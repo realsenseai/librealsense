@@ -388,9 +388,13 @@ namespace librealsense
         depth_ep->register_processing_block({ {RS2_FORMAT_W10} }, { {RS2_FORMAT_RAW10, RS2_STREAM_INFRARED, 1} }, []() { return std::make_shared<w10_converter>(RS2_FORMAT_RAW10); });
         depth_ep->register_processing_block({ {RS2_FORMAT_W10} }, { {RS2_FORMAT_Y10BPACK, RS2_STREAM_INFRARED, 1} }, []() { return std::make_shared<w10_converter>(RS2_FORMAT_Y10BPACK); });
 
-        depth_ep->register_processing_block( processing_block_factory::create_pbf_vector< uyvy_converter >( RS2_FORMAT_UYVY,
-                                                                                                            map_supported_color_formats( RS2_FORMAT_UYVY ),
+        //depth_ep->register_processing_block( processing_block_factory::create_pbf_vector< uyvy_converter >( RS2_FORMAT_UYVY,
+        //                                                                                                    map_supported_color_formats( RS2_FORMAT_UYVY ),
+        //                                                                                                    RS2_STREAM_INFRARED ) );
+        depth_ep->register_processing_block( processing_block_factory::create_pbf_vector< m420_converter >( RS2_FORMAT_M420,
+                                                                                                            map_supported_color_formats( RS2_FORMAT_M420 ),
                                                                                                             RS2_STREAM_INFRARED ) );
+
 
         return depth_ep;
     }
