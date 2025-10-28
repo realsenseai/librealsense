@@ -4,6 +4,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 # View the makefile commands during build
 #set(CMAKE_VERBOSE_MAKEFILE on)
 
+macro(use_cxx14)
+  if (CMAKE_VERSION VERSION_LESS "3.1")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++14")
+    else()
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+    endif()
+  else()
+    set(CMAKE_CXX_STANDARD 14)
+  endif()
+endmacro(use_cxx14)
+use_cxx14()
+
 include(GNUInstallDirs)
 # include librealsense helper macros
 include(CMake/lrs_macros.cmake)
