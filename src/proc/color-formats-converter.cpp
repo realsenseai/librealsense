@@ -6,6 +6,7 @@
 #include "option.h"
 #include "image-avx.h"
 #include "image.h"
+#include <opencv2/opencv.hpp>
 
 #define STB_IMAGE_STATIC
 #define STB_IMAGE_IMPLEMENTATION
@@ -784,6 +785,55 @@ namespace librealsense
             break;
         }
     }
+    // --- Rectification parameters for one camera ---
+    struct RectificationParams
+    {
+        cv::Mat cameraMatrix;
+        cv::Mat distCoeffs;
+        cv::Mat R;
+        cv::Mat newCamMat;
+        cv::Size imageSize;
+    };
+
+    void rectify( uint8_t * const d[], const uint8_t * s, int width, int height, int actual_size )
+    {
+        static bool first_time = true;
+        static cv::Mat map1, map2;
+        static cv::Mat rectified;
+        if( first_time )
+        {
+            RectificationParams params;
+            params.cameraMatrix = ( cv::Mat_< double >( 3, 3 ) << 649.6231, 0, 636.1855, 0, 648.288, 402.3958, 0, 0, 1 );
+            params.distCoeffs = ( cv::Mat_< double >( 1, 5 ) << -0.052214, 0.060396, 0.00053593, -0.0014044, -0.018184 );
+            params.R = ( cv::Mat_< double >( 3, 3 ) << 
+                         0.999949436295546, 0.002088371842696, -0.009836846815234,
+                         -0.002097318108441, 0.999997396311540, -8.992368395849524e-04,
+                         0.009834943262254, 9.198223677947176e-04, 0.999951212718821 );
+            params.newCamMat = ( cv::Mat_< double >( 3, 3 ) << 650.6063, 0, 638.5314, 0, 650.6063, 363.5143, 0, 0, 1 );
+            params.imageSize = cv::Size( 1280, 800 );
+
+            // Preallocate buffer
+            rectified.create( cv::Size( 1280, 800 ), CV_8UC3 );
+
+            // Precompute undistort/rectify maps
+            cv::initUndistortRectifyMap( params.cameraMatrix, params.distCoeffs, params.R,
+                                         params.newCamMat, params.imageSize, CV_16SC2, map1, map2 );
+
+            first_time = false;
+        }
+        
+        if( true )
+        {
+            // Remap to rectified image
+            cv::Mat rgbBuffer( height, width, CV_8UC3, const_cast< uint8_t * >( s ) ); // Uses the data without copying it
+            cv::remap( rgbBuffer, rectified, map1, map2, cv::INTER_LINEAR );
+            memcpy( d[0], rectified.data, actual_size );
+        }
+        else
+        {
+            memcpy( d[0], s, actual_size );
+        }
+    }
 
     void unpack_m420(rs2_format dst_format, rs2_stream dst_stream, uint8_t * const d[], const uint8_t * s, int w, int h, int actual_size)
     {
@@ -797,7 +847,11 @@ namespace librealsense
             unpack_m420<RS2_FORMAT_Y16>(d, s, w, h, actual_size);
             break;
         case RS2_FORMAT_RGB8:
-            unpack_m420<RS2_FORMAT_RGB8>(d, s, w, h, actual_size);
+            uint8_t * unrectified_rgb[1];
+            unrectified_rgb[0] = new uint8_t[w * h * 3];
+            unpack_m420< RS2_FORMAT_RGB8 >( unrectified_rgb, s, w, h, actual_size );
+            rectify( d, unrectified_rgb[0], w, h, actual_size );
+            delete[] unrectified_rgb[0];
             break;
         case RS2_FORMAT_RGBA8:
             unpack_m420<RS2_FORMAT_RGBA8>(d, s, w, h, actual_size);
