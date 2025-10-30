@@ -384,8 +384,8 @@ void uvc_sensor::start( rs2_frame_callback_sptr callback )
     else if( ! _is_opened )
         throw wrong_api_call_sequence_exception( "start_streaming(...) failed. UVC device was not opened!" );
 
-    raise_on_before_streaming_changes( true );  // Required to be just before actual start allow recording to work
     _source.set_callback( callback );
+    raise_on_before_streaming_changes( true );  // Required to be just before actual start allow recording to work
     _is_streaming = true;
     _device->start_callbacks();
 }
