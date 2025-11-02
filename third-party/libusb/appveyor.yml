@@ -1,0 +1,108 @@
+version: 1.0.{build}
+image:
+  - Visual Studio 2013
+  - Visual Studio 2015
+  - Visual Studio 2017
+  - Visual Studio 2019
+  - Visual Studio 2022
+platform:
+  - Win32
+  - x64
+configuration:
+  - Debug
+  - Release
+environment:
+  toolset: UNK
+clone_depth: 1
+build:
+  parallel: true
+for:
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2013
+    environment:
+      toolset: v120
+    build:
+      project: msvc\libusb.sln
+
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2015
+          configuration: Debug
+    environment:
+      toolset: v140
+    build:
+      project: msvc\libusb.sln
+
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2015
+          platform: Win32
+          configuration: Release
+    environment:
+      toolset: v140
+    install:
+      - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\msys64\home\appveyor\libusb
+      - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\cygwin\home\appveyor\libusb
+    build_script:
+      - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+      - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" MinGW
+      - cmd: C:\cygwin\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" cygwin
+    after_build:
+      - cmd: 7z a "libusb-build_%APPVEYOR_BUILD_WORKER_IMAGE%_%PLATFORM%_%CONFIGURATION%.7z" tag_* README-build.txt build\%TOOLSET%\%PLATFORM%\%CONFIGURATION%\dll build\%TOOLSET%\%PLATFORM%\%CONFIGURATION%\lib build\%TOOLSET%\%PLATFORM%\%CONFIGURATION%\*.exe C:\msys64\home\appveyor\libusb-MinGW-Win32 C:\cygwin\home\appveyor\libusb-cygwin-Win32
+
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2015
+          platform: x64
+          configuration: Release
+    environment:
+      toolset: v140
+    install:
+      - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\msys64\home\appveyor\libusb
+      - cmd: xcopy /S /I "%APPVEYOR_BUILD_FOLDER%" C:\cygwin64\home\appveyor\libusb
+    build_script:
+      - cmd: msbuild "%APPVEYOR_BUILD_FOLDER%\msvc\libusb.sln" /m /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+      - cmd: C:\msys64\usr\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" MinGW
+      - cmd: C:\cygwin64\bin\bash -l "%APPVEYOR_BUILD_FOLDER%\.private\appveyor_build.sh" cygwin
+    after_build:
+      - cmd: 7z a "libusb-build_%APPVEYOR_BUILD_WORKER_IMAGE%_%PLATFORM%_%CONFIGURATION%.7z" tag_* README-build.txt build\%TOOLSET%\%PLATFORM%\%CONFIGURATION%\dll build\%TOOLSET%\%PLATFORM%\%CONFIGURATION%\lib build\%TOOLSET%\%PLATFORM%\%CONFIGURATION%\*.exe C:\msys64\home\appveyor\libusb-MinGW-x64 C:\cygwin64\home\appveyor\libusb-cygwin-x64
+
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2017
+    environment:
+      toolset: v141
+    build:
+      project: msvc\libusb.sln
+
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2019
+    environment:
+      toolset: v142
+    build:
+      project: msvc\libusb.sln
+
+  -
+    matrix:
+      only:
+        - image: Visual Studio 2022
+    environment:
+      toolset: v143
+    build:
+      project: msvc\libusb.sln
+
+after_build:
+  - cmd: ECHO This was built by %APPVEYOR_BUILD_WORKER_IMAGE% from %APPVEYOR_REPO_NAME% commit %APPVEYOR_REPO_COMMIT% > README-build.txt
+  - cmd: ECHO > tag_%APPVEYOR_REPO_TAG_NAME%_commit_%APPVEYOR_REPO_COMMIT%
+  - cmd: 7z a "libusb-build_%APPVEYOR_BUILD_WORKER_IMAGE%_%PLATFORM%_%CONFIGURATION%.7z" tag_* README-build.txt build\%TOOLSET%\%PLATFORM%\%CONFIGURATION%\dll build\%TOOLSET%\%PLATFORM%\%CONFIGURATION%\lib build\%TOOLSET%\%PLATFORM%\%CONFIGURATION%\*.exe
+
+artifacts:
+  - path: "libusb-build_%APPVEYOR_BUILD_WORKER_IMAGE%_%PLATFORM%_%CONFIGURATION%.7z"

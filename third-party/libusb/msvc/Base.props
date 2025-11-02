@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <LibusbRootDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))\</LibusbRootDir>
+    <IntDir>$(LibusbRootDir)build\$(PlatformToolset)\$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(IntDir)..\</OutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <!--ClCompile Base-->
+    <ClCompile>
+      <AdditionalIncludeDirectories>.;..\libusb;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_WIN32_WINNT=_WIN32_WINNT_VISTA;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <!--Treat sources as utf-8-->
+      <AdditionalOptions Condition="'$(PlatformToolsetVersion)'&gt;'120'">/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <DiagnosticsFormat>Caret</DiagnosticsFormat>
+    </ClCompile>
+    <!--ClCompile Debug*-->
+    <ClCompile Condition="$(Configuration.StartsWith('Debug'))">
+      <Optimization>Disabled</Optimization>
+    </ClCompile>
+    <ClCompile Condition="$(Configuration.StartsWith('Debug')) And '$(EnableASAN)'=='true'">
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+    </ClCompile>
+    <!--ClCompile Release*-->
+    <ClCompile Condition="$(Configuration.StartsWith('Release'))">
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OmitFramePointers>true</OmitFramePointers>
+      <StringPooling>true</StringPooling>
+      <AdditionalOptions>/Gw %(AdditionalOptions)</AdditionalOptions>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+    </ClCompile>
+    <!--Link Base-->
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
+    </Link>
+    <!--Link Release*-->
+    <Link Condition="$(Configuration.StartsWith('Release'))">
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <AdditionalDependencies>kernel32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <!--Link Base:Application-->
+    <Link Condition="'$(ConfigurationType)'=='Application'">
+      <SubSystem>Console</SubSystem>
+    </Link>
+    <Lib>
+      <TreatLibWarningAsErrors>true</TreatLibWarningAsErrors>
+      <LinkTimeCodeGeneration>true</LinkTimeCodeGeneration>
+    </Lib>
+  </ItemDefinitionGroup>
+</Project>

@@ -1,0 +1,202 @@
+Copyright © 2001 Johannes Erdfelt <johannes@erdfelt.com>
+Copyright © 2007-2009 Daniel Drake <dsd@gentoo.org>
+Copyright © 2010-2012 Peter Stuge <peter@stuge.se>
+Copyright © 2008-2016 Nathan Hjelm <hjelmn@users.sourceforge.net>
+Copyright © 2009-2013 Pete Batard <pete@akeo.ie>
+Copyright © 2009-2013 Ludovic Rousseau <ludovic.rousseau@gmail.com>
+Copyright © 2010-2012 Michael Plante <michael.plante@gmail.com>
+Copyright © 2011-2013 Hans de Goede <hdegoede@redhat.com>
+Copyright © 2012-2013 Martin Pieuchot <mpi@openbsd.org>
+Copyright © 2012-2013 Toby Gray <toby.gray@realvnc.com>
+Copyright © 2013-2018 Chris Dickens <christopher.a.dickens@gmail.com>
+
+Other contributors:
+Aaron Luft
+Adam Korcz
+Adrian Bunk
+Adrien Destugues
+Akshay Jaggi
+Alan Ott
+Alan Stern
+Aleksandr Mezin
+Alexander Pyhalov
+Alexander Schlarb
+Alexander Stein
+Alex Vatchenko
+Andrew Aldridge
+Andrew Fernandes
+Andrew Goodney
+Andy Chunyu
+Andy McFadden
+Angus Gratton
+Anil Nair
+Ankur Verma
+Anthony Clay
+Antonio Ospite
+Artem Egorkine
+Aurelien Jarno
+Axel Gembe
+Aymeric Vincent
+Baruch Siach
+Bastien Nocera
+Bei Zhang
+Bence Csokas
+Benjamin Berg
+Benjamin Dobell
+Bohdan Tymkiv
+Brent Rector
+Bruno Harbulot
+Carl Karsten
+Christophe Zeitouny
+Chris Zhu
+Chunyu Xie
+Colin Walters
+Craig Hutchinson
+Dave Camarillo
+David Engraf
+Davidlohr Bueso
+David Moore
+Dmitry Fleytman
+Dmitry Kostjuchenko
+Dmitry Zakablukov
+Doug Johnston
+Evan Hunter
+Evan Miller
+Fabrice Fontaine
+Federico Manzan
+Felipe Balbi
+Florian Albrechtskirchinger
+Francesco Montorsi
+Francisco Facioni
+Frank Li
+Frederik Carlier
+Freek Dijkstra
+Gaurav Gupta
+Graeme Gill
+Greg Kroah-Hartman
+Gustavo Zacarias
+Haidong Zheng
+Hans Ulrich Niedermann
+Harry Mallon
+Hector Martin
+Hoi-Ho Chan
+Ido Yariv
+Igor Anokhin
+Ihor Dutchak
+Ilya Konstantinov
+Jakub Klama
+James Hanko
+Jeffrey Nichols
+Jie Zhang
+Jim Chen
+Johann Richard
+John Keeping
+John Sheu
+Jonas Malaco
+Jonathon Jongsma
+Joost Muller
+Josh Gao
+Joshua Blake
+Joshua Hou
+Juan Cruz Viotti
+Julian Scheel
+Justin Bischoff
+Karsten Koenig
+Keith Ahluwalia
+Kenjiro Tsuji
+Kimura Masaru
+Konrad Rzepecki
+Kuangye Guo
+Lars Kanis
+Lars Wirzenius
+Lei Chen
+Léo Lam
+Liang Yunwang
+Luca Longinotti
+Luz Paz
+Mac Wang
+Marco Trevisan (Treviño)
+Marcus Meissner
+Mark Kuo
+Markus Heidelberg
+Martin Ettl
+Martin Koegler
+Martin Ling
+Martin Thierer
+Mathias Hjärtström
+Matthew Stapleton
+Matthias Bolte
+Michael Dickens
+Michel Zou
+Mike Frysinger
+Mikhail Gusarov
+Mikolaj Kucharski
+Morgan Leborgne
+Moritz Fischer
+Nancy Li
+Nia Alarie
+Nicholas Corgan
+Omri Iluz
+Orin Eman
+Ozkan Sezer
+Patrick Stewart
+Paul Cercueil
+Paul Fertser
+Paul Qureshi
+Pekka Nikander
+Philémon Favrod
+Pino Toscano
+Rob Walker
+Romain Vimont
+Roman Kalashnikov
+Ryan Hileman
+Ryan Schmidt
+Saleem Rashid
+Sameeh Jubran
+Sean McBride
+Sebastian Pipping
+Sebastian von Ohr
+Sergey Serb
+Shawn Hoffman
+Simon Haggett
+Simon Newton
+Slash Gordon
+Stefan Agner
+Stefan Tauner
+Steinar H. Gunderson
+Stephen Groat
+Theo Buehler
+Thomas Röfer
+Tim Hutt
+Tim Roberts
+Tobias Klauser
+Toby Peterson
+Tormod Volden
+Trygve Laugstøl
+Uri Lublin
+Uwe Bonnes
+Vasily Khoruzhick
+Vegard Storheil Eriksen
+Venkatesh Shukla
+Vianney le Clément de Saint-Marcq
+Victor Toso
+Vinicius Tinti
+Vitali Lovich
+Vladimir Beloborodov
+William Orr
+William Skellenger
+Xiaofan Chen
+Yegor Yefremov
+Zhiqiang Liu
+Zoltán Kovács
+Сергей Валерьевич
+Ларионов Даниил
+Роман Донченко
+jonner
+orbitcowboy
+osy
+parafin
+RipleyTom
+Seneral
+saur0n
+winterrace
