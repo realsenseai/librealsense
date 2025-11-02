@@ -89,3 +89,4 @@ librealsense-log.txt
 *.cxx
 
 .vscode/*
+third-party/libusb/*
