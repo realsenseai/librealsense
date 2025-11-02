@@ -23,6 +23,7 @@
 #include "proc/color-formats-converter.h"
 #include "proc/y8i-to-y8y8.h"
 #include "proc/y16i-10msb-to-y16y16.h"
+#include <src/proc/rectification-filter.h>
 
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
@@ -135,7 +136,20 @@ namespace librealsense
 
     processing_blocks d500_depth_sensor::get_recommended_processing_blocks() const
     {
-        return get_ds_depth_recommended_proccesing_blocks();
+        auto res = get_ds_depth_recommended_proccesing_blocks();
+
+        std::string dev_name = _owner->get_info( RS2_CAMERA_INFO_NAME );
+        if( dev_name.find( "D555" ) != std::string::npos )
+        {
+            auto * table = reinterpret_cast< librealsense::ds::d500_coefficients_table * >( _owner->get_calibration_table().data() );
+
+            res.push_back( std::make_shared< rectification_filter >( table->left_coefficients_table.base_instrinsics,
+                                                                     table->left_coefficients_table.distortion_coeffs,
+                                                                     table->left_coefficients_table.rotation_matrix,
+                                                                     table->rectified_intrinsics ) );
+        }
+        
+        return res;
     }
 
     rs2_intrinsics d500_depth_sensor::get_intrinsics( const stream_profile & profile ) const
