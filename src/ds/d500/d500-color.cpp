@@ -13,6 +13,7 @@
 #include "platform/platform-utils.h"
 #include <src/metadata-parser.h>
 #include <src/ds/ds-thermal-monitor.h>
+#include <src/proc/rectification-filter.h>
 
 #include <src/ds/features/auto-exposure-roi-feature.h>
 
@@ -248,6 +249,32 @@ namespace librealsense
 
     processing_blocks d500_color_sensor::get_recommended_processing_blocks() const
     {
-        return get_color_recommended_proccesing_blocks();
+        auto res = get_color_recommended_proccesing_blocks();
+
+        std::string dev_name = _owner->get_info( RS2_CAMERA_INFO_NAME );
+        if( dev_name.find( "D555" ) != std::string::npos )
+        {
+            std::vector< uint8_t > table_scope = _owner->get_calibration_table(); // Hold data, table returns as temporary
+            auto table = ds::check_calib< ds::d500_coefficients_table >( table_scope );
+            float3x3 base_intrinsics = {0};
+            base_intrinsics( 0, 0 ) = table->right_coefficients_table.base_instrinsics.fx;
+            base_intrinsics( 1, 1 ) = table->right_coefficients_table.base_instrinsics.fy;
+            base_intrinsics( 2, 0 ) = table->right_coefficients_table.base_instrinsics.ppx;
+            base_intrinsics( 2, 1 ) = table->right_coefficients_table.base_instrinsics.ppy;
+            base_intrinsics( 2, 2 ) = 1;
+            std::vector< float > coeffs{ table->right_coefficients_table.distortion_coeffs,
+                                         table->right_coefficients_table.distortion_coeffs + 5 }; // Using just first 5 coefficients
+            float3x3 rotation = table->right_coefficients_table.rotation_matrix;  // Remove const
+            float3x3 rectified_intrinsics = { 0 };
+            rectified_intrinsics( 0, 0 ) = table->rectified_intrinsics.fx;
+            rectified_intrinsics( 1, 1 ) = table->rectified_intrinsics.fy;
+            rectified_intrinsics( 2, 0 ) = table->rectified_intrinsics.ppx;
+            rectified_intrinsics( 2, 1 ) = table->rectified_intrinsics.ppy;
+            rectified_intrinsics( 2, 2 ) = 1;
+            res.push_back( std::make_shared< rectification_filter >( RS2_STREAM_COLOR, base_intrinsics, coeffs, rotation, rectified_intrinsics,
+                                                                     table->rectified_intrinsics.image_width, table->rectified_intrinsics.image_height ) );
+        }
+
+        return res;
     }
 }

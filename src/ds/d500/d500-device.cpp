@@ -141,12 +141,26 @@ namespace librealsense
         std::string dev_name = _owner->get_info( RS2_CAMERA_INFO_NAME );
         if( dev_name.find( "D555" ) != std::string::npos )
         {
-            auto * table = reinterpret_cast< librealsense::ds::d500_coefficients_table * >( _owner->get_calibration_table().data() );
-
-            res.push_back( std::make_shared< rectification_filter >( table->left_coefficients_table.base_instrinsics,
-                                                                     table->left_coefficients_table.distortion_coeffs,
-                                                                     table->left_coefficients_table.rotation_matrix,
-                                                                     table->rectified_intrinsics ) );
+            std::vector< uint8_t > table_scope = _owner->get_calibration_table(); // Hold data, table returns as temporary
+            auto table = ds::check_calib< ds::d500_coefficients_table >( table_scope );
+            //auto * table = reinterpret_cast< ds::d500_coefficients_table * >( _owner->get_calibration_table().data() );
+            float3x3 base_intrinsics = {0};
+            base_intrinsics( 1, 1 ) = table->left_coefficients_table.base_instrinsics.fy;
+            base_intrinsics( 2, 0 ) = table->left_coefficients_table.base_instrinsics.ppx;
+            base_intrinsics( 2, 1 ) = table->left_coefficients_table.base_instrinsics.ppy;
+            base_intrinsics( 0, 0 ) = table->left_coefficients_table.base_instrinsics.fx;
+            base_intrinsics( 2, 2 ) = 1;
+            std::vector< float > coeffs{ table->left_coefficients_table.distortion_coeffs,
+                                         table->left_coefficients_table.distortion_coeffs + 5 }; // Using just first 5 coefficients
+            float3x3 rotation = table->left_coefficients_table.rotation_matrix; // Remove const
+            float3x3 rectified_intrinsics = { 0 };
+            rectified_intrinsics( 0, 0 ) = table->rectified_intrinsics.fx;
+            rectified_intrinsics( 1, 1 ) = table->rectified_intrinsics.fy;
+            rectified_intrinsics( 2, 0 ) = table->rectified_intrinsics.ppx;
+            rectified_intrinsics( 2, 1 ) = table->rectified_intrinsics.ppy;
+            rectified_intrinsics( 2, 2 ) = 1;
+            res.push_back( std::make_shared< rectification_filter >( RS2_STREAM_INFRARED, base_intrinsics, coeffs, rotation, rectified_intrinsics,
+                                                                     table->rectified_intrinsics.image_width, table->rectified_intrinsics.image_height ) );
         }
         
         return res;
