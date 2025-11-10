@@ -1,4 +1,4 @@
-# This branch is the root branch for the SDK API documantation:
+# This branch is the root branch for the SDK API documentation:
 
 **Doxygen (C++ docs) is available [here](https://intelrealsense.github.io/librealsense/doxygen/annotated.html)**
 
