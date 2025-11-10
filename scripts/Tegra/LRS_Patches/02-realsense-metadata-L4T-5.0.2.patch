@@ -1,18 +1,18 @@
-From ebead177b193c29765c36b5d9b2f2a7defa7adaa Mon Sep 17 00:00:00 2001
+From ff91c889746b45c0e10dad0469755c657f63aa04 Mon Sep 17 00:00:00 2001
 From: Dmitry Perchanov <dmitry.perchanov@intel.com>
 Date: Thu, 24 Nov 2022 18:57:46 +0200
 Subject: [PATCH] Enabling UVC Metadata attributes with L4T 5.0.2 Ubuntu 20.04.
  Kernel 5.10
 
 ---
- drivers/media/usb/uvc/uvc_driver.c | 261 +++++++++++++++++++++++++++++
- 1 file changed, 261 insertions(+)
+ drivers/media/usb/uvc/uvc_driver.c | 270 +++++++++++++++++++++++++++++
+ 1 file changed, 270 insertions(+)
 
 diff --git a/drivers/media/usb/uvc/uvc_driver.c b/drivers/media/usb/uvc/uvc_driver.c
-index 8ed019b26e76..443bfedb516b 100644
+index 8ed019b26..dfdc2b047 100644
 --- a/drivers/media/usb/uvc/uvc_driver.c
 +++ b/drivers/media/usb/uvc/uvc_driver.c
-@@ -3350,6 +3350,267 @@ static const struct usb_device_id uvc_ids[] = {
+@@ -3350,6 +3350,276 @@ static const struct usb_device_id uvc_ids[] = {
  	  .bInterfaceSubClass	= 1,
  	  .bInterfaceProtocol	= 0,
  	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
@@ -268,11 +268,20 @@ index 8ed019b26e76..443bfedb516b 100644
 +	  .bInterfaceSubClass	= 1,
 +	  .bInterfaceProtocol	= 0,
 +	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
-+	 /* Intel D421 */
++	  /* Intel D421 */
 +	{ .match_flags		= USB_DEVICE_ID_MATCH_DEVICE
 +				| USB_DEVICE_ID_MATCH_INT_INFO,
 +	  .idVendor			= 0x8086,
 +	  .idProduct		= 0x1155,
++	  .bInterfaceClass	= USB_CLASS_VIDEO,
++	  .bInterfaceSubClass	= 1,
++	  .bInterfaceProtocol	= 0,
++	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
++	  /* Intel D436 */
++	{ .match_flags		= USB_DEVICE_ID_MATCH_DEVICE
++				| USB_DEVICE_ID_MATCH_INT_INFO,
++	  .idVendor			= 0x8086,
++	  .idProduct		= 0x1156,
 +	  .bInterfaceClass	= USB_CLASS_VIDEO,
 +	  .bInterfaceSubClass	= 1,
 +	  .bInterfaceProtocol	= 0,

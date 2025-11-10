@@ -583,7 +583,10 @@ void output_model::draw(ux_window& win, rect view_rect, device_models_list & dev
 
 
         ImGui::SetCursorPos(ImVec2(7, h - ImGui::GetTextLineHeightWithSpacing() - 2));
-        ImGui::Text("%s", textual_icons::minus_square_o); ImGui::SameLine();
+        std::string minus_square_icon_str = std::string(rsutils::string::from()
+                            << textual_icons::minus_square_o);
+        ImGui::Text("%s", minus_square_icon_str.c_str());
+        ImGui::SameLine();
         ImGui::SetCursorPos(ImVec2(30, h - ImGui::GetTextLineHeightWithSpacing() - 4));
 
 

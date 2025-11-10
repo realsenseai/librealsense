@@ -2716,7 +2716,7 @@ namespace rs2
                         std::string excl_icon_str = std::string(rsutils::string::from()
                             << textual_icons::exclamation_triangle
                             << " Using GLSL for processing but not for rendering can reduce CPU utilisation, but is likely to hurt overall performance!");
-                        ImGui::Text(excl_icon_str.c_str());
+                        ImGui::Text("%s", excl_icon_str.c_str());
                         ImGui::PopStyleColor();
                     }
 #endif
@@ -2974,7 +2974,7 @@ namespace rs2
                     std::string excl_icon_str = std::string(rsutils::string::from() 
                         << textual_icons::exclamation_triangle 
                         << " DDS changes will take effect only after restarting the application");
-                    ImGui::Text(excl_icon_str.c_str());
+                    ImGui::Text("%s", excl_icon_str.c_str());
                     ImGui::PopStyleColor();
 
                 }
@@ -3052,7 +3052,7 @@ namespace rs2
                     std::string excl_icon_str = std::string(rsutils::string::from()
                         << textual_icons::exclamation_triangle
                         << " The application will be restarted in order for new settings to take effect");
-                    ImGui::Text(excl_icon_str.c_str());
+                    ImGui::Text("%s", excl_icon_str.c_str());
                     ImGui::PopStyleColor();
                 }
 

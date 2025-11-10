@@ -430,7 +430,9 @@ namespace rs2
                                     ImGui::SetCursorPos({ pos.x + 57, pos.y + bar_spacing * (i - j) + 14 });
                                     ImGui::PushStyleColor(ImGuiCol_Text,
                                         blend(blend(light_grey, alpha), distance_guide ? 1.f : fade_factor));
-                                    ImGui::Text(textual_icons::angle_right);
+                                    std::string angle_right_str = std::string(rsutils::string::from()
+                            << textual_icons::angle_right);
+                                    ImGui::Text("%s", angle_right_str.c_str());
                                     ImGui::PopStyleColor();
                                 }
                             }
@@ -445,7 +447,8 @@ namespace rs2
                                     ImGui::SetCursorPos({ pos.x + 57, pos.y + bar_spacing * (i + j) + 14 });
                                     ImGui::PushStyleColor(ImGuiCol_Text,
                                         blend(blend(light_grey, alpha), distance_guide ? 1.f : fade_factor));
-                                    ImGui::Text(textual_icons::angle_left);
+                                    std::string angle_left_str = std::string(rsutils::string::from() << textual_icons::angle_left);
+                                    ImGui::Text("%s", angle_left_str.c_str());
                                     ImGui::PopStyleColor();
                                 }
                             }
@@ -1240,7 +1243,9 @@ namespace rs2
                 auto col0 = ImGui::GetCursorPos();
                 ImGui::SetCursorPosX(left_x);
                 ImGui::PushFont(win.get_large_font());
-                ImGui::Text(textual_icons::angle_double_up);
+                std::string angle_double_up_str = std::string(rsutils::string::from()
+                            << textual_icons::angle_double_up);
+                ImGui::Text("%s", angle_double_up_str.c_str());
                 if (ImGui::IsItemHovered())
                 {
                     RsImGui::CustomTooltip("This metric shows positive trend");
@@ -1256,7 +1261,9 @@ namespace rs2
                 auto col0 = ImGui::GetCursorPos();
                 ImGui::SetCursorPosX(left_x);
                 ImGui::PushFont(win.get_large_font());
-                ImGui::Text(textual_icons::angle_double_down);
+                std::string angle_double_down_str = std::string(rsutils::string::from()
+                            << textual_icons::angle_double_down);
+                ImGui::Text("%s", angle_double_down_str.c_str());
                 if (ImGui::IsItemHovered())
                 {
                     RsImGui::CustomTooltip("This metric shows negative trend");
