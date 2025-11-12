@@ -7,6 +7,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <string>
 
 #include <media/ros/ros_file_format.h>
 #include <src/core/frame-interface.h>
@@ -16,11 +17,26 @@
 namespace librealsense {
 
 class frame_source; // forward declaration
+class context; // forward declaration to allow ctor with context pointer
+
+// Bring commonly used device_serializer types into librealsense namespace so existing
+// playback code that relied on previous header using-directives continues to compile
+using device_serializer::nanoseconds;
+using device_serializer::device_snapshot;
+using device_serializer::serialized_data;
+using device_serializer::serialized_frame;
+using device_serializer::serialized_invalid_frame;
+using device_serializer::serialized_option;
+using device_serializer::serialized_notification;
+using device_serializer::serialized_end_of_file;
 
 class ros2_reader : public device_serializer::reader
 {
 public:
     explicit ros2_reader( std::shared_ptr< rosbag2_storage::storage_interfaces::ReadOnlyInterface > storage );
+    // Overload matching legacy usage: constructed with filename & context. For now, if no storage
+    // is provided we operate as empty (EOF immediately).
+    ros2_reader( const std::string & file_name, std::shared_ptr< context > const & ctx );
 
     device_serializer::device_snapshot query_device_description( const device_serializer::nanoseconds & ) override;
     std::shared_ptr< device_serializer::serialized_data > read_next_data() override;
@@ -43,7 +59,7 @@ private:
     std::string _file;
     bool _initialized = false;
     std::vector< rosbag2_storage::SerializedBagMessage > _messages; // in-memory list (simple implementation) 
-    size_t _cursor = 0;
+    size_t _cursor =0;
 };
 
 }

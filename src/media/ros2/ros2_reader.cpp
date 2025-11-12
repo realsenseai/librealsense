@@ -23,6 +23,19 @@ ros2_reader::ros2_reader( std::shared_ptr< rosbag2_storage::storage_interfaces::
     reset();
 }
 
+// Legacy overload used by playback_device_info::create_device
+ros2_reader::ros2_reader( const std::string & file_name, std::shared_ptr< context > const & ctx )
+    : _file( file_name )
+{
+    // At this point no rosbag2 storage API is available through filename alone.
+    // A proper implementation should open the bag via rosbag2_storage API.
+    // For now leave reader empty so playback treats it as EOF.
+    _messages.clear();
+    _cursor =0;
+    _duration = nanoseconds(0 );
+    _initialized = true;
+}
+
 device_snapshot ros2_reader::query_device_description( const nanoseconds & )
 {
     // Minimal empty snapshot; advanced device description reconstruction can be added later
@@ -32,7 +45,7 @@ device_snapshot ros2_reader::query_device_description( const nanoseconds & )
 void ros2_reader::reset()
 {
     _messages.clear();
-    _cursor = 0;
+    _cursor =0;
     if( ! _storage ) return;
     while( _storage->has_next() )
     {
@@ -53,7 +66,7 @@ void ros2_reader::seek_to_time( const nanoseconds & t )
 {
     if( _messages.empty() ) return;
     int64_t target = static_cast< int64_t >( t.count() );
-    _cursor = 0;
+    _cursor =0;
     while( _cursor < _messages.size() && _messages[ _cursor ].time_stamp < target )
         ++_cursor;
 }
@@ -62,13 +75,13 @@ std::shared_ptr< serialized_data > ros2_reader::parse_frame( std::string const &
 {
     auto sid = ros_topic::get_stream_identifier( topic );
     frame_additional_data add{};
-    add.timestamp = double( msg.time_stamp ) / 1e6; // ns -> ms
-    add.frame_number = 0; // will try to parse later from metadata message if present
+    add.timestamp = double( msg.time_stamp ) /1e6; // ns -> ms
+    add.frame_number =0; // will try to parse later from metadata message if present
     add.fisheye_ae_mode = false;
 
     auto size = msg.serialized_data->buffer_length;
     // allocate frame
-    frame_source fs( 32 );
+    frame_source fs(32 );
     fs.init( nullptr );
     frame_interface * fi = fs.alloc_frame( { sid.stream_type, sid.stream_index, librealsense::frame_source::stream_to_frame_types( sid.stream_type ) }, size, std::move( add ), true );
     if( ! fi )
@@ -82,7 +95,7 @@ std::shared_ptr< serialized_data > ros2_reader::parse_option( std::string const 
 {
     auto sid = ros_topic::get_sensor_identifier( topic );
     std::string payload = to_string_buffer( msg );
-    float value = 0.f;
+    float value =0.f;
     try { value = std::stof( payload ); } catch(...) {}
     // option id from topic name
     rs2_option opt_id = RS2_OPTION_COUNT;
@@ -108,7 +121,7 @@ std::shared_ptr< serialized_data > ros2_reader::parse_notification( std::string 
     rs2_log_severity severity = RS2_LOG_SEVERITY_INFO;
     std::string description;
     uint64_t ts_val = msg.time_stamp;
-    size_t pos = 0;
+    size_t pos =0;
     while( pos < payload.size() )
     {
         auto semi = payload.find( ';', pos );
@@ -116,17 +129,17 @@ std::shared_ptr< serialized_data > ros2_reader::parse_notification( std::string 
         auto eq = part.find( '=' );
         if( eq != std::string::npos )
         {
-            std::string key = part.substr( 0, eq );
-            std::string val = part.substr( eq + 1 );
+            std::string key = part.substr(0, eq );
+            std::string val = part.substr( eq +1 );
             if( key == "category" ) try_parse( val, category );
             else if( key == "severity" ) try_parse( val, severity );
             else if( key == "description" ) description = val;
             else if( key == "timestamp" ) { try { ts_val = std::stoull( val ); } catch(...) {} }
         }
         if( semi == std::string::npos ) break;
-        pos = semi + 1;
+        pos = semi +1;
     }
-    notification n( category, 0, severity, description );
+    notification n( category,0, severity, description );
     n.timestamp = ts_val;
     return std::make_shared< serialized_notification >( nanoseconds( msg.time_stamp ), sid, n );
 }

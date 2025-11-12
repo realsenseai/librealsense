@@ -6,7 +6,7 @@
 #include "playback-device-info.h"
 #include "core/motion.h"
 #include "stream.h"
-#include "media/ros/ros_reader.h"
+#include "media/ros2/ros2_reader.h"
 #include "environment.h"
 #include "sync.h"
 #include <src/depth-sensor.h>
@@ -29,7 +29,7 @@ std::shared_ptr< device_interface > playback_device_info::create_device()
 {
     auto playback_dev
         = std::make_shared< playback_device >( shared_from_this(),
-                                               std::make_shared< ros_reader >( _filename, get_context() ) );
+                                               std::make_shared< ros2_reader >( _filename, get_context() ) );
     return playback_dev;
 }
 

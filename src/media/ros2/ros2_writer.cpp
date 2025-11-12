@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
+#include "rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp"
 
 namespace librealsense {
 using namespace device_serializer;
@@ -31,12 +32,13 @@ ros2_writer::ros2_writer( const std::string & file_path, bool enable_compression
     opts.max_bagfile_duration = 0;
     opts.max_cache_size = 0;
 
-    rosbag2_storage::StorageFactory factory;
-    _storage = factory.open_read_write( file_path, storage_id );
+    // Direct instantiation - no factory, no plugin loading
+    _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
+    _storage->open( file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_WRITE );
+
     if( ! _storage )
         throw std::runtime_error( rsutils::string::from() << "Failed to open rosbag2 storage for uri '" << file_path
                                                           << "' using storage id '" << storage_id << "'" );
-
     _file = file_path.empty() ? _storage->get_relative_file_path() : file_path;
 
     ensure_topic( ros_topic::file_version_topic(), "librealsense/file_version" );
