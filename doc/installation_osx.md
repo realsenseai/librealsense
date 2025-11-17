@@ -2,6 +2,21 @@
 
 **Note:** macOS support for the full range of functionality offered by the SDK is not yet complete. If you need support for R200 or the ZR300, [legacy librealsense](https://github.com/IntelRealSense/librealsense/tree/legacy) offers a subset of SDK functionality.
 
+## macOS 12+ (Monterey) and newer
+
+ **sudo** required for USB access. On macOS 12+ most librealsense tools that use libusb must be run with elevated privileges. This is due to macOS USB security changes and overriding the default UVC driver.
+```bash
+# examples
+sudo examples/rs-multicam
+sudo examples/rs-enumerate-devices
+sudo examples/rs-hello-realsense
+sudo examples/rs-depth
+ ```
+
+**Current Limitations:**
+- **RealSense Viewer is not supported** on macOS in the current release
+- **Motion sensors (IMU) are disabled** on macOS in the current release
+
 ## Building from Source
 
 1. Install CommandLineTools `sudo xcode-select --install` or download XCode 6.0+ via the AppStore

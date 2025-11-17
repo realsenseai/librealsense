@@ -54,6 +54,7 @@ namespace librealsense
             _device_capabilities, _hw_monitor); 
         _ds_motion_common->init_motion(hid_infos.empty(), *_depth_stream);
 
+#if !defined(__APPLE__) // Motion sensors not supported on macOS
         // Try to add HID endpoint
         auto hid_ep = create_hid_device( dev_info->get_context(), dev_info->get_group().hid_devices );
         if (hid_ep)
@@ -63,6 +64,7 @@ namespace librealsense
             // HID metadata attributes
             hid_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
         }
+#endif
     }
 
     void d500_motion::register_stream_to_extrinsic_group(const stream_interface& stream, uint32_t group_index)
