@@ -3,7 +3,7 @@
 
 #include "profile.h"
 #include "media/record/record_device.h"
-#include "media/ros/ros_writer.h"
+#include "media/ros2/ros2_writer.h"
 
 namespace librealsense
 {
@@ -19,7 +19,7 @@ namespace librealsense
                 if (!dev)
                     throw librealsense::invalid_value_exception("Failed to create a profile, device is null");
 
-                _dev = std::make_shared<record_device>(dev, std::make_shared<ros_writer>(to_file, dev->compress_while_record()));
+                _dev = std::make_shared<record_device>(dev, std::make_shared<ros2_writer>(to_file, dev->compress_while_record()));
             }
             _multistream = config.resolve(_dev.get());
         }
