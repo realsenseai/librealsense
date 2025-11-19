@@ -6,7 +6,7 @@
 #include "stream.h"
 #include "media/playback/playback_device.h"
 #include "media/record/record_device.h"
-#include "media/ros/ros_writer.h"
+//#include "media/ros/ros_writer.h"
 #include <src/proc/syncer-processing-block.h>
 #include <src/core/frame-callback.h>
 #ifdef BUILD_WITH_DDS
