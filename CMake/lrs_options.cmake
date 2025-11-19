@@ -56,4 +56,5 @@ option(BUILD_RS2_ALL "Build realsense2-all static bundle containing all realsens
 option(ENABLE_SECURITY_FLAGS "Enable additional compiler security flags to enhance the build's security" OFF)
 option(USE_EXTERNAL_LZ4 "Use externally build LZ4 library instead of building and using the in this repo provided version" OFF)
 option(BUILD_ASAN "Enable AddressSanitizer" OFF)
+option(BUILD_ROSBAG2 "Build rosbag2 third-party components" ON) # temporary flag, should be removed when fully integrated
 mark_as_advanced(BUILD_ASAN)
