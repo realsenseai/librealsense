@@ -94,6 +94,9 @@ namespace librealsense
                 std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(ds_timestamp_reader_metadata), _tf_keeper, enable_global_time_option)),
                 this);
 
+            // Many commands need power during initialization phase, no point turning it on and off again for each.
+            raw_color_ep->power_for_duration( std::chrono::milliseconds( 1000 ) );
+
             auto color_ep = std::make_shared<d400_color_sensor>(this,
                 raw_color_ep,
                 d400_color_fourcc_to_rs2_format,

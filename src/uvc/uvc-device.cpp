@@ -79,11 +79,12 @@ namespace librealsense
             return nullptr;
         }
 
-        rs_uvc_device::rs_uvc_device(const rs_usb_device& usb_device, const uvc_device_info &info, uint8_t usb_request_count) :
-                _usb_device(usb_device),
-                _info(info),
-                _action_dispatcher(10),
-                _usb_request_count(usb_request_count)
+        rs_uvc_device::rs_uvc_device( const rs_usb_device & usb_device, const uvc_device_info & info, uint8_t usb_request_count )
+            : _info( info )
+            , _power_counter( 0 )
+            , _usb_device( usb_device )
+            , _usb_request_count( usb_request_count )
+            , _action_dispatcher( 10 )
         {
             _parser = std::make_shared<uvc_parser>(usb_device, info);
             _action_dispatcher.start();
@@ -174,28 +175,53 @@ namespace librealsense
             {
                 if(state != _power_state)
                 {
+                    std::lock_guard< std::recursive_mutex > lock( _power_lock );
                     switch(state)
                     {
                         case D0:
-                            _messenger = _usb_device->open(static_cast<uint8_t>(_info.mi));
-                            if (_messenger)
+                            if( _power_counter.fetch_add( 1 ) == 0 )
                             {
-                                try{
-                                    listen_to_interrupts();
-                                } catch(const std::exception& exception) {
-                                    // this exception catching avoids crash when disconnecting 2 devices at once - bug seen in android os
-                                    LOG_WARNING("rs_uvc_device exception in listen_to_interrupts method: " << exception.what());
+                                try
+                                {
+                                    _messenger = _usb_device->open(static_cast<uint8_t>(_info.mi));
+                                    if (_messenger)
+                                    {
+                                        try
+                                        {
+                                            listen_to_interrupts();
+                                        }
+                                        catch(const std::exception& exception)
+                                        {
+                                            // this exception catching avoids crash when disconnecting 2 devices at once - bug seen in android os
+                                            LOG_WARNING("rs_uvc_device exception in listen_to_interrupts method: " << exception.what());
+                                        }
+                                        _power_state = D0;
+                                    }
                                 }
-                                _power_state = D0;
+                                //In case of failure need to decrease use counter
+                                catch( std::exception const & e )
+                                {
+                                    _power_counter.fetch_add( -1 );
+                                    throw e;
+                                }
+                                catch( ... )
+                                {
+                                    _power_counter.fetch_add( -1 );
+                                    throw;
+                                }
                             }
+                            
                             break;
                         case D3:
-                            if(_messenger)
+                            if( _power_counter.fetch_add( -1 ) == 1 )
                             {
-                                close_uvc_device();                            
-                                _messenger.reset();
+                                if( _messenger )
+                                {
+                                    close_uvc_device();
+                                    _messenger.reset();
+                                }
+                                _power_state = D3;
                             }
-                            _power_state = D3;
                             break;
                     }
                 }
@@ -208,12 +234,6 @@ namespace librealsense
         power_state rs_uvc_device::get_power_state() const
         {
             return _power_state;
-        }
-
-        void rs_uvc_device::init_xu(const extension_unit& xu)
-        {
-            // not supported
-            return;
         }
 
         bool rs_uvc_device::set_xu(const extension_unit& xu, uint8_t ctrl, const uint8_t* data, int len)

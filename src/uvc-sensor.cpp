@@ -31,7 +31,6 @@ uvc_sensor::uvc_sensor( std::string const & name,
                         device * dev )
     : super( name, dev )
     , _device( std::move( uvc_device ) )
-    , _user_count( 0 )
     , _timestamp_reader( std::move( timestamp_reader ) )
     , _gyro_counter(0)
     , _accel_counter(0)
@@ -372,7 +371,7 @@ void uvc_sensor::finished_bulk_operation()
 
 void uvc_sensor::register_xu( platform::extension_unit xu )
 {
-    _xus.push_back( std::move( xu ) );
+    _device->register_xu( std::move( xu ) );
 }
 
 
@@ -413,49 +412,35 @@ void uvc_sensor::reset_streaming()
 
 void uvc_sensor::acquire_power()
 {
-    std::lock_guard< std::mutex > lock( _power_lock );
-    if( _user_count.fetch_add( 1 ) == 0 )
+    try
     {
-        try
-        {
-            _device->set_power_state( platform::D0 );
-            for( auto && xu : _xus )
-                _device->init_xu( xu );
-        }
-        catch( std::exception const & e )
-        {
-            _user_count.fetch_add( -1 );
-            LOG_ERROR( "acquire_power failed: " << e.what() );
-            throw;
-        }
-        catch( ... )
-        {
-            _user_count.fetch_add( -1 );
-            LOG_ERROR( "acquire_power failed" );
-            throw;
-        }
+        _device->set_power_state( platform::D0 );
+    }
+    catch( std::exception const & e )
+    {
+        LOG_ERROR( "acquire_power failed: " << e.what() );
+        throw;
+    }
+    catch( ... )
+    {
+        LOG_ERROR( "acquire_power failed" );
+        throw;
     }
 }
 
 void uvc_sensor::release_power()
 {
-    std::lock_guard< std::mutex > lock( _power_lock );
-    if( _user_count.fetch_add( -1 ) == 1 )
+    try
     {
-        try
-        {
-            _device->set_power_state( platform::D3 );
-        }
-        catch( std::exception const & e )
-        {
-            // TODO may need to change the user-count?
-            LOG_ERROR( "release_power failed: " << e.what() );
-        }
-        catch( ... )
-        {
-            // TODO may need to change the user-count?
-            LOG_ERROR( "release_power failed" );
-        }
+        _device->set_power_state( platform::D3 );
+    }
+    catch( std::exception const & e )
+    {
+        LOG_ERROR( "release_power failed: " << e.what() );
+    }
+    catch( ... )
+    {
+        LOG_ERROR( "release_power failed" );
     }
 }
 

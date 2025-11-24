@@ -128,7 +128,7 @@ public:
     virtual void set_power_state( power_state state ) = 0;
     virtual power_state get_power_state() const = 0;
 
-    virtual void init_xu( const extension_unit & xu ) = 0;
+    virtual void register_xu( platform::extension_unit && xu ) = 0;
     virtual bool set_xu( const extension_unit & xu, uint8_t ctrl, const uint8_t * data, int len ) = 0;
     virtual bool get_xu( const extension_unit & xu, uint8_t ctrl, uint8_t * data, int len ) const = 0;
     virtual control_range get_xu_range( const extension_unit & xu, uint8_t ctrl, int len ) const = 0;
@@ -183,7 +183,7 @@ public:
 
     power_state get_power_state() const override { return _dev->get_power_state(); }
 
-    void init_xu( const extension_unit & xu ) override { _dev->init_xu( xu ); }
+    void register_xu( platform::extension_unit && xu ) override { _dev->register_xu( std::move( xu ) ); }
 
     bool set_xu( const extension_unit & xu, uint8_t ctrl, const uint8_t * data, int len ) override
     {
@@ -313,7 +313,7 @@ public:
 
     power_state get_power_state() const override { return _dev.front()->get_power_state(); }
 
-    void init_xu( const extension_unit & xu ) override { _dev.front()->init_xu( xu ); }
+    void register_xu( platform::extension_unit && xu ) override { _dev.front()->register_xu( std::move( xu ) ); }
 
     bool set_xu( const extension_unit & xu, uint8_t ctrl, const uint8_t * data, int len ) override
     {
