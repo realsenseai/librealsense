@@ -48,14 +48,14 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC
         ${ROSBAG2_COMPILE_FLAGS}
 )
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0)
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0) # GCC 13 and above require cstdint to be included for stdint types
     target_compile_options(realsense-file PRIVATE
       $<$<COMPILE_LANGUAGE:CXX>:-std=c++14>
       $<$<COMPILE_LANGUAGE:CXX>:-include cstdint>
       $<$<COMPILE_LANGUAGE:C>:-include stdint.h>
     )
-    target_link_libraries(realsense-file PRIVATE stdc++fs)
   endif()
+  target_link_libraries(realsense-file PRIVATE stdc++fs)
 endif()
 
 
@@ -63,9 +63,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         $<$<BOOL:${USE_EXTERNAL_LZ4}>:lz4::lz4>
 )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC
+target_link_libraries(${PROJECT_NAME} PRIVATE
         yaml-cpp
-        SQLite3
+        #SQLite3 # configured in external_sqlite3.cmake
 )
 
 #set_target_properties(${PROJECT_NAME} PROPERTIES VERSION "${LIBVERSION}" SOVERSION "${LIBSOVERSION}")
