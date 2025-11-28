@@ -242,14 +242,12 @@ namespace rs2
                     out << new_verts[i].x << " ";
                     out << new_verts[i].y << " ";
                     out << new_verts[i].z << " ";
-                    out << "\n";
 
                     if (mesh && use_normals)
                     {
                         out << normals[i].x << " ";
                         out << normals[i].y << " ";
                         out << normals[i].z << " ";
-                        out << "\n";
                     }
 
                     if (use_texcoords)
@@ -257,8 +255,8 @@ namespace rs2
                         out << unsigned(new_tex[i][0]) << " ";
                         out << unsigned(new_tex[i][1]) << " ";
                         out << unsigned(new_tex[i][2]) << " ";
-                        out << "\n";
                     }
+                    out << "\n";
                 }
                 if (mesh)
                 {
