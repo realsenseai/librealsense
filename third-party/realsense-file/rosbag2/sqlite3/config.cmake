@@ -166,31 +166,31 @@ function(get_sqlite3)
         WINDOWS_EXPORT_ALL_SYMBOLS ON # For Windows DLLs - our custom addition
     )
 
-    # install(TARGETS SQLite3
-    #     EXPORT sqlite3-targets
-    #     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    #     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    #     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    #     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    # )
-	# 
-    # install(EXPORT sqlite3-targets
-    #     FILE sqlite3-targets.cmake
-    #     NAMESPACE SQLite::
-    #     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/sqlite3
-    # )
-	# 
-    # write_basic_package_version_file(
-    #     ${CMAKE_CURRENT_BINARY_DIR}/sqlite3-config-version.cmake
-    #     VERSION ${PROJECT_VERSION}
-    #     COMPATIBILITY AnyNewerVersion
-    # )
-	# 
-    # install(FILES
-    #     ${CMAKE_CURRENT_BINARY_DIR}/sqlite3-config-version.cmake
-    #     ${CMAKE_CURRENT_SOURCE_DIR}/sqlite3-config.cmake
-    #     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/sqlite3
-    # )
+    install(TARGETS SQLite3
+        EXPORT sqlite3-targets
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+
+    install(EXPORT sqlite3-targets
+        FILE sqlite3-targets.cmake
+        NAMESPACE SQLite::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/sqlite3
+    )
+
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/sqlite3-config-version.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY AnyNewerVersion
+    )
+
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/sqlite3-config-version.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/sqlite3-config.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/sqlite3
+    )
 endfunction()
 
 get_sqlite3()
