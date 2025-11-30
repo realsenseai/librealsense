@@ -13,8 +13,8 @@
 #include "core/extension.h"
 #include "media/playback/playback-device-info.h"
 #include "media/record/record_device.h"
-#include <media/ros/ros_writer.h>
-#include <media/ros/ros_reader.h>
+#include <media/ros2/ros2_writer.h>
+#include <media/ros2/ros2_reader.h>
 #include "core/advanced_mode.h"
 #include "core/pose-frame.h"
 #include "core/motion-frame.h"
@@ -2247,7 +2247,7 @@ rs2_device* rs2_create_record_device_ex(const rs2_device* device, const char* fi
     VALIDATE_NOT_NULL(file);
 
     return new rs2_device({
-        std::make_shared<record_device>(device->device, std::make_shared<ros_writer>(file, compression_enabled != 0))
+        std::make_shared<record_device>(device->device, std::make_shared<ros2_writer>(file, compression_enabled != 0))
         });
 }
 HANDLE_EXCEPTIONS_AND_RETURN(nullptr, device, file)
