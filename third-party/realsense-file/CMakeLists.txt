@@ -65,7 +65,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         yaml-cpp
-        SQLite3 # configured in external_sqlite3.cmake
+        #SQLite3 # configured in external_sqlite3.cmake
 )
 
 #set_target_properties(${PROJECT_NAME} PROPERTIES VERSION "${LIBVERSION}" SOVERSION "${LIBSOVERSION}")
