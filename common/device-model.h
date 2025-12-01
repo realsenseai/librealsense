@@ -427,6 +427,8 @@ namespace rs2
         calibration_model _calib_model;
         dds_model _dds_model;
         hdr_model _hdr_model;
+
+        bool _is_d500_device;
     };
 
     std::pair<std::string, std::string> get_device_name(const device& dev);
