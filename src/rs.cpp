@@ -911,8 +911,9 @@ void rs2_set_option(const rs2_options* options, rs2_option option, float value, 
         if (range.min != range.max && range.step)
             VALIDATE_RANGE(value, range.min, range.max);
         if ((int)value != value)
-            throw invalid_value_exception(rsutils::string::from() << "not an integer: " << value);
-        option_ref.set(value);
+            LOG_WARNING("Float value " << value << " given to integer option " << rs2_get_option_name(options, option, error)
+                << ", truncating to " << (int)value);
+        option_ref.set((int)value);
         break;
 
     case RS2_OPTION_TYPE_BOOLEAN:

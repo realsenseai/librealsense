@@ -80,6 +80,7 @@ public:
     bool is_ready() const { return state_t::READY == _state; }
 
     void open( const dds_stream_profiles & profiles );
+    void close( const dds_stream_profiles & profiles );
 
     void write_control_message( rsutils::json const &, rsutils::json * reply = nullptr );
 
@@ -140,10 +141,13 @@ private:
     void on_set_filter(rsutils::json const&, dds_sample const&);
     void on_query_filter(rsutils::json const&, dds_sample const&);
 
+    void add_profiles_to_json( const realdds::dds_stream_profiles & profiles, rsutils::json & profiles_as_json ) const;
+
     on_metadata_available_signal _on_metadata_available;
     on_device_log_signal _on_device_log;
     on_notification_signal _on_notification;
     on_calibration_changed_signal _on_calibration_changed;
+    dds_stream_profiles _open_profiles_list;
 };
 
 

@@ -261,13 +261,8 @@ dds_sensor_proxy::find_profile( sid_index sidx, realdds::dds_motion_stream_profi
 }
 
 
-void dds_sensor_proxy::open( const stream_profiles & profiles )
+realdds::dds_stream_profiles dds_sensor_proxy::find_dds_profiles( const librealsense::stream_profiles & source_profiles ) const
 {
-    _formats_converter.prepare_to_convert( profiles );
-    _active_converted_profiles = profiles;
-    const auto & source_profiles = _formats_converter.get_active_source_profiles();
-    // TODO - register processing block options?
-
     realdds::dds_stream_profiles realdds_profiles;
     for( size_t i = 0; i < source_profiles.size(); ++i )
     {
@@ -275,25 +270,19 @@ void dds_sensor_proxy::open( const stream_profiles & profiles )
         sid_index sidx( sp->get_unique_id(), sp->get_stream_index() );
         if( auto const vsp = As< video_stream_profile >( sp ) )
         {
-            auto video_profile = find_profile(
-                sidx,
-                realdds::dds_video_stream_profile( sp->get_framerate(),
-                                                   realdds::dds_video_encoding::from_rs2( sp->get_format() ),
-                                                   vsp->get_width(),
-                                                   vsp->get_height() ) );
+            auto video_profile = find_profile( sidx, 
+                                               realdds::dds_video_stream_profile( sp->get_framerate(),
+                                                                                  realdds::dds_video_encoding::from_rs2( sp->get_format() ),
+                                                                                  vsp->get_width(),
+                                                                                  vsp->get_height() ) );
             if( video_profile )
-            {
                 realdds_profiles.push_back( video_profile );
-                calculate_bandwidth( vsp );
-            }
             else
                 LOG_ERROR( "no profile found in stream for rs2 profile " << vsp );
         }
         else if( Is< motion_stream_profile >( sp ) )
         {
-            auto motion_profile = find_profile(
-                sidx,
-                realdds::dds_motion_stream_profile( source_profiles[i]->get_framerate() ) );
+            auto motion_profile = find_profile( sidx, realdds::dds_motion_stream_profile( source_profiles[i]->get_framerate() ) );
             if( motion_profile )
                 realdds_profiles.push_back( motion_profile );
             else
@@ -305,23 +294,38 @@ void dds_sensor_proxy::open( const stream_profiles & profiles )
         }
     }
 
+    return realdds_profiles;
+}
+
+void dds_sensor_proxy::open( const stream_profiles & profiles )
+{
+    _formats_converter.prepare_to_convert( profiles );
+    _active_converted_profiles = profiles;
+    const auto & source_profiles = _formats_converter.get_active_source_profiles();
+    // TODO - register processing block options?
+
+    for( size_t i = 0; i < source_profiles.size(); ++i )
+        if( auto const vsp = As< video_stream_profile >( source_profiles[i] ) )
+            log_bandwidth( vsp );
+
     try
     {
+        software_sensor::open( source_profiles ); // Call before send to device to check SDK conditions (not open/streaming/etc...)
         if( source_profiles.size() > 0 )
         {
+            realdds::dds_stream_profiles realdds_profiles = find_dds_profiles( source_profiles );
             _dev->open( realdds_profiles );
         }
-
-        software_sensor::open( source_profiles );
     }
     catch( realdds::dds_runtime_error const & e )
     {
+        software_sensor::close();
         throw invalid_value_exception( e.what() );
     }
 }
 
 
-void dds_sensor_proxy::calculate_bandwidth( const std::shared_ptr< video_stream_profile > & vsp )
+void dds_sensor_proxy::log_bandwidth( const std::shared_ptr< video_stream_profile > & vsp ) const
 {
     size_t width = vsp->get_width();
     size_t height = vsp->get_height();
@@ -632,8 +636,19 @@ void dds_sensor_proxy::stop()
 
 void dds_sensor_proxy::close()
 {
-    software_sensor::close();
-    _active_converted_profiles.clear();
+    const auto & source_profiles = _formats_converter.get_active_source_profiles();
+    realdds::dds_stream_profiles realdds_profiles = find_dds_profiles( source_profiles );
+
+    try
+    {
+        software_sensor::close();
+        _dev->close( realdds_profiles );
+        _active_converted_profiles.clear();
+    }
+    catch( realdds::dds_runtime_error const & e )
+    {
+        throw invalid_value_exception( e.what() );
+    }
 }
 
 

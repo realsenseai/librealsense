@@ -1332,10 +1332,10 @@ namespace rs2
 
     bool subdevice_model::is_multiple_resolutions_supported() const
     {
-        std::string product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
+        std::string product_name = dev.get_info(RS2_CAMERA_INFO_NAME);
         std::string sensor_name = s->get_info(RS2_CAMERA_INFO_NAME);
-
-        return product_line == "D500" && sensor_name == "Stereo Module";
+        
+        return product_name.find("D585S") != std::string::npos && sensor_name == "Stereo Module";
     }
 
     std::pair<int, int> subdevice_model::get_max_resolution(rs2_stream stream) const

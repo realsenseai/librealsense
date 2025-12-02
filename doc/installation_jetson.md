@@ -97,7 +97,7 @@ See [building-from-source-using-native-backend](https://github.com/realsenseai/l
 
 The method was verified with **Jetson AGX Thor™** with JetPack 7.0 (beta level), **Jetson AGX Orin™** with JetPack 6.0, **Jetson AGX Xavier™** boards with JetPack **5.0.2**[L4T 35.1.0].
 
-For **Jetson Nano™** setup, please see the following user instructions [NVIDIA Jetson Nano with RealSense Depth Camera Using ROS2 Humble | by Kabilankb | May, 2024 | Medium](https://medium.com/@kabilankb2003/nvidia-jetson-nano-with-intel-realsense-depth-camera-using-ros2-humble-c5926566a4d9)
+For **Jetson Nano™** setup, please see the following user instructions [NVIDIA Jetson Nano with RealSense Depth Camera Using ROS2 Humble | by Kabilankb | May, 2024 | Medium](https://medium.com/@kabilankb2003/nvidia-jetson-nano-with-intel-realsense-depth-camera-using-ros2-humble-c5926566a4d8)
 
 
 * **Prerequisite**

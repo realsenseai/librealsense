@@ -1046,16 +1046,17 @@ void lrs_device_controller::fill_ros2_node_entities( realdds::topics::ros2::node
 
 bool lrs_device_controller::on_open_streams( json const & control, json & reply )
 {
-    // Note that this function is called "start-streaming" but it's really a response to "open-streams" so does not
-    // actually start streaming. It simply sets and locks in which streams should be open when streaming starts.
+    // Note this function is a response to "open-streams" so does not actually start streaming.
+    // It simply sets and locks in which streams should be open when streaming starts.
     // This effectively lets one control _specifically_ which streams should be streamable, and nothing else: if left
     // out, a sensor is reset back to its default state using implicit stream selection.
     // (For example, the 'Stereo Module' sensor controls Depth, IR1, IR2: but turning on all 3 has performance
     // implications and may not be desirable. So you can open only Depth and IR1/2 will stay inactive...)
-    if( control.nested( topics::control::open_streams::key::reset ).default_value( true ) )
+    if( control.nested( topics::control::open_streams::key::reset ).default_value( false ) )
         _bridge.reset();
 
-    auto const & msg_profiles = control[topics::control::open_streams::key::stream_profiles];
+    json msg_profiles;
+    control.nested( topics::control::open_streams::key::stream_profiles ).get_ex( msg_profiles ); // Might be an empty list
     for( auto const & name2profile : msg_profiles.items() )
     {
         std::string const & stream_name = name2profile.key();

@@ -78,6 +78,7 @@ public:
     size_t foreach_option( std::function< void( std::shared_ptr< dds_option > option ) > fn ) const;
 
     void open( const dds_stream_profiles & profiles );
+    void close( const dds_stream_profiles & profiles );
 
     void set_option_value( const std::shared_ptr< dds_option > & option, rsutils::json new_value );
     rsutils::json query_option_value( const std::shared_ptr< dds_option > & option );

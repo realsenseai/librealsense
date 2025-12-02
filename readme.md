@@ -20,6 +20,15 @@ The SDK allows depth and color streaming, and provides intrinsic and extrinsic c
   <a href="https://github.com/realsenseai/librealsense/network/members"><img src="https://img.shields.io/github/forks/realsenseai/librealsense.svg" alt="Forks"></a>
 </p>
 
+## Important Notice
+
+We are happy to announce that the RealSense GitHub repositories have been successfully migrated to the RealSenseAI organization.
+Please make sure to update your links to the new RealSenseAI organization for both cloning the repositories and accessing specific files within them.
+
+[https://github.com/**IntelRealSense**/librealsense](https://github.com/IntelRealSense/librealsense) --> [https://github.com/**realsenseai**/librealsense](https://github.com/realsenseai/librealsense)
+
+Note: A redirection from the previous name IntelRealSense is currently in place, but we cannot guarantee how long it will remain active. We recommend that all users update their references to point to the new GitHub location.
+
 ## Use Cases
 
 Below are some of the many real-world applications powered by RealSense technology:

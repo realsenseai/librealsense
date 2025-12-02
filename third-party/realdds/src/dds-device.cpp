@@ -192,6 +192,12 @@ void dds_device::open( const dds_stream_profiles & profiles )
     _impl->open( profiles );
 }
 
+void dds_device::close( const dds_stream_profiles & profiles )
+{
+    wait_until_ready( 0 );  // throw if not
+    _impl->close( profiles );
+}
+
 void dds_device::set_option_value( const std::shared_ptr< dds_option > & option, json new_value )
 {
     wait_until_ready( 0 );  // throw if not
