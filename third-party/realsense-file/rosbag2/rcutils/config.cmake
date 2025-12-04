@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.10)
 
+if(UNIX AND NOT APPLE)
+  include(${CMAKE_CURRENT_LIST_DIR}/cmake/check_c_compiler_uses_glibc.cmake)
+  check_c_compiler_uses_glibc(USES_GLIBC)
+  if(USES_GLIBC)
+    # Ensure GNU extended libc API is used, as C++ test code will.
+    # See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=2082.
+    set(ROSBAG2_COMPILE_FLAGS "${ROSBAG2_COMPILE_FLAGS};_GNU_SOURCE")
+  endif()
+endif()
+
 if(WIN32)
   set(time_impl_c time_win32.c)
 else()

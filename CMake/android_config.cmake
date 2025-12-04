@@ -16,7 +16,7 @@ macro(os_set_flags)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-switch -Wno-multichar")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fPIE -pie")
     set(HWM_OVER_XU ON)
-    
+	
     if(FORCE_RSUSB_BACKEND)
         set(BACKEND RS2_USE_ANDROID_BACKEND)
         set(IMPORT_DEPTH_CAM_FW OFF)
