@@ -1,10 +1,6 @@
 
 cmake_minimum_required(VERSION 3.10)
 
-if (ANDROID)
-    set(ANDROID_PLATFORM 24 CACHE STRING "Android API level" FORCE) # see wrappers/android/build.gradle, needed for rosbag2\rcutils\src\process.c to run getprogname()
-endif()
-
 set( LRS_TARGET realsense2 )
 project( ${LRS_TARGET} LANGUAGES CXX C )
 

@@ -57,22 +57,7 @@ char * rcutils_get_executable_name(rcutils_allocator_t allocator)
   RCUTILS_CHECK_ALLOCATOR_WITH_MSG(
     &allocator, "invalid allocator", return NULL);
 
-#if defined __APPLE__ || defined __FreeBSD__ || (defined __ANDROID__ && __ANDROID_API__ >= 21)
-  const char * appname = getprogname();
-#elif defined __GNUC__ && !defined(__QNXNTO__)
-  const char * appname = program_invocation_name;
-#elif defined _WIN32 || defined __CYGWIN__
-  char appname[MAX_PATH];
-  int32_t size = GetModuleFileNameA(NULL, appname, MAX_PATH);
-  if (size == 0) {
-    return NULL;
-  }
-#elif defined __QNXNTO__
-  extern char * __progname;
-  const char * appname = __progname;
-#else
-#error "Unsupported OS"
-#endif
+  const char* appname = "realsense";
 
   size_t applen = strlen(appname);
 
