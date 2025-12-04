@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-if(UNIX AND NOT APPLE)
+if((UNIX AND NOT APPLE) OR ANDROID)
   include(${CMAKE_CURRENT_LIST_DIR}/cmake/check_c_compiler_uses_glibc.cmake)
   check_c_compiler_uses_glibc(USES_GLIBC)
   if(USES_GLIBC)

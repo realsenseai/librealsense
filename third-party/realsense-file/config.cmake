@@ -17,7 +17,9 @@ FetchContent_Declare(
 # Disable yaml-cpp's uninstall target
 #set(YAML_CPP_DISABLE_UNINSTALL ON CACHE BOOL "" FORCE)
 
+set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
 FetchContent_MakeAvailable(yaml-cpp)
+unset(CMAKE_POLICY_VERSION_MINIMUM)
 
 list(APPEND ROSBAG_HEADER_DIRS ${ROSBAG2_HEADER_DIRS})
 list(APPEND SOURCE_FILES_ROSBAG ${SOURCE_FILES_ROSBAG2})
