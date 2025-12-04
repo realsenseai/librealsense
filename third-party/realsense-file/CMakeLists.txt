@@ -55,7 +55,6 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       $<$<COMPILE_LANGUAGE:C>:-include stdint.h>
     )
   endif()
-  target_link_libraries(realsense-file PRIVATE stdc++fs)
 endif()
 
 
