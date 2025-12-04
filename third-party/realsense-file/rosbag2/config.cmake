@@ -4,7 +4,7 @@ if(NOT BUILD_ROSBAG2)
 endif()
 
 
-set(CMAKE_CXX_STANDARD 14)
+#set(CMAKE_CXX_STANDARD 14)
 
 # -- zstd --
 file(GLOB_RECURSE ZSTD_SOURCES
