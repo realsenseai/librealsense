@@ -59,9 +59,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 if (ANDROID)
-  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -stdlib=libc++")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -stdlib=libc++")
   target_link_libraries(realsense-file PRIVATE c++_experimental)
-  # Or try: target_link_libraries(realsense-file PRIVATE c++fs)
+  target_link_libraries(realsense-file PRIVATE c++fs)
 endif()
 
 
