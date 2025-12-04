@@ -599,8 +599,8 @@ jobs:
       shell: bash
       run: |
         mkdir build
-        wget https://dl.google.com/android/repository/android-ndk-r20b-linux-x86_64.zip;
-        unzip -q android-ndk-r20b-linux-x86_64.zip -d ./;
+        wget https://dl.google.com/android/repository/android-ndk-r23c-linux.zip;
+        unzip -q android-ndk-r23c-linux.zip -d ./;
         sudo apt-get update;
         sudo apt-get install -qq build-essential xorg-dev libgl1-mesa-dev libglu1-mesa-dev libglew-dev libglm-dev;
         sudo apt-get install -qq libusb-1.0-0-dev;
