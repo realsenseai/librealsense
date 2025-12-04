@@ -35,43 +35,6 @@
 #ifndef PLUGINLIB__IMPL__FILESYSTEM_HELPER_HPP_
 #define PLUGINLIB__IMPL__FILESYSTEM_HELPER_HPP_
 
-
-#if defined(__has_include)
-# if __has_include(<filesystem>) && __cplusplus >= 201703L
-#  include <filesystem>
-
-namespace pluginlib
-{
-namespace impl
-{
-namespace fs = std::filesystem;
-}  // namespace impl
-}  // namespace pluginlib
-
-#  define PLUGINLIB__IMPL__FILESYSYEM_HELPER__HAS_STD_FILESYSTEM
-# elif __has_include(<experimental/filesystem>)
-// MSVC deprecates <experimental/filesystem> and in favor of <filesystem>
-// use this macro to acknowledge this deprecation and unblock the build break
-#  define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
-// Clang 9.0 deprecates experimental/filesystem in favor of C++17's
-// std::filesystem. Since pluginlib currently targets C++14 but needs to
-// support recent clang releases this acknowledges and suppresses the
-// deprecation error.
-#  define _LIBCPP_NO_EXPERIMENTAL_DEPRECATION_WARNING_FILESYSTEM
-#  include <experimental/filesystem>
-
-namespace pluginlib
-{
-namespace impl
-{
-namespace fs = std::experimental::filesystem;
-}  // namespace impl
-}  // namespace pluginlib
-
-#  define PLUGINLIB__IMPL__FILESYSYEM_HELPER__HAS_STD_FILESYSTEM
-# endif
-#endif
-
 // The standard library does not provide it, so emulate it.
 #ifndef PLUGINLIB__IMPL__FILESYSYEM_HELPER__HAS_STD_FILESYSTEM
 
