@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(realsense-file)
 
 set(ROSBAG2_COMPILE_FLAGS)
-include(config.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/config.cmake)
 
 FILE(GLOB_RECURSE AllSources
         ${ROSBAG_DIR}/*.h
@@ -64,7 +64,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         yaml-cpp
-        #SQLite3 # configured in external_sqlite3.cmake
 )
 
 #set_target_properties(${PROJECT_NAME} PROPERTIES VERSION "${LIBVERSION}" SOVERSION "${LIBSOVERSION}")

@@ -17,18 +17,8 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/ros/ros_reader.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros/ros_writer.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros/ros_file_format.h"
-        # ROS2 bag (rosbag2 storage) minimal reader/writer
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.cpp"
-)
-
-# Include paths for rosbag2 storage (third-party vendor drop)
-target_include_directories(${LRS_TARGET}
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/third-party/realsense-file/rosbag2/rosbag2_storage/include
-        ${CMAKE_SOURCE_DIR}/third-party/realsense-file/rosbag2/rosbag2_storage_default_plugins/include
-        ${CMAKE_SOURCE_DIR}/third-party/realsense-file/rosbag2/rcutils/include
-        ${CMAKE_SOURCE_DIR}/third-party/realsense-file/rosbag2/rcpputils/include
 )
