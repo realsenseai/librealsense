@@ -1,6 +1,11 @@
 set(SQLITE3_VERSION "3.49.1")
 set(SQLITE3_DOWNLOAD_URL "https://sqlite.org/2025/sqlite-amalgamation-3490100.zip")
 
+
+if(POLICY CMP0135) # suppress warning for cmake 3.24+
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 include(FetchContent)
 FetchContent_Declare(sqlite3_ext URL ${SQLITE3_DOWNLOAD_URL})
 FetchContent_MakeAvailable(sqlite3_ext)
