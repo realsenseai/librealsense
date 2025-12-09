@@ -152,6 +152,7 @@ class TestConfigFromText( TestConfig ):
     Configuration for a test -- from any text-based syntax with a given prefix, e.g. for python:
         #test:usb2
         #test:device L500* D400*
+        #test:device D400_CAM_SYNC    # requires 2x D400 devices (excludes D405)
         #test:retries 3
         #test:priority 0
     And, for C++ the prefix could be:
