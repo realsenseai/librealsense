@@ -23,6 +23,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/rosbag2_compression/config.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/console_bridge/config.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/class_loader/config.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/ament_index_cpp/config.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/yaml_cpp/config.cmake)
 # Temporary workaround as we reach here twice for some reason...
 if(NOT TARGET SQLite3)
     include(${CMAKE_CURRENT_LIST_DIR}/sqlite3/config.cmake)
@@ -38,7 +39,6 @@ set(HEADER_FILES_ROSBAG2
     ${HEADER_FILES_ROSBAG2_STORAGE}
     ${HEADER_FILES_ROSBAG2_STORAGE_DEFAULT_PLUGINS}
     ${HEADER_FILES_TINYXML2}
-    ${HEADER_FILES_SQLITE3}
     ${ZSTD_HEADERS}
 )
 
@@ -52,7 +52,6 @@ set(SOURCE_FILES_ROSBAG2
     ${SOURCE_FILES_ROSBAG2_STORAGE}
     ${SOURCE_FILES_ROSBAG2_STORAGE_DEFAULT_PLUGINS}
     ${SOURCE_FILES_TINYXML2}
-    ${SOURCE_FILES_SQLITE3}
     ${ZSTD_SOURCES}
 )
 
@@ -66,5 +65,4 @@ set(ROSBAG2_HEADER_DIRS
     ${CMAKE_CURRENT_LIST_DIR}/rosbag2_storage/include/
     ${CMAKE_CURRENT_LIST_DIR}/rosbag2_storage_default_plugins/include/
     ${CMAKE_CURRENT_LIST_DIR}/tinyxml2/
-    ${HEADER_DIR_SQLITE3}
 )

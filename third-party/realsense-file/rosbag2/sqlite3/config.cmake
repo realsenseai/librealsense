@@ -6,20 +6,17 @@ if(POLICY CMP0135) # suppress warning for cmake 3.24+
     cmake_policy(SET CMP0135 NEW)
 endif()
 
-include(FetchContent)
-FetchContent_Declare(sqlite3_ext URL ${SQLITE3_DOWNLOAD_URL})
-FetchContent_MakeAvailable(sqlite3_ext)
+if (NOT TARGET sqlite3)
+    ExternalProject_Add(sqlite3
+        URL ${SQLITE3_DOWNLOAD_URL}
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ""
+    )
+endif()
 
-# Just set the variable with the main sqlite3 source and header files
-set(SOURCE_FILES_SQLITE3 
-    ${sqlite3_ext_SOURCE_DIR}/sqlite3.c
-)
-
-set(HEADER_FILES_SQLITE3 
-    ${sqlite3_ext_SOURCE_DIR}/sqlite3.h
-    ${sqlite3_ext_SOURCE_DIR}/sqlite3ext.h
-)
-
+ExternalProject_Get_Property(sqlite3 SOURCE_DIR)
+set(sqlite3_SOURCE_DIR ${SOURCE_DIR})
 set(HEADER_DIR_SQLITE3 
-    ${sqlite3_ext_SOURCE_DIR}
+    ${sqlite3_SOURCE_DIR}
 )

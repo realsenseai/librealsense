@@ -288,7 +288,7 @@ jobs:
       - name: "Check minimal CMake version"
         env:
           EXPECTED_CMAKE_MAJOR_VER: 3
-          EXPECTED_CMAKE_MINOR_VER: 14
+          EXPECTED_CMAKE_MINOR_VER: 10
           CURRENT_CMAKE_MAJOR_VER: ${{ steps.cmake_version.outputs.current_cmake_major_ver }}
           CURRENT_CMAKE_MINOR_VER: ${{ steps.cmake_version.outputs.current_cmake_minor_ver }}
 
