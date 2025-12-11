@@ -201,6 +201,10 @@ if device.is_in_recovery_mode():
         current_fw_version = rsutils.version(device.get_info(rs.camera_info.firmware_version))
         log.d("FW version after recovery:", current_fw_version)
 
+if not device.supports(rs.camera_info.recommended_firmware_version):
+    log.i('rs.camera_info.recommended_firmware_version not supported')
+else:
+    log.i('bundled_fw_version = ', device.get_info(rs.camera_info.recommended_firmware_version))
 
 if custom_fw_path:
     custom_fw_version = extract_version_from_filename(custom_fw_path)
@@ -251,7 +255,7 @@ subprocess.run( cmd )   # may throw
 time.sleep(3) # MIPI devices do not re-enumerate so we need to give them some time to restart
 device, ctx = test.find_first_device_or_exit()
 current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
-log.i('bundled_fw_version = ', bundled_fw_version)
+
 expected_fw_version = custom_fw_version if custom_fw_path else bundled_fw_version
 test.check_equal(current_fw_version, expected_fw_version)
 new_update_counter = get_update_counter( device )
