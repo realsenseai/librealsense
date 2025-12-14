@@ -1,47 +1,139 @@
 import { useState } from 'react'
 import { useAppStore } from '../store'
-import type { SensorInfo, OptionInfo, StreamConfig } from '../api/types'
+import type { SensorInfo, OptionInfo, StreamConfig, DeviceState } from '../api/types'
 
 export function ControlsPanel() {
-  const { selectedDevice, sensors, options, streamConfigs, updateStreamConfig, isStreaming } =
-    useAppStore()
+  const { deviceStates, updateStreamConfig, setOption, isAnyDeviceStreaming } = useAppStore()
+  
+  const activeDevices = Object.values(deviceStates).filter(ds => ds.isActive)
+  const isStreaming = isAnyDeviceStreaming()
+  const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set())
 
-  const [expandedSensor, setExpandedSensor] = useState<string | null>(null)
+  const toggleDeviceExpanded = (deviceId: string) => {
+    setExpandedDevices(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(deviceId)) {
+        newSet.delete(deviceId)
+      } else {
+        newSet.add(deviceId)
+      }
+      return newSet
+    })
+  }
 
-  if (!selectedDevice) return null
+  if (activeDevices.length === 0) {
+    return (
+      <div className="p-4 text-gray-500 text-center">
+        <p>No devices activated</p>
+        <p className="text-sm mt-1">Toggle a device on to configure streams</p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="panel-header">Stream Configuration</h2>
+      {activeDevices.map((deviceState) => (
+        <DeviceControlSection
+          key={deviceState.device.device_id}
+          deviceState={deviceState}
+          isExpanded={activeDevices.length === 1 || expandedDevices.has(deviceState.device.device_id)}
+          onToggle={() => toggleDeviceExpanded(deviceState.device.device_id)}
+          onUpdateStreamConfig={(config) => updateStreamConfig(deviceState.device.device_id, config)}
+          onSetOption={(sensorId, optionId, value) => 
+            setOption(deviceState.device.device_id, sensorId, optionId, value)
+          }
+          isStreaming={isStreaming}
+          showHeader={activeDevices.length > 1}
+        />
+      ))}
+    </div>
+  )
+}
 
-      {/* Stream Toggles */}
-      <div className="space-y-2">
-        {streamConfigs.map((config) => (
-          <StreamConfigItem
-            key={`${config.sensor_id}-${config.stream_type}`}
-            config={config}
-            sensors={sensors}
-            onUpdate={updateStreamConfig}
-            disabled={isStreaming}
-          />
-        ))}
-      </div>
+interface DeviceControlSectionProps {
+  deviceState: DeviceState
+  isExpanded: boolean
+  onToggle: () => void
+  onUpdateStreamConfig: (config: StreamConfig) => void
+  onSetOption: (sensorId: string, optionId: string, value: number | boolean | string) => Promise<void>
+  isStreaming: boolean
+  showHeader: boolean
+}
 
-      {/* Sensor Options */}
-      <div className="border-t border-gray-700 pt-4">
-        <h2 className="panel-header">Camera Controls</h2>
-        {sensors.map((sensor) => (
-          <SensorOptionsPanel
-            key={sensor.sensor_id}
-            sensor={sensor}
-            options={options[sensor.sensor_id] || []}
-            isExpanded={expandedSensor === sensor.sensor_id}
-            onToggle={() =>
-              setExpandedSensor(expandedSensor === sensor.sensor_id ? null : sensor.sensor_id)
-            }
-          />
-        ))}
-      </div>
+function DeviceControlSection({
+  deviceState,
+  isExpanded,
+  onToggle,
+  onUpdateStreamConfig,
+  onSetOption,
+  isStreaming,
+  showHeader,
+}: DeviceControlSectionProps) {
+  const [expandedSensor, setExpandedSensor] = useState<string | null>(null)
+  const { device, sensors, options, streamConfigs } = deviceState
+
+  return (
+    <div className={showHeader ? 'border border-gray-700 rounded-lg overflow-hidden' : ''}>
+      {/* Device Header - collapsible when multiple devices */}
+      {showHeader && (
+        <button
+          onClick={onToggle}
+          className="w-full flex items-center justify-between p-3 bg-gray-800 hover:bg-gray-750 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-white">{device.name}</span>
+            {deviceState.isStreaming && (
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            )}
+          </div>
+          <svg
+            className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      )}
+
+      {/* Device Controls */}
+      {(isExpanded || !showHeader) && (
+        <div className={showHeader ? 'p-3 space-y-4 bg-gray-900/50' : 'space-y-4'}>
+          {/* Stream Configuration */}
+          <div>
+            <h2 className="panel-header">Stream Configuration</h2>
+            <div className="space-y-2">
+              {streamConfigs.map((config) => (
+                <StreamConfigItem
+                  key={`${config.sensor_id}-${config.stream_type}`}
+                  config={config}
+                  sensors={sensors}
+                  onUpdate={onUpdateStreamConfig}
+                  disabled={isStreaming}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Sensor Options */}
+          <div className="border-t border-gray-700 pt-4">
+            <h2 className="panel-header">Camera Controls</h2>
+            {sensors.map((sensor) => (
+              <SensorOptionsPanel
+                key={sensor.sensor_id}
+                sensor={sensor}
+                options={options[sensor.sensor_id] || []}
+                isExpanded={expandedSensor === sensor.sensor_id}
+                onToggle={() =>
+                  setExpandedSensor(expandedSensor === sensor.sensor_id ? null : sensor.sensor_id)
+                }
+                onSetOption={onSetOption}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -152,9 +244,10 @@ interface SensorOptionsPanelProps {
   options: OptionInfo[]
   isExpanded: boolean
   onToggle: () => void
+  onSetOption: (sensorId: string, optionId: string, value: number | boolean | string) => Promise<void>
 }
 
-function SensorOptionsPanel({ sensor, options, isExpanded, onToggle }: SensorOptionsPanelProps) {
+function SensorOptionsPanel({ sensor, options, isExpanded, onToggle, onSetOption }: SensorOptionsPanelProps) {
   return (
     <div className="mb-2">
       <button
@@ -178,7 +271,12 @@ function SensorOptionsPanel({ sensor, options, isExpanded, onToggle }: SensorOpt
             <p className="text-gray-500 text-sm">No options available</p>
           ) : (
             options.map((option) => (
-              <OptionControl key={option.option_id} option={option} sensorId={sensor.sensor_id} />
+              <OptionControl 
+                key={option.option_id} 
+                option={option} 
+                sensorId={sensor.sensor_id}
+                onSetOption={onSetOption}
+              />
             ))
           )}
         </div>
@@ -190,17 +288,16 @@ function SensorOptionsPanel({ sensor, options, isExpanded, onToggle }: SensorOpt
 interface OptionControlProps {
   option: OptionInfo
   sensorId: string
+  onSetOption: (sensorId: string, optionId: string, value: number | boolean | string) => Promise<void>
 }
 
-function OptionControl({ option, sensorId }: OptionControlProps) {
-  const { selectedDevice, setOption } = useAppStore()
+function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
   const [localValue, setLocalValue] = useState(option.current_value)
 
   const handleChange = async (value: number | boolean | string) => {
-    if (!selectedDevice) return
     setLocalValue(value)
     try {
-      await setOption(selectedDevice.device_id, sensorId, option.option_id, value)
+      await onSetOption(sensorId, option.option_id, value)
     } catch (error) {
       // Revert on error
       setLocalValue(option.current_value)

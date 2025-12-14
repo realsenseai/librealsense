@@ -1,71 +1,178 @@
+import { useState } from 'react'
 import { useAppStore } from '../store'
+import { APP_VERSION } from './WhatsNew'
 
-export function Header() {
-  const { viewMode, setViewMode, isStreaming, startStreaming, stopStreaming, selectedDevice } =
-    useAppStore()
+interface WhatsNewModalProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+function AboutModal({ isOpen, onClose }: WhatsNewModalProps) {
+  if (!isOpen) return null
 
   return (
-    <header className="bg-rs-dark border-b border-gray-700 px-4 py-3">
-      <div className="flex items-center justify-between">
-        {/* Logo and Title */}
-        <div className="flex items-center gap-3">
-          <img 
-            src="/realsense-logo.png" 
-            alt="RealSense" 
-            className="h-8 w-auto"
-          />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-rs-dark border border-gray-600 rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-rs-blue to-blue-600 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <img 
+              src="/realsense-logo.png" 
+              alt="RealSense" 
+              className="h-8 w-auto"
+            />
+            <div>
+              <h2 className="text-xl font-bold text-white">About</h2>
+              <p className="text-blue-100 text-sm">RealSense React Viewer</p>
+            </div>
+          </div>
         </div>
 
-        {/* View Mode Toggle */}
-        {selectedDevice && (
-          <div className="flex items-center gap-4">
-            <div className="flex bg-gray-700 rounded-lg p-1">
+        {/* Content */}
+        <div className="p-6 space-y-4">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-400">Version</span>
+            <span className="text-white font-mono">{APP_VERSION}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-400">License</span>
+            <span className="text-white">Apache 2.0</span>
+          </div>
+          <div className="pt-2 border-t border-gray-700">
+            <p className="text-gray-400 text-sm">
+              A modern React-based web UI for Intel RealSense cameras, 
+              leveraging the REST API backend for device control and streaming.
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 bg-gray-800/50 flex justify-between items-center">
+          <a 
+            href="https://github.com/IntelRealSense/librealsense" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-sm text-rs-blue hover:text-blue-400 transition-colors"
+          >
+            GitHub Repository →
+          </a>
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-rs-blue text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function Header() {
+  const { 
+    viewMode, 
+    setViewMode, 
+    startAllStreaming, 
+    stopAllStreaming, 
+    deviceStates,
+    isAnyDeviceStreaming,
+    getActiveDevices,
+  } = useAppStore()
+  const [showAbout, setShowAbout] = useState(false)
+
+  const activeDevices = getActiveDevices()
+  const hasActiveDevices = activeDevices.length > 0
+  const isStreaming = isAnyDeviceStreaming()
+  
+  // Check if any active device has enabled streams
+  const hasEnabledStreams = activeDevices.some(ds => 
+    ds.streamConfigs.some(c => c.enable)
+  )
+
+  // Count streaming devices
+  const streamingCount = Object.values(deviceStates).filter(ds => ds.isStreaming).length
+
+  return (
+    <>
+      <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
+      
+      <header className="bg-rs-dark border-b border-gray-700 px-4 py-3">
+        <div className="flex items-center justify-between">
+          {/* Logo and Title */}
+          <div className="flex items-center gap-3">
+            <img 
+              src="/realsense-logo.png" 
+              alt="RealSense" 
+              className="h-8 w-auto"
+            />
+          </div>
+
+          {/* Center Controls */}
+          {hasActiveDevices && (
+            <div className="flex items-center gap-4">
+              <div className="flex bg-gray-700 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('2d')}
+                  className={`px-4 py-1 rounded-md text-sm transition-colors ${
+                    viewMode === '2d'
+                      ? 'bg-rs-blue text-white'
+                      : 'text-gray-300 hover:text-white'
+                  }`}
+                >
+                  2D View
+                </button>
+                <button
+                  onClick={() => setViewMode('3d')}
+                  className={`px-4 py-1 rounded-md text-sm transition-colors ${
+                    viewMode === '3d'
+                      ? 'bg-rs-blue text-white'
+                      : 'text-gray-300 hover:text-white'
+                  }`}
+                >
+                  3D View
+                </button>
+              </div>
+
+              {/* Streaming Controls */}
               <button
-                onClick={() => setViewMode('2d')}
-                className={`px-4 py-1 rounded-md text-sm transition-colors ${
-                  viewMode === '2d'
-                    ? 'bg-rs-blue text-white'
-                    : 'text-gray-300 hover:text-white'
+                onClick={isStreaming ? stopAllStreaming : startAllStreaming}
+                disabled={!hasEnabledStreams && !isStreaming}
+                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                  isStreaming
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : hasEnabledStreams
+                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                 }`}
+                title={!hasEnabledStreams && !isStreaming ? 'Enable at least one stream first' : ''}
               >
-                2D View
-              </button>
-              <button
-                onClick={() => setViewMode('3d')}
-                className={`px-4 py-1 rounded-md text-sm transition-colors ${
-                  viewMode === '3d'
-                    ? 'bg-rs-blue text-white'
-                    : 'text-gray-300 hover:text-white'
-                }`}
-              >
-                3D View
+                {isStreaming ? (
+                  <>
+                    <span className="inline-block w-3 h-3 bg-white rounded-sm mr-2" />
+                    Stop{streamingCount > 1 ? ` (${streamingCount})` : ''}
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-block w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[10px] border-l-white mr-2" />
+                    Start{activeDevices.length > 1 ? ` All (${activeDevices.length})` : ''}
+                  </>
+                )}
               </button>
             </div>
+          )}
 
-            {/* Streaming Controls */}
-            <button
-              onClick={isStreaming ? stopStreaming : startStreaming}
-              className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-                isStreaming
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
-            >
-              {isStreaming ? (
-                <>
-                  <span className="inline-block w-3 h-3 bg-white rounded-sm mr-2" />
-                  Stop
-                </>
-              ) : (
-                <>
-                  <span className="inline-block w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[10px] border-l-white mr-2" />
-                  Start
-                </>
-              )}
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
+          {/* Right side - Info button */}
+          <button
+            onClick={() => setShowAbout(true)}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+            title="About"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+        </div>
+      </header>
+    </>
   )
 }

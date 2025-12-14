@@ -115,3 +115,15 @@ export interface StreamLayout {
   position: { x: number; y: number }
   size: { width: number; height: number }
 }
+
+// Per-device state for multi-camera support
+export interface DeviceState {
+  device: DeviceInfo
+  sensors: SensorInfo[]
+  options: Record<string, OptionInfo[]> // keyed by sensor_id
+  streamConfigs: StreamConfig[]
+  isStreaming: boolean
+  isActive: boolean // whether this device is shown in viewer
+  isLoading: boolean // loading sensors/options
+  streamMetadata: Record<string, StreamMetadata> // keyed by stream_type
+}

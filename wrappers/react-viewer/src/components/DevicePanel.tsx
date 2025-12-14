@@ -5,15 +5,17 @@ import type { DeviceInfo } from '../api/types'
 export function DevicePanel() {
   const {
     devices,
-    selectedDevice,
+    deviceStates,
     isLoadingDevices,
-    isStreaming,
     fetchDevices,
-    selectDevice,
+    toggleDeviceActive,
     resetDevice,
     error,
     clearError,
+    isAnyDeviceStreaming,
   } = useAppStore()
+
+  const isStreaming = isAnyDeviceStreaming()
 
   useEffect(() => {
     fetchDevices()
@@ -91,15 +93,20 @@ export function DevicePanel() {
         </div>
       ) : (
         <div className="space-y-2">
-          {devices.map((device) => (
-            <DeviceCard
-              key={device.device_id}
-              device={device}
-              isSelected={selectedDevice?.device_id === device.device_id}
-              onSelect={() => selectDevice(device)}
-              onReset={() => resetDevice(device.device_id)}
-            />
-          ))}
+          {devices.map((device) => {
+            const deviceState = deviceStates[device.device_id]
+            return (
+              <DeviceCard
+                key={device.device_id}
+                device={device}
+                isActive={deviceState?.isActive || false}
+                isLoading={deviceState?.isLoading || false}
+                isStreaming={deviceState?.isStreaming || false}
+                onToggle={() => toggleDeviceActive(device)}
+                onReset={() => resetDevice(device.device_id)}
+              />
+            )
+          })}
         </div>
       )}
     </div>
@@ -108,17 +115,18 @@ export function DevicePanel() {
 
 interface DeviceCardProps {
   device: DeviceInfo
-  isSelected: boolean
-  onSelect: () => void
+  isActive: boolean
+  isLoading: boolean
+  isStreaming: boolean
+  onToggle: () => void
   onReset: () => void
 }
 
-function DeviceCard({ device, isSelected, onSelect, onReset }: DeviceCardProps) {
+function DeviceCard({ device, isActive, isLoading, isStreaming, onToggle, onReset }: DeviceCardProps) {
   return (
     <div
-      onClick={onSelect}
-      className={`p-3 rounded-lg cursor-pointer transition-all ${
-        isSelected
+      className={`p-3 rounded-lg transition-all ${
+        isActive
           ? 'bg-rs-blue/20 border border-rs-blue'
           : 'bg-gray-800 border border-gray-700 hover:border-gray-600'
       }`}
@@ -128,10 +136,28 @@ function DeviceCard({ device, isSelected, onSelect, onReset }: DeviceCardProps) 
           <h3 className="font-semibold text-white truncate">{device.name}</h3>
           <p className="text-sm text-gray-400 truncate">S/N: {device.serial_number}</p>
         </div>
-        <div className="flex items-center gap-1 ml-2">
-          {device.is_streaming && (
+        <div className="flex items-center gap-2 ml-2">
+          {isStreaming && (
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Streaming" />
           )}
+          {isLoading && (
+            <div className="w-4 h-4 border-2 border-rs-blue border-t-transparent rounded-full animate-spin" title="Loading..." />
+          )}
+          {/* Toggle switch */}
+          <button
+            onClick={onToggle}
+            disabled={isLoading || isStreaming}
+            className={`relative w-10 h-5 rounded-full transition-colors ${
+              isActive ? 'bg-rs-blue' : 'bg-gray-600'
+            } ${isLoading || isStreaming ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
+            title={isActive ? 'Deactivate device' : 'Activate device'}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                isActive ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
         </div>
       </div>
 
@@ -158,14 +184,15 @@ function DeviceCard({ device, isSelected, onSelect, onReset }: DeviceCardProps) 
       )}
 
       {/* Actions */}
-      {isSelected && (
+      {isActive && (
         <div className="mt-3 pt-3 border-t border-gray-600">
           <button
             onClick={(e) => {
               e.stopPropagation()
               onReset()
             }}
-            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+            disabled={isStreaming}
+            className={`text-xs ${isStreaming ? 'text-gray-500 cursor-not-allowed' : 'text-red-400 hover:text-red-300'} transition-colors`}
           >
             Hardware Reset
           </button>
