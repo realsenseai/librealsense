@@ -7,6 +7,7 @@ export function DevicePanel() {
     devices,
     selectedDevice,
     isLoadingDevices,
+    isStreaming,
     fetchDevices,
     selectDevice,
     resetDevice,
@@ -16,10 +17,12 @@ export function DevicePanel() {
 
   useEffect(() => {
     fetchDevices()
-    // Poll for device changes every 3 seconds
-    const interval = setInterval(fetchDevices, 3000)
-    return () => clearInterval(interval)
-  }, [fetchDevices])
+    // Only poll for device changes when NOT streaming (polling causes frame hiccups)
+    if (!isStreaming) {
+      const interval = setInterval(fetchDevices, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [fetchDevices, isStreaming])
 
   return (
     <div className="p-4">

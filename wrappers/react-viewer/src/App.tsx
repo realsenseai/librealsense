@@ -5,11 +5,12 @@ import { ControlsPanel } from './components/ControlsPanel'
 import { PointCloudViewer } from './components/PointCloudViewer'
 import { IMUViewer } from './components/IMUViewer'
 import { Header } from './components/Header'
+import { LoadingSplash } from './components/LoadingSplash'
 import { useAppStore } from './store'
 import { socketService } from './api/socket'
 
 function App() {
-  const { viewMode, selectedDevice, isConnected } = useAppStore()
+  const { viewMode, selectedDevice, isConnected, isLoadingSensors } = useAppStore()
 
   useEffect(() => {
     // Connect to Socket.IO on mount
@@ -24,21 +25,26 @@ function App() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-rs-darker flex flex-col">
+    <div className="h-screen bg-rs-darker flex flex-col overflow-hidden">
+      {/* Loading Splash Screen */}
+      {isLoadingSensors && (
+        <LoadingSplash message="Initializing device sensors..." />
+      )}
+      
       <Header />
       
-      <div className="flex-1 flex">
+      <div className="flex-1 flex min-h-0">
         {/* Left Sidebar - Device Panel */}
-        <aside className="w-72 bg-rs-dark border-r border-gray-700 overflow-y-auto">
+        <aside className="w-72 flex-shrink-0 bg-rs-dark border-r border-gray-700 overflow-y-auto">
           <DevicePanel />
         </aside>
 
-        {/* Main Content Area */}
-        <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Main Content Area - Independent of sidebars */}
+        <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
           {selectedDevice ? (
             <>
               {/* Stream/PointCloud View */}
-              <div className="flex-1 p-4 overflow-hidden">
+              <div className="flex-1 p-4 min-h-0 overflow-hidden">
                 {viewMode === '2d' ? (
                   <StreamViewer />
                 ) : (
@@ -65,9 +71,9 @@ function App() {
           )}
         </main>
 
-        {/* Right Sidebar - Controls Panel */}
+        {/* Right Sidebar - Controls Panel - scrolls independently */}
         {selectedDevice && (
-          <aside className="w-80 bg-rs-dark border-l border-gray-700 overflow-y-auto">
+          <aside className="w-80 flex-shrink-0 bg-rs-dark border-l border-gray-700 overflow-y-auto">
             <ControlsPanel />
           </aside>
         )}
