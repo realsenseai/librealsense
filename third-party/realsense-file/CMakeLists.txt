@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(realsense-file)
 
-include(config.cmake)
+set(ROSBAG2_COMPILE_FLAGS)
+include(${CMAKE_CURRENT_LIST_DIR}/config.cmake)
 
 FILE(GLOB_RECURSE AllSources
         ${ROSBAG_DIR}/*.h
@@ -31,12 +32,31 @@ add_library(${PROJECT_NAME} STATIC
     ${SOURCE_FILES_COMPRESSION}
 )
 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${ROSBAG_HEADER_DIRS}
         $<$<NOT:$<BOOL:${USE_EXTERNAL_LZ4}>>:${LZ4_INCLUDE_PATH}>
+        ${HEADER_DIR_SQLITE3}
+        ${HEADER_DIR_YAML_CPP}
 )
+
+message(STATUS "ROSBAG2_COMPILE_FLAGS: ${ROSBAG2_COMPILE_FLAGS}")
+target_compile_definitions(${PROJECT_NAME} PUBLIC
+        ${ROSBAG2_COMPILE_FLAGS}
+)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0) # GCC 13 and above require cstdint to be included for stdint types
+    target_compile_options(realsense-file PRIVATE
+      $<$<COMPILE_LANGUAGE:CXX>:-std=c++14>
+      $<$<COMPILE_LANGUAGE:CXX>:-include cstdint>
+      $<$<COMPILE_LANGUAGE:C>:-include stdint.h>
+    )
+  endif()
+endif()
+
+add_dependencies(${PROJECT_NAME} sqlite3)
+add_dependencies(${PROJECT_NAME} yaml_cpp)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         $<$<BOOL:${USE_EXTERNAL_LZ4}>:lz4::lz4>
