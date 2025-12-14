@@ -6,11 +6,19 @@ import { PointCloudViewer } from './components/PointCloudViewer'
 import { IMUViewer } from './components/IMUViewer'
 import { Header } from './components/Header'
 import { LoadingSplash } from './components/LoadingSplash'
+import { WhatsNew } from './components/WhatsNew'
 import { useAppStore } from './store'
 import { socketService } from './api/socket'
 
 function App() {
-  const { viewMode, selectedDevice, isConnected, isLoadingSensors } = useAppStore()
+  const { viewMode, isConnected, getActiveDevices } = useAppStore()
+
+  const activeDevices = getActiveDevices()
+  const hasActiveDevices = activeDevices.length > 0
+  
+  // Check if any device is loading
+  const isAnyDeviceLoading = activeDevices.some(ds => ds.isLoading)
+  const loadingDeviceName = activeDevices.find(ds => ds.isLoading)?.device.name
 
   useEffect(() => {
     // Connect to Socket.IO on mount
@@ -26,9 +34,12 @@ function App() {
 
   return (
     <div className="h-screen bg-rs-darker flex flex-col overflow-hidden">
+      {/* What's New Modal */}
+      <WhatsNew />
+      
       {/* Loading Splash Screen */}
-      {isLoadingSensors && (
-        <LoadingSplash message="Initializing device sensors..." />
+      {isAnyDeviceLoading && (
+        <LoadingSplash message={`Initializing ${loadingDeviceName || 'device'} sensors...`} />
       )}
       
       <Header />
@@ -41,7 +52,7 @@ function App() {
 
         {/* Main Content Area - Independent of sidebars */}
         <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-          {selectedDevice ? (
+          {hasActiveDevices ? (
             <>
               {/* Stream/PointCloud View */}
               <div className="flex-1 p-4 min-h-0 overflow-hidden">
@@ -64,15 +75,15 @@ function App() {
                   <circle cx="65" cy="40" r="8" fill="currentColor" opacity="0.5"/>
                   <circle cx="50" cy="60" r="6" fill="currentColor" opacity="0.3"/>
                 </svg>
-                <p className="text-xl">No Device Selected</p>
-                <p className="text-sm mt-2">Connect a RealSense device or select one from the sidebar</p>
+                <p className="text-xl">No Device Activated</p>
+                <p className="text-sm mt-2">Connect a RealSense device and toggle it on from the sidebar</p>
               </div>
             </div>
           )}
         </main>
 
         {/* Right Sidebar - Controls Panel - scrolls independently */}
-        {selectedDevice && (
+        {hasActiveDevices && (
           <aside className="w-80 flex-shrink-0 bg-rs-dark border-l border-gray-700 overflow-y-auto">
             <ControlsPanel />
           </aside>

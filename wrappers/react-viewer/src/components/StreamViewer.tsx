@@ -1,14 +1,53 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store'
 import { WebRTCHandler } from '../api/webrtc'
+import type { DeviceState, StreamConfig } from '../api/types'
+
+// A stream with its device context
+interface DeviceStream {
+  deviceId: string
+  deviceName: string
+  serialNumber: string
+  config: StreamConfig
+  isStreaming: boolean
+  metadata?: {
+    timestamp: number
+    frame_number: number
+    width: number
+    height: number
+  }
+}
 
 export function StreamViewer() {
-  const { selectedDevice, streamConfigs, isStreaming, streamMetadata } = useAppStore()
-  const enabledStreams = streamConfigs.filter((c) => c.enable)
+  const { deviceStates } = useAppStore()
+  
+  // Collect all enabled streams from all active devices
+  const allEnabledStreams = useMemo(() => {
+    const streams: DeviceStream[] = []
+    
+    Object.values(deviceStates).forEach((ds: DeviceState) => {
+      if (!ds.isActive) return
+      
+      ds.streamConfigs.filter(c => c.enable).forEach(config => {
+        streams.push({
+          deviceId: ds.device.device_id,
+          deviceName: ds.device.name,
+          serialNumber: ds.device.serial_number,
+          config,
+          isStreaming: ds.isStreaming,
+          metadata: ds.streamMetadata[config.stream_type],
+        })
+      })
+    })
+    
+    return streams
+  }, [deviceStates])
+
+  const activeDeviceCount = Object.values(deviceStates).filter(ds => ds.isActive).length
 
   return (
     <div className="h-full">
-      {enabledStreams.length === 0 ? (
+      {allEnabledStreams.length === 0 ? (
         <div className="h-full flex items-center justify-center text-gray-500">
           <div className="text-center">
             <svg
@@ -25,24 +64,31 @@ export function StreamViewer() {
               />
             </svg>
             <p className="text-lg">No Streams Enabled</p>
-            <p className="text-sm mt-1">Enable streams in the right panel to start viewing</p>
+            <p className="text-sm mt-1">
+              {activeDeviceCount === 0 
+                ? 'Activate a device and enable streams to start viewing'
+                : 'Enable streams in the right panel to start viewing'}
+            </p>
           </div>
         </div>
       ) : (
         <div
           className="h-full grid gap-2"
           style={{
-            gridTemplateColumns: `repeat(${Math.min(enabledStreams.length, 2)}, 1fr)`,
-            gridTemplateRows: `repeat(${Math.ceil(enabledStreams.length / 2)}, 1fr)`,
+            gridTemplateColumns: `repeat(${Math.min(allEnabledStreams.length, 2)}, 1fr)`,
+            gridTemplateRows: `repeat(${Math.ceil(allEnabledStreams.length / 2)}, 1fr)`,
           }}
         >
-          {enabledStreams.map((config) => (
+          {allEnabledStreams.map((stream) => (
             <StreamTile
-              key={`${config.sensor_id}-${config.stream_type}`}
-              deviceId={selectedDevice?.device_id || ''}
-              streamType={config.stream_type}
-              isStreaming={isStreaming}
-              metadata={streamMetadata[config.stream_type]}
+              key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
+              deviceId={stream.deviceId}
+              deviceName={stream.deviceName}
+              serialNumber={stream.serialNumber}
+              streamType={stream.config.stream_type}
+              isStreaming={stream.isStreaming}
+              metadata={stream.metadata}
+              showDeviceName={activeDeviceCount > 1}
             />
           ))}
         </div>
@@ -53,8 +99,11 @@ export function StreamViewer() {
 
 interface StreamTileProps {
   deviceId: string
+  deviceName: string
+  serialNumber: string
   streamType: string
   isStreaming: boolean
+  showDeviceName?: boolean
   metadata?: {
     timestamp: number
     frame_number: number
@@ -63,7 +112,7 @@ interface StreamTileProps {
   }
 }
 
-function StreamTile({ deviceId, streamType, isStreaming, metadata }: StreamTileProps) {
+function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreaming, showDeviceName, metadata }: StreamTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const webrtcHandlerRef = useRef<WebRTCHandler | null>(null)
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | null>(null)
@@ -170,9 +219,18 @@ function StreamTile({ deviceId, streamType, isStreaming, metadata }: StreamTileP
         className="w-full h-full object-contain stream-video"
       />
 
+      {/* Device Name Header (shown for multi-camera) */}
+      {showDeviceName && (
+        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent px-2 py-1">
+          <div className="text-xs text-white font-medium truncate">
+            {deviceName} <span className="text-gray-400">({serialNumber})</span>
+          </div>
+        </div>
+      )}
+
       {/* Stream Label */}
       <div
-        className={`absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold text-white ${getStreamColor(
+        className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} left-2 px-2 py-1 rounded text-xs font-semibold text-white ${getStreamColor(
           streamType
         )}`}
       >
@@ -181,7 +239,7 @@ function StreamTile({ deviceId, streamType, isStreaming, metadata }: StreamTileP
 
       {/* Connection Status */}
       {isStreaming && connectionState && connectionState !== 'connected' && (
-        <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-600 rounded text-xs text-white">
+        <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 px-2 py-1 bg-yellow-600 rounded text-xs text-white`}>
           {connectionState}
         </div>
       )}
