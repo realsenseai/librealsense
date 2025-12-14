@@ -83,3 +83,23 @@ body {
   @apply bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 
          focus:border-rs-blue focus:outline-none;
 }
+
+/* Loading animation */
+@keyframes loading-bar {
+  0% {
+    width: 0%;
+    margin-left: 0%;
+  }
+  50% {
+    width: 60%;
+    margin-left: 20%;
+  }
+  100% {
+    width: 0%;
+    margin-left: 100%;
+  }
+}
+
+.animate-loading-bar {
+  animation: loading-bar 1.5s ease-in-out infinite;
+}

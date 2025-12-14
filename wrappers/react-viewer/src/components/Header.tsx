@@ -9,19 +9,11 @@ export function Header() {
       <div className="flex items-center justify-between">
         {/* Logo and Title */}
         <div className="flex items-center gap-3">
-          <svg className="w-8 h-8" viewBox="0 0 100 100">
-            <defs>
-              <linearGradient id="rsGradHeader" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style={{ stopColor: '#0071c5' }} />
-                <stop offset="100%" style={{ stopColor: '#00a3e0' }} />
-              </linearGradient>
-            </defs>
-            <circle cx="50" cy="50" r="45" fill="url(#rsGradHeader)" />
-            <circle cx="35" cy="40" r="8" fill="white" opacity="0.9" />
-            <circle cx="65" cy="40" r="8" fill="white" opacity="0.9" />
-            <circle cx="50" cy="60" r="6" fill="white" opacity="0.7" />
-          </svg>
-          <h1 className="text-xl font-bold text-white">RealSense Viewer</h1>
+          <img 
+            src="/realsense-logo.png" 
+            alt="RealSense" 
+            className="h-8 w-auto"
+          />
         </div>
 
         {/* View Mode Toggle */}
