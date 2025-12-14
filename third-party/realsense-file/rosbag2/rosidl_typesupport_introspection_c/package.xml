@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rosidl_typesupport_introspection_c</name>
+  <version>1.3.1</version>
+  <description>
+    Generate the message type support for dynamic message construction in C.
+  </description>
+  <maintainer email="dthomas@osrfoundation.org">Dirk Thomas</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake_ros</buildtool_depend>
+
+  <buildtool_export_depend>ament_cmake</buildtool_export_depend>
+  <buildtool_export_depend>rosidl_cmake</buildtool_export_depend>
+
+  <build_export_depend>rosidl_runtime_c</build_export_depend>
+
+  <exec_depend>rosidl_cmake</exec_depend>
+  <exec_depend>rosidl_parser</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <member_of_group>rosidl_typesupport_c_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
