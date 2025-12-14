@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { DevicePanel } from './components/DevicePanel'
 import { StreamViewer } from './components/StreamViewer'
-import { ControlsPanel } from './components/ControlsPanel'
 import { PointCloudViewer } from './components/PointCloudViewer'
 import { IMUViewer } from './components/IMUViewer'
 import { Header } from './components/Header'
@@ -45,12 +44,12 @@ function App() {
       <Header />
       
       <div className="flex-1 flex min-h-0">
-        {/* Left Sidebar - Device Panel */}
-        <aside className="w-72 flex-shrink-0 bg-rs-dark border-r border-gray-700 overflow-y-auto">
+        {/* Left Sidebar - Device Panel with Controls */}
+        <aside className="w-80 flex-shrink-0 bg-rs-dark border-r border-gray-700 overflow-y-auto">
           <DevicePanel />
         </aside>
 
-        {/* Main Content Area - Independent of sidebars */}
+        {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
           {hasActiveDevices ? (
             <>
@@ -81,13 +80,6 @@ function App() {
             </div>
           )}
         </main>
-
-        {/* Right Sidebar - Controls Panel - scrolls independently */}
-        {hasActiveDevices && (
-          <aside className="w-80 flex-shrink-0 bg-rs-dark border-l border-gray-700 overflow-y-auto">
-            <ControlsPanel />
-          </aside>
-        )}
       </div>
 
       {/* Connection Status */}

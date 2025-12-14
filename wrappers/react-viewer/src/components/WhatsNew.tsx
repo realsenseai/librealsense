@@ -1,10 +1,20 @@
 import { useState, useEffect } from 'react'
 
 // Version of the React Viewer - update this with each release
-export const APP_VERSION = '0.2.0'
+export const APP_VERSION = '0.3.0'
 
 // What's New content for each version
 const WHATS_NEW: Record<string, { title: string; features: string[] }> = {
+  '0.3.0': {
+    title: "Improved UI Layout & Device Actions",
+    features: [
+      "Controls moved under each device in the left sidebar - no more right panel",
+      "Per-device Start/Stop streaming buttons near stream configuration",
+      "Hamburger menu for device actions (Hardware Reset, Calibration)",
+      "Stream types properly filtered based on actual sensor capabilities",
+      "Compact controls design for better space utilization",
+    ],
+  },
   '0.2.0': {
     title: "Multi-Camera Support & Improved UI",
     features: [
