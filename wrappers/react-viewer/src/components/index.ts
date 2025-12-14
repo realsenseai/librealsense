@@ -1,7 +1,6 @@
 export { Header } from './Header'
 export { DevicePanel } from './DevicePanel'
 export { StreamViewer } from './StreamViewer'
-export { ControlsPanel } from './ControlsPanel'
 export { PointCloudViewer } from './PointCloudViewer'
 export { IMUViewer } from './IMUViewer'
 export { LoadingSplash } from './LoadingSplash'

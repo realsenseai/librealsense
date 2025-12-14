@@ -72,25 +72,12 @@ export function Header() {
   const { 
     viewMode, 
     setViewMode, 
-    startAllStreaming, 
-    stopAllStreaming, 
-    deviceStates,
-    isAnyDeviceStreaming,
     getActiveDevices,
   } = useAppStore()
   const [showAbout, setShowAbout] = useState(false)
 
   const activeDevices = getActiveDevices()
   const hasActiveDevices = activeDevices.length > 0
-  const isStreaming = isAnyDeviceStreaming()
-  
-  // Check if any active device has enabled streams
-  const hasEnabledStreams = activeDevices.some(ds => 
-    ds.streamConfigs.some(c => c.enable)
-  )
-
-  // Count streaming devices
-  const streamingCount = Object.values(deviceStates).filter(ds => ds.isStreaming).length
 
   return (
     <>
@@ -107,7 +94,7 @@ export function Header() {
             />
           </div>
 
-          {/* Center Controls */}
+          {/* Center Controls - View Mode Toggle */}
           {hasActiveDevices && (
             <div className="flex items-center gap-4">
               <div className="flex bg-gray-700 rounded-lg p-1">
@@ -132,32 +119,6 @@ export function Header() {
                   3D View
                 </button>
               </div>
-
-              {/* Streaming Controls */}
-              <button
-                onClick={isStreaming ? stopAllStreaming : startAllStreaming}
-                disabled={!hasEnabledStreams && !isStreaming}
-                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-                  isStreaming
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : hasEnabledStreams
-                      ? 'bg-green-600 hover:bg-green-700 text-white'
-                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                }`}
-                title={!hasEnabledStreams && !isStreaming ? 'Enable at least one stream first' : ''}
-              >
-                {isStreaming ? (
-                  <>
-                    <span className="inline-block w-3 h-3 bg-white rounded-sm mr-2" />
-                    Stop{streamingCount > 1 ? ` (${streamingCount})` : ''}
-                  </>
-                ) : (
-                  <>
-                    <span className="inline-block w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[10px] border-l-white mr-2" />
-                    Start{activeDevices.length > 1 ? ` All (${activeDevices.length})` : ''}
-                  </>
-                )}
-              </button>
             </div>
           )}
 
