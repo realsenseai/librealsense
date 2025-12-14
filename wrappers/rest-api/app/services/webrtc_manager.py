@@ -28,13 +28,34 @@ class RealSenseVideoTrack(VideoStreamTrack):
             # Get frame from RealSense
             frame_data = self.realsense_manager.get_latest_frame(self.device_id, self.stream_type)
 
+            # Handle different data types and normalize to uint8
+            if frame_data.dtype == np.uint16:
+                # For uint16 data (IR Y16), use fast bit-shift normalization
+                # This assumes 10-bit or 12-bit data in 16-bit container
+                # Right shift by 8 gives good visualization for most IR sensors
+                frame_data = (frame_data >> 6).clip(0, 255).astype(np.uint8)
+            elif frame_data.dtype != np.uint8:
+                # Convert other dtypes to uint8
+                frame_data = frame_data.astype(np.uint8)
+
             # Convert to RGB format if necessary
             if len(frame_data.shape) == 3 and frame_data.shape[2] == 3:
-                # Already RGB, no conversion needed
-                img = frame_data
+                # Already has 3 channels - could be RGB or BGR
+                # RealSense colorizer outputs BGR, convert to RGB
+                if self.stream_type.startswith('depth'):
+                    img = cv2.cvtColor(frame_data, cv2.COLOR_BGR2RGB)
+                else:
+                    img = frame_data
+            elif len(frame_data.shape) == 3 and frame_data.shape[2] == 4:
+                # RGBA/BGRA - convert to RGB
+                img = cv2.cvtColor(frame_data, cv2.COLOR_BGRA2RGB)
+            elif len(frame_data.shape) == 2:
+                # Grayscale (e.g., infrared Y8/Y16) - convert to RGB
+                img = cv2.cvtColor(frame_data, cv2.COLOR_GRAY2RGB)
             else:
-                # Convert to RGB
-                img = cv2.cvtColor(frame_data, cv2.COLOR_BGR2RGB)
+                # Unknown format, try to use as-is
+                img = frame_data
+                
             # Create VideoFrame
             video_frame = VideoFrame.from_ndarray(img, format="rgb24")
 
@@ -53,7 +74,10 @@ class RealSenseVideoTrack(VideoStreamTrack):
             video_frame.pts = pts
             video_frame.time_base = time_base
 
-            print(f"Error getting frame: {str(e)}")
+            import traceback
+            error_detail = getattr(e, 'detail', str(e))
+            print(f"Error getting frame for {self.stream_type}: {error_detail}")
+            traceback.print_exc()
             return video_frame
 
 class WebRTCManager:

@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4a4a6a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5a5a7a;
+}
+
+/* Stream viewer video */
+.stream-video {
+  object-fit: contain;
+  background: #000;
+}
+
+/* Panel styling */
+.panel {
+  @apply bg-rs-dark rounded-lg p-4 shadow-lg;
+}
+
+.panel-header {
+  @apply text-lg font-semibold mb-3 text-rs-blue;
+}
+
+/* Control inputs */
+.control-slider {
+  @apply w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer;
+}
+
+.control-slider::-webkit-slider-thumb {
+  @apply appearance-none w-4 h-4 bg-rs-blue rounded-full cursor-pointer;
+}
+
+.control-button {
+  @apply px-4 py-2 bg-rs-blue text-white rounded-lg hover:bg-blue-600 
+         transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.control-button-secondary {
+  @apply px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 
+         transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.control-checkbox {
+  @apply w-4 h-4 text-rs-blue bg-gray-700 border-gray-600 rounded 
+         focus:ring-rs-blue focus:ring-2;
+}
+
+.control-select {
+  @apply bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 
+         focus:border-rs-blue focus:outline-none;
+}

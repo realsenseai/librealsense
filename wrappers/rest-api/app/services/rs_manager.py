@@ -624,18 +624,20 @@ class RealSenseManager:
                 )
 
             if stream_type not in self.frame_queues[device_id]:
+                available_streams = list(self.frame_queues[device_id].keys())
                 raise RealSenseError(
-                    status_code=400, detail=f"Stream type {stream_type} is not active"
+                    status_code=400, detail=f"Stream type '{stream_type}' is not active. Available: {available_streams}"
                 )
 
-            if not self.frame_queues[device_id][stream_type]:
+            queue = self.frame_queues[device_id][stream_type]
+            if len(queue) == 0:
                 raise RealSenseError(
                     status_code=503,
                     detail=f"No frames available for stream {stream_type}",
                 )
 
             # Return the most recent frame
-            return self.frame_queues[device_id][stream_type][-1]
+            return queue[-1]
 
     def get_latest_metadata(self, device_id: str, stream_type: str) -> Dict:
         """Get the latest METADATA dictionary from a specific stream"""
@@ -679,152 +681,134 @@ class RealSenseManager:
 
     def _collect_frames(self, device_id: str, align_processor=None):
         """Thread function to collect frames from the pipeline"""
+        print(f"[INFO] Frame collection thread started for device {device_id}")
+        print(f"[INFO] Active streams: {self.active_streams.get(device_id, set())}")
+        
+        # Pre-compute stream mappings for performance (avoid lookup on every frame)
+        stream_mappings = {}
+        for active_stream in self.active_streams.get(device_id, set()):
+            stream_name_list = active_stream.split("-")
+            stream_type_base = stream_name_list[0]
+            rs_stream = None
+            for name, val in rs.stream.__members__.items():
+                if name.lower() == stream_type_base.lower():
+                    rs_stream = val
+                    break
+            if rs_stream is not None:
+                ir_index = int(stream_name_list[1]) if len(stream_name_list) > 1 else 1
+                stream_mappings[active_stream] = (rs_stream, ir_index)
+        
+        # Create a single colorizer instance for depth (reuse for performance)
+        colorizer = rs.colorizer()
+        
         try:
             while device_id in self.pipelines:
                 try:
                     # Wait for a frameset
                     frames = self.pipelines[device_id].wait_for_frames()
+                    
                     # Apply alignment if requested
                     if align_processor:
                         frames = align_processor.process(frames)
 
-                    # Extract individual frames and add to queues
+                    # Process frames outside the lock for better performance
+                    processed_frames = {}
+                    processed_metadata = {}
+                    
+                    for active_stream, (rs_stream, ir_index) in stream_mappings.items():
+
+                        try:
+                            frame = None
+                            frame_data = None
+                            points = None
+                            
+                            # Use the rs_stream enum directly for comparison
+                            if rs_stream == rs.stream.depth:
+                                frame_data = frames.get_depth_frame()
+                                if frame_data:
+                                    colorized = colorizer.colorize(frame_data)
+                                    frame = np.asanyarray(colorized.get_data())
+                                    if self.is_pointcloud_enabled.get(device_id, False):
+                                        points = self.pc.calculate(frame_data)
+                            elif rs_stream == rs.stream.color:
+                                frame_data = frames.get_color_frame()
+                                if frame_data:
+                                    frame = np.asanyarray(frame_data.get_data())
+                            elif rs_stream == rs.stream.infrared:
+                                frame_data = frames.get_infrared_frame(ir_index)
+                                if frame_data:
+                                    frame = np.asanyarray(frame_data.get_data())
+                            elif rs_stream == rs.stream.gyro or rs_stream == rs.stream.accel:
+                                motion_data = None
+                                frame_data = None
+                                for f in frames:
+                                    if f.get_profile().stream_type() == rs_stream:
+                                        frame_data = f.as_motion_frame()
+                                        motion_data = frame_data.get_motion_data()
+                                        break
+
+                                motion_json_data = None
+                                if motion_data:
+                                    motion_json_data = {
+                                        "x": float(motion_data.x),
+                                        "y": float(motion_data.y),
+                                        "z": float(motion_data.z),
+                                    }
+                                    # Create simple visualization frame for motion data
+                                    frame = np.zeros((120, 320, 3), dtype=np.uint8)
+                                    cv2.putText(frame, f"X: {motion_data.x:.3f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 100), 1)
+                                    cv2.putText(frame, f"Y: {motion_data.y:.3f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 255, 100), 1)
+                                    cv2.putText(frame, f"Z: {motion_data.z:.3f}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1)
+                            else:
+                                continue  # Unknown stream type
+
+                            # Skip if no frame data was obtained
+                            if frame is None or frame_data is None:
+                                continue
+
+                            # Add metadata
+                            metadata = {
+                                "timestamp": frame_data.get_timestamp(),
+                                "frame_number": frame_data.get_frame_number(),
+                                "width": getattr(frame_data, "get_width", lambda: 640)() or 640,
+                                "height": getattr(frame_data, "get_height", lambda: 480)() or 480,
+                            }
+
+                            if rs_stream == rs.stream.gyro or rs_stream == rs.stream.accel:
+                                if motion_json_data:
+                                    metadata["motion_data"] = motion_json_data
+
+                            if points:
+                                v, t = points.get_vertices(), points.get_texture_coordinates()
+                                verts = np.asanyarray(v).view(np.float32).reshape(-1, 3)
+                                verts = verts[verts[:, 2] >= 0.03]  # Filter out z < 0.03
+                                metadata["point_cloud"] = {"vertices": verts, "texture_coordinates": []}
+
+                            # Store processed frame and metadata
+                            processed_frames[active_stream] = frame
+                            processed_metadata[active_stream] = metadata
+                            
+                        except Exception as e:
+                            if not isinstance(e, RuntimeError):
+                                print(f"Error processing {active_stream}: {type(e).__name__}: {str(e)}")
+
+                    # Now add to queues with lock held briefly
                     with self.lock:
                         if device_id not in self.frame_queues:
                             break
-
-                        for stream_type in self.active_streams[device_id]:
-                            stream_name_list = stream_type.split("-")
-                            stream_type = stream_name_list[0]
-                            rs_stream = None
-                            for name, val in rs.stream.__members__.items():
-                                if name.lower() == stream_type.lower():
-                                    rs_stream = val
-                                    break
-
-                            if rs_stream is None:
-                                continue
-
-                            try:
-                                frame = None
-                                frame_data = None
-                                points = None
-                                if stream_type == rs.stream.depth.name:
-                                    frame_data = frames.get_depth_frame()
-                                    frame = (
-                                        rs.colorizer().colorize(frame_data).get_data()
-                                    )  # assuming no throw if 'not frame'
-                                    if self.is_pointcloud_enabled.get(device_id, False):
-                                        points = self.pc.calculate(frame_data)
-                                elif stream_type == rs.stream.color.name:
-                                    frame_data = frames.get_color_frame()
-                                    frame = frame_data.get_data()
-                                elif stream_type == rs.stream.infrared.name:
-                                    frame_data = frames.get_infrared_frame(
-                                        int(stream_name_list[1])
-                                    )
-                                    frame = frame_data.get_data()
-                                elif (
-                                    stream_type == rs.stream.gyro.name
-                                    or stream_type == rs.stream.accel.name
-                                ):
-                                    motion_data = None
-                                    frame_data = None
-                                    for f in frames:
-                                        if f.get_profile().stream_type().name == stream_type:
-                                            frame_data = f.as_motion_frame()
-                                            motion_data = frame_data.get_motion_data()
-
-                                    motion_json_data = None
-                                    if motion_data:
-                                        motion_json_data = {
-                                            "x": float(motion_data.x),
-                                            "y": float(motion_data.y),
-                                            "z": float(motion_data.z),
-                                        }
-
-                                    text = f"x: {motion_data.x:.6f}\ny: {motion_data.y:.6f}\nz: {motion_data.z:.6f}".split(
-                                        "\n"
-                                    )
-                                    frame = np.zeros(
-                                        (480, 640, 3), dtype=np.uint8
-                                    )  # probably better load an image instead: image = cv2.imread(path)
-                                    y0, dy = 50, 40
-                                    for i, coord in enumerate(text):
-                                        y = y0 + dy * i
-                                        cv2.putText(
-                                            frame,
-                                            coord,
-                                            (10, y),
-                                            cv2.FONT_HERSHEY_SIMPLEX,
-                                            1,
-                                            (255, 255, 255),
-                                            2,
-                                            cv2.LINE_AA,
-                                        )
-                                else:
-                                    pass
-
-                                # Add metadata
-                                metadata = {
-                                    "timestamp": frame_data.get_timestamp(),
-                                    "frame_number": frame_data.get_frame_number(),
-                                    "width": getattr(
-                                        frame_data, "get_width", lambda: 640
-                                    )()
-                                    or 640,
-                                    "height": getattr(
-                                        frame_data, "get_height", lambda: 480
-                                    )()
-                                    or 480,
-                                }
-
-                                if (
-                                    stream_type == rs.stream.gyro.name
-                                    or stream_type == rs.stream.accel.name
-                                ):
-                                    if motion_json_data:
-                                        metadata["motion_data"] = motion_json_data
-
-                                if points:
-                                    v, t = (
-                                        points.get_vertices(),
-                                        points.get_texture_coordinates(),
-                                    )
-                                    verts = (
-                                        np.asanyarray(v).view(np.float32).reshape(-1, 3)
-                                    )  # xyz
-                                    verts = verts[
-                                        verts[:, 2] >= 0.03
-                                    ]  # Filter out values where z < 0.03
-                                    # texcoords = np.asanyarray(t).view(np.float32).reshape(-1, 2)  # uv
-                                    metadata["point_cloud"] = {
-                                        "vertices": verts,
-                                        "texture_coordinates": [],
-                                    }
-
-                                frame = np.asanyarray(frame)
-
-                                # Add to queue
-                                frame_queue = self.frame_queues[device_id][
-                                    "-".join(stream_name_list)
-                                ]
-                                frame_queue.append(frame)
-
-                                metadata_queue = self.metadata_queues[device_id][
-                                    "-".join(stream_name_list)
-                                ]
-                                metadata_queue.append(metadata)
-
-                                # Keep queue size limited
-                                while len(frame_queue) > self.max_queue_size:
-                                    frame_queue.pop(0)
-
-                                while len(metadata_queue) > self.max_queue_size:
-                                    metadata_queue.pop(0)
-                            except RuntimeError:
-                                # Frame may not be available for this stream type
-                                pass
+                            
+                        for active_stream, frame in processed_frames.items():
+                            frame_queue = self.frame_queues[device_id][active_stream]
+                            frame_queue.append(frame)
+                            # Keep queue size limited
+                            while len(frame_queue) > self.max_queue_size:
+                                frame_queue.pop(0)
+                                
+                        for active_stream, metadata in processed_metadata.items():
+                            metadata_queue = self.metadata_queues[device_id][active_stream]
+                            metadata_queue.append(metadata)
+                            while len(metadata_queue) > self.max_queue_size:
+                                metadata_queue.pop(0)
 
                 except RuntimeError as e:
                     # Handle timeout or other error
