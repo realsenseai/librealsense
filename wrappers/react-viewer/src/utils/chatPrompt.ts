@@ -13,6 +13,7 @@ export interface ProposedSettings {
     optionId: string
     value: number | boolean | string
   }>
+  streamAction?: 'start' | 'stop'
   explanation?: string
 }
 
@@ -29,7 +30,8 @@ Help users configure their RealSense cameras using natural language. You can:
 1. Explain camera settings and their effects
 2. Recommend configurations for specific use cases
 3. Propose specific settings changes that the user can apply with one click
-4. Generate code snippets in Python or C++ for the RealSense SDK
+4. Start or stop camera streams with specific resolutions and frame rates
+5. Generate code snippets in Python or C++ for the RealSense SDK
 
 ## Current Device Context
 ${deviceContext || 'No cameras connected.'}
@@ -40,6 +42,7 @@ When proposing settings changes, include them in a JSON block that can be parsed
 \`\`\`settings
 {
   "deviceSerial": "device_serial_number",
+  "streamAction": "start|stop",
   "streamConfigs": [
     {
       "sensor_id": "sensor_name",
@@ -61,6 +64,13 @@ When proposing settings changes, include them in a JSON block that can be parsed
 }
 \`\`\`
 
+## Stream Control
+- Use "streamAction": "start" to start streaming with the specified streamConfigs
+- Use "streamAction": "stop" to stop streaming
+- When starting, you MUST provide streamConfigs with at least one enabled stream
+- Common resolutions: 1280x720, 848x480, 640x480, 640x360, 424x240
+- Common frame rates: 6, 15, 30, 60, 90 (availability depends on resolution)
+
 ## Guidelines
 - Be concise but informative
 - When users describe use cases (robotics, 3D scanning, etc.), recommend appropriate settings
@@ -68,6 +78,7 @@ When proposing settings changes, include them in a JSON block that can be parsed
 - If a setting is outside valid range, explain the constraint
 - For code generation, use modern RealSense SDK 2.0 patterns
 - Consider performance vs quality tradeoffs
+- Higher resolution = lower max FPS, lower resolution = higher max FPS
 
 ## Available Stream Types
 - Depth: Z16, Y8, Y16 formats
@@ -118,8 +129,19 @@ function formatSensors(sensors: SensorInfo[]): string {
   
   return sensors.map(s => {
     const profiles = s.supported_stream_profiles || []
-    const streamTypes = [...new Set(profiles.map(p => p.stream_type))].join(', ')
-    return `  - ${s.name}: ${streamTypes || 'No streams'}`
+    const streamTypes = [...new Set(profiles.map(p => p.stream_type))]
+    
+    // Build available resolutions and FPS for each stream type
+    const streamDetails = streamTypes.map(type => {
+      const typeProfiles = profiles.filter(p => p.stream_type === type)
+      const resolutions = [...new Set(typeProfiles.flatMap(p => 
+        p.resolutions.map(r => `${r[0]}x${r[1]}`)
+      ))].slice(0, 5).join(', ') // Limit to 5 resolutions
+      const fps = [...new Set(typeProfiles.flatMap(p => p.fps))].sort((a, b) => a - b).join(', ')
+      return `${type} (${resolutions} @ ${fps} fps)`
+    })
+    
+    return `  - ${s.name}:\n      ${streamDetails.join('\n      ') || 'No streams'}`
   }).join('\n')
 }
 
@@ -183,6 +205,7 @@ export function parseProposedSettings(content: string): ProposedSettings | undef
       deviceSerial: parsed.deviceSerial,
       streamConfigs: parsed.streamConfigs,
       optionChanges: parsed.optionChanges,
+      streamAction: parsed.streamAction,
       explanation: parsed.explanation,
     }
   } catch (error) {

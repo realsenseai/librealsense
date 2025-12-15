@@ -684,11 +684,43 @@ export const useAppStore = create<AppState>()((set, get) => ({
       
       const deviceId = deviceState.device.device_id
       
-      // Apply stream configurations
-      if (settings.streamConfigs) {
-        for (const config of settings.streamConfigs) {
-          get().updateStreamConfig(deviceId, config)
-        }
+      // Apply stream configurations to local state first
+      // Apply stream configurations - match by stream_type (case-insensitive)
+      if (settings.streamConfigs && settings.streamConfigs.length > 0) {
+        set((state) => {
+          const deviceState = state.deviceStates[deviceId]
+          if (!deviceState) return state
+          
+          // Create updated stream configs
+          const updatedConfigs = deviceState.streamConfigs.map(existingConfig => {
+            // Find matching proposed config by stream_type (case-insensitive)
+            const proposedConfig = settings.streamConfigs!.find(
+              pc => pc.stream_type.toLowerCase() === existingConfig.stream_type.toLowerCase()
+            )
+            
+            if (proposedConfig) {
+              // Merge proposed config with existing, keeping sensor_id from existing
+              return {
+                ...existingConfig,
+                format: proposedConfig.format || existingConfig.format,
+                resolution: proposedConfig.resolution || existingConfig.resolution,
+                framerate: proposedConfig.framerate || existingConfig.framerate,
+                enable: proposedConfig.enable,
+              }
+            }
+            return existingConfig
+          })
+          
+          return {
+            deviceStates: {
+              ...state.deviceStates,
+              [deviceId]: {
+                ...deviceState,
+                streamConfigs: updatedConfigs,
+              },
+            },
+          }
+        })
       }
       
       // Apply option changes
@@ -698,14 +730,38 @@ export const useAppStore = create<AppState>()((set, get) => ({
         }
       }
       
+      // Handle stream start/stop actions
+      if (settings.streamAction === 'start') {
+        // Make sure we have stream configs before starting
+        const currentState = get().deviceStates[deviceId]
+        const enabledConfigs = currentState?.streamConfigs.filter(c => c.enable) || []
+        if (enabledConfigs.length === 0) {
+          throw new Error('No streams enabled. Please configure at least one stream before starting.')
+        }
+        await get().startDeviceStreaming(deviceId)
+      } else if (settings.streamAction === 'stop') {
+        await get().stopDeviceStreaming(deviceId)
+      }
+      
       // Clear pending settings
       set({ pendingSettings: null })
+      
+      // Build confirmation message
+      let confirmContent = '✓ Settings applied successfully'
+      if (settings.streamAction === 'start') {
+        confirmContent = '✓ Streaming started'
+      } else if (settings.streamAction === 'stop') {
+        confirmContent = '✓ Streaming stopped'
+      }
+      if (settings.explanation) {
+        confirmContent += `: ${settings.explanation}`
+      }
       
       // Add confirmation message
       const confirmMessage: ChatMessage = {
         id: generateMessageId(),
         role: 'assistant',
-        content: `✓ Settings applied successfully${settings.explanation ? `: ${settings.explanation}` : '.'}`,
+        content: confirmContent,
         timestamp: Date.now(),
       }
       set((s) => ({

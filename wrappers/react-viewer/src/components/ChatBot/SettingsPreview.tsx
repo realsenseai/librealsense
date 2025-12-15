@@ -1,4 +1,4 @@
-import { Check, X, Settings } from 'lucide-react'
+import { Check, X, Settings, Play, Square } from 'lucide-react'
 import { useAppStore } from '../../store'
 import type { ProposedSettings } from '../../utils/chatPrompt'
 
@@ -19,15 +19,29 @@ export function SettingsPreview({ settings }: SettingsPreviewProps) {
 
   const hasStreamChanges = settings.streamConfigs && settings.streamConfigs.length > 0
   const hasOptionChanges = settings.optionChanges && settings.optionChanges.length > 0
+  const hasStreamAction = settings.streamAction === 'start' || settings.streamAction === 'stop'
 
-  if (!hasStreamChanges && !hasOptionChanges) return null
+  if (!hasStreamChanges && !hasOptionChanges && !hasStreamAction) return null
 
   return (
     <div className="mx-3 mb-3 p-3 bg-gray-800 border border-rs-blue/50 rounded-lg">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Settings className="w-4 h-4 text-rs-blue" />
-          <span className="text-sm font-medium text-white">Proposed Changes</span>
+          {hasStreamAction ? (
+            settings.streamAction === 'start' ? (
+              <Play className="w-4 h-4 text-green-400" />
+            ) : (
+              <Square className="w-4 h-4 text-red-400" />
+            )
+          ) : (
+            <Settings className="w-4 h-4 text-rs-blue" />
+          )}
+          <span className="text-sm font-medium text-white">
+            {hasStreamAction 
+              ? (settings.streamAction === 'start' ? 'Start Streaming' : 'Stop Streaming')
+              : 'Proposed Changes'
+            }
+          </span>
         </div>
         <span className="text-xs text-gray-400">
           {device?.device.name || settings.deviceSerial}
