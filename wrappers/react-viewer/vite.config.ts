@@ -23,5 +23,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    chunkSizeWarningLimit: 1600, // Three.js makes bundles large
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'three': ['three', '@react-three/fiber', '@react-three/drei'],
+          'charts': ['recharts'],
+        },
+      },
+    },
   },
 })

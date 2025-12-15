@@ -11,6 +11,14 @@ import type {
   DeviceState,
 } from '../api/types'
 import { apiClient } from '../api/client'
+import {
+  checkChatAvailability,
+  sendChatMessage as sendChatMessageApi,
+  generateMessageId,
+  type ChatMessage,
+  type ChatResponse,
+} from '../api/chat'
+import type { ProposedSettings } from '../utils/chatPrompt'
 
 interface IMUHistory {
   accel: { timestamp: number; x: number; y: number; z: number }[]
@@ -79,6 +87,19 @@ interface AppState {
   setViewMode: (mode: ViewMode) => void
   isIMUViewerExpanded: boolean
   toggleIMUViewer: () => void
+
+  // Chat/AI Assistant state
+  isChatOpen: boolean
+  isChatAvailable: boolean
+  isChatLoading: boolean
+  chatMessages: ChatMessage[]
+  pendingSettings: ProposedSettings | null
+  toggleChat: () => void
+  checkChatAvailability: () => Promise<void>
+  sendChatMessage: (content: string) => Promise<void>
+  applyProposedSettings: () => Promise<void>
+  dismissProposedSettings: () => void
+  clearChat: () => void
 
   // Error handling
   error: string | null
@@ -321,7 +342,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
               options: {
                 ...deviceState.options,
                 [sensorId]: deviceState.options[sensorId]?.map((opt) =>
-                  opt.option_id === optionId ? { ...opt, current_value: value } : opt
+                  // Match by option_id OR by name (case-insensitive) for chatbot compatibility
+                  (opt.option_id === optionId || opt.name.toLowerCase() === optionId.toLowerCase())
+                    ? { ...opt, current_value: value } 
+                    : opt
                 ),
               },
             },
@@ -576,6 +600,132 @@ export const useAppStore = create<AppState>()((set, get) => ({
   setViewMode: (mode) => set({ viewMode: mode }),
   isIMUViewerExpanded: false,
   toggleIMUViewer: () => set((state) => ({ isIMUViewerExpanded: !state.isIMUViewerExpanded })),
+
+  // Chat/AI Assistant state
+  isChatOpen: false,
+  isChatAvailable: false,
+  isChatLoading: false,
+  chatMessages: [],
+  pendingSettings: null,
+  
+  toggleChat: () => set((state) => ({ isChatOpen: !state.isChatOpen })),
+  
+  checkChatAvailability: async () => {
+    const available = await checkChatAvailability()
+    set({ isChatAvailable: available })
+  },
+  
+  sendChatMessage: async (content: string) => {
+    const state = get()
+    
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: generateMessageId(),
+      role: 'user',
+      content,
+      timestamp: Date.now(),
+    }
+    
+    set((s) => ({
+      chatMessages: [...s.chatMessages, userMessage],
+      isChatLoading: true,
+    }))
+    
+    try {
+      // Get all messages for context
+      const allMessages = [...state.chatMessages, userMessage]
+      
+      // Send to API with device context
+      const response: ChatResponse = await sendChatMessageApi(allMessages, state.deviceStates)
+      
+      // Add assistant message
+      const assistantMessage: ChatMessage = {
+        id: generateMessageId(),
+        role: 'assistant',
+        content: response.content,
+        proposedSettings: response.proposedSettings,
+        timestamp: Date.now(),
+      }
+      
+      set((s) => ({
+        chatMessages: [...s.chatMessages, assistantMessage],
+        pendingSettings: response.proposedSettings || s.pendingSettings,
+        isChatLoading: false,
+      }))
+    } catch (error) {
+      const errorMessage: ChatMessage = {
+        id: generateMessageId(),
+        role: 'assistant',
+        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+        timestamp: Date.now(),
+      }
+      
+      set((s) => ({
+        chatMessages: [...s.chatMessages, errorMessage],
+        isChatLoading: false,
+      }))
+    }
+  },
+  
+  applyProposedSettings: async () => {
+    const state = get()
+    const settings = state.pendingSettings
+    if (!settings) return
+    
+    try {
+      // Find the device
+      const deviceState = Object.values(state.deviceStates).find(
+        ds => ds.device.serial_number === settings.deviceSerial
+      )
+      
+      if (!deviceState) {
+        throw new Error(`Device ${settings.deviceSerial} not found`)
+      }
+      
+      const deviceId = deviceState.device.device_id
+      
+      // Apply stream configurations
+      if (settings.streamConfigs) {
+        for (const config of settings.streamConfigs) {
+          get().updateStreamConfig(deviceId, config)
+        }
+      }
+      
+      // Apply option changes
+      if (settings.optionChanges) {
+        for (const change of settings.optionChanges) {
+          await get().setOption(deviceId, change.sensorId, change.optionId, change.value)
+        }
+      }
+      
+      // Clear pending settings
+      set({ pendingSettings: null })
+      
+      // Add confirmation message
+      const confirmMessage: ChatMessage = {
+        id: generateMessageId(),
+        role: 'assistant',
+        content: `✓ Settings applied successfully${settings.explanation ? `: ${settings.explanation}` : '.'}`,
+        timestamp: Date.now(),
+      }
+      set((s) => ({
+        chatMessages: [...s.chatMessages, confirmMessage],
+      }))
+    } catch (error) {
+      get().setError(`Failed to apply settings: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  },
+  
+  dismissProposedSettings: () => {
+    set({ pendingSettings: null })
+  },
+  
+  clearChat: () => {
+    set({
+      chatMessages: [],
+      pendingSettings: null,
+    })
+  },
 
   // Error handling
   error: null,
