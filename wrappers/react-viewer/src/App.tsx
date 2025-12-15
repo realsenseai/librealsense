@@ -6,6 +6,7 @@ import { IMUViewer } from './components/IMUViewer'
 import { Header } from './components/Header'
 import { LoadingSplash } from './components/LoadingSplash'
 import { WhatsNew } from './components/WhatsNew'
+import { ChatButton, ChatPanel } from './components/ChatBot'
 import { useAppStore } from './store'
 import { socketService } from './api/socket'
 
@@ -83,11 +84,15 @@ function App() {
       </div>
 
       {/* Connection Status */}
-      <div className={`fixed bottom-4 right-4 px-3 py-1 rounded-full text-sm ${
+      <div className={`fixed bottom-4 left-4 px-3 py-1 rounded-full text-sm ${
         isConnected ? 'bg-green-600' : 'bg-red-600'
       }`}>
         {isConnected ? '● Connected' : '○ Disconnected'}
       </div>
+
+      {/* AI Chat Assistant */}
+      <ChatPanel />
+      <ChatButton />
     </div>
   )
 }

@@ -335,8 +335,10 @@ class RealSenseManager:
 
         sensor = dev.sensors[sensor_index]
 
+        # Find the option by name (case-insensitive comparison)
+        option_value = None
         for option in sensor.get_supported_options():
-            if option.name == option_id:
+            if option.name.lower() == option_id.lower():
                 option_value = option
                 break
 
@@ -345,13 +347,25 @@ class RealSenseManager:
                 status_code=404, detail=f"Option {option_id} not found"
             )
 
-        # Check value range
+        # Check value range (only for numeric values)
         option_range = sensor.get_option_range(option_value)
-        if value < option_range.min or value > option_range.max:
-            raise RealSenseError(
-                status_code=400,
-                detail=f"Value {value} is out of range [{option_range.min}, {option_range.max}] for option {option_id}",
-            )
+        
+        # Convert boolean to float (RealSense uses 0/1 for booleans)
+        if isinstance(value, bool):
+            value = 1.0 if value else 0.0
+        
+        # Ensure value is numeric for range check
+        try:
+            numeric_value = float(value)
+            if numeric_value < option_range.min or numeric_value > option_range.max:
+                raise RealSenseError(
+                    status_code=400,
+                    detail=f"Value {value} is out of range [{option_range.min}, {option_range.max}] for option {option_id}",
+                )
+            value = numeric_value
+        except (ValueError, TypeError):
+            # Non-numeric value, skip range check
+            pass
 
         # Set the option value
         try:

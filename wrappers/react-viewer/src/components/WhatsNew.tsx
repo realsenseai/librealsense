@@ -1,10 +1,20 @@
 import { useState, useEffect } from 'react'
 
 // Version of the React Viewer - update this with each release
-export const APP_VERSION = '0.3.0'
+export const APP_VERSION = '0.4.0'
 
 // What's New content for each version
 const WHATS_NEW: Record<string, { title: string; features: string[] }> = {
+  '0.4.0': {
+    title: "AI Configuration Assistant",
+    features: [
+      "New AI chatbot for natural language camera configuration",
+      "Ask questions like 'Set up for 3D scanning' or 'Optimize for robotics'",
+      "AI proposes settings changes with one-click apply",
+      "Export configurations as Python or C++ code snippets",
+      "Context-aware suggestions based on connected devices",
+    ],
+  },
   '0.3.0': {
     title: "Improved UI Layout & Device Actions",
     features: [

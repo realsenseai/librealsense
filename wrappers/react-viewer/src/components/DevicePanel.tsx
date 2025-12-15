@@ -459,6 +459,16 @@ interface SensorOptionsPanelProps {
 }
 
 function SensorOptionsPanel({ sensor, options, isExpanded, onToggle, onSetOption }: SensorOptionsPanelProps) {
+  // Count modified options
+  const modifiedCount = options.filter(o => !o.read_only && o.current_value !== o.default_value).length
+
+  const handleRestoreAllDefaults = async () => {
+    const modifiedOptions = options.filter(o => !o.read_only && o.current_value !== o.default_value)
+    for (const option of modifiedOptions) {
+      await onSetOption(sensor.sensor_id, option.option_id, option.default_value)
+    }
+  }
+
   return (
     <div className="mb-1">
       <button
@@ -466,18 +476,37 @@ function SensorOptionsPanel({ sensor, options, isExpanded, onToggle, onSetOption
         className="w-full flex items-center justify-between p-1.5 bg-gray-800/50 rounded hover:bg-gray-700 transition-colors text-xs"
       >
         <span className="font-medium">{sensor.name}</span>
-        <svg
-          className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <div className="flex items-center gap-1">
+          {modifiedCount > 0 && (
+            <span className="px-1.5 py-0.5 bg-rs-blue/20 text-rs-blue rounded text-[10px]">
+              {modifiedCount} modified
+            </span>
+          )}
+          <svg
+            className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
       </button>
 
       {isExpanded && (
         <div className="mt-1 space-y-1 pl-2">
+          {/* Restore All Defaults button */}
+          {modifiedCount > 0 && (
+            <button
+              onClick={handleRestoreAllDefaults}
+              className="w-full flex items-center justify-center gap-1 p-1 bg-gray-700/50 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors mb-1"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Restore All Defaults
+            </button>
+          )}
           {options.length === 0 ? (
             <p className="text-gray-500 text-xs py-1">No options available</p>
           ) : (
@@ -505,6 +534,11 @@ interface OptionControlProps {
 function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
   const [localValue, setLocalValue] = useState(option.current_value)
 
+  // Sync with external changes (e.g., from chatbot)
+  useEffect(() => {
+    setLocalValue(option.current_value)
+  }, [option.current_value])
+
   const handleChange = async (value: number | boolean | string) => {
     setLocalValue(value)
     try {
@@ -514,6 +548,11 @@ function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
     }
   }
 
+  const handleRestoreDefault = async () => {
+    await handleChange(option.default_value)
+  }
+
+  const isModified = localValue !== option.default_value
   const isBoolean = typeof option.current_value === 'boolean' || 
     (option.min_value === 0 && option.max_value === 1 && option.step === 1)
   const isSlider = typeof option.min_value === 'number' && typeof option.max_value === 'number'
@@ -521,10 +560,23 @@ function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
   return (
     <div className="bg-gray-800/30 rounded p-1.5 text-xs">
       <div className="flex items-center justify-between mb-0.5">
-        <label className="font-medium truncate text-gray-300" title={option.description}>
+        <label className="font-medium truncate text-gray-300 flex-1" title={option.description}>
           {option.name}
         </label>
-        {option.units && <span className="text-gray-500 ml-1">{option.units}</span>}
+        <div className="flex items-center gap-1">
+          {option.units && <span className="text-gray-500">{option.units}</span>}
+          {!option.read_only && isModified && (
+            <button
+              onClick={handleRestoreDefault}
+              className="text-gray-500 hover:text-rs-blue transition-colors"
+              title={`Restore default (${option.default_value})`}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {option.read_only ? (
