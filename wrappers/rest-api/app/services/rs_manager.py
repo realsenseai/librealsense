@@ -336,15 +336,24 @@ class RealSenseManager:
         sensor = dev.sensors[sensor_index]
 
         # Find the option by name (case-insensitive comparison)
+        # Match against both raw option name and display name
         option_value = None
-        for option in sensor.get_supported_options():
-            if option.name.lower() == option_id.lower():
+        supported_options = list(sensor.get_supported_options())
+        option_id_lower = option_id.lower().replace(" ", "_")  # Normalize spaces to underscores
+        
+        for option in supported_options:
+            opt_name_lower = option.name.lower()
+            # Match by raw name or by normalized display name
+            if opt_name_lower == option_id_lower or opt_name_lower == option_id.lower():
                 option_value = option
                 break
 
         if option_value is None:
+            # Provide helpful error with available options
+            available_names = [opt.name for opt in supported_options]
             raise RealSenseError(
-                status_code=404, detail=f"Option {option_id} not found"
+                status_code=404, 
+                detail=f"Option '{option_id}' not found. Available options: {', '.join(available_names)}"
             )
 
         # Check value range (only for numeric values)
