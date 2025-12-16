@@ -5,11 +5,26 @@ export interface DeviceInfo {
   name: string
   serial_number: string
   firmware_version?: string
+  recommended_firmware_version?: string
+  firmware_status?: FirmwareStatus
+  firmware_file_available?: boolean
   physical_port?: string
   usb_type?: string
   product_id?: string
   sensors: string[]
   is_streaming: boolean
+}
+
+export type FirmwareStatus = 'up_to_date' | 'outdated' | 'missing_file' | 'unknown'
+
+export interface FirmwareState {
+  current?: string
+  recommended?: string
+  status: FirmwareStatus
+  file_available?: boolean
+  is_updating?: boolean
+  progress?: number
+  last_error?: string | null
 }
 
 export interface SensorInfo {
@@ -119,6 +134,7 @@ export interface StreamLayout {
 // Per-device state for multi-camera support
 export interface DeviceState {
   device: DeviceInfo
+  firmware?: FirmwareState
   sensors: SensorInfo[]
   options: Record<string, OptionInfo[]> // keyed by sensor_id
   streamConfigs: StreamConfig[]

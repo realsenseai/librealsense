@@ -1,10 +1,20 @@
 import { useState, useEffect } from 'react'
 
 // Version of the React Viewer - update this with each release
-export const APP_VERSION = '0.4.0'
+export const APP_VERSION = '0.5.0'
 
 // What's New content for each version
 const WHATS_NEW: Record<string, { title: string; features: string[] }> = {
+  '0.5.0': {
+    title: "Auto Firmware Check + Update",
+    features: [
+      "Automatic firmware status check on device discovery",
+      "Shows update banner when FW is outdated (like old viewer)",
+      "One-click install using bundled signed image (no uploads)",
+      "Graceful handling when FW bundle is missing — visible debug notice",
+      "Safer updates: disabled while streaming; detailed backend errors",
+    ],
+  },
   '0.4.0': {
     title: "AI Configuration Assistant",
     features: [
