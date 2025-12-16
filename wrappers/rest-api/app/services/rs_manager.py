@@ -73,6 +73,9 @@ class RealSenseManager:
         self.is_pointcloud_enabled: Dict[str, bool] = {}
         self.pc = rs.pointcloud()
 
+        # Store latest raw depth frames for pixel depth queries
+        self.depth_frames: Dict[str, Any] = {}  # device_id -> rs.depth_frame
+
         # Firmware update tracking
         self._fw_updates_in_progress: Set[str] = set()
 
@@ -1278,6 +1281,8 @@ class RealSenseManager:
                             if rs_stream == rs.stream.depth:
                                 frame_data = frames.get_depth_frame()
                                 if frame_data:
+                                    # Store raw depth frame for pixel queries
+                                    self.depth_frames[device_id] = frame_data
                                     colorized = colorizer.colorize(frame_data)
                                     frame = np.asanyarray(colorized.get_data())
                                     if self.is_pointcloud_enabled.get(device_id, False):
@@ -1383,7 +1388,60 @@ class RealSenseManager:
                             del self.frame_queues[device_id]
                         if device_id in self.metadata_queues:
                             del self.metadata_queues[device_id]
+                        if device_id in self.depth_frames:
+                            del self.depth_frames[device_id]
                         if device_id in self.device_infos:
                             self.device_infos[device_id].is_streaming = False
             except Exception:
                 pass
+
+    def get_depth_at_pixel(self, device_id: str, x: int, y: int) -> Optional[float]:
+        """Get depth value (in meters) at specific pixel coordinates."""
+        with self.lock:
+            if device_id not in self.depth_frames:
+                return None
+            depth_frame = self.depth_frames[device_id]
+            try:
+                # get_distance returns depth in meters
+                return depth_frame.get_distance(x, y)
+            except Exception as e:
+                print(f"Error getting depth at pixel ({x}, {y}): {str(e)}")
+                return None
+
+    def get_depth_range(self, device_id: str) -> Dict[str, Any]:
+        """
+        Calculate dynamic depth range for legend based on current frame.
+        Matches legacy viewer algorithm: mean + 1.5*stddev, rounded up to nearest 4m.
+        """
+        import math
+        with self.lock:
+            if device_id not in self.depth_frames:
+                return {"min_depth": 0, "max_depth": 6, "units": "meters"}
+            depth_frame = self.depth_frames[device_id]
+            try:
+                width = depth_frame.get_width()
+                height = depth_frame.get_height()
+                # Sample every 30th pixel like legacy viewer
+                skip = 30
+                distances = []
+                for y in range(0, height, skip):
+                    for x in range(0, width, skip):
+                        d = depth_frame.get_distance(x, y)
+                        if d > 0:
+                            distances.append(d)
+                if not distances:
+                    return {"min_depth": 0, "max_depth": 6, "units": "meters"}
+                # Calculate mean and standard deviation
+                mean = sum(distances) / len(distances)
+                variance = sum((d - mean) ** 2 for d in distances) / len(distances)
+                stddev = math.sqrt(variance)
+                # Round up to nearest 4m
+                length_jump = 4.0
+                max_depth = math.ceil((mean + 1.5 * stddev) / length_jump) * length_jump
+                # Clamp to reasonable range
+                max_depth = max(4.0, min(max_depth, 16.0))
+                return {"min_depth": 0, "max_depth": max_depth, "units": "meters"}
+            except Exception as e:
+                print(f"Error calculating depth range: {str(e)}")
+                return {"min_depth": 0, "max_depth": 6, "units": "meters"}
+
