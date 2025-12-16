@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../store'
-import type { DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState } from '../api/types'
+import type { DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState } from '../api/types'
+import { FirmwareProgressModal } from './FirmwareProgressModal'
+import { ToastContainer, type ToastType } from './Toast'
+
+interface Toast {
+  id: string
+  type: ToastType
+  message: string
+}
 
 export function DevicePanel() {
   const {
@@ -17,18 +25,89 @@ export function DevicePanel() {
     setOption,
     startDeviceStreaming,
     stopDeviceStreaming,
+    checkFirmwareUpdates,
+    updateFirmware,
   } = useAppStore()
 
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const [firmwareProgressDeviceId, setFirmwareProgressDeviceId] = useState<string | null>(null)
+  const [firmwareProgressStates, setFirmwareProgressStates] = useState<Record<string, FirmwareState>>({})
+
   const isStreaming = isAnyDeviceStreaming()
+  const isFirmwareUpdating = firmwareProgressDeviceId !== null
 
   useEffect(() => {
+    // Don't poll during firmware update - device may be in DFU mode
+    if (isFirmwareUpdating) {
+      return
+    }
+    
     fetchDevices()
     // Only poll for device changes when NOT streaming (polling causes frame hiccups)
     if (!isStreaming) {
       const interval = setInterval(fetchDevices, 5000)
       return () => clearInterval(interval)
     }
-  }, [fetchDevices, isStreaming])
+  }, [fetchDevices, isStreaming, isFirmwareUpdating])
+
+  const addToast = (type: ToastType, message: string) => {
+    const id = Date.now().toString()
+    setToasts((prev) => [...prev, { id, type, message }])
+  }
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  const handleFirmwareProgressUpdate = (deviceId: string, progress: number) => {
+    setFirmwareProgressStates((prev) => {
+      const current = prev[deviceId] || { status: 'unknown' as const, is_updating: true, progress: 0 }
+      return {
+        ...prev,
+        [deviceId]: {
+          ...current,
+          progress,
+        },
+      }
+    })
+  }
+
+  const handleFirmwareSuccess = (deviceId: string, fwVersion: string | null) => {
+    // Set progress to 100% to show completion state in modal
+    setFirmwareProgressStates((prev) => {
+      const current = prev[deviceId] || { status: 'unknown' as const, is_updating: false, progress: 1.0 }
+      return {
+        ...prev,
+        [deviceId]: {
+          ...current,
+          progress: 1.0,
+          is_updating: false,
+        },
+      }
+    })
+    addToast('success', `Firmware update successful! Version: ${fwVersion || 'Unknown'}`)
+    // Note: modal will auto-close after 2 seconds (handled in FirmwareProgressModal)
+  }
+
+  const handleFirmwareError = (deviceId: string, error: string) => {
+    // Set error state in modal
+    setFirmwareProgressStates((prev) => {
+      const current = prev[deviceId] || { status: 'unknown' as const, is_updating: false, progress: 0 }
+      return {
+        ...prev,
+        [deviceId]: {
+          ...current,
+          is_updating: false,
+          last_error: error,
+        },
+      }
+    })
+    addToast('error', `Firmware update failed: ${error}`)
+  }
+
+  const handleCloseFirmwareModal = () => {
+    setFirmwareProgressDeviceId(null)
+  }
 
   return (
     <div className="p-4">
@@ -112,11 +191,58 @@ export function DevicePanel() {
                 }
                 onStartStreaming={() => startDeviceStreaming(device.device_id)}
                 onStopStreaming={() => stopDeviceStreaming(device.device_id)}
+                onCheckFirmwareUpdates={() => checkFirmwareUpdates(device.device_id)}
+                onUpdateFirmware={() => {
+                  setFirmwareProgressDeviceId(device.device_id)
+                  // Initialize progress state with progress at 0 and clear any previous errors
+                  const baseFirmware = deviceState?.firmware || {
+                    current: device.firmware_version,
+                    recommended: device.recommended_firmware_version,
+                    status: 'unknown' as const,
+                    file_available: device.firmware_file_available,
+                  }
+                  setFirmwareProgressStates((prev) => ({
+                    ...prev,
+                    [device.device_id]: {
+                      ...baseFirmware,
+                      is_updating: true,
+                      progress: 0,
+                      last_error: null,
+                    },
+                  }))
+                  updateFirmware(device.device_id)
+                }}
               />
             )
           })}
         </div>
       )}
+
+      {/* Firmware Progress Modal */}
+      {firmwareProgressDeviceId && (
+        <FirmwareProgressModal
+          isOpen={true}
+          device={devices.find((d) => d.device_id === firmwareProgressDeviceId) || { device_id: '', name: 'Unknown' }}
+          firmware={
+            firmwareProgressStates[firmwareProgressDeviceId] || {
+              current: 'Unknown',
+              recommended: 'Unknown',
+              status: 'unknown' as const,
+              file_available: false,
+              is_updating: true,
+              progress: 0,
+              last_error: null,
+            }
+          }
+          onClose={handleCloseFirmwareModal}
+          onProgressUpdate={(progress) => handleFirmwareProgressUpdate(firmwareProgressDeviceId, progress)}
+          onSuccess={(fwVersion) => handleFirmwareSuccess(firmwareProgressDeviceId, fwVersion)}
+          onError={(error) => handleFirmwareError(firmwareProgressDeviceId, error)}
+        />
+      )}
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   )
 }
@@ -130,6 +256,8 @@ interface DeviceCardProps {
   onSetOption: (sensorId: string, optionId: string, value: number | boolean | string) => Promise<void>
   onStartStreaming: () => void
   onStopStreaming: () => void
+  onCheckFirmwareUpdates: () => void
+  onUpdateFirmware: () => void
 }
 
 function DeviceCard({ 
@@ -141,9 +269,12 @@ function DeviceCard({
   onSetOption,
   onStartStreaming,
   onStopStreaming,
+  onCheckFirmwareUpdates,
+  onUpdateFirmware,
 }: DeviceCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [expandedSensor, setExpandedSensor] = useState<string | null>(null)
+  const [showDismissMenu, setShowDismissMenu] = useState(false)
   
   const isActive = deviceState?.isActive || false
   const isLoading = deviceState?.isLoading || false
@@ -153,6 +284,42 @@ function DeviceCard({
   const streamConfigs = deviceState?.streamConfigs || []
   
   const hasEnabledStreams = streamConfigs.some(c => c.enable)
+
+  const firmware = deviceState?.firmware || {
+    current: device.firmware_version,
+    recommended: device.recommended_firmware_version,
+    status: (device.firmware_status as FirmwareState['status']) || 'unknown',
+    file_available: device.firmware_file_available,
+    is_updating: false,
+    progress: undefined,
+    last_error: null,
+  }
+
+  // Check if FW update has been dismissed
+  const dismissKey = `fw-dismiss-${device.device_id}-${firmware.recommended}`
+  const dismissData = localStorage.getItem(dismissKey)
+  const isDismissed = dismissData === 'forever'
+  const isRemindLater = dismissData ? new Date(dismissData).getTime() > Date.now() : false
+
+  const showFirmwareUpdate = firmware.status === 'outdated' && !isDismissed && !isRemindLater
+  const showMissingFirmware = firmware.status === 'missing_file'
+
+  const handleDismiss = (mode: 'later' | 'forever') => {
+    if (mode === 'forever') {
+      localStorage.setItem(dismissKey, 'forever')
+    } else {
+      // Remind in 7 days
+      const remindDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      localStorage.setItem(dismissKey, remindDate.toISOString())
+    }
+    setShowDismissMenu(false)
+  }
+
+  const handleCheckFirmwareUpdates = () => {
+    // Clear any existing dismissal state so the banner appears if update is available
+    localStorage.removeItem(dismissKey)
+    onCheckFirmwareUpdates()
+  }
 
   return (
     <div
@@ -226,6 +393,19 @@ function DeviceCard({
                     <button
                       onClick={() => {
                         setShowMenu(false)
+                        handleCheckFirmwareUpdates()
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      Check for Firmware Updates
+                    </button>
+                    <div className="border-t border-gray-600 my-1" />
+                    <button
+                      onClick={() => {
+                        setShowMenu(false)
                         onReset()
                       }}
                       disabled={isStreaming}
@@ -260,6 +440,82 @@ function DeviceCard({
             </button>
           </div>
         </div>
+
+        {/* Firmware status / update */}
+        {showFirmwareUpdate && (
+          <div className="mt-2 p-2 bg-amber-900/40 border border-amber-600 rounded text-amber-200 text-xs">
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <div className="font-semibold text-amber-100">Firmware update available</div>
+                <div className="text-amber-50/90">
+                  Current: {firmware.current || 'Unknown'} · Recommended: {firmware.recommended || 'Unknown'}
+                </div>
+                {!firmware.file_available && (
+                  <div className="text-amber-300 mt-1">FW update needed but bundled file not found (debug message)</div>
+                )}
+                {firmware.last_error && (
+                  <div className="text-red-200 mt-1">{firmware.last_error}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={onUpdateFirmware}
+                  disabled={isStreaming || firmware.is_updating || !firmware.file_available}
+                  className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                    isStreaming || firmware.is_updating || !firmware.file_available
+                      ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      : 'bg-amber-500 hover:bg-amber-400 text-black'
+                  }`}
+                >
+                  {firmware.is_updating ? 'Updating…' : 'Install update'}
+                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowDismissMenu(!showDismissMenu)}
+                    className="p-1 hover:bg-amber-800 rounded transition-colors"
+                    title="Dismiss"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  {showDismissMenu && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowDismissMenu(false)} />
+                      <div className="absolute right-0 mt-1 w-40 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-20 py-1">
+                        <button
+                          onClick={() => handleDismiss('later')}
+                          className="w-full px-3 py-2 text-left text-xs hover:bg-gray-700 transition-colors"
+                        >
+                          Remind me later
+                        </button>
+                        <button
+                          onClick={() => handleDismiss('forever')}
+                          className="w-full px-3 py-2 text-left text-xs hover:bg-gray-700 transition-colors"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showMissingFirmware && !showFirmwareUpdate && (
+          <div className="mt-2 p-2 bg-amber-900/40 border border-amber-600 rounded text-amber-200 text-xs">
+            <div className="font-semibold text-amber-100">FW update needed but bundled file not found (debug message)</div>
+            <div>Current: {firmware.current || 'Unknown'} · Recommended: {firmware.recommended || 'Unknown'}</div>
+          </div>
+        )}
+
+        {firmware.is_updating && (
+          <div className="mt-2 text-xs text-blue-200">
+            Updating firmware... {Math.round((firmware.progress || 0) * 100)}%
+          </div>
+        )}
 
         {/* Device Details */}
         <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-500">
