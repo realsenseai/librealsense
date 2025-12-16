@@ -227,6 +227,31 @@ class ApiClient {
     return response.data
   }
 
+  async getDepthAtPixel(
+    deviceId: string,
+    x: number,
+    y: number
+  ): Promise<{ depth: number | null; x: number; y: number; units: string }> {
+    const response = await this.client.get<{
+      depth: number | null
+      x: number
+      y: number
+      units: string
+    }>(`/devices/${deviceId}/stream/depth-at-pixel/`, { params: { x, y } })
+    return response.data
+  }
+
+  async getDepthRange(
+    deviceId: string
+  ): Promise<{ min_depth: number; max_depth: number; units: string }> {
+    const response = await this.client.get<{
+      min_depth: number
+      max_depth: number
+      units: string
+    }>(`/devices/${deviceId}/stream/depth-range/`)
+    return response.data
+  }
+
   // ============ Point Cloud ============
 
   async enablePointCloud(deviceId: string): Promise<void> {

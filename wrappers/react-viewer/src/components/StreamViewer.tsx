@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useAppStore } from '../store'
 import { WebRTCHandler } from '../api/webrtc'
+import { apiClient } from '../api/client'
+import { DepthLegend } from './DepthLegend'
 import type { DeviceState, StreamConfig } from '../api/types'
 
 // A stream with its device context
@@ -114,11 +116,45 @@ interface StreamTileProps {
 
 function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreaming, showDeviceName, metadata }: StreamTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const webrtcHandlerRef = useRef<WebRTCHandler | null>(null)
+  const hoverRequestId = useRef(0)
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | null>(null)
   const [fps, setFps] = useState(0)
   const lastFrameTime = useRef(0)
   const frameCount = useRef(0)
+  const [hoverDepth, setHoverDepth] = useState<{
+    x: number
+    y: number
+    depth: number | null
+    mouseX: number
+    mouseY: number
+  } | null>(null)
+  const [depthRange, setDepthRange] = useState<{ min: number; max: number }>({ min: 0, max: 6 })
+
+  const isDepthStream = streamType.toLowerCase() === 'depth'
+
+  // Fetch dynamic depth range periodically for depth streams
+  useEffect(() => {
+    if (!isDepthStream || !isStreaming) return
+    let cancelled = false
+    const fetchRange = async () => {
+      try {
+        const result = await apiClient.getDepthRange(deviceId)
+        if (!cancelled) {
+          setDepthRange({ min: result.min_depth, max: result.max_depth })
+        }
+      } catch (error) {
+        // Ignore errors, keep previous range
+      }
+    }
+    fetchRange()
+    const interval = setInterval(fetchRange, 2000) // Update every 2 seconds
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [isDepthStream, isStreaming, deviceId])
 
   // Calculate FPS from metadata updates
   useEffect(() => {
@@ -141,6 +177,60 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
 
   const handleConnectionStateChange = useCallback((state: RTCPeerConnectionState) => {
     setConnectionState(state)
+  }, [])
+
+  // Throttle depth queries to avoid overloading the backend
+  const lastQueryTime = useRef(0)
+  const pendingQuery = useRef<{ x: number; y: number; mouseX: number; mouseY: number } | null>(null)
+  const queryThrottleMs = 50 // Query at most every 50ms
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!isDepthStream || !isStreaming || !containerRef.current || !metadata) return
+
+      const rect = containerRef.current.getBoundingClientRect()
+      const x = Math.floor(((e.clientX - rect.left) / rect.width) * metadata.width)
+      const y = Math.floor(((e.clientY - rect.top) / rect.height) * metadata.height)
+      const mouseX = e.clientX - rect.left
+      const mouseY = e.clientY - rect.top
+
+      // Bounds check
+      if (x < 0 || x >= metadata.width || y < 0 || y >= metadata.height) {
+        setHoverDepth(null)
+        return
+      }
+
+      // Store pending query coords
+      pendingQuery.current = { x, y, mouseX, mouseY }
+
+      const now = Date.now()
+      if (now - lastQueryTime.current < queryThrottleMs) {
+        // Skip this event, a recent query is still fresh
+        return
+      }
+      lastQueryTime.current = now
+
+      const requestId = ++hoverRequestId.current
+      apiClient.getDepthAtPixel(deviceId, x, y).then((result) => {
+        if (requestId === hoverRequestId.current && pendingQuery.current) {
+          setHoverDepth({
+            x: pendingQuery.current.x,
+            y: pendingQuery.current.y,
+            depth: result.depth,
+            mouseX: pendingQuery.current.mouseX,
+            mouseY: pendingQuery.current.mouseY,
+          })
+        }
+      }).catch((error) => {
+        console.error('Error getting depth at pixel:', error)
+      })
+    },
+    [isDepthStream, isStreaming, deviceId, metadata]
+  )
+
+  const handleMouseLeave = useCallback(() => {
+    hoverRequestId.current++
+    setHoverDepth(null)
   }, [])
 
   useEffect(() => {
@@ -209,13 +299,20 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
   }
 
   return (
-    <div className="relative bg-black rounded-lg overflow-hidden">
+    <div 
+      ref={containerRef}
+      className="relative bg-black rounded-lg overflow-hidden"
+      onMouseMove={isDepthStream ? handleMouseMove : undefined}
+      onMouseLeave={isDepthStream ? handleMouseLeave : undefined}
+    >
       {/* Video Element */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
+        disablePictureInPicture
+        controlsList="nodownload nofullscreen noremoteplayback"
         className="w-full h-full object-contain stream-video"
       />
 
@@ -279,6 +376,33 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
               />
             </svg>
             <p>Press Start to stream</p>
+          </div>
+        </div>
+      )}
+
+      {/* Depth Legend (for depth streams) */}
+      {isDepthStream && isStreaming && (
+        <div className="absolute top-12 right-2 bottom-12 w-16">
+          <DepthLegend minDepth={depthRange.min} maxDepth={depthRange.max} colorScheme="jet" show={true} />
+        </div>
+      )}
+
+      {/* Hover Depth Tooltip (for depth streams) */}
+      {isDepthStream && hoverDepth && (
+        <div
+          className="absolute bg-black/90 text-white text-sm px-3 py-2 rounded shadow-lg pointer-events-none z-20"
+          style={{
+            left: `${hoverDepth.mouseX + 14}px`,
+            top: `${hoverDepth.mouseY + 14}px`,
+            willChange: 'transform',
+          }}
+        >
+          <div className="font-mono">
+            <span className="text-gray-400">Pixel:</span> ({hoverDepth.x}, {hoverDepth.y})
+          </div>
+          <div className="font-mono font-bold">
+            <span className="text-gray-400">Depth:</span>{' '}
+            {hoverDepth.depth !== null ? `${hoverDepth.depth.toFixed(3)} m` : 'N/A'}
           </div>
         </div>
       )}
