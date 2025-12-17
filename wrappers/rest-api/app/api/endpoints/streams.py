@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 
 
-from app.models.stream import StreamStatus, StreamStart
+from app.models.stream import StreamStatus, StreamStart, StreamStartTiming
 from app.services.rs_manager import RealSenseManager
 from app.api.dependencies import get_realsense_manager
 
 router = APIRouter()
 
-@router.post("/start", response_model=StreamStatus)
+@router.post("/start", response_model=StreamStartTiming)
 async def start_stream(
     device_id: str,
     stream_config: StreamStart,
@@ -16,9 +16,19 @@ async def start_stream(
 ):
     """
     Start streaming from a RealSense device with the specified configuration.
+    Returns timing info for diagnostics.
     """
+    import time
+    t0 = time.perf_counter()
     try:
-        return rs_manager.start_stream(device_id, stream_config.configs, stream_config.align_to)
+        result = rs_manager.start_stream(
+            device_id,
+            stream_config.configs,
+            stream_config.align_to,
+            reuse_cache=stream_config.reuse_cache,
+        )
+        result['timings']['endpoint_total'] = time.perf_counter() - t0
+        return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

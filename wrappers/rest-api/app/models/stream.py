@@ -19,6 +19,7 @@ class StreamStart(BaseModel):
     configs: List[StreamConfig]
     align_to: Optional[str] = None  # Align to specific stream
     apply_filters: bool = False
+    reuse_cache: bool = True  # allow callers to force rebuild when needed
 
 class StreamStatus(BaseModel):
     device_id: str
@@ -30,3 +31,13 @@ class StreamStatus(BaseModel):
 class PointCloudStatus(BaseModel):
     device_id: str
     is_active: bool
+
+class StreamStartTiming(BaseModel):
+    device_id: str
+    is_streaming: bool
+    active_streams: List[str] = []
+    timings: dict
+    framerate: Optional[float] = None
+    duration: Optional[float] = None  # Time in seconds
+    config_reused: Optional[bool] = None
+    config_signature: Optional[str] = None
