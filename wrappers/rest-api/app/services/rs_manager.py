@@ -73,6 +73,11 @@ class RealSenseManager:
         self.is_pointcloud_enabled: Dict[str, bool] = {}
         self.pc = rs.pointcloud()
 
+        # Caches for pipeline/config reuse to reduce startup cost
+        self.config_cache: Dict[str, Dict[str, rs.config]] = {}  # device -> signature -> config
+        self.pipeline_cache: Dict[str, rs.pipeline] = {}  # device -> last pipeline object
+        self.pipeline_signatures: Dict[str, str] = {}  # device -> active signature
+
         # Store latest raw depth frames for pixel depth queries
         self.depth_frames: Dict[str, Any] = {}  # device_id -> rs.depth_frame
 
@@ -91,6 +96,9 @@ class RealSenseManager:
 
         self.sio = sio
         self.metadata_socket_server = MetadataSocketServer(sio, self)
+
+        # Device discovery cache metadata
+        self._last_refresh_time: float = 0.0
 
         # Initialize devices
         self.refresh_devices()
@@ -350,15 +358,31 @@ class RealSenseManager:
 
                 self.device_infos[device_id] = device_info
 
+            # Update cache timestamp after a successful refresh
+            import time
+            self._last_refresh_time = time.perf_counter()
             return list(self.device_infos.values())
 
-    def get_devices(self) -> List[DeviceInfo]:
-        """Get all connected devices"""
-        return self.refresh_devices()
+    def _make_signature(self, configs: List[StreamConfig], align_to: Optional[str]) -> str:
+        """Deterministic signature for a stream start request."""
+        parts = []
+        for cfg in sorted(configs, key=lambda c: (c.stream_type.lower(), c.sensor_id, c.resolution.width, c.resolution.height, c.framerate, c.format.lower())):
+            parts.append(
+                f"{cfg.stream_type.lower()}|{cfg.format.lower()}|{cfg.resolution.width}x{cfg.resolution.height}@{cfg.framerate}|sensor:{cfg.sensor_id}"
+            )
+        align_part = align_to.lower() if align_to else "none"
+        return ";".join(parts) + f"|align:{align_part}"
 
-    def get_device(self, device_id: str) -> DeviceInfo:
+    def get_devices(self, force_refresh: bool = False) -> List[DeviceInfo]:
+        """Get all connected devices, with optional forced refresh."""
+        if force_refresh or not self.device_infos:
+            return self.refresh_devices()
+        with self.lock:
+            return list(self.device_infos.values())
+
+    def get_device(self, device_id: str, force_refresh: bool = False) -> DeviceInfo:
         """Get a specific device by ID"""
-        devices = self.get_devices()
+        devices = self.get_devices(force_refresh=force_refresh)
         for device in devices:
             if device.device_id == device_id:
                 return device
@@ -922,129 +946,157 @@ class RealSenseManager:
         device_id: str,
         configs: List[StreamConfig],
         align_to: Optional[str] = None,
-    ) -> StreamStatus:
-        """Start streaming from a device"""
-        self.refresh_devices()
+        reuse_cache: bool = True,
+        timing: bool = True,
+    ) -> dict:
+        """Start streaming from a device, with timing info for diagnostics"""
+        import time
+        timings = {}
+        t0 = time.perf_counter()
+        refreshed = False
+        # Only refresh when the cache is empty or the requested device is unknown
+        if not self.devices or device_id not in self.devices:
+            self.refresh_devices()
+            refreshed = True
+        timings['refresh_devices'] = time.perf_counter() - t0 if refreshed else 0.0
+
+        t1 = time.perf_counter()
         if device_id not in self.devices:
-            if device_id not in self.devices:
-                raise RealSenseError(
-                    status_code=404, detail=f"Device {device_id} not found"
-                )
-
-        # Stop existing stream if running
-        if device_id in self.pipelines:
-            return StreamStatus(
-                device_id=device_id,
-                is_streaming=True,
-                active_streams=list(self.active_streams[device_id]),
+            raise RealSenseError(
+                status_code=404, detail=f"Device {device_id} not found"
             )
+        timings['device_lookup'] = time.perf_counter() - t1
+        signature = self._make_signature(configs, align_to)
 
-        # Initialize pipeline and config
-        pipeline = rs.pipeline(self.ctx)
-        config = rs.config()
-        config.enable_device(device_id)
+        t2 = time.perf_counter()
+        # If already streaming with identical signature, short-circuit
+        if device_id in self.pipelines and self.pipeline_signatures.get(device_id) == signature:
+            return {
+                'device_id': device_id,
+                'is_streaming': True,
+                'active_streams': list(self.active_streams[device_id]),
+                'timings': timings,
+                'config_reused': True,
+                'config_signature': signature,
+            }
 
+        # Initialize or reuse pipeline and config
+        config_cache_for_device = self.config_cache.setdefault(device_id, {})
+
+        if not reuse_cache:
+            config_cache_for_device.pop(signature, None)
+            self.pipeline_cache.pop(device_id, None)
+        pipeline = self.pipeline_cache.get(device_id) if reuse_cache else None
+        pipeline = pipeline or rs.pipeline(self.ctx)
+
+        config_reused = False
+        if reuse_cache and signature in config_cache_for_device:
+            config = config_cache_for_device[signature]
+            config_reused = True
+        else:
+            config = rs.config()
+            config.enable_device(device_id)
+        timings['pipeline_config_init'] = 0.0 if config_reused else time.perf_counter() - t2
+
+        t3 = time.perf_counter()
         # Track active stream types
         active_streams = set()
-
-        # Enable streams based on configuration
-        for stream_config in configs:
-            # Parse sensor index from sensor_id
-            try:
-                sensor_index = int(stream_config.sensor_id.split("-")[-1])
-                if sensor_index < 0 or sensor_index >= len(
-                    self.devices[device_id].sensors
-                ):
+        # Enable streams based on configuration only if not reused
+        if not config_reused:
+            for stream_config in configs:
+                # Parse sensor index from sensor_id
+                try:
+                    sensor_index = int(stream_config.sensor_id.split("-")[-1])
+                    if sensor_index < 0 or sensor_index >= len(
+                        self.devices[device_id].sensors
+                    ):
+                        raise RealSenseError(
+                            status_code=404,
+                            detail=f"Sensor {stream_config.sensor_id} not found",
+                        )
+                except (ValueError, IndexError):
                     raise RealSenseError(
                         status_code=404,
-                        detail=f"Sensor {stream_config.sensor_id} not found",
+                        detail=f"Invalid sensor ID format: {stream_config.sensor_id}",
                     )
-            except (ValueError, IndexError):
-                raise RealSenseError(
-                    status_code=404,
-                    detail=f"Invalid sensor ID format: {stream_config.sensor_id}",
-                )
-
-            # Get stream type from string
-            stream_name_list = stream_config.stream_type.split("-")
-            stream_type = None
-            for name, val in rs.stream.__members__.items():
-                if name.lower() == stream_name_list[0].lower():
-                    stream_type = val
-                    break
-
-            if stream_type is None:
-                raise RealSenseError(
-                    status_code=400,
-                    detail=f"Invalid stream type: {stream_config.stream_type}",
-                )
-
-            # Get format from string
-            format_type = None
-            for name, val in rs.format.__members__.items():
-                if name.lower() == stream_config.format.lower():
-                    format_type = val
-                    break
-
-            if format_type is None:
-                raise RealSenseError(
-                    status_code=400, detail=f"Invalid format: {stream_config.format}"
-                )
-
-            if active_streams and stream_config.stream_type in active_streams:
-                continue
-
-            # Enable stream
-            try:
-                if len(stream_name_list) > 1:
-                    stream_index = int(stream_name_list[1])
-                    config.enable_stream(
-                        stream_type,
-                        stream_index,
-                        stream_config.resolution.width,
-                        stream_config.resolution.height,
-                        format_type,
-                        stream_config.framerate,
+                # Get stream type from string
+                stream_name_list = stream_config.stream_type.split("-")
+                stream_type = None
+                for name, val in rs.stream.__members__.items():
+                    if name.lower() == stream_name_list[0].lower():
+                        stream_type = val
+                        break
+                if stream_type is None:
+                    raise RealSenseError(
+                        status_code=400,
+                        detail=f"Invalid stream type: {stream_config.stream_type}",
                     )
-                elif format_type == rs.format.combined_motion:
-                    config.enable_stream(stream_type)
-                else:
-                    config.enable_stream(
-                        stream_type,
-                        stream_config.resolution.width,
-                        stream_config.resolution.height,
-                        format_type,
-                        stream_config.framerate,
+                format_type = None
+                for name, val in rs.format.__members__.items():
+                    if name.lower() == stream_config.format.lower():
+                        format_type = val
+                        break
+                if format_type is None:
+                    raise RealSenseError(
+                        status_code=400, detail=f"Invalid format: {stream_config.format}"
                     )
-
+                if active_streams and stream_config.stream_type in active_streams:
+                    continue
+                try:
+                    if len(stream_name_list) > 1:
+                        stream_index = int(stream_name_list[1])
+                        config.enable_stream(
+                            stream_type,
+                            stream_index,
+                            stream_config.resolution.width,
+                            stream_config.resolution.height,
+                            format_type,
+                            stream_config.framerate,
+                        )
+                    elif format_type == rs.format.combined_motion:
+                        config.enable_stream(stream_type)
+                    else:
+                        config.enable_stream(
+                            stream_type,
+                            stream_config.resolution.width,
+                            stream_config.resolution.height,
+                            format_type,
+                            stream_config.framerate,
+                        )
+                    active_streams.add(stream_config.stream_type)
+                except RuntimeError as e:
+                    raise RealSenseError(
+                        status_code=400, detail=f"Failed to enable stream: {str(e)}"
+                    )
+        else:
+            # Even when reusing config, rebuild the active_streams set for reporting
+            for stream_config in configs:
                 active_streams.add(stream_config.stream_type)
 
-            except RuntimeError as e:
-                raise RealSenseError(
-                    status_code=400, detail=f"Failed to enable stream: {str(e)}"
-                )
-
+        timings['stream_enable'] = 0.0 if config_reused else time.perf_counter() - t3
+        t4 = time.perf_counter()
         # Start streaming
         try:
             pipeline_profile = pipeline.start(config)
-
+            timings['pipeline_start'] = time.perf_counter() - t4
+            t5 = time.perf_counter()
             # Set up align if requested
             align_processor = None
             if align_to:
-                # Get stream type from string
                 align_stream = None
                 for name, val in rs.stream.__members__.items():
                     if name.lower() == align_to.lower():
                         align_stream = val
                         break
-
                 if align_stream:
                     align_processor = rs.align(align_stream)
-
             # Store pipeline and config
             with self.lock:
                 self.pipelines[device_id] = pipeline
                 self.configs[device_id] = config
+                self.pipeline_cache[device_id] = pipeline
+                self.pipeline_signatures[device_id] = signature
+                config_cache_for_device[signature] = config
                 self.active_streams[device_id] = active_streams
                 self.frame_queues[device_id] = {
                     stream_type: [] for stream_type in active_streams
@@ -1052,30 +1104,33 @@ class RealSenseManager:
                 self.metadata_queues[device_id] = {
                     stream_key: [] for stream_key in active_streams
                 }
-
+            timings['post_start_setup'] = time.perf_counter() - t5
+            t6 = time.perf_counter()
             # Start frame collection thread
             threading.Thread(
                 target=self._collect_frames,
                 args=(device_id, align_processor),
                 daemon=True,
             ).start()
-
             # Update device info
             if device_id in self.device_infos:
                 self.device_infos[device_id].is_streaming = True
-
             threading.Thread(
                 target=self.metadata_socket_server.start_broadcast,
                 args=(device_id,),
                 daemon=True,
             ).start()
-
-            return StreamStatus(
-                device_id=device_id,
-                is_streaming=True,
-                active_streams=list(active_streams),
-            )
-
+            timings['thread_start'] = time.perf_counter() - t6
+            timings['total'] = time.perf_counter() - t0
+            print(f"[TIMING] start_stream timings for {device_id}: {timings}")
+            return {
+                'device_id': device_id,
+                'is_streaming': True,
+                'active_streams': list(active_streams),
+                'timings': timings,
+                'config_reused': config_reused,
+                'config_signature': signature,
+            }
         except RuntimeError as e:
             raise RealSenseError(
                 status_code=500, detail=f"Failed to start streaming: {str(e)}"
@@ -1102,6 +1157,8 @@ class RealSenseManager:
                     del self.active_streams[device_id]
                 else:
                     active_streams = []
+                if device_id in self.pipeline_signatures:
+                    del self.pipeline_signatures[device_id]
                 if device_id in self.frame_queues:
                     del self.frame_queues[device_id]
                 if device_id in self.metadata_queues:
