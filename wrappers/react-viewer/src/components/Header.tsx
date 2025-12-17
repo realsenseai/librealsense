@@ -109,11 +109,12 @@ export function Header() {
                   2D View
                 </button>
                 <button
-                  onClick={() => setViewMode('3d')}
-                  className={`px-4 py-1 rounded-md text-sm transition-colors ${
+                  disabled
+                  title="3D View feature coming soon"
+                  className={`px-4 py-1 rounded-md text-sm transition-colors cursor-not-allowed ${
                     viewMode === '3d'
                       ? 'bg-rs-blue text-white'
-                      : 'text-gray-300 hover:text-white'
+                      : 'text-gray-500 opacity-50'
                   }`}
                 >
                   3D View
