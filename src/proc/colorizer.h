@@ -8,6 +8,10 @@
 #include <vector>
 #include <set>
 
+#if defined(__AVX2__) and !defined(ANDROID)
+#include <immintrin.h>
+#endif    
+
 namespace rs2
 {
     class stream_profile;
@@ -41,6 +45,30 @@ namespace librealsense {
             t = std::max( 0.f, std::min( t, 1.f ) );
             return _data[(int)(t * (_size - 1))];
         }
+
+#if defined (__AVX2__) and !defined(ANDROID)
+	inline void get_avx2(__m256* c, __m256 value) const
+        {
+           __m256 zero = _mm256_set1_ps(0.f);
+            __m256 one = _mm256_set1_ps(1.f);
+            __m256 sizeMinOne = _mm256_sub_ps(_mm256_set1_ps(_size), one);
+
+            __m256 min = _mm256_set1_ps( _min );
+            __m256 max = _mm256_set1_ps( _max );
+            __m256 t = _mm256_div_ps( _mm256_sub_ps(value, min ), _mm256_sub_ps(max,min) );
+            t = _mm256_min_ps(one, _mm256_max_ps( zero, t));
+
+            __m256i index = _mm256_cvtps_epi32(_mm256_mul_ps(  _mm256_floor_ps( _mm256_mul_ps( t, sizeMinOne)), _mm256_set1_ps(3))); // multiply each element in index by 3 because _data are float3s not floats.  There are 3 times as many of them.
+
+            float* dataR = (float*) _data;
+            float* dataG = dataR + 1;
+            float* dataB = dataR + 2;
+
+            c[0] = _mm256_i32gather_ps( dataR, index, 4); // r[8] // requires AVX2
+            c[1] = _mm256_i32gather_ps( dataG, index, 4); // g[8]
+            c[2] = _mm256_i32gather_ps( dataB, index, 4); // b[8] 
+        }
+#endif 
 
         float min_key() const { return _min; }
         float max_key() const { return _max; }
@@ -136,6 +164,18 @@ namespace librealsense {
             }
         }
 
+#if defined (__AVX2__) and !defined(ANDROID)
+        template<typename T, typename F>
+	void make_rgb_data_avx2(const T* depth_data, uint8_t* rgb_data, int width, int height, F coloring_func)
+        {
+            auto cm = _maps[_map_index];
+
+            for ( auto i = 0; i < width*height; i+=8) {
+                colorize_pixel_avx2(rgb_data, i, cm, depth_data, coloring_func);
+            }
+        }
+#endif
+
         template<typename T, typename F>
         void colorize_pixel(uint8_t* rgb_data, int idx, color_map* cm, T data, F coloring_func)
         {
@@ -154,6 +194,43 @@ namespace librealsense {
                 rgb_data[idx * 3 + 2] = 0;
             }
         }
+
+#if defined (__AVX2__) and !defined(ANDROID)
+	        template<typename T, typename F>
+        void colorize_pixel_avx2(uint8_t* rgb_data, int idx, color_map* cm, const T* data, F coloring_func_avx)
+        {
+            auto f = coloring_func_avx(data+idx); // 0-255 based on histogram locationcolorize_pixel
+            __m256 c256[3]; // for r,g,b values.
+            cm->get_avx2(c256, f);
+            __m256 depth_data = _mm256_cvtepi32_ps (_mm256_set_epi32( (int)*(data+idx+7),
+                                    (int)*(data+idx+6),
+                                    (int)*(data+idx+5),
+                                    (int)*(data+idx+4),
+                                    (int)*(data+idx+3),
+                                    (int)*(data+idx+2),
+                                    (int)*(data+idx+1),
+                                    (int)*(data+idx+0) ) );
+            __m256 zero = _mm256_set1_ps(0.0f);
+            __m256 not_zero = _mm256_cmp_ps (depth_data, zero, _CMP_GT_OS);
+            c256[0] = _mm256_blendv_ps( zero, c256[0], not_zero );
+            c256[1] = _mm256_blendv_ps( zero, c256[1], not_zero );
+            c256[2] = _mm256_blendv_ps( zero, c256[2], not_zero ); // if data[i], set rgb to calcualted value, otherwise set rgb to zero.  following behavior from colorize_pixel ( c impl )
+	    __m256i r_planar = _mm256_cvtps_epi32(c256[0]);
+            __m256i g_planar = _mm256_cvtps_epi32(c256[1]);
+            __m256i b_planar = _mm256_cvtps_epi32(c256[2]);
+
+            __m256i a32to8_mask = _mm256_setr_epi8(0,4,8,12,16,20,24,28,0,4,8,12,16,20,24,28,0,4,8,12,16,20,24,28,0,4,8,12,16,20,24,28); // 4 duplicates of 8 8bit pixel values coming from 32bit depth values
+            __m256i rgbatorgb_mask = _mm256_setr_epi8(0,1,2,4,5,6,8,9,10,12,13,14,16,17,18,20,21,22,24,25,26,28,29,30,3,7,11,15,19,23,27,31); // moves all the a values to back, we only care about rgb.
+
+            __m256i rg_packed = _mm256_unpacklo_epi8(_mm256_shuffle_epi8(r_planar, a32to8_mask),
+                                                     _mm256_shuffle_epi8(g_planar, a32to8_mask) );
+            __m256i ba_packed  = _mm256_unpacklo_epi8(_mm256_shuffle_epi8(b_planar, a32to8_mask ),
+                                                      _mm256_set1_epi8(-1));
+            __m256i rgba_packed = _mm256_unpacklo_epi16( rg_packed, ba_packed );
+            __m256i rgb_packed = _mm256_shuffle_epi8( rgba_packed, rgbatorgb_mask );
+            memcpy(rgb_data+(idx*3), &rgb_packed,24);
+        }
+#endif
 
         float _min, _max;
         bool _equalize;
