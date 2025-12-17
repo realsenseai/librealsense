@@ -78,6 +78,9 @@ class RealSenseManager:
         self.pipeline_cache: Dict[str, rs.pipeline] = {}  # device -> last pipeline object
         self.pipeline_signatures: Dict[str, str] = {}  # device -> active signature
 
+        # Stop coordination
+        self.stopping: Set[str] = set()
+
         # Store latest raw depth frames for pixel depth queries
         self.depth_frames: Dict[str, Any] = {}  # device_id -> rs.depth_frame
 
@@ -965,6 +968,8 @@ class RealSenseManager:
             raise RealSenseError(
                 status_code=404, detail=f"Device {device_id} not found"
             )
+        if device_id in self.stopping:
+            raise RealSenseError(status_code=409, detail="Stop in progress; try again shortly")
         timings['device_lookup'] = time.perf_counter() - t1
         signature = self._make_signature(configs, align_to)
 
@@ -1137,46 +1142,54 @@ class RealSenseManager:
             )
 
     def stop_stream(self, device_id: str) -> StreamStatus:
-        """Stop streaming from a device"""
+        """Stop streaming from a device. Returns immediately and completes stop in background."""
         with self.lock:
-            if device_id not in self.pipelines:
+            if device_id not in self.devices:
+                return StreamStatus(device_id=device_id, is_streaming=False, active_streams=[], stopping=False)
+
+            # If already stopping, report status
+            if device_id in self.stopping:
                 return StreamStatus(
-                    device_id=device_id, is_streaming=False, active_streams=[]
+                    device_id=device_id,
+                    is_streaming=device_id in self.pipelines,
+                    active_streams=list(self.active_streams.get(device_id, set())),
+                    stopping=True,
                 )
 
+            is_streaming = device_id in self.pipelines
+            active_streams = list(self.active_streams.get(device_id, set()))
+            if not is_streaming:
+                return StreamStatus(device_id=device_id, is_streaming=False, active_streams=active_streams, stopping=False)
+
+            self.stopping.add(device_id)
+
+        def _do_stop():
             try:
                 self.metadata_socket_server.stop_broadcast()
                 self.pipelines[device_id].stop()
+            except Exception as e:
+                logging.error("Failed to stop streaming for %s: %s", device_id, e)
+            finally:
+                with self.lock:
+                    # Clean up resources
+                    self.pipelines.pop(device_id, None)
+                    self.configs.pop(device_id, None)
+                    active = list(self.active_streams.pop(device_id, set()))
+                    self.pipeline_signatures.pop(device_id, None)
+                    self.frame_queues.pop(device_id, None)
+                    self.metadata_queues.pop(device_id, None)
+                    self.stopping.discard(device_id)
+                    if device_id in self.device_infos:
+                        self.device_infos[device_id].is_streaming = False
 
-                # Clean up resources
-                del self.pipelines[device_id]
-                if device_id in self.configs:
-                    del self.configs[device_id]
-                if device_id in self.active_streams:
-                    active_streams = list(self.active_streams[device_id])
-                    del self.active_streams[device_id]
-                else:
-                    active_streams = []
-                if device_id in self.pipeline_signatures:
-                    del self.pipeline_signatures[device_id]
-                if device_id in self.frame_queues:
-                    del self.frame_queues[device_id]
-                if device_id in self.metadata_queues:
-                    del self.metadata_queues[device_id]
+        threading.Thread(target=_do_stop, daemon=True).start()
 
-                # Update device info
-                if device_id in self.device_infos:
-                    self.device_infos[device_id].is_streaming = False
-
-                return StreamStatus(
-                    device_id=device_id,
-                    is_streaming=False,
-                    active_streams=active_streams,
-                )
-            except RuntimeError as e:
-                raise RealSenseError(
-                    status_code=500, detail=f"Failed to stop streaming: {str(e)}"
-                )
+        return StreamStatus(
+            device_id=device_id,
+            is_streaming=False,
+            active_streams=active_streams,
+            stopping=True,
+        )
 
     def activate_point_cloud(self, device_id: str, enable: bool) -> bool:
         """Activate or deactivate point cloud processing"""
@@ -1218,11 +1231,13 @@ class RealSenseManager:
 
         is_streaming = device_id in self.pipelines
         active_streams = list(self.active_streams.get(device_id, set()))
+        stopping = device_id in self.stopping
 
         return StreamStatus(
             device_id=device_id,
             is_streaming=is_streaming,
             active_streams=active_streams,
+            stopping=stopping,
         )
 
     def get_latest_frame(

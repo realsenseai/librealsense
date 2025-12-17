@@ -25,6 +25,7 @@ class StreamStatus(BaseModel):
     device_id: str
     is_streaming: bool
     active_streams: List[str] = []
+    stopping: bool = False
     framerate: Optional[float] = None
     duration: Optional[float] = None  # Time in seconds
 

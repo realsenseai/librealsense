@@ -218,8 +218,9 @@ class ApiClient {
     await this.client.post(`/devices/${deviceId}/stream/start/`, request)
   }
 
-  async stopStreaming(deviceId: string): Promise<void> {
-    await this.client.post(`/devices/${deviceId}/stream/stop/`)
+  async stopStreaming(deviceId: string): Promise<StreamStatus> {
+    const response = await this.client.post<StreamStatus>(`/devices/${deviceId}/stream/stop/`)
+    return response.data
   }
 
   async getStreamStatus(deviceId: string): Promise<StreamStatus> {

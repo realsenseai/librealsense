@@ -324,6 +324,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         options: {},
         streamConfigs: [],
         isStreaming: false,
+        isStopping: false,
         isActive: true,
         isLoading: true,
         streamMetadata: {},
@@ -563,6 +564,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const deviceState = state.deviceStates[deviceId]
     if (!deviceState) return
 
+    // If a stop is still in progress, wait briefly until it finishes
+    if (deviceState.isStopping) {
+      for (let i = 0; i < 20; i++) {
+        try {
+          const status = await apiClient.getStreamStatus(deviceId)
+          if (!status.stopping) break
+        } catch (e) {
+          // ignore and retry
+        }
+        await new Promise((resolve) => setTimeout(resolve, 150))
+      }
+    }
+
     const enabledConfigs = deviceState.streamConfigs.filter((c) => c.enable)
     if (enabledConfigs.length === 0) {
       set({ error: 'Please enable at least one stream' })
@@ -573,6 +587,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       await apiClient.startStreaming(deviceId, {
         configs: enabledConfigs,
         apply_filters: false,
+        reuse_cache: true,
       })
       set((s) => ({
         deviceStates: {
@@ -580,6 +595,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           [deviceId]: {
             ...s.deviceStates[deviceId],
             isStreaming: true,
+            isStopping: false,
           },
         },
         error: null,
@@ -592,15 +608,29 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   stopDeviceStreaming: async (deviceId) => {
+    // Optimistically mark stopping and hide stream immediately
+    set((state) => ({
+      deviceStates: {
+        ...state.deviceStates,
+        [deviceId]: {
+          ...state.deviceStates[deviceId],
+          isStopping: true,
+          isStreaming: false,
+          streamMetadata: {},
+        },
+      },
+    }))
+
     try {
-      await apiClient.stopStreaming(deviceId)
+      const status = await apiClient.stopStreaming(deviceId)
       set((state) => ({
         deviceStates: {
           ...state.deviceStates,
           [deviceId]: {
             ...state.deviceStates[deviceId],
-            isStreaming: false,
-            streamMetadata: {},
+            isStopping: !!status?.stopping,
+            isStreaming: status?.is_streaming ?? false,
+            streamMetadata: status?.stopping ? state.deviceStates[deviceId].streamMetadata : {},
           },
         },
       }))
@@ -608,6 +638,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
       set({
         error: `Failed to stop streaming: ${error instanceof Error ? error.message : 'Unknown error'}`,
       })
+      // Roll back stopping flag on error
+      set((state) => ({
+        deviceStates: {
+          ...state.deviceStates,
+          [deviceId]: {
+            ...state.deviceStates[deviceId],
+            isStopping: false,
+          },
+        },
+      }))
     }
   },
 
