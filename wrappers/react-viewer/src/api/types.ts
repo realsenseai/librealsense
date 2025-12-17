@@ -68,11 +68,14 @@ export interface StreamStartRequest {
   configs: StreamConfig[]
   align_to?: string
   apply_filters: boolean
+  reuse_cache?: boolean
 }
 
 export interface StreamStatus {
+  device_id?: string
   is_streaming: boolean
   active_streams: string[]
+  stopping?: boolean
 }
 
 export interface WebRTCOffer {
@@ -139,6 +142,7 @@ export interface DeviceState {
   options: Record<string, OptionInfo[]> // keyed by sensor_id
   streamConfigs: StreamConfig[]
   isStreaming: boolean
+   isStopping?: boolean
   isActive: boolean // whether this device is shown in viewer
   isLoading: boolean // loading sensors/options
   streamMetadata: Record<string, StreamMetadata> // keyed by stream_type
