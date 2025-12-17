@@ -40,12 +40,9 @@ class RealSenseVideoTrack(VideoStreamTrack):
 
             # Convert to RGB format if necessary
             if len(frame_data.shape) == 3 and frame_data.shape[2] == 3:
-                # Already has 3 channels - could be RGB or BGR
-                # RealSense colorizer outputs BGR, convert to RGB
-                if self.stream_type.startswith('depth'):
-                    img = cv2.cvtColor(frame_data, cv2.COLOR_BGR2RGB)
-                else:
-                    img = frame_data
+                # Already has 3 channels - RealSense colorizer outputs RGB format
+                # Use directly without conversion to preserve color scheme (blue=near, red=far)
+                img = frame_data
             elif len(frame_data.shape) == 3 and frame_data.shape[2] == 4:
                 # RGBA/BGRA - convert to RGB
                 img = cv2.cvtColor(frame_data, cv2.COLOR_BGRA2RGB)
