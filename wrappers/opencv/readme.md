@@ -11,6 +11,7 @@ Examples in this folder are designed to complement existing [SDK examples](../..
 4. [DNN](./dnn) - Intel RealSense camera used for real-time object-detection
 5. [Depth Filter](./depth-filter) - Depth Filtering for Collision Avoidance
 6. [Rotate](./rotate-pointcloud) - Rotate point cloud before visualization
+6. [Auto exposure](./auto-exposure) - Auto select ROI for auto-exposure
 
 ## Getting Started:
 This page is certainly **not** a comprehensive guide to getting started with OpenCV and CMake, but it can help get on the right track. 
