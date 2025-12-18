@@ -106,6 +106,7 @@ namespace librealsense
 
         private:
             std::string _device_path;
+            std::string _subdevice_path;
             uint32_t _timeout;
             int _fildes;
             std::atomic< int > _lock_counter;
@@ -129,6 +130,7 @@ namespace librealsense
 
             uint32_t get_full_length() const { return _length; }
             uint32_t get_length_frame_only() const { return _original_length; }
+            uint32_t get_stride() const { return _stride; }
 
             uint8_t* get_frame_start() const { return _start; }
 
@@ -139,6 +141,7 @@ namespace librealsense
             uint8_t* _start;
             uint32_t _length;
             uint32_t _original_length;
+            uint32_t _stride;
             uint32_t _offset;
             bool _use_memory_map;
             uint32_t _index;
@@ -363,6 +366,7 @@ namespace librealsense
 
             control_range get_pu_range(rs2_option option) const override;
 
+            uint32_t mbus_code_to_fourcc(uint32_t mbus_code) const;
             std::vector<stream_profile> get_profiles() const override;
 
             void lock() const override;
@@ -435,7 +439,9 @@ namespace librealsense
 
             power_state _state = D3;
             std::string _name = "";
+            std::string _subdev_name = "";
             std::string _device_path = "";
+            std::string _subdevice_path = "";
             usb_spec _device_usb_spec = usb_undefined;
             uvc_device_info _info;
 
@@ -458,6 +464,7 @@ namespace librealsense
             std::vector<int>  _fds;             // list the file descriptors to be monitored during frames polling
             buffers_mgr     _buf_dispatch;      // Holder for partial (MD only) frames that shall be preserved between 'select' calls when polling v4l buffers
             int _fd = 0;
+            int _sub_fd = 0;
             frame_drop_monitor _frame_drop_monitor;           // used to check the frames drops kpi
             v4l2_video_md_syncer _video_md_syncer;
             bool _are_device_capabilities_assigned;
