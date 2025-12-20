@@ -15,3 +15,8 @@ add_subdirectory(rotate-pointcloud)
 if(BUILD_CV_KINFU_EXAMPLE)
     add_subdirectory(kinfu)
 endif()
+
+string(FIND "${OpenCV_LIB_COMPONENTS}" "opencv_rgbd" _index)
+if (${_index} GREATER -1)
+    add_subdirectory(registration)
+endif()
