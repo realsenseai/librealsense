@@ -23,3 +23,15 @@ npm-debug.log*
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Test results
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Vitest
+.vitest/

@@ -76,6 +76,15 @@ react-viewer/
 | `npm run lint` | Run ESLint |
 | `npm run bundle` | Copy build to FastAPI static folder |
 
+## Testing
+
+- `npm test`: Run unit and integration tests (Vitest)
+- `npm run test:coverage`: Generate coverage report (HTML/LCOV)
+- `npm run test:e2e`: Run Playwright E2E tests (headless)
+- First time E2E setup: `npx playwright install`
+
+See detailed instructions in `tests/README.md`.
+
 ## Production Deployment
 
 ### Option 1: Separate Frontend/Backend
