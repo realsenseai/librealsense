@@ -85,13 +85,44 @@ react-viewer/
 
 See detailed instructions in `tests/README.md`.
 
+## Desktop Application (Tauri)
+
+Build a **standalone cross-platform desktop app** for Windows, macOS, and Linux that bundles both the React UI and FastAPI backend.
+
+### Quick Start
+
+Prerequisites: Rust (install from https://rustup.rs/)
+
+```bash
+# 1. Install Tauri CLI
+npm run tauri:install
+
+# 2. In one terminal, start the FastAPI backend
+cd ../rest-api
+python main.py
+
+# 3. In another terminal, start Tauri dev mode
+npm run tauri:dev
+```
+
+This opens a native desktop window with hot-reload.
+
+### Production Build
+
+See [DESKTOP_BUILD.md](DESKTOP_BUILD.md) for detailed build instructions, including:
+- Building the FastAPI executable with PyInstaller
+- Creating platform-specific installers (.msi, .dmg, .AppImage)
+- Code signing and distribution
+
 ## Production Deployment
 
-### Option 1: Separate Frontend/Backend
+### Option 1: Web Browser
 
-Deploy React app on any static hosting (Vercel, Netlify, etc.) and configure the API URL.
+1. Start the FastAPI backend (separate)
+2. Deploy React app on any static hosting (Vercel, Netlify, etc.)
+3. Configure API URL for your backend server
 
-### Option 2: Bundled with FastAPI
+### Option 2: Bundled Web (FastAPI serves React)
 
 1. Build the React app:
    ```bash

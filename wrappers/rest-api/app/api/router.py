@@ -2,6 +2,13 @@ from fastapi import APIRouter
 from app.api.endpoints import devices, sensors, options, streams, webrtc, point_cloud, firmware
 
 api_router = APIRouter()
+
+# Health check endpoint
+@api_router.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring the backend service."""
+    return {"status": "ok", "service": "realsense-api"}
+
 # Register firmware routes before devices to avoid conflicts with /{device_id} catch-all
 api_router.include_router(firmware.router, prefix="/devices", tags=["firmware"])
 api_router.include_router(devices.router, prefix="/devices", tags=["devices"])

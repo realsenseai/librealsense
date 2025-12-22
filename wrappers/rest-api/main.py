@@ -1,5 +1,6 @@
 import asyncio
 import uvicorn
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -47,4 +48,26 @@ async def startup_event():
 combined_app = socketio.ASGIApp(socketio_server=sio, other_asgi_app=app, socketio_path='socket')
 
 if __name__ == "__main__":
-    uvicorn.run("main:combined_app", host="0.0.0.0", port=8000, reload=True, log_level="debug")
+    # Disable reload when running as a bundled executable (PyInstaller)
+    # Reload mode doesn't work in PyInstaller and causes issues with device access
+    is_bundled = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+    reload_enabled = not is_bundled and '--reload' not in sys.argv
+    
+    if is_bundled:
+        # When bundled, pass the app object directly (string import doesn't work)
+        # Bind to localhost only to avoid Windows Firewall prompts
+        uvicorn.run(
+            combined_app,
+            host="127.0.0.1",
+            port=8000,
+            log_level="info"
+        )
+    else:
+        # In development, use string reference to enable reload
+        uvicorn.run(
+            "main:combined_app",
+            host="127.0.0.1",
+            port=8000,
+            reload=reload_enabled,
+            log_level="debug"
+        )
