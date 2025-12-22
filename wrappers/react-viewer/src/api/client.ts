@@ -11,7 +11,20 @@ import type {
   ICECandidate,
 } from './types'
 
-const API_BASE = '/api'
+// Detect if running in Tauri desktop app
+const isDesktopApp = typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined
+
+// Determine API base URL based on environment
+const getApiBase = () => {
+  if (isDesktopApp) {
+    // Desktop app: API server runs on localhost:8000
+    return 'http://localhost:8000/api/v1'
+  }
+  // Browser: use relative path (proxied by Vite in dev, served by backend in prod)
+  return '/api/v1'
+}
+
+const API_BASE = getApiBase()
 
 type FirmwareProgressCallback = (progress: number) => void
 type FirmwareErrorCallback = (error: string) => void
@@ -35,25 +48,51 @@ class ApiClient {
   }
 
   private initializeSocket() {
-    // In dev, Vite runs on :3000 and proxies `/socket` to the backend; in prod
-    // the viewer is typically served by the backend so `window.location.origin` is fine.
-    // You can override with VITE_SOCKET_ORIGIN (e.g. http://localhost:8000) if needed.
-    const socketOrigin = (import.meta as any).env?.VITE_SOCKET_ORIGIN || window.location.origin
+    // Determine Socket.IO origin based on environment
+    let socketOrigin: string
+    
+    if (isDesktopApp) {
+      // Desktop app: connect to localhost:8000
+      socketOrigin = 'http://localhost:8000'
+      console.log('🖥️ Desktop app detected. Connecting to FastAPI backend at:', socketOrigin)
+    } else {
+      // Browser: use environment variable or current origin
+      socketOrigin = (import.meta as any).env?.VITE_SOCKET_ORIGIN || window.location.origin
+      console.log('🌐 Browser mode. Connecting to:', socketOrigin)
+    }
 
     this.socket = io(socketOrigin, {
       path: '/socket',
+      reconnectionDelay: 1000,
+      reconnection: true,
+      reconnectionAttempts: 5,
     })
 
     this.socket.on('connect', () => {
-      console.log('Socket.IO connected', { origin: socketOrigin, id: this.socket?.id })
+      console.log('✅ Socket.IO connected successfully', { 
+        origin: socketOrigin, 
+        id: this.socket?.id, 
+        desktop: isDesktopApp 
+      })
     })
 
-    this.socket.on('connect_error', (err) => {
-      console.error('Socket.IO connect_error', { origin: socketOrigin, message: err?.message, err })
+    this.socket.on('connect_error', (err: any) => {
+      console.error('❌ Socket.IO connection error', { 
+        origin: socketOrigin,
+        message: err?.message || 'Unknown error',
+        type: err?.type,
+        err,
+        desktop: isDesktopApp,
+        hint: isDesktopApp ? 'Make sure FastAPI backend is running and accessible' : 'Check if API proxy is configured'
+      })
     })
 
-    this.socket.on('disconnect', () => {
-      console.log('Socket.IO disconnected')
+    this.socket.on('disconnect', (reason: string) => {
+      console.warn('⚠️ Socket.IO disconnected. Reason:', reason)
+    })
+
+    this.socket.on('error', (error: any) => {
+      console.error('❌ Socket.IO error:', error)
     })
   }
 

@@ -7,6 +7,7 @@ import { Header } from './components/Header'
 import { LoadingSplash } from './components/LoadingSplash'
 import { WhatsNew } from './components/WhatsNew'
 import { ChatButton, ChatPanel } from './components/ChatBot'
+import { ApiDiagnostics } from './components/ApiDiagnostics'
 import { useAppStore } from './store'
 import { socketService } from './api/socket'
 
@@ -89,6 +90,9 @@ function App() {
       }`}>
         {isConnected ? '● Connected' : '○ Disconnected'}
       </div>
+
+      {/* API Diagnostics (shows when there's a connection error) */}
+      <ApiDiagnostics />
 
       {/* AI Chat Assistant */}
       <ChatPanel />
