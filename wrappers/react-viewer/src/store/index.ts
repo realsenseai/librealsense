@@ -913,7 +913,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
       // Apply option changes
       if (settings.optionChanges) {
         for (const change of settings.optionChanges) {
-          await get().setOption(deviceId, change.sensorId, change.optionId, change.value)
+          // Map sensor label (e.g., "RGB Camera") to unique sensor_id for this device
+          let uniqueSensorId = change.sensorId
+          if (deviceState.sensors && deviceState.sensors.length > 0) {
+            const match = deviceState.sensors.find(
+              s => s.name === change.sensorId || s.sensor_id === change.sensorId
+            )
+            if (match) {
+              uniqueSensorId = match.sensor_id
+            }
+          }
+          await get().setOption(deviceId, uniqueSensorId, change.optionId, change.value)
         }
       }
       
