@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -64,9 +65,15 @@ class Enumerator {
         mListener = listener;
         mContext = context;
 
-        context.registerReceiver(mBroadcastReceiver, new IntentFilter(UsbUtilities.ACTION_USB_PERMISSION));
-        context.registerReceiver(mBroadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED));
-        context.registerReceiver(mBroadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(mBroadcastReceiver, new IntentFilter(UsbUtilities.ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED);
+            context.registerReceiver(mBroadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED), Context.RECEIVER_NOT_EXPORTED);
+            context.registerReceiver(mBroadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED), Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            context.registerReceiver(mBroadcastReceiver, new IntentFilter(UsbUtilities.ACTION_USB_PERMISSION));
+            context.registerReceiver(mBroadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED));
+            context.registerReceiver(mBroadcastReceiver, new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED));
+        }
 
         onDeviceAttach(context);
     }
