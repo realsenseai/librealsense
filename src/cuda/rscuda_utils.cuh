@@ -15,6 +15,54 @@
 
 namespace rscuda
 {
+
+    template <typename T>
+    class DeviceBuffer final
+    {
+    public:
+        DeviceBuffer() = default;
+
+        explicit DeviceBuffer(std::size_t const num_elements) :
+        data_{DeviceBuffer<T>::allocateBuffer(num_elements)},
+        size_{num_elements}
+        {}
+
+        DeviceBuffer(std::size_t const num_elements, std::size_t const number_of_channels = 1U) :
+        DeviceBuffer{num_elements * number_of_channels}
+        {}
+
+	void reserve(std::size_t const reserve_size)
+        {
+            if (size_ < reserve_size)
+            {
+                cudaFree(data_);
+                data_ = DeviceBuffer<T>::allocateBuffer(reserve_size);
+                size_ = reserve_size;
+            }
+        }
+
+        void reserve(std::size_t const reserve_size, std::size_t const reserve_channels)
+        {
+            reserve(reserve_size * reserve_channels);
+        }
+
+        std::size_t size() const { return size_; }
+
+        T* data() { return data_; }
+
+    private:
+        static T* allocateBuffer(std::size_t const reserve_size)
+        {
+            T* datatemp{nullptr};
+            cudaMalloc(&datatemp, reserve_size * sizeof(T));
+            return datatemp;
+        }
+
+        T* data_{};
+        // Size is in number of elements, not bytes.
+        std::size_t size_{};
+    };
+
     template<typename  T>
     std::shared_ptr<T> alloc_dev(int elements)
     {
