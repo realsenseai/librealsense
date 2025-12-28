@@ -37,8 +37,6 @@ target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${ROSBAG_HEADER_DIRS}
         $<$<NOT:$<BOOL:${USE_EXTERNAL_LZ4}>>:${LZ4_INCLUDE_PATH}>
-        ${HEADER_DIR_SQLITE3}
-        ${HEADER_DIR_YAML_CPP}
 )
 
 message(STATUS "ROSBAG2_COMPILE_FLAGS: ${ROSBAG2_COMPILE_FLAGS}")

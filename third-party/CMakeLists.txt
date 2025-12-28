@@ -7,13 +7,12 @@ pop_security_flags() # remove security flags for third party, as we cannot guara
 
 include(CMake/external_json.cmake)
 # Add additional include directories to allow file to include rosbag headers
-include(${_rel_path}/realsense-file/config.cmake)
+include(${_rel_path}/realsense-file/CMakeLists.txt)
 
 if(BUILD_EASYLOGGINGPP)
     include(${_rel_path}/easyloggingpp/CMakeLists.txt)
 endif()
 
-add_subdirectory(${_rel_path}/realsense-file)
 add_subdirectory( ${_rel_path}/tclap )
 
 if( BUILD_WITH_DDS )
