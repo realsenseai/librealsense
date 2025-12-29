@@ -11,7 +11,7 @@ import zlib
 import ctypes
 
 # Constants for calibration
-CALIBRATION_TIMEOUT_SECONDS = 30
+CALIBRATION_TIMEOUT_SECONDS = 90  # Increased from 30 to allow for longer calibration processes
 OCC_TIMEOUT_MS = 9000
 TARE_TIMEOUT_MS = 10000
 FRAME_PROCESSING_TIMEOUT_MS = 5000

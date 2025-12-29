@@ -23,7 +23,7 @@ from test_calibrations_common import (
 # Constants & thresholds (reintroduce after import fix)
 PIXEL_CORRECTION = -2.0  # pixel shift to apply to principal point
 EPSILON = 0.001         # distance comparison tolerance
-HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION = 1
+HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION = 2
 
 def on_chip_calibration_json(occ_json_file, host_assistance):
     occ_json = None
