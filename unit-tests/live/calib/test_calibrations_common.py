@@ -12,7 +12,7 @@ import ctypes
 
 # Constants for calibration
 CALIBRATION_TIMEOUT_SECONDS = 90  # Increased from 30 to allow for longer calibration processes
-OCC_TIMEOUT_MS = 9000
+OCC_TIMEOUT_MS = 30000  # Increased from 9000 to 30000ms to match working examples
 TARE_TIMEOUT_MS = 10000
 FRAME_PROCESSING_TIMEOUT_MS = 5000
 HARDWARE_RESET_DELAY_SECONDS = 3
@@ -94,8 +94,11 @@ def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground
                 raise RuntimeError("Calibration timed out after {} seconds".format(CALIBRATION_TIMEOUT_SECONDS))
             frame_set = pipeline.wait_for_frames()
             depth_frame = frame_set.get_depth_frame()
-            new_calib, health = calib_dev.process_calibration_frame(depth_frame, on_calib_cb, FRAME_PROCESSING_TIMEOUT_MS)
-            calib_done = len(new_calib) > 0
+            
+            # Only process valid depth frames
+            if depth_frame:
+                new_calib, health = calib_dev.process_calibration_frame(depth_frame, on_calib_cb, FRAME_PROCESSING_TIMEOUT_MS)
+                calib_done = len(new_calib) > 0
         # Preserve final table
         if calib_done:
             new_calib_result = bytes(new_calib)
