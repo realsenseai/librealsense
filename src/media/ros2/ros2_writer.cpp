@@ -1,5 +1,6 @@
 // License: Apache 2.0 See LICENSE file in root directory.
 // Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
+
 #include "ros2_writer.h"
 #include <rcutils/time.h>
 #include <rsutils/string/from.h>
@@ -25,25 +26,18 @@ static rcutils_allocator_t make_simple_allocator()
 
 ros2_writer::ros2_writer( const std::string & file_path, bool enable_compression, const std::string & storage_id )
 {
-    rosbag2_storage::StorageOptions opts;
-    opts.uri = file_path;
-    opts.storage_id = storage_id;
-    opts.max_bagfile_size = 0;
-    opts.max_bagfile_duration = 0;
-    opts.max_cache_size = 0;
-
-    // Direct instantiation - no factory, no plugin loading
     _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
     _storage->open( file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_WRITE );
 
     if( ! _storage )
         throw std::runtime_error( rsutils::string::from() << "Failed to open rosbag2 storage for uri '" << file_path
                                                           << "' using storage id '" << storage_id << "'" );
-    _file = file_path.empty() ? _storage->get_relative_file_path() : file_path;
+    _file = file_path;
 
-    ensure_topic( ros_topic::file_version_topic(), "librealsense/file_version" );
-    write_string( ros_topic::file_version_topic(),
-                  get_static_file_info_timestamp(),
+    auto file_version_topic = ros_topic::file_version_topic();
+    ensure_topic( file_version_topic, "librealsense/file_version" );
+    write_string( file_version_topic,
+                  nanoseconds{ 0 },
                   std::to_string( get_file_version() ) );
 }
 

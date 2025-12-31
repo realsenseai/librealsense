@@ -26,8 +26,6 @@
 
 namespace librealsense
 {
-    // Minimal ROS2 bag (rosbag2) writer adapter.
-    // Updated ctor: user supplies file path (and optional storage id) instead of a pre-created storage instance.
     class ros2_writer : public device_serializer::writer
     {
     public:

@@ -1,175 +1,365 @@
 // License: Apache 2.0 See LICENSE file in root directory.
 // Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
+
 #include "ros2_reader.h"
+#include <rcutils/time.h>
 #include <rsutils/string/from.h>
-#include <algorithm>
+#include <cstdlib>
 #include <cstring>
-#include <src/source.h> // for frame_source & stream_to_frame_types
+#include <algorithm>
+#include <sstream>
+#include <limits>
+#include "rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp"
 
 namespace librealsense {
-using namespace device_serializer;
+    using namespace device_serializer;
 
-static std::string to_string_buffer( const rosbag2_storage::SerializedBagMessage & msg )
-{
-    if( ! msg.serialized_data || ! msg.serialized_data->buffer ) return {};
-    return std::string( reinterpret_cast< char * >( msg.serialized_data->buffer ), msg.serialized_data->buffer_length );
-}
-
-ros2_reader::ros2_reader( std::shared_ptr< rosbag2_storage::storage_interfaces::ReadOnlyInterface > storage )
-    : _storage( std::move( storage ) )
-{
-    if( _storage )
-        _file = _storage->get_relative_file_path();
-    reset();
-}
-
-// Legacy overload used by playback_device_info::create_device
-ros2_reader::ros2_reader( const std::string & file_name, std::shared_ptr< context > const & ctx )
-    : _file( file_name )
-{
-    // At this point no rosbag2 storage API is available through filename alone.
-    // A proper implementation should open the bag via rosbag2_storage API.
-    // For now leave reader empty so playback treats it as EOF.
-    _messages.clear();
-    _cursor =0;
-    _duration = nanoseconds(0 );
-    _initialized = true;
-}
-
-device_snapshot ros2_reader::query_device_description( const nanoseconds & )
-{
-    // Minimal empty snapshot; advanced device description reconstruction can be added later
-    return device_snapshot();
-}
-
-void ros2_reader::reset()
-{
-    _messages.clear();
-    _cursor =0;
-    if( ! _storage ) return;
-    while( _storage->has_next() )
-    {
-        auto m = _storage->read_next();
-        _messages.push_back( *m );
-    }
-    if( ! _messages.empty() )
-    {
-        auto first_ts = _messages.front().time_stamp;
-        auto last_ts = _messages.back().time_stamp;
-        if( last_ts > first_ts )
-            _duration = nanoseconds( static_cast< uint64_t >( last_ts - first_ts ) );
-    }
-    _initialized = true;
-}
-
-void ros2_reader::seek_to_time( const nanoseconds & t )
-{
-    if( _messages.empty() ) return;
-    int64_t target = static_cast< int64_t >( t.count() );
-    _cursor =0;
-    while( _cursor < _messages.size() && _messages[ _cursor ].time_stamp < target )
-        ++_cursor;
-}
-
-std::shared_ptr< serialized_data > ros2_reader::parse_frame( std::string const & topic, const rosbag2_storage::SerializedBagMessage & msg )
-{
-    auto sid = ros_topic::get_stream_identifier( topic );
-    frame_additional_data add{};
-    add.timestamp = double( msg.time_stamp ) /1e6; // ns -> ms
-    add.frame_number =0; // will try to parse later from metadata message if present
-    add.fisheye_ae_mode = false;
-
-    auto size = msg.serialized_data->buffer_length;
-    // allocate frame
-    frame_source fs(32 );
-    fs.init( nullptr );
-    frame_interface * fi = fs.alloc_frame( { sid.stream_type, sid.stream_index, librealsense::frame_source::stream_to_frame_types( sid.stream_type ) }, size, std::move( add ), true );
-    if( ! fi )
-        return std::make_shared< serialized_invalid_frame >( nanoseconds( msg.time_stamp ), sid );
-    std::memcpy( const_cast< uint8_t * >( fi->get_frame_data() ), msg.serialized_data->buffer, size );
-    frame_holder fh{ fi };
-    return std::make_shared< serialized_frame >( nanoseconds( msg.time_stamp ), sid, std::move( fh ) );
-}
-
-std::shared_ptr< serialized_data > ros2_reader::parse_option( std::string const & topic, const rosbag2_storage::SerializedBagMessage & msg )
-{
-    auto sid = ros_topic::get_sensor_identifier( topic );
-    std::string payload = to_string_buffer( msg );
-    float value =0.f;
-    try { value = std::stof( payload ); } catch(...) {}
-    // option id from topic name
-    rs2_option opt_id = RS2_OPTION_COUNT;
-    try
-    {
-        std::string opt_name = ros_topic::get_option_name( topic );
-        std::replace( opt_name.begin(), opt_name.end(), '_', ' ' );
-        if( ! try_parse( opt_name, opt_id ) )
-            return nullptr;
-    }
-    catch(...) { return nullptr; }
-
-    auto option = std::make_shared< const_value_option >( "Recorded option", value );
-    return std::make_shared< serialized_option >( nanoseconds( msg.time_stamp ), sid, opt_id, option );
-}
-
-std::shared_ptr< serialized_data > ros2_reader::parse_notification( std::string const & topic, const rosbag2_storage::SerializedBagMessage & msg )
-{
-    auto sid = ros_topic::get_sensor_identifier( topic );
-    std::string payload = to_string_buffer( msg );
-    // very simple parse key=value; pairs (only category/severity/description/timestamp extracted)
-    rs2_notification_category category = RS2_NOTIFICATION_CATEGORY_UNKNOWN_ERROR;
-    rs2_log_severity severity = RS2_LOG_SEVERITY_INFO;
-    std::string description;
-    uint64_t ts_val = msg.time_stamp;
-    size_t pos =0;
-    while( pos < payload.size() )
-    {
-        auto semi = payload.find( ';', pos );
-        std::string part = payload.substr( pos, semi == std::string::npos ? std::string::npos : semi - pos );
-        auto eq = part.find( '=' );
-        if( eq != std::string::npos )
-        {
-            std::string key = part.substr(0, eq );
-            std::string val = part.substr( eq +1 );
-            if( key == "category" ) try_parse( val, category );
-            else if( key == "severity" ) try_parse( val, severity );
-            else if( key == "description" ) description = val;
-            else if( key == "timestamp" ) { try { ts_val = std::stoull( val ); } catch(...) {} }
+    // Basic string splitter helper
+    static std::vector<std::string> split_string(const std::string& s, char delimiter) {
+        std::vector<std::string> tokens;
+        std::string token;
+        std::istringstream tokenStream(s);
+        while (std::getline(tokenStream, token, delimiter)) {
+            tokens.push_back(token);
         }
-        if( semi == std::string::npos ) break;
-        pos = semi +1;
+        return tokens;
     }
-    notification n( category,0, severity, description );
-    n.timestamp = ts_val;
-    return std::make_shared< serialized_notification >( nanoseconds( msg.time_stamp ), sid, n );
-}
 
-std::shared_ptr< serialized_data > ros2_reader::parse_message( const rosbag2_storage::SerializedBagMessage & msg )
-{
-    std::string topic = msg.topic_name;
-    if( topic.find( "/option/" ) != std::string::npos && topic.find( "/value" ) != std::string::npos )
-        return parse_option( topic, msg );
-    if( topic.find( "/notification/" ) != std::string::npos )
-        return parse_notification( topic, msg );
-
-    // frame data topics end with /data and contain raw bytes
-    if( topic.find( "/data" ) != std::string::npos && topic.find( "/tf" ) == std::string::npos && topic.find( "/metadata" ) == std::string::npos )
-        return parse_frame( topic, msg );
-
-    return nullptr; // ignore others
-}
-
-std::shared_ptr< serialized_data > ros2_reader::read_next_data()
-{
-    if( _cursor >= _messages.size() )
-        return std::make_shared< serialized_end_of_file >();
-    while( _cursor < _messages.size() )
+    ros2_reader::ros2_reader(const std::string& file_path, const std::shared_ptr<context>& ctx)
+        : _file_path(file_path + ".db3")
+        , _context(ctx)
     {
-        auto & m = _messages[ _cursor++ ];
-        auto data = parse_message( m );
-        if( data ) return data;
+        _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
+        _storage->open(_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
+
+        if (!_storage)
+            throw std::runtime_error(rsutils::string::from() << "Failed to open rosbag2 storage for uri '" << _file_path << "'");
+
+        _topics_cache = _storage->get_all_topics_and_types();
     }
-    return std::make_shared< serialized_end_of_file >();
-}
+
+    void ros2_reader::reset()
+    {
+        // Sqlite storage reset usually involves re-opening to clear cursor state
+        _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
+        _storage->open(_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
+        _last_frame_cache.clear();
+    }
+
+    void ros2_reader::seek_to_time(const nanoseconds& time)
+    {
+        // rosbag2 storage interfaces typically read sequentially.
+        // To seek accurately in a raw storage plugin without the higher-level Reader API:
+        // 1. Reset file.
+        // 2. Read forward until timestamp >= time.
+        // 3. While reading forward, we MUST update _last_frame_cache so fetch_last_frames works.
+
+        reset();
+
+        while (_storage->has_next())
+        {
+            auto next_msg = _storage->read_next();
+            if (!next_msg) break;
+
+            nanoseconds msg_ts(next_msg->time_stamp);
+
+            // Update cache if it's a frame
+            std::string topic = next_msg->topic_name;
+            stream_identifier stream_id;
+            if (is_stream_topic(topic, stream_id))
+            {
+                // We have to wrap this into serialized_data to cache it
+                // Note: Full frame parsing would be needed here for a complete implementation
+                // For now, we use serialized_invalid_frame as a placeholder
+                auto data = std::make_shared<serialized_invalid_frame>(msg_ts, stream_id);
+                _last_frame_cache[stream_id] = data;
+            }
+
+            if (msg_ts >= time)
+            {
+                break;
+            }
+        }
+    }
+
+    nanoseconds ros2_reader::query_duration() const
+    {
+        auto meta = _storage->get_metadata();
+        return nanoseconds(meta.duration.count());
+    }
+
+    void ros2_reader::enable_stream(const std::vector<stream_identifier>& stream_ids)
+    {
+        for (const auto& id : stream_ids) _enabled_streams.insert(id);
+    }
+
+    void ros2_reader::disable_stream(const std::vector<stream_identifier>& stream_ids)
+    {
+        for (const auto& id : stream_ids) _enabled_streams.erase(id);
+    }
+
+    std::vector<std::shared_ptr<serialized_data>> ros2_reader::fetch_last_frames(const nanoseconds& seek_time)
+    {
+        std::vector<std::shared_ptr<serialized_data>> frames;
+        for (auto&& kv : _last_frame_cache)
+        {
+            // Filter by enabled streams
+            if (_enabled_streams.empty() || _enabled_streams.count(kv.first))
+            {
+                if (kv.second) frames.push_back(kv.second);
+            }
+        }
+        return frames;
+    }
+
+    std::map< std::string, std::string > ros2_reader::parse_key_value_string(const std::string& payload) const
+    {
+        std::map< std::string, std::string > kv_map;
+        auto pairs = split_string(payload, ';');
+        for (const auto& pair : pairs)
+        {
+            auto kv = split_string(pair, '=');
+            // Expect at least a key
+            if (kv.size() >= 1) {
+                std::string key = kv[0];
+                std::string value = (kv.size() >= 2) ? kv[1] : "";
+                kv_map[key] = value;
+            }
+        }
+        return kv_map;
+    }
+
+    device_snapshot ros2_reader::query_device_description(const nanoseconds& time)
+    {
+        if (_initialized) return _initial_snapshot;
+
+        reset(); // Ensure we scan from start
+        device_snapshot dev_snap;
+        std::map< uint32_t, sensor_snapshot > sensors;
+        snapshot_collection device_extensions;
+
+        // 1. Read device Info
+        auto info = read_info_snapshot(ros_topic::device_info_topic(get_device_index()));
+        device_extensions[RS2_EXTENSION_INFO] = info;
+
+        // between reads, reset storage to read from start
+        reset();
+
+        // 2. Read sensor infos and stream profiles
+        auto sensor_indices = read_sensor_indices(get_device_index());
+
+        //while (_storage->has_next())
+        //{
+        //    auto msg = _storage->read_next();
+        //    std::string topic = msg->topic_name;
+        //    std::string payload_str;
+
+        //    if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
+        //    {
+        //        payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+        //    }
+
+        //    if (topic.find("librealsense/file_version") != std::string::npos) continue;
+
+        //    // 1. Device Info (Simple heuristic based on topic name)
+        //    if (topic.find("info") != std::string::npos && topic.find("sensor") == std::string::npos && topic.find("stream") == std::string::npos)
+        //    {
+        //        auto kv = parse_key_value_string(payload_str);
+        //        // In a real implementation: populate info_interface from KV
+        //    }
+
+        //    // 2. Stream Info
+        //    stream_identifier stream_id;
+        //    if (is_stream_topic(topic, stream_id) && topic.find("info") != std::string::npos && topic.find("video") == std::string::npos)
+        //    {
+        //        // Logic to add stream profile to sensor snapshot
+        //    }
+        //}
+
+        //for (auto& s : sensors) dev_snap.get_sensors_snapshots().push_back(s.second);
+
+        //_initial_snapshot = dev_snap;
+        //_initialized = true;
+
+        //reset(); // Reset for playback
+
+        _initial_snapshot = device_snapshot(device_extensions, {}, {});
+        return _initial_snapshot;
+    }
+
+    std::shared_ptr<info_container> ros2_reader::read_info_snapshot(const std::string& topic) const
+    {
+        // temp return nothing
+        //return std::make_shared<info_container>();
+        auto infos = std::make_shared<info_container>();
+        std::map<rs2_camera_info, std::string> values;
+        // Read all messages on the topic and populate infos
+        _storage->reset_filter();
+        _storage->set_filter(rosbag2_storage::StorageFilter{ {topic} });
+
+        while (_storage->has_next())
+        {
+            auto msg = _storage->read_next();
+            std::string topic = msg->topic_name;
+            std::string payload_str;
+
+            if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
+            {
+                payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+            }
+            auto kv = parse_key_value_string(payload_str);
+            try
+            {
+                rs2_camera_info info;
+                auto it = kv.begin();
+                std::string key = it->first;
+                std::string value = it->second;
+                convert(key, info);
+                infos->register_info(info, value);
+            }
+            catch (const std::exception& e)
+            {
+                std::cerr << e.what() << std::endl;
+            }
+        }
+        _storage->reset_filter();
+        return infos;
+    }
+
+    std::set<uint32_t> ros2_reader::read_sensor_indices(uint32_t device_index) const
+    {
+        std::set<uint32_t> sensor_indices;
+
+        auto sensor_info_topic = ros_topic::sensor_info_topic({ device_index, 0 });
+
+        for (const auto& topic : _topics_cache)
+        {
+            // expecting topic name to be like device_0/sensor_X/info
+            std::string expected_prefix = "/device_" + std::to_string(device_index) + "/sensor_";
+            std::string expected_suffix = "/info";
+            if (topic.name.find(expected_prefix) == 0 && topic.name.find(expected_suffix) != std::string::npos)
+            {
+                // Extract sensor index from topic name
+                uint32_t sensor_index = ros_topic::get_sensor_index(topic.name);
+                sensor_indices.insert(sensor_index);
+            }
+        }
+
+        _storage->reset_filter();
+        _storage->set_filter(rosbag2_storage::StorageFilter{ {sensor_info_topic} });
+        while (_storage->has_next())
+        {
+            auto msg = _storage->read_next();
+            std::string topic = msg->topic_name;
+            // Extract sensor index from topic
+            uint32_t sensor_index = ros_topic::get_sensor_index(topic);
+            sensor_indices.insert(sensor_index);
+
+            std::string payload_str;
+
+            if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
+            {
+                payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+            }
+            auto kv = parse_key_value_string(payload_str);
+            try
+            {
+                rs2_camera_info info;
+                auto it = kv.begin();
+                std::string key = it->first;
+                std::string value = it->second;
+                convert(key, info);
+                //infos->register_info(info, value);
+            }
+            catch (const std::exception& e)
+            {
+                std::cerr << e.what() << std::endl;
+            }
+        }
+
+        _storage->reset_filter();
+
+        // old logic:
+        /*
+        rosbag::View sensor_infos(m_file, SensorInfoQuery(device_index));
+            for (auto sensor_info : sensor_infos)
+            {
+                auto msg = instantiate_msg<diagnostic_msgs::KeyValue>(sensor_info);
+                sensor_indices.insert(static_cast<uint32_t>(ros_topic::get_sensor_index(sensor_info.getTopic())));
+            }
+        
+        */
+
+        return sensor_indices;
+    }
+
+    std::shared_ptr< serialized_data > ros2_reader::read_next_data()
+    {
+        if (!_storage->has_next())
+        {
+            return std::make_shared<serialized_end_of_file>();
+        }
+
+        while (_storage->has_next())
+        {
+            auto msg = _storage->read_next();
+            if (!msg) return std::make_shared<serialized_end_of_file>();
+
+            std::string topic = msg->topic_name;
+            nanoseconds ts(msg->time_stamp);
+
+            // 1. Frames
+            if (topic.find("raw_frame") != std::string::npos)
+            {
+                stream_identifier sid;
+                // Need actual topic parsing logic here
+                // if (parse_topic(topic, sid)) ...
+
+                // Filter: if we have enabled streams and this isn't one, skip it
+                // if (!_enabled_streams.empty() && _enabled_streams.find(sid) == _enabled_streams.end()) continue;
+
+                // For now, return an invalid frame as placeholder
+                // A full implementation would parse the frame data
+                auto data = std::make_shared<serialized_invalid_frame>(ts, sid);
+
+                // Update cache for fetch_last_frames
+                // _last_frame_cache[sid] = data;
+
+                return data;
+            }
+
+            // 2. Options
+            sensor_identifier sensor_id;
+            rs2_option opt;
+            if (is_option_topic(topic, sensor_id, opt))
+            {
+                // Parse float
+                // std::string payload(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+                // float val = std::stof(payload);
+                // Return option data - need a proper option object
+                // For now, return end of file as we don't have a complete option implementation
+                continue;
+            }
+        }
+        return std::make_shared<serialized_end_of_file>();
+    }
+
+    // Helpers ---------------------------------------------------------------------
+
+    bool ros2_reader::is_stream_topic(const std::string& topic, stream_identifier& id) const
+    {
+        // Placeholder: Needs to match writer's make_frame_topic
+        // Example: "device_0/sensor_0/Color_0/image/0"
+        // Return true if parsed successfully
+        return false;
+    }
+
+    bool ros2_reader::is_option_topic(const std::string& topic, sensor_identifier& sid, rs2_option& opt) const
+    {
+        // Placeholder: Match writer's option topic
+        return topic.find("option/") != std::string::npos;
+    }
+
+    const std::string& ros2_reader::get_file_name() const { return _file_path; }
 
 } // namespace librealsense

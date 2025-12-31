@@ -19,6 +19,7 @@
 
 
 using namespace librealsense;
+using namespace device_serializer;
 
 static bool is_video_stream( rs2_stream stream )
 {
