@@ -39,6 +39,14 @@ export function IMUViewer() {
   // Get latest values
   const latestAccel = imuHistory.accel[imuHistory.accel.length - 1]
   const latestGyro = imuHistory.gyro[imuHistory.gyro.length - 1]
+  
+  // Calculate magnitude (norm) for latest values
+  const accelNorm = latestAccel 
+    ? Math.sqrt(latestAccel.x ** 2 + latestAccel.y ** 2 + latestAccel.z ** 2)
+    : null
+  const gyroNorm = latestGyro
+    ? Math.sqrt(latestGyro.x ** 2 + latestGyro.y ** 2 + latestGyro.z ** 2)
+    : null
 
   return (
     <div className="border-t border-gray-700 bg-rs-dark">
@@ -101,20 +109,31 @@ export function IMUViewer() {
                     <span className="text-xs text-gray-500">m/s²</span>
                   </div>
                   {latestAccel ? (
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div>
-                        <span className="text-red-400">X:</span>{' '}
-                        <span className="font-mono">{latestAccel.x.toFixed(3)}</span>
+                    <>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div>
+                          <span className="text-red-400">X:</span>{' '}
+                          <span className="font-mono">{latestAccel.x.toFixed(3)}</span>
+                        </div>
+                        <div>
+                          <span className="text-green-400">Y:</span>{' '}
+                          <span className="font-mono">{latestAccel.y.toFixed(3)}</span>
+                        </div>
+                        <div>
+                          <span className="text-blue-400">Z:</span>{' '}
+                          <span className="font-mono">{latestAccel.z.toFixed(3)}</span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-green-400">Y:</span>{' '}
-                        <span className="font-mono">{latestAccel.y.toFixed(3)}</span>
-                      </div>
-                      <div>
-                        <span className="text-blue-400">Z:</span>{' '}
-                        <span className="font-mono">{latestAccel.z.toFixed(3)}</span>
-                      </div>
-                    </div>
+                      {accelNorm !== null && (
+                        <div className="mt-2 pt-2 border-t border-gray-700 text-sm">
+                          <span className="text-purple-400">‖a‖:</span>{' '}
+                          <span className="font-mono font-semibold">{accelNorm.toFixed(3)}</span>
+                          <span className="text-xs text-gray-500 ml-1">
+                            {Math.abs(accelNorm - 9.81) < 0.5 ? '(≈1g)' : ''}
+                          </span>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <p className="text-gray-500 text-sm">No data</p>
                   )}
@@ -127,20 +146,31 @@ export function IMUViewer() {
                     <span className="text-xs text-gray-500">rad/s</span>
                   </div>
                   {latestGyro ? (
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div>
-                        <span className="text-red-400">X:</span>{' '}
-                        <span className="font-mono">{latestGyro.x.toFixed(3)}</span>
+                    <>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div>
+                          <span className="text-red-400">X:</span>{' '}
+                          <span className="font-mono">{latestGyro.x.toFixed(3)}</span>
+                        </div>
+                        <div>
+                          <span className="text-green-400">Y:</span>{' '}
+                          <span className="font-mono">{latestGyro.y.toFixed(3)}</span>
+                        </div>
+                        <div>
+                          <span className="text-blue-400">Z:</span>{' '}
+                          <span className="font-mono">{latestGyro.z.toFixed(3)}</span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-green-400">Y:</span>{' '}
-                        <span className="font-mono">{latestGyro.y.toFixed(3)}</span>
-                      </div>
-                      <div>
-                        <span className="text-blue-400">Z:</span>{' '}
-                        <span className="font-mono">{latestGyro.z.toFixed(3)}</span>
-                      </div>
-                    </div>
+                      {gyroNorm !== null && (
+                        <div className="mt-2 pt-2 border-t border-gray-700 text-sm">
+                          <span className="text-purple-400">‖ω‖:</span>{' '}
+                          <span className="font-mono font-semibold">{gyroNorm.toFixed(3)}</span>
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({(gyroNorm * 180 / Math.PI).toFixed(1)}°/s)
+                          </span>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <p className="text-gray-500 text-sm">No data</p>
                   )}

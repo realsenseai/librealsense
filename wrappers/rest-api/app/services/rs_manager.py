@@ -1761,7 +1761,13 @@ class RealSenseManager:
         if len(profiles) <= 1:
             return
         
-        # All profiles must have same FPS for hardware sync
+        # Motion streams (gyro/accel) can have different FPS - skip validation
+        motion_streams = {rs.stream.gyro, rs.stream.accel}
+        all_motion = all(p.stream_type() in motion_streams for p in profiles)
+        if all_motion:
+            return  # Motion streams don't require FPS sync
+        
+        # Video streams must have same FPS for hardware sync
         fps_values = set(p.fps() for p in profiles)
         if len(fps_values) > 1:
             profile_details = [f"{p.stream_type().name}@{p.fps()}fps" for p in profiles]

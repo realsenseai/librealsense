@@ -138,6 +138,7 @@ export interface StreamLayout {
 export interface SensorConfig {
   resolution: { width: number; height: number }
   framerate: number
+  isMotionSensor?: boolean // Motion sensors use per-stream FPS instead of shared
 }
 
 // Per-device state for multi-camera support

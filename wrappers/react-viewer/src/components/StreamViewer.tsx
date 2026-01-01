@@ -95,18 +95,35 @@ export function StreamViewer() {
             gridTemplateRows: `repeat(${Math.ceil(allEnabledStreams.length / 2)}, 1fr)`,
           }}
         >
-          {allEnabledStreams.map((stream) => (
-            <StreamTile
-              key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
-              deviceId={stream.deviceId}
-              deviceName={stream.deviceName}
-              serialNumber={stream.serialNumber}
-              streamType={stream.config.stream_type}
-              isStreaming={stream.isStreaming}
-              metadata={stream.metadata}
-              showDeviceName={activeDeviceCount > 1}
-            />
-          ))}
+          {allEnabledStreams.map((stream) => {
+            const isMotionStream = ['gyro', 'accel'].includes(stream.config.stream_type.toLowerCase())
+            
+            if (isMotionStream) {
+              return (
+                <IMUStreamTile
+                  key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
+                  streamType={stream.config.stream_type}
+                  isStreaming={stream.isStreaming}
+                  showDeviceName={activeDeviceCount > 1}
+                  deviceName={stream.deviceName}
+                  serialNumber={stream.serialNumber}
+                />
+              )
+            }
+            
+            return (
+              <StreamTile
+                key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
+                deviceId={stream.deviceId}
+                deviceName={stream.deviceName}
+                serialNumber={stream.serialNumber}
+                streamType={stream.config.stream_type}
+                isStreaming={stream.isStreaming}
+                metadata={stream.metadata}
+                showDeviceName={activeDeviceCount > 1}
+              />
+            )
+          })}
         </div>
       )}
     </div>
@@ -420,6 +437,163 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// IMU Stream Tile - specialized visualization for gyro/accel streams
+interface IMUStreamTileProps {
+  streamType: string
+  isStreaming: boolean
+  showDeviceName?: boolean
+  deviceName: string
+  serialNumber: string
+}
+
+function IMUStreamTile({ streamType, isStreaming, showDeviceName, deviceName, serialNumber }: IMUStreamTileProps) {
+  const { imuHistory } = useAppStore()
+  
+  const isGyro = streamType.toLowerCase() === 'gyro'
+  const isAccel = streamType.toLowerCase() === 'accel'
+  
+  const data = isGyro ? imuHistory.gyro : isAccel ? imuHistory.accel : []
+  const latest = data[data.length - 1]
+  
+  // Calculate magnitude
+  const magnitude = latest 
+    ? Math.sqrt(latest.x ** 2 + latest.y ** 2 + latest.z ** 2)
+    : null
+  
+  const getStreamColor = () => {
+    if (isGyro) return { bg: 'bg-red-900/50', border: 'border-red-500', text: 'text-red-400' }
+    if (isAccel) return { bg: 'bg-orange-900/50', border: 'border-orange-500', text: 'text-orange-400' }
+    return { bg: 'bg-gray-900/50', border: 'border-gray-500', text: 'text-gray-400' }
+  }
+  
+  const colors = getStreamColor()
+  const unit = isGyro ? 'rad/s' : 'm/s²'
+  
+  // Calculate bar widths based on value (normalized to max expected range)
+  const maxRange = isGyro ? 10 : 20  // rad/s for gyro, m/s² for accel
+  const getBarWidth = (value: number) => {
+    const normalized = Math.min(Math.abs(value) / maxRange, 1) * 100
+    return `${normalized}%`
+  }
+  
+  return (
+    <div className={`relative rounded-lg overflow-hidden ${colors.bg} border ${colors.border} flex flex-col`}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2 bg-black/30">
+        <div className="flex items-center gap-2">
+          <span className={`font-semibold ${colors.text}`}>
+            {streamType.toUpperCase()}
+          </span>
+          {isStreaming && (
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          )}
+        </div>
+        <span className="text-xs text-gray-400">{unit}</span>
+      </div>
+      
+      {showDeviceName && (
+        <div className="px-3 py-1 text-xs text-gray-400 bg-black/20">
+          {deviceName} ({serialNumber})
+        </div>
+      )}
+      
+      {/* Content */}
+      <div className="flex-1 flex flex-col justify-center p-4">
+        {!isStreaming ? (
+          <div className="text-center text-gray-500">
+            <p>Not streaming</p>
+          </div>
+        ) : !latest ? (
+          <div className="text-center text-gray-500">
+            <p>Waiting for data...</p>
+          </div>
+        ) : (
+          <>
+            {/* X/Y/Z Values with visual bars */}
+            <div className="space-y-3">
+              {/* X */}
+              <div className="flex items-center gap-3">
+                <span className="text-red-400 font-bold w-4">X</span>
+                <div className="flex-1 h-4 bg-gray-800 rounded overflow-hidden relative">
+                  <div 
+                    className="absolute top-0 h-full bg-red-500/70 transition-all duration-75"
+                    style={{ 
+                      width: getBarWidth(latest.x),
+                      left: latest.x >= 0 ? '50%' : `calc(50% - ${getBarWidth(latest.x)})`,
+                    }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs font-mono text-white drop-shadow">
+                      {latest.x.toFixed(3)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Y */}
+              <div className="flex items-center gap-3">
+                <span className="text-green-400 font-bold w-4">Y</span>
+                <div className="flex-1 h-4 bg-gray-800 rounded overflow-hidden relative">
+                  <div 
+                    className="absolute top-0 h-full bg-green-500/70 transition-all duration-75"
+                    style={{ 
+                      width: getBarWidth(latest.y),
+                      left: latest.y >= 0 ? '50%' : `calc(50% - ${getBarWidth(latest.y)})`,
+                    }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs font-mono text-white drop-shadow">
+                      {latest.y.toFixed(3)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Z */}
+              <div className="flex items-center gap-3">
+                <span className="text-blue-400 font-bold w-4">Z</span>
+                <div className="flex-1 h-4 bg-gray-800 rounded overflow-hidden relative">
+                  <div 
+                    className="absolute top-0 h-full bg-blue-500/70 transition-all duration-75"
+                    style={{ 
+                      width: getBarWidth(latest.z),
+                      left: latest.z >= 0 ? '50%' : `calc(50% - ${getBarWidth(latest.z)})`,
+                    }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs font-mono text-white drop-shadow">
+                      {latest.z.toFixed(3)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Magnitude */}
+            {magnitude !== null && (
+              <div className="mt-4 pt-3 border-t border-gray-700 flex items-center justify-between">
+                <span className="text-purple-400 font-semibold">‖{isGyro ? 'ω' : 'a'}‖</span>
+                <span className="font-mono font-bold text-lg">
+                  {magnitude.toFixed(3)}
+                  <span className="text-xs text-gray-400 ml-1">{unit}</span>
+                </span>
+                {isAccel && Math.abs(magnitude - 9.81) < 0.5 && (
+                  <span className="text-xs text-green-400">(≈1g)</span>
+                )}
+              </div>
+            )}
+            
+            {/* Sample count */}
+            <div className="mt-2 text-xs text-gray-500 text-center">
+              {data.length} samples
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
