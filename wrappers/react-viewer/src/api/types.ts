@@ -134,6 +134,12 @@ export interface StreamLayout {
   size: { width: number; height: number }
 }
 
+// Per-sensor configuration (resolution/FPS shared across all streams from same sensor)
+export interface SensorConfig {
+  resolution: { width: number; height: number }
+  framerate: number
+}
+
 // Per-device state for multi-camera support
 export interface DeviceState {
   device: DeviceInfo
@@ -141,9 +147,63 @@ export interface DeviceState {
   sensors: SensorInfo[]
   options: Record<string, OptionInfo[]> // keyed by sensor_id
   streamConfigs: StreamConfig[]
+  sensorConfigs: Record<string, SensorConfig> // Per-sensor resolution/FPS, keyed by sensor_id
   isStreaming: boolean
-   isStopping?: boolean
+  isStopping?: boolean
   isActive: boolean // whether this device is shown in viewer
   isLoading: boolean // loading sensors/options
   streamMetadata: Record<string, StreamMetadata> // keyed by stream_type
+  // Per-sensor streaming state (sensor API)
+  streamingMode: 'idle' | 'pipeline' | 'sensor' // which API is being used
+  sensorStreamingStatus: Record<string, SensorStreamStatus> // keyed by sensor_id
+}
+
+// Per-sensor streaming types (for sensor API)
+export interface SensorStreamConfig {
+  stream_type: string
+  format: string
+  resolution: { width: number; height: number }
+  framerate: number
+}
+
+export interface SensorStartRequest {
+  config: SensorStreamConfig
+}
+
+export interface SensorStartItem {
+  sensor_id: string
+  config: SensorStreamConfig
+}
+
+export interface BatchSensorStartRequest {
+  sensors: SensorStartItem[]
+}
+
+export interface BatchSensorStopRequest {
+  sensor_ids?: string[] | null
+}
+
+export interface SensorStreamStatus {
+  sensor_id: string
+  name: string
+  is_streaming: boolean
+  // Single stream_type for backward compatibility (first stream)
+  stream_type?: string | null
+  resolution?: { width: number; height: number } | null
+  framerate?: number | null
+  format?: string | null
+  // New: multiple streams support
+  stream_types?: string[]  // All active stream types
+  streams?: SensorStreamConfig[]  // All active stream configs
+  error?: string | null
+  started_at?: string | null
+  // UI-only: pending operation state for optimistic updates
+  pendingOp?: 'stopping' | null
+}
+
+export interface BatchSensorStatus {
+  device_id: string
+  mode: 'idle' | 'pipeline' | 'sensor'
+  sensors: SensorStreamStatus[]
+  errors: string[]
 }

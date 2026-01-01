@@ -19,6 +19,8 @@ async def start_stream(
     Returns timing info for diagnostics.
     """
     import time
+    import logging
+    import traceback
     t0 = time.perf_counter()
     try:
         result = rs_manager.start_stream(
@@ -30,7 +32,12 @@ async def start_stream(
         result['timings']['endpoint_total'] = time.perf_counter() - t0
         return result
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        error_msg = str(e) if str(e) else repr(e)
+        logging.error(f"[PIPELINE] Start stream failed: {error_msg}")
+        logging.error(traceback.format_exc())
+        for cfg in stream_config.configs:
+            logging.error(f"  Config: {cfg.stream_type} {cfg.format} {cfg.resolution.width}x{cfg.resolution.height}@{cfg.framerate}fps")
+        raise HTTPException(status_code=400, detail=error_msg)
 
 @router.post("/stop", response_model=StreamStatus)
 async def stop_stream(
