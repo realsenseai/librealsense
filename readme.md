@@ -33,7 +33,7 @@ Note: A redirection from the previous name IntelRealSense is currently in place,
 We have updated our branch policy:
 From now on, we will also push beta releases to the master branch, so users can access up-to-date code and features.
 In the near future, beta binaries will also be pushed to public distribution servers (e.g., APT).
-The last validated official release can be found on our Releases page on GitHub."
+The last validated official release can be found on our Releases page on GitHub.
 
 ## Use Cases
 
