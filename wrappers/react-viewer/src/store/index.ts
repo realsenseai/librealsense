@@ -488,6 +488,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
         }
         
         // Set sensor-level resolution/fps from common options
+        // Check if this is a motion sensor (gyro/accel use per-stream FPS)
+        const isMotionSensor = sensor.name.toLowerCase().includes('motion')
+        
         if (commonResolutions && commonResolutions.size > 0 && commonFps && commonFps.size > 0) {
           const firstCommonRes = [...commonResolutions][0]
           const [width, height] = firstCommonRes.split('x').map(Number)
@@ -504,6 +507,23 @@ export const useAppStore = create<AppState>()((set, get) => ({
           sensorConfigs[sensor.sensor_id] = {
             resolution: { width, height },
             framerate: selectedFps,
+            isMotionSensor,
+          }
+        } else if (sensor.supported_stream_profiles.length > 0) {
+          // Fallback for sensors without common resolutions (e.g., motion sensors)
+          // Use first profile's resolution
+          const firstProfile = sensor.supported_stream_profiles[0]
+          const width = firstProfile.resolutions[0]?.[0] || 320
+          const height = firstProfile.resolutions[0]?.[1] || 120
+          
+          // For motion sensors, don't require common FPS - each stream uses its own
+          // Just pick a reasonable default for the sensor-level config (won't be used for motion)
+          const selectedFps = firstProfile.fps[0] || 200
+          
+          sensorConfigs[sensor.sensor_id] = {
+            resolution: { width, height },
+            framerate: selectedFps,
+            isMotionSensor,
           }
         }
       }
@@ -849,12 +869,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
       return
     }
 
-    // Build configs array for all enabled streams using sensor-level resolution/FPS
+    // Build configs array for all enabled streams
+    // Motion sensors use per-stream FPS, others use sensor-level FPS
     const configs: SensorStreamConfig[] = enabledStreamConfigs.map(c => ({
       stream_type: c.stream_type,
       format: c.format,
-      resolution: sensorConfig.resolution,  // Use sensor-level resolution
-      framerate: sensorConfig.framerate,    // Use sensor-level FPS
+      resolution: sensorConfig.isMotionSensor ? c.resolution : sensorConfig.resolution,
+      framerate: sensorConfig.isMotionSensor ? c.framerate : sensorConfig.framerate,
     }))
 
     try {

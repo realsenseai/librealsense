@@ -669,8 +669,8 @@ function DeviceCard({
                       </div>
                     )}
                     
-                    {/* Per-sensor Resolution/FPS controls */}
-                    {sensorConfig && (
+                    {/* Per-sensor Resolution/FPS controls - hidden for motion sensors (they use per-stream FPS) */}
+                    {sensorConfig && !sensorConfig.isMotionSensor && (
                       <div className="mb-2 flex items-center gap-2 text-xs">
                         <div className="flex items-center gap-1">
                           <label className="text-gray-500">Res:</label>
@@ -708,7 +708,7 @@ function DeviceCard({
                       </div>
                     )}
                     
-                    {/* Stream configs for this sensor (format only) */}
+                    {/* Stream configs for this sensor (format only for video, format + FPS for motion) */}
                     <div className="space-y-1">
                       {sensorStreamConfigs.map((config) => (
                         <StreamConfigItem
@@ -717,6 +717,7 @@ function DeviceCard({
                           sensors={sensors}
                           onUpdate={onUpdateStreamConfig}
                           disabled={streamingMode === 'pipeline' || isSensorStreaming}
+                          isMotionSensor={sensorConfig?.isMotionSensor ?? false}
                         />
                       ))}
                     </div>
@@ -753,9 +754,10 @@ interface StreamConfigItemProps {
   sensors: SensorInfo[]
   onUpdate: (config: StreamConfig) => void
   disabled: boolean
+  isMotionSensor: boolean
 }
 
-function StreamConfigItem({ config, sensors, onUpdate, disabled }: StreamConfigItemProps) {
+function StreamConfigItem({ config, sensors, onUpdate, disabled, isMotionSensor }: StreamConfigItemProps) {
   const sensor = sensors.find((s) => s.sensor_id === config.sensor_id)
   const profile = sensor?.supported_stream_profiles.find((p) => 
     p.stream_type.toLowerCase() === config.stream_type.toLowerCase()
@@ -776,16 +778,19 @@ function StreamConfigItem({ config, sensors, onUpdate, disabled }: StreamConfigI
     return colors[type.toLowerCase()] || 'text-gray-400'
   }
 
+  // Available FPS options for this stream profile
+  const availableFps = [...profile.fps].sort((a, b) => a - b)
+
   return (
-    <div className="flex items-center gap-2 py-0.5">
+    <div className="flex items-center gap-2 py-0.5 flex-wrap">
       <input
         type="checkbox"
         checked={config.enable}
         onChange={(e) => onUpdate({ ...config, enable: e.target.checked })}
         disabled={disabled}
-        className="control-checkbox w-3 h-3"
+        className="control-checkbox w-3 h-3 flex-shrink-0"
       />
-      <span className={`text-xs font-semibold min-w-[80px] ${getStreamColor(config.stream_type)}`}>
+      <span className={`text-xs font-semibold min-w-[50px] ${getStreamColor(config.stream_type)}`}>
         {config.stream_type.toUpperCase()}
       </span>
       {/* Format selector - only shown when enabled */}
@@ -794,11 +799,26 @@ function StreamConfigItem({ config, sensors, onUpdate, disabled }: StreamConfigI
           value={config.format}
           onChange={(e) => onUpdate({ ...config, format: e.target.value })}
           disabled={disabled}
-          className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+          className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs max-w-[100px]"
         >
           {profile.formats.map((format) => (
             <option key={format} value={format}>
               {format}
+            </option>
+          ))}
+        </select>
+      )}
+      {/* Per-stream FPS selector for motion sensors */}
+      {config.enable && isMotionSensor && (
+        <select
+          value={config.framerate}
+          onChange={(e) => onUpdate({ ...config, framerate: Number(e.target.value) })}
+          disabled={disabled}
+          className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs w-[70px]"
+        >
+          {availableFps.map((fps) => (
+            <option key={fps} value={fps}>
+              {fps}Hz
             </option>
           ))}
         </select>
