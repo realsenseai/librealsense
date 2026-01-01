@@ -42,6 +42,7 @@ interface AppState {
   devices: DeviceInfo[]
   deviceStates: Record<string, DeviceState> // keyed by device_id
   isLoadingDevices: boolean
+  hasUserInteracted: boolean // Track if user manually toggled a device (skip auto-activate)
   fetchDevices: () => Promise<void>
   checkFirmwareUpdates: (deviceId: string) => Promise<void>
   updateFirmware: (deviceId: string) => Promise<void>
@@ -144,6 +145,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   devices: [],
   deviceStates: {},
   isLoadingDevices: false,
+  hasUserInteracted: false,
   
   fetchDevices: async () => {
     set({ isLoadingDevices: true, error: null })
@@ -191,6 +193,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
         return { devices, deviceStates: newDeviceStates, isLoadingDevices: false }
       })
+      
+      // Auto-activate if exactly 1 device and user hasn't manually interacted
+      const currentState = get()
+      const activeDevices = Object.values(currentState.deviceStates).filter(ds => ds.isActive)
+      if (devices.length === 1 && activeDevices.length === 0 && !currentState.hasUserInteracted) {
+        await get().toggleDeviceActive(devices[0])
+      }
     } catch (error) {
       set({
         error: `Failed to fetch devices: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -304,6 +313,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   toggleDeviceActive: async (device: DeviceInfo) => {
+    // Mark that user has interacted (skip future auto-activation)
+    set({ hasUserInteracted: true })
+    
     const state = get()
     const existing = state.deviceStates[device.device_id]
     
@@ -458,6 +470,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
             )
           }
           
+          // Enable depth and color streams by default for better UX
+          const streamTypeLower = profile.stream_type.toLowerCase()
+          const enableByDefault = streamTypeLower === 'depth' || streamTypeLower === 'color'
+          
           configs.push({
             sensor_id: sensor.sensor_id,
             stream_type: profile.stream_type,
@@ -467,7 +483,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
               height: profile.resolutions[0][1],
             },
             framerate: profile.fps[0],
-            enable: false,
+            enable: enableByDefault,
           })
         }
         
