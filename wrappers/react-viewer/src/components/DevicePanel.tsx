@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../store'
-import type { DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState } from '../api/types'
+import type { DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState, SensorConfig } from '../api/types'
 import { FirmwareProgressModal } from './FirmwareProgressModal'
 import { ToastContainer, type ToastType } from './Toast'
 
@@ -22,9 +22,10 @@ export function DevicePanel() {
     clearError,
     isAnyDeviceStreaming,
     updateStreamConfig,
+    updateSensorConfig,
     setOption,
-    startDeviceStreaming,
-    stopDeviceStreaming,
+    startSensorStreaming,
+    stopSensorStreaming,
     checkFirmwareUpdates,
     updateFirmware,
   } = useAppStore()
@@ -186,11 +187,12 @@ export function DevicePanel() {
                 onToggle={() => toggleDeviceActive(device)}
                 onReset={() => resetDevice(device.device_id)}
                 onUpdateStreamConfig={(config) => updateStreamConfig(device.device_id, config)}
+                onUpdateSensorConfig={(sensorId, config) => updateSensorConfig(device.device_id, sensorId, config)}
                 onSetOption={(sensorId, optionId, value) => 
                   setOption(device.device_id, sensorId, optionId, value)
                 }
-                onStartStreaming={() => startDeviceStreaming(device.device_id)}
-                onStopStreaming={() => stopDeviceStreaming(device.device_id)}
+                onStartSensorStreaming={(sensorId) => startSensorStreaming(device.device_id, sensorId)}
+                onStopSensorStreaming={(sensorId) => stopSensorStreaming(device.device_id, sensorId)}
                 onCheckFirmwareUpdates={() => checkFirmwareUpdates(device.device_id)}
                 onUpdateFirmware={() => {
                   setFirmwareProgressDeviceId(device.device_id)
@@ -253,9 +255,10 @@ interface DeviceCardProps {
   onToggle: () => void
   onReset: () => void
   onUpdateStreamConfig: (config: StreamConfig) => void
+  onUpdateSensorConfig: (sensorId: string, config: Partial<SensorConfig>) => void
   onSetOption: (sensorId: string, optionId: string, value: number | boolean | string) => Promise<void>
-  onStartStreaming: () => void
-  onStopStreaming: () => void
+  onStartSensorStreaming: (sensorId: string) => void
+  onStopSensorStreaming: (sensorId: string) => void
   onCheckFirmwareUpdates: () => void
   onUpdateFirmware: () => void
 }
@@ -266,9 +269,10 @@ function DeviceCard({
   onToggle, 
   onReset, 
   onUpdateStreamConfig,
+  onUpdateSensorConfig,
   onSetOption,
-  onStartStreaming,
-  onStopStreaming,
+  onStartSensorStreaming,
+  onStopSensorStreaming,
   onCheckFirmwareUpdates,
   onUpdateFirmware,
 }: DeviceCardProps) {
@@ -282,8 +286,18 @@ function DeviceCard({
   const sensors = deviceState?.sensors || []
   const options = deviceState?.options || {}
   const streamConfigs = deviceState?.streamConfigs || []
+  const sensorConfigs = deviceState?.sensorConfigs || {}
+  const streamingMode = deviceState?.streamingMode || 'idle'
+  const sensorStreamingStatus = deviceState?.sensorStreamingStatus || {}
   
-  const hasEnabledStreams = streamConfigs.some(c => c.enable)
+  // Group stream configs by sensor
+  const streamsBySensor: Record<string, StreamConfig[]> = {}
+  for (const config of streamConfigs) {
+    if (!streamsBySensor[config.sensor_id]) {
+      streamsBySensor[config.sensor_id] = []
+    }
+    streamsBySensor[config.sensor_id].push(config)
+  }
 
   const firmware = deviceState?.firmware || {
     current: device.firmware_version,
@@ -546,32 +560,169 @@ function DeviceCard({
           {/* Stream Configuration */}
           <div className="p-3">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-gray-300">Streams</h4>
-              {/* Start/Stop Button */}
-              <button
-                onClick={isStreaming ? onStopStreaming : onStartStreaming}
-                disabled={!hasEnabledStreams && !isStreaming}
-                className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
-                  isStreaming
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : hasEnabledStreams
-                      ? 'bg-green-600 hover:bg-green-700 text-white'
-                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {isStreaming ? '■ Stop' : '▶ Start'}
-              </button>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-medium text-gray-300">Streams</h4>
+                {/* Streaming mode indicator */}
+                {streamingMode !== 'idle' && (
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${
+                    streamingMode === 'pipeline' 
+                      ? 'bg-blue-900 text-blue-300' 
+                      : 'bg-purple-900 text-purple-300'
+                  }`}>
+                    {streamingMode === 'pipeline' ? 'All' : 'Per-sensor'}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              {streamConfigs.map((config) => (
-                <StreamConfigItem
-                  key={`${config.sensor_id}-${config.stream_type}`}
-                  config={config}
-                  sensors={sensors}
-                  onUpdate={onUpdateStreamConfig}
-                  disabled={isStreaming}
-                />
-              ))}
+            
+            {/* Stream configs grouped by sensor */}
+            <div className="space-y-3">
+              {sensors.map((sensor) => {
+                const sensorStreamConfigs = streamsBySensor[sensor.sensor_id] || []
+                if (sensorStreamConfigs.length === 0) return null
+                
+                const sensorStatus = sensorStreamingStatus[sensor.sensor_id]
+                const isSensorStreaming = sensorStatus?.is_streaming || false
+                const isSensorPending = sensorStatus?.pendingOp === 'stopping'
+                const sensorError = sensorStatus?.error
+                const hasEnabledSensorStreams = sensorStreamConfigs.some(c => c.enable)
+                const sensorConfig = sensorConfigs[sensor.sensor_id]
+                
+                // Per-sensor button: disabled if pipeline mode active, or no streams enabled
+                const canStartSensor = hasEnabledSensorStreams && streamingMode !== 'pipeline'
+                
+                // Compute intersection of resolutions/FPS across all stream profiles on this sensor
+                // All streams must use the same resolution/FPS when opened together
+                const computeCommonOptions = () => {
+                  const profiles = sensor.supported_stream_profiles
+                  if (profiles.length === 0) return { resolutions: [], fps: [] }
+                  
+                  // Start with first profile's options
+                  let commonResolutions = new Set(
+                    profiles[0].resolutions.map(([w, h]) => `${w}x${h}`)
+                  )
+                  let commonFps = new Set(profiles[0].fps)
+                  
+                  // Intersect with each subsequent profile
+                  for (let i = 1; i < profiles.length; i++) {
+                    const profileRes = new Set(
+                      profiles[i].resolutions.map(([w, h]) => `${w}x${h}`)
+                    )
+                    const profileFps = new Set(profiles[i].fps)
+                    
+                    commonResolutions = new Set(
+                      [...commonResolutions].filter(r => profileRes.has(r))
+                    )
+                    commonFps = new Set(
+                      [...commonFps].filter(f => profileFps.has(f))
+                    )
+                  }
+                  
+                  // Convert back to arrays
+                  const resolutions: [number, number][] = [...commonResolutions].map(r => {
+                    const [w, h] = r.split('x').map(Number)
+                    return [w, h] as [number, number]
+                  })
+                  const fps = [...commonFps].sort((a, b) => a - b)
+                  
+                  return { resolutions, fps }
+                }
+                
+                const { resolutions: availableResolutions, fps: availableFps } = computeCommonOptions()
+                
+                return (
+                  <div key={sensor.sensor_id} className="bg-gray-800/50 rounded-lg p-2">
+                    {/* Sensor header with per-sensor start button */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-300">{sensor.name}</span>
+                        {isSensorStreaming && (
+                          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                        )}
+                      </div>
+                      {/* Per-sensor start/stop button */}
+                      <button
+                        onClick={() => isSensorStreaming 
+                          ? onStopSensorStreaming(sensor.sensor_id) 
+                          : onStartSensorStreaming(sensor.sensor_id)
+                        }
+                        disabled={isSensorPending || (!canStartSensor && !isSensorStreaming)}
+                        title={streamingMode === 'pipeline' ? 'Stop all streams first' : isSensorPending ? 'Stopping...' : undefined}
+                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                          isSensorPending
+                            ? 'bg-yellow-600 text-white cursor-wait'
+                            : isSensorStreaming
+                              ? 'bg-red-600 hover:bg-red-700 text-white'
+                              : canStartSensor
+                                ? 'bg-green-600/80 hover:bg-green-600 text-white'
+                                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        {isSensorPending ? '⏳' : isSensorStreaming ? '■' : '▶'}
+                      </button>
+                    </div>
+                    
+                    {/* Inline error for this sensor */}
+                    {sensorError && (
+                      <div className="mb-2 text-xs text-red-400 bg-red-900/30 rounded px-2 py-1">
+                        {sensorError}
+                      </div>
+                    )}
+                    
+                    {/* Per-sensor Resolution/FPS controls */}
+                    {sensorConfig && (
+                      <div className="mb-2 flex items-center gap-2 text-xs">
+                        <div className="flex items-center gap-1">
+                          <label className="text-gray-500">Res:</label>
+                          <select
+                            value={`${sensorConfig.resolution.width}x${sensorConfig.resolution.height}`}
+                            onChange={(e) => {
+                              const [width, height] = e.target.value.split('x').map(Number)
+                              onUpdateSensorConfig(sensor.sensor_id, { resolution: { width, height } })
+                            }}
+                            disabled={streamingMode === 'pipeline' || isSensorStreaming}
+                            className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+                          >
+                            {availableResolutions.map(([w, h]) => (
+                              <option key={`${w}x${h}`} value={`${w}x${h}`}>
+                                {w}×{h}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <label className="text-gray-500">FPS:</label>
+                          <select
+                            value={sensorConfig.framerate}
+                            onChange={(e) => onUpdateSensorConfig(sensor.sensor_id, { framerate: Number(e.target.value) })}
+                            disabled={streamingMode === 'pipeline' || isSensorStreaming}
+                            className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+                          >
+                            {availableFps.map((fps) => (
+                              <option key={fps} value={fps}>
+                                {fps}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Stream configs for this sensor (format only) */}
+                    <div className="space-y-1">
+                      {sensorStreamConfigs.map((config) => (
+                        <StreamConfigItem
+                          key={`${config.sensor_id}-${config.stream_type}`}
+                          config={config}
+                          sensors={sensors}
+                          onUpdate={onUpdateStreamConfig}
+                          disabled={streamingMode === 'pipeline' || isSensorStreaming}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
@@ -626,81 +777,31 @@ function StreamConfigItem({ config, sensors, onUpdate, disabled }: StreamConfigI
   }
 
   return (
-    <div className="bg-gray-800/50 rounded p-2">
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={config.enable}
-          onChange={(e) => onUpdate({ ...config, enable: e.target.checked })}
-          disabled={disabled}
-          className="control-checkbox w-3 h-3"
-        />
-        <span className={`text-xs font-semibold ${getStreamColor(config.stream_type)}`}>
-          {config.stream_type.toUpperCase()}
-        </span>
-        {config.enable && (
-          <span className="text-xs text-gray-500 ml-auto">
-            {config.resolution.width}×{config.resolution.height} @ {config.framerate}fps
-          </span>
-        )}
-      </div>
-
+    <div className="flex items-center gap-2 py-0.5">
+      <input
+        type="checkbox"
+        checked={config.enable}
+        onChange={(e) => onUpdate({ ...config, enable: e.target.checked })}
+        disabled={disabled}
+        className="control-checkbox w-3 h-3"
+      />
+      <span className={`text-xs font-semibold min-w-[80px] ${getStreamColor(config.stream_type)}`}>
+        {config.stream_type.toUpperCase()}
+      </span>
+      {/* Format selector - only shown when enabled */}
       {config.enable && (
-        <div className="mt-2 ml-5 space-y-1 text-xs">
-          {/* Resolution */}
-          <div className="flex items-center gap-2">
-            <label className="w-16 text-gray-500">Res:</label>
-            <select
-              value={`${config.resolution.width}x${config.resolution.height}`}
-              onChange={(e) => {
-                const [width, height] = e.target.value.split('x').map(Number)
-                onUpdate({ ...config, resolution: { width, height } })
-              }}
-              disabled={disabled}
-              className="flex-1 bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
-            >
-              {profile.resolutions.map(([w, h]) => (
-                <option key={`${w}x${h}`} value={`${w}x${h}`}>
-                  {w}×{h}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* FPS */}
-          <div className="flex items-center gap-2">
-            <label className="w-16 text-gray-500">FPS:</label>
-            <select
-              value={config.framerate}
-              onChange={(e) => onUpdate({ ...config, framerate: Number(e.target.value) })}
-              disabled={disabled}
-              className="flex-1 bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
-            >
-              {profile.fps.map((fps) => (
-                <option key={fps} value={fps}>
-                  {fps}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Format */}
-          <div className="flex items-center gap-2">
-            <label className="w-16 text-gray-500">Format:</label>
-            <select
-              value={config.format}
-              onChange={(e) => onUpdate({ ...config, format: e.target.value })}
-              disabled={disabled}
-              className="flex-1 bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
-            >
-              {profile.formats.map((format) => (
-                <option key={format} value={format}>
-                  {format}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        <select
+          value={config.format}
+          onChange={(e) => onUpdate({ ...config, format: e.target.value })}
+          disabled={disabled}
+          className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+        >
+          {profile.formats.map((format) => (
+            <option key={format} value={format}>
+              {format}
+            </option>
+          ))}
+        </select>
       )}
     </div>
   )

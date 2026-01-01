@@ -9,6 +9,11 @@ import type {
   WebRTCOffer,
   WebRTCSession,
   ICECandidate,
+  SensorStreamConfig,
+  SensorStreamStatus,
+  BatchSensorStartRequest,
+  BatchSensorStopRequest,
+  BatchSensorStatus,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -289,6 +294,63 @@ class ApiClient {
       max_depth: number
       units: string
     }>(`/devices/${deviceId}/stream/depth-range/`)
+    return response.data
+  }
+
+  // ============ Per-Sensor Streaming (Sensor API) ============
+
+  async startSensor(
+    deviceId: string,
+    sensorId: string,
+    configs: SensorStreamConfig[]  // Array of configs for multi-profile support
+  ): Promise<SensorStreamStatus> {
+    const response = await this.client.post<SensorStreamStatus>(
+      `/devices/${deviceId}/sensors/${sensorId}/start`,
+      { configs }  // Send as list
+    )
+    return response.data
+  }
+
+  async stopSensor(deviceId: string, sensorId: string): Promise<SensorStreamStatus> {
+    const response = await this.client.post<SensorStreamStatus>(
+      `/devices/${deviceId}/sensors/${sensorId}/stop`
+    )
+    return response.data
+  }
+
+  async getSensorStatus(deviceId: string, sensorId: string): Promise<SensorStreamStatus> {
+    const response = await this.client.get<SensorStreamStatus>(
+      `/devices/${deviceId}/sensors/${sensorId}/status`
+    )
+    return response.data
+  }
+
+  async batchStartSensors(
+    deviceId: string,
+    request: BatchSensorStartRequest
+  ): Promise<BatchSensorStatus> {
+    const response = await this.client.post<BatchSensorStatus>(
+      `/devices/${deviceId}/sensors/batch/start`,
+      request
+    )
+    return response.data
+  }
+
+  async batchStopSensors(
+    deviceId: string,
+    request?: BatchSensorStopRequest
+  ): Promise<BatchSensorStatus> {
+    const response = await this.client.post<BatchSensorStatus>(
+      `/devices/${deviceId}/sensors/batch/stop`,
+      request || {}
+    )
+    return response.data
+  }
+
+  async getBatchSensorStatus(deviceId: string): Promise<BatchSensorStatus> {
+    const response = await this.client.get<BatchSensorStatus>(
+      `/devices/${deviceId}/sensors/batch/status`
+    )
     return response.data
   }
 

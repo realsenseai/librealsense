@@ -71,10 +71,13 @@ class RealSenseVideoTrack(VideoStreamTrack):
             video_frame.pts = pts
             video_frame.time_base = time_base
 
-            import traceback
+            # Only log non-503 errors (503 = frames not yet available, which is normal briefly)
             error_detail = getattr(e, 'detail', str(e))
-            print(f"Error getting frame for {self.stream_type}: {error_detail}")
-            traceback.print_exc()
+            status_code = getattr(e, 'status_code', None)
+            if status_code != 503:
+                import traceback
+                print(f"Error getting frame for {self.stream_type}: {error_detail}")
+                traceback.print_exc()
             return video_frame
 
 class WebRTCManager:

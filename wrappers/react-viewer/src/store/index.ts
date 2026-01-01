@@ -10,7 +10,14 @@ import type {
   ViewMode,
   DeviceState,
   FirmwareState,
+  SensorStreamConfig,
+  SensorStreamStatus,
+  SensorConfig,
 } from '../api/types'
+
+// Map to track pending stop operations by "deviceId:sensorId" key
+// Used to await completion before allowing a new start
+const pendingStopPromises = new Map<string, Promise<void>>()
 import { apiClient } from '../api/client'
 import {
   checkChatAvailability,
@@ -63,6 +70,7 @@ interface AppState {
 
   // Per-device stream configuration  
   updateStreamConfig: (deviceIdOrConfig: string | StreamConfig, config?: StreamConfig) => void
+  updateSensorConfig: (deviceId: string, sensorId: string, config: Partial<SensorConfig>) => void
 
   // Per-device streaming
   startDeviceStreaming: (deviceId: string) => Promise<void>
@@ -71,6 +79,11 @@ interface AppState {
   stopAllStreaming: () => Promise<void>
   startStreaming: () => Promise<void>
   stopStreaming: () => Promise<void>
+
+  // Per-sensor streaming (sensor API)
+  startSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
+  stopSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
+  refreshSensorStatus: (deviceId: string) => Promise<void>
 
   // Metadata from Socket.IO
   updateMetadata: (metadata: MetadataUpdate) => void
@@ -323,11 +336,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
         sensors: [],
         options: {},
         streamConfigs: [],
+        sensorConfigs: {},
         isStreaming: false,
         isStopping: false,
         isActive: true,
         isLoading: true,
         streamMetadata: {},
+        streamingMode: 'idle',
+        sensorStreamingStatus: {},
       }
       set((s) => ({
         deviceStates: { ...s.deviceStates, [device.device_id]: deviceState },
@@ -404,6 +420,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       // Build initial stream configs from sensor profiles
       const configs: StreamConfig[] = []
       const optionsMap: Record<string, OptionInfo[]> = {}
+      const sensorConfigs: Record<string, SensorConfig> = {}
       
       for (const sensor of sensors) {
         // Store options from sensor response
@@ -411,19 +428,66 @@ export const useAppStore = create<AppState>()((set, get) => ({
           optionsMap[sensor.sensor_id] = sensor.options
         }
         
-        for (const profile of sensor.supported_stream_profiles) {
-          if (profile.resolutions.length > 0 && profile.fps.length > 0) {
-            configs.push({
-              sensor_id: sensor.sensor_id,
-              stream_type: profile.stream_type,
-              format: profile.formats[0] || 'rgb8',
-              resolution: {
-                width: profile.resolutions[0][0],
-                height: profile.resolutions[0][1],
-              },
-              framerate: profile.fps[0],
-              enable: false,
-            })
+        // Compute intersection of resolutions/FPS across all stream profiles
+        // All streams on same sensor must use same resolution/FPS when opened together
+        const profiles = sensor.supported_stream_profiles.filter(
+          p => p.resolutions.length > 0 && p.fps.length > 0
+        )
+        
+        let commonResolutions: Set<string> = new Set<string>()
+        let commonFps: Set<number> = new Set<number>()
+        let isFirst = true
+        
+        for (const profile of profiles) {
+          const profileRes = new Set<string>(
+            profile.resolutions.map(([w, h]) => `${w}x${h}`)
+          )
+          const profileFps = new Set<number>(profile.fps)
+          
+          if (isFirst) {
+            commonResolutions = profileRes
+            commonFps = profileFps
+            isFirst = false
+          } else {
+            // Intersect
+            commonResolutions = new Set<string>(
+              [...commonResolutions].filter(r => profileRes.has(r))
+            )
+            commonFps = new Set<number>(
+              [...commonFps].filter(f => profileFps.has(f))
+            )
+          }
+          
+          configs.push({
+            sensor_id: sensor.sensor_id,
+            stream_type: profile.stream_type,
+            format: profile.formats[0] || 'rgb8',
+            resolution: {
+              width: profile.resolutions[0][0],
+              height: profile.resolutions[0][1],
+            },
+            framerate: profile.fps[0],
+            enable: false,
+          })
+        }
+        
+        // Set sensor-level resolution/fps from common options
+        if (commonResolutions && commonResolutions.size > 0 && commonFps && commonFps.size > 0) {
+          const firstCommonRes = [...commonResolutions][0]
+          const [width, height] = firstCommonRes.split('x').map(Number)
+          
+          // Pick a reasonable FPS: prefer 30, else 15, else highest available
+          const sortedFps = [...commonFps].sort((a, b) => b - a) // descending
+          let selectedFps = sortedFps[0] // default to highest
+          if (commonFps.has(30)) {
+            selectedFps = 30
+          } else if (commonFps.has(15)) {
+            selectedFps = 15
+          }
+          
+          sensorConfigs[sensor.sensor_id] = {
+            resolution: { width, height },
+            framerate: selectedFps,
           }
         }
       }
@@ -436,6 +500,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
             sensors,
             options: optionsMap,
             streamConfigs: configs,
+            sensorConfigs,
             isLoading: false,
           },
         },
@@ -558,6 +623,32 @@ export const useAppStore = create<AppState>()((set, get) => ({
     })
   },
 
+  // Per-sensor configuration (resolution/FPS at sensor level)
+  updateSensorConfig: (deviceId, sensorId, config) => {
+    set((state) => {
+      const deviceState = state.deviceStates[deviceId]
+      if (!deviceState) return state
+      
+      const currentConfig = deviceState.sensorConfigs[sensorId] || { resolution: { width: 0, height: 0 }, framerate: 0 }
+      
+      return {
+        deviceStates: {
+          ...state.deviceStates,
+          [deviceId]: {
+            ...deviceState,
+            sensorConfigs: {
+              ...deviceState.sensorConfigs,
+              [sensorId]: {
+                ...currentConfig,
+                ...config,
+              },
+            },
+          },
+        },
+      }
+    })
+  },
+
   // Per-device streaming
   startDeviceStreaming: async (deviceId) => {
     const state = get()
@@ -577,15 +668,28 @@ export const useAppStore = create<AppState>()((set, get) => ({
       }
     }
 
-    const enabledConfigs = deviceState.streamConfigs.filter((c) => c.enable)
-    if (enabledConfigs.length === 0) {
+    const enabledStreamConfigs = deviceState.streamConfigs.filter((c) => c.enable)
+    if (enabledStreamConfigs.length === 0) {
       set({ error: 'Please enable at least one stream' })
       return
     }
 
+    // Apply sensor-level resolution/FPS to each enabled stream config
+    const configsWithSensorSettings = enabledStreamConfigs.map(c => {
+      const sensorConfig = deviceState.sensorConfigs[c.sensor_id]
+      if (sensorConfig) {
+        return {
+          ...c,
+          resolution: sensorConfig.resolution,
+          framerate: sensorConfig.framerate,
+        }
+      }
+      return c
+    })
+
     try {
       await apiClient.startStreaming(deviceId, {
-        configs: enabledConfigs,
+        configs: configsWithSensorSettings,
         apply_filters: false,
         reuse_cache: true,
       })
@@ -596,13 +700,24 @@ export const useAppStore = create<AppState>()((set, get) => ({
             ...s.deviceStates[deviceId],
             isStreaming: true,
             isStopping: false,
+            streamingMode: 'pipeline',
           },
         },
         error: null,
       }))
     } catch (error) {
+      // Extract error message - axios errors have response.data.detail
+      let errorMessage = 'Unknown error'
+      if (error && typeof error === 'object') {
+        const axiosError = error as { response?: { data?: { detail?: string } }; message?: string }
+        if (axiosError.response?.data?.detail) {
+          errorMessage = axiosError.response.data.detail
+        } else if (axiosError.message) {
+          errorMessage = axiosError.message
+        }
+      }
       set({
-        error: `Failed to start streaming: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error: `Failed to start streaming: ${errorMessage}`,
       })
     }
   },
@@ -630,6 +745,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
             ...state.deviceStates[deviceId],
             isStopping: !!status?.stopping,
             isStreaming: status?.is_streaming ?? false,
+            streamingMode: 'idle',
+            sensorStreamingStatus: {},
             streamMetadata: status?.stopping ? state.deviceStates[deviceId].streamMetadata : {},
           },
         },
@@ -679,6 +796,243 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   stopStreaming: async () => {
     await get().stopAllStreaming()
+  },
+
+  // Per-sensor streaming (sensor API)
+  startSensorStreaming: async (deviceId, sensorId) => {
+    // Wait for any pending stop operation to complete before starting
+    const pendingKey = `${deviceId}:${sensorId}`
+    const pendingStop = pendingStopPromises.get(pendingKey)
+    if (pendingStop) {
+      await pendingStop
+    }
+
+    const state = get()
+    const deviceState = state.deviceStates[deviceId]
+    if (!deviceState) return
+
+    // Check mode - can't use sensor API if pipeline is active
+    if (deviceState.streamingMode === 'pipeline') {
+      set({ error: 'Stop all streams before using per-sensor control' })
+      return
+    }
+
+    // Find ALL enabled stream configs for this sensor (not just first)
+    const enabledStreamConfigs = deviceState.streamConfigs.filter(
+      c => c.sensor_id === sensorId && c.enable
+    )
+    if (enabledStreamConfigs.length === 0) {
+      set({ error: 'Enable at least one stream for this sensor' })
+      return
+    }
+
+    // Get sensor-level resolution/FPS (shared across all streams from this sensor)
+    const sensorConfig = deviceState.sensorConfigs[sensorId]
+    if (!sensorConfig) {
+      set({ error: 'Sensor configuration not found' })
+      return
+    }
+
+    // Build configs array for all enabled streams using sensor-level resolution/FPS
+    const configs: SensorStreamConfig[] = enabledStreamConfigs.map(c => ({
+      stream_type: c.stream_type,
+      format: c.format,
+      resolution: sensorConfig.resolution,  // Use sensor-level resolution
+      framerate: sensorConfig.framerate,    // Use sensor-level FPS
+    }))
+
+    try {
+      const status = await apiClient.startSensor(deviceId, sensorId, configs)
+      
+      set((s) => ({
+        deviceStates: {
+          ...s.deviceStates,
+          [deviceId]: {
+            ...s.deviceStates[deviceId],
+            streamingMode: 'sensor',
+            isStreaming: true,
+            sensorStreamingStatus: {
+              ...s.deviceStates[deviceId].sensorStreamingStatus,
+              [sensorId]: status,
+            },
+          },
+        },
+        error: null,
+      }))
+    } catch (error) {
+      // Extract error message - axios errors have response.data.detail
+      let errorMessage = 'Failed to start sensor'
+      if (error && typeof error === 'object') {
+        const axiosError = error as { response?: { data?: { detail?: string } }; message?: string }
+        if (axiosError.response?.data?.detail) {
+          errorMessage = axiosError.response.data.detail
+        } else if (axiosError.message) {
+          errorMessage = axiosError.message
+        }
+      }
+      
+      // Store error in sensor status
+      set((s) => ({
+        deviceStates: {
+          ...s.deviceStates,
+          [deviceId]: {
+            ...s.deviceStates[deviceId],
+            sensorStreamingStatus: {
+              ...s.deviceStates[deviceId].sensorStreamingStatus,
+              [sensorId]: {
+                sensor_id: sensorId,
+                name: '',
+                is_streaming: false,
+                error: errorMessage,
+              },
+            },
+          },
+        },
+      }))
+    }
+  },
+
+  stopSensorStreaming: async (deviceId, sensorId) => {
+    const pendingKey = `${deviceId}:${sensorId}`
+
+    // Optimistically update UI immediately
+    set((s) => {
+      const deviceState = s.deviceStates[deviceId]
+      if (!deviceState) return s
+
+      const currentSensorStatus = deviceState.sensorStreamingStatus[sensorId] || {
+        sensor_id: sensorId,
+        name: '',
+        is_streaming: false,
+      }
+
+      const newSensorStatus = {
+        ...deviceState.sensorStreamingStatus,
+        [sensorId]: {
+          ...currentSensorStatus,
+          is_streaming: false,  // Optimistic: immediately show as stopped
+          pendingOp: 'stopping' as const,  // Track that we're stopping
+        },
+      }
+
+      // Check if any sensors are still streaming (excluding this one)
+      const anyStreaming = Object.entries(newSensorStatus).some(
+        ([id, ss]) => id !== sensorId && ss.is_streaming
+      )
+
+      return {
+        deviceStates: {
+          ...s.deviceStates,
+          [deviceId]: {
+            ...deviceState,
+            streamingMode: anyStreaming ? 'sensor' : 'idle',
+            isStreaming: anyStreaming,
+            sensorStreamingStatus: newSensorStatus,
+          },
+        },
+      }
+    })
+
+    // Create and store the stop promise so startSensorStreaming can await it
+    const stopPromise = (async () => {
+      try {
+        const status = await apiClient.stopSensor(deviceId, sensorId)
+        
+        set((s) => {
+          const deviceState = s.deviceStates[deviceId]
+          if (!deviceState) return s
+
+          const newSensorStatus = { ...deviceState.sensorStreamingStatus }
+          newSensorStatus[sensorId] = {
+            ...status,
+            pendingOp: null,  // Clear pending state
+          }
+
+          // Recheck streaming state with actual server response
+          const anyStreaming = Object.values(newSensorStatus).some(ss => ss.is_streaming)
+
+          return {
+            deviceStates: {
+              ...s.deviceStates,
+              [deviceId]: {
+                ...deviceState,
+                streamingMode: anyStreaming ? 'sensor' : 'idle',
+                isStreaming: anyStreaming,
+                sensorStreamingStatus: newSensorStatus,
+              },
+            },
+          }
+        })
+      } catch (error) {
+        // Rollback: restore streaming state on error
+        set((s) => {
+          const deviceState = s.deviceStates[deviceId]
+          if (!deviceState) return s
+
+          const currentSensorStatus = deviceState.sensorStreamingStatus[sensorId]
+
+          return {
+            error: `Failed to stop sensor: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            deviceStates: {
+              ...s.deviceStates,
+              [deviceId]: {
+                ...deviceState,
+                streamingMode: 'sensor',
+                isStreaming: true,
+                sensorStreamingStatus: {
+                  ...deviceState.sensorStreamingStatus,
+                  [sensorId]: {
+                    ...currentSensorStatus,
+                    is_streaming: true,  // Rollback: restore streaming state
+                    pendingOp: null,     // Clear pending state
+                  },
+                },
+              },
+            },
+          }
+        })
+      } finally {
+        // Always remove from pending map when done
+        pendingStopPromises.delete(pendingKey)
+      }
+    })()
+
+    pendingStopPromises.set(pendingKey, stopPromise)
+    await stopPromise
+  },
+
+  refreshSensorStatus: async (deviceId) => {
+    try {
+      const batchStatus = await apiClient.getBatchSensorStatus(deviceId)
+      
+      set((s) => {
+        const deviceState = s.deviceStates[deviceId]
+        if (!deviceState) return s
+
+        const sensorStatus: Record<string, SensorStreamStatus> = {}
+        for (const ss of batchStatus.sensors) {
+          sensorStatus[ss.sensor_id] = ss
+        }
+
+        const anyStreaming = batchStatus.sensors.some(ss => ss.is_streaming)
+        const mode = batchStatus.mode === 'sensor' ? 'sensor' : 
+                     batchStatus.mode === 'pipeline' ? 'pipeline' : 'idle'
+
+        return {
+          deviceStates: {
+            ...s.deviceStates,
+            [deviceId]: {
+              ...deviceState,
+              streamingMode: mode,
+              isStreaming: anyStreaming || deviceState.isStreaming,
+              sensorStreamingStatus: sensorStatus,
+            },
+          },
+        }
+      })
+    } catch (error) {
+      console.error('Failed to refresh sensor status:', error)
+    }
   },
 
   // Metadata
