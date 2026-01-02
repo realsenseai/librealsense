@@ -1481,7 +1481,8 @@ namespace librealsense
         }
 
         v4l_uvc_device::v4l_uvc_device(const uvc_device_info& info, bool use_memory_map)
-            : _name(info.id), 
+            : _power_counter( 0 ),
+              _name(info.id), 
               _device_path(info.device_path),
               _device_usb_spec(info.conn_spec),
               _info(info),
@@ -2090,15 +2091,44 @@ namespace librealsense
 
         void v4l_uvc_device::set_power_state(power_state state)
         {
-            if (state == D0 && _state == D3)
+            std::lock_guard< std::recursive_mutex > lock( _power_lock );
+            switch (state)
             {
-                map_device_descriptor();
-            }
-            if (state == D3 && _state == D0)
+            case D0:
             {
-                close(_profile);
-                unmap_device_descriptor();
+                if( _power_counter.fetch_add( 1 ) == 0 )
+                {
+                    try
+                    {
+                        map_device_descriptor();
+                    }
+                    //In case of failure need to decrease use counter
+                    catch( std::exception const & e )
+                    {
+                        _power_counter.fetch_add( -1 );
+                        throw e;
+                    }
+                    catch( ... )
+                    {
+                        _power_counter.fetch_add( -1 );
+                        throw;
+                    }
+                }
+                break;
             }
+            case D3:
+            {
+                if( _power_counter.fetch_add( -1 ) == 1 )
+                {
+                    close(_profile);
+                    unmap_device_descriptor();
+                }
+                break;
+            }
+            default:
+                throw std::runtime_error("illegal power state request");
+            }
+
             _state = state;
         }
 
