@@ -53,6 +53,9 @@ export interface OptionInfo {
   step?: number
   units?: string
   read_only: boolean
+  category: string
+  filter_name?: string  // For post-processing filter options
+  value_descriptions?: Record<string, string>  // For enum-type options: {value: description}
 }
 
 export interface StreamConfig {
