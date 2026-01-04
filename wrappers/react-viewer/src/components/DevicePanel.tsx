@@ -836,15 +836,60 @@ interface SensorOptionsPanelProps {
 }
 
 function SensorOptionsPanel({ sensor, options, isExpanded, onToggle, onSetOption }: SensorOptionsPanelProps) {
-  // Count modified options
-  const modifiedCount = options.filter(o => !o.read_only && o.current_value !== o.default_value).length
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
-  const handleRestoreAllDefaults = async () => {
-    const modifiedOptions = options.filter(o => !o.read_only && o.current_value !== o.default_value)
-    for (const option of modifiedOptions) {
-      await onSetOption(sensor.sensor_id, option.option_id, option.default_value)
+  // Group options by category
+  const optionsByCategory = options.reduce((acc, option) => {
+    const category = option.category || 'Basic Controls'
+    if (!acc[category]) {
+      acc[category] = []
+    }
+    acc[category].push(option)
+    return acc
+  }, {} as Record<string, OptionInfo[]>)
+
+  // Ensure consistent category order: Basic Controls first, then Post-Processing
+  const categoryOrder = ['Basic Controls', 'Post-Processing']
+  const sortedCategories = Object.keys(optionsByCategory).sort((a, b) => {
+    const indexA = categoryOrder.indexOf(a)
+    const indexB = categoryOrder.indexOf(b)
+    if (indexA === -1 && indexB === -1) return a.localeCompare(b)
+    if (indexA === -1) return 1
+    if (indexB === -1) return -1
+    return indexA - indexB
+  })
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(category)) {
+        newSet.delete(category)
+      } else {
+        newSet.add(category)
+      }
+      return newSet
+    })
+  }
+
+  const handleRestoreCategoryDefaults = async (category: string) => {
+    const categoryOptions = optionsByCategory[category] || []
+    for (const option of categoryOptions) {
+      if (!option.read_only && option.current_value !== option.default_value) {
+        await onSetOption(sensor.sensor_id, option.option_id, option.default_value)
+      }
     }
   }
+
+  const handleRestoreAllDefaults = async () => {
+    for (const option of options) {
+      if (!option.read_only && option.current_value !== option.default_value) {
+        await onSetOption(sensor.sensor_id, option.option_id, option.default_value)
+      }
+    }
+  }
+
+  // Count modified options across all categories
+  const modifiedCount = options.filter(o => !o.read_only && o.current_value !== o.default_value).length
 
   return (
     <div className="mb-1">
@@ -872,30 +917,271 @@ function SensorOptionsPanel({ sensor, options, isExpanded, onToggle, onSetOption
 
       {isExpanded && (
         <div className="mt-1 space-y-1 pl-2">
-          {/* Restore All Defaults button */}
-          {modifiedCount > 0 && (
-            <button
-              onClick={handleRestoreAllDefaults}
-              className="w-full flex items-center justify-center gap-1 p-1 bg-gray-700/50 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors mb-1"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Restore All Defaults
-            </button>
-          )}
           {options.length === 0 ? (
             <p className="text-gray-500 text-xs py-1">No options available</p>
           ) : (
-            options.map((option) => (
-              <OptionControl 
-                key={option.option_id} 
-                option={option} 
-                sensorId={sensor.sensor_id}
-                onSetOption={onSetOption}
-              />
-            ))
+            <>
+              {/* Global restore defaults for all sensor options */}
+              {modifiedCount > 0 && (
+                <button
+                  onClick={handleRestoreAllDefaults}
+                  className="w-full flex items-center justify-center gap-1 p-1 bg-gray-700/50 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors mb-1"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Restore All Defaults
+                </button>
+              )}
+
+              {sortedCategories.map(category => (
+                <CategorySection
+                  key={category}
+                  category={category}
+                  options={optionsByCategory[category]}
+                  isExpanded={expandedCategories.has(category)}
+                  onToggle={() => toggleCategory(category)}
+                  onRestoreDefaults={() => handleRestoreCategoryDefaults(category)}
+                  sensorId={sensor.sensor_id}
+                  onSetOption={onSetOption}
+                />
+              ))}
+            </>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface CategorySectionProps {
+  category: string
+  options: OptionInfo[]
+  isExpanded: boolean
+  onToggle: () => void
+  onRestoreDefaults: () => void
+  sensorId: string
+  onSetOption: (sensorId: string, optionId: string, value: number | boolean | string) => Promise<void>
+}
+
+function CategorySection({ category, options, isExpanded, onToggle, onRestoreDefaults, sensorId, onSetOption }: CategorySectionProps) {
+  const hasModifiedOptions = options.some(opt => !opt.read_only && opt.current_value !== opt.default_value)
+
+  // For Post-Processing category, render specialized filter sections
+  if (category === 'Post-Processing') {
+    return (
+      <PostProcessingSection
+        options={options}
+        isExpanded={isExpanded}
+        onToggle={onToggle}
+        onRestoreDefaults={onRestoreDefaults}
+        sensorId={sensorId}
+        onSetOption={onSetOption}
+        hasModifiedOptions={hasModifiedOptions}
+      />
+    )
+  }
+
+  return (
+    <div className="border border-gray-700 rounded overflow-hidden">
+      <div className="flex items-center bg-gray-750 hover:bg-gray-700 transition-colors">
+        <button
+          onClick={onToggle}
+          className="flex-1 flex items-center justify-between p-1.5"
+        >
+          <span className="text-xs font-medium text-gray-300">{category}</span>
+          <svg
+            className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {hasModifiedOptions && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onRestoreDefaults(); }}
+            className="px-1.5 py-0.5 mr-1 text-[10px] text-rs-blue hover:text-blue-400"
+            title={`Restore ${category} to defaults`}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {isExpanded && (
+        <div className="p-1.5 space-y-1 bg-gray-800/30">
+          {options.map((option) => (
+            <OptionControl 
+              key={option.option_id} 
+              option={option} 
+              sensorId={sensorId}
+              onSetOption={onSetOption}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface PostProcessingSectionProps {
+  options: OptionInfo[]
+  isExpanded: boolean
+  onToggle: () => void
+  onRestoreDefaults: () => void
+  sensorId: string
+  onSetOption: (sensorId: string, optionId: string, value: number | boolean | string) => Promise<void>
+  hasModifiedOptions: boolean
+}
+
+function PostProcessingSection({ options, isExpanded, onToggle, onRestoreDefaults, sensorId, onSetOption, hasModifiedOptions }: PostProcessingSectionProps) {
+  const [expandedFilters, setExpandedFilters] = useState<Set<string>>(new Set())
+
+  // Group options by filter_name
+  const filterGroups = options.reduce((acc, option) => {
+    const filterName = option.filter_name || 'Other'
+    if (!acc[filterName]) {
+      acc[filterName] = { enableOption: null as OptionInfo | null, paramOptions: [] as OptionInfo[] }
+    }
+    if (option.option_id.endsWith('_Enabled')) {
+      acc[filterName].enableOption = option
+    } else {
+      acc[filterName].paramOptions.push(option)
+    }
+    return acc
+  }, {} as Record<string, { enableOption: OptionInfo | null; paramOptions: OptionInfo[] }>)
+
+  const toggleFilter = (filterName: string) => {
+    setExpandedFilters(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(filterName)) {
+        newSet.delete(filterName)
+      } else {
+        newSet.add(filterName)
+      }
+      return newSet
+    })
+  }
+
+  return (
+    <div className="border border-gray-700 rounded overflow-hidden">
+      <div className="flex items-center bg-gray-750 hover:bg-gray-700 transition-colors">
+        <button
+          onClick={onToggle}
+          className="flex-1 flex items-center justify-between p-1.5"
+        >
+          <span className="text-xs font-medium text-gray-300">Post-Processing</span>
+          <svg
+            className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {hasModifiedOptions && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onRestoreDefaults(); }}
+            className="px-1.5 py-0.5 mr-1 text-[10px] text-rs-blue hover:text-blue-400"
+            title="Restore Post-Processing to defaults"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {isExpanded && (
+        <div className="p-1.5 space-y-1 bg-gray-800/30">
+          {Object.entries(filterGroups).map(([filterName, group]) => (
+            <FilterDropdown
+              key={filterName}
+              filterName={filterName}
+              enableOption={group.enableOption}
+              paramOptions={group.paramOptions}
+              isExpanded={expandedFilters.has(filterName)}
+              onToggle={() => toggleFilter(filterName)}
+              sensorId={sensorId}
+              onSetOption={onSetOption}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface FilterDropdownProps {
+  filterName: string
+  enableOption: OptionInfo | null
+  paramOptions: OptionInfo[]
+  isExpanded: boolean
+  onToggle: () => void
+  sensorId: string
+  onSetOption: (sensorId: string, optionId: string, value: number | boolean | string) => Promise<void>
+}
+
+function FilterDropdown({ filterName, enableOption, paramOptions, isExpanded, onToggle, sensorId, onSetOption }: FilterDropdownProps) {
+  const isEnabled = enableOption ? Boolean(enableOption.current_value) : false
+
+  const handleToggleEnable = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (enableOption) {
+      await onSetOption(sensorId, enableOption.option_id, isEnabled ? 0 : 1)
+    }
+  }
+
+  return (
+    <div className="border border-gray-600 rounded overflow-hidden">
+      <div 
+        className="flex items-center justify-between p-1.5 bg-gray-700/50 hover:bg-gray-700 transition-colors cursor-pointer"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-1.5">
+          <svg
+            className={`w-2.5 h-2.5 transition-transform text-gray-400 ${isExpanded ? 'rotate-90' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <span className="text-xs font-medium text-gray-200">{filterName}</span>
+        </div>
+        
+        {/* Toggle Switch */}
+        {enableOption && (
+          <button
+            onClick={handleToggleEnable}
+            className={`relative w-8 h-4 rounded-full transition-colors ${
+              isEnabled ? 'bg-rs-blue' : 'bg-gray-600'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                isEnabled ? 'translate-x-4' : ''
+              }`}
+            />
+          </button>
+        )}
+      </div>
+
+      {isExpanded && paramOptions.length > 0 && (
+        <div className="p-1.5 space-y-1 bg-gray-800/50">
+          {paramOptions.map((option) => (
+            <OptionControl
+              key={option.option_id}
+              option={option}
+              sensorId={sensorId}
+              onSetOption={onSetOption}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -931,8 +1217,17 @@ function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
 
   const isModified = localValue !== option.default_value
   const isBoolean = typeof option.current_value === 'boolean' || 
-    (option.min_value === 0 && option.max_value === 1 && option.step === 1)
+    (option.min_value === 0 && option.max_value === 1 && option.step === 1 && !option.value_descriptions)
+  const isEnum = option.value_descriptions && Object.keys(option.value_descriptions).length > 0
   const isSlider = typeof option.min_value === 'number' && typeof option.max_value === 'number'
+
+  // Get default value display for enum types
+  const getDefaultDisplay = () => {
+    if (isEnum && option.value_descriptions) {
+      return option.value_descriptions[String(Math.round(Number(option.default_value)))] || String(option.default_value)
+    }
+    return String(option.default_value)
+  }
 
   return (
     <div className="bg-gray-800/30 rounded p-1.5 text-xs">
@@ -946,7 +1241,7 @@ function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
             <button
               onClick={handleRestoreDefault}
               className="text-gray-500 hover:text-rs-blue transition-colors"
-              title={`Restore default (${option.default_value})`}
+              title={`Restore default (${getDefaultDisplay()})`}
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -968,6 +1263,18 @@ function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
           />
           <span className="text-gray-400">{localValue ? 'On' : 'Off'}</span>
         </label>
+      ) : isEnum ? (
+        <select
+          value={String(Math.round(Number(localValue)))}
+          onChange={(e) => handleChange(Number(e.target.value))}
+          className="w-full bg-gray-700 text-white rounded px-1 py-0.5 border border-gray-600 focus:border-rs-blue focus:outline-none"
+        >
+          {Object.entries(option.value_descriptions!).map(([val, desc]) => (
+            <option key={val} value={val}>
+              {desc}
+            </option>
+          ))}
+        </select>
       ) : isSlider ? (
         <div className="flex items-center gap-1">
           <input

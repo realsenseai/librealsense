@@ -118,6 +118,11 @@ class RealSenseManager:
         # Per-sensor frame queues: device_id -> sensor_id -> list of frames
         self.sensor_frame_queues: Dict[str, Dict[str, List]] = {}
         # Per-sensor metadata queues: device_id -> sensor_id -> list of metadata dicts
+
+        # --- Post-Processing Filters ---
+        # Stores filter instances per device/sensor: device_id -> sensor_id -> list of filter dicts
+        # Each filter dict: { "filter": rs.filter, "name": str, "enabled": bool }
+        self.processing_blocks: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
         self.sensor_metadata_queues: Dict[str, Dict[str, List[Dict]]] = {}
         # Per-sensor rs.frame_queue objects: device_id -> sensor_id -> rs.frame_queue
         self.sensor_rs_queues: Dict[str, Dict[str, Any]] = {}
@@ -854,6 +859,8 @@ class RealSenseManager:
 
         sensor = dev.sensors[sensor_index]
         options = []
+        
+        # 1. Add native sensor options (Basic Controls)
         for option in sensor.get_supported_options():
             try:
                 opt_name = option.name
@@ -870,13 +877,142 @@ class RealSenseManager:
                     max_value=option_range.max,
                     step=option_range.step,
                     read_only=sensor.is_option_read_only(option),
+                    category="Basic Controls",
                 )
                 options.append(option_info)
             except RuntimeError as e:
                 # Skip options that can't be read
                 pass
 
+        # 2. Add post-processing filter options
+        filters = self._get_or_create_processing_blocks(device_id, sensor_id, sensor)
+        for filter_info in filters:
+            filter_obj = filter_info["filter"]
+            filter_name = filter_info["name"]
+            # Use URL-safe name for option_id (replace spaces with underscores)
+            safe_filter_name = filter_name.replace(" ", "_")
+            is_enabled = filter_info["enabled"]
+            
+            # Add enable/disable toggle for the filter
+            options.append(OptionInfo(
+                option_id=f"PP_{safe_filter_name}_Enabled",
+                name=f"{filter_name}",
+                description=f"Enable/Disable {filter_name}",
+                current_value=1.0 if is_enabled else 0.0,
+                default_value=filter_info["default_enabled"],
+                min_value=0.0,
+                max_value=1.0,
+                step=1.0,
+                read_only=False,
+                category="Post-Processing",
+                filter_name=filter_name,
+            ))
+            
+            # Hidden options that shouldn't be shown to users (same as legacy viewer)
+            hidden_options = {
+                'frames_queue_size',
+                'stream_filter', 
+                'stream_format_filter',
+                'stream_index_filter',
+                'noise_estimation',
+                'region_of_interest',
+            }
+            
+            # Add filter-specific options (excluding hidden ones)
+            for opt in filter_obj.get_supported_options():
+                try:
+                    opt_name = opt.name
+                    # Skip hidden options
+                    if opt_name in hidden_options:
+                        continue
+                        
+                    current_value = filter_obj.get_option(opt)
+                    option_range = filter_obj.get_option_range(opt)
+                    opt_description = filter_obj.get_option_description(opt)
+                    
+                    # For holes_fill option, use description as display name (matches legacy viewer)
+                    # This is because holes_fill has different meanings per filter:
+                    # - Spatial: "Holes filling mode"
+                    # - Temporal: "Persistency mode"  
+                    # - Hole Filling: "Hole Filling mode"
+                    if opt_name == 'holes_fill':
+                        display_name = opt_description
+                    else:
+                        display_name = opt_name.replace('_', ' ').title()
+                    
+                    # Check for enum-type options (step of 1, integer range)
+                    # and collect value descriptions if available
+                    value_descs = None
+                    if option_range.step == 1.0 and option_range.min == int(option_range.min) and option_range.max == int(option_range.max):
+                        # Might be an enum, try to get value descriptions
+                        descs = {}
+                        for val in range(int(option_range.min), int(option_range.max) + 1):
+                            try:
+                                desc = filter_obj.get_option_value_description(opt, float(val))
+                                if desc:
+                                    descs[str(val)] = desc
+                            except RuntimeError:
+                                pass
+                        if descs:
+                            value_descs = descs
+                    
+                    options.append(OptionInfo(
+                        option_id=f"PP_{safe_filter_name}_{opt_name}",
+                        name=display_name,
+                        description=opt_description,
+                        current_value=current_value,
+                        default_value=option_range.default,
+                        min_value=option_range.min,
+                        max_value=option_range.max,
+                        step=option_range.step,
+                        read_only=filter_obj.is_option_read_only(opt),
+                        category="Post-Processing",
+                        filter_name=filter_name,
+                        value_descriptions=value_descs,
+                    ))
+                except RuntimeError:
+                    pass
+
         return options
+
+    def _get_or_create_processing_blocks(self, device_id: str, sensor_id: str, sensor) -> List[Dict[str, Any]]:
+        """Get or create post-processing filter blocks for a sensor.
+        
+        Uses the SDK's get_recommended_filters() to get sensor-appropriate filters.
+        Returns list of dicts: { "filter": rs.filter, "name": str, "enabled": bool, "default_enabled": float }
+        """
+        if device_id not in self.processing_blocks:
+            self.processing_blocks[device_id] = {}
+        
+        if sensor_id not in self.processing_blocks[device_id]:
+            filters = []
+            try:
+                recommended = sensor.get_recommended_filters()
+                for f in recommended:
+                    try:
+                        filter_name = f.get_info(rs.camera_info.name)
+                    except RuntimeError:
+                        filter_name = "Unknown Filter"
+                    
+                    # Determine default enable state per legacy viewer behavior
+                    # Spatial and Temporal enabled by default, others disabled
+                    default_enabled = 0.0
+                    if "Spatial" in filter_name or "Temporal" in filter_name:
+                        default_enabled = 1.0
+                    
+                    filters.append({
+                        "filter": f,
+                        "name": filter_name,
+                        "enabled": bool(default_enabled),
+                        "default_enabled": default_enabled,
+                    })
+            except RuntimeError:
+                # Sensor doesn't support get_recommended_filters
+                pass
+            
+            self.processing_blocks[device_id][sensor_id] = filters
+        
+        return self.processing_blocks[device_id][sensor_id]
 
     def get_sensor_option(
         self, device_id: str, sensor_id: str, option_id: str
@@ -914,6 +1050,10 @@ class RealSenseManager:
             )
 
         sensor = dev.sensors[sensor_index]
+
+        # Check if this is a post-processing filter option (starts with "PP_")
+        if option_id.startswith("PP_"):
+            return self._set_filter_option(device_id, sensor_id, sensor, option_id, value)
 
         # Find the option by name (case-insensitive comparison)
         # Match against both raw option name and display name
@@ -964,6 +1104,93 @@ class RealSenseManager:
             raise RealSenseError(
                 status_code=500, detail=f"Failed to set option: {str(e)}"
             )
+
+    def _set_filter_option(self, device_id: str, sensor_id: str, sensor, option_id: str, value: Any) -> bool:
+        """Set a post-processing filter option.
+        
+        option_id format: PP_{SafeFilterName}_Enabled or PP_{SafeFilterName}_{OptionName}
+        where SafeFilterName has spaces replaced with underscores.
+        """
+        filters = self._get_or_create_processing_blocks(device_id, sensor_id, sensor)
+        
+        # Find the filter by matching URL-safe name
+        target_filter = None
+        remaining_option = None
+        
+        for filter_info in filters:
+            filter_name = filter_info["name"]
+            # Use URL-safe name for matching (spaces replaced with underscores)
+            safe_filter_name = filter_name.replace(" ", "_")
+            prefix = f"PP_{safe_filter_name}_"
+            if option_id.startswith(prefix):
+                target_filter = filter_info
+                remaining_option = option_id[len(prefix):]
+                break
+        
+        if target_filter is None:
+            raise RealSenseError(status_code=404, detail=f"Filter not found for option: {option_id}")
+        
+        # Handle enable/disable toggle
+        if remaining_option == "Enabled":
+            target_filter["enabled"] = bool(value) if isinstance(value, bool) else float(value) > 0
+            logging.info(f"[PP] Filter '{target_filter['name']}' enabled={target_filter['enabled']}")
+            return True
+        
+        # Handle filter-specific option
+        filter_obj = target_filter["filter"]
+        for opt in filter_obj.get_supported_options():
+            if opt.name == remaining_option:
+                try:
+                    # Convert boolean to float
+                    if isinstance(value, bool):
+                        value = 1.0 if value else 0.0
+                    filter_obj.set_option(opt, float(value))
+                    return True
+                except RuntimeError as e:
+                    raise RealSenseError(status_code=500, detail=f"Failed to set filter option: {str(e)}")
+        
+        raise RealSenseError(status_code=404, detail=f"Filter option not found: {remaining_option}")
+
+    def _apply_depth_filters(self, device_id: str, frame: rs.depth_frame) -> rs.depth_frame:
+        """Apply enabled post-processing filters to a depth frame.
+        
+        Filters are applied in the SDK-recommended order.
+        """
+        if device_id not in self.processing_blocks:
+            return frame
+        
+        # Apply filters from all sensors (typically depth sensor)
+        for sensor_id, filters in self.processing_blocks[device_id].items():
+            for filter_info in filters:
+                if filter_info["enabled"]:
+                    try:
+                        result = filter_info["filter"].process(frame)
+                        # Some filters return depth_frame, others return frame
+                        if result.is_depth_frame():
+                            frame = result.as_depth_frame()
+                        else:
+                            # Try to extract depth frame from frameset if filter returns a frameset
+                            try:
+                                fs = result.as_frameset()
+                                depth = fs.get_depth_frame()
+                                if depth:
+                                    frame = depth
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        # Log but don't fail streaming if a filter errors
+                        logging.warning(f"Filter {filter_info['name']} error: {e}")
+        
+        return frame
+
+    def _apply_color_filters(self, device_id: str, frame: rs.video_frame) -> rs.video_frame:
+        """Apply enabled post-processing filters to a color frame.
+        
+        Currently limited to filters that support color frames.
+        """
+        # Color frame filtering is minimal - most PP filters are depth-specific
+        # Future: could add rotation filter for color here
+        return frame
 
     def start_stream(
         self,
@@ -1155,6 +1382,20 @@ class RealSenseManager:
                 self.streaming_mode[device_id] = "pipeline"
             timings['post_start_setup'] = time.perf_counter() - t5
             t6 = time.perf_counter()
+            
+            # Initialize post-processing filters for enabled sensors if not already done
+            dev = self.devices[device_id]
+            for stream_config in configs:
+                if not stream_config.enable:
+                    continue
+                try:
+                    sensor_index = int(stream_config.sensor_id.split("-")[-1])
+                    if 0 <= sensor_index < len(dev.sensors):
+                        sensor = dev.sensors[sensor_index]
+                        self._get_or_create_processing_blocks(device_id, stream_config.sensor_id, sensor)
+                except (ValueError, IndexError):
+                    pass
+            
             # Start frame collection thread
             threading.Thread(
                 target=self._collect_frames,
@@ -1439,6 +1680,8 @@ class RealSenseManager:
                             if rs_stream == rs.stream.depth:
                                 frame_data = frames.get_depth_frame()
                                 if frame_data:
+                                    # Apply post-processing filters
+                                    frame_data = self._apply_depth_filters(device_id, frame_data)
                                     # Store raw depth frame for pixel queries
                                     self.depth_frames[device_id] = frame_data
                                     colorized = colorizer.colorize(frame_data)
@@ -1448,6 +1691,8 @@ class RealSenseManager:
                             elif rs_stream == rs.stream.color:
                                 frame_data = frames.get_color_frame()
                                 if frame_data:
+                                    # Apply post-processing filters for color
+                                    frame_data = self._apply_color_filters(device_id, frame_data)
                                     frame = np.asanyarray(frame_data.get_data())
                             elif rs_stream == rs.stream.infrared:
                                 frame_data = frames.get_infrared_frame(ir_index)
@@ -1835,6 +2080,8 @@ class RealSenseManager:
                     if "depth" in frame_stream_name:
                         # Store depth frame (cast from raw) for pixel queries and get_depth_range
                         depth_frame = frame.as_depth_frame()
+                        # Apply post-processing filters
+                        depth_frame = self._apply_depth_filters(device_id, depth_frame)
                         self.depth_frames[device_id] = depth_frame
                         colorized = colorizer.colorize(depth_frame)
                         processed_frame = np.asanyarray(colorized.get_data())
@@ -1842,9 +2089,12 @@ class RealSenseManager:
                         metadata["height"] = depth_frame.get_height()
                         
                     elif "color" in frame_stream_name:
-                        processed_frame = np.asanyarray(frame.get_data())
-                        metadata["width"] = frame.as_video_frame().get_width()
-                        metadata["height"] = frame.as_video_frame().get_height()
+                        color_frame = frame.as_video_frame()
+                        # Apply post-processing filters for color
+                        color_frame = self._apply_color_filters(device_id, color_frame)
+                        processed_frame = np.asanyarray(color_frame.get_data())
+                        metadata["width"] = color_frame.get_width()
+                        metadata["height"] = color_frame.get_height()
                         
                     elif "infrared" in frame_stream_name:
                         processed_frame = np.asanyarray(frame.get_data())
@@ -2020,6 +2270,9 @@ class RealSenseManager:
                 self.sensor_frame_queues[device_id][sensor_id] = {st: [] for st in stream_types}
                 self.sensor_metadata_queues[device_id][sensor_id] = {st: [] for st in stream_types}
                 self.sensor_rs_queues[device_id][sensor_id] = rs_queue
+            
+            # Initialize post-processing filters for this sensor if not already done
+            self._get_or_create_processing_blocks(device_id, sensor_id, sensor)
             
             # Start frame collection thread
             threading.Thread(
