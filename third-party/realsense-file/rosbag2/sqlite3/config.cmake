@@ -23,6 +23,8 @@ set(SQLITE3_SOURCES "${sqlite3_SOURCE_DIR}/sqlite3.c")
 add_library(sqlite3_lib STATIC ${SQLITE3_SOURCES})
 set_source_files_properties(${SQLITE3_SOURCES} PROPERTIES GENERATED TRUE)
 
+add_dependencies(sqlite3_lib sqlite3)
+
 target_include_directories(sqlite3_lib PUBLIC $<BUILD_INTERFACE:${sqlite3_SOURCE_DIR}>)
 
 if(UNIX)
