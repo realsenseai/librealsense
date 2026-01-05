@@ -87,18 +87,28 @@ def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground
             new_calib, health = calib_dev.run_tare_calibration(ground_truth, json_config, on_calib_cb, TARE_TIMEOUT_MS)
 
         calib_done = len(new_calib) > 0
-        timeout_end = time.time() + CALIBRATION_TIMEOUT_SECONDS
+        log.d(f"Initial calibration call completed. Calibration done: {calib_done}, table size: {len(new_calib)}")
         
-        while not calib_done:
-            if time.time() > timeout_end:
-                raise RuntimeError("Calibration timed out after {} seconds".format(CALIBRATION_TIMEOUT_SECONDS))
-            frame_set = pipeline.wait_for_frames()
-            depth_frame = frame_set.get_depth_frame()
+        if not calib_done:
+            log.d("Entering frame processing loop for host-assisted calibration")
+            timeout_end = time.time() + CALIBRATION_TIMEOUT_SECONDS
+            frame_count = 0
             
-            # Only process valid depth frames
-            if depth_frame:
-                new_calib, health = calib_dev.process_calibration_frame(depth_frame, on_calib_cb, FRAME_PROCESSING_TIMEOUT_MS)
-                calib_done = len(new_calib) > 0
+            while not calib_done:
+                if time.time() > timeout_end:
+                    raise RuntimeError("Calibration timed out after {} seconds".format(CALIBRATION_TIMEOUT_SECONDS))
+                frame_set = pipeline.wait_for_frames()
+                depth_frame = frame_set.get_depth_frame()
+                
+                # Only process valid depth frames
+                if depth_frame:
+                    frame_count += 1
+                    new_calib, health = calib_dev.process_calibration_frame(depth_frame, on_calib_cb, FRAME_PROCESSING_TIMEOUT_MS)
+                    calib_done = len(new_calib) > 0
+                    if frame_count % 30 == 0:
+                        log.d(f"Processed {frame_count} frames, calibration done: {calib_done}")
+        else:
+            log.d("Calibration completed in initial call (no frame processing needed)")
         # Preserve final table
         if calib_done:
             new_calib_result = bytes(new_calib)
