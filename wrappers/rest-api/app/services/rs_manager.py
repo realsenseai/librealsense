@@ -994,11 +994,9 @@ class RealSenseManager:
                     except RuntimeError:
                         filter_name = "Unknown Filter"
                     
-                    # Determine default enable state per legacy viewer behavior
-                    # Spatial and Temporal enabled by default, others disabled
+                    # All filters disabled by default for performance
+                    # User can enable specific filters as needed
                     default_enabled = 0.0
-                    if "Spatial" in filter_name or "Temporal" in filter_name:
-                        default_enabled = 1.0
                     
                     filters.append({
                         "filter": f,
@@ -1159,27 +1157,44 @@ class RealSenseManager:
         if device_id not in self.processing_blocks:
             return frame
         
-        # Apply filters from all sensors (typically depth sensor)
-        for sensor_id, filters in self.processing_blocks[device_id].items():
-            for filter_info in filters:
-                if filter_info["enabled"]:
+        # Find depth sensor filters (sensor-0 is typically depth)
+        # Only depth sensor has PP filters, skip other sensors
+        depth_sensor_id = None
+        for sensor_id in self.processing_blocks[device_id]:
+            if "sensor-0" in sensor_id:  # Depth sensor is typically sensor-0
+                depth_sensor_id = sensor_id
+                break
+        
+        if not depth_sensor_id:
+            return frame
+        
+        filters = self.processing_blocks[device_id].get(depth_sensor_id, [])
+        
+        # Quick check: if no filters are enabled, return early
+        if not any(f["enabled"] for f in filters):
+            return frame
+        
+        # Apply only enabled filters
+        for filter_info in filters:
+            if not filter_info["enabled"]:
+                continue
+            try:
+                result = filter_info["filter"].process(frame)
+                # Some filters return depth_frame, others return frame
+                if result.is_depth_frame():
+                    frame = result.as_depth_frame()
+                else:
+                    # Try to extract depth frame from frameset if filter returns a frameset
                     try:
-                        result = filter_info["filter"].process(frame)
-                        # Some filters return depth_frame, others return frame
-                        if result.is_depth_frame():
-                            frame = result.as_depth_frame()
-                        else:
-                            # Try to extract depth frame from frameset if filter returns a frameset
-                            try:
-                                fs = result.as_frameset()
-                                depth = fs.get_depth_frame()
-                                if depth:
-                                    frame = depth
-                            except Exception:
-                                pass
-                    except Exception as e:
-                        # Log but don't fail streaming if a filter errors
-                        logging.warning(f"Filter {filter_info['name']} error: {e}")
+                        fs = result.as_frameset()
+                        depth = fs.get_depth_frame()
+                        if depth:
+                            frame = depth
+                    except Exception:
+                        pass
+            except Exception as e:
+                # Log but don't fail streaming if a filter errors
+                logging.warning(f"Filter {filter_info['name']} error: {e}")
         
         return frame
 
