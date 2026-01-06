@@ -2241,8 +2241,8 @@ class RealSenseManager:
             # Start sensor
             sensor.start(rs_queue)
             
-            # Collect stream types
-            stream_types = [c.stream_type for c in configs]
+            # Collect stream types (normalized to lowercase for consistent lookup)
+            stream_types = [c.stream_type.lower() for c in configs]
             
             # Update state
             with self.lock:
@@ -2297,7 +2297,7 @@ class RealSenseManager:
                 sensor_id=sensor_id,
                 name=sensor_name,
                 is_streaming=True,
-                stream_type=first_config.stream_type,  # Backward compat
+                stream_type=first_config.stream_type.lower(),  # Backward compat (lowercase for consistency)
                 stream_types=stream_types,
                 streams=configs,
                 resolution=first_config.resolution,
