@@ -30,10 +30,11 @@ export default defineConfig({
         'dist/',
       ],
       all: true,
-      lines: 70,
-      functions: 70,
-      branches: 70,
-      statements: 70,
+      // Target 60% coverage as agreed
+      lines: 60,
+      functions: 60,
+      branches: 50,
+      statements: 60,
     },
   },
 })

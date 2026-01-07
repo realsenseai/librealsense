@@ -337,11 +337,13 @@ function DeviceCard({
 
   return (
     <div
-      className={`rounded-lg transition-all ${
+      className={`device-card rounded-lg transition-all ${
         isActive
           ? 'bg-rs-blue/10 border border-rs-blue'
-          : 'bg-gray-800 border border-gray-700 hover:border-gray-600'
+          : 'bg-gray-800 border border-gray-700 hover:border-gray-600 cursor-pointer'
       }`}
+      data-testid="device-card"
+      onClick={!isActive && !isLoading ? onToggle : undefined}
     >
       {/* Device Header */}
       <div className="p-3">
@@ -361,7 +363,7 @@ function DeviceCard({
             {/* Hamburger Menu */}
             <div className="relative">
               <button
-                onClick={() => setShowMenu(!showMenu)}
+                onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
                 className="p-1 hover:bg-gray-700 rounded transition-colors"
                 title="Device actions"
               >
@@ -439,7 +441,7 @@ function DeviceCard({
             
             {/* Toggle switch */}
             <button
-              onClick={onToggle}
+              onClick={(e) => { e.stopPropagation(); onToggle(); }}
               disabled={isLoading || isStreaming}
               className={`relative w-10 h-5 rounded-full transition-colors ${
                 isActive ? 'bg-rs-blue' : 'bg-gray-600'
@@ -647,7 +649,8 @@ function DeviceCard({
                           : onStartSensorStreaming(sensor.sensor_id)
                         }
                         disabled={isSensorPending || (!canStartSensor && !isSensorStreaming)}
-                        title={streamingMode === 'pipeline' ? 'Stop all streams first' : isSensorPending ? 'Stopping...' : undefined}
+                        data-testid={isSensorStreaming ? "stop-streaming" : "start-streaming"}
+                        title={streamingMode === 'pipeline' ? 'Stop all streams first' : isSensorPending ? 'Stopping...' : isSensorStreaming ? 'Stop' : 'Start'}
                         className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                           isSensorPending
                             ? 'bg-yellow-600 text-white cursor-wait'
@@ -658,6 +661,7 @@ function DeviceCard({
                                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                         }`}
                       >
+                        <span className="sr-only">{isSensorStreaming ? 'Stop' : 'Start'}</span>
                         {isSensorPending ? '⏳' : isSensorStreaming ? '■' : '▶'}
                       </button>
                     </div>
@@ -783,16 +787,19 @@ function StreamConfigItem({ config, sensors, onUpdate, disabled, isMotionSensor 
 
   return (
     <div className="flex items-center gap-2 py-0.5 flex-wrap">
-      <input
-        type="checkbox"
-        checked={config.enable}
-        onChange={(e) => onUpdate({ ...config, enable: e.target.checked })}
-        disabled={disabled}
-        className="control-checkbox w-3 h-3 flex-shrink-0"
-      />
-      <span className={`text-xs font-semibold min-w-[50px] ${getStreamColor(config.stream_type)}`}>
-        {config.stream_type.toUpperCase()}
-      </span>
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={config.enable}
+          onChange={(e) => onUpdate({ ...config, enable: e.target.checked })}
+          disabled={disabled}
+          className="control-checkbox w-3 h-3 flex-shrink-0"
+          data-testid={`toggle-stream-${config.stream_type.toLowerCase()}`}
+        />
+        <span className={`text-xs font-semibold min-w-[50px] ${getStreamColor(config.stream_type)}`}>
+          {config.stream_type.toUpperCase()}
+        </span>
+      </label>
       {/* Format selector - only shown when enabled */}
       {config.enable && (
         <select

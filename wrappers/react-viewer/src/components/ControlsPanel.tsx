@@ -165,18 +165,19 @@ function StreamConfigItem({ config, sensors, onUpdate, disabled }: StreamConfigI
 
   return (
     <div className="bg-gray-800 rounded-lg p-3">
-      <div className="flex items-center gap-3 mb-2">
+      <label className="flex items-center gap-3 mb-2 cursor-pointer">
         <input
           type="checkbox"
           checked={config.enable}
           onChange={(e) => onUpdate({ ...config, enable: e.target.checked })}
           disabled={disabled}
           className="control-checkbox"
+          data-testid={`toggle-stream-${config.stream_type.toLowerCase()}`}
         />
         <span className={`font-semibold ${getStreamColor(config.stream_type)}`}>
           {config.stream_type.toUpperCase()}
         </span>
-      </div>
+      </label>
 
       {config.enable && (
         <div className="ml-7 space-y-2 text-sm">

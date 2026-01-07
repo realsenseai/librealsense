@@ -2,6 +2,9 @@ import '@testing-library/jest-dom'
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeAll, afterAll, vi } from 'vitest'
 
+// Import MSW server - this sets up the lifecycle hooks automatically
+import '../mocks/server'
+
 // Cleanup after each test
 afterEach(() => {
   cleanup()
