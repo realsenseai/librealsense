@@ -27,6 +27,17 @@ static rcutils_allocator_t make_simple_allocator()
 ros2_writer::ros2_writer( const std::string & file_path, bool enable_compression, const std::string & storage_id )
 {
     _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
+    // check if file exists, if so, delete it to record - rosbag2 sqlite plugin doesn't overwrite existing files
+    std::ifstream f(file_path + ".db3");
+    if (f.good())
+    {
+        f.close();
+        if (std::remove((file_path + ".db3").c_str()) != 0)
+        {
+            throw std::runtime_error( rsutils::string::from() << "Failed to remove existing rosbag2 storage file '" << file_path << "'" );
+        }
+    }
+
     _storage->open( file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_WRITE );
 
     if( ! _storage )

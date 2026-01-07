@@ -51,7 +51,8 @@ namespace librealsense
         bool is_stream_topic(const std::string& topic, device_serializer::stream_identifier& id) const;
         bool is_option_topic(const std::string& topic, device_serializer::sensor_identifier& sid, rs2_option& opt) const;
         std::shared_ptr<info_container> read_info_snapshot(const std::string& topic) const;
-        std::set<uint32_t> read_sensor_indices(uint32_t device_index) const;
+        stream_profiles read_stream_info(uint32_t device_index, uint32_t sensor_index);
+        std::set<uint32_t> read_sensor_indices(uint32_t device_index);
 
         std::shared_ptr< rosbag2_storage::storage_interfaces::ReadWriteInterface > _storage;
         std::string _file_path;

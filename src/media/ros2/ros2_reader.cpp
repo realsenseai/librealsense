@@ -137,16 +137,66 @@ namespace librealsense {
         device_snapshot dev_snap;
         std::map< uint32_t, sensor_snapshot > sensors;
         snapshot_collection device_extensions;
+        uint32_t device_index = get_device_index();
 
         // 1. Read device Info
-        auto info = read_info_snapshot(ros_topic::device_info_topic(get_device_index()));
+        auto info = read_info_snapshot(ros_topic::device_info_topic(device_index));
         device_extensions[RS2_EXTENSION_INFO] = info;
 
         // between reads, reset storage to read from start
         reset();
 
-        // 2. Read sensor infos and stream profiles
-        auto sensor_indices = read_sensor_indices(get_device_index());
+        // 2. Read sensor indices from topics cached - does not call storage read!
+        auto sensor_indices = read_sensor_indices(device_index);
+
+        // TODO: Move this to a helper function
+        std::vector<sensor_snapshot> sensor_descriptions;
+        // Read each sensor info topic
+        for (auto sensor_index : sensor_indices)
+        {
+            snapshot_collection sensor_extensions;
+            auto sensor_info = std::make_shared<info_container>();
+            auto sensor_info_topic = ros_topic::sensor_info_topic({ device_index, sensor_index });
+            _storage->reset_filter();
+            _storage->set_filter(rosbag2_storage::StorageFilter{ {sensor_info_topic} });
+
+            while (_storage->has_next())
+            {
+                auto msg = _storage->read_next();
+                std::string topic = msg->topic_name;
+                std::string payload_str;
+
+                if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
+                {
+                    payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+                }
+                auto kv = parse_key_value_string(payload_str);
+                try
+                {
+                    rs2_camera_info info;
+                    auto it = kv.begin();
+                    std::string key = it->first;
+                    std::string value = it->second;
+                    convert(key, info);
+                    sensor_info->register_info(info, value);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << e.what() << std::endl;
+                }
+            }
+
+
+            sensor_extensions[RS2_EXTENSION_INFO] = sensor_info;
+            // TODO: Read sensor stream infos and sensor options as well, and see add_sensor_extension on previous code
+            auto streams_snapshots = read_stream_info(device_index, sensor_index);
+            sensor_descriptions.emplace_back(sensor_index, sensor_extensions, streams_snapshots);
+
+            reset();
+        }
+
+        _storage->reset_filter();
+
 
         //while (_storage->has_next())
         //{
@@ -183,7 +233,7 @@ namespace librealsense {
 
         //reset(); // Reset for playback
 
-        _initial_snapshot = device_snapshot(device_extensions, {}, {});
+        _initial_snapshot = device_snapshot(device_extensions, sensor_descriptions, {});
         return _initial_snapshot;
     }
 
@@ -226,11 +276,47 @@ namespace librealsense {
         return infos;
     }
 
-    std::set<uint32_t> ros2_reader::read_sensor_indices(uint32_t device_index) const
+    stream_profiles ros2_reader::read_stream_info(uint32_t device_index, uint32_t sensor_index)
+    {
+        stream_profiles streams;
+        auto dummy_stream = std::make_shared<video_stream_profile>();
+        dummy_stream->set_stream_index(1);
+        dummy_stream->set_stream_type(RS2_STREAM_DEPTH);
+        dummy_stream->set_format(RS2_FORMAT_Z16);
+        dummy_stream->set_framerate(30);
+        dummy_stream->set_dims(640, 480);
+
+        //streams.push_back(dummy_stream); // Placeholder to avoid empty stream list
+        //return streams;
+
+
+        //The below regex matches both stream info messages and also video \ imu stream info (both have the same prefix)
+        std::string regex_const_str = R"RRR(/([a-zA-Z0-9_ ])+_(\d)+/info)RRR";
+        std::string topic_query = "/device_" + std::to_string(device_index) + "/sensor_" + std::to_string(sensor_index) + regex_const_str;
+        _storage->reset_filter();
+        _storage->set_filter(rosbag2_storage::StorageFilter{ {topic_query} });
+        while (_storage->has_next())
+        {
+            auto msg = _storage->read_next();
+            if (!msg) continue;
+            // Placeholder for actual message deserialization
+            // if (infos_view.isType<realsense_msgs::StreamInfo>() == false)
+            // {
+            //     continue;
+            // }
+            stream_identifier stream_id = {}; // ros_topic::get_stream_identifier(msg->topic_name);
+            // Placeholder: create a dummy video stream profile
+            auto profile = std::make_shared<video_stream_profile>();
+            streams.push_back(profile);
+        }
+        _storage->reset_filter();
+        return streams;
+
+    }
+
+    std::set<uint32_t> ros2_reader::read_sensor_indices(uint32_t device_index)
     {
         std::set<uint32_t> sensor_indices;
-
-        auto sensor_info_topic = ros_topic::sensor_info_topic({ device_index, 0 });
 
         for (const auto& topic : _topics_cache)
         {
@@ -245,50 +331,46 @@ namespace librealsense {
             }
         }
 
-        _storage->reset_filter();
-        _storage->set_filter(rosbag2_storage::StorageFilter{ {sensor_info_topic} });
-        while (_storage->has_next())
+        /*for (auto sensor_index : sensor_indices)
         {
-            auto msg = _storage->read_next();
-            std::string topic = msg->topic_name;
-            // Extract sensor index from topic
-            uint32_t sensor_index = ros_topic::get_sensor_index(topic);
-            sensor_indices.insert(sensor_index);
+            snapshot_collection sensor_extensions;
+            auto sensor_info = std::make_shared<info_container>();
+            auto sensor_info_topic = ros_topic::sensor_info_topic({ device_index, sensor_index });
+            _storage->reset_filter();
+            _storage->set_filter(rosbag2_storage::StorageFilter{ {sensor_info_topic} });
 
-            std::string payload_str;
+            while (_storage->has_next())
+            {
+                auto msg = _storage->read_next();
+                std::string topic = msg->topic_name;
+                std::string payload_str;
 
-            if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
-            {
-                payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+                if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
+                {
+                    payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+                }
+                auto kv = parse_key_value_string(payload_str);
+                try
+                {
+                    rs2_camera_info info;
+                    auto it = kv.begin();
+                    std::string key = it->first;
+                    std::string value = it->second;
+                    convert(key, info);
+                    sensor_info->register_info(info, value);
+                    sensor_extensions[RS2_EXTENSION_INFO] = sensor_info;
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << e.what() << std::endl;
+                }
             }
-            auto kv = parse_key_value_string(payload_str);
-            try
-            {
-                rs2_camera_info info;
-                auto it = kv.begin();
-                std::string key = it->first;
-                std::string value = it->second;
-                convert(key, info);
-                //infos->register_info(info, value);
-            }
-            catch (const std::exception& e)
-            {
-                std::cerr << e.what() << std::endl;
-            }
-        }
+
+            reset();
+        }*/
 
         _storage->reset_filter();
 
-        // old logic:
-        /*
-        rosbag::View sensor_infos(m_file, SensorInfoQuery(device_index));
-            for (auto sensor_info : sensor_infos)
-            {
-                auto msg = instantiate_msg<diagnostic_msgs::KeyValue>(sensor_info);
-                sensor_indices.insert(static_cast<uint32_t>(ros_topic::get_sensor_index(sensor_info.getTopic())));
-            }
-        
-        */
 
         return sensor_indices;
     }
@@ -308,36 +390,59 @@ namespace librealsense {
             std::string topic = msg->topic_name;
             nanoseconds ts(msg->time_stamp);
 
-            // 1. Frames
-            if (topic.find("raw_frame") != std::string::npos)
+            // 1. Check if this is a frame data topic (e.g., /device_0/sensor_0/Depth_0/image/data)
+            stream_identifier sid;
+            if (topic.find("/image/data") != std::string::npos || topic.find("/imu/data") != std::string::npos)
             {
-                stream_identifier sid;
-                // Need actual topic parsing logic here
-                // if (parse_topic(topic, sid)) ...
+                if (!is_stream_topic(topic, sid))
+                {
+                    LOG_WARNING("Failed to parse stream topic: " << topic);
+                    continue;
+                }
 
                 // Filter: if we have enabled streams and this isn't one, skip it
-                // if (!_enabled_streams.empty() && _enabled_streams.find(sid) == _enabled_streams.end()) continue;
+                if (!_enabled_streams.empty() && _enabled_streams.find(sid) == _enabled_streams.end())
+                {
+                    continue;
+                }
 
-                // For now, return an invalid frame as placeholder
-                // A full implementation would parse the frame data
+                // TODO: Parse the actual frame data from msg->serialized_data
+                // For now, return a placeholder invalid frame
                 auto data = std::make_shared<serialized_invalid_frame>(ts, sid);
 
                 // Update cache for fetch_last_frames
-                // _last_frame_cache[sid] = data;
+                _last_frame_cache[sid] = data;
 
                 return data;
             }
 
-            // 2. Options
+            // 2. Options (e.g., /device_0/sensor_0/option/...)
             sensor_identifier sensor_id;
             rs2_option opt;
             if (is_option_topic(topic, sensor_id, opt))
             {
-                // Parse float
-                // std::string payload(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
-                // float val = std::stof(payload);
-                // Return option data - need a proper option object
-                // For now, return end of file as we don't have a complete option implementation
+                // Parse option value
+                if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
+                {
+                    std::string payload(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+                    try
+                    {
+                        float val = std::stof(payload);
+                        auto option = std::make_shared<const_value_option>("Recorded option", val);
+                        return std::make_shared<serialized_option>(ts, sensor_id, opt, option);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        LOG_WARNING("Failed to parse option value: " << e.what());
+                    }
+                }
+                continue;
+            }
+
+            // 3. Notifications
+            if (topic.find("/notification/") != std::string::npos)
+            {
+                // TODO: Implement notification parsing
                 continue;
             }
         }
@@ -348,16 +453,60 @@ namespace librealsense {
 
     bool ros2_reader::is_stream_topic(const std::string& topic, stream_identifier& id) const
     {
-        // Placeholder: Needs to match writer's make_frame_topic
-        // Example: "device_0/sensor_0/Color_0/image/0"
-        // Return true if parsed successfully
-        return false;
+        // Parse topics like: /device_0/sensor_0/Depth_0/image/data or /device_0/sensor_0/Accel_0/imu/data
+        // Extract device_index, sensor_index, stream_type, and stream_index using ros_topic helper
+        
+        // Check if it's a frame data topic
+        if (topic.find("/image/data") == std::string::npos && 
+            topic.find("/imu/data") == std::string::npos &&
+            topic.find("/pose/transform/data") == std::string::npos)
+        {
+            return false;
+        }
+
+        try
+        {
+            // Use ros_topic helper to parse the identifier
+            id = ros_topic::get_stream_identifier(topic);
+            return true;
+        }
+        catch (const std::exception& e)
+        {
+            LOG_WARNING("Failed to parse stream identifier from topic '" << topic << "': " << e.what());
+            return false;
+        }
     }
 
     bool ros2_reader::is_option_topic(const std::string& topic, sensor_identifier& sid, rs2_option& opt) const
     {
-        // Placeholder: Match writer's option topic
-        return topic.find("option/") != std::string::npos;
+        // Parse topics like: /device_0/sensor_0/option/Depth_Units/value
+        if (topic.find("/option/") == std::string::npos || topic.find("/value") == std::string::npos)
+        {
+            return false;
+        }
+
+        try
+        {
+            // Extract sensor identifier
+            sid = ros_topic::get_sensor_identifier(topic);
+            
+            // Extract option name
+            std::string option_name = ros_topic::get_option_name(topic);
+            
+            // Convert option name to rs2_option enum
+            if (!convert(option_name, opt))
+            {
+                LOG_WARNING("Failed to convert option name: " << option_name);
+                return false;
+            }
+            
+            return true;
+        }
+        catch (const std::exception& e)
+        {
+            LOG_WARNING("Failed to parse option topic '" << topic << "': " << e.what());
+            return false;
+        }
     }
 
     const std::string& ros2_reader::get_file_name() const { return _file_path; }
