@@ -65,7 +65,7 @@ namespace librealsense
         // except for D405, in which the color is part of the depth unit
         // and it will then been found in end point 0 (the depth's one)
         auto color_devs_info_mi3 = filter_by_mi(group.uvc_devices, 3);
-        if (color_devs_info_mi3.size() == 1 || _is_mipi_device)
+        if (color_devs_info_mi3.size() == 1 || (_is_mipi_device && _pid != ds::RS401_GMSL_PID) )
         {
             // means color end point in part of a separate color sensor (e.g. D435)
             if (_is_mipi_device)
