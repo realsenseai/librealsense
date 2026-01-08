@@ -1111,17 +1111,34 @@ namespace librealsense
             const int camera_video_nodes = 7;
             int cam_id = ind / camera_video_nodes;
             ind = (ind - first_video_index) % camera_video_nodes; // offset from first mipi video node and assume 6 nodes per mipi camera
-            if (ind == 0 || ind == 2 || ind == 4)
-                mi = 0; // video node indicator
-            else if (ind == 1 || ind == 3 || ind == 5)
-                mi = 3; // metadata node indicator
-            else if (ind == 6)
-                mi = 4; // IMU node indicator
+
+            if (device_pid == D401_GMSL_PID)
+            {
+                if( ind == 0 || ind == 2 || ind == 4 )
+                    mi = 0;  // video node indicator
+                else if( ind == 1 || ind == 3 || ind == 5 )
+                    mi = 3;  // metadata node indicator
+                else
+                {
+                    LOG_WARNING( "Unresolved Video4Linux device mi, device is skipped" );
+                    throw linux_backend_exception( "Unresolved Video4Linux device, device is skipped" );
+                }
+            }
             else
             {
-                LOG_WARNING("Unresolved Video4Linux device mi, device is skipped");
-                throw linux_backend_exception("Unresolved Video4Linux device, device is skipped");
+                if( ind == 0 || ind == 2 || ind == 4 )
+                    mi = 0;  // video node indicator
+                else if( ind == 1 || ind == 3 || ind == 5 )
+                    mi = 3;  // metadata node indicator
+                else if( ind == 6 )
+                    mi = 4;  // IMU node indicator
+                else
+                {
+                    LOG_WARNING( "Unresolved Video4Linux device mi, device is skipped" );
+                    throw linux_backend_exception( "Unresolved Video4Linux device, device is skipped" );
+                }
             }
+            
 
             uvc_device_info info{};
             info.pid = pid;
