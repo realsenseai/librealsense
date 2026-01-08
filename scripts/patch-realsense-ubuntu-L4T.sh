@@ -102,11 +102,14 @@ case ${JETSON_L4T_VERSION} in
 		UBUNTU_CODENAME=jammy
 		KBASE=./Tegra/kernel/kernel-${UBUNTU_CODENAME}-src
 	;;
-	"38.2" | "38.2.1" | "38.2.2" | "38.3")
-		# 38.2 --> 7.0
-		PATCHES_REV="7.0"
-		# starting from 38.2 licence link is inconsistent with release version
+	"38.2" | "38.2.1" | "38.2.2")
+		# for revisions 38 licence link is inconsistent
 		JETSON_L4T_REVISION_LONG="2.0"
+		# 38.2 --> 7.0
+		;&
+	"38.4")
+		# 38.4 --> 7.1
+		PATCHES_REV="7.0"
 		KERNEL_RELEASE="6.8"
 		UBUNTU_CODENAME=noble
 		KBASE=./Tegra/kernel/kernel-${UBUNTU_CODENAME}-src
@@ -142,7 +145,7 @@ DisplayNvidiaLicense "r${JETSON_L4T_RELEASE}_Release_v${JETSON_L4T_REVISION_LONG
 pushd ${KBASE} > /dev/null
 
 L4T_Patches_Dir=${sdk_dir}/scripts/Tegra/LRS_Patches/
-if [ ! -d ${L4T_Patches_Dir} ]; then
+if [[ ! -d ${L4T_Patches_Dir} ]]; then
 	echo -e "\e[41mThe L4T kernel patches directory  ${L4T_Patches_Dir} was not found, aborting\e[0m"
 	exit 3
 else
@@ -156,7 +159,7 @@ echo -e "\e[32mPrepare workspace for kernel build\e[0m"
 export ARCH=arm64
 
 RUNNING_KERNEL=/lib/modules/$(uname -r)
-if [[ -L $RUNNING_KERNEL/build ]] then
+if [[ -L $RUNNING_KERNEL/build ]]; then
 	export KBUILD_EXTRA_SYMBOLS=$RUNNING_KERNEL/build/Module.symvers
 fi
 
