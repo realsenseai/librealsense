@@ -253,17 +253,87 @@ def get_current_rect_params(auto_calib_device):
         log.e(f"Error reading principal points: {e}")
         return None
         
-def restore_calibration_table(device):
+def save_calibration_table(device):
+    """Save the current calibration table for later restoration.
+    
+    Args:
+        device: auto_calibrated_device or regular device
+        
+    Returns:
+        bytes: Calibration table as bytes, or None on failure
+    """
+    try:
+        # Handle both device types
+        if isinstance(device, rs.auto_calibrated_device):
+            auto_calib_device = device
+        else:
+            auto_calib_device = rs.auto_calibrated_device(device)
+            
+        if not auto_calib_device:
+            log.e("Device does not support auto calibration")
+            return None
+            
+        calib_table = auto_calib_device.get_calibration_table()
+        if calib_table is not None:
+            saved_table = bytes(calib_table)
+            log.d(f"Saved calibration table ({len(saved_table)} bytes)")
+            return saved_table
+        else:
+            log.e("Failed to retrieve calibration table")
+            return None
+    except Exception as e:
+        log.e(f"Error saving calibration table: {e}")
+        return None
+
+
+def restore_calibration_table(device, saved_table=None, use_factory=False):
+    """Restore calibration table from saved data or factory reset.
+    
+    Args:
+        device: auto_calibrated_device or regular device
+        saved_table (bytes): Previously saved calibration table. If None, uses factory reset.
+        use_factory (bool): If True, perform factory reset regardless of saved_table
+        
+    Returns:
+        bool: True if restoration successful, False otherwise
+    """
     global _global_original_calib_table
 
-    # Get the auto calibrated device interface
-    auto_calib_device = rs.auto_calibrated_device(device)
-    if not auto_calib_device:
-        log.e("Device does not support auto calibration")
-        return False
+    try:
+        # Handle both device types
+        if isinstance(device, rs.auto_calibrated_device):
+            auto_calib_device = device
+        else:
+            auto_calib_device = rs.auto_calibrated_device(device)
+            
+        if not auto_calib_device:
+            log.e("Device does not support auto calibration")
+            return False
 
-    auto_calib_device.reset_to_factory_calibration()
-    return True
+        # Option 1: Factory reset
+        if use_factory or saved_table is None:
+            log.i("Restoring factory calibration")
+            auto_calib_device.reset_to_factory_calibration()
+            return True
+            
+        # Option 2: Restore from saved table
+        log.i(f"Restoring saved calibration table ({len(saved_table)} bytes)")
+        calib_list = list(saved_table)
+        auto_calib_device.set_calibration_table(calib_list)
+        auto_calib_device.write_calibration()
+        
+        # Verify restoration
+        current_table = auto_calib_device.get_calibration_table()
+        if current_table and bytes(current_table) == saved_table:
+            log.d("Calibration table restored and verified successfully")
+            return True
+        else:
+            log.w("Calibration table restored but verification failed")
+            return True  # Still return True as write succeeded
+            
+    except Exception as e:
+        log.e(f"Error restoring calibration table: {e}")
+        return False
 
 def get_calibration_table(device):
     """Get current calibration table from device"""

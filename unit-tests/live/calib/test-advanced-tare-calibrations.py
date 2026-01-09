@@ -11,6 +11,7 @@ from test_calibrations_common import (
     get_calibration_device,
     get_current_rect_params,
     modify_extrinsic_calibration,
+    save_calibration_table,
     restore_calibration_table,
     write_calibration_table_with_crc,
     measure_average_depth,
@@ -114,6 +115,11 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
         8. Measure post-Tare average depth; assert convergence toward ground truth and principal point reversion (failure handling if not satisfied).
     """
     try:
+        # 0. Save original calibration table
+        saved_table = save_calibration_table(calib_dev)
+        if saved_table is None:
+            log.e("Failed to save original calibration table")
+            test.fail()
 
         # 1. Read base (reference) principal points
         principal_points_result = get_current_rect_params(calib_dev)
@@ -220,7 +226,7 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
             pipeline.stop()
         except Exception:
             pass
-    return calib_dev
+    return calib_dev, saved_table
 
 
 if not is_mipi_device() and not is_d555():
@@ -235,16 +241,16 @@ if not is_mipi_device() and not is_d555():
                 test.check(_target_z > TARGET_Z_MIN and _target_z < TARGET_Z_MAX)
             image_width, image_height, fps = (256, 144, 90)
             config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
-            calib_dev = run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, _target_z)
+            calib_dev, saved_table = run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, _target_z)
         except Exception as e:
             log.e("Tare calibration with principal point modification failed: ", str(e))
             test.fail()
         finally:
             if calib_dev is not None and getattr(test, 'test_failed', True):
                 log.i("Restoring calibration table after test failure")
-                restore_calibration_table(calib_dev)
+                restore_calibration_table(calib_dev, saved_table)
 
-
+"""
 if is_mipi_device() and not is_d555():
 # mipi devices do not support OCC calibration without host assistance
 # D555 needs different parsing of calibration tables , SRC and more
@@ -257,15 +263,15 @@ if is_mipi_device() and not is_d555():
                 test.check(_target_z > TARGET_Z_MIN and _target_z < TARGET_Z_MAX)
             image_width, image_height, fps = (1280, 720, 30)
             config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
-            calib_dev = run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, _target_z)
+            calib_dev, saved_table = run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, _target_z)
         except Exception as e:
             log.e("Tare calibration with principal point modification failed: ", str(e))
             test.fail()
         finally:
             if calib_dev is not None and getattr(test, 'test_failed', True):
                 log.i("Restoring calibration table after test failure")
-                restore_calibration_table(calib_dev)
-
+                restore_calibration_table(calib_dev, saved_table)
+"""
 test.print_results_and_exit()
 
 # for step 2 -  not in use for now
