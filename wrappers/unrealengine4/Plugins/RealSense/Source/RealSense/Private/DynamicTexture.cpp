@@ -16,11 +16,15 @@ FDynamicTexture::FDynamicTexture(FString Name,
 	this->Compression = Compression;
 
 	CommandCounter.Increment();
+#if ENGINE_MAJOR_VERSION >= 4 && ENGINE_MINOR_VERSION >= 27
+	this->RenderCmd_CreateTexture();
+#else
 	ENQUEUE_RENDER_COMMAND(CreateTextureCmd)(
 		[this](FRHICommandListImmediate& RHICmdList)
 		{
 			this->RenderCmd_CreateTexture();
 		});
+#endif
 }
 
 FDynamicTexture::~FDynamicTexture()
