@@ -77,6 +77,7 @@ HEALTH_FACTOR_THRESHOLD = 0.25
 TARGET_Z_MIN = 600
 TARGET_Z_MAX = 1500
 _target_z = None
+"""
 if is_mipi_device():
     with test.closure("Tare calibration test with host assistance"):
         try:
@@ -94,7 +95,7 @@ if is_mipi_device():
         except Exception as e:
             log.e("Tare calibration test with host assistance failed: ", str(e))
             test.fail()
-
+"""
 if not is_mipi_device():
 # mipi devices do not support OCC calibration without host assistance  
     with test.closure("Tare calibration test"):

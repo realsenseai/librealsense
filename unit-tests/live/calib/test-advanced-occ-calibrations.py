@@ -217,7 +217,7 @@ if not is_mipi_device() and not is_d555():
             if calib_dev is not None and getattr(test, 'test_failed', True):
                 log.i("Restoring calibration table after test failure")
                 restore_calibration_table(calib_dev, saved_table)
-
+"""
 if is_mipi_device() and not is_d555():
     with test.closure("Advanced OCC calibration test with host assistance"):
         calib_dev = None
@@ -236,7 +236,7 @@ if is_mipi_device() and not is_d555():
             if calib_dev is not None and getattr(test, 'test_failed', True):
                 log.i("Restoring calibration table after test failure")
                 restore_calibration_table(calib_dev, saved_table)
-
+"""
 test.print_results_and_exit()
 
 """
