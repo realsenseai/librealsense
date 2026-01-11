@@ -384,10 +384,8 @@ public:
 
     bool is_platform_jetson() const override
     {
-        for( auto & elem : _dev )
-        {
-            return elem->is_platform_jetson();
-        }
+        if(_dev.size() > 0)
+            return _dev[0]->is_platform_jetson();
         return false;
     }
 
