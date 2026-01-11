@@ -10,6 +10,7 @@
 #include <sstream>
 #include <limits>
 #include "rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp"
+#include <regex>
 
 namespace librealsense {
     using namespace device_serializer;
@@ -24,6 +25,17 @@ namespace librealsense {
         }
         return tokens;
     }
+
+    std::vector<std::string> filter_by_regex(const std::vector<rosbag2_storage::TopicMetadata>& input,
+        const std::regex& re)
+    {
+        std::vector<std::string> out;
+        for (auto const& s : input)
+            if (std::regex_match(s.name, re))
+                out.push_back(s.name);
+        return out;
+    }
+
 
     ros2_reader::ros2_reader(const std::string& file_path, const std::shared_ptr<context>& ctx)
         : _file_path(file_path + ".db3")
@@ -143,7 +155,7 @@ namespace librealsense {
         auto info = read_info_snapshot(ros_topic::device_info_topic(device_index));
         device_extensions[RS2_EXTENSION_INFO] = info;
 
-        // between reads, reset storage to read from start
+        // TODO: Need to fix write order, so that device info is written first, before streams, and so we can get rid of the reset here
         reset();
 
         // 2. Read sensor indices from topics cached - does not call storage read!
@@ -152,86 +164,66 @@ namespace librealsense {
         // TODO: Move this to a helper function
         std::vector<sensor_snapshot> sensor_descriptions;
         // Read each sensor info topic
-        for (auto sensor_index : sensor_indices)
+        auto regex_query = std::regex((rsutils::string::from() << "^/device_" << device_index << "/sensor_(\\d+)/[^/]+/info$").str());
+        std::vector<std::string> stream_info_topics = filter_by_regex(_topics_cache, regex_query); // topics only
+
+        regex_query = std::regex("^/device_0/sensor_\\d+.*/(info|imu_intrinsic|camera_info)$");
+        std::vector<std::string> sensor_info_topics = filter_by_regex(_topics_cache, regex_query); // expected to contain all sensor info and stream info topics
+        
+        _storage->reset_filter();
+        _storage->set_filter(rosbag2_storage::StorageFilter{ sensor_info_topics });
+
+        std::map< uint32_t, stream_profiles > sensor_to_streams_snapshots;
+
+        for (auto& stream_topic : stream_info_topics)
         {
-            snapshot_collection sensor_extensions;
-            auto sensor_info = std::make_shared<info_container>();
-            auto sensor_info_topic = ros_topic::sensor_info_topic({ device_index, sensor_index });
-            _storage->reset_filter();
-            _storage->set_filter(rosbag2_storage::StorageFilter{ {sensor_info_topic} });
+            stream_identifier stream_id = ros_topic::get_stream_identifier(stream_topic);
+            auto streams_snapshots = read_stream_info(device_index, stream_id.sensor_index);
+            sensor_to_streams_snapshots[stream_id.sensor_index].push_back(streams_snapshots[0]); // TODO: fix later so read_stream_info returns one and not an array
+        }
 
-            while (_storage->has_next())
+        std::map<uint32_t, std::shared_ptr<info_container>> sensor_infos_cache;
+
+        while (_storage->has_next())
+        {
+            auto msg = _storage->read_next();
+            std::string topic = msg->topic_name;
+            std::string payload_str;
+            if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
             {
-                auto msg = _storage->read_next();
-                std::string topic = msg->topic_name;
-                std::string payload_str;
-
-                if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
-                {
-                    payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
-                }
-                auto kv = parse_key_value_string(payload_str);
+                payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+            }
+            uint32_t sensor_index = ros_topic::get_sensor_index(topic);
+            auto kv = parse_key_value_string(payload_str);
+            if (sensor_infos_cache.find(sensor_index) == sensor_infos_cache.end())
+            {
+                sensor_infos_cache[sensor_index] = std::make_shared<info_container>();
+            }
+            auto sensor_info = sensor_infos_cache[sensor_index];
+            for (const auto& it : kv)
+            {
                 try
                 {
                     rs2_camera_info info;
-                    auto it = kv.begin();
-                    std::string key = it->first;
-                    std::string value = it->second;
-                    convert(key, info);
-                    sensor_info->register_info(info, value);
+                    convert(it.first, info);
+                    sensor_info->register_info(info, it.second);
                 }
                 catch (const std::exception& e)
                 {
                     std::cerr << e.what() << std::endl;
                 }
             }
-
-
-            sensor_extensions[RS2_EXTENSION_INFO] = sensor_info;
-            // TODO: Read sensor stream infos and sensor options as well, and see add_sensor_extension on previous code
-            auto streams_snapshots = read_stream_info(device_index, sensor_index);
-            sensor_descriptions.emplace_back(sensor_index, sensor_extensions, streams_snapshots);
-
-            reset();
+            sensor_infos_cache[sensor_index] = sensor_info;
         }
 
-        _storage->reset_filter();
-
-
-        //while (_storage->has_next())
-        //{
-        //    auto msg = _storage->read_next();
-        //    std::string topic = msg->topic_name;
-        //    std::string payload_str;
-
-        //    if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
-        //    {
-        //        payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
-        //    }
-
-        //    if (topic.find("librealsense/file_version") != std::string::npos) continue;
-
-        //    // 1. Device Info (Simple heuristic based on topic name)
-        //    if (topic.find("info") != std::string::npos && topic.find("sensor") == std::string::npos && topic.find("stream") == std::string::npos)
-        //    {
-        //        auto kv = parse_key_value_string(payload_str);
-        //        // In a real implementation: populate info_interface from KV
-        //    }
-
-        //    // 2. Stream Info
-        //    stream_identifier stream_id;
-        //    if (is_stream_topic(topic, stream_id) && topic.find("info") != std::string::npos && topic.find("video") == std::string::npos)
-        //    {
-        //        // Logic to add stream profile to sensor snapshot
-        //    }
-        //}
-
-        //for (auto& s : sensors) dev_snap.get_sensors_snapshots().push_back(s.second);
-
-        //_initial_snapshot = dev_snap;
-        //_initialized = true;
-
-        //reset(); // Reset for playback
+        for (auto sensor_index : sensor_indices)
+        {
+            snapshot_collection sensor_extensions;
+            sensor_extensions[RS2_EXTENSION_INFO] = sensor_infos_cache[sensor_index];
+            auto sensor_streams = sensor_to_streams_snapshots[sensor_index];
+            // TODO: Read sensor stream infos and sensor options, and see add_sensor_extension on previous code
+            sensor_descriptions.emplace_back(sensor_index, sensor_extensions, sensor_streams);
+        }
 
         _initial_snapshot = device_snapshot(device_extensions, sensor_descriptions, {});
         return _initial_snapshot;
@@ -239,8 +231,6 @@ namespace librealsense {
 
     std::shared_ptr<info_container> ros2_reader::read_info_snapshot(const std::string& topic) const
     {
-        // temp return nothing
-        //return std::make_shared<info_container>();
         auto infos = std::make_shared<info_container>();
         std::map<rs2_camera_info, std::string> values;
         // Read all messages on the topic and populate infos
@@ -279,37 +269,107 @@ namespace librealsense {
     stream_profiles ros2_reader::read_stream_info(uint32_t device_index, uint32_t sensor_index)
     {
         stream_profiles streams;
-        auto dummy_stream = std::make_shared<video_stream_profile>();
-        dummy_stream->set_stream_index(1);
-        dummy_stream->set_stream_type(RS2_STREAM_DEPTH);
-        dummy_stream->set_format(RS2_FORMAT_Z16);
-        dummy_stream->set_framerate(30);
-        dummy_stream->set_dims(640, 480);
-
-        //streams.push_back(dummy_stream); // Placeholder to avoid empty stream list
-        //return streams;
 
 
-        //The below regex matches both stream info messages and also video \ imu stream info (both have the same prefix)
-        std::string regex_const_str = R"RRR(/([a-zA-Z0-9_ ])+_(\d)+/info)RRR";
-        std::string topic_query = "/device_" + std::to_string(device_index) + "/sensor_" + std::to_string(sensor_index) + regex_const_str;
-        _storage->reset_filter();
-        _storage->set_filter(rosbag2_storage::StorageFilter{ {topic_query} });
-        while (_storage->has_next())
+        auto msg = _storage->read_next();
+        std::string topic = msg->topic_name;
+        std::string payload_str;
+
+        if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
         {
-            auto msg = _storage->read_next();
-            if (!msg) continue;
-            // Placeholder for actual message deserialization
-            // if (infos_view.isType<realsense_msgs::StreamInfo>() == false)
-            // {
-            //     continue;
-            // }
-            stream_identifier stream_id = {}; // ros_topic::get_stream_identifier(msg->topic_name);
-            // Placeholder: create a dummy video stream profile
-            auto profile = std::make_shared<video_stream_profile>();
-            streams.push_back(profile);
+            payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
         }
-        _storage->reset_filter();
+        auto kv = parse_key_value_string(payload_str);
+        auto encoding = kv.find("encoding")->second;
+        auto fps = static_cast<uint32_t>(std::stoul(kv.find("fps")->second));
+        //auto is_recommended = (kv.find("is_recommended")->second == "true");
+
+        rs2_format format;
+        convert(encoding, format);
+
+        stream_identifier stream_id = ros_topic::get_stream_identifier(msg->topic_name);
+
+        msg = _storage->read_next();
+        if (msg->topic_name.find("imu_intrinsic") != std::string::npos)
+        {
+            auto motion_profile = std::make_shared<motion_stream_profile>();
+            motion_profile->set_stream_index(stream_id.stream_index);
+            motion_profile->set_stream_type(stream_id.stream_type);
+            motion_profile->set_format(format);
+            motion_profile->set_framerate(fps);
+
+            // IMU stream info
+            std::string imu_payload_str;
+            if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
+            {
+                imu_payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+            }
+            auto imu_kv = parse_key_value_string(imu_payload_str);
+            rs2_motion_device_intrinsic intrinsics{};
+            auto data_str = imu_kv.find("data")->second;
+            auto data_tokens = split_string(data_str, ',');
+            for (size_t row = 0; row < 3; ++row)
+            {
+                for (size_t col = 0; col < 4; ++col)
+                {
+                    //intrinsics.data[row][col] = std::stof(data_tokens[row * 4 + col]); // commented out for now until rerecording a new bag
+                }
+            }
+            auto noise_str = imu_kv.find("noise_variances")->second;
+            auto noise_tokens = split_string(noise_str, ',');
+            for (size_t i = 0; i < std::min(noise_tokens.size(), size_t(3)); ++i)
+            {
+                intrinsics.noise_variances[i] = std::stof(noise_tokens[i]);
+            }
+            auto bias_str = imu_kv.find("bias_variances")->second;
+            auto bias_tokens = split_string(bias_str, ',');
+            for (size_t i = 0; i < std::min(bias_tokens.size(), size_t(3)); ++i)
+            {
+                intrinsics.bias_variances[i] = std::stof(bias_tokens[i]);
+            }
+            motion_profile->set_intrinsics([intrinsics]() { return intrinsics; });
+
+            streams.push_back(motion_profile);
+
+        }
+        else if (msg->topic_name.find("camera_info") != std::string::npos)
+        {
+            auto video_profile = std::make_shared<video_stream_profile>();
+            video_profile->set_stream_index(stream_id.stream_index);
+            video_profile->set_stream_type(stream_id.stream_type);
+            video_profile->set_format(format);
+            video_profile->set_framerate(fps);
+
+            auto video_info_msg = msg;
+            std::string video_payload_str;
+            if (video_info_msg->serialized_data && video_info_msg->serialized_data->buffer_length > 0)
+            {
+                video_payload_str = std::string(reinterpret_cast<const char*>(video_info_msg->serialized_data->buffer), video_info_msg->serialized_data->buffer_length);
+            }
+            auto video_kv = parse_key_value_string(video_payload_str);
+            uint32_t width = static_cast<uint32_t>(std::stoul(video_kv.find("width")->second));
+            uint32_t height = static_cast<uint32_t>(std::stoul(video_kv.find("height")->second));
+            rs2_intrinsics intrinsics{};
+            intrinsics.fx = std::stof(video_kv.find("fx")->second);
+            intrinsics.ppx = std::stof(video_kv.find("ppx")->second);
+            intrinsics.fy = std::stof(video_kv.find("fy")->second);
+            intrinsics.ppy = std::stof(video_kv.find("ppy")->second);
+            auto dist_model_str = video_kv.find("model")->second;
+            rs2_distortion dist_model;
+            convert(dist_model_str, dist_model);
+            intrinsics.model = dist_model;
+            // the coeffs is coeffs=x1,x2,x3,...
+            auto coeffs_str = video_kv.find("coeffs")->second;
+            auto coeffs_tokens = split_string(coeffs_str, ',');
+            for (size_t i = 0; i < std::min(coeffs_tokens.size(), size_t(5)); ++i)
+            {
+                intrinsics.coeffs[i] = std::stof(coeffs_tokens[i]);
+            }
+            video_profile->set_dims(width, height);
+            video_profile->set_intrinsics([intrinsics]() { return intrinsics; });
+            streams.push_back(video_profile);
+        }
+
         return streams;
 
     }
@@ -385,21 +445,16 @@ namespace librealsense {
         while (_storage->has_next())
         {
             auto msg = _storage->read_next();
-            if (!msg) return std::make_shared<serialized_end_of_file>();
 
             std::string topic = msg->topic_name;
+            std::cout << "Reading topic: " << topic << std::endl;
             nanoseconds ts(msg->time_stamp);
 
             // 1. Check if this is a frame data topic (e.g., /device_0/sensor_0/Depth_0/image/data)
             stream_identifier sid;
-            if (topic.find("/image/data") != std::string::npos || topic.find("/imu/data") != std::string::npos)
+            //is_stream_topic(topic, sid);
+            if (is_stream_topic(topic, sid))
             {
-                if (!is_stream_topic(topic, sid))
-                {
-                    LOG_WARNING("Failed to parse stream topic: " << topic);
-                    continue;
-                }
-
                 // Filter: if we have enabled streams and this isn't one, skip it
                 if (!_enabled_streams.empty() && _enabled_streams.find(sid) == _enabled_streams.end())
                 {
@@ -419,7 +474,7 @@ namespace librealsense {
             // 2. Options (e.g., /device_0/sensor_0/option/...)
             sensor_identifier sensor_id;
             rs2_option opt;
-            if (is_option_topic(topic, sensor_id, opt))
+            if (false && is_option_topic(topic, sensor_id, opt))
             {
                 // Parse option value
                 if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
