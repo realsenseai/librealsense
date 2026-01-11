@@ -773,23 +773,55 @@ namespace librealsense
 
         void wmf_uvc_device::set_power_state(power_state state)
         {
-            if (state == _power_state)
-                return;
+            std::lock_guard< std::recursive_mutex > lock( _source_lock );
 
             switch (state)
             {
-            case D0: set_d0(); break;
-            case D3: set_d3(); break;
+            case D0:
+            {
+                if( _power_counter.fetch_add( 1 ) == 0 )
+                {
+                    try
+                    {
+                        set_d0();
+                    }
+                    //In case of failure need to decrease use counter
+                    catch( std::exception const & e )
+                    {
+                        _power_counter.fetch_add( -1 );
+                        throw e;
+                    }
+                    catch( ... )
+                    {
+                        _power_counter.fetch_add( -1 );
+                        throw;
+                    }
+                }
+                break;
+            }
+            case D3:
+            {
+                if( _power_counter.fetch_add( -1 ) == 1 )
+                {
+                    set_d3();
+                }
+                break;
+            }
             default:
                 throw std::runtime_error("illegal power state request");
             }
         }
 
-        wmf_uvc_device::wmf_uvc_device(const uvc_device_info& info,
-            std::shared_ptr<const wmf_backend> backend)
-            : _streamIndex(MAX_PINS), _info(info), _is_flushed(), _has_started(), _backend(std::move(backend)),
-            _systemwide_lock(info.unique_id.c_str(), WAIT_FOR_MUTEX_TIME_OUT),
-            _location(""), _device_usb_spec(usb3_type)
+        wmf_uvc_device::wmf_uvc_device( const uvc_device_info & info, std::shared_ptr< const wmf_backend > backend )
+            : _streamIndex( MAX_PINS )
+            , _info( info )
+            , _is_flushed()
+            , _has_started()
+            , _backend( std::move( backend ) )
+            , _systemwide_lock( info.unique_id.c_str(), WAIT_FOR_MUTEX_TIME_OUT )
+            , _location( "" )
+            , _device_usb_spec( usb3_type )
+            , _power_counter( 0 )
         {
             if (!is_connected(info))
             {
@@ -884,7 +916,9 @@ namespace librealsense
             //enable reader
             CHECK_HR(MFCreateSourceReaderFromMediaSource(_source, _reader_attrs, &_reader));
             CHECK_HR(_reader->SetStreamSelection(static_cast<DWORD>(MF_SOURCE_READER_ALL_STREAMS), TRUE));
-            _power_state = D0;
+
+            for( auto && xu : _xus )
+                init_xu( xu );
         }
 
         void wmf_uvc_device::set_d3()
@@ -896,7 +930,6 @@ namespace librealsense
             safe_release(_source);
             for (auto& elem : _streams)
                 elem.callback = nullptr;
-            _power_state = D3;
         }
 
         void wmf_uvc_device::foreach_profile(std::function<void(const mf_profile& profile, CComPtr<IMFMediaType> media_type, bool& quit)> action) const
@@ -1216,5 +1249,14 @@ namespace librealsense
             _profiles.clear();
             _frame_callbacks.clear();
         }
-    }
-}
+
+        power_state wmf_uvc_device::get_power_state() const
+        {
+            LOG_ERROR( "wmf_uvc_device::get_power_state start. this = " << this );
+            std::lock_guard< std::recursive_mutex > lock( _source_lock );
+            std::string tmp = _source ? "D0" : "D3";
+            LOG_ERROR( "wmf_uvc_device::get_power_state got lock. power state is " << tmp );
+            return _source ? D0 : D3;
+        }
+    } //namespace platform
+} //namespace librealsense

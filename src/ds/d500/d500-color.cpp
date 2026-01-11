@@ -85,6 +85,9 @@ namespace librealsense
                                              enable_global_time_option ) ),
             this );
 
+        // Many commands need power during initialization phase, no point turning it on and off again for each.
+        raw_color_ep->power_for_duration( std::chrono::milliseconds( 1000 ) );
+
         auto color_ep = std::make_shared<d500_color_sensor>(this,
             raw_color_ep,
             d500_color_fourcc_to_rs2_format,
