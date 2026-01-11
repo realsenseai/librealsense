@@ -384,7 +384,7 @@ public:
 
     bool is_platform_jetson() const override
     {
-        if(_dev.size() > 0)
+        if(_dev.size() > 0 && _dev[0])
             return _dev[0]->is_platform_jetson();
         return false;
     }
