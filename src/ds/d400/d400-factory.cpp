@@ -1228,7 +1228,7 @@ namespace librealsense
 
     std::shared_ptr<matcher> rs401_gmsl_device::create_matcher(const frame_holder& frame) const
     {
-        std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get() };
+        std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get() };
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 

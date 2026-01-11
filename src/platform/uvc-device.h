@@ -382,7 +382,14 @@ public:
         }
     }
 
-    bool is_platform_jetson() const override { return false; }
+    bool is_platform_jetson() const override
+    {
+        for( auto & elem : _dev )
+        {
+            return elem->is_platform_jetson();
+        }
+        return false;
+    }
 
 private:
     uint32_t get_dev_index_by_profiles( const stream_profile & profile ) const

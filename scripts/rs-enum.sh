@@ -99,12 +99,12 @@ vid_dev_idx=$(echo "${dot}" | grep "DS5 mux" | grep "vi-output" | tr '\\n' '\n' 
 [[ -z ${vid_dev_idx} ]] && exit 0
 
 # get cameras physical location
-dfuid=($(ls -1 /sys/class/d4xx-class/ | awk -F'-' '{print $3"-"$4}'))
+dfuid=($(ls -1 /sys/class/d4xx-class/ | awk -F'-' '{print $4}'))
 cam_id=0
 [[ $quiet -eq 0 ]] && printf "Bus\tCamera\tSensor\tNode Type\tVideo Node\tRS Link\n"
 
 for dfuid_x in ${dfuid[*]}; do # for all physical cameras one by one.
-  vid_dev_idx_arr=($(echo "${dot}" | grep "vi-output, DS5 mux ${dfuid_x}" | tr '\\n' '\n' | grep video | awk -F'"' '{print $1}' | grep -Po "\\d+"))
+  vid_dev_idx_arr=($(echo "${dot}" | grep "vi-output, DS5 mux [[:digit:]]*-${dfuid_x}" | tr '\\n' '\n' | grep video | awk -F'"' '{print $1}' | grep -Po "\\d+"))
   sens_id=0
     for i in ${vid_dev_idx_arr[*]}; do
       vid="/dev/video${i}"
