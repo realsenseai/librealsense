@@ -3,7 +3,7 @@
 
 # Currently, we exclude D457 as it's failing
 # test:device each(D400*) !D457
-# test:donotrun:!nightly
+# test:donotrun
 # test:timeout 600
 # CI timeout set to 10 minutes to accommodate comprehensive testing of all
 # supported depth profiles
