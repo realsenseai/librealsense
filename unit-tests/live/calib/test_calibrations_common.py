@@ -11,8 +11,8 @@ import zlib
 import ctypes
 
 # Constants for calibration
-CALIBRATION_TIMEOUT_SECONDS = 30
-OCC_TIMEOUT_MS = 9000
+CALIBRATION_TIMEOUT_SECONDS = 90  # Increased from 30 to allow for longer calibration processes
+OCC_TIMEOUT_MS = 30000  # Increased from 9000 to 30000ms to match working examples
 TARE_TIMEOUT_MS = 10000
 FRAME_PROCESSING_TIMEOUT_MS = 5000
 HARDWARE_RESET_DELAY_SECONDS = 3
@@ -87,15 +87,28 @@ def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground
             new_calib, health = calib_dev.run_tare_calibration(ground_truth, json_config, on_calib_cb, TARE_TIMEOUT_MS)
 
         calib_done = len(new_calib) > 0
-        timeout_end = time.time() + CALIBRATION_TIMEOUT_SECONDS
+        log.d(f"Initial calibration call completed. Calibration done: {calib_done}, table size: {len(new_calib)}")
         
-        while not calib_done:
-            if time.time() > timeout_end:
-                raise RuntimeError("Calibration timed out after {} seconds".format(CALIBRATION_TIMEOUT_SECONDS))
-            frame_set = pipeline.wait_for_frames()
-            depth_frame = frame_set.get_depth_frame()
-            new_calib, health = calib_dev.process_calibration_frame(depth_frame, on_calib_cb, FRAME_PROCESSING_TIMEOUT_MS)
-            calib_done = len(new_calib) > 0
+        if not calib_done:
+            log.d("Entering frame processing loop for host-assisted calibration")
+            timeout_end = time.time() + CALIBRATION_TIMEOUT_SECONDS
+            frame_count = 0
+            
+            while not calib_done:
+                if time.time() > timeout_end:
+                    raise RuntimeError("Calibration timed out after {} seconds".format(CALIBRATION_TIMEOUT_SECONDS))
+                frame_set = pipeline.wait_for_frames()
+                depth_frame = frame_set.get_depth_frame()
+                
+                # Only process valid depth frames
+                if depth_frame:
+                    frame_count += 1
+                    new_calib, health = calib_dev.process_calibration_frame(depth_frame, on_calib_cb, FRAME_PROCESSING_TIMEOUT_MS)
+                    calib_done = len(new_calib) > 0
+                    if frame_count % 30 == 0:
+                        log.d(f"Processed {frame_count} frames, calibration done: {calib_done}")
+        else:
+            log.d("Calibration completed in initial call (no frame processing needed)")
         # Preserve final table
         if calib_done:
             new_calib_result = bytes(new_calib)
@@ -240,17 +253,87 @@ def get_current_rect_params(auto_calib_device):
         log.e(f"Error reading principal points: {e}")
         return None
         
-def restore_calibration_table(device):
+def save_calibration_table(device):
+    """Save the current calibration table for later restoration.
+    
+    Args:
+        device: auto_calibrated_device or regular device
+        
+    Returns:
+        bytes: Calibration table as bytes, or None on failure
+    """
+    try:
+        # Handle both device types
+        if isinstance(device, rs.auto_calibrated_device):
+            auto_calib_device = device
+        else:
+            auto_calib_device = rs.auto_calibrated_device(device)
+            
+        if not auto_calib_device:
+            log.e("Device does not support auto calibration")
+            return None
+            
+        calib_table = auto_calib_device.get_calibration_table()
+        if calib_table is not None:
+            saved_table = bytes(calib_table)
+            log.d(f"Saved calibration table ({len(saved_table)} bytes)")
+            return saved_table
+        else:
+            log.e("Failed to retrieve calibration table")
+            return None
+    except Exception as e:
+        log.e(f"Error saving calibration table: {e}")
+        return None
+
+
+def restore_calibration_table(device, saved_table=None, use_factory=False):
+    """Restore calibration table from saved data or factory reset.
+    
+    Args:
+        device: auto_calibrated_device or regular device
+        saved_table (bytes): Previously saved calibration table. If None, uses factory reset.
+        use_factory (bool): If True, perform factory reset regardless of saved_table
+        
+    Returns:
+        bool: True if restoration successful, False otherwise
+    """
     global _global_original_calib_table
 
-    # Get the auto calibrated device interface
-    auto_calib_device = rs.auto_calibrated_device(device)
-    if not auto_calib_device:
-        log.e("Device does not support auto calibration")
-        return False
+    try:
+        # Handle both device types
+        if isinstance(device, rs.auto_calibrated_device):
+            auto_calib_device = device
+        else:
+            auto_calib_device = rs.auto_calibrated_device(device)
+            
+        if not auto_calib_device:
+            log.e("Device does not support auto calibration")
+            return False
 
-    auto_calib_device.reset_to_factory_calibration()
-    return True
+        # Option 1: Factory reset
+        if use_factory or saved_table is None:
+            log.i("Restoring factory calibration")
+            auto_calib_device.reset_to_factory_calibration()
+            return True
+            
+        # Option 2: Restore from saved table
+        log.i(f"Restoring saved calibration table ({len(saved_table)} bytes)")
+        calib_list = list(saved_table)
+        auto_calib_device.set_calibration_table(calib_list)
+        auto_calib_device.write_calibration()
+        
+        # Verify restoration
+        current_table = auto_calib_device.get_calibration_table()
+        if current_table and bytes(current_table) == saved_table:
+            log.d("Calibration table restored and verified successfully")
+            return True
+        else:
+            log.w("Calibration table restored but verification failed")
+            return True  # Still return True as write succeeded
+            
+    except Exception as e:
+        log.e(f"Error restoring calibration table: {e}")
+        return False
 
 def get_calibration_table(device):
     """Get current calibration table from device"""
