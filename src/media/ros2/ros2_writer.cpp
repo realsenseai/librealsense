@@ -157,24 +157,31 @@ namespace librealsense
 
     void ros2_writer::write_frame_metadata(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame)
     {
-        auto metadata_topic = ros_topic::frame_metadata_topic(stream_id);
-        ensure_topic(metadata_topic, "librealsense/frame_metadata");
+        
         std::string system_time = std::to_string(frame->get_frame_system_time());
-        write_string(metadata_topic, timestamp, std::string(SYSTEM_TIME_MD_STR) + "=" + system_time + ";");
+        //write_string(metadata_topic, timestamp, std::string(SYSTEM_TIME_MD_STR) + "=" + system_time + ";");
 
         std::string timestamp_domain = librealsense::get_string(frame->get_frame_timestamp_domain());
-        write_string(metadata_topic, timestamp, std::string(TIMESTAMP_DOMAIN_MD_STR) + "=" + timestamp_domain + ";");
+        //write_string(metadata_topic, timestamp, std::string(TIMESTAMP_DOMAIN_MD_STR) + "=" + timestamp_domain + ";");
 
-        for (int i = 0; i < static_cast<rs2_frame_metadata_value>(rs2_frame_metadata_value::RS2_FRAME_METADATA_COUNT); i++)
+        std::string frame_number = std::to_string(frame->get_frame_number());
+
+        std::string metadata_payload = rsutils::string::from() << FRAME_NUMBER_MD_STR << "=" << frame_number << ";" << TIMESTAMP_DOMAIN_MD_STR << "=" << timestamp_domain << ";" << SYSTEM_TIME_MD_STR << "=" << system_time << ";";
+        for (int i = 0; i < RS2_FRAME_METADATA_COUNT; i++)
         {
             rs2_frame_metadata_value type = static_cast<rs2_frame_metadata_value>(i);
             rs2_metadata_type md;
             if (frame->find_metadata(type, &md))
             {
                 std::string md_value = std::to_string(md);
-                write_string(metadata_topic, timestamp, std::string(librealsense::get_string(type)) + "=" + md_value + ";");
+                //write_string(metadata_topic, timestamp, std::string(librealsense::get_string(type)) + "=" + md_value + ";");
+                metadata_payload += librealsense::get_string(type) + "=" + md_value + ";";
             }
         }
+
+        auto metadata_topic = ros_topic::frame_metadata_topic(stream_id);
+        ensure_topic(metadata_topic, "librealsense/frame_metadata");
+        write_string(metadata_topic, timestamp, metadata_payload);
     }
 
     void ros2_writer::write_sensor_option(sensor_identifier sid, const nanoseconds& timestamp, rs2_option type, const librealsense::option& option)
@@ -269,9 +276,9 @@ namespace librealsense
         _storage->write(msg);
 
         // Minimal metadata: frame number + timestamp domain/system time
-        std::string md_topic = ros_topic::frame_metadata_topic(stream_id);
-        std::string md_payload = rsutils::string::from() << FRAME_NUMBER_MD_STR << "=" << fi->get_frame_number() << ";" << TIMESTAMP_DOMAIN_MD_STR << "=" << librealsense::get_string(fi->get_frame_timestamp_domain()) << ";" << SYSTEM_TIME_MD_STR << "=" << fi->get_frame_system_time();
-        write_string(md_topic, timestamp, md_payload);
+        //std::string md_topic = ros_topic::frame_metadata_topic(stream_id);
+        //std::string md_payload = rsutils::string::from() << FRAME_NUMBER_MD_STR << "=" << fi->get_frame_number() << ";" << TIMESTAMP_DOMAIN_MD_STR << "=" << librealsense::get_string(fi->get_frame_timestamp_domain()) << ";" << SYSTEM_TIME_MD_STR << "=" << fi->get_frame_system_time();
+        //write_string(md_topic, timestamp, md_payload);
         write_additional_frame_messages(stream_id, timestamp, frame);
     }
 
@@ -298,9 +305,9 @@ namespace librealsense
         msg->topic_name = topic;
         _storage->write(msg);
         // Minimal metadata: frame number + timestamp domain/system time
-        std::string md_topic = ros_topic::frame_metadata_topic(stream_id);
-        std::string md_payload = rsutils::string::from() << FRAME_NUMBER_MD_STR << "=" << fi->get_frame_number() << ";" << TIMESTAMP_DOMAIN_MD_STR << "=" << librealsense::get_string(fi->get_frame_timestamp_domain()) << ";" << SYSTEM_TIME_MD_STR << "=" << fi->get_frame_system_time();
-        write_string(md_topic, timestamp, md_payload);
+        //std::string md_topic = ros_topic::frame_metadata_topic(stream_id);
+        //std::string md_payload = rsutils::string::from() << FRAME_NUMBER_MD_STR << "=" << fi->get_frame_number() << ";" << TIMESTAMP_DOMAIN_MD_STR << "=" << librealsense::get_string(fi->get_frame_timestamp_domain()) << ";" << SYSTEM_TIME_MD_STR << "=" << fi->get_frame_system_time();
+        //write_string(md_topic, timestamp, md_payload);
         write_additional_frame_messages(stream_id, timestamp, frame);
     }
 

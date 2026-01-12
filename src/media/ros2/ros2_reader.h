@@ -13,6 +13,7 @@
 #include <src/core/info-interface.h>
 #include <src/core/options-interface.h>
 #include <src/core/frame-interface.h>
+#include <src/source.h>
 
 // rosbag2 storage headers
 #include <rosbag2_storage/storage_interfaces/read_write_interface.hpp>
@@ -67,5 +68,8 @@ namespace librealsense
         // Cache to support fetch_last_frames logic
         // Maps stream ID to the last frame data seen
         std::map< device_serializer::stream_identifier, std::shared_ptr<device_serializer::serialized_data> > _last_frame_cache;
+
+        // Frame source for allocating frames
+        std::shared_ptr<frame_source> _frame_source;
     };
 }

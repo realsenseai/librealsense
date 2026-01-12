@@ -11,6 +11,12 @@
 #include <limits>
 #include "rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp"
 #include <regex>
+#include "core/video-frame.h"
+#include "core/motion-frame.h"
+#include "core/pose-frame.h"
+#include "stream.h"
+#include "source.h"
+#include "image.h"
 
 namespace librealsense {
     using namespace device_serializer;
@@ -226,6 +232,7 @@ namespace librealsense {
         }
 
         _initial_snapshot = device_snapshot(device_extensions, sensor_descriptions, {});
+        _initialized = true;
         return _initial_snapshot;
     }
 
@@ -447,12 +454,10 @@ namespace librealsense {
             auto msg = _storage->read_next();
 
             std::string topic = msg->topic_name;
-            std::cout << "Reading topic: " << topic << std::endl;
             nanoseconds ts(msg->time_stamp);
 
             // 1. Check if this is a frame data topic (e.g., /device_0/sensor_0/Depth_0/image/data)
             stream_identifier sid;
-            //is_stream_topic(topic, sid);
             if (is_stream_topic(topic, sid))
             {
                 // Filter: if we have enabled streams and this isn't one, skip it
@@ -461,9 +466,185 @@ namespace librealsense {
                     continue;
                 }
 
-                // TODO: Parse the actual frame data from msg->serialized_data
-                // For now, return a placeholder invalid frame
-                auto data = std::make_shared<serialized_invalid_frame>(ts, sid);
+                // Parse the actual frame data from msg->serialized_data
+                if (!msg->serialized_data || msg->serialized_data->buffer_length == 0)
+                {
+                    LOG_WARNING("Frame data message has no payload");
+                    continue;
+                }
+
+                // Read metadata to get frame number, timestamp domain, and system time
+                frame_additional_data additional_data{};
+                additional_data.timestamp = static_cast<double>(ts.count()) / 1000000.0; // Convert ns to ms
+                additional_data.frame_number = 0;
+                additional_data.timestamp_domain = RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME;
+                additional_data.system_time = 0;
+
+                // Try to read metadata from the metadata topic
+                auto md_topic = ros_topic::frame_metadata_topic(sid);
+                _storage->reset_filter();
+                _storage->set_filter(rosbag2_storage::StorageFilter{ {md_topic} });
+                
+                // Look for metadata at the same timestamp
+                while (_storage->has_next())
+                {
+                    auto md_msg = _storage->read_next();
+                    if (md_msg->time_stamp == msg->time_stamp)
+                    {
+                        if (md_msg->serialized_data && md_msg->serialized_data->buffer_length > 0)
+                        {
+                            std::string payload_str(reinterpret_cast<const char*>(md_msg->serialized_data->buffer), 
+                                                    md_msg->serialized_data->buffer_length);
+                            auto kv = parse_key_value_string(payload_str);
+                            
+                            auto fn_it = kv.find(FRAME_NUMBER_MD_STR);
+                            if (fn_it != kv.end())
+                            {
+                                try { additional_data.frame_number = std::stoull(fn_it->second); } catch(...) {}
+                            }
+                            
+                            auto td_it = kv.find(TIMESTAMP_DOMAIN_MD_STR);
+                            if (td_it != kv.end())
+                            {
+                                rs2_timestamp_domain domain;
+                                if (convert(td_it->second, domain))
+                                {
+                                    additional_data.timestamp_domain = domain;
+                                }
+                            }
+                            
+                            auto st_it = kv.find(SYSTEM_TIME_MD_STR);
+                            if (st_it != kv.end())
+                            {
+                                try { additional_data.system_time = std::stod(st_it->second); } catch(...) {}
+                            }
+                        }
+                        break;
+                    }
+                }
+                
+                // Reset filter to continue reading frame data
+                _storage->reset_filter();
+
+                // Determine frame type from stream type
+                rs2_extension frame_ext = RS2_EXTENSION_VIDEO_FRAME;
+                if (sid.stream_type == RS2_STREAM_ACCEL || sid.stream_type == RS2_STREAM_GYRO || sid.stream_type == RS2_STREAM_MOTION)
+                {
+                    frame_ext = RS2_EXTENSION_MOTION_FRAME;
+                }
+                else if (sid.stream_type == RS2_STREAM_POSE)
+                {
+                    frame_ext = RS2_EXTENSION_POSE_FRAME;
+                }
+
+                // Initialize frame source if needed
+                if (!_frame_source)
+                {
+                    _frame_source = std::make_shared<frame_source>(32);
+                    _frame_source->init(std::shared_ptr<metadata_parser_map>());
+                }
+
+                // Allocate frame through frame source
+                frame_interface* frame_ptr = _frame_source->alloc_frame(
+                    { sid.stream_type, sid.stream_index, frame_ext },
+                    msg->serialized_data->buffer_length,
+                    std::move(additional_data),
+                    true
+                );
+
+                if (!frame_ptr)
+                {
+                    LOG_WARNING("Failed to allocate frame");
+                    continue;
+                }
+
+                // Copy the raw binary data into the frame's data buffer
+                auto frame_data = const_cast<uint8_t*>(frame_ptr->get_frame_data());
+                std::memcpy(frame_data, msg->serialized_data->buffer, msg->serialized_data->buffer_length);
+
+                // Set up stream profile and frame-specific properties
+                if (frame_ext == RS2_EXTENSION_VIDEO_FRAME)
+                {
+                    auto video_frame_ptr = static_cast<video_frame*>(frame_ptr);
+                    
+                    // Try to get the stream profile from the device snapshot to get width/height
+                    if (_initialized && !_initial_snapshot.get_sensors_snapshots().empty())
+                    {
+                        // Find the matching stream profile
+                        for (auto& sensor_snap : _initial_snapshot.get_sensors_snapshots())
+                        {
+                            for (auto& stream_profile : sensor_snap.get_stream_profiles())
+                            {
+                                if (stream_profile->get_stream_type() == sid.stream_type &&
+                                    stream_profile->get_stream_index() == sid.stream_index)
+                                {
+                                    // Found matching profile - use it
+                                    frame_ptr->set_stream(stream_profile);
+                                    
+                                    // For video frames, set dimensions
+                                    if (auto vsp = std::dynamic_pointer_cast<video_stream_profile>(stream_profile))
+                                    {
+                                        int width = vsp->get_width();
+                                        int height = vsp->get_height();
+                                        int bpp = get_image_bpp(vsp->get_format());
+                                        int stride = width * bpp / 8;
+                                        video_frame_ptr->assign(width, height, stride, bpp);
+                                    }
+                                    goto profile_found;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Fallback: create a temporary profile if we don't have the snapshot yet
+                    {
+                        auto temp_profile = std::make_shared<video_stream_profile>();
+                        temp_profile->set_stream_type(sid.stream_type);
+                        temp_profile->set_stream_index(sid.stream_index);
+                        // Set some default dimensions - these should be overridden by the actual profile
+                        // For now, we'll try to infer from data size if it's a known format
+                        temp_profile->set_format(RS2_FORMAT_ANY);
+                        frame_ptr->set_stream(temp_profile);
+                        
+                        // Note: Without width/height, the frame won't display properly
+                        // The playback device should set the correct stream profile later
+                        LOG_WARNING("Using temporary stream profile without dimensions for " << rs2_stream_to_string(sid.stream_type));
+                    }
+                    
+                    profile_found:;
+                }
+                else if (frame_ext == RS2_EXTENSION_MOTION_FRAME)
+                {
+                    // For motion frames, try to get the profile from snapshot
+                    if (_initialized && !_initial_snapshot.get_sensors_snapshots().empty())
+                    {
+                        for (auto& sensor_snap : _initial_snapshot.get_sensors_snapshots())
+                        {
+                            for (auto& stream_profile : sensor_snap.get_stream_profiles())
+                            {
+                                if (stream_profile->get_stream_type() == sid.stream_type &&
+                                    stream_profile->get_stream_index() == sid.stream_index)
+                                {
+                                    frame_ptr->set_stream(stream_profile);
+                                    goto motion_profile_found;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Fallback: create temporary motion profile
+                    {
+                        auto temp_profile = std::make_shared<motion_stream_profile>();
+                        temp_profile->set_stream_type(sid.stream_type);
+                        temp_profile->set_stream_index(sid.stream_index);
+                        temp_profile->set_format(RS2_FORMAT_MOTION_XYZ32F);
+                        frame_ptr->set_stream(temp_profile);
+                    }
+                    
+                    motion_profile_found:;
+                }
+
+                auto data = std::make_shared<serialized_frame>(ts, sid, frame_holder{ frame_ptr });
 
                 // Update cache for fetch_last_frames
                 _last_frame_cache[sid] = data;
