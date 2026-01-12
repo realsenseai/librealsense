@@ -55,6 +55,11 @@ namespace librealsense
         stream_profiles read_stream_info(uint32_t device_index, uint32_t sensor_index);
         std::set<uint32_t> read_sensor_indices(uint32_t device_index);
 
+        // Frame setup helpers
+        void read_frame_metadata(const device_serializer::stream_identifier& sid, int64_t timestamp, frame_additional_data& additional_data) const;
+        void setup_video_frame(frame_interface* frame_ptr, const device_serializer::stream_identifier& sid) const;
+        void setup_motion_frame(frame_interface* frame_ptr, const device_serializer::stream_identifier& sid) const;
+
         std::shared_ptr< rosbag2_storage::storage_interfaces::ReadWriteInterface > _storage;
         std::string _file_path;
         std::vector< rosbag2_storage::TopicMetadata > _topics_cache;
