@@ -109,6 +109,9 @@ namespace librealsense
 
     void ros2_writer::write_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame)
     {
+        if (!frame || !frame.frame)
+            return;
+
         if (Is<video_frame>(frame.frame))
         {
             write_video_frame(stream_id, timestamp, std::move(frame));
@@ -452,13 +455,16 @@ namespace librealsense
         case RS2_EXTENSION_INFO:
         {
             auto info = SnapshotAs<RS2_EXTENSION_INFO>(snapshot);
-            if (is_device)
+            if (info)
             {
-                write_vendor_info(ros_topic::device_info_topic(device_id), timestamp, info);
-            }
-            else
-            {
-                write_vendor_info(ros_topic::sensor_info_topic({ device_id, sensor_id }), timestamp, info);
+                if (is_device)
+                {
+                    write_vendor_info(ros_topic::device_info_topic(device_id), timestamp, info);
+                }
+                else
+                {
+                    write_vendor_info(ros_topic::sensor_info_topic({ device_id, sensor_id }), timestamp, info);
+                }
             }
             break;
         }
@@ -525,6 +531,9 @@ namespace librealsense
 
     void ros2_writer::write_sensor_options(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<options_interface> options)
     {
+        if (!options)
+            return;
+
         for (int i = 0; i < static_cast<int>(RS2_OPTION_COUNT); i++)
         {
             auto option_id = static_cast<rs2_option>(i);

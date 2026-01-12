@@ -23,7 +23,6 @@
 #include <src/core/frame-interface.h>
 #include <src/core/stream-profile-interface.h>
 #include <src/option.h>
-//#include <rcutils/types/rcutils_uint8_array.h>
 
 namespace librealsense
 {

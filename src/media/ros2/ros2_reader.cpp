@@ -32,6 +32,14 @@ namespace librealsense {
         return tokens;
     }
 
+    static std::string get_value(const std::map<std::string, std::string>& kv, const std::string& key)
+    {
+        auto it = kv.find(key);
+        if (it == kv.end())
+            throw std::runtime_error(rsutils::string::from() << "Key not found: " << key);
+        return it->second;
+    }
+
     std::vector<std::string> filter_by_regex(const std::vector<rosbag2_storage::TopicMetadata>& input,
         const std::regex& re)
     {
@@ -147,6 +155,16 @@ namespace librealsense {
         return kv_map;
     }
 
+    std::map< std::string, std::string > ros2_reader::parse_msg_payload(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg) const
+    {
+        std::string payload_str;
+        if (msg && msg->serialized_data && msg->serialized_data->buffer_length > 0)
+        {
+            payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
+        }
+        return parse_key_value_string(payload_str);
+    }
+
     device_snapshot ros2_reader::query_device_description(const nanoseconds& time)
     {
         if (_initialized) return _initial_snapshot;
@@ -194,13 +212,8 @@ namespace librealsense {
         {
             auto msg = _storage->read_next();
             std::string topic = msg->topic_name;
-            std::string payload_str;
-            if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
-            {
-                payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
-            }
+            auto kv = parse_msg_payload(msg);
             uint32_t sensor_index = ros_topic::get_sensor_index(topic);
-            auto kv = parse_key_value_string(payload_str);
             if (sensor_infos_cache.find(sensor_index) == sensor_infos_cache.end())
             {
                 sensor_infos_cache[sensor_index] = std::make_shared<info_container>();
@@ -247,14 +260,7 @@ namespace librealsense {
         while (_storage->has_next())
         {
             auto msg = _storage->read_next();
-            std::string topic = msg->topic_name;
-            std::string payload_str;
-
-            if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
-            {
-                payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
-            }
-            auto kv = parse_key_value_string(payload_str);
+            auto kv = parse_msg_payload(msg);
             try
             {
                 rs2_camera_info info;
@@ -277,18 +283,13 @@ namespace librealsense {
     {
         stream_profiles streams;
 
-
         auto msg = _storage->read_next();
-        std::string topic = msg->topic_name;
-        std::string payload_str;
+        if (!msg)
+            return streams;
 
-        if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
-        {
-            payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
-        }
-        auto kv = parse_key_value_string(payload_str);
-        auto encoding = kv.find("encoding")->second;
-        auto fps = static_cast<uint32_t>(std::stoul(kv.find("fps")->second));
+        auto kv = parse_msg_payload(msg);
+        auto encoding = get_value(kv, "encoding");
+        auto fps = static_cast<uint32_t>(std::stoul(get_value(kv, "fps")));
         //auto is_recommended = (kv.find("is_recommended")->second == "true");
 
         rs2_format format;
@@ -297,88 +298,112 @@ namespace librealsense {
         stream_identifier stream_id = ros_topic::get_stream_identifier(msg->topic_name);
 
         msg = _storage->read_next();
+        if (!msg)
+            return streams;
+        
+        auto intrinsics_kv = parse_msg_payload(msg);
+
         if (msg->topic_name.find("imu_intrinsic") != std::string::npos)
         {
-            auto motion_profile = std::make_shared<motion_stream_profile>();
-            motion_profile->set_stream_index(stream_id.stream_index);
-            motion_profile->set_stream_type(stream_id.stream_type);
-            motion_profile->set_format(format);
-            motion_profile->set_framerate(fps);
-
-            // IMU stream info
-            std::string imu_payload_str;
-            if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
-            {
-                imu_payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
-            }
-            auto imu_kv = parse_key_value_string(imu_payload_str);
-            rs2_motion_device_intrinsic intrinsics{};
-            auto data_str = imu_kv.find("data")->second;
-            auto data_tokens = split_string(data_str, ',');
-            for (size_t row = 0; row < 3; ++row)
-            {
-                for (size_t col = 0; col < 4; ++col)
-                {
-                    //intrinsics.data[row][col] = std::stof(data_tokens[row * 4 + col]); // commented out for now until rerecording a new bag
-                }
-            }
-            auto noise_str = imu_kv.find("noise_variances")->second;
-            auto noise_tokens = split_string(noise_str, ',');
-            for (size_t i = 0; i < std::min(noise_tokens.size(), size_t(3)); ++i)
-            {
-                intrinsics.noise_variances[i] = std::stof(noise_tokens[i]);
-            }
-            auto bias_str = imu_kv.find("bias_variances")->second;
-            auto bias_tokens = split_string(bias_str, ',');
-            for (size_t i = 0; i < std::min(bias_tokens.size(), size_t(3)); ++i)
-            {
-                intrinsics.bias_variances[i] = std::stof(bias_tokens[i]);
-            }
-            motion_profile->set_intrinsics([intrinsics]() { return intrinsics; });
-
-            streams.push_back(motion_profile);
-
+            streams.push_back(create_motion_profile(stream_id, format, fps, intrinsics_kv));
         }
         else if (msg->topic_name.find("camera_info") != std::string::npos)
         {
-            auto video_profile = std::make_shared<video_stream_profile>();
-            video_profile->set_stream_index(stream_id.stream_index);
-            video_profile->set_stream_type(stream_id.stream_type);
-            video_profile->set_format(format);
-            video_profile->set_framerate(fps);
-
-            auto video_info_msg = msg;
-            std::string video_payload_str;
-            if (video_info_msg->serialized_data && video_info_msg->serialized_data->buffer_length > 0)
-            {
-                video_payload_str = std::string(reinterpret_cast<const char*>(video_info_msg->serialized_data->buffer), video_info_msg->serialized_data->buffer_length);
-            }
-            auto video_kv = parse_key_value_string(video_payload_str);
-            uint32_t width = static_cast<uint32_t>(std::stoul(video_kv.find("width")->second));
-            uint32_t height = static_cast<uint32_t>(std::stoul(video_kv.find("height")->second));
-            rs2_intrinsics intrinsics{};
-            intrinsics.fx = std::stof(video_kv.find("fx")->second);
-            intrinsics.ppx = std::stof(video_kv.find("ppx")->second);
-            intrinsics.fy = std::stof(video_kv.find("fy")->second);
-            intrinsics.ppy = std::stof(video_kv.find("ppy")->second);
-            auto dist_model_str = video_kv.find("model")->second;
-            rs2_distortion dist_model;
-            convert(dist_model_str, dist_model);
-            intrinsics.model = dist_model;
-            // the coeffs is coeffs=x1,x2,x3,...
-            auto coeffs_str = video_kv.find("coeffs")->second;
-            auto coeffs_tokens = split_string(coeffs_str, ',');
-            for (size_t i = 0; i < std::min(coeffs_tokens.size(), size_t(5)); ++i)
-            {
-                intrinsics.coeffs[i] = std::stof(coeffs_tokens[i]);
-            }
-            video_profile->set_dims(width, height);
-            video_profile->set_intrinsics([intrinsics]() { return intrinsics; });
-            streams.push_back(video_profile);
+            streams.push_back(create_video_profile(stream_id, format, fps, intrinsics_kv));
         }
 
         return streams;
+    }
 
+    rs2_motion_device_intrinsic ros2_reader::parse_motion_intrinsics(const std::map<std::string, std::string>& kv) const
+    {
+        rs2_motion_device_intrinsic intrinsics{};
+
+        auto data_str = get_value(kv, "data");
+        auto data_tokens = split_string(data_str, ',');
+        for (size_t row = 0; row < 3; ++row)
+        {
+            for (size_t col = 0; col < 4; ++col)
+            {
+                intrinsics.data[row][col] = std::stof(data_tokens[row * 4 + col]);
+            }
+        }
+
+        auto noise_str = get_value(kv, "noise_variances");
+        auto noise_tokens = split_string(noise_str, ',');
+        for (size_t i = 0; i < std::min(noise_tokens.size(), size_t(3)); ++i)
+        {
+            intrinsics.noise_variances[i] = std::stof(noise_tokens[i]);
+        }
+
+        auto bias_str = get_value(kv, "bias_variances");
+        auto bias_tokens = split_string(bias_str, ',');
+        for (size_t i = 0; i < std::min(bias_tokens.size(), size_t(3)); ++i)
+        {
+            intrinsics.bias_variances[i] = std::stof(bias_tokens[i]);
+        }
+
+        return intrinsics;
+    }
+
+    rs2_intrinsics ros2_reader::parse_video_intrinsics(const std::map<std::string, std::string>& kv) const
+    {
+        rs2_intrinsics intrinsics{};
+
+        intrinsics.width = static_cast<int>(std::stoul(get_value(kv, "width")));
+        intrinsics.height = static_cast<int>(std::stoul(get_value(kv, "height")));
+        intrinsics.fx = std::stof(get_value(kv, "fx"));
+        intrinsics.ppx = std::stof(get_value(kv, "ppx"));
+        intrinsics.fy = std::stof(get_value(kv, "fy"));
+        intrinsics.ppy = std::stof(get_value(kv, "ppy"));
+
+        auto dist_model_str = get_value(kv, "model");
+        rs2_distortion dist_model;
+        convert(dist_model_str, dist_model);
+        intrinsics.model = dist_model;
+
+        auto coeffs_str = get_value(kv, "coeffs");
+        auto coeffs_tokens = split_string(coeffs_str, ',');
+        for (size_t i = 0; i < std::min(coeffs_tokens.size(), size_t(5)); ++i)
+        {
+            intrinsics.coeffs[i] = std::stof(coeffs_tokens[i]);
+        }
+
+        return intrinsics;
+    }
+
+    std::shared_ptr<motion_stream_profile> ros2_reader::create_motion_profile(const stream_identifier& stream_id, rs2_format format,
+        uint32_t fps, const std::map<std::string, std::string>& intrinsics_kv) const
+    {
+        auto motion_profile = std::make_shared<motion_stream_profile>();
+        motion_profile->set_stream_index(stream_id.stream_index);
+        motion_profile->set_stream_type(stream_id.stream_type);
+        motion_profile->set_format(format);
+        motion_profile->set_framerate(fps);
+
+        auto intrinsics = parse_motion_intrinsics(intrinsics_kv);
+        motion_profile->set_intrinsics([intrinsics]() { return intrinsics; });
+
+        return motion_profile;
+    }
+
+    std::shared_ptr<video_stream_profile> ros2_reader::create_video_profile(const stream_identifier& stream_id, rs2_format format,
+        uint32_t fps, const std::map<std::string, std::string>& intrinsics_kv) const
+    {
+        auto video_profile = std::make_shared<video_stream_profile>();
+        video_profile->set_stream_index(stream_id.stream_index);
+        video_profile->set_stream_type(stream_id.stream_type);
+        video_profile->set_format(format);
+        video_profile->set_framerate(fps);
+
+        auto intrinsics = parse_video_intrinsics(intrinsics_kv);
+        uint32_t width = static_cast<uint32_t>(intrinsics.width);
+        uint32_t height = static_cast<uint32_t>(intrinsics.height);
+
+        video_profile->set_dims(width, height);
+        video_profile->set_intrinsics([intrinsics]() { return intrinsics; });
+
+        return video_profile;
     }
 
     std::set<uint32_t> ros2_reader::read_sensor_indices(uint32_t device_index)
@@ -397,48 +422,6 @@ namespace librealsense {
                 sensor_indices.insert(sensor_index);
             }
         }
-
-        /*for (auto sensor_index : sensor_indices)
-        {
-            snapshot_collection sensor_extensions;
-            auto sensor_info = std::make_shared<info_container>();
-            auto sensor_info_topic = ros_topic::sensor_info_topic({ device_index, sensor_index });
-            _storage->reset_filter();
-            _storage->set_filter(rosbag2_storage::StorageFilter{ {sensor_info_topic} });
-
-            while (_storage->has_next())
-            {
-                auto msg = _storage->read_next();
-                std::string topic = msg->topic_name;
-                std::string payload_str;
-
-                if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
-                {
-                    payload_str = std::string(reinterpret_cast<const char*>(msg->serialized_data->buffer), msg->serialized_data->buffer_length);
-                }
-                auto kv = parse_key_value_string(payload_str);
-                try
-                {
-                    rs2_camera_info info;
-                    auto it = kv.begin();
-                    std::string key = it->first;
-                    std::string value = it->second;
-                    convert(key, info);
-                    sensor_info->register_info(info, value);
-                    sensor_extensions[RS2_EXTENSION_INFO] = sensor_info;
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << e.what() << std::endl;
-                }
-            }
-
-            reset();
-        }*/
-
-        _storage->reset_filter();
-
-
         return sensor_indices;
     }
 
@@ -465,76 +448,7 @@ namespace librealsense {
                 {
                     continue;
                 }
-
-                // Parse the actual frame data from msg->serialized_data
-                if (!msg->serialized_data || msg->serialized_data->buffer_length == 0)
-                {
-                    LOG_WARNING("Frame data message has no payload");
-                    continue;
-                }
-
-                // Read metadata to get frame number, timestamp domain, and system time
-                frame_additional_data additional_data{};
-                additional_data.timestamp = static_cast<double>(ts.count()) / 1000000.0; // Convert ns to ms
-                additional_data.frame_number = 0;
-                additional_data.timestamp_domain = RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME;
-                additional_data.system_time = 0;
-
-                // Try to read metadata from the metadata topic
-                read_frame_metadata(sid, msg->time_stamp, additional_data);
-
-                // Determine frame type from stream type
-                rs2_extension frame_ext = RS2_EXTENSION_VIDEO_FRAME;
-                if (sid.stream_type == RS2_STREAM_ACCEL || sid.stream_type == RS2_STREAM_GYRO || sid.stream_type == RS2_STREAM_MOTION)
-                {
-                    frame_ext = RS2_EXTENSION_MOTION_FRAME;
-                }
-                else if (sid.stream_type == RS2_STREAM_POSE)
-                {
-                    frame_ext = RS2_EXTENSION_POSE_FRAME;
-                }
-
-                // Initialize frame source if needed
-                if (!_frame_source)
-                {
-                    _frame_source = std::make_shared<frame_source>(32);
-                    _frame_source->init(std::shared_ptr<metadata_parser_map>());
-                }
-
-                // Allocate frame through frame source
-                frame_interface* frame_ptr = _frame_source->alloc_frame(
-                    { sid.stream_type, sid.stream_index, frame_ext },
-                    msg->serialized_data->buffer_length,
-                    std::move(additional_data),
-                    true
-                );
-
-                if (!frame_ptr)
-                {
-                    LOG_WARNING("Failed to allocate frame");
-                    continue;
-                }
-
-                // Copy the raw binary data into the frame's data buffer
-                auto frame_data = const_cast<uint8_t*>(frame_ptr->get_frame_data());
-                std::memcpy(frame_data, msg->serialized_data->buffer, msg->serialized_data->buffer_length);
-
-                // Set up stream profile and frame-specific properties
-                if (frame_ext == RS2_EXTENSION_VIDEO_FRAME)
-                {
-                    setup_video_frame(frame_ptr, sid);
-                }
-                else if (frame_ext == RS2_EXTENSION_MOTION_FRAME)
-                {
-                    setup_motion_frame(frame_ptr, sid);
-                }
-
-                auto data = std::make_shared<serialized_frame>(ts, sid, frame_holder{ frame_ptr });
-
-                // Update cache for fetch_last_frames
-                _last_frame_cache[sid] = data;
-
-                return data;
+                return read_frame_data(msg, sid);
             }
 
             // 2. Options (e.g., /device_0/sensor_0/option/...)
@@ -570,6 +484,94 @@ namespace librealsense {
         return std::make_shared<serialized_end_of_file>();
     }
 
+    std::shared_ptr< serialized_data > ros2_reader::read_frame_data(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg, const stream_identifier& sid)
+    {
+        nanoseconds ts(msg->time_stamp);
+
+        // Parse the actual frame data from msg->serialized_data
+        if (!msg->serialized_data || msg->serialized_data->buffer_length == 0)
+        {
+            LOG_WARNING("Frame data message has no payload");
+            return nullptr;
+        }
+
+        // Read metadata to get frame number, timestamp domain, and system time
+        frame_additional_data additional_data{};
+        additional_data.timestamp = static_cast<double>(ts.count()) / 1000000.0; // Convert ns to ms
+        additional_data.frame_number = 0;
+        additional_data.timestamp_domain = RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME;
+        additional_data.system_time = 0;
+
+        // Try to read metadata from the metadata topic
+        read_frame_metadata(sid, msg->time_stamp, additional_data);
+
+        // Allocate frame using helper
+        frame_holder frame = allocate_frame(sid, msg, additional_data);
+
+        if (!frame)
+        {
+            LOG_WARNING("Failed to allocate frame");
+            return nullptr;
+        }
+
+        // Copy the raw binary data into the frame's data buffer
+        auto frame_data = const_cast<uint8_t*>(frame->get_frame_data());
+        std::memcpy(frame_data, msg->serialized_data->buffer, msg->serialized_data->buffer_length);
+
+        rs2_extension frame_ext = get_frame_extension(sid.stream_type);
+        if (frame_ext == RS2_EXTENSION_VIDEO_FRAME)
+        {
+            setup_video_frame(frame.frame, sid);
+        }
+        else if (frame_ext == RS2_EXTENSION_MOTION_FRAME)
+        {
+            setup_motion_frame(frame.frame, sid);
+        }
+
+        auto data = std::make_shared<serialized_frame>(ts, sid, std::move(frame));
+
+        // Update cache for fetch_last_frames
+        _last_frame_cache[sid] = data;
+
+        return data;
+    }
+        
+    frame_holder ros2_reader::allocate_frame(const stream_identifier& sid, const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg, const frame_additional_data& additional_data)
+    {
+        // Determine frame type from stream type
+        rs2_extension frame_ext = get_frame_extension(sid.stream_type);
+
+        // Initialize frame source if needed
+        if (!_frame_source)
+        {
+            _frame_source = std::make_shared<frame_source>(32);
+            _frame_source->init(std::shared_ptr<metadata_parser_map>());
+        }
+
+        // Allocate frame through frame source
+        frame_additional_data ad = additional_data;
+
+        return _frame_source->alloc_frame(
+            { sid.stream_type, sid.stream_index, frame_ext },
+            msg->serialized_data->buffer_length,
+            std::move(ad),
+            true
+        );
+    }
+        
+    rs2_extension ros2_reader::get_frame_extension(rs2_stream stream_type)
+    {
+        if (stream_type == RS2_STREAM_ACCEL || stream_type == RS2_STREAM_GYRO || stream_type == RS2_STREAM_MOTION)
+        {
+            return RS2_EXTENSION_MOTION_FRAME;
+        }
+        else if (stream_type == RS2_STREAM_POSE)
+        {
+            return RS2_EXTENSION_POSE_FRAME;
+        }
+        return RS2_EXTENSION_VIDEO_FRAME;
+    }
+
     void ros2_reader::read_frame_metadata(const stream_identifier& sid, int64_t timestamp, frame_additional_data& additional_data) const
     {
         auto md_topic = ros_topic::frame_metadata_topic(sid);
@@ -582,33 +584,27 @@ namespace librealsense {
             auto md_msg = _storage->read_next();
             if (md_msg->time_stamp == timestamp)
             {
-                if (md_msg->serialized_data && md_msg->serialized_data->buffer_length > 0)
+                auto kv = parse_msg_payload(md_msg);
+                auto fn_it = kv.find(FRAME_NUMBER_MD_STR);
+                if (fn_it != kv.end())
                 {
-                    std::string payload_str(reinterpret_cast<const char*>(md_msg->serialized_data->buffer), 
-                                            md_msg->serialized_data->buffer_length);
-                    auto kv = parse_key_value_string(payload_str);
-                    
-                    auto fn_it = kv.find(FRAME_NUMBER_MD_STR);
-                    if (fn_it != kv.end())
+                    try { additional_data.frame_number = std::stoull(fn_it->second); } catch(...) {}
+                }
+                
+                auto td_it = kv.find(TIMESTAMP_DOMAIN_MD_STR);
+                if (td_it != kv.end())
+                {
+                    rs2_timestamp_domain domain;
+                    if (convert(td_it->second, domain))
                     {
-                        try { additional_data.frame_number = std::stoull(fn_it->second); } catch(...) {}
+                        additional_data.timestamp_domain = domain;
                     }
-                    
-                    auto td_it = kv.find(TIMESTAMP_DOMAIN_MD_STR);
-                    if (td_it != kv.end())
-                    {
-                        rs2_timestamp_domain domain;
-                        if (convert(td_it->second, domain))
-                        {
-                            additional_data.timestamp_domain = domain;
-                        }
-                    }
-                    
-                    auto st_it = kv.find(SYSTEM_TIME_MD_STR);
-                    if (st_it != kv.end())
-                    {
-                        try { additional_data.system_time = std::stod(st_it->second); } catch(...) {}
-                    }
+                }
+                
+                auto st_it = kv.find(SYSTEM_TIME_MD_STR);
+                if (st_it != kv.end())
+                {
+                    try { additional_data.system_time = std::stod(st_it->second); } catch(...) {}
                 }
                 break;
             }
