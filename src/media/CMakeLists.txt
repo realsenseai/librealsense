@@ -22,3 +22,13 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.cpp"
 )
+
+# Suppress deprecated-declarations warning for ros2 files that include third-party rosbag2 headers
+# which use deprecated std::iterator (deprecated in C++17, removed in C++20)
+if(NOT MSVC)
+    set_source_files_properties(
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.cpp"
+        PROPERTIES COMPILE_FLAGS "-Wno-deprecated-declarations"
+    )
+endif()

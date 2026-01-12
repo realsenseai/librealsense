@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
+#include <fstream>   // for std::ifstream
 #include "rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp"
 
 namespace librealsense
