@@ -88,17 +88,27 @@ camera_vid=("depth" "depth-md" "color" "color-md" "ir" "ir-md" "imu")
 
 
 # Helper function: detect RS devices
+# Searches v4l2-ctl output for RealSense DS5 mux devices on Tegra platforms
+# Returns lines matching the pattern "vi-output, DS5 mux <I2C-address>"
+# Example output: "vi-output, DS5 mux 30-001a (platform:tegra-capture-vi:0):"
 detect_rs_devices() {
   ${v4l2_util} --list-devices | grep -E "vi-output, DS5 mux [0-9]+-[0-9a-fA-F]+"
 }
 
 # Helper function: extract I2C address from RS device line
+# Parses the I2C bus address from a DS5 mux device line
+# Input example: "vi-output, DS5 mux 30-001a (platform:tegra-capture-vi:0):"
+# Output example: "30-001a"
 extract_i2c_address() {
   local rs_line="$1"
   echo "${rs_line}" | grep -oE '[0-9]+-[0-9a-fA-F]+' | head -1
 }
 
 # Helper function: get video devices for a specific RS device
+# Extracts all /dev/videoN devices associated with a specific I2C address
+# Uses awk to parse v4l2-ctl output and find video devices under the matching mux
+# Input example: "30-001a"
+# Output example: "/dev/video0\n/dev/video1\n/dev/video2\n/dev/video3\n/dev/video4\n/dev/video5\n/dev/video6"
 get_video_devices_for_rs() {
   local i2c_pattern="$1"
   ${v4l2_util} --list-devices | awk -v pattern="${i2c_pattern}" '
@@ -118,6 +128,10 @@ get_video_devices_for_rs() {
 }
 
 # Helper function: create video device link
+# Creates a symbolic link from /dev/videoN to a standardized RS device name
+# Handles both info display and actual link creation based on global flags
+# Input example: create_video_link "/dev/video0" "/dev/video-rs-depth-0" "mipi" "0" "depth" "Streaming"
+# Creates: /dev/video-rs-depth-0 -> /dev/video0
 create_video_link() {
   local vid="$1"
   local dev_ln="$2"
@@ -136,6 +150,10 @@ create_video_link() {
 }
 
 # Helper function: process video devices for a RS camera
+# Processes all video devices for one RealSense camera, determining device types
+# Maps devices to sensors based on driver names (tegra-video=streaming, tegra-embedded=metadata)
+# Expected device order: depth, depth-md, color, color-md, ir, ir-md, imu
+# Input example: "/dev/video0 /dev/video1 /dev/video2" "0"
 process_rs_video_devices() {
   local vid_devices="$1"
   local cam_id="$2"
@@ -174,6 +192,10 @@ process_rs_video_devices() {
 }
 
 # Helper function: create DFU device link
+# Creates symbolic link for firmware update (DFU) device based on camera index
+# Maps d4xx class devices to standardized names for firmware operations
+# Input example: create_dfu_link "0"
+# Creates: /dev/d4xx-dfu-0 -> /dev/d4xx-dfu-a (if d4xx-dfu-a exists)
 create_dfu_link() {
   local cam_id="$1"
   
@@ -203,6 +225,10 @@ create_dfu_link() {
 }
 
 # Helper function: process a single RS device
+# Orchestrates complete processing of one RealSense DS5 mux device
+# Extracts I2C address, finds video devices, creates links, and handles DFU
+# Input example: "vi-output, DS5 mux 30-001a (platform:tegra-capture-vi:0):" "0"
+# Returns: 0 on success, 1 on failure (used to increment camera counter)
 process_single_rs_device() {
   local rs_line="$1"
   local cam_id="$2"
