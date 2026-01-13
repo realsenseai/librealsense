@@ -407,6 +407,8 @@ namespace librealsense
 
         std::vector<tagged_profile> get_profiles_tags() const override
         {
+            int *a = nullptr;
+            *a = 5;
             std::vector<tagged_profile> tags;
             auto usb_spec = get_usb_spec();
             if (usb_spec >= platform::usb3_type || usb_spec == platform::usb_undefined)
