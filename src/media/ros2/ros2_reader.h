@@ -49,6 +49,7 @@ namespace librealsense
         // Helper to parse "key=value;key2=val2" format used by writer
         std::map< std::string, std::string > parse_key_value_string(const std::string& payload) const;
         std::map< std::string, std::string > parse_msg_payload(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg) const;
+        void register_camera_infos(std::shared_ptr<info_container>& infos, const std::map<std::string, std::string>& kv) const;
 
         // Topic parsing helpers
         bool is_stream_topic(const std::string& topic, stream_identifier& id) const;

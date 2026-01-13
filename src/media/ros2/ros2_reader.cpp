@@ -165,6 +165,25 @@ namespace librealsense {
         return parse_key_value_string(payload_str);
     }
 
+    void ros2_reader::register_camera_infos(std::shared_ptr<info_container>& infos, const std::map<std::string, std::string>& kv) const
+    {
+        for (const auto& it : kv)
+        {
+            try
+            {
+                rs2_camera_info info;
+                if (convert(it.first, info))
+                {
+                    infos->register_info(info, it.second);
+                }
+            }
+            catch (const std::exception& e)
+            {
+                std::cerr << e.what() << std::endl;
+            }
+        }
+    }
+
     device_snapshot ros2_reader::query_device_description(const nanoseconds& time)
     {
         if (_initialized) return _initial_snapshot;
@@ -213,19 +232,7 @@ namespace librealsense {
         {
             auto msg = _storage->read_next();
             auto kv = parse_msg_payload(msg);
-            try
-            {
-                rs2_camera_info info;
-                auto it = kv.begin();
-                std::string key = it->first;
-                std::string value = it->second;
-                convert(key, info);
-                infos->register_info(info, value);
-            }
-            catch (const std::exception& e)
-            {
-                std::cerr << e.what() << std::endl;
-            }
+            register_camera_infos(infos, kv);
         }
         _storage->reset_filter();
         return infos;
@@ -377,13 +384,15 @@ namespace librealsense {
 
     std::map<uint32_t, stream_profiles> ros2_reader::read_all_stream_profiles(uint32_t device_index)
     {
-        auto sensor_info_topics_regex = std::regex((rsutils::string::from() << "^/device_" << device_index << "/sensor_(\\d+)/[^/]+/(info|imu_intrinsic|camera_info)$").str());
+        auto sensor_info_topics_regex = std::regex((rsutils::string::from() << "^/device_" << device_index 
+            << "/sensor_\\d+.*/(info|imu_intrinsic|camera_info)$").str()); // get both sensor and stream info topics
         std::vector<std::string> sensor_info_topics = filter_by_regex(_topics_cache, sensor_info_topics_regex);
 
         _storage->reset_filter();
         _storage->set_filter(rosbag2_storage::StorageFilter{ sensor_info_topics });
 
-        auto stream_info_topics_regex = std::regex((rsutils::string::from() << "^/device_" << device_index << "/sensor_(\\d+)/[^/]+/info$").str());
+        auto stream_info_topics_regex = std::regex((rsutils::string::from() << "^/device_" << device_index 
+            << "/sensor_\\d+/[^/]+/info$").str()); // get only stream info topics - expecting length to be number of streams
         std::vector<std::string> stream_info_topics = filter_by_regex(_topics_cache, stream_info_topics_regex);
 
         std::map<uint32_t, stream_profiles> sensor_to_streams;
@@ -413,19 +422,7 @@ namespace librealsense {
             auto& sensor_info = sensors_info[sensor_index];
             if (!sensor_info)
                 sensor_info = std::make_shared<info_container>();
-            for (const auto& it : kv)
-            {
-                try
-                {
-                    rs2_camera_info info;
-                    convert(it.first, info);
-                    sensor_info->register_info(info, it.second);
-                }
-                catch (const std::exception& e)
-                {
-                    std::cerr << e.what() << std::endl;
-                }
-            }
+            register_camera_infos(sensor_info, kv);
         }
 
         return sensors_info;
