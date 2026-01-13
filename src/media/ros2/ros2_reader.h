@@ -54,8 +54,10 @@ namespace librealsense
         bool is_stream_topic(const std::string& topic, stream_identifier& id) const;
         bool is_option_topic(const std::string& topic, sensor_identifier& sid, rs2_option& opt) const;
         std::shared_ptr<info_container> read_info_snapshot(const std::string& topic) const;
-        stream_profiles read_stream_info(uint32_t device_index, uint32_t sensor_index);
+        std::shared_ptr<stream_profile_interface> read_next_stream_profile();
         std::set<uint32_t> read_sensor_indices(uint32_t device_index);
+        std::map<uint32_t, stream_profiles> read_all_stream_profiles(uint32_t device_index);
+        std::map<uint32_t, std::shared_ptr<info_container>> read_all_sensor_info();
 
         // Stream profile parsing helpers
         rs2_motion_device_intrinsic parse_motion_intrinsics(const std::map<std::string, std::string>& kv) const;
