@@ -1510,18 +1510,20 @@ namespace rs2
     void subdevice_model::pause()
     {
         _pause = true;
-        if (dev.as<playback>() && dev.as<playback>().current_status() == RS2_PLAYBACK_STATUS_PLAYING)
+        auto playback_dev = dev.as<rs2::playback>();
+        if (playback_dev && playback_dev.current_status() == RS2_PLAYBACK_STATUS_PLAYING)
         {
-            dev.as<playback>().pause();
+            playback_dev.pause();
         }
     }
 
     void subdevice_model::resume()
     {
         _pause = false;
-        if (dev.as<playback>() && dev.as<playback>().current_status() == RS2_PLAYBACK_STATUS_PAUSED)
+        auto playback_dev = dev.as<rs2::playback>();
+        if (playback_dev && playback_dev.current_status() == RS2_PLAYBACK_STATUS_PAUSED)
         {
-            dev.as<playback>().resume();
+            playback_dev.resume();
         }
     }
 
