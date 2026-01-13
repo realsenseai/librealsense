@@ -620,10 +620,6 @@ namespace rs2
             label = rsutils::string::from() << textual_icons::play << "##Resume " << profile.unique_id();
             if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
             {
-                if (p)
-                {
-                    p.resume();
-                }
                 dev->resume();
                 viewer.paused = false;
             }
@@ -638,10 +634,6 @@ namespace rs2
             label = rsutils::string::from() << textual_icons::pause << "##Pause " << profile.unique_id();
             if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
             {
-                if (p)
-                {
-                    p.pause();
-                }
                 dev->pause();
                 viewer.paused = true;
             }
