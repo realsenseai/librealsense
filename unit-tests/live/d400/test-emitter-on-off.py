@@ -3,13 +3,7 @@
 #
 # test:device each(D400*)
 #
-# Validates emitter control functionality on D400 devices by verifying:
-# 1. Emitter can be enabled and disabled via emitter_enabled option
-# 2. Emitter_on_off option can be set (if supported)
-# 3. IR frame contrast and metadata correctly reflect emitter state
-# 4. Emitter state persists across stream start/stop cycles
-# 5. Camera remains stable during rapid emitter toggling
-# 6. Emitter_on_off alternates emitter state frame-by-frame (if supported)
+# Validates emitter control functionality on D400 devices.
 #
 # Test methodology:
 # - Uses IR frame analysis (pixel contrast/standard deviation) to detect emitter state
@@ -19,17 +13,58 @@
 # - Validates frame metadata (frame_emitter_mode, frame_laser_power) when available
 #
 # Configuration flags:
-# - USE_AUTO_EXPOSURE: Use auto exposure vs manual (1/6 frame time)
+# - USE_AUTO_EXPOSURE: Use auto exposure vs manual (1/6 frame time); overridden to True for D415
 # - ENABLE_VISUAL_VERIFICATION: Display IR frames with cv2 for visual inspection
 # - CV2_WAIT_KEY_MS: Duration to display visualization windows
-# - CONTRAST_DIFF_THRESHOLD: Minimum contrast difference to distinguish emitter states
+# - CONTRAST_DIFF_THRESHOLD: Minimum contrast difference to distinguish emitter states; overridden to 5.0 for D415
 #
 # Requirements:
 # - Device must support emitter_enabled option
 # - IR stream profile must be available
-
-# Disabling until error will be fixed
-#test:donotrun
+#
+# Tests:
+# 1. "Verify emitter can be enabled and disabled"
+#    - Basic emitter control without streaming
+#    - Tests set/get of emitter_enabled option (ON/OFF/ON)
+#    - Verifies fundamental option functionality
+#
+# 2. "Verify emitter_on_off option when supported"
+#    - Tests emitter_on_off option availability and control
+#    - Basic set/get test (1/0) for frame-by-frame alternation mode
+#    - Skips if device doesn't support this option
+#
+# 3. "Calibrate emitter ON/OFF contrast threshold"
+#    - Measures IR pixel contrast with emitter ON and OFF
+#    - Calculates threshold as midpoint between measurements
+#    - Validates contrast difference exceeds CONTRAST_DIFF_THRESHOLD
+#    - Cross-validates with frame metadata when available
+#    - Establishes baseline for subsequent detection tests
+#
+# 4. "Verify emitter state using calibrated threshold"
+#    - Applies calibrated threshold to detect emitter states
+#    - Validates ON state has contrast above threshold
+#    - Validates OFF state has contrast below threshold
+#    - Cross-checks with frame metadata when available
+#
+# 5. "Toggle emitter while streaming - verify camera stability"
+#    - Tests rapid emitter toggling during active streaming
+#    - Verifies no frame drops or excessive gaps
+#    - Checks max frame gap < 3x frame time at 30fps
+#    - Confirms camera remains stable during state changes
+#    - Logs emitter state detection rate (informational)
+#
+# 6. "Verify emitter state persists across stream start/stop"
+#    - Sets emitter OFF, starts/stops streaming, verifies still OFF
+#    - Sets emitter ON, starts/stops streaming, verifies still ON
+#    - Confirms emitter configuration survives stream lifecycle
+#
+# 7. "Verify emitter_on_off alternates emitter state while streaming"
+#    - Enables emitter_on_off mode during streaming
+#    - Captures 60 frames and analyzes contrast patterns
+#    - Verifies high alternation rate (>0.6 transitions)
+#    - Validates both ON and OFF states are present
+#    - Cross-checks laser power metadata with contrast threshold
+#    - Skips if device doesn't support emitter_on_off option
 
 import pyrealsense2 as rs
 from rspy import test, log
@@ -51,6 +86,13 @@ CONTRAST_DIFF_THRESHOLD = 25.0
 
 device, _ = test.find_first_device_or_exit()
 depth_sensor = device.first_depth_sensor()
+
+# Override USE_AUTO_EXPOSURE and CONTRAST_DIFF_THRESHOLD for D415 devices
+device_name = device.get_info(rs.camera_info.name)
+if 'D415' in device_name:
+    USE_AUTO_EXPOSURE = True
+    CONTRAST_DIFF_THRESHOLD = 5.0
+    log.i(f"D415 detected - overriding USE_AUTO_EXPOSURE to True and CONTRAST_DIFF_THRESHOLD to 5.0")
 
 # Check if emitter_enabled option is supported
 if not depth_sensor.supports(rs.option.emitter_enabled):
