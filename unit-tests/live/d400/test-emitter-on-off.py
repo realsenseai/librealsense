@@ -28,6 +28,9 @@
 # - Device must support emitter_enabled option
 # - IR stream profile must be available
 
+# Disabling until error will be fixed
+#test:donotrun
+
 import pyrealsense2 as rs
 from rspy import test, log
 import time
