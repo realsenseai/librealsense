@@ -430,24 +430,24 @@ namespace librealsense
 
         // Opaque retrieval
         ds_caps val{ds_caps::CAP_UNDEFINED};
-        if (gvd_buf[active_projector])  // DepthActiveMode
+        if (gvd_buf[d400_gvd_offsets::active_projector])  // DepthActiveMode
             val |= ds_caps::CAP_ACTIVE_PROJECTOR;
-        if (gvd_buf[rgb_sensor])                           // WithRGB
+        if (gvd_buf[d400_gvd_offsets::rgb_sensor])                           // WithRGB
             val |= ds_caps::CAP_RGB_SENSOR;
-        if (gvd_buf[imu_sensor])
+        if (gvd_buf[d400_gvd_offsets::imu_sensor])
         {
             val |= ds_caps::CAP_IMU_SENSOR;
-            if (gvd_buf[imu_acc_chip_id] == I2C_IMU_BMI055_ID_ACC)
+            if (gvd_buf[d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI055_ID_ACC)
             {
                 val |= ds_caps::CAP_BMI_055;
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI055" << std::dec);
             }
-            else if (gvd_buf[imu_acc_chip_id] == I2C_IMU_BMI085_ID_ACC)
+            else if (gvd_buf[d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI085_ID_ACC)
             {
                 val |= ds_caps::CAP_BMI_085;
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI085" << std::dec);
             }
-            else if (gvd_buf[imu_acc_chip_id] == I2C_IMU_BMI088_ID_ACC)
+            else if (gvd_buf[d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI088_ID_ACC)
             {
                 val |= ds_caps::CAP_BMI_088;
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI088" << std::dec);
@@ -465,18 +465,18 @@ namespace librealsense
             else
                 LOG_WARNING("The IMU sensor is undefined for PID " << std::hex << _pid << " and imu_chip_id: " << gvd_buf[imu_acc_chip_id] << std::dec);
         }
-        if (0xFF != (gvd_buf[fisheye_sensor_lb] & gvd_buf[fisheye_sensor_hb]))
+        if( 0xFF != ( gvd_buf[d400_gvd_offsets::fisheye_sensor_lb] & gvd_buf[d400_gvd_offsets::fisheye_sensor_hb] ) )
             val |= ds_caps::CAP_FISHEYE_SENSOR;
-        if (0x1 == gvd_buf[depth_sensor_type])
+        if( 0x1 == gvd_buf[d400_gvd_offsets::depth_sensor_type] )
             val |= ds_caps::CAP_ROLLING_SHUTTER;  // e.g. ASRC
-        if (0x2 == gvd_buf[depth_sensor_type])
+        if( 0x2 == gvd_buf[d400_gvd_offsets::depth_sensor_type] )
             val |= ds_caps::CAP_GLOBAL_SHUTTER;   // e.g. AWGC
         // Option INTER_CAM_SYNC_MODE is not enabled in D405
         if (_pid != ds::RS405_PID)
             val |= ds_caps::CAP_INTERCAM_HW_SYNC;
-        if (gvd_buf[ip65_sealed_offset] == 0x1)
+        if (gvd_buf[d400_gvd_offsets::ip65_sealed_offset] == 0x1)
             val |= ds_caps::CAP_IP65;
-        if (gvd_buf[ir_filter_offset] == 0x1)
+        if (gvd_buf[d400_gvd_offsets::ir_filter_offset] == 0x1)
             val |= ds_caps::CAP_IR_FILTER;
         return val;
     }
@@ -628,7 +628,7 @@ namespace librealsense
             if (_fw_version >= firmware_version("5.10.4.0"))
                 _device_capabilities = parse_device_capabilities( gvd_buff );
         
-            _imu_type = set_imu_type();
+            set_imu_type();
 
             //D457 Development
             advanced_mode = is_camera_in_advanced_mode();
@@ -1368,18 +1368,18 @@ namespace librealsense
 
     
 
-    std::string d400_device::set_imu_type()
+    void d400_device::set_imu_type()
     {
         using namespace ds;
 
         if( ( _device_capabilities & ds_caps::CAP_BMI_055 ) == ds_caps::CAP_BMI_055 )
-            return "BMI055";
+            _imu_type = "BMI055";
         else if( ( _device_capabilities & ds_caps::CAP_BMI_085 ) == ds_caps::CAP_BMI_085 )
-            return "BMI085";
+            _imu_type = "BMI085";
         else if( ( _device_capabilities & ds_caps::CAP_BMI_088 ) == ds_caps::CAP_BMI_088 )
-            return "BMI088";
+            _imu_type = "BMI088";
         else
-            return "IMU_Unknown";
+            _imu_type = "IMU_Unknown";
     }
 
     }

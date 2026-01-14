@@ -127,7 +127,7 @@ namespace librealsense
 
         void init(std::shared_ptr<context> ctx, const platform::backend_device_group& group);
         void register_features();
-        std::string set_imu_type();
+        void set_imu_type();
 
         friend class d400_depth_sensor;
 

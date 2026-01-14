@@ -535,7 +535,7 @@ namespace librealsense
 
 #pragma pack(pop)
 
-        enum d400_gvd_fields
+        enum d400_gvd_offsets
         {
             // Keep sorted
             gvd_version_offset = 2,

@@ -317,13 +317,12 @@ namespace librealsense
         using namespace ds;
 
         ds_caps val{ds_caps::CAP_UNDEFINED};
-        if (gvd_buf[active_projector])
+        if( gvd_buf[d500_gvd_offsets::active_projector] )
             val |= ds_caps::CAP_ACTIVE_PROJECTOR;
-        if (gvd_buf[rgb_sensor])
+        if( gvd_buf[d500_gvd_offsets::rgb_sensor] )
             val |= ds_caps::CAP_RGB_SENSOR;
-        if (gvd_buf[imu_sensor])
+        if( gvd_buf[d500_gvd_offsets::imu_sensor] )
             val |= ds_caps::CAP_IMU_SENSOR;
-        val |= ds_caps::CAP_IMU_SENSOR; // to be removed after issue is resolved in FW
             
         // assuming always true for d500 devices
         val |= ds_caps::CAP_GLOBAL_SHUTTER;
@@ -837,6 +836,6 @@ namespace librealsense
             parsed_fields->imu_type.assign( imu_type_char, strnlen( imu_type_char, 8 ) );
         }
         else
-            parsed_fields->imu_type = "IMU_Unkown";
+            parsed_fields->imu_type = "IMU_Unknown";
     }
 }
