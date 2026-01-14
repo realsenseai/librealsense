@@ -69,10 +69,9 @@ namespace librealsense
             uint32_t fps, const std::map<std::string, std::string>& intrinsics_kv) const;
 
         // Frame setup helpers
-        void read_frame_metadata(const stream_identifier& sid, int64_t timestamp, frame_additional_data& additional_data) const;
+        void read_frame_metadata(frame_additional_data& additional_data);
         void setup_video_frame(frame_interface* frame_ptr, const stream_identifier& sid) const;
         void setup_motion_frame(frame_interface* frame_ptr, const stream_identifier& sid) const;
-        static rs2_extension get_frame_extension(rs2_stream stream_type);
         
         std::shared_ptr< serialized_data > read_frame_data(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg, const stream_identifier& sid);
         frame_holder allocate_frame(const stream_identifier& sid, const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg, const frame_additional_data& additional_data);

@@ -498,15 +498,15 @@ namespace librealsense {
             return nullptr;
         }
 
-        // Read metadata to get frame number, timestamp domain, and system time
+        // Set up frame metadata with defaults from the message timestamp
         frame_additional_data additional_data{};
         additional_data.timestamp = static_cast<double>(ts.count()) / 1000000.0; // Convert ns to ms
         additional_data.frame_number = 0;
         additional_data.timestamp_domain = RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME;
-        additional_data.system_time = 0;
+        additional_data.system_time = additional_data.timestamp;
 
-        // Try to read metadata from the metadata topic
-        read_frame_metadata(sid, msg->time_stamp, additional_data);
+        // Read metadata from the next message (metadata immediately follows frame data)
+        read_frame_metadata(additional_data);
 
         // Allocate frame using helper
         frame_holder frame = allocate_frame(sid, msg, additional_data);
@@ -521,8 +521,8 @@ namespace librealsense {
         auto frame_data = const_cast<uint8_t*>(frame->get_frame_data());
         std::memcpy(frame_data, msg->serialized_data->buffer, msg->serialized_data->buffer_length);
 
-        rs2_extension frame_ext = get_frame_extension(sid.stream_type);
-        if (frame_ext == RS2_EXTENSION_VIDEO_FRAME)
+        rs2_extension frame_ext = frame_source::stream_to_frame_types(sid.stream_type);
+        if (frame_ext == RS2_EXTENSION_VIDEO_FRAME || frame_ext == RS2_EXTENSION_DEPTH_FRAME)
         {
             setup_video_frame(frame.frame, sid);
         }
@@ -542,13 +542,13 @@ namespace librealsense {
     frame_holder ros2_reader::allocate_frame(const stream_identifier& sid, const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg, const frame_additional_data& additional_data)
     {
         // Determine frame type from stream type
-        rs2_extension frame_ext = get_frame_extension(sid.stream_type);
+        rs2_extension frame_ext = frame_source::stream_to_frame_types(sid.stream_type);
 
         // Initialize frame source if needed
         if (!_frame_source)
         {
             _frame_source = std::make_shared<frame_source>(32);
-            _frame_source->init(std::shared_ptr<metadata_parser_map>());
+            _frame_source->init(md_constant_parser::create_metadata_parser_map());
         }
 
         // Allocate frame through frame source
@@ -561,60 +561,50 @@ namespace librealsense {
             true
         );
     }
-        
-    rs2_extension ros2_reader::get_frame_extension(rs2_stream stream_type)
-    {
-        if (stream_type == RS2_STREAM_ACCEL || stream_type == RS2_STREAM_GYRO || stream_type == RS2_STREAM_MOTION)
-        {
-            return RS2_EXTENSION_MOTION_FRAME;
-        }
-        else if (stream_type == RS2_STREAM_POSE)
-        {
-            return RS2_EXTENSION_POSE_FRAME;
-        }
-        return RS2_EXTENSION_VIDEO_FRAME;
-    }
 
-    void ros2_reader::read_frame_metadata(const stream_identifier& sid, int64_t timestamp, frame_additional_data& additional_data) const
+    void ros2_reader::read_frame_metadata(frame_additional_data& additional_data)
     {
-        auto md_topic = ros_topic::frame_metadata_topic(sid);
-        _storage->reset_filter();
-        _storage->set_filter(rosbag2_storage::StorageFilter{ {md_topic} });
-        
-        // Look for metadata at the same timestamp
-        while (_storage->has_next())
+        // Read the next message which should be the metadata for this frame
+        if (!_storage->has_next())
+            return;
+
+        auto md_msg = _storage->read_next();
+        if (!md_msg || md_msg->topic_name.find("/metadata") == std::string::npos)
+            return;
+
+        auto kv = parse_msg_payload(md_msg);
+
+        additional_data.frame_number = std::stoull(get_value(kv, FRAME_NUMBER_MD_STR));
+        convert(get_value(kv, TIMESTAMP_DOMAIN_MD_STR), additional_data.timestamp_domain);  
+        convert(get_value(kv, SYSTEM_TIME_MD_STR), additional_data.system_time);
+
+        // Read all RS2_FRAME_METADATA values and populate metadata_blob
+        // The blob format is: [rs2_frame_metadata_value][rs2_metadata_type] pairs
+        uint8_t* blob_ptr = additional_data.metadata_blob.data();
+        size_t blob_offset = 0;
+
+        for (int i = 0; i < RS2_FRAME_METADATA_COUNT; i++)
         {
-            auto md_msg = _storage->read_next();
-            if (md_msg->time_stamp == timestamp)
+            rs2_frame_metadata_value md_type = static_cast<rs2_frame_metadata_value>(i);
+            std::string md_name = librealsense::get_string(md_type);
+            
+            try
             {
-                auto kv = parse_msg_payload(md_msg);
-                auto fn_it = kv.find(FRAME_NUMBER_MD_STR);
-                if (fn_it != kv.end())
-                {
-                    try { additional_data.frame_number = std::stoull(fn_it->second); } catch(...) {}
-                }
+                rs2_metadata_type md_value;
+                convert(get_value(kv, md_name), md_value);
                 
-                auto td_it = kv.find(TIMESTAMP_DOMAIN_MD_STR);
-                if (td_it != kv.end())
-                {
-                    rs2_timestamp_domain domain;
-                    if (convert(td_it->second, domain))
-                    {
-                        additional_data.timestamp_domain = domain;
-                    }
-                }
+                // Write the type
+                std::memcpy(blob_ptr + blob_offset, &md_type, sizeof(rs2_frame_metadata_value));
+                blob_offset += sizeof(rs2_frame_metadata_value);
                 
-                auto st_it = kv.find(SYSTEM_TIME_MD_STR);
-                if (st_it != kv.end())
-                {
-                    try { additional_data.system_time = std::stod(st_it->second); } catch(...) {}
-                }
-                break;
+                // Write the value
+                std::memcpy(blob_ptr + blob_offset, &md_value, sizeof(rs2_metadata_type));
+                blob_offset += sizeof(rs2_metadata_type);
             }
+            catch (...) {}
         }
-        
-        // Reset filter to continue reading frame data
-        _storage->reset_filter();
+
+        additional_data.metadata_size = static_cast<uint32_t>(blob_offset);
     }
 
     void ros2_reader::setup_video_frame(frame_interface* frame_ptr, const stream_identifier& sid) const
