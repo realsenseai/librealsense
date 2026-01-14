@@ -68,7 +68,7 @@ namespace rs2
 
     void open_url(const char* url)
     {
-        if( !is_valid_url( url ) )
+        if( url && !is_valid_url( url ) )
         {
             throw std::invalid_argument( "The URL provided is not valid: " + std::string( url ) );
         }
