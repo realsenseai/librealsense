@@ -92,7 +92,7 @@ case ${JETSON_L4T_VERSION} in
 		[[ $JETSON_L4T_VERSION = "35.1" ]] && RELEASE_STRING="Release"
 		KBASE=./Tegra/kernel/kernel-$KERNEL_RELEASE
 	;;
-	"36.3" | "36.4" | "36.4.3" | "36.4.4")
+	"36.3" | "36.4" | "36.4.3" | "36.4.4" | "36.4.7")
 		# 36.3 --> 6.0
 		# 36.4 -> 6.1
 		# 36.4.3 --> 6.2
