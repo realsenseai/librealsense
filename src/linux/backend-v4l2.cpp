@@ -1057,13 +1057,11 @@ namespace librealsense
 
         uint16_t v4l_uvc_device::assign_mipi_mi(const std::string& name)
         {
-            uint16_t mi = -1;
+            uint16_t mi = 0;
             if (name.find("imu") != std::string::npos)
                 mi = 4;
             else if (name.find("md") != std::string::npos)
                 mi = 3;
-            else
-                mi = 0;
             return mi;
         }
 
@@ -1101,7 +1099,7 @@ namespace librealsense
             // the loop's index in method get_mipi_rs_enum_nodes and pass it to other methods from there
             static std::regex video_dev_index("\\d+$");
             std::smatch match;
-            uint8_t cam_id;
+            uint8_t cam_id = 0;
             if (std::regex_search(name, match, video_dev_index))
             {
                 cam_id = static_cast<uint8_t>(std::stoi(match[0]));
