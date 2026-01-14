@@ -127,6 +127,7 @@ namespace librealsense
 
         void init(std::shared_ptr<context> ctx, const platform::backend_device_group& group);
         void register_features();
+        std::string set_imu_type();
 
         friend class d400_depth_sensor;
 
@@ -155,6 +156,7 @@ namespace librealsense
         std::shared_ptr<auto_gain_limit_option> _gain_limit_value_control;
         std::shared_ptr<auto_exposure_limit_option> _ae_limit_value_control;
         bool _is_mipi_device;
+        std::string _imu_type;
     };
 
     class ds5u_device : public d400_device

@@ -123,7 +123,7 @@ namespace librealsense
 
         void init(std::shared_ptr<context> ctx, const platform::backend_device_group& group);
         void register_features();
-
+        void set_imu_type( const std::vector< uint8_t > & gvd_buf, ds::d500_gvd_parsed_fields * parsed_fields );
         friend class d500_depth_sensor;
 
         std::shared_ptr<hw_monitor_extended_buffers> _hw_monitor;

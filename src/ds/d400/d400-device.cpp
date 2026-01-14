@@ -628,6 +628,8 @@ namespace librealsense
             if (_fw_version >= firmware_version("5.10.4.0"))
                 _device_capabilities = parse_device_capabilities( gvd_buff );
         
+            _imu_type = set_imu_type();
+
             //D457 Development
             advanced_mode = is_camera_in_advanced_mode();
             auto _usb_mode = usb3_type;
@@ -972,6 +974,7 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_RECOMMENDED_FIRMWARE_VERSION, _recommended_fw_version);
         register_info(RS2_CAMERA_INFO_CAMERA_LOCKED, _is_locked ? "YES" : "NO");
         register_info(RS2_CAMERA_INFO_DFU_DEVICE_PATH, group.uvc_devices.front().dfu_device_path);
+        register_info(RS2_CAMERA_INFO_IMU_TYPE, _imu_type);
 
         if (usb_modality)
         {
@@ -1362,4 +1365,21 @@ namespace librealsense
                                                                             RS2_OPTION_PROJECTOR_TEMPERATURE ) );
         }
     }
-}
+
+    
+
+    std::string d400_device::set_imu_type()
+    {
+        using namespace ds;
+
+        if( ( _device_capabilities & ds_caps::CAP_BMI_055 ) == ds_caps::CAP_BMI_055 )
+            return "BMI055";
+        else if( ( _device_capabilities & ds_caps::CAP_BMI_085 ) == ds_caps::CAP_BMI_085 )
+            return "BMI085";
+        else if( ( _device_capabilities & ds_caps::CAP_BMI_088 ) == ds_caps::CAP_BMI_088 )
+            return "BMI088";
+        else
+            return "IMU_Unknown";
+    }
+
+    }
