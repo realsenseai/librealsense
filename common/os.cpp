@@ -58,8 +58,20 @@ namespace rs2
         return str;
     }
 
+    bool is_valid_url( const std::string & url )
+    {
+        static const std::regex url_regex( R"(^(https?):\/\/([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/[^\s]*)?$)",
+                                           std::regex::icase );
+
+        return std::regex_match( url, url_regex );
+    }
+
     void open_url(const char* url)
     {
+        if( !is_valid_url( url ) )
+        {
+            throw std::invalid_argument( "The URL provided is not valid: " + std::string( url ) );
+        }
 #if (defined(_WIN32) || defined(_WIN64))
         if (reinterpret_cast<INT_PTR>(ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOW)) < 32)
             throw std::runtime_error("Failed opening URL");
