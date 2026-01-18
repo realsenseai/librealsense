@@ -67,21 +67,22 @@ namespace librealsense
 
         bool d500_try_fetch_usb_device(std::vector<platform::usb_device_info>& devices,
             const platform::uvc_device_info& info, platform::usb_device_info& result);
-
-        namespace d500_gvd_offsets 
-        {
-            constexpr size_t version_offset = 0;
-            constexpr size_t payload_size_offset = 0x2;
-            constexpr size_t crc32_offset = 0x4;
-            constexpr size_t rgb_sensor = 0x47;
-            constexpr size_t imu_sensor = 0x49;
-            constexpr size_t active_projector = 0x4a;
-            constexpr size_t imu_type = 0x1e2;  // offset for start of string uint8_t[8]
-            constexpr size_t optical_module_serial_offset = 0x54;
-            constexpr size_t mb_module_serial_offset = 0x7a;
-            constexpr size_t fw_version_offset = 0xba;
-            constexpr size_t safety_sw_suite_version_offset = 0x10F;
-        }  // namespace d500_gvd_offsets
+        
+        namespace d500_gvd {
+        enum d500_gvd_offsets {
+            version_offset = 0,
+            payload_size_offset = 0x2,
+            crc32_offset = 0x4,
+            rgb_sensor = 0x47,
+            imu_sensor = 0x49,
+            active_projector = 0x4a,
+            imu_type = 0x1e2,  // offset for start of string uint8_t[8]
+            optical_module_serial_offset = 0x54,
+            mb_module_serial_offset = 0x7a,
+            fw_version_offset = 0xba,
+            safety_sw_suite_version_offset = 0x10F
+        };  // enum d500_gvd_offsets
+        }  // namespace d500_gvd
 
         struct d500_gvd_parsed_fields
         {

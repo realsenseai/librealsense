@@ -534,9 +534,9 @@ namespace librealsense
         }
 
 #pragma pack(pop)
-
-        enum d400_gvd_offsets
+        namespace d400_gvd
         {
+        enum d400_gvd_offsets {
             // Keep sorted
             gvd_version_offset = 2,
             camera_fw_version_offset = 12,
@@ -554,6 +554,7 @@ namespace librealsense
             imu_sensor = 178,
             motion_module_fw_version_offset = 212
         };
+        }  // namespace d400_gvd        
 
         const uint8_t I2C_IMU_BMI055_ID_ACC = 0xfa;
         const uint8_t I2C_IMU_BMI085_ID_ACC = 0x1f;

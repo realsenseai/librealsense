@@ -120,9 +120,9 @@ namespace librealsense
 
     void ds_device_common::get_fw_details( const std::vector<uint8_t> &gvd_buff, std::string& optic_serial, std::string& asic_serial, std::string& fwv ) const
     {
-        optic_serial = _hw_monitor->get_module_serial_string(gvd_buff, module_serial_offset);
-        asic_serial = _hw_monitor->get_module_serial_string(gvd_buff, module_asic_serial_offset);
-        fwv = _hw_monitor->get_firmware_version_string<uint8_t>(gvd_buff, camera_fw_version_offset);
+        optic_serial = _hw_monitor->get_module_serial_string(gvd_buff, d400_gvd::d400_gvd_offsets::module_serial_offset);
+        asic_serial = _hw_monitor->get_module_serial_string(gvd_buff, d400_gvd::d400_gvd_offsets::module_asic_serial_offset);
+        fwv = _hw_monitor->get_firmware_version_string<uint8_t>(gvd_buff, d400_gvd::d400_gvd_offsets::camera_fw_version_offset);
     }
 
     std::vector<uint8_t> ds_device_common::backup_flash( rs2_update_progress_callback_sptr callback )

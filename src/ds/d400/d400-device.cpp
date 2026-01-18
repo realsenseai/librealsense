@@ -430,24 +430,24 @@ namespace librealsense
 
         // Opaque retrieval
         ds_caps val{ds_caps::CAP_UNDEFINED};
-        if (gvd_buf[d400_gvd_offsets::active_projector])  // DepthActiveMode
+        if (gvd_buf[d400_gvd::d400_gvd_offsets::active_projector])  // DepthActiveMode
             val |= ds_caps::CAP_ACTIVE_PROJECTOR;
-        if (gvd_buf[d400_gvd_offsets::rgb_sensor])                           // WithRGB
+        if (gvd_buf[d400_gvd::d400_gvd_offsets::rgb_sensor])                           // WithRGB
             val |= ds_caps::CAP_RGB_SENSOR;
-        if (gvd_buf[d400_gvd_offsets::imu_sensor])
+        if (gvd_buf[d400_gvd::d400_gvd_offsets::imu_sensor])
         {
             val |= ds_caps::CAP_IMU_SENSOR;
-            if (gvd_buf[d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI055_ID_ACC)
+            if (gvd_buf[d400_gvd::d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI055_ID_ACC)
             {
                 val |= ds_caps::CAP_BMI_055;
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI055" << std::dec);
             }
-            else if (gvd_buf[d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI085_ID_ACC)
+            else if (gvd_buf[d400_gvd::d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI085_ID_ACC)
             {
                 val |= ds_caps::CAP_BMI_085;
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI085" << std::dec);
             }
-            else if (gvd_buf[d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI088_ID_ACC)
+            else if (gvd_buf[d400_gvd::d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI088_ID_ACC)
             {
                 val |= ds_caps::CAP_BMI_088;
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI088" << std::dec);
@@ -463,20 +463,20 @@ namespace librealsense
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI085" << std::dec);
             }
             else
-                LOG_WARNING("The IMU sensor is undefined for PID " << std::hex << _pid << " and imu_chip_id: " << gvd_buf[imu_acc_chip_id] << std::dec);
+                LOG_WARNING("The IMU sensor is undefined for PID " << std::hex << _pid << " and imu_chip_id: " << gvd_buf[d400_gvd::d400_gvd_offsets::imu_acc_chip_id] << std::dec);
         }
-        if( 0xFF != ( gvd_buf[d400_gvd_offsets::fisheye_sensor_lb] & gvd_buf[d400_gvd_offsets::fisheye_sensor_hb] ) )
+        if( 0xFF != ( gvd_buf[d400_gvd::d400_gvd_offsets::fisheye_sensor_lb] & gvd_buf[d400_gvd::d400_gvd_offsets::fisheye_sensor_hb] ) )
             val |= ds_caps::CAP_FISHEYE_SENSOR;
-        if( 0x1 == gvd_buf[d400_gvd_offsets::depth_sensor_type] )
+        if( 0x1 == gvd_buf[d400_gvd::d400_gvd_offsets::depth_sensor_type] )
             val |= ds_caps::CAP_ROLLING_SHUTTER;  // e.g. ASRC
-        if( 0x2 == gvd_buf[d400_gvd_offsets::depth_sensor_type] )
+        if( 0x2 == gvd_buf[d400_gvd::d400_gvd_offsets::depth_sensor_type] )
             val |= ds_caps::CAP_GLOBAL_SHUTTER;   // e.g. AWGC
         // Option INTER_CAM_SYNC_MODE is not enabled in D405
         if (_pid != ds::RS405_PID)
             val |= ds_caps::CAP_INTERCAM_HW_SYNC;
-        if (gvd_buf[d400_gvd_offsets::ip65_sealed_offset] == 0x1)
+        if (gvd_buf[d400_gvd::d400_gvd_offsets::ip65_sealed_offset] == 0x1)
             val |= ds_caps::CAP_IP65;
-        if (gvd_buf[d400_gvd_offsets::ir_filter_offset] == 0x1)
+        if (gvd_buf[d400_gvd::d400_gvd_offsets::ir_filter_offset] == 0x1)
             val |= ds_caps::CAP_IR_FILTER;
         return val;
     }
@@ -688,7 +688,7 @@ namespace librealsense
 
             if (_fw_version >= firmware_version("5.6.3.0"))
             {
-                _is_locked = _ds_device_common->is_locked( gvd_buff.data(), is_camera_locked_offset );
+                _is_locked = _ds_device_common->is_locked( gvd_buff.data(), d400_gvd::d400_gvd_offsets::is_camera_locked_offset );
             }
 
             if (_fw_version >= firmware_version("5.5.8.0"))
@@ -740,7 +740,7 @@ namespace librealsense
             auto ir_filter_mask = ds_caps::CAP_IR_FILTER;
             if (val_in_range(_pid, { RS435_RGB_PID, RS435I_PID, RS455_PID }) &&
                 (_device_capabilities & ir_filter_mask) == ir_filter_mask &&
-                is_capability_supports(ds_caps::CAP_IR_FILTER, gvd_buff[gvd_version_offset]))
+                is_capability_supports(ds_caps::CAP_IR_FILTER, gvd_buff[d400_gvd::d400_gvd_offsets::gvd_version_offset]))
             {
                 update_device_name(device_name, ds_caps::CAP_IR_FILTER);
             }
@@ -748,7 +748,7 @@ namespace librealsense
             auto ip65_mask = ds_caps::CAP_IP65;
             if (val_in_range(_pid, { RS455_PID })&&
                 (_device_capabilities & ip65_mask) == ip65_mask &&
-                is_capability_supports(ds_caps::CAP_IP65, gvd_buff[gvd_version_offset]))
+                is_capability_supports(ds_caps::CAP_IP65, gvd_buff[d400_gvd::d400_gvd_offsets::gvd_version_offset]))
             {
                 update_device_name(device_name, ds_caps::CAP_IP65);
             }
