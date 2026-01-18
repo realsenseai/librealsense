@@ -819,6 +819,17 @@ void dds_device_proxy::update( const void * /*image*/, int /*image_size*/, rs2_u
         {
             if( id != realdds::topics::notification::dfu_apply::id )
                 return;
+
+            // Break early on error. No status field means no error.
+            if( auto status_j = notification.nested( realdds::topics::reply::key::status ) )
+            {
+                if( status_j.is_string() && status_j.string_ref() == realdds::topics::reply::status::ok )
+                    return;
+                error_desc = notification.nested( realdds::topics::reply::key::explanation ).string_ref_or_empty();
+                dfu_done = true;
+            }
+
+            // Update progress to user, signal device-proxy thread that process is done at 100%
             if( auto progress
                 = notification.nested( realdds::topics::notification::dfu_apply::key::progress, &json::is_number ) )
             {
@@ -828,15 +839,6 @@ void dds_device_proxy::update( const void * /*image*/, int /*image_size*/, rs2_u
                     callback->on_update_progress( fraction );
                 if (fraction >= 1) // 100%
                     dfu_done = true;
-            }
-
-            // Break early on error. No status field means no error.
-            if( auto status_j = notification.nested( realdds::topics::reply::key::status ) )
-            {
-                if( status_j.is_string() && status_j.string_ref() == realdds::topics::reply::status::ok )
-                    return;
-                error_desc = notification.nested( realdds::topics::reply::key::explanation ).string_ref_or_empty();
-                dfu_done = true;
             }
         } );
 
