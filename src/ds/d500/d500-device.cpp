@@ -831,6 +831,7 @@ namespace librealsense
 
     void d500_device::set_imu_type( const std::vector< uint8_t > & gvd_buf, ds::d500_gvd_parsed_fields * parsed_fields )
     {
+        // setting imu type in gvd parsed fields
         if ((_device_capabilities & ds::ds_caps::CAP_IMU_SENSOR) == ds::ds_caps::CAP_IMU_SENSOR)
         {
             const char * imu_type_char = reinterpret_cast< const char * >( gvd_buf.data() + ds::d500_gvd_offsets::imu_type );
@@ -838,5 +839,13 @@ namespace librealsense
         }
         else
             parsed_fields->imu_type = "IMU_Unknown";
+
+        // updating device capabilities based on imu type
+        if(parsed_fields->imu_type != "BMI055")
+            _device_capabilities |= ds::ds_caps::CAP_BMI_055;
+        else if (parsed_fields->imu_type == "BMI085")
+            _device_capabilities |= ds::ds_caps::CAP_BMI_085;
+        else if( parsed_fields->imu_type == "BMI088" )
+            _device_capabilities |= ds::ds_caps::CAP_BMI_088;
     }
 }
