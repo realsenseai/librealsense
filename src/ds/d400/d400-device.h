@@ -128,6 +128,8 @@ namespace librealsense
         void init(std::shared_ptr<context> ctx, const platform::backend_device_group& group);
         void register_features();
         void set_imu_type();
+        void get_fw_details( const std::vector< uint8_t > & gvd_buff, std::string & optic_serial,
+                             std::string & asic_serial, std::string & fwv ) const;
 
         friend class d400_depth_sensor;
 
