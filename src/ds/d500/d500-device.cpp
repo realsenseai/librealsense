@@ -841,7 +841,7 @@ namespace librealsense
             parsed_fields->imu_type = "IMU_Unknown";
 
         // updating device capabilities based on imu type
-        if(parsed_fields->imu_type != "BMI055")
+        if(parsed_fields->imu_type == "BMI055")
             _device_capabilities |= ds::ds_caps::CAP_BMI_055;
         else if (parsed_fields->imu_type == "BMI085")
             _device_capabilities |= ds::ds_caps::CAP_BMI_085;
