@@ -1380,8 +1380,6 @@ namespace librealsense
             _imu_type = "IMU_Unknown";
     }
 
-    
-
     void d400_device::get_fw_details( const std::vector< uint8_t > & gvd_buff, std::string & optic_serial,
                                            std::string & asic_serial, std::string & fwv ) const
     {
