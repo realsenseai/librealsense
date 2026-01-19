@@ -317,11 +317,11 @@ namespace librealsense
         using namespace ds;
 
         ds_caps val{ds_caps::CAP_UNDEFINED};
-        if( gvd_buf[d500_gvd::d500_gvd_offsets::active_projector] )
+        if( gvd_buf[d500_gvd_offsets::active_projector] )
             val |= ds_caps::CAP_ACTIVE_PROJECTOR;
-        if( gvd_buf[d500_gvd::d500_gvd_offsets::rgb_sensor] )
+        if( gvd_buf[d500_gvd_offsets::rgb_sensor] )
             val |= ds_caps::CAP_RGB_SENSOR;
-        if( gvd_buf[d500_gvd::d500_gvd_offsets::imu_sensor] )
+        if( gvd_buf[d500_gvd_offsets::imu_sensor] )
             val |= ds_caps::CAP_IMU_SENSOR;
             
         // assuming always true for d500 devices
@@ -500,7 +500,7 @@ namespace librealsense
                 
             pid_hex_str = rsutils::string::from() << std::uppercase << rsutils::string::hexdump( _pid );
 
-            _is_locked = _ds_device_common->is_locked( gvd_buff.data(), d400_gvd::d400_gvd_offsets::is_camera_locked_offset );
+            _is_locked = _ds_device_common->is_locked( gvd_buff.data(), d500_gvd_offsets::is_camera_locked_offset );
 
 
             //EXPOSURE AND GAIN - preparing uvc options
@@ -800,17 +800,18 @@ namespace librealsense
     
     void d500_device::get_gvd_details(const std::vector<uint8_t>& gvd_buff, ds::d500_gvd_parsed_fields* parsed_fields) const
     {
-        parsed_fields->gvd_version[0] = *reinterpret_cast<const uint8_t*>(gvd_buff.data() + ds::d500_gvd::d500_gvd_offsets::version_offset);
-        parsed_fields->gvd_version[1] = *reinterpret_cast<const uint8_t*>(gvd_buff.data() + ds::d500_gvd::d500_gvd_offsets::version_offset + sizeof(uint8_t));
+        using namespace ds::d500_gvd_offsets;
+        parsed_fields->gvd_version[0] = *reinterpret_cast<const uint8_t*>(gvd_buff.data() + version_offset);
+        parsed_fields->gvd_version[1] = *reinterpret_cast<const uint8_t*>(gvd_buff.data() + version_offset + sizeof(uint8_t));
 
-        parsed_fields->payload_size = *reinterpret_cast<const uint32_t*>(gvd_buff.data() + ds::d500_gvd::d500_gvd_offsets::payload_size_offset);
-        parsed_fields->crc32 = *reinterpret_cast<const uint32_t*>(gvd_buff.data() + ds::d500_gvd::d500_gvd_offsets::crc32_offset);
-        parsed_fields->optical_module_sn = _hw_monitor->get_module_serial_string(gvd_buff, ds::d500_gvd::d500_gvd_offsets::optical_module_serial_offset);
-        parsed_fields->mb_module_sn = _hw_monitor->get_module_serial_string(gvd_buff, ds::d500_gvd::d500_gvd_offsets::mb_module_serial_offset);
-        parsed_fields->fw_version = _hw_monitor->get_firmware_version_string<uint16_t>(gvd_buff, ds::d500_gvd::d500_gvd_offsets::fw_version_offset, 4, false);
+        parsed_fields->payload_size = *reinterpret_cast<const uint32_t*>(gvd_buff.data() + payload_size_offset);
+        parsed_fields->crc32 = *reinterpret_cast<const uint32_t*>(gvd_buff.data() + crc32_offset);
+        parsed_fields->optical_module_sn = _hw_monitor->get_module_serial_string(gvd_buff, optical_module_serial_offset);
+        parsed_fields->mb_module_sn = _hw_monitor->get_module_serial_string(gvd_buff, mb_module_serial_offset);
+        parsed_fields->fw_version = _hw_monitor->get_firmware_version_string<uint16_t>(gvd_buff, fw_version_offset, 4, false);
         if (_pid == ds::D585S_PID)
         {
-            parsed_fields->safety_sw_suite_version = _hw_monitor->get_firmware_version_string<uint8_t>(gvd_buff, ds::d500_gvd::d500_gvd_offsets::safety_sw_suite_version_offset, 4, false);
+            parsed_fields->safety_sw_suite_version = _hw_monitor->get_firmware_version_string<uint8_t>(gvd_buff, safety_sw_suite_version_offset, 4, false);
         }
 
         constexpr size_t gvd_header_size = 8;
@@ -832,7 +833,7 @@ namespace librealsense
     {
         if ((_device_capabilities & ds::ds_caps::CAP_IMU_SENSOR) == ds::ds_caps::CAP_IMU_SENSOR)
         {
-            const char * imu_type_char = reinterpret_cast< const char * >( gvd_buf.data() + ds::d500_gvd::d500_gvd_offsets::imu_type );
+            const char * imu_type_char = reinterpret_cast< const char * >( gvd_buf.data() + ds::d500_gvd_offsets::imu_type );
             parsed_fields->imu_type.assign( imu_type_char, strnlen( imu_type_char, 8 ) );
         }
         else

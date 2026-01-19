@@ -534,27 +534,25 @@ namespace librealsense
         }
 
 #pragma pack(pop)
-        namespace d400_gvd
+        namespace d400_gvd_offsets 
         {
-        enum d400_gvd_offsets {
-            // Keep sorted
-            gvd_version_offset = 2,
-            camera_fw_version_offset = 12,
-            is_camera_locked_offset = 25,
-            module_serial_offset = 48,
-            module_asic_serial_offset = 64,
-            fisheye_sensor_lb = 112,
-            fisheye_sensor_hb = 113,
-            imu_acc_chip_id = 124,
-            ip65_sealed_offset = 161,
-            ir_filter_offset = 164,
-            depth_sensor_type = 166,
-            active_projector = 170,
-            rgb_sensor = 174,
-            imu_sensor = 178,
-            motion_module_fw_version_offset = 212
-        };
-        }  // namespace d400_gvd        
+            constexpr size_t version_offset = 0;
+            constexpr size_t gvd_version_offset = 2;
+            constexpr size_t camera_fw_version_offset = 12;
+            constexpr size_t is_camera_locked_offset = 25;
+            constexpr size_t module_serial_offset = 48;
+            constexpr size_t module_asic_serial_offset = 64;
+            constexpr size_t fisheye_sensor_lb = 112;
+            constexpr size_t fisheye_sensor_hb = 113;
+            constexpr size_t imu_acc_chip_id = 124;
+            constexpr size_t ip65_sealed_offset = 161;
+            constexpr size_t ir_filter_offset = 164;
+            constexpr size_t depth_sensor_type = 166;
+            constexpr size_t active_projector = 170;
+            constexpr size_t rgb_sensor = 174;
+            constexpr size_t imu_sensor = 178;
+            constexpr size_t motion_module_fw_version_offset = 212;
+        } 
 
         const uint8_t I2C_IMU_BMI055_ID_ACC = 0xfa;
         const uint8_t I2C_IMU_BMI085_ID_ACC = 0x1f;
