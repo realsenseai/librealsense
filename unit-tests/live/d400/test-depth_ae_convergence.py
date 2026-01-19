@@ -1,9 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
-# Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Currently, we exclude D457 as it's failing
-# test:device each(D400*) !D457
-# test:donotrun
+# test:device each(D400*)
 # test:timeout 600
 # CI timeout set to 10 minutes to accommodate comprehensive testing of all
 # supported depth profiles
@@ -39,6 +37,7 @@ if convergence was not required (exposure change < 5%) the test is skipped.
 import os, time
 from pprint import pformat
 import pyrealsense2 as rs
+import pyrsutils as rsutils
 from rspy import test, log
 from rspy import tests_wrapper as tw
 
@@ -58,6 +57,12 @@ TIMEOUT_ACCEL = max(ACCEL_MAX * 1.5, ACCEL_MAX + 0.5)
 
 device, _ = test.find_first_device_or_exit()
 tw.start_wrapper(device)
+
+# Check firmware version
+fw_version = rsutils.version(device.get_info(rs.camera_info.firmware_version))
+if fw_version <= rsutils.version(5,17,0,10):
+    log.i(f"Firmware version {fw_version} <= 5.17.0.10, skipping test...")
+    test.print_results_and_exit()
 
 sensor = device.first_depth_sensor()
 if not sensor.supports(rs.option.enable_auto_exposure):
