@@ -161,16 +161,15 @@ namespace librealsense
 
     void ros2_writer::write_frame_metadata(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame)
     {
-        
         std::string system_time = std::to_string(frame->get_frame_system_time());
-        //write_string(metadata_topic, timestamp, std::string(SYSTEM_TIME_MD_STR) + "=" + system_time + ";");
-
         std::string timestamp_domain = librealsense::get_string(frame->get_frame_timestamp_domain());
-        //write_string(metadata_topic, timestamp, std::string(TIMESTAMP_DOMAIN_MD_STR) + "=" + timestamp_domain + ";");
-
         std::string frame_number = std::to_string(frame->get_frame_number());
+        std::string ts = std::to_string(frame->get_frame_timestamp());
 
-        std::string metadata_payload = rsutils::string::from() << FRAME_NUMBER_MD_STR << "=" << frame_number << ";" << TIMESTAMP_DOMAIN_MD_STR << "=" << timestamp_domain << ";" << SYSTEM_TIME_MD_STR << "=" << system_time << ";";
+        std::string metadata_payload = rsutils::string::from() << FRAME_NUMBER_MD_STR << "=" << frame_number << ";" 
+                                                                << TIMESTAMP_DOMAIN_MD_STR << "=" << timestamp_domain << ";" 
+                                                                << SYSTEM_TIME_MD_STR << "=" << system_time << ";"
+                                                                << TIMESTAMP_MD_STR << "="  << ts << ";";
         for (int i = 0; i < RS2_FRAME_METADATA_COUNT; i++)
         {
             rs2_frame_metadata_value type = static_cast<rs2_frame_metadata_value>(i);
@@ -259,30 +258,23 @@ namespace librealsense
         auto vid_frame = dynamic_cast<librealsense::video_frame*>(frame.frame);
         if (!vid_frame)
             throw std::runtime_error("Frame is not video frame");
-        auto fi = frame.frame;
-        auto topic = ros_topic::frame_data_topic(stream_id);
-        ensure_topic(topic, "librealsense/raw_frame");
-
-        auto size = fi->get_frame_data_size();
+        auto size = vid_frame->get_stride() * vid_frame->get_height();
+        auto p_data = vid_frame->get_frame_data();
         auto buffer = std::make_shared< rcutils_uint8_array_t >();
         buffer->buffer = static_cast<uint8_t*>(std::malloc(size));
         if (!buffer->buffer)
             throw std::runtime_error("Failed to allocate rosbag2 frame buffer");
-        std::memcpy(buffer->buffer, fi->get_frame_data(), size);
+        std::memcpy(buffer->buffer, p_data, size);
         buffer->buffer_length = size;
         buffer->buffer_capacity = size;
         buffer->allocator = rcutils_get_default_allocator();
-
+        auto image_topic = ros_topic::frame_data_topic(stream_id);
+        ensure_topic(image_topic, "librealsense/raw_frame");
         auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
         msg->serialized_data = buffer;
         msg->time_stamp = static_cast<rcutils_time_point_value_t>(timestamp.count());
-        msg->topic_name = topic;
+        msg->topic_name = image_topic;
         _storage->write(msg);
-
-        // Minimal metadata: frame number + timestamp domain/system time
-        //std::string md_topic = ros_topic::frame_metadata_topic(stream_id);
-        //std::string md_payload = rsutils::string::from() << FRAME_NUMBER_MD_STR << "=" << fi->get_frame_number() << ";" << TIMESTAMP_DOMAIN_MD_STR << "=" << librealsense::get_string(fi->get_frame_timestamp_domain()) << ";" << SYSTEM_TIME_MD_STR << "=" << fi->get_frame_system_time();
-        //write_string(md_topic, timestamp, md_payload);
         write_additional_frame_messages(stream_id, timestamp, frame);
     }
 
@@ -291,15 +283,26 @@ namespace librealsense
         auto motion_frame = dynamic_cast<librealsense::motion_frame*>(frame.frame);
         if (!motion_frame)
             throw std::runtime_error("Frame is not motion frame");
-        auto fi = frame.frame;
+        auto fi = motion_frame;
         auto topic = ros_topic::frame_data_topic(stream_id);
         ensure_topic(topic, "librealsense/raw_motion_frame");
         auto size = fi->get_frame_data_size();
+        auto data_ptr = reinterpret_cast<const float*>(frame.frame->get_frame_data());
         auto buffer = std::make_shared< rcutils_uint8_array_t >();
+        if (stream_id.stream_type == RS2_STREAM_ACCEL || stream_id.stream_type == RS2_STREAM_GYRO)
+        {
+            size = 3 * sizeof(float);
+        }
+        else if (stream_id.stream_type == RS2_STREAM_MOTION)
+        {
+            auto data_imu = *reinterpret_cast<const rs2_combined_motion*>(frame.frame->get_frame_data());
+            size = sizeof(data_imu);
+            data_ptr = reinterpret_cast<const float*>(&data_imu);
+        }
         buffer->buffer = static_cast<uint8_t*>(std::malloc(size));
         if (!buffer->buffer)
             throw std::runtime_error("Failed to allocate rosbag2 motion frame buffer");
-        std::memcpy(buffer->buffer, fi->get_frame_data(), size);
+        std::memcpy(buffer->buffer, data_ptr, size);
         buffer->buffer_length = size;
         buffer->buffer_capacity = size;
         buffer->allocator = rcutils_get_default_allocator();

@@ -228,6 +228,7 @@ namespace librealsense
     constexpr const char* MAPPER_CONFIDENCE_MD_STR = "Mapper Confidence";
     constexpr const char* FRAME_TIMESTAMP_MD_STR = "frame_timestamp";
     constexpr const char* TRACKER_CONFIDENCE_MD_STR = "Tracker Confidence";
+    constexpr const char* TIMESTAMP_MD_STR = "timestamp";
 
     class ros_topic
     {

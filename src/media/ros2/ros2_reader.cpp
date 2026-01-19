@@ -218,6 +218,7 @@ namespace librealsense {
 
         _initial_snapshot = device_snapshot(device_extensions, sensor_descriptions, {});
         _initialized = true;
+        reset();
         return _initial_snapshot;
     }
 
@@ -494,8 +495,7 @@ namespace librealsense {
         // Parse the actual frame data from msg->serialized_data
         if (!msg->serialized_data || !msg->serialized_data->buffer || msg->serialized_data->buffer_length == 0)
         {
-            LOG_WARNING("Frame data message has no payload");
-            return nullptr;
+            throw std::runtime_error("Frame data message has no payload");
         }
 
         // Set up frame metadata with defaults from the message timestamp
@@ -513,8 +513,7 @@ namespace librealsense {
 
         if (!frame)
         {
-            LOG_WARNING("Failed to allocate frame");
-            return nullptr;
+            throw std::runtime_error("Failed to allocate frame");
         }
 
         // Copy the raw binary data into the frame's data buffer
@@ -577,6 +576,7 @@ namespace librealsense {
         additional_data.frame_number = std::stoull(get_value(kv, FRAME_NUMBER_MD_STR));
         convert(get_value(kv, TIMESTAMP_DOMAIN_MD_STR), additional_data.timestamp_domain);  
         convert(get_value(kv, SYSTEM_TIME_MD_STR), additional_data.system_time);
+        additional_data.timestamp = std::stod(get_value(kv, TIMESTAMP_MD_STR));
 
         // Read all RS2_FRAME_METADATA values and populate metadata_blob
         // The blob format is: [rs2_frame_metadata_value][rs2_metadata_type] pairs
