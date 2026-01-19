@@ -34,7 +34,7 @@ Note: The keyring contains both the new RS public key and the Intel public key f
 
 - Add the server to the list of repositories:
 ```
-echo "deb [signed-by=/usr/share/keyrings/librealsenseai.gpg] https://librealsense.realsenseai.com/Debian/apt-repo `lsb_release -cs` main" | \
+echo "deb [signed-by=/etc/apt/keyrings/librealsenseai.gpg] https://librealsense.realsenseai.com/Debian/apt-repo `lsb_release -cs` main" | \
 sudo tee /etc/apt/sources.list.d/librealsense.list
 sudo apt-get update
 ```
