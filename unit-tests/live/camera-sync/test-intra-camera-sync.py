@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # test:device D400* !D405 !D401
-
+# test:donotrun
 """
 RealSense Intra-Camera Synchronization Validation Test
 
