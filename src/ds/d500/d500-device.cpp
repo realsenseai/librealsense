@@ -359,6 +359,9 @@ namespace librealsense
 
         raw_depth_ep->register_xu(depth_xu); // make sure the XU is initialized every time we power the camera
 
+        // Many commands need power during initialization phase, no point turning it on and off again for each.
+        raw_depth_ep->power_for_duration( std::chrono::milliseconds( 1000 ) );
+
         auto depth_ep = std::make_shared<d500_depth_sensor>(this, raw_depth_ep);
 
         depth_ep->register_info(RS2_CAMERA_INFO_PHYSICAL_PORT, filter_by_mi(all_device_infos, 0).front().device_path);

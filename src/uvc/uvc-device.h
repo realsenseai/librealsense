@@ -51,7 +51,7 @@ namespace librealsense
             virtual void set_power_state(power_state state) override;
             virtual power_state get_power_state() const override;
 
-            virtual void init_xu(const extension_unit& xu) override;
+            void register_xu( platform::extension_unit && xu ) override {} // Not supported
             virtual bool set_xu(const extension_unit& xu, uint8_t ctrl, const uint8_t* data, int len) override;
             virtual bool get_xu(const extension_unit& xu, uint8_t ctrl, uint8_t* data, int len) const override;
             virtual control_range get_xu_range(const extension_unit& xu, uint8_t ctrl, int len) const override;
@@ -96,7 +96,8 @@ namespace librealsense
 
             const uvc_device_info                   _info;
             power_state                             _power_state = D3; // power state change is unsupported
-
+            std::recursive_mutex                    _power_lock;
+            std::atomic< int >                      _power_counter;
             std::vector<profile_and_callback>       _streams;
 
             std::string                             _location;
