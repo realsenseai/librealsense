@@ -1,6 +1,13 @@
 # Set CMAKE_INSTALL_* if not defined
 set(CMAKECONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/${LRS_TARGET}")
 
+if(UNIX)
+    # Set a relative RPATH for installed libraries
+    # to learn more about RPATH and cmake: https://gitlab.kitware.com/cmake/community/-/wikis/doc/cmake/RPATH-handling
+    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:\$ORIGIN:\$ORIGIN/../lib:\$ORIGIN/../include")
+endif()
+
+
 add_custom_target(uninstall "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
 
 include(CMakePackageConfigHelpers)
