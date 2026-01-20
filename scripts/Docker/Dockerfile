@@ -41,6 +41,7 @@ RUN ln -s /usr/src/librealsense-$LIBRS_VERSION /usr/src/librealsense
 RUN cd /usr/src/librealsense \
     && mkdir build && cd build \
     && cmake \
+    -DPYTHON_EXECUTABLE=/usr/bin/python3 \
     -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE} -s" \
     -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE} -s" \
     -DCMAKE_INSTALL_PREFIX=/opt/librealsense \    
