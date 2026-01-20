@@ -24,8 +24,8 @@ The steps are described in [Linux manual installation guide](./installation.md)
 sudo mkdir -p /etc/apt/keyrings
 
 # Download and dearmor
-curl -sSf https://librealsense.realsenseai.com/Debian/librealsense.asc | \
-gpg --dearmor | sudo tee /etc/apt/keyrings/librealsense.gpg > /dev/null
+curl -sSf https://librealsense.realsenseai.com/Debian/librealsenseai.asc | \
+gpg --dearmor | sudo tee /etc/apt/keyrings/librealsenseai.gpg > /dev/null
 ```
 Note: The keyring contains both the new RS public key and the Intel public key for old repos, ensuring compatibility with both new and existing packages.
 
