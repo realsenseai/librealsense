@@ -53,6 +53,20 @@ void dds_device::impl::set_state( state_t new_state )
     if( new_state == _state )
         return;
 
+    if( state_t::OFFLINE == new_state )  // Discovery lost
+    {
+        if( _notifications_reader )
+        {
+            _notifications_reader->stop();
+            _notifications_reader.reset();
+        }
+    }
+
+    if( state_t::ONLINE == new_state )  // Discovery restored
+    {
+        create_notifications_reader();
+    }
+
     if( state_t::READY == new_state )
     {
         if( _metadata_reader )
