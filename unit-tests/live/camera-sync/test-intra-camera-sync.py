@@ -1,8 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# test:device D400* !D405 !D401
-# test:donotrun
+# test:device D455
 """
 RealSense Intra-Camera Synchronization Validation Test
 
@@ -13,7 +12,7 @@ timestamps from both sensors remain synchronized within a 3ms tolerance.
 This test verifies that depth and RGB sensors on a single device produce synchronized
 timestamps when global time is enabled on both sensors.
 
-Requires: D400 camera with firmware >= 5.15.0.0 and color sensor support
+Requires: D400 camera with firmware >= 5.17.1.3 and color sensor support
 """
 
 import pyrealsense2 as rs
