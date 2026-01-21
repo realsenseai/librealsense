@@ -225,8 +225,8 @@ int main(int argc, char **argv)
 
     // Configure kinfu's parameters
     params->frameSize = size;
-    params->intr = Matx33f(intrin.fx, 0, intrin.ppx,
-                           0, intrin.fy, intrin.ppy,
+    params->intr = Matx33f(intrin.fx/2, 0, intrin.ppx/2,
+                           0, intrin.fy/2, intrin.ppy/2,
                            0, 0, 1);
     params->depthFactor = 1 / depth_scale;
 
