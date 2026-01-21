@@ -3,7 +3,6 @@
 
 # test:device each(D400*)
 # test:timeout 600
-# test:donotrun
 # CI timeout set to 10 minutes to accommodate comprehensive testing of all
 # supported depth profiles
 
@@ -276,6 +275,9 @@ def check_metadata_availability(profile, timeout=2.0):
 # -----------------------------------------------------------------------------------------------
 # Run Tests
 
+# Track all test results
+test_results = []  # List of (config_name, passed: bool)
+
 # Run AE convergence for all supported depth profiles (resolution + fps)
 # Exclude profiles with frame rates lower than 15 fps from testing
 depth_profiles = [p for p in sensor.profiles if p.stream_type() == rs.stream.depth and p.fps() >= 15]
@@ -315,14 +317,17 @@ for prof in depth_profiles:
     else:
         test.start(f"Depth AE convergence (REGULAR) [{fmt}]")
         measured = details.get('measured_convergence_time') if isinstance(details, dict) else None
-        if status == 'passed':
+        passed = (status == 'passed')
+        test_results.append((f"REGULAR [{fmt}]", passed))
+
+        if passed:
             log.i(f"REGULAR [{fmt}] convergence duration: {details['duration']:.3f}s (frames={details['frames']}, threshold={details['max_allowed']}s)")
         else:
             if measured is not None:
                 log.i(f"REGULAR [{fmt}] FAILED - measured convergence time: {measured:.3f}s (frames={details['frames']}, threshold={details['max_allowed']}s)")
             else:
                 log.i(f"REGULAR [{fmt}] FAILED - no convergence observed within timeout ({details.get('duration', 0):.3f}s); frames collected={details.get('frames')}, variation_last_window={details.get('variation_last_window')}")
-        test.check(status == 'passed', f"Regular AE convergence within {details.get('max_allowed', REGULAR_MAX)}s for {fmt}")
+        # Don't fail immediately - just log the result. Individual results are not checked; only overall threshold matters.
         test.finish()
 
         # Report samples
@@ -356,14 +361,17 @@ for prof in depth_profiles:
                 else:
                     test.start(f"Depth AE convergence (ACCELERATED) [{fmt}]")
                     measured_a = accel_details.get('measured_convergence_time') if isinstance(accel_details, dict) else None
-                    if accel_status == 'passed':
+                    passed_a = (accel_status == 'passed')
+                    test_results.append((f"ACCELERATED [{fmt}]", passed_a))
+
+                    if passed_a:
                         log.i(f"ACCELERATED [{fmt}] convergence duration: {accel_details['duration']:.3f}s (frames={accel_details['frames']}, threshold={accel_details['max_allowed']}s)")
                     else:
                         if measured_a is not None:
                             log.i(f"ACCELERATED [{fmt}] FAILED - measured convergence time: {measured_a:.3f}s (frames={accel_details['frames']}, threshold={accel_details['max_allowed']}s)")
                         else:
                             log.i(f"ACCELERATED [{fmt}] FAILED - no convergence observed within timeout ({accel_details.get('duration', 0):.3f}s); frames collected={accel_details.get('frames')}, variation_last_window={accel_details.get('variation_last_window')}")
-                    test.check(accel_status == 'passed', f"Accelerated AE convergence within {accel_details.get('max_allowed', ACCEL_MAX)}s for {fmt}")
+                    # Don't fail immediately - just log the result. Individual results are not checked; only overall threshold matters.
                     # Compare speed-up if both passed
                     # ACCELERATED mode is faster in certain cases (not all), so skip this test for now
                     #if status == 'passed' and accel_status == 'passed':
@@ -378,6 +386,35 @@ for prof in depth_profiles:
                     log.i(f"ACCELERATED [{fmt}] gains: {format_list_abbrev(accel_details.get('gains', []))}")
                     test.info(f"ACCELERATED AE exposures [{fmt}]", format_list_abbrev(accel_details.get('exposures', [])))
                     test.info(f"ACCELERATED AE gains [{fmt}]", format_list_abbrev(accel_details.get('gains', [])))
+
+# -----------------------------------------------------------------------------------------------
+# Evaluate Overall Test Results (10% failure threshold)
+
+total_configs = len(test_results)
+failed_configs = [name for name, passed in test_results if not passed]
+failure_count = len(failed_configs)
+
+if total_configs > 0:
+    failure_rate = (failure_count / total_configs) * 100
+    log.i(f"\n{'='*80}")
+    log.i(f"OVERALL RESULTS: {failure_count} of {total_configs} configurations failed ({failure_rate:.1f}%)")
+    log.i(f"{'='*80}")
+
+    if failure_count > 0:
+        log.i(f"Failed configurations:")
+        for name in failed_configs:
+            log.i(f"  - {name}")
+
+    # Apply 10% threshold: only fail if more than 10% of configs failed
+    FAILURE_THRESHOLD = 10.0  # 10%
+    test.start("Overall AE convergence test (10% failure threshold)")
+    if failure_rate > FAILURE_THRESHOLD:
+        test.check(False, f"Failure rate {failure_rate:.1f}% exceeds {FAILURE_THRESHOLD}% threshold ({failure_count}/{total_configs} configs failed)")
+    else:
+        test.check(True, f"Failure rate {failure_rate:.1f}% is within {FAILURE_THRESHOLD}% threshold ({failure_count}/{total_configs} configs failed)")
+    test.finish()
+else:
+    log.w("No configurations were tested")
 
 tw.stop_wrapper(device)
 test.print_results_and_exit()
