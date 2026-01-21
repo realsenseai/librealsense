@@ -2,7 +2,7 @@
 
 **Note:** Due to the USB 3.0 translation layer between native hardware and virtual machine, the librealsense team does not recommend or support installation in a VM.
 
-librealsense shall be built on Windows using [CMake v3.10+](https://cmake.org/download/) and Visual Studio >= 2017: 
+librealsense shall be built on Windows using [CMake v3.10+](https://cmake.org/download/) and Visual Studio >= 2019: 
 (MSVC2015 and older are not fully compatible with the C++14 feature-set).
 
 ![Windows CMake](./img/windows_cmake.png)
