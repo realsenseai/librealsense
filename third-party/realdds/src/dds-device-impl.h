@@ -33,15 +33,14 @@ public:
     enum class state_t
     {
         OFFLINE,                  // disconnected by device-watcher
-        ONLINE,                   // default state, waiting for handshake (device-header)
         INITIALIZING,             // handshake with device
         READY                     // post handshake; streamable, controllable, etc.
     };
 
     void set_state( state_t );
 
-    state_t _state = state_t::ONLINE;
-    size_t _n_streams_expected = 0;  // needed only until ready
+    state_t _state = state_t::INITIALIZING;
+    size_t _n_streams_expected = 0xFFFF;  // needed only until ready
 
     topics::device_info _info;
     rsutils::json const _device_settings;
@@ -53,6 +52,7 @@ public:
     // Flags to indicate received discovery messages
     std::map< std::string, bool > _stream_header_received;
     std::map< std::string, bool > _stream_options_received;
+    bool _device_header_received = false;
     bool _device_options_received = false;
     // Data stores in case streams were received out of order
     std::map< std::string, dds_options > _stream_options_for_init;
@@ -152,6 +152,8 @@ private:
     void on_query_filter(rsutils::json const&, dds_sample const&);
 
     void add_profiles_to_json( const realdds::dds_stream_profiles & profiles, rsutils::json & profiles_as_json ) const;
+
+    bool all_initialization_data_received() const;
 
     on_metadata_available_signal _on_metadata_available;
     on_device_log_signal _on_device_log;

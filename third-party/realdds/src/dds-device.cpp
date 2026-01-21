@@ -135,7 +135,7 @@ void dds_device::on_discovery_restored( topics::device_info const & new_info )
         DDS_THROW( runtime_error, "device serial number cannot change" );
 
     _impl->_info = new_info;
-    _impl->set_state( impl::state_t::ONLINE );
+    _impl->set_state( impl::state_t::INITIALIZING );
     // NOTE: still not ready - pending handshake/reinitialization
 }
 

@@ -60,9 +60,12 @@ void dds_device::impl::set_state( state_t new_state )
             _notifications_reader->stop();
             _notifications_reader.reset();
         }
+
+        // Reset initialization data, we expect to receive it again if connection will be re-established.
+        reset();
     }
 
-    if( state_t::ONLINE == new_state )  // Discovery restored
+    if( state_t::INITIALIZING == new_state )  // Discovery restored
     {
         create_notifications_reader();
     }
@@ -136,6 +139,7 @@ void dds_device::impl::reset()
     _streams.clear();
     _stream_header_received.clear();
     _stream_options_received.clear();
+    _device_header_received = false;
     _device_options_received = false;
     _options.clear();
     _extrinsics_map.clear();
@@ -768,11 +772,10 @@ void dds_device::impl::create_control_writer()
 
 void dds_device::impl::on_device_header( json const & j, dds_sample const & sample )
 {
-    if( _state != state_t::ONLINE )
+    if( _state != state_t::INITIALIZING )
         return;
 
-    // We can get here when we regain connectivity - reset everything, just as if we're freshly constructed
-    reset();
+    _device_header_received = true;
 
     // The server GUID is the server's notification writer's GUID -- that way, we can easily associate all notifications
     // with a server.
@@ -801,7 +804,8 @@ void dds_device::impl::on_device_header( json const & j, dds_sample const & samp
         }
     }
 
-    set_state( state_t::INITIALIZING );
+    if( all_initialization_data_received() )
+        set_state( state_t::READY );
 }
 
 
@@ -823,7 +827,7 @@ void dds_device::impl::on_device_options( json const & j, dds_sample const & sam
         }
     }
 
-    if( _stream_header_received.size() == _n_streams_expected && _stream_options_received.size() == _n_streams_expected )
+    if( all_initialization_data_received() )
         set_state( state_t::READY );
 }
 
@@ -885,17 +889,17 @@ void dds_device::impl::on_stream_header( json const & j, dds_sample const & samp
                    "failed to instantiate stream type '" << stream_type << "' (instead, got '" << stream->type_string()
                                                          << "')" );
     _stream_header_received[stream_name] = true;
-    LOG_DEBUG( "[" << debug_name() << "] ... stream " << _streams.size() << "/" << _n_streams_expected << " '" << stream_name
-                             << "' received with " << profiles.size() << " profiles"
-                             << ( stream->metadata_enabled() ? " and metadata" : "" ) );
+    std::string expected_streams = _n_streams_expected == 0xFFFF ? "unknown" : std::to_string( _n_streams_expected );
+    LOG_DEBUG( "[" << debug_name() << "] ... stream " << _streams.size() << "/" << expected_streams << " '" << stream_name
+                   << "' received with " << profiles.size() << " profiles"
+                   << ( stream->metadata_enabled() ? " and metadata" : "" ) );
 
     // Handle out of order stream-options message
     init_stream_options_if_possible( stream_name, stream );
     init_stream_filters_if_possible( stream_name, stream );
     init_stream_intrinsics_if_possible( stream_name, stream );
 
-    if( _stream_header_received.size() == _n_streams_expected && _stream_options_received.size() == _n_streams_expected &&
-        _device_options_received )
+    if( all_initialization_data_received() )
         set_state( state_t::READY );
 }
 
@@ -965,9 +969,15 @@ void dds_device::impl::on_stream_options( json const & j, dds_sample const & sam
     _stream_options_received[stream_name] = true;
     LOG_DEBUG( "[" << debug_name() << "] ... stream '" << stream_name << "' received " << num_of_options << " options" );
 
-    if( _stream_header_received.size() == _n_streams_expected && _stream_options_received.size() == _n_streams_expected &&
-        _device_options_received )
+    if( all_initialization_data_received() )
         set_state( state_t::READY );
+}
+
+bool dds_device::impl::all_initialization_data_received() const
+{
+    return _device_header_received && _device_options_received &&
+           _stream_header_received.size() == _n_streams_expected &&
+           _stream_options_received.size() == _n_streams_expected;
 }
 
 void dds_device::impl::init_stream_options_if_possible( const std::string & stream_name,
