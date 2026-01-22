@@ -708,6 +708,7 @@ namespace librealsense
             , d400_mipi_device()
             , firmware_logger_device( dev_info, d400_device::_hw_monitor, get_firmware_logs_command(), get_flash_logs_command() )
         {
+            store_sensors_indices({_depth_device_idx,_color_device_idx, _motion_module_device_idx});
         }
 
         std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override;

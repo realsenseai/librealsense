@@ -21,9 +21,15 @@ namespace librealsense
         void update_flash(const std::vector<uint8_t>& image,
                           rs2_update_progress_callback_sptr callback, int update_mode) override;
 
+        void store_sensors_indices(std::vector<int> sensors_indices) {_sensors_indices = sensors_indices;}
+
     private:
         void update_signed_firmware(const std::vector<uint8_t>& image,
                           rs2_update_progress_callback_sptr callback);
         static void simulate_device_reconnect(std::shared_ptr<const device_info> dev_info);
+
+        void pause_options_watchers();
+        void unpause_options_watchers();
+        std::vector<int> _sensors_indices;
     };
 }

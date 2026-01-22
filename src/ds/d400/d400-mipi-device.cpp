@@ -112,18 +112,37 @@ namespace librealsense
                                         int update_mode)
     {
         // first pausing the options watcher (if running)
-        get_depth_sensor().pause_options_watcher();
+        pause_options_watchers();
+
 
         try{
             update_signed_firmware(image,callback);
         }
         catch(...)
         {
-            get_depth_sensor().pause_options_watcher();
+            unpause_options_watchers();
             throw;
         }
 
         // finally, unpausing the options watcher
-        get_depth_sensor().pause_options_watcher();
+        unpause_options_watchers();
+    }
+
+    void d400_mipi_device::pause_options_watchers()
+    {
+        for( auto& sensor_index : _sensors_indices)
+        {
+            auto& synthetic_sensor_ref = dynamic_cast<synthetic_sensor&>(get_sensor(sensor_index));
+            synthetic_sensor_ref.pause_options_watcher();
+        }
+    }
+
+    void d400_mipi_device::unpause_options_watchers()
+    {
+        for( auto& sensor_index : _sensors_indices)
+        {
+            auto& synthetic_sensor_ref = dynamic_cast<synthetic_sensor&>(get_sensor(sensor_index));
+            synthetic_sensor_ref.unpause_options_watcher();
+        }
     }
 }
