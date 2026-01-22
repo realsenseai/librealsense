@@ -8,7 +8,6 @@
 #include <map>
 #include <set>
 
-// Add required core interfaces used by this writer
 #include <src/core/info-interface.h>
 #include <src/core/options-interface.h>
 
@@ -16,7 +15,6 @@
 #include <rosbag2_storage/serialized_bag_message.hpp>
 #include <rosbag2_storage/storage_interfaces/read_write_interface.hpp>
 #include <rosbag2_storage/topic_metadata.hpp>
-#include <rosbag2_storage/storage_factory.hpp>   // added for internal storage creation
 #include <rosbag2_storage/storage_options.hpp>  // for storage options struct
 
 #include <media/ros/ros_file_format.h> // reuse ros_topic naming + helpers
@@ -48,7 +46,6 @@ namespace librealsense
 
         void write_notification(const sensor_identifier& sensor_id, const nanoseconds& timestamp, const notification& n) override;
         void write_additional_frame_messages(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
-        void write_sensor_processing_blocks(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<recommended_proccesing_blocks_interface> proccesing_blocks);
         void write_video_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame);
         void write_motion_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame);
         void write_stream_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<stream_profile_interface> profile);
@@ -75,49 +72,6 @@ namespace librealsense
         void write_vendor_info(const std::string& topic, nanoseconds timestamp, std::shared_ptr<info_interface> info_snapshot);
         void write_sensor_option(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, rs2_option type, const librealsense::option& option);
         void write_sensor_options(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<options_interface> options);
-        //template <typename T>
-        //void write_message(const std::string& topic,
-        //    const std::chrono::nanoseconds& time,
-        //    const T& msg)
-        //{
-        //    try
-        //    {
-        //        auto bag_msg = std::make_shared<rosbag2_storage::SerializedBagMessage>();
-        //        bag_msg->topic_name = topic;
-        //        bag_msg->time_stamp =
-        //            static_cast<rcutils_time_point_value_t>(time.count());
-
-        //        // Allocate buffer for serialized data
-        //        auto buffer = std::make_shared<rcutils_uint8_array_t>();
-        //        buffer->allocator = rcutils_get_default_allocator();
-
-        //        // Compute serialized size for T and allocate
-        //        const size_t serialized_size = /* your serialization size for T */;
-        //        if (rcutils_uint8_array_init(buffer.get(), serialized_size, &buffer->allocator)
-        //            != RCUTILS_RET_OK)
-        //        {
-        //            throw std::runtime_error("Failed to allocate serialization buffer");
-        //        }
-
-        //        // Serialize msg into buffer->buffer (CDR bytes for ROS2)
-        //        uint8_t* out = buffer->buffer;
-        //        /* your code that serializes T into out, producing exactly serialized_size bytes */
-
-        //        bag_msg->serialized_data = buffer;
-
-        //        // finally write to storage
-        //        _storage->write(bag_msg);   // _storage: shared_ptr<ReadWriteInterface>
-        //        LOG_DEBUG("Recorded: \"" << topic << "\" . TS: " << time.count());
-        //    }
-        //    catch (const std::exception& e)
-        //    {
-        //        throw io_exception(
-        //            rsutils::string::from()
-        //            << "Ros2 Writer failed to write topic: \"" << topic
-        //            << "\" to file. (Exception: " << e.what() << ')');
-        //    }
-        //}
-
 
         static uint8_t is_big_endian();
         std::string m_file_path;

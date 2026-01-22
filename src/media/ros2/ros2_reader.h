@@ -27,6 +27,7 @@ namespace librealsense
 {
     using namespace device_serializer;
     class context;
+    class processing_block_interface;
 
     class ros2_reader : public reader
     {
@@ -79,7 +80,7 @@ namespace librealsense
         std::shared_ptr< rosbag2_storage::storage_interfaces::ReadWriteInterface > _storage;
         std::string _file_path;
         std::vector< rosbag2_storage::TopicMetadata > _topics_cache;
-        std::shared_ptr<context> _context;
+        std::shared_ptr<context> m_context;
 
         // State management
         device_snapshot _initial_snapshot;

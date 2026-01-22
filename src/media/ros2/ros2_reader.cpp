@@ -17,6 +17,7 @@
 #include "stream.h"
 #include "source.h"
 #include "image.h"
+#include <src/context.h>
 
 namespace librealsense {
     using namespace device_serializer;
@@ -53,7 +54,7 @@ namespace librealsense {
 
     ros2_reader::ros2_reader(const std::string& file_path, const std::shared_ptr<context>& ctx)
         : _file_path(file_path + ".db3")
-        , _context(ctx)
+        , m_context(ctx)
     {
         _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
         _storage->open(_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
@@ -74,6 +75,7 @@ namespace librealsense {
 
     void ros2_reader::seek_to_time(const nanoseconds& time)
     {
+        // TODO: Rework this function
         // rosbag2 storage interfaces typically read sequentially.
         // To seek accurately in a raw storage plugin without the higher-level Reader API:
         // 1. Reset file.
@@ -366,19 +368,13 @@ namespace librealsense {
 
     std::set<uint32_t> ros2_reader::read_sensor_indices(uint32_t device_index)
     {
-        std::set<uint32_t> sensor_indices;
+        std::regex regex((rsutils::string::from() << "^/device_" << device_index
+            << "/sensor_(\\d+)/info$").str());
+        auto stream_info_topics = filter_by_regex(_topics_cache, regex);
 
-        for (const auto& topic : _topics_cache)
-        {
-            // expecting topic name to be like device_0/sensor_X/info
-            std::string expected_prefix = "/device_" + std::to_string(device_index) + "/sensor_";
-            std::string expected_suffix = "/info";
-            if (topic.name.find(expected_prefix) == 0 && topic.name.find(expected_suffix) != std::string::npos)
-            {
-                // Extract sensor index from topic name
-                uint32_t sensor_index = ros_topic::get_sensor_index(topic.name);
-                sensor_indices.insert(sensor_index);
-            }
+        std::set<uint32_t> sensor_indices;
+        for (const auto& topic : stream_info_topics) {
+            sensor_indices.insert(ros_topic::get_sensor_index(topic));
         }
         return sensor_indices;
     }
@@ -460,6 +456,7 @@ namespace librealsense {
             rs2_option opt;
             if (false && is_option_topic(topic, sensor_id, opt))
             {
+                // TODO: disabled for now
                 // Parse option value
                 if (msg->serialized_data && msg->serialized_data->buffer_length > 0)
                 {
@@ -498,17 +495,10 @@ namespace librealsense {
             throw std::runtime_error("Frame data message has no payload");
         }
 
-        // Set up frame metadata with defaults from the message timestamp
-        frame_additional_data additional_data{};
-        additional_data.timestamp = static_cast<double>(ts.count()) / 1000000.0; // Convert ns to ms
-        additional_data.frame_number = 0;
-        additional_data.timestamp_domain = RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME;
-        additional_data.system_time = additional_data.timestamp;
-
         // Read metadata from the next message (metadata immediately follows frame data)
+        frame_additional_data additional_data{};
         read_frame_metadata(additional_data);
 
-        // Allocate frame using helper
         frame_holder frame = allocate_frame(sid, msg, additional_data);
 
         if (!frame)
@@ -540,7 +530,6 @@ namespace librealsense {
         
     frame_holder ros2_reader::allocate_frame(const stream_identifier& sid, const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg, const frame_additional_data& additional_data)
     {
-        // Determine frame type from stream type
         rs2_extension frame_ext = frame_source::stream_to_frame_types(sid.stream_type);
 
         // Initialize frame source if needed
@@ -579,7 +568,6 @@ namespace librealsense {
         additional_data.timestamp = std::stod(get_value(kv, TIMESTAMP_MD_STR));
 
         // Read all RS2_FRAME_METADATA values and populate metadata_blob
-        // The blob format is: [rs2_frame_metadata_value][rs2_metadata_type] pairs
         uint8_t* blob_ptr = additional_data.metadata_blob.data();
         size_t blob_offset = 0;
 

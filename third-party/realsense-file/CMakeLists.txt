@@ -39,11 +39,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         $<$<NOT:$<BOOL:${USE_EXTERNAL_LZ4}>>:${LZ4_INCLUDE_PATH}>
 )
 
-if(MSVC) # suppress all warnings due to 3rd party code warnings
-    target_compile_options(${PROJECT_NAME} PRIVATE /W0)
-else()
-    target_compile_options(${PROJECT_NAME} PRIVATE -w)
-endif()
+disable_third_party_warnings(${PROJECT_NAME})
 
 message(STATUS "ROSBAG2_COMPILE_FLAGS: ${ROSBAG2_COMPILE_FLAGS}")
 target_compile_definitions(${PROJECT_NAME} PUBLIC
