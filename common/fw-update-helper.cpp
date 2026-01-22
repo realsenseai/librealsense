@@ -146,8 +146,34 @@ namespace rs2
                 fail(ss.str());
                 return;
             }
+
+            _progress = 1;
+
+            dev_updatable.update_unsigned(_fw, [&](const float progress)
+            {
+                _progress = progress;
+                switch(static_cast<int>(progress))
+                {
+                case 5:
+                    log("Burning Signed Firmware on MIPI device");
+                    break;
+                case 95:
+                    log("Firmware Update completed, waiting for device to reconnect");
+                    _done = true;
+                    break;
+                case 100:
+                    log("FW update process completed successfully");
+                    _done = true;
+                    break;
+                }
+            });
         }
-        log("Burning Signed Firmware on MIPI device");
+        else
+        {
+            // use update_device API to call update_firmware
+            return;
+        }
+        /*log("Burning Signed Firmware on MIPI device");
 
         rs2_camera_info _dfu_port_info = (is_mipi_recovery)?(RS2_CAMERA_INFO_PHYSICAL_PORT):(RS2_CAMERA_INFO_DFU_DEVICE_PATH);
         // Write signed firmware to appropriate file descriptor
@@ -190,7 +216,7 @@ namespace rs2
         }
         _done = true;
         // Restart the device to reconstruct with the new version information
-        _dev.hardware_reset();
+        _dev.hardware_reset();*/
     }
 
     void firmware_update_manager::backup_firmware(updatable& upd, int& next_progress, const std::string& serial)

@@ -18,7 +18,12 @@ namespace librealsense
 
         void hardware_reset() override;
         void toggle_advanced_mode(bool enable) override;
+        void update_flash(const std::vector<uint8_t>& image,
+                          rs2_update_progress_callback_sptr callback, int update_mode) override;
+
     private:
+        void update_signed_firmware(const std::vector<uint8_t>& image,
+                          rs2_update_progress_callback_sptr callback);
         static void simulate_device_reconnect(std::shared_ptr<const device_info> dev_info);
     };
 }
