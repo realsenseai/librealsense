@@ -15,7 +15,7 @@
 #
 # This test supports both separate accel/gyro streams and combined motion format.
 
-# test:device each(D400*)
+# test:device each(D400*) 
 # test:device each(D500*)
 
 import pyrealsense2 as rs
