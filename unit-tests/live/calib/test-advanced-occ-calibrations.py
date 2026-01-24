@@ -40,6 +40,14 @@ def on_chip_calibration_json(occ_json_file, host_assistance):
         occ_json = '{\n  ' + \
                    '"calib type": 0,\n' + \
                    '"host assistance": ' + str(int(host_assistance)) + ',\n' + \
+                   '"speed": 2,\n' + \
+                   '"average step count": 20,\n' + \
+                   '"scan parameter": 0,\n' + \
+                   '"step count": 20,\n' + \
+                   '"apply preset": 1,\n' + \
+                   '"accuracy": 2,\n' + \
+                   '"scan only": ' + str(int(host_assistance)) + ',\n' + \
+                   '"interactive scan": 0,\n' + \
                    '"resize factor": 1\n' + \
                    '}'
     return occ_json

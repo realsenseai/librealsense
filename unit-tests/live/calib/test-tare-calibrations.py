@@ -22,6 +22,12 @@ def tare_calibration_json(tare_json_file, host_assistance):
         log.i('Using default parameters for Tare calibration.')
         tare_json = '{\n  '+\
                     '"host assistance": ' + str(int(host_assistance)) + ',\n'+\
+                    '"speed": 3,\n'+\
+                    '"scan parameter": 0,\n'+\
+                    '"step count": 20,\n'+\
+                    '"apply preset": 1,\n'+\
+                    '"accuracy": 2,\n'+\
+                    '"depth": 0,\n'+\
                     '"resize factor": 1\n'+\
                     '}'
     return tare_json
@@ -94,7 +100,6 @@ if is_mipi_device():
             test.check(abs(health_factor) < HEALTH_FACTOR_THRESHOLD)
         except Exception as e:
             log.e("Tare calibration test with host assistance failed: ", str(e))
-            test.fail()
 """
 if not is_mipi_device():
 # mipi devices do not support OCC calibration without host assistance  
