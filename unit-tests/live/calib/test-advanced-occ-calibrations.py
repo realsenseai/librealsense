@@ -221,8 +221,8 @@ if not is_mipi_device() and not is_d555():
             test.fail()
         finally:
             restore_calibration_table(calib_dev, None)
-"""
-temprorary disabled on mipi devices to stabilize the lab
+
+# temprorary disabled on mipi devices to stabilize the lab
 if is_mipi_device() and not is_d555():
     with test.closure("Advanced OCC calibration test with host assistance"):
         calib_dev = None
@@ -242,7 +242,6 @@ if is_mipi_device() and not is_d555():
             test.fail()
         finally:
             restore_calibration_table(calib_dev, None)
-"""
 test.print_results_and_exit()
 
 """
