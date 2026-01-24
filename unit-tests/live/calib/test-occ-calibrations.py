@@ -23,6 +23,14 @@ def on_chip_calibration_json(occ_json_file, host_assistance):
         occ_json = '{\n  '+\
                     '"calib type": 0,\n'+\
                     '"host assistance": ' + str(int(host_assistance)) + ',\n'+\
+                    '"speed": 2,\n'+\
+                    '"average step count": 20,\n'+\
+                    '"scan parameter": 0,\n'+\
+                    '"step count": 20,\n'+\
+                    '"apply preset": 1,\n'+\
+                    '"accuracy": 2,\n'+\
+                    '"scan only": ' + str(int(host_assistance)) + ',\n'+\
+                    '"interactive scan": 0,\n'+\
                     '"resize factor": 1\n'+\
                     '}'
     # TODO - host assistance actual value may be different when reading from json
@@ -49,7 +57,7 @@ if not is_mipi_device():
             except Exception as e:
                 log.e(f"OCC calibration test iteration {iteration} failed: ", str(e))
                 test.fail()
-"""
+
 if is_mipi_device():
     with test.closure(f"OCC calibration test with host assistance - {NUM_ITERATIONS} iterations"):
         for iteration in range(1, NUM_ITERATIONS + 1):
@@ -65,7 +73,6 @@ if is_mipi_device():
             except Exception as e:
                 log.e(f"OCC calibration test with host assistance iteration {iteration} failed: ", str(e))
                 test.fail()
-"""
 test.print_results_and_exit()
 
 
