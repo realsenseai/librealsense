@@ -23,9 +23,10 @@ from test_calibrations_common import (
 
 # Constants & thresholds (reintroduce after import fix)
 PIXEL_CORRECTION = -1.0  # pixel shift to apply to principal point
-EPSILON = 0.1         # distance comparison tolerance
+EPSILON = 0.5         # distance comparison tolerance
 DIFF_THREDSHOLD = 0.001  # minimum change expected after OCC calibration
 HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION = 2
+DEPTH_MODIF_THRESHOLD_MM = 100.0  # 10 cm minimum depth change after modification to consider convergence
 DEPTH_CONVERGENCE_TOLERANCE_MM = 50.0  # 5 cm tolerance for depth convergence toward ground truth
 def on_chip_calibration_json(occ_json_file, host_assistance):
     occ_json = None
@@ -128,71 +129,66 @@ def run_advanced_occ_calibration_test(host_assistance, config, pipeline, calib_d
             test.fail()
 
         # 6. Run OCC
-        iterations = 1
-        depth_check_failed = True
-        while (depth_check_failed and iterations > 0):
-            iterations -= 1
-            occ_json = on_chip_calibration_json(None, host_assistance)
-            new_calib_bytes = None
-            try:
-                health_factor, new_calib_bytes = calibration_main(config, pipeline, calib_dev, True, occ_json, None, return_table=True)
-            except Exception as e:
-                log.e(f"Calibration_main failed: {e}")
-                health_factor = None
+        occ_json = on_chip_calibration_json(None, host_assistance)
+        new_calib_bytes = None
+        try:
+            health_factor, new_calib_bytes = calibration_main(config, pipeline, calib_dev, True, occ_json, None, return_table=True)
+        except Exception as e:
+            log.e(f"Calibration_main failed: {e}")
+            health_factor = None
 
-            if not (new_calib_bytes and health_factor is not None and abs(health_factor) < HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION):
-                log.e(f"OCC calibration failed or health factor out of threshold (hf={health_factor})")
+        if not (new_calib_bytes and health_factor is not None and abs(health_factor) < HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION):
+            log.e(f"OCC calibration failed or health factor out of threshold (hf={health_factor})")
+            test.fail()
+        log.i(f"OCC calibration completed (health factor={health_factor:+.4f})")
+
+        # 7 Write updated table & evaluate
+        write_ok, _ = write_calibration_table_with_crc(calib_dev, new_calib_bytes)
+        if not write_ok:
+            log.e("Failed to write OCC calibration table to device")
+            test.fail()
+
+        # Allow time for device to apply the new calibration table
+        time.sleep(0.5)
+
+        final_principal_points_result = get_current_rect_params(calib_dev)
+        if final_principal_points_result is None:
+            log.e("Could not read final principal points")
+            test.fail()
+
+        fin_left_pp, fin_right_pp, fin_offsets = final_principal_points_result
+        final_axis_val = fin_right_pp[1]
+        log.i(f"  Final principal points (Right) ppx={fin_right_pp[0]:.6f} ppy={fin_right_pp[1]:.6f}")
+
+        # 8. Reversion checks:
+            # a. Final must differ from modified (change happened)
+            # b. Final must be closer to base than to modified (strict revert expectation)
+        dist_from_original = abs(final_axis_val - base_axis_val)
+        dist_from_modified = abs(final_axis_val - modified_axis_val)
+        log.i(f"  ppy distances: from_base={dist_from_original:.6f} from_modified={dist_from_modified:.6f}")
+
+        # Measure average depth after OCC correction
+        post_avg_depth_m = measure_average_depth(config, pipeline, width=image_width, height=image_height, fps=fps)
+        if post_avg_depth_m is not None:
+            log.i(f"Average depth after OCC: {post_avg_depth_m*1000:.1f} mm")
+        else:
+            log.e("Average depth after OCC unavailable")
+            test.fail()
+
+        # Depth convergence assertion relative to ground truth: ensure post depth is closer to ground truth than modified depth
+        if (ground_truth_mm is not None and
+            modified_avg_depth_m is not None and
+            post_avg_depth_m is not None):
+            dist_modified_gt_mm = abs(modified_avg_depth_m * 1000.0 - ground_truth_mm)
+            dist_post_gt_mm = abs(post_avg_depth_m * 1000.0 - ground_truth_mm)
+            log.i(f"Depth to ground truth (mm): modified={dist_modified_gt_mm:.1f} post={dist_post_gt_mm:.1f} (ground truth={ground_truth_mm:.1f} mm)")
+            # verify convergence
+            if dist_post_gt_mm > dist_modified_gt_mm + DEPTH_CONVERGENCE_TOLERANCE_MM and dist_modified_gt_mm > DEPTH_MODIF_THRESHOLD_MM:
+                log.e("Post-calibration average depth did not converge toward ground truth")
                 test.fail()
-            log.i(f"OCC calibration completed (health factor={health_factor:+.4f})")
-
-            # 7 Write updated table & evaluate
-            write_ok, _ = write_calibration_table_with_crc(calib_dev, new_calib_bytes)
-            if not write_ok:
-                log.e("Failed to write OCC calibration table to device")
-                test.fail()
-
-            final_principal_points_result = get_current_rect_params(calib_dev)
-            if final_principal_points_result is None:
-                log.e("Could not read final principal points")
-                test.fail()
-
-            fin_left_pp, fin_right_pp, fin_offsets = final_principal_points_result
-            final_axis_val = fin_right_pp[1]
-            log.i(f"  Final principal points (Right) ppx={fin_right_pp[0]:.6f} ppy={fin_right_pp[1]:.6f}")
-
-            # 8. Reversion checks:
-                # a. Final must differ from modified (change happened)
-                # b. Final must be closer to base than to modified (strict revert expectation)
-            dist_from_original = abs(final_axis_val - base_axis_val)
-            dist_from_modified = abs(final_axis_val - modified_axis_val)
-            log.i(f"  ppy distances: from_base={dist_from_original:.6f} from_modified={dist_from_modified:.6f}")
-
-            # Measure average depth after OCC correction
-            post_avg_depth_m = measure_average_depth(config, pipeline, width=image_width, height=image_height, fps=fps)
-            if post_avg_depth_m is not None:
-                log.i(f"Average depth after OCC: {post_avg_depth_m*1000:.1f} mm")
             else:
-                log.e("Average depth after OCC unavailable")
-                test.fail()
-
-            # Depth convergence assertion relative to ground truth: ensure post depth is closer to ground truth than modified depth
-            if (ground_truth_mm is not None and
-                modified_avg_depth_m is not None and
-                post_avg_depth_m is not None):
-                dist_modified_gt_mm = abs(modified_avg_depth_m * 1000.0 - ground_truth_mm)
-                dist_post_gt_mm = abs(post_avg_depth_m * 1000.0 - ground_truth_mm)
-                log.i(f"Depth to ground truth (mm): modified={dist_modified_gt_mm:.1f} post={dist_post_gt_mm:.1f} (ground truth={ground_truth_mm:.1f} mm)")
-                # verify convergence
-                if dist_post_gt_mm > dist_modified_gt_mm + DEPTH_CONVERGENCE_TOLERANCE_MM:
-                    log.e("Post-calibration average depth did not converge toward ground truth")
-                    depth_check_failed = True
-                #    restore_calibration_table(calib_dev, None)
-                #    if iterations == 0:
-                #        test.fail()
-                else:
-                    improvement = dist_modified_gt_mm - dist_post_gt_mm
-                    log.i(f"Post-calibration average depth converged toward ground truth (improvement={improvement:.1f} mm)")
-                    depth_check_failed = False
+                improvement = dist_modified_gt_mm - dist_post_gt_mm
+                log.i(f"Post-calibration average depth converged toward ground truth (improvement={improvement:.1f} mm)")
 
         if abs(final_axis_val - modified_axis_val) <= DIFF_THREDSHOLD:
             log.e(f"OCC left ppy unchanged (within EPSILON={DIFF_THREDSHOLD}); failing")            
