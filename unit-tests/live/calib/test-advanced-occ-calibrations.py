@@ -19,7 +19,7 @@ from test_calibrations_common import (
 )
 
 #disabled until we stabilize lab
-#test:donotrun
+#test:device D400*
 
 # Constants & thresholds (reintroduce after import fix)
 PIXEL_CORRECTION = -1.0  # pixel shift to apply to principal point
