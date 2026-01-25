@@ -324,7 +324,7 @@ public:
         {
             LOG_ERROR( rsutils::string::from() << "Failed to create device for PID 0x" << std::hex << std::setw( 4 )
                                                << std::setfill( '0' ) << (int)pid << "! (" << e.what() << ")" );
-            // Create a device with partial capabilities when allowed instead of failing
+            // Create a device with partial capabilities instead of failing
             return std::make_shared< rs500_device >( dev_info );
         }        
     }
