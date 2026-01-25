@@ -35,7 +35,8 @@ from rspy import repo
 pyrs_dir = repo.find_pyrs_dir()
 sys.path.insert( 1, pyrs_dir )
 
-MAX_ENUMERATION_TIME = 17  # [sec]
+# D555 takes ~18 [sec]
+MAX_ENUMERATION_TIME = 22  # [sec]
 
 # We need both pyrealsense2 and hub. We can work without hub, but
 # without pyrealsense2 no devices at all will be returned.
