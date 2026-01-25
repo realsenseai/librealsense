@@ -1377,7 +1377,10 @@ namespace librealsense
         else if( ( _device_capabilities & ds_caps::CAP_BMI_088 ) == ds_caps::CAP_BMI_088 )
             _imu_type = "BMI088";
         else
+        {
             _imu_type = "IMU_Unknown";
+            LOG_ERROR("IMU type could not be recognized!");
+        }
     }
 
     void d400_device::get_fw_details( const std::vector< uint8_t > & gvd_buff, std::string & optic_serial,

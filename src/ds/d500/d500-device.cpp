@@ -838,7 +838,10 @@ namespace librealsense
             parsed_fields->imu_type.assign( imu_type_char, strnlen( imu_type_char, 8 ) );
         }
         else
+        {
             parsed_fields->imu_type = "IMU_Unknown";
+            LOG_ERROR("IMU type could not be recognized!");
+        }
 
         // updating device capabilities based on imu type
         if(parsed_fields->imu_type == "BMI055")
