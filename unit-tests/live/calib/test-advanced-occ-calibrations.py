@@ -24,7 +24,7 @@ from test_calibrations_common import (
 # Constants & thresholds (reintroduce after import fix)
 PIXEL_CORRECTION = -1.0  # pixel shift to apply to principal point
 EPSILON = 0.5         # distance comparison tolerance
-DIFF_THREDSHOLD = 0.001  # minimum change expected after OCC calibration
+DIFF_THRESHOLD = 0.001  # minimum change expected after OCC calibration
 HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION = 2
 DEPTH_MODIF_THRESHOLD_MM = 100.0  # 10 cm minimum depth change after modification to consider convergence
 DEPTH_CONVERGENCE_TOLERANCE_MM = 50.0  # 5 cm tolerance for depth convergence toward ground truth
@@ -182,7 +182,7 @@ def run_advanced_occ_calibration_test(host_assistance, config, pipeline, calib_d
             dist_modified_gt_mm = abs(modified_avg_depth_m * 1000.0 - ground_truth_mm)
             dist_post_gt_mm = abs(post_avg_depth_m * 1000.0 - ground_truth_mm)
             log.i(f"Depth to ground truth (mm): modified={dist_modified_gt_mm:.1f} post={dist_post_gt_mm:.1f} (ground truth={ground_truth_mm:.1f} mm)")
-            # verify convergence
+            # verify convergence toward ground truth, allow tollerance in case of too small modification in depth due to small distance change
             if dist_post_gt_mm > dist_modified_gt_mm + DEPTH_CONVERGENCE_TOLERANCE_MM and dist_modified_gt_mm > DEPTH_MODIF_THRESHOLD_MM:
                 log.e("Post-calibration average depth did not converge toward ground truth")
                 test.fail()
@@ -190,8 +190,8 @@ def run_advanced_occ_calibration_test(host_assistance, config, pipeline, calib_d
                 improvement = dist_modified_gt_mm - dist_post_gt_mm
                 log.i(f"Post-calibration average depth converged toward ground truth (improvement={improvement:.1f} mm)")
 
-        if abs(final_axis_val - modified_axis_val) <= DIFF_THREDSHOLD:
-            log.e(f"OCC left ppy unchanged (within EPSILON={DIFF_THREDSHOLD}); failing")            
+        if abs(final_axis_val - modified_axis_val) <= DIFF_THRESHOLD:
+            log.e(f"OCC left ppy unchanged (within DIFF_THRESHOLD={DIFF_THRESHOLD}); failing")            
             test.fail()
         elif dist_from_modified + EPSILON <= dist_from_original:
             log.e("OCC did not revert toward base (still closer to modified)")
