@@ -245,7 +245,9 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
             hub.connect(hub_reset)
         if recycle_ports:
             hub.disable_ports( sleep_on_change = 5 )
+            print("Sleepint for :", MAX_ENUMERATION_TIME)
             hub.enable_ports( sleep_on_change = MAX_ENUMERATION_TIME )
+            print("ports enabled")
     #
     # Get all devices, and store by serial-number
     global _device_by_sn, _context, _port_to_sn
