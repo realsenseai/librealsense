@@ -1,4 +1,4 @@
-﻿# OpenVINO Samples for Intel® RealSense™ cameras
+﻿# OpenVINO Samples for RealSense cameras
 Examples in this folder are designed to complement existing
 [SDK examples](../../examples) and demonstrate how Intel RealSense cameras can
 be used together with the OpenVINO™ toolkit in the domain of computer-vision.

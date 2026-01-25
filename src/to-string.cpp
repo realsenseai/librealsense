@@ -716,6 +716,7 @@ const char * get_string( rs2_camera_info value )
     CASE( DFU_DEVICE_PATH )
     CASE( CONNECTION_TYPE )
     CASE( SMCU_FW_VERSION )
+    CASE( IMU_TYPE )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;

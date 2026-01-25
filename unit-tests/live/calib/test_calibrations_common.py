@@ -428,15 +428,10 @@ def on_chip_calibration_json(occ_json_file, host_assistance):
         occ_json = '{\n  ' + \
                    '"calib type": 0,\n' + \
                    '"host assistance": ' + str(int(host_assistance)) + ',\n' + \
-                   '"keep new value after successful scan": 1,\n' + \
-                   '"fl data sampling": 0,\n' + \
-                   '"adjust both sides": 0,\n' + \
-                   '"fl scan location": 0,\n' + \
-                   '"fy scan direction": 0,\n' + \
-                   '"white wall mode": 0,\n' + \
-                   '"speed": 2,\n' + \
+                   '"data sampling": 1,\n' + \
                    '"scan parameter": 0,\n' + \
-                   '"apply preset": 0,\n' + \
+                   '"speed": 2,\n' + \
+                   '"apply preset": 1,\n' + \
                    '"scan only": ' + str(int(host_assistance)) + ',\n' + \
                    '"interactive scan": 0,\n' + \
                    '"resize factor": 1\n' + \

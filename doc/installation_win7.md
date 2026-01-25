@@ -1,6 +1,6 @@
 # Windows 7 Installation
 
-> **Note:** RealSense products are being regularly validated and receive official support for Windows 10 and Linux eco-systems. Not all product features are enabled on Windows 7. 
+> **Note:** RealSense products are being regularly validated and receive official support for Windows 10/11 and Linux eco-systems. Not all product features are enabled on Windows 7 and it is no longer maintained. 
 
 > We are constantly expanding the list of supported platforms, devices and features based on customer and community feedback. If your use case is not yet covered, please open [a new issue](https://github.com/realsenseai/librealsense/issues/new)
 

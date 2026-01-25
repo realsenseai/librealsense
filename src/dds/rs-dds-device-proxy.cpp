@@ -25,6 +25,7 @@
 #include <rsutils/string/hexarray.h>
 #include <rsutils/string/from.h>
 #include <rsutils/number/crc32.h>
+#include <rsutils/time/timer.h>
 
 #include <src/ds/d500/d500-auto-calibration.h>
 #include <src/ds/d500/d500-debug-protocol-calibration-engine.h>
@@ -786,7 +787,10 @@ bool dds_device_proxy::check_fw_compatibility( const std::vector< uint8_t > & im
             subscription.cancel();
         }
         LOG_DEBUG( dfu_ready );
-        realdds::dds_device::check_reply( dfu_ready );  // throws if not OK
+        std::string tmp_error_str;
+        realdds::dds_device::check_reply( dfu_ready, &tmp_error_str );
+        if( ! tmp_error_str.empty() )
+            return false; // Error is logged by notification reader thread
     }
     catch( std::exception const & e )
     {
@@ -808,11 +812,24 @@ void dds_device_proxy::update( const void * /*image*/, int /*image_size*/, rs2_u
     // Set up a reply handler that will get the "dfu-apply" messages and progress notifications
     // NOTE: this depends on the implementation! If the device goes offline (as the DDS adapter device will), we won't
     // get anything...
+    std::atomic< bool > dfu_done( false );
+    std::string error_desc;
     auto subscription = _dds_dev->on_notification(
-        [callback]( std::string const & id, json const & notification )
+        [callback, &dfu_done, &error_desc]( std::string const & id, json const & notification )
         {
             if( id != realdds::topics::notification::dfu_apply::id )
                 return;
+
+            // Break early on error. No status field means no error.
+            if( auto status_j = notification.nested( realdds::topics::reply::key::status ) )
+            {
+                if( status_j.is_string() && status_j.string_ref() == realdds::topics::reply::status::ok )
+                    return;
+                error_desc = notification.nested( realdds::topics::reply::key::explanation ).string_ref_or_empty();
+                dfu_done = true;
+            }
+
+            // Update progress to user, signal device-proxy thread that process is done at 100%
             if( auto progress
                 = notification.nested( realdds::topics::notification::dfu_apply::key::progress, &json::is_number ) )
             {
@@ -820,6 +837,8 @@ void dds_device_proxy::update( const void * /*image*/, int /*image_size*/, rs2_u
                 LOG_DEBUG( "... DFU progress: " << ( fraction * 100 ) );
                 if( callback )
                     callback->on_update_progress( fraction );
+                if (fraction >= 1) // 100%
+                    dfu_done = true;
             }
         } );
 
@@ -831,7 +850,17 @@ void dds_device_proxy::update( const void * /*image*/, int /*image_size*/, rs2_u
 
     // The device will take time to do its thing. We want to return only when it's done, but we cannot know when it's
     // done if it goes down. It should go down right before restarting, so that's what we wait for:
-    _dds_dev->wait_until_offline( 5 * 60 * 1000 );  // ms -> 5 minutes
+    rsutils::time::timer timer{ std::chrono::minutes( 5 ) };
+    do
+    {
+        if( timer.has_expired() )
+            throw std::runtime_error( "timeout waiting for device update" );
+        std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+    }
+    while( ! dfu_done && ! _dds_dev->is_offline() );
+
+    if( ! error_desc.empty() )
+        throw std::runtime_error( "Device DFU failure: " + error_desc );
 }
 
 

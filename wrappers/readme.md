@@ -13,6 +13,7 @@
 * [OpenNI2](./openni2) - OpenNI2 integration
 * [Unreal Engine 4](./unrealengine4) - Unreal Engine 4 integration
 * [Rest API](./rest-api) - Rest API wrapper
+* [NodeJS](https://github.com/realsenseai/librealsense/tree/v2.53.1/wrappers/nodejs#librealsense2-nodejs-wrapper) - NodeJS wrapper, last supported version was v2.53.1
 
 If you are interested in official support for a language / framework, please let us know via [a new Issue](https://github.com/realsenseai/librealsense/issues/new)
 

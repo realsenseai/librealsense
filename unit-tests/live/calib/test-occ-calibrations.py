@@ -48,6 +48,7 @@ if not is_mipi_device():
                 log.i(f"Completed OCC calibration iteration {iteration}/{NUM_ITERATIONS} - Health factor: {health_factor}")
             except Exception as e:
                 log.e(f"OCC calibration test iteration {iteration} failed: ", str(e))
+                test.fail()
 """
 if is_mipi_device():
     with test.closure(f"OCC calibration test with host assistance - {NUM_ITERATIONS} iterations"):
@@ -63,6 +64,7 @@ if is_mipi_device():
                 log.i(f"Completed OCC calibration iteration {iteration}/{NUM_ITERATIONS} - Health factor: {health_factor}")   
             except Exception as e:
                 log.e(f"OCC calibration test with host assistance iteration {iteration} failed: ", str(e))
+                test.fail()
 """
 test.print_results_and_exit()
 
