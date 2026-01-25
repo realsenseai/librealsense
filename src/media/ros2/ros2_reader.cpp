@@ -18,6 +18,11 @@
 #include "source.h"
 #include "image.h"
 #include <src/context.h>
+#include <src/depth-sensor.h>
+#include <src/color-sensor.h>
+#include <src/safety-sensor.h>
+#include <src/depth-mapping-sensor.h>
+#include <src/sensor.h>
 
 namespace librealsense {
     using namespace device_serializer;
@@ -215,10 +220,20 @@ namespace librealsense {
             snapshot_collection sensor_extensions;
             sensor_extensions[RS2_EXTENSION_INFO] = sensors_info[sensor_index];
             auto& sensor_streams = sensor_to_streams[sensor_index];
+
+            // Get sensor name and add appropriate sensor extension
+            std::string sensor_name = "";
+            auto sensor_info = sensors_info[sensor_index];
+            if (sensor_info && sensor_info->supports_info(RS2_CAMERA_INFO_NAME))
+            {
+                sensor_name = sensor_info->get_info(RS2_CAMERA_INFO_NAME);
+            }
+            add_sensor_extension(sensor_extensions, sensor_name);
+
             sensor_descriptions.emplace_back(sensor_index, sensor_extensions, sensor_streams);
         }
 
-        _initial_snapshot = device_snapshot(device_extensions, sensor_descriptions, {});
+        _initial_snapshot = device_snapshot(device_extensions, sensor_descriptions, m_extrinsics_map);
         _initialized = true;
         reset();
         return _initial_snapshot;
@@ -366,7 +381,7 @@ namespace librealsense {
         return video_profile;
     }
 
-    std::set<uint32_t> ros2_reader::read_sensor_indices(uint32_t device_index)
+    std::set<uint32_t> ros2_reader::read_sensor_indices(uint32_t device_index) const
     {
         std::regex regex((rsutils::string::from() << "^/device_" << device_index
             << "/sensor_(\\d+)/info$").str());
@@ -665,6 +680,196 @@ namespace librealsense {
         temp_profile->set_stream_index(sid.stream_index);
         temp_profile->set_format(RS2_FORMAT_MOTION_XYZ32F);
         frame_ptr->set_stream(temp_profile);
+    }
+
+
+    namespace {
+
+    class depth_sensor_snapshot
+        : public virtual depth_sensor
+        , public extension_snapshot
+    {
+    public:
+        depth_sensor_snapshot( float depth_units )
+            : m_depth_units( depth_units )
+        {
+        }
+        float get_depth_scale() const override { return m_depth_units; }
+
+        void update( std::shared_ptr< extension_snapshot > ext ) override
+        {
+            if( auto api = As< depth_sensor >( ext ) )
+            {
+                m_depth_units = api->get_depth_scale();
+            }
+        }
+
+    protected:
+        float m_depth_units;
+    };
+
+    class depth_stereo_sensor_snapshot
+        : public depth_stereo_sensor
+        , public depth_sensor_snapshot
+    {
+    public:
+        depth_stereo_sensor_snapshot( float depth_units, float stereo_bl_mm )
+            : depth_sensor_snapshot( depth_units )
+            , m_stereo_baseline_mm( stereo_bl_mm )
+        {
+        }
+
+        float get_stereo_baseline_mm() const override { return m_stereo_baseline_mm; }
+
+        void update( std::shared_ptr< extension_snapshot > ext ) override
+        {
+            depth_sensor_snapshot::update( ext );
+
+            if( auto api = As< depth_stereo_sensor >( ext ) )
+            {
+                m_stereo_baseline_mm = api->get_stereo_baseline_mm();
+            }
+        }
+
+    private:
+        float m_stereo_baseline_mm;
+    };
+
+    }  // namespace
+
+
+    namespace {
+
+    class color_sensor_snapshot
+        : public virtual color_sensor
+        , public extension_snapshot
+    {
+    public:
+        void update( std::shared_ptr< extension_snapshot > ext ) override {}
+    };
+
+    class motion_sensor_snapshot
+        : public virtual motion_sensor
+        , public extension_snapshot
+    {
+    public:
+        void update( std::shared_ptr< extension_snapshot > ext ) override {}
+    };
+
+    class fisheye_sensor_snapshot
+        : public virtual fisheye_sensor
+        , public extension_snapshot
+    {
+    public:
+        void update( std::shared_ptr< extension_snapshot > ext ) override {}
+    };
+
+    class safety_sensor_snapshot
+        : public virtual safety_sensor
+        , public extension_snapshot
+    {
+    public:
+        void update(std::shared_ptr< extension_snapshot > ext) override {}
+        std::string get_safety_preset(int index) const override { return ""; }
+        void set_safety_preset(int index, const std::string& sp_json_str) const override {}
+        std::string get_safety_interface_config(rs2_calib_location loc) const override {return ""; };
+        void set_safety_interface_config(const std::string& sic_json_str) const override {};
+        std::string get_application_config() const override { return ""; }
+        void set_application_config(const std::string& application_config_json_str) const override {}
+
+    };
+
+    class depth_mapping_sensor_snapshot
+        : public virtual depth_mapping_sensor
+        , public extension_snapshot
+    {
+    public:
+        void update(std::shared_ptr< extension_snapshot > ext) override {}
+    };
+
+    }  // namespace
+
+
+    void ros2_reader::add_sensor_extension(snapshot_collection& sensor_extensions, const std::string& sensor_name)
+    {
+        if (is_color_sensor(sensor_name))
+        {
+            sensor_extensions[RS2_EXTENSION_COLOR_SENSOR] = std::make_shared<color_sensor_snapshot>();
+        }
+        else if( is_motion_module_sensor( sensor_name ) )
+        {
+            sensor_extensions[RS2_EXTENSION_MOTION_SENSOR] = std::make_shared<motion_sensor_snapshot>();
+        }
+        else if( is_fisheye_module_sensor( sensor_name ) )
+        {
+            sensor_extensions[RS2_EXTENSION_FISHEYE_SENSOR] = std::make_shared<fisheye_sensor_snapshot>();
+        }
+        else if( is_depth_sensor( sensor_name ) )
+        {
+            if( sensor_extensions.find( RS2_EXTENSION_DEPTH_SENSOR ) == nullptr )
+            {
+                float depth_units = 0.01f; // Default to 1mm for devices that don't have this option implemented
+                sensor_extensions[RS2_EXTENSION_DEPTH_SENSOR] = std::make_shared< depth_sensor_snapshot >( depth_units );
+
+                if( is_stereo_depth_sensor( sensor_name ) ) // Need both extensions
+                {
+                    if( sensor_extensions.find( RS2_EXTENSION_DEPTH_STEREO_SENSOR ) == nullptr )
+                    {
+                        float baseline = 0.095f; // Default for D555 (and D455 but D400 have baseline option implemented and won't need this)
+                        for( auto & ext : m_extrinsics_map ) // Get real value from extrinsics data, if exists
+                        {
+                            if( ext.first.stream_type == RS2_STREAM_INFRARED && ext.first.stream_index == 2 )
+                                baseline = ext.second.second.translation[0];
+                        }
+                        sensor_extensions[RS2_EXTENSION_DEPTH_STEREO_SENSOR] = std::make_shared< depth_stereo_sensor_snapshot >( depth_units, baseline );
+                    }
+                }
+            }
+        }
+        else if (is_safety_module_sensor(sensor_name))
+        {
+            sensor_extensions[RS2_EXTENSION_SAFETY_SENSOR] = std::make_shared<safety_sensor_snapshot>();
+        }
+        else if (is_depth_mapping_sensor(sensor_name))
+        {
+            sensor_extensions[RS2_EXTENSION_DEPTH_MAPPING_SENSOR] = std::make_shared<depth_mapping_sensor_snapshot>();
+        }
+    }
+
+
+    bool ros2_reader::is_depth_sensor(const std::string& sensor_name)
+    {
+        return (sensor_name.compare("Stereo Module") == 0 || sensor_name.compare("Coded-Light Depth Sensor") == 0);
+    }
+
+    bool ros2_reader::is_stereo_depth_sensor(const std::string& sensor_name)
+    {
+        return sensor_name.compare( "Stereo Module" ) == 0;
+    }
+
+    bool ros2_reader::is_color_sensor(const std::string& sensor_name)
+    {
+        return sensor_name.compare( "RGB Camera" ) == 0;
+    }
+
+    bool ros2_reader::is_motion_module_sensor(const std::string& sensor_name)
+    {
+        return (sensor_name.compare("Motion Module") == 0);
+    }
+
+    bool ros2_reader::is_fisheye_module_sensor(const std::string& sensor_name)
+    {
+        return (sensor_name.compare("Wide FOV Camera") == 0);
+    }
+
+    bool ros2_reader::is_safety_module_sensor(const std::string& sensor_name)
+    {
+        return (sensor_name.compare("Safety Camera") == 0);
+    }
+
+    bool ros2_reader::is_depth_mapping_sensor(const std::string& sensor_name)
+    {
+        return (sensor_name.compare("Depth Mapping Camera") == 0);
     }
 
     // Helpers ---------------------------------------------------------------------

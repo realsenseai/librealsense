@@ -3,6 +3,7 @@
 
 #temporary fix to prevent the test from running on Win_SH_Py_DDS_CI 
 #test:donotrun:dds
+#test:donotrun  # disabled due to rosbag upgrade
 
 import pyrealsense2 as rs
 from rspy import test, repo

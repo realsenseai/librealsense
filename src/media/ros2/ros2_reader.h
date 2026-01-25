@@ -37,14 +37,14 @@ namespace librealsense
 
         // Interface Implementations
         device_snapshot query_device_description(const nanoseconds& time) override;
-        std::shared_ptr< serialized_data > read_next_data() override;
-        void seek_to_time(const nanoseconds& time) override;
+        std::shared_ptr<serialized_data> read_next_data() override;
+        void seek_to_time(const nanoseconds& seek_time) override;
+        std::vector<std::shared_ptr<serialized_data>> fetch_last_frames(const nanoseconds& seek_time) override;
         nanoseconds query_duration() const override;
         void reset() override;
         void enable_stream(const std::vector<stream_identifier>& stream_ids) override;
         void disable_stream(const std::vector<stream_identifier>& stream_ids) override;
         const std::string& get_file_name() const override;
-        std::vector<std::shared_ptr<serialized_data>> fetch_last_frames(const nanoseconds& seek_time) override;
 
     private:
         // Helper to parse "key=value;key2=val2" format used by writer
@@ -52,12 +52,23 @@ namespace librealsense
         std::map< std::string, std::string > parse_msg_payload(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg) const;
         void register_camera_infos(std::shared_ptr<info_container>& infos, const std::map<std::string, std::string>& kv) const;
 
+        void add_sensor_extension(snapshot_collection& sensor_extensions, const std::string& sensor_name);
+       
+        static bool is_depth_sensor(const std::string& sensor_name);
+        static bool is_stereo_depth_sensor(const std::string& sensor_name);
+        static bool is_color_sensor(const std::string& sensor_name);
+        static bool is_motion_module_sensor(const std::string& sensor_name);
+        static bool is_fisheye_module_sensor(const std::string& sensor_name);
+        static bool is_safety_module_sensor(const std::string& sensor_name);
+        static bool is_depth_mapping_sensor(const std::string& sensor_name);
+
+
         // Topic parsing helpers
         bool is_stream_topic(const std::string& topic, stream_identifier& id) const;
         bool is_option_topic(const std::string& topic, sensor_identifier& sid, rs2_option& opt) const;
         std::shared_ptr<info_container> read_info_snapshot(const std::string& topic) const;
         std::shared_ptr<stream_profile_interface> read_next_stream_profile();
-        std::set<uint32_t> read_sensor_indices(uint32_t device_index);
+        std::set<uint32_t> read_sensor_indices(uint32_t device_index) const;
         std::map<uint32_t, stream_profiles> read_all_stream_profiles(uint32_t device_index);
         std::map<uint32_t, std::shared_ptr<info_container>> read_all_sensor_info();
 
@@ -93,5 +104,8 @@ namespace librealsense
 
         // Frame source for allocating frames
         std::shared_ptr<frame_source> _frame_source;
+
+        // Extrinsics map for stereo baseline calculation
+        std::map<stream_identifier, std::pair<uint32_t, rs2_extrinsics>> m_extrinsics_map;
     };
 }

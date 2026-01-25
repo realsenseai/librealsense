@@ -296,7 +296,6 @@ namespace librealsense
         write_additional_frame_messages(stream_id, timestamp, frame);
     }
 
-
     void ros2_writer::write_stream_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<stream_profile_interface> profile)
     {
         auto topic = ros_topic::stream_info_topic({ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) });
@@ -309,7 +308,6 @@ namespace librealsense
         write_string(topic, timestamp, payload);
     }
 
-    
     void ros2_writer::write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<video_stream_profile_interface> profile)
     {
         write_stream_info(timestamp, sensor_id, profile);

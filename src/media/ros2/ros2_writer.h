@@ -41,6 +41,7 @@ namespace librealsense
     private:
         void write_file_version();
         void write_frame_metadata(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
+        void write_extrinsics(const stream_identifier& stream_id, frame_interface* frame);
         void write_string( std::string const & topic, const device_serializer::nanoseconds & ts, std::string const & payload );
         void ensure_topic( const std::string & name, const std::string & type );
 
