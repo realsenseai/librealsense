@@ -10,7 +10,6 @@
 #include "device.h"
 #include "image.h"
 #include "metadata-parser.h"
-#include "context.h"
 
 #include <src/core/matcher-factory.h>
 
@@ -40,6 +39,8 @@
 namespace librealsense
 {
     // PSR
+    // default d400 device
+    // used as fallback for partial device creation when enabled by config
     class rs400_device : public d400_nonmonochrome,
                          public ds_advanced_mode_base,
                          public firmware_logger_device
@@ -1141,16 +1142,10 @@ namespace librealsense
         }
         catch( const std::exception& e )
         {
-            auto ctx = get_context();
-            if( ctx && is_partial_device_allowed( ctx ) )
-            {
-                LOG_ERROR( rsutils::string::from() << "Failed to create device for PID 0x" << std::hex << std::setw( 4 )
-                                                   << std::setfill( '0' ) << (int)pid << "! (" << e.what() << ")" );
-                // Create a device with partial capabilities when allowed instead of failing
-                return std::make_shared< rs400_device >( dev_info, register_device_notifications );
-            }
-            else
-                throw; // rethrowing exception
+            LOG_ERROR( rsutils::string::from() << "Failed to create device for PID 0x" << std::hex << std::setw( 4 )
+                                               << std::setfill( '0' ) << (int)pid << "! (" << e.what() << ")" );
+            // Create a device with partial capabilities when allowed instead of failing
+            return std::make_shared< rs400_device >( dev_info, register_device_notifications );
         }
     }
 
