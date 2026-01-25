@@ -48,6 +48,10 @@ namespace librealsense
     {
         try
         {
+            if (get_info(RS2_CAMERA_INFO_IMU_TYPE) == "IMU_Unknown")
+            {
+                throw std::runtime_error("Motion Sensor Failure - IMU type not recognized");
+            }
             using namespace ds;
 
             std::vector<platform::hid_device_info> hid_infos = dev_info->get_group().hid_devices;

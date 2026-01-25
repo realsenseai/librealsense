@@ -124,6 +124,10 @@ namespace librealsense
     {
         try
         {
+            if (get_info(RS2_CAMERA_INFO_IMU_TYPE) == "IMU_Unknown")
+            {
+                throw std::runtime_error("Motion Sensor Failure - IMU type not recognized");
+            }
             _ds_motion_common = std::make_shared<ds_motion_common>(this, _fw_version,
                                                                    _device_capabilities, _hw_monitor);
         } 
@@ -140,6 +144,12 @@ namespace librealsense
         d400_motion_base(dev_info)
     {
         try {
+            // in case d400_motion_base failed on exception
+            if (!_ds_motion_common)
+            {
+                throw std::runtime_error("Failed upstream");
+            }
+
             using namespace ds;
 
             std::vector<platform::hid_device_info> hid_infos = dev_info->get_group().hid_devices;
@@ -196,6 +206,12 @@ namespace librealsense
     {
         try
         {
+            // in case d400_motion_base failed on exception
+            if (!_ds_motion_common)
+            {
+                throw std::runtime_error("Failed upstream");
+            }
+
             using namespace ds;
 
             std::vector<platform::uvc_device_info> uvc_infos = dev_info->get_group().uvc_devices;
