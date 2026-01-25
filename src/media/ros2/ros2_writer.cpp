@@ -187,6 +187,37 @@ namespace librealsense
         write_string(metadata_topic, timestamp, metadata_payload);
     }
 
+    void ros2_writer::write_extrinsics(const stream_identifier& stream_id, frame_interface* frame)
+    {
+        if (m_extrinsics_msgs.find(stream_id) != m_extrinsics_msgs.end())
+        {
+            return; //already wrote it
+        }
+        auto& dev = frame->get_sensor()->get_device();
+        uint32_t reference_id = 0;
+        rs2_extrinsics ext;
+        std::tie(reference_id, ext) = dev.get_extrinsics(*frame->get_stream());
+        
+        // Serialize extrinsics as string: rotation (9 floats) and translation (3 floats)
+        std::string payload = "rotation=";
+        for (int i = 0; i < 9; ++i)
+        {
+            payload += std::to_string(ext.rotation[i]);
+            if (i < 8) payload += ",";
+        }
+        payload += ";translation=";
+        for (int i = 0; i < 3; ++i)
+        {
+            payload += std::to_string(ext.translation[i]);
+            if (i < 2) payload += ",";
+        }
+        
+        auto topic = ros_topic::stream_extrinsic_topic(stream_id, reference_id);
+        ensure_topic(topic, "librealsense/extrinsics");
+        write_string(topic, get_static_file_info_timestamp(), payload);
+        m_extrinsics_msgs.insert(stream_id);
+    }
+
     void ros2_writer::write_sensor_option(sensor_identifier sid, const nanoseconds& timestamp, rs2_option type, const librealsense::option& option)
     {
         float value = option.query();
@@ -227,7 +258,7 @@ namespace librealsense
 
         try
         {
-            //write_extrinsics(stream_id, frame);
+            write_extrinsics(stream_id, frame);
         }
         catch (std::exception const& e)
         {

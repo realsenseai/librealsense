@@ -79,5 +79,6 @@ namespace librealsense
         std::map< std::string, rosbag2_storage::TopicMetadata > _topics; // created topics cache
         std::shared_ptr< rosbag2_storage::storage_interfaces::ReadWriteInterface > _storage;
         std::map<uint32_t, std::set<rs2_option>> m_written_options_descriptions;
+        std::set<device_serializer::stream_identifier> m_extrinsics_msgs;
     };
 }
