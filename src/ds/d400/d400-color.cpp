@@ -42,8 +42,13 @@ namespace librealsense
           _color_stream(new stream(RS2_STREAM_COLOR)),
           _separate_color(true)
     {
-        create_color_device( dev_info->get_context(), dev_info->get_group() );
-        init();
+        try
+        {
+            create_color_device( dev_info->get_context(), dev_info->get_group() );
+            init();
+        } catch (...) {
+            LOG_ERROR("Color Sensor Failure!");
+        }
     }
 
     void d400_color::create_color_device(std::shared_ptr<context> ctx, const platform::backend_device_group& group)

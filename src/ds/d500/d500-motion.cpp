@@ -46,25 +46,33 @@ namespace librealsense
         : device( dev_info )
         , d500_device( dev_info )
     {
-        using namespace ds;
+        try
+        {
+            using namespace ds;
 
-        std::vector<platform::hid_device_info> hid_infos = dev_info->get_group().hid_devices;
+            std::vector<platform::hid_device_info> hid_infos = dev_info->get_group().hid_devices;
 
-        _ds_motion_common = std::make_shared<ds_motion_common>(this, _fw_version,
-            _device_capabilities, _hw_monitor); 
-        _ds_motion_common->init_motion(hid_infos.empty(), *_depth_stream);
+            _ds_motion_common = std::make_shared<ds_motion_common>(this, _fw_version,
+                                                                   _device_capabilities, _hw_monitor);
+            _ds_motion_common->init_motion(hid_infos.empty(), *_depth_stream);
 
 #if !defined(__APPLE__) // Motion sensors not supported on macOS
-        // Try to add HID endpoint
-        auto hid_ep = create_hid_device( dev_info->get_context(), dev_info->get_group().hid_devices );
-        if (hid_ep)
-        {
-            _motion_module_device_idx = static_cast<uint8_t>(add_sensor(hid_ep));
+            // Try to add HID endpoint
+            auto hid_ep = create_hid_device( dev_info->get_context(), dev_info->get_group().hid_devices );
+            if (hid_ep)
+            {
+                _motion_module_device_idx = static_cast<uint8_t>(add_sensor(hid_ep));
 
-            // HID metadata attributes
-            hid_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
-        }
+                // HID metadata attributes
+                hid_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
+            }
 #endif
+        }
+        catch (...)
+        {
+            LOG_ERROR("HID Motion Sensor Failure!");
+        }
+
     }
 
     void d500_motion::register_stream_to_extrinsic_group(const stream_interface& stream, uint32_t group_index)

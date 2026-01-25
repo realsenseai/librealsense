@@ -122,8 +122,15 @@ namespace librealsense
         _accel_stream(new stream(RS2_STREAM_ACCEL)),
         _gyro_stream(new stream(RS2_STREAM_GYRO))
     {
-        _ds_motion_common = std::make_shared<ds_motion_common>(this, _fw_version,
-            _device_capabilities, _hw_monitor);
+        try
+        {
+            _ds_motion_common = std::make_shared<ds_motion_common>(this, _fw_version,
+                                                                   _device_capabilities, _hw_monitor);
+        } catch (...)
+        {
+            LOG_ERROR("Base Motion Sensor Failure!");
+        }
+
     }
 
     d400_motion::d400_motion( std::shared_ptr< const d400_info > const & dev_info )
@@ -131,29 +138,33 @@ namespace librealsense
         d400_device(dev_info),
         d400_motion_base(dev_info)
     {
-        using namespace ds;
+        try {
+            using namespace ds;
 
-        std::vector<platform::hid_device_info> hid_infos = dev_info->get_group().hid_devices;
+            std::vector<platform::hid_device_info> hid_infos = dev_info->get_group().hid_devices;
 
-        _ds_motion_common->init_motion(hid_infos.empty(), *_depth_stream);
-        
-        initialize_fisheye_sensor( dev_info->get_context(), dev_info->get_group() );
+            _ds_motion_common->init_motion(hid_infos.empty(), *_depth_stream);
+
+            initialize_fisheye_sensor( dev_info->get_context(), dev_info->get_group() );
 
 #if !defined(__APPLE__) // Motion sensors not supported on macOS
-        // Try to add HID endpoint
-        auto hid_ep = create_hid_device( dev_info->get_context(), dev_info->get_group().hid_devices );
-        if (hid_ep)
-        {
-            _motion_module_device_idx = static_cast<uint8_t>(add_sensor(hid_ep));
+            // Try to add HID endpoint
+            auto hid_ep = create_hid_device( dev_info->get_context(), dev_info->get_group().hid_devices );
+            if (hid_ep)
+            {
+                _motion_module_device_idx = static_cast<uint8_t>(add_sensor(hid_ep));
 
-            // HID metadata attributes
-            hid_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
-        }
-        //for FW >=5.16 the scale factor changes to 1000.0 since FW sends 32bit
-        if (_fw_version >= firmware_version( 5, 16, 0, 0))
-            get_raw_motion_sensor()->set_gyro_scale_factor( 10000.0 );
+                // HID metadata attributes
+                hid_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
+            }
+            //for FW >=5.16 the scale factor changes to 1000.0 since FW sends 32bit
+            if (_fw_version >= firmware_version( 5, 16, 0, 0))
+                get_raw_motion_sensor()->set_gyro_scale_factor( 10000.0 );
 #endif
-
+        }
+        catch (...) {
+            LOG_ERROR("HID Motion Sensor Failure!");
+        }
     }
 
 
@@ -181,30 +192,37 @@ namespace librealsense
           d400_device(dev_info),
           d400_motion_base(dev_info)
     {
-        using namespace ds;
-
-        std::vector<platform::uvc_device_info> uvc_infos = dev_info->get_group().uvc_devices;
-
-        _ds_motion_common->init_motion(uvc_infos.empty(), *_depth_stream);
-
-        if (!uvc_infos.empty())
+        try
         {
-            // product id - D457 dev - check - must not be the front of uvc_infos vector
-            _pid = uvc_infos.front().pid;
-        }
+            using namespace ds;
+
+            std::vector<platform::uvc_device_info> uvc_infos = dev_info->get_group().uvc_devices;
+
+            _ds_motion_common->init_motion(uvc_infos.empty(), *_depth_stream);
+
+            if (!uvc_infos.empty())
+            {
+                // product id - D457 dev - check - must not be the front of uvc_infos vector
+                _pid = uvc_infos.front().pid;
+            }
 
 #if !defined(__APPLE__) // Motion sensors not supported on macOS
-        // Try to add HID endpoint
-        std::shared_ptr<synthetic_sensor> sensor_ep;
-        sensor_ep = create_uvc_device(dev_info->get_context(), dev_info->get_group().uvc_devices, _fw_version);
-        if (sensor_ep)
-        {
-            _motion_module_device_idx = static_cast<uint8_t>(add_sensor(sensor_ep));
+            // Try to add HID endpoint
+            std::shared_ptr<synthetic_sensor> sensor_ep;
+            sensor_ep = create_uvc_device(dev_info->get_context(), dev_info->get_group().uvc_devices, _fw_version);
+            if (sensor_ep)
+            {
+                _motion_module_device_idx = static_cast<uint8_t>(add_sensor(sensor_ep));
 
-            // HID metadata attributes - D457 dev - check metadata parser
-            sensor_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
-        }
+                // HID metadata attributes - D457 dev - check metadata parser
+                sensor_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
+            }
 #endif
+        } catch (...)
+        {
+            LOG_ERROR("UVC Motion Sensor Failure!");
+        }
+
     }
 
     void d400_motion::initialize_fisheye_sensor(std::shared_ptr<context> ctx, const platform::backend_device_group& group)

@@ -47,8 +47,15 @@ namespace librealsense
         , _separate_color( true )
         , _native_format( native_format )
     {
-        create_color_device( dev_info->get_context(), dev_info->get_group() );
-        init();
+        try
+        {
+            create_color_device( dev_info->get_context(), dev_info->get_group() );
+            init();
+        }
+        catch (...)
+        {
+            LOG_ERROR("Color Sensor Failure!");
+        }
     }
 
     void d500_color::create_color_device(std::shared_ptr<context> ctx, const platform::backend_device_group& group)
