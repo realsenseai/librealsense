@@ -68,9 +68,9 @@ namespace librealsense
             }
 #endif
         }
-        catch (...)
+        catch (const std::exception& e)
         {
-            LOG_ERROR("HID Motion Sensor Failure!");
+            LOG_ERROR("HID Motion Sensor Failure! " << e.what());
         }
 
     }

@@ -46,8 +46,10 @@ namespace librealsense
         {
             create_color_device( dev_info->get_context(), dev_info->get_group() );
             init();
-        } catch (...) {
-            LOG_ERROR("Color Sensor Failure!");
+        } 
+        catch (const std::exception& e)
+        {
+            LOG_ERROR("Color Sensor Failure! " << e.what());
         }
     }
 

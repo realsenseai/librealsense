@@ -126,9 +126,10 @@ namespace librealsense
         {
             _ds_motion_common = std::make_shared<ds_motion_common>(this, _fw_version,
                                                                    _device_capabilities, _hw_monitor);
-        } catch (...)
+        } 
+        catch (const std::exception& e)
         {
-            LOG_ERROR("Base Motion Sensor Failure!");
+            LOG_ERROR("Base Motion Sensor Failure! " << e.what());
         }
 
     }
@@ -162,8 +163,9 @@ namespace librealsense
                 get_raw_motion_sensor()->set_gyro_scale_factor( 10000.0 );
 #endif
         }
-        catch (...) {
-            LOG_ERROR("HID Motion Sensor Failure!");
+        catch (const std::exception& e) 
+        {
+            LOG_ERROR("HID Motion Sensor Failure! " << e.what());
         }
     }
 
@@ -218,9 +220,10 @@ namespace librealsense
                 sensor_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
             }
 #endif
-        } catch (...)
+        } 
+        catch (const std::exception& e)
         {
-            LOG_ERROR("UVC Motion Sensor Failure!");
+            LOG_ERROR("UVC Motion Sensor Failure! " << e.what());
         }
 
     }
