@@ -122,7 +122,6 @@ namespace librealsense
             //Rethrowing with better clearer message
             throw io_exception( rsutils::string::from() << "Failed to create ros reader: " << e.what() );
         }
-        _topics_cache = _storage->get_all_topics_and_types();
     }
 
     device_snapshot ros2_reader::query_device_description(const nanoseconds& time)
@@ -152,6 +151,8 @@ namespace librealsense
                 // Filter: if we have enabled streams and this isn't one, skip it
                 if (!_enabled_streams.empty() && _enabled_streams.find(sid) == _enabled_streams.end())
                 {
+                    // Following message is expected to be metadata, consume it
+                    read_next_cached();
                     continue;
                 }
                 LOG_DEBUG("Next message is a frame");
@@ -179,8 +180,14 @@ namespace librealsense
                 auto notification = create_notification(msg);
                 return std::make_shared<serialized_notification>(timestamp, sensor_id, notification);
             }
+
+            std::string err_msg = rsutils::string::from() << "Unknown message type "
+                                                          << "(Topic: " << msg->topic_name << ")"
+                                                          << "(Timestamp: " << msg->time_stamp << ")";
+            LOG_ERROR(err_msg);
+            throw invalid_value_exception(err_msg);
         }
-        return std::make_shared<serialized_end_of_file>();
+        return std::make_shared<serialized_end_of_file>(); // reached if only disabled streams are left
     }
 
     void ros2_reader::seek_to_time(const nanoseconds& seek_time)
@@ -226,8 +233,11 @@ namespace librealsense
         _storage->open(m_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
         m_version = read_file_version();
         _last_frame_cache.clear();
+        _initialized = false;
+        m_read_options_descriptions.clear();
         m_frame_source = std::make_shared<frame_source>(32);
         m_frame_source->init(m_metadata_parser_map);
+        m_initial_device_description = read_device_description(nanoseconds(0), true);
     }
 
     void ros2_reader::enable_stream(const std::vector<device_serializer::stream_identifier>& stream_ids)
@@ -850,6 +860,7 @@ namespace librealsense
         if (_initialized) return m_initial_device_description;
 
         //reset(); // Ensure we scan from start
+        _topics_cache = _storage->get_all_topics_and_types();
         snapshot_collection device_extensions;
         constexpr auto device_index = get_device_index();
 
