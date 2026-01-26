@@ -74,7 +74,10 @@ namespace librealsense
         }
         catch (const std::exception& e)
         {
-            LOG_ERROR("HID Motion Sensor Failure! " << e.what());
+            auto device_name = get_info( RS2_CAMERA_INFO_NAME );
+            auto serial = get_info( RS2_CAMERA_INFO_SERIAL_NUMBER );
+            LOG_ERROR( "Device Name : " << device_name << " Serial : " << serial
+                << " HID Motion Sensor Failure! "  << e.what() );
         }
 
     }
