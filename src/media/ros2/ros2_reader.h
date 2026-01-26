@@ -22,6 +22,7 @@
 
 #include <media/ros/ros_file_format.h> // helpers for topic names
 #include <src/core/info.h>
+#include <src/core/options-container.h>
 
 namespace librealsense
 {
@@ -75,20 +76,23 @@ namespace librealsense
 
         // Topic parsing helpers
         bool is_stream_topic(const std::string& topic, stream_identifier& id) const;
+        std::string read_option_description(const uint32_t sensor_index, const rs2_option& id);
         bool is_option_topic(const std::string& topic, sensor_identifier& sid, rs2_option& opt) const;
         std::shared_ptr<info_container> read_info_snapshot(const std::string& topic);
         std::shared_ptr<stream_profile_interface> read_next_stream_profile();
         std::set<uint32_t> read_sensor_indices(uint32_t device_index) const;
         std::map<uint32_t, stream_profiles> read_all_stream_profiles(uint32_t device_index);
-        std::map<uint32_t, std::shared_ptr<info_container>> read_all_sensor_info(std::set<uint32_t> sensor_indices);
+        std::map<uint32_t, std::shared_ptr<info_container>> read_all_sensor_info(std::set<uint32_t> sensor_indices); // TODO remove
 
         // Stream profile parsing helpers
         rs2_motion_device_intrinsic parse_motion_intrinsics(const std::map<std::string, std::string>& kv) const;
         rs2_intrinsics parse_video_intrinsics(const std::map<std::string, std::string>& kv) const;
         std::shared_ptr<motion_stream_profile> create_motion_profile(const stream_identifier& stream_id, rs2_format format,
             uint32_t fps, const std::map<std::string, std::string>& intrinsics_kv) const;
-        std::shared_ptr<video_stream_profile> create_video_profile(const stream_identifier& stream_id, rs2_format format,
-            uint32_t fps, const std::map<std::string, std::string>& intrinsics_kv) const;
+        //std::shared_ptr<video_stream_profile> create_video_profile(const stream_identifier& stream_id, rs2_format format,
+        //    uint32_t fps, const std::map<std::string, std::string>& intrinsics_kv) const; // TODO replace with:
+        static std::shared_ptr<video_stream_profile> create_video_stream_profile(const stream_identifier& stream_id, rs2_format format,
+            uint32_t fps, const std::map<std::string, std::string>& intrinsics_kv);
 
 
         // Frame setup helpers
@@ -96,8 +100,11 @@ namespace librealsense
         void setup_video_frame(frame_interface* frame_ptr, const stream_identifier& sid) const;
         void setup_motion_frame(frame_interface* frame_ptr, const stream_identifier& sid) const;
         
+        std::pair<rs2_option, std::shared_ptr<librealsense::option>> create_option(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg);
         std::shared_ptr< serialized_data > read_frame_data(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg, const stream_identifier& sid);
         frame_holder allocate_frame(const stream_identifier& sid, const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg, const frame_additional_data& additional_data);
+        notification create_notification(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg) const;
+        std::shared_ptr<options_container> read_sensor_options(device_serializer::sensor_identifier sensor_id);
 
         std::shared_ptr< rosbag2_storage::storage_interfaces::ReadWriteInterface > _storage;
 
@@ -109,6 +116,8 @@ namespace librealsense
         std::vector< rosbag2_storage::TopicMetadata > _topics_cache;
         std::shared_ptr<context>                m_context;
         uint32_t                                m_version;
+        std::map<uint32_t, std::map<rs2_option, std::string>> m_read_options_descriptions;
+
         // State management
         bool _initialized = false;
         std::set< stream_identifier > _enabled_streams;
