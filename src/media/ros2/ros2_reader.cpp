@@ -613,7 +613,21 @@ namespace librealsense
 
     bool ros2_reader::try_read_stream_extrinsic(const stream_identifier& stream_id, uint32_t& group_id, rs2_extrinsics& extrinsic)
     {
-        auto msg = read_next_cached();
+        auto msg = peek_next_cached();
+        if (!msg)
+        {
+            return false;
+        }
+        // Check if this is the extrinsic topic for the requested stream
+        // Some devices might not have extrinsics for all streams, ie. software device unless explicitly set
+        auto regex_str = (rsutils::string::from() << "^/device_" << stream_id.device_index <<
+                                                     "/sensor_" << stream_id.sensor_index << "/[^/]+/tf/\\d+$").str();
+        auto extrinsic_topics = filter_by_regex(_topics_cache, std::regex(regex_str));
+        if (std::find(extrinsic_topics.begin(), extrinsic_topics.end(), msg->topic_name) == extrinsic_topics.end())
+        {
+            return false;
+        }
+        msg = read_next_cached();
         group_id = ros_topic::get_extrinsic_group_index(msg->topic_name);
         auto kv = parse_msg_payload(msg);
 
@@ -880,9 +894,8 @@ namespace librealsense
         auto sensors_info = std::map<uint32_t, std::shared_ptr<info_container>>();
         auto sensors_options = std::map<uint32_t, std::shared_ptr<options_container>>();
 
-        for (auto& sensor_pair : sensor_to_streams)
+        for (auto& sensor_index : sensor_indices)
         {
-            uint32_t sensor_index = sensor_pair.first;
             auto sensor_info_topic = ros_topic::sensor_info_topic({ device_index, sensor_index });
             auto sensor_info = read_info_snapshot(sensor_info_topic);
             sensors_info[sensor_index] = sensor_info;
