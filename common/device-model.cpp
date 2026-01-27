@@ -864,12 +864,9 @@ namespace rs2
         bool yes_was_chosen = false;
         if (yes_no_dialog("Advanced Mode", message_text, yes_was_chosen, window, error_message))
         {
-            if (yes_was_chosen)
-            {
-                dev.as<advanced_mode>().toggle_advanced_mode(enable_advanced_mode);
-                restarting_device_info = get_device_info(dev, false);
-                view.not_model->add_log(enable_advanced_mode ? "Turning on advanced mode..." : "Turning off  advanced mode...");
-            }
+            dev.as<advanced_mode>().toggle_advanced_mode(enable_advanced_mode);
+            restarting_device_info = get_device_info(dev, false);
+            view.not_model->add_log(enable_advanced_mode ? "Turning on advanced mode..." : "Turning off  advanced mode...");
             keep_showing = false;
         }
         return keep_showing;

@@ -1054,7 +1054,7 @@ namespace librealsense
             , d400_active( dev_info )
             , d400_color( dev_info )
             , d400_motion( dev_info )
-            , ds_advanced_mode_base()
+            , ds_advanced_mode_base(d400_device::_depth_units_register_action)
             , firmware_logger_device( dev_info, d400_device::_hw_monitor, get_firmware_logs_command(), get_flash_logs_command() )
             , ds_thermal_tracking( d400_device::_thermal_monitor )
         {

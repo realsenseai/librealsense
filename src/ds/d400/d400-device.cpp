@@ -926,16 +926,20 @@ namespace librealsense
 
             if (advanced_mode && _fw_version >= firmware_version("5.6.3.0"))
             {
-                auto depth_scale = std::make_shared<depth_scale_option>(*_hw_monitor);
-                auto depth_sensor = As<d400_depth_sensor, synthetic_sensor>(&get_depth_sensor());
-                assert(depth_sensor);
-
-                depth_scale->add_observer([depth_sensor](float val)
+                auto _depth_units_register_action = [this]()
                 {
-                    depth_sensor->set_depth_scale(val);
-                });
+                    auto depth_scale = std::make_shared<depth_scale_option>(*_hw_monitor);
+                    auto depth_sensor = As<d400_depth_sensor, synthetic_sensor>(&get_depth_sensor());
+                    assert(depth_sensor);
 
-                depth_sensor->register_option(RS2_OPTION_DEPTH_UNITS, depth_scale);
+                    depth_scale->add_observer([depth_sensor](float val)
+                    {
+                        depth_sensor->set_depth_scale(val);
+                    });
+
+                    depth_sensor->register_option(RS2_OPTION_DEPTH_UNITS, depth_scale);
+                };
+                _depth_units_register_action();
             }
             else
             {

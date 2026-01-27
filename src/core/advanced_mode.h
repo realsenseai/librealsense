@@ -101,6 +101,9 @@ namespace librealsense
     class ds_advanced_mode_base : public ds_advanced_mode_interface
     {
     public:
+        ds_advanced_mode_base(std::function<void()> depth_units_register_action) :
+            _depth_units_register_action(std::move(depth_units_register_action)) {}
+        ds_advanced_mode_base() : _depth_units_register_action(nullptr){}
         virtual ~ds_advanced_mode_base() = default;
         virtual void initialize_advanced_mode( device_interface * dev );
 
@@ -208,6 +211,7 @@ namespace librealsense
         bool _amplitude_factor_support = false;
         bool _blocked = false;
         std::string _block_message;
+        std::function<void()> _depth_units_register_action;
 
         preset get_all() const;
         void set_all( const preset & p );
@@ -221,6 +225,8 @@ namespace librealsense
 
         void register_to_visual_preset_option();
         void unregister_from_visual_preset_option();
+        void register_to_depth_scale_option();
+        void unregister_from_depth_scale_option();
 
         template<class T>
         void set(const T& strct, EtAdvancedModeRegGroup cmd) const
