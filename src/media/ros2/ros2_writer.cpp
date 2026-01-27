@@ -71,17 +71,31 @@ namespace librealsense
         _topics.emplace(name, md);
     }
 
+    std::shared_ptr<rcutils_uint8_array_t> ros2_writer::create_buffer(const void* data, size_t size)
+    {
+        auto buffer = std::shared_ptr<rcutils_uint8_array_t>(new rcutils_uint8_array_t(),
+            [](rcutils_uint8_array_t* arr) {
+                rcutils_uint8_array_fini(arr);
+                delete arr;
+            });
+
+        // Initialize the array with the allocator
+        auto ret = rcutils_uint8_array_init(buffer.get(), size, &rcutils_get_default_allocator());
+        if (ret != RCUTILS_RET_OK)
+            throw std::runtime_error("Failed to initialize rosbag2 buffer");
+
+        // Now copy the data
+        std::memcpy(buffer->buffer, data, size);
+        buffer->buffer_length = size;
+
+        return buffer;
+    }
+
+
     void ros2_writer::write_string(std::string const& topic, const nanoseconds& ts, std::string const& payload)
     {
         ensure_topic(topic, "librealsense/string");
-        auto buffer = std::make_shared< rcutils_uint8_array_t >();
-        buffer->buffer_length = payload.size();
-        buffer->buffer_capacity = payload.size();
-        buffer->allocator = rcutils_get_default_allocator();
-        buffer->buffer = static_cast<uint8_t*>(std::malloc(payload.size()));
-        if (!buffer->buffer)
-            throw std::runtime_error("Failed to allocate rosbag2 string buffer");
-        std::memcpy(buffer->buffer, payload.data(), payload.size());
+        auto buffer = create_buffer(payload.data(), payload.size());
 
         auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
         msg->serialized_data = buffer;
@@ -258,14 +272,7 @@ namespace librealsense
             throw std::runtime_error("Frame is not video frame");
         auto size = vid_frame->get_stride() * vid_frame->get_height();
         auto p_data = vid_frame->get_frame_data();
-        auto buffer = std::make_shared< rcutils_uint8_array_t >();
-        buffer->buffer = static_cast<uint8_t*>(std::malloc(size));
-        if (!buffer->buffer)
-            throw std::runtime_error("Failed to allocate rosbag2 frame buffer");
-        std::memcpy(buffer->buffer, p_data, size);
-        buffer->buffer_length = size;
-        buffer->buffer_capacity = size;
-        buffer->allocator = rcutils_get_default_allocator();
+        auto buffer = create_buffer(p_data, size);
         auto image_topic = ros_topic::frame_data_topic(stream_id);
         ensure_topic(image_topic, "librealsense/raw_frame");
         auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
@@ -286,7 +293,6 @@ namespace librealsense
         ensure_topic(topic, "librealsense/raw_motion_frame");
         auto size = fi->get_frame_data_size();
         auto data_ptr = reinterpret_cast<const float*>(frame.frame->get_frame_data());
-        auto buffer = std::make_shared< rcutils_uint8_array_t >();
         if (stream_id.stream_type == RS2_STREAM_ACCEL || stream_id.stream_type == RS2_STREAM_GYRO)
         {
             size = 3 * sizeof(float);
@@ -297,13 +303,7 @@ namespace librealsense
             size = sizeof(data_imu);
             data_ptr = reinterpret_cast<const float*>(&data_imu);
         }
-        buffer->buffer = static_cast<uint8_t*>(std::malloc(size));
-        if (!buffer->buffer)
-            throw std::runtime_error("Failed to allocate rosbag2 motion frame buffer");
-        std::memcpy(buffer->buffer, data_ptr, size);
-        buffer->buffer_length = size;
-        buffer->buffer_capacity = size;
-        buffer->allocator = rcutils_get_default_allocator();
+        auto buffer = create_buffer(data_ptr, size);
         auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
         msg->serialized_data = buffer;
         msg->time_stamp = static_cast<rcutils_time_point_value_t>(timestamp.count());
