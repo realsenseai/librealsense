@@ -40,7 +40,7 @@ public:
     void set_state( state_t );
 
     state_t _state = state_t::INITIALIZING;
-    size_t _n_streams_expected = 0xFFFF;  // needed only until ready
+    size_t _n_streams_expected = 0;  // needed only until ready
 
     topics::device_info _info;
     rsutils::json const _device_settings;

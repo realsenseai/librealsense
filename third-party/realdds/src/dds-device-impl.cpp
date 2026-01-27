@@ -889,7 +889,7 @@ void dds_device::impl::on_stream_header( json const & j, dds_sample const & samp
                    "failed to instantiate stream type '" << stream_type << "' (instead, got '" << stream->type_string()
                                                          << "')" );
     _stream_header_received[stream_name] = true;
-    std::string expected_streams = _n_streams_expected == 0xFFFF ? "unknown" : std::to_string( _n_streams_expected );
+    std::string expected_streams = _n_streams_expected == 0 ? "unknown" : std::to_string( _n_streams_expected );
     LOG_DEBUG( "[" << debug_name() << "] ... stream " << _streams.size() << "/" << expected_streams << " '" << stream_name
                    << "' received with " << profiles.size() << " profiles"
                    << ( stream->metadata_enabled() ? " and metadata" : "" ) );
