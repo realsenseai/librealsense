@@ -2078,7 +2078,8 @@ namespace rs2
                         ImGui::PopItemWidth();
                         return is_clicked;
                     };
-                    sub->options_metadata[RS2_OPTION_VISUAL_PRESET].custom_draw_method = draw_preset_combo_box;
+                    auto & visual_preset_opt_model = sub->options_metadata.at(RS2_OPTION_VISUAL_PRESET);
+                    visual_preset_opt_model.custom_draw_method = draw_preset_combo_box;
                     ImGui::PopStyleColor(1);
                     if (sub->draw_option(RS2_OPTION_VISUAL_PRESET, dev.is<playback>() || update_read_only_options, error_message, *viewer.not_model))
                     {

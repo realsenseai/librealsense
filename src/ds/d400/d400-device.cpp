@@ -930,7 +930,7 @@ namespace librealsense
                                                   rsutils::lazy< float >( [this]() { return get_stereo_baseline_mm(); } ) ) );
             }
 
-            if (advanced_mode && _fw_version >= firmware_version("5.6.3.0"))
+            _depth_units_register_action = [this]()
             {
                 auto depth_scale = std::make_shared<depth_scale_option>(*_hw_monitor);
                 auto depth_sensor = As<d400_depth_sensor, synthetic_sensor>(&get_depth_sensor());
@@ -942,6 +942,11 @@ namespace librealsense
                 });
 
                 depth_sensor->register_option(RS2_OPTION_DEPTH_UNITS, depth_scale);
+            };
+
+            if (advanced_mode && _fw_version >= firmware_version("5.6.3.0"))
+            {
+                _depth_units_register_action();
             }
             else
             {

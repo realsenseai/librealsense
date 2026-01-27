@@ -33,7 +33,8 @@ namespace rs2
     {
         try
         {
-            for( rs2::option_value option : s->get_supported_option_values() )
+            auto supported_options = s->get_supported_option_values();
+            for( rs2::option_value option : supported_options )
             {
                 options_metadata[option->id]
                     = create_option_model( option, opt_base_label, this, s, options_invalidated, error_message );

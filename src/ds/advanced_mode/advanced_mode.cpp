@@ -30,6 +30,19 @@ namespace librealsense
         _depth_sensor->unregister_option(RS2_OPTION_VISUAL_PRESET);
     }
 
+    void ds_advanced_mode_base::register_to_depth_scale_option()
+    {
+        if (_depth_units_register_action)
+        {
+            _depth_units_register_action();
+        }
+    }
+
+    void ds_advanced_mode_base::unregister_from_depth_scale_option()
+    {
+        _depth_sensor->unregister_option(RS2_OPTION_DEPTH_UNITS);
+    }
+
     void ds_advanced_mode_base::initialize_advanced_mode( device_interface * dev )
     {
         _dev = dev;
@@ -75,16 +88,20 @@ namespace librealsense
 
     void ds_advanced_mode_base::toggle_advanced_mode( bool enable )
     {
+        if (! enable )
+        {
+            unregister_from_visual_preset_option();
+            unregister_from_depth_scale_option();
+        }
         send_receive( encode_command( ds::fw_cmd::EN_ADV, enable ) );
         send_receive( encode_command( ds::fw_cmd::HWRST ) );
 
         // register / unregister visual preset option
-        if( is_enabled() )
+        if( enable )
         {
             register_to_visual_preset_option();
+            register_to_depth_scale_option();
         }
-        else
-            unregister_from_visual_preset_option();
     }
 
     void ds_advanced_mode_base::apply_preset( const std::vector< platform::stream_profile > & configuration,

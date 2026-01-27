@@ -100,7 +100,10 @@ namespace rs2
             std::string& error_message, notifications_model& model)
         {
             if (options_metadata.find(opt) != options_metadata.end())
-                return options_metadata[opt].draw_option(update_read_only_options, streaming, error_message, model);
+            {
+                auto & opt_model = options_metadata.at(opt);
+                return opt_model.draw_option(update_read_only_options, streaming, error_message, model);
+            }
             return false;
         }
 
