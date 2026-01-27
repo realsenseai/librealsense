@@ -29,6 +29,7 @@ namespace librealsense
     using namespace device_serializer;
     class context;
     class processing_block_interface;
+    class recommended_proccesing_blocks_snapshot;
 
     class ros2_reader : public reader
     {
@@ -47,7 +48,8 @@ namespace librealsense
         void disable_stream(const std::vector<stream_identifier>& stream_ids) override;
         const std::string& get_file_name() const override;
 
-        // Caching wrapper methods
+        // We use a simple caching mechanism to have a lookahead functionality
+        // needed in some cases to tell what is the next message without missing it
         bool has_next_cached() const;
         std::shared_ptr<rosbag2_storage::SerializedBagMessage> read_next_cached();
         std::shared_ptr<rosbag2_storage::SerializedBagMessage> peek_next_cached();
@@ -62,6 +64,7 @@ namespace librealsense
 
         uint32_t read_file_version();
         bool try_read_stream_extrinsic(const stream_identifier& stream_id, uint32_t& group_id, rs2_extrinsics& extrinsic);
+        std::shared_ptr<recommended_proccesing_blocks_snapshot> update_proccesing_blocks(uint32_t sensor_index, const nanoseconds& time, std::shared_ptr<options_container>& sensor_options);
         void add_sensor_extension(snapshot_collection& sensor_extensions, const std::string& sensor_name);
        
         static bool is_depth_sensor(const std::string& sensor_name);
@@ -72,6 +75,8 @@ namespace librealsense
         static bool is_safety_module_sensor(const std::string& sensor_name);
         static bool is_depth_mapping_sensor(const std::string& sensor_name);
 
+        std::shared_ptr<recommended_proccesing_blocks_snapshot> read_proccesing_blocks(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp,
+            std::shared_ptr<options_interface> options);
         device_snapshot read_device_description(const nanoseconds& time, bool reset = false);
 
         // Topic parsing helpers
@@ -89,8 +94,6 @@ namespace librealsense
         rs2_intrinsics parse_video_intrinsics(const std::map<std::string, std::string>& kv) const;
         std::shared_ptr<motion_stream_profile> create_motion_profile(const stream_identifier& stream_id, rs2_format format,
             uint32_t fps, const std::map<std::string, std::string>& intrinsics_kv) const;
-        //std::shared_ptr<video_stream_profile> create_video_profile(const stream_identifier& stream_id, rs2_format format,
-        //    uint32_t fps, const std::map<std::string, std::string>& intrinsics_kv) const; // TODO replace with:
         static std::shared_ptr<video_stream_profile> create_video_stream_profile(const stream_identifier& stream_id, rs2_format format,
             uint32_t fps, const std::map<std::string, std::string>& intrinsics_kv);
 
@@ -102,7 +105,12 @@ namespace librealsense
         
         std::pair<rs2_option, std::shared_ptr<librealsense::option>> create_option(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg);
         std::shared_ptr< serialized_data > read_frame_data(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg, const stream_identifier& sid);
-        frame_holder allocate_frame(const stream_identifier& sid, const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg, const frame_additional_data& additional_data);
+
+        std::shared_ptr< processing_block_interface >
+            create_processing_block(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg,
+                                 bool & depth_to_disparity,
+                                 std::shared_ptr< options_interface > options );
+
         notification create_notification(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg) const;
         std::shared_ptr<options_container> read_sensor_options(device_serializer::sensor_identifier sensor_id);
 

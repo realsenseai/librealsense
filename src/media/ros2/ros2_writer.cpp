@@ -218,21 +218,6 @@ namespace librealsense
         m_extrinsics_msgs.insert(stream_id);
     }
 
-    void ros2_writer::write_sensor_option(sensor_identifier sid, const nanoseconds& timestamp, rs2_option type, const librealsense::option& option)
-    {
-        float value = option.query();
-        //One message for value
-        write_string(ros_topic::option_value_topic(sid, type), timestamp, std::to_string(value));
-        //Another message for description, should be written once per topic
-        if (m_written_options_descriptions[sid.sensor_index].find(type) == m_written_options_descriptions[sid.sensor_index].end())
-        {
-            const char* desc = option.get_description();
-            std::string description = desc ? std::string(desc) : (rsutils::string::from() << "Read only option " << librealsense::get_string(type));
-            write_string(ros_topic::option_description_topic(sid, type), get_static_file_info_timestamp(), description);
-            m_written_options_descriptions[sid.sensor_index].insert(type);
-        }
-    }
-
     void ros2_writer::write_notification(const sensor_identifier& sensor_id, const nanoseconds& ts, const notification& n)
     {
         std::string topic = ros_topic::notification_topic(sensor_id, n.category);
@@ -468,9 +453,20 @@ namespace librealsense
             write_streaming_info(timestamp, { device_id, sensor_id }, profile);
             break;
         }
-        default:
-            // Other snapshots ignored for now in minimal ROS2 writer 
+        /*case RS2_EXTENSION_POSE_PROFILE:
+        {
+            auto profile = SnapshotAs<RS2_EXTENSION_POSE_PROFILE>(snapshot);
+            write_streaming_info(timestamp, { device_id, sensor_id }, profile);
             break;
+        }*/
+        case RS2_EXTENSION_RECOMMENDED_FILTERS:
+        {
+            auto filters = SnapshotAs<RS2_EXTENSION_RECOMMENDED_FILTERS>(snapshot);
+            write_sensor_processing_blocks({ device_id, sensor_id }, timestamp, filters);
+            break;
+        }
+        default:
+            throw invalid_value_exception( rsutils::string::from() << "Failed to Write Extension Snapshot: Unsupported extension \"" << librealsense::get_string(type) << "\"");
         }
 
     }
@@ -485,6 +481,21 @@ namespace librealsense
                 std::string kv = rsutils::string::from() << rs2_camera_info_to_string(camera_info) << "=" << info_snapshot->get_info(camera_info);
                 write_string(topic, timestamp, kv);
             }
+        }
+    }
+
+    void ros2_writer::write_sensor_option(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, rs2_option type, const librealsense::option& option)
+    {
+        float value = option.query();
+        //One message for value
+        write_string(ros_topic::option_value_topic(sensor_id, type), timestamp, std::to_string(value));
+        //Another message for description, should be written once per topic
+        if (m_written_options_descriptions[sensor_id.sensor_index].find(type) == m_written_options_descriptions[sensor_id.sensor_index].end())
+        {
+            const char* desc = option.get_description();
+            std::string description = desc ? std::string(desc) : (rsutils::string::from() << "Read only option " << librealsense::get_string(type));
+            write_string(ros_topic::option_description_topic(sensor_id, type), get_static_file_info_timestamp(), description);
+            m_written_options_descriptions[sensor_id.sensor_index].insert(type);
         }
     }
 
@@ -537,7 +548,7 @@ namespace librealsense
         return {};
     }
 
-    /*void ros2_writer::write_sensor_processing_blocks(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<recommended_proccesing_blocks_interface> proccesing_blocks)
+    void ros2_writer::write_sensor_processing_blocks(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<recommended_proccesing_blocks_interface> proccesing_blocks)
     {
         for (auto block : proccesing_blocks->get_recommended_processing_blocks())
         {
@@ -549,9 +560,7 @@ namespace librealsense
             }
             try
             {
-                std_msgs::String processing_block_msg;
-                processing_block_msg.data = name;
-                write_message(ros_topic::post_processing_blocks_topic(sensor_id), timestamp, processing_block_msg);
+                write_string(ros_topic::post_processing_blocks_topic(sensor_id), timestamp, name);
             }
             catch (std::exception& e)
             {
@@ -559,7 +568,7 @@ namespace librealsense
                     << ": " << e.what());
             }
         }
-    }*/
+    }
 
     uint8_t ros2_writer::is_big_endian()
     {

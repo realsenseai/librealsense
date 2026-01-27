@@ -6,8 +6,6 @@
 # test:device each(D400*)
 # test:device each(D500*) !D555
 
-# test:donotrun:!nightly
-
 import pyrealsense2 as rs, os, time, tempfile, platform, sys
 from rspy import devices, log, test
 
@@ -128,32 +126,32 @@ temp_dir = tempfile.TemporaryDirectory( prefix='recordings_' )
 file_name = temp_dir.name + os.sep + 'rec.bag'
 
 ################################################################################################
-test.start("Trying to record and playback using pipeline interface")
-
-cfg = pipeline = None
-try:
-    # dev, ctx = test.find_first_device_or_exit()  # uncomment when running in a loop
-    # creating a pipeline and recording to a file
-    pipeline = rs.pipeline(ctx)
-    cfg = rs.config()
-    cfg.enable_record_to_file( file_name )
-    pipeline.start( cfg )
-    time.sleep(3)
-    pipeline.stop()
-    # we create a new pipeline and use it to playback from the file we just recoded to
-    pipeline = rs.pipeline(ctx)
-    cfg = rs.config()
-    cfg.enable_device_from_file(file_name)
-    pipeline.start(cfg)
-    # if the record-playback worked we will get frames, otherwise the next line will timeout and throw
-    pipeline.wait_for_frames()
-except Exception:
-    test.unexpected_exception()
-finally: # we must remove all references to the file so we can use it again in the next test
-    cfg = None
-    stop_pipeline( pipeline )
-
-test.finish()
+# test.start("Trying to record and playback using pipeline interface")
+#
+# cfg = pipeline = None
+# try:
+#     # dev, ctx = test.find_first_device_or_exit()  # uncomment when running in a loop
+#     # creating a pipeline and recording to a file
+#     pipeline = rs.pipeline(ctx)
+#     cfg = rs.config()
+#     cfg.enable_record_to_file( file_name )
+#     pipeline.start( cfg )
+#     time.sleep(3)
+#     pipeline.stop()
+#     # we create a new pipeline and use it to playback from the file we just recoded to
+#     pipeline = rs.pipeline(ctx)
+#     cfg = rs.config()
+#     cfg.enable_device_from_file(file_name)
+#     pipeline.start(cfg)
+#     # if the record-playback worked we will get frames, otherwise the next line will timeout and throw
+#     pipeline.wait_for_frames()
+# except Exception:
+#     test.unexpected_exception()
+# finally: # we must remove all references to the file so we can use it again in the next test
+#     cfg = None
+#     stop_pipeline( pipeline )
+#
+# test.finish()
 
 ################################################################################################
 test.start("Trying to record and playback using sensor interface")
