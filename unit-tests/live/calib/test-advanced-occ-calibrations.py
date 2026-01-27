@@ -23,7 +23,7 @@ from test_calibrations_common import (
 
 # Constants & thresholds (reintroduce after import fix)
 PIXEL_CORRECTION = -1.0  # pixel shift to apply to principal point
-EPSILON = 0.5         # distance comparison tolerance
+EPSILON = 0.5         # half of PIXEL_CORRECTION tolerance
 DIFF_THRESHOLD = 0.001  # minimum change expected after OCC calibration
 HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION = 2
 DEPTH_MODIF_THRESHOLD_MM = 100.0  # 10 cm minimum depth change after modification to consider convergence
@@ -116,7 +116,7 @@ def run_advanced_occ_calibration_test(host_assistance, config, pipeline, calib_d
         mod_left_pp, mod_right_pp, mod_offsets = modified_principal_points_result
         modified_axis_val = mod_right_pp[1]
         returned_modified_axis_val = modified_ppy if modify_ppy else modified_ppx
-        if abs(modified_axis_val - returned_modified_axis_val) > EPSILON:
+        if abs(modified_axis_val - returned_modified_axis_val) > EPSILON: # verify that we fix at least 1/2 of modification
             log.e(f"Modification mismatch for ppy. Expected {returned_modified_axis_val:.6f} got {modified_axis_val:.6f}")
             test.fail()
 
