@@ -127,7 +127,7 @@ namespace rs2
         return false;
     }
 
-    void firmware_update_manager::process_mipi()
+    void firmware_update_manager::process_mipi_signed_fw()
     {
         bool is_mipi_recovery = !(strcmp(_dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID), "BBCD"));
         if (!_is_signed)
@@ -146,74 +146,51 @@ namespace rs2
                 fail(ss.str());
                 return;
             }
+        }
 
-            _progress = 1;
+        _progress = 1;
 
-            auto update_dev = _dev.as<update_device>();
-            if (!update_dev)
+        auto update_dev = _dev.as<update_device>();
+        if (!update_dev)
+        {
+            std::stringstream ss;
+            ss << "The firmware version could not be burnt on ";
+            ss << _dev.get_info(RS2_CAMERA_INFO_NAME) << std::endl;
+            fail(ss.str());
+            return;
+        }
+        // avoids same log sent multiple times
+        int log_step = 0;
+        update_dev.update(_fw, [&](const float progress)
+        {
+            _progress = progress * 100.f;
+            switch(static_cast<int>(_progress))
             {
-                std::stringstream ss;
-                ss << "The firmware version could not be burnt on ";
-                ss << _dev.get_info(RS2_CAMERA_INFO_NAME) << std::endl;
-                fail(ss.str());
-                return;
-            }
-            update_dev.update(_fw, [&](const float progress)
-            {
-                _progress = progress;
-                switch(static_cast<int>(progress))
+            case 5:
+                if ( log_step == 0)
                 {
-                case 5:
                     log("Burning Signed Firmware on MIPI device");
-                    break;
-                case 95:
+                    log_step = 1;
+                }
+                break;
+            case 95:
+                if ( log_step == 1 )
+                {
                     log("Firmware Update completed, waiting for device to reconnect");
-                    _done = true;
-                    break;
-                case 100:
+                    log_step = 2;
+                }
+                break;
+            case 100:
+                if ( log_step == 2 )
+                {
                     log("FW update process completed successfully");
                     _done = true;
-                    break;
+                    log_step = 3;
                 }
-            });
-        }
-        else
-        {
-            // use update_device API to call update_firmware
-            return;
-        }
-        /*log("Burning Signed Firmware on MIPI device");
+                break;
+            }
+        });
 
-        rs2_camera_info _dfu_port_info = (is_mipi_recovery)?(RS2_CAMERA_INFO_PHYSICAL_PORT):(RS2_CAMERA_INFO_DFU_DEVICE_PATH);
-        // Write signed firmware to appropriate file descriptor
-        std::ofstream fw_path_in_device(_dev.get_info(_dfu_port_info), std::ios::binary);
-        if (fw_path_in_device)
-        {
-            bool burn_done = false;
-            std::thread show_progress_thread(
-                [&]()
-                {
-                    for( int i = 0; i < 101 && !burn_done; ++i ) // Show percentage [0-100]
-                    {
-                        _progress = i;
-                        std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-                    }
-                } );
-
-            fw_path_in_device.write(reinterpret_cast<const char*>(_fw.data()), _fw.size());
-            burn_done = true;
-            show_progress_thread.join();
-        }
-        else
-        {
-            fail("Firmware Update failed - wrong path or permissions missing");
-            return;
-        }
-        log("FW update process completed successfully.");
-        LOG_INFO("FW update process completed successfully.");
-        fw_path_in_device.close();
-
-        _progress = 100;
         if (is_mipi_recovery)
         {
             log("For GMSL MIPI device please reboot, or reload d4xx driver\n"\
@@ -223,9 +200,9 @@ namespace rs2
                      "sudo rmmod d4xx && sudo modprobe d4xx\n"\
                      "and restart the realsense-viewer");
         }
-        _done = true;
+
         // Restart the device to reconstruct with the new version information
-        _dev.hardware_reset();*/
+        _dev.hardware_reset();
     }
 
     void firmware_update_manager::backup_firmware(updatable& upd, int& next_progress, const std::string& serial)
@@ -336,7 +313,7 @@ namespace rs2
         // if device is MIPI device, and fw is signed - using mipi specific procedure
         if (_is_signed && !strcmp(_dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE), "GMSL"))
         {
-            process_mipi();
+            process_mipi_signed_fw();
             return;
         }
 

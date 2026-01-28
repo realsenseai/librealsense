@@ -75,7 +75,7 @@ namespace librealsense
                     for( int i = 0; i < 95 && !burn_done; ++i ) // Show percentage [0-100]
                     {
                         if (callback)
-                            callback->on_update_progress(i);
+                            callback->on_update_progress(static_cast<float>(i) / 100.f);
                         std::this_thread::sleep_for( std::chrono::milliseconds( 1020 ) );
                     }
                 } );
@@ -93,7 +93,7 @@ namespace librealsense
         fw_path_in_device.close();
 
         if (callback)
-            callback->on_update_progress(95);
+            callback->on_update_progress(0.95f);
         if (is_mipi_recovery)
         {
             LOG_INFO("For GMSL MIPI device please reboot, or reload d4xx driver\n"\
@@ -104,7 +104,7 @@ namespace librealsense
         hardware_reset();
         std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
         if (callback)
-            callback->on_update_progress(100);
+            callback->on_update_progress(1.f);
     }
 
     void d400_mipi_device::update( const void * fw_image, int fw_image_size, rs2_update_progress_callback_sptr progress_callback) const
