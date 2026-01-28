@@ -80,7 +80,8 @@ namespace librealsense
             });
 
         // Initialize the array with the allocator
-        auto ret = rcutils_uint8_array_init(buffer.get(), size, &rcutils_get_default_allocator());
+        rcutils_allocator_t alloc = rcutils_get_default_allocator();
+        auto ret = rcutils_uint8_array_init(buffer.get(), size, &alloc);
         if (ret != RCUTILS_RET_OK)
             throw std::runtime_error("Failed to initialize rosbag2 buffer");
 
