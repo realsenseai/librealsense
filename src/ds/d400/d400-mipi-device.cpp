@@ -107,16 +107,19 @@ namespace librealsense
             callback->on_update_progress(100);
     }
 
-    void d400_mipi_device::update_flash(const std::vector<uint8_t>& image,
-                                        rs2_update_progress_callback_sptr callback,
-                                        int update_mode)
+    void d400_mipi_device::update( const void * fw_image, int fw_image_size, rs2_update_progress_callback_sptr progress_callback) const
+    {
+        const_cast<d400_mipi_device*>(this)->update_non_const(fw_image, fw_image_size, progress_callback);
+    }
+
+    void d400_mipi_device::update_non_const( const void * fw_image, int fw_image_size, rs2_update_progress_callback_sptr progress_callback )
     {
         // first pausing the options watcher (if running)
         pause_options_watchers();
 
-
         try{
-            update_signed_firmware(image,callback);
+            std::vector<uint8_t> fw_image_vec (static_cast<const uint8_t*>(fw_image), static_cast<const uint8_t*>(fw_image) + fw_image_size);
+            update_signed_firmware(fw_image_vec, progress_callback);
         }
         catch(...)
         {

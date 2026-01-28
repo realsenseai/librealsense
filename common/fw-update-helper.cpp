@@ -149,7 +149,16 @@ namespace rs2
 
             _progress = 1;
 
-            dev_updatable.update_unsigned(_fw, [&](const float progress)
+            auto update_dev = _dev.as<update_device>();
+            if (!update_dev)
+            {
+                std::stringstream ss;
+                ss << "The firmware version could not be burnt on ";
+                ss << _dev.get_info(RS2_CAMERA_INFO_NAME) << std::endl;
+                fail(ss.str());
+                return;
+            }
+            update_dev.update(_fw, [&](const float progress)
             {
                 _progress = progress;
                 switch(static_cast<int>(progress))
