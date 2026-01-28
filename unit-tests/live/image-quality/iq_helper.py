@@ -81,7 +81,6 @@ def find_roi_location(pipeline, required_ids, DEBUG_MODE=False):
 
     if page_pts is None:
         log.e("Failed to detect page within timeout")
-        test.fail()
         raise Exception("Page not found")
 
     # page found - use it to calculate transformation matrix from frame to region of interest

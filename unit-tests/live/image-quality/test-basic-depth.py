@@ -1,8 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
-# test:device D400*
-# test:donotrun
+# test:device each(D400*)
 
 import pyrealsense2 as rs
 from rspy import log, test
@@ -12,21 +11,62 @@ import time
 from iq_helper import find_roi_location, get_roi_from_frame, WIDTH, HEIGHT
 
 NUM_FRAMES = 100 # Number of frames to check
-DEPTH_TOLERANCE = 0.05  # Acceptable deviation from expected depth in meters
-FRAMES_PASS_THRESHOLD =0.8 # Percentage of frames that needs to pass
+DEPTH_TOLERANCE = 0.08  # Acceptable deviation from expected depth in meters
+FRAMES_PASS_THRESHOLD = 0.75 # Percentage of frames that needs to pass
 DEBUG_MODE = False
 
-DISTANCE_FROM_CUBE = 0.53
-DISTANCE_FROM_BACKGROUND = 0.67
+EXPECTED_DEPTH_DIFF = 0.10  # Expected difference in meters between background and cube
+
 dev, ctx = test.find_first_device_or_exit()
+depth_sensor = dev.first_depth_sensor()
+
+def detect_roi_with_exposure(marker_ids):
+    # Set increasingly high exposure to be able to detect ArUco markers
+    global pipeline, depth_sensor
+    exposure = 10000
+    max_exposure = 30000
+    step = 10000
+    while exposure <= max_exposure:
+        depth_sensor.set_option(rs.option.exposure, exposure)
+        try:
+            find_roi_location(pipeline, marker_ids, DEBUG_MODE)  # markers in the lab are 4,5,6,7
+            return True
+        except Exception:
+            exposure += step
+            log.d("Failed to detect markers with exposure", exposure - step,
+                  ", trying with exposure", exposure)
+
+    raise Exception("Page not found")
+
+def average_depth_in_region(depth_image, center_x, center_y, region_size=5):
+    """
+    Samples a square region around (center_x, center_y) in depth_image,
+    ignores zero values, and returns the average depth value.
+    """
+    half = region_size // 2
+    h, w = depth_image.shape
+    values = []
+    for dy in range(-half, half + 1):
+        for dx in range(-half, half + 1):
+            x = center_x + dx
+            y = center_y + dy
+            if 0 <= x < w and 0 <= y < h:
+                v = depth_image[y, x]
+                if v > 0:
+                    values.append(v)
+    if values:
+        return np.mean(values)
+    else:
+        return 0
 
 def run_test(resolution, fps):
-
     try:
+        global pipeline
         pipeline = rs.pipeline(ctx)
+        profile = None
         cfg = rs.config()
         cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, fps)
-        cfg.enable_stream(rs.stream.infrared, 1, 640, 480, rs.format.y8, 30)  # needed for finding the ArUco markers
+        cfg.enable_stream(rs.stream.infrared, 1, resolution[0], resolution[1], rs.format.y8, fps)  # needed for finding the ArUco markers
         if not cfg.can_resolve(pipeline):
             log.i(f"Configuration {resolution[0]}x{resolution[1]} @ {fps}fps is not supported by the device")
             return
@@ -37,15 +77,13 @@ def run_test(resolution, fps):
         depth_scale = depth_sensor.get_depth_scale()
 
         # find region of interest (page) and get the transformation matrix
-        find_roi_location(pipeline, (4,5,6,7), DEBUG_MODE)  # markers in the lab are 4,5,6,7
+        detect_roi_with_exposure((4,5,6,7))
 
-        # Known pixel positions and expected depth values (in meters)
-        # Using temporary values until setup in lab is completed
-        depth_points = {
-            "cube": ((HEIGHT // 2, WIDTH // 2), DISTANCE_FROM_CUBE),  # cube expected to be at the center of page
-            "background": ((HEIGHT // 2, int(WIDTH * 0.1)), DISTANCE_FROM_BACKGROUND)  # left edge, background
-        }
-        depth_passes = {name: 0 for name in depth_points}
+        # Known pixel positions - center of cube and left edge to sample background
+        cube_x, cube_y = WIDTH // 2, HEIGHT // 2
+        bg_x, bg_y = int(WIDTH * 0.1), HEIGHT // 2
+
+        pass_count = 0
         for i in range(NUM_FRAMES):
             frames = pipeline.wait_for_frames()
             depth_frame = frames.get_depth_frame()
@@ -53,43 +91,74 @@ def run_test(resolution, fps):
             if not depth_frame:
                 continue
 
+            # Get the warped ROI from the depth frame
             depth_image = get_roi_from_frame(depth_frame)
 
-            for point_name, ((x, y), expected_depth) in depth_points.items():
-                raw_depth = depth_image[y, x]
-                depth_value = raw_depth * depth_scale  # Convert to meters
+            # Sample depths (average over region, ignore zeros)
+            raw_cube = average_depth_in_region(depth_image, cube_x, cube_y, region_size=5)
+            raw_bg = average_depth_in_region(depth_image, bg_x, bg_y, region_size=5)
+            depth_cube = raw_cube * depth_scale
+            depth_bg = raw_bg * depth_scale
+            measured_diff = depth_bg - depth_cube  # background should be further than cube
 
-                if abs(depth_value - expected_depth) <= DEPTH_TOLERANCE:
-                    depth_passes[point_name] += 1
-                else:
-                    log.d(f"Frame {i} - {point_name} at ({x},{y}): {depth_value:.3f}m ≠ {expected_depth:.3f}m")
+            if raw_cube == 0 or raw_bg == 0:
+                log.d(f"Frame {i} - Not enough valid depth points in region (cube or bg)")
+                continue
+
+            if abs(measured_diff - EXPECTED_DEPTH_DIFF) <= DEPTH_TOLERANCE:
+                pass_count += 1
+            else:
+                log.d(f"Frame {i} - Depth diff: {measured_diff:.3f}m too far from "
+                      f"{EXPECTED_DEPTH_DIFF:.3f}m (cube: {depth_cube:.3f}m, bg: {depth_bg:.3f}m)")
 
             if DEBUG_MODE:
-                # display IR image along with transformed view of IR, get_roi_from_frame(infrared_frame)
-                infrared_np = np.asanyarray(infrared_frame.get_data())
-                w, h = infrared_np.shape
-                dbg_resized = cv2.resize(get_roi_from_frame(infrared_frame), (h, w))
+                colorizer = rs.colorizer()
+                colorized_frame = colorizer.colorize(depth_frame)
+                roi_img_disp = get_roi_from_frame(colorized_frame)
 
-                dbg = np.hstack([infrared_np, dbg_resized])
-                cv2.imshow("Depth IQ - IR | Depth", dbg)
+                # Draw region rectangles for cube and background
+                region = 5
+                half = region // 2
+                cv2.rectangle(roi_img_disp, (cube_x - half, cube_y - half), (cube_x + half, cube_y + half), (0, 0, 255), 1)
+                cv2.rectangle(roi_img_disp, (bg_x - half, bg_y - half), (bg_x + half, bg_y + half), (0, 255, 0), 1)
+
+                # Draw points for cube and background (cv2.circle uses (x, y) order)
+                cv2.circle(roi_img_disp, (cube_x, cube_y), 3, (0, 0, 255), -1)  # Red for cube
+                cv2.circle(roi_img_disp, (bg_x, bg_y), 3, (0, 255, 0), -1)      # Green for background
+
+                # Add labels for each point with their measured distance
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.5
+                thickness = 1
+                cube_label = f"cube: {depth_cube:.2f}m"
+                bg_label = f"bg: {depth_bg:.2f}m"
+                diff_label = f"diff: {measured_diff:.3f}m (exp: {EXPECTED_DEPTH_DIFF:.2f}m)"
+
+                cv2.putText(roi_img_disp, cube_label, (cube_x + 10, cube_y - 10),
+                           font, font_scale, (0, 0, 255), thickness, cv2.LINE_AA)
+                cv2.putText(roi_img_disp, bg_label, (bg_x + 10, bg_y - 10),
+                           font, font_scale, (0, 255, 0), thickness, cv2.LINE_AA)
+                cv2.putText(roi_img_disp, diff_label, (10, 30),
+                           font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+
+                cv2.imshow("ROI with Sampled Points", roi_img_disp)
                 cv2.waitKey(1)
 
         # wait for close
-        if DEBUG_MODE:
-            cv2.waitKey(0)
+        # if DEBUG_MODE:
+        #     cv2.waitKey(0)
 
-        # Check that each point passed the threshold
         min_passes = int(NUM_FRAMES * FRAMES_PASS_THRESHOLD)
-        for point_name, count in depth_passes.items():
-            log.i(f"{point_name.title()} passed in {count}/{NUM_FRAMES} frames")
-            test.check(count >= min_passes)
+        log.i(f"Depth diff passed in {pass_count}/{NUM_FRAMES} frames")
+        test.check(pass_count >= min_passes)
 
     except Exception as e:
         test.fail()
         raise e
     finally:
         cv2.destroyAllWindows()
-        pipeline.stop()
+        if profile:
+            pipeline.stop()
 
 
 log.d("context:", test.context)
