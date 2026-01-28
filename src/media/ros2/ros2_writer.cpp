@@ -75,7 +75,10 @@ namespace librealsense
     {
         auto buffer = std::shared_ptr<rcutils_uint8_array_t>(new rcutils_uint8_array_t(),
             [](rcutils_uint8_array_t* arr) {
-                (void)rcutils_uint8_array_fini(arr); // Cast to void to suppress warning
+                if (arr) {
+                    rcutils_ret_t ret = rcutils_uint8_array_fini(arr);
+                    (void)ret; // Cast to void to suppress unusued warning
+                } 
                 delete arr;
             });
 
