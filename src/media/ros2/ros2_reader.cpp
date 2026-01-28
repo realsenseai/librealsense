@@ -198,9 +198,11 @@ namespace librealsense
 
         reset();
 
-        while (nanoseconds(peek_next_cached()->time_stamp) < seek_time)
+        auto msg = peek_next_cached();
+        while (msg && nanoseconds(msg->time_stamp) < seek_time)
         {
             read_next_cached();
+            msg = peek_next_cached();
         }
     }
 
@@ -607,7 +609,7 @@ namespace librealsense
         return true;
     }
 
-    std::shared_ptr<recommended_proccesing_blocks_snapshot> ros2_reader::update_proccesing_blocks(uint32_t sensor_index, const nanoseconds& time, std::shared_ptr<options_container>& sensor_options)
+    std::shared_ptr<recommended_proccesing_blocks_snapshot> ros2_reader::update_proccesing_blocks(uint32_t sensor_index, std::shared_ptr<options_container>& sensor_options)
     {
         auto options_snapshot = sensor_options;
         if (options_snapshot == nullptr)
@@ -621,7 +623,6 @@ namespace librealsense
         }
         auto proccesing_blocks = read_proccesing_blocks(
             {get_device_index(), sensor_index},
-            time,
             options_api
         );
         return proccesing_blocks;
@@ -840,7 +841,7 @@ namespace librealsense
         }
     }
 
-    std::shared_ptr<recommended_proccesing_blocks_snapshot> ros2_reader::read_proccesing_blocks(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<options_interface> options)
+    std::shared_ptr<recommended_proccesing_blocks_snapshot> ros2_reader::read_proccesing_blocks(device_serializer::sensor_identifier sensor_id, std::shared_ptr<options_interface> options)
     {
         //Taking all messages from the beginning of the bag until the time point requested
         std::string proccesing_block_topic = ros_topic::post_processing_blocks_topic(sensor_id);
@@ -892,7 +893,7 @@ namespace librealsense
             sensors_info[sensor_index] = sensor_info;
             auto sensor_options = read_sensor_options({ device_index, sensor_index });
             sensors_options[sensor_index] = sensor_options;
-            auto sensor_recommended_filters = update_proccesing_blocks(sensor_index, time, sensor_options);
+            auto sensor_recommended_filters = update_proccesing_blocks(sensor_index, sensor_options);
             sensors_processing_blocks[sensor_index] = sensor_recommended_filters;
         }
 

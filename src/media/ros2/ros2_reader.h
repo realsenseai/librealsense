@@ -65,7 +65,7 @@ namespace librealsense
 
         uint32_t read_file_version();
         bool try_read_stream_extrinsic(const stream_identifier& stream_id, uint32_t& group_id, rs2_extrinsics& extrinsic);
-        std::shared_ptr<recommended_proccesing_blocks_snapshot> update_proccesing_blocks(uint32_t sensor_index, const nanoseconds& time, std::shared_ptr<options_container>& sensor_options);
+        std::shared_ptr<recommended_proccesing_blocks_snapshot> update_proccesing_blocks(uint32_t sensor_index, std::shared_ptr<options_container>& sensor_options);
         void add_sensor_extension(snapshot_collection& sensor_extensions, const std::string& sensor_name);
        
         static bool is_depth_sensor(const std::string& sensor_name);
@@ -76,7 +76,7 @@ namespace librealsense
         static bool is_safety_module_sensor(const std::string& sensor_name);
         static bool is_depth_mapping_sensor(const std::string& sensor_name);
 
-        std::shared_ptr<recommended_proccesing_blocks_snapshot> read_proccesing_blocks(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp,
+        std::shared_ptr<recommended_proccesing_blocks_snapshot> read_proccesing_blocks(device_serializer::sensor_identifier sensor_id,
             std::shared_ptr<options_interface> options);
         device_snapshot read_device_description(const nanoseconds& time, bool reset = false);
 
