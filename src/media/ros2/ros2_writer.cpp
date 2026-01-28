@@ -305,7 +305,7 @@ namespace librealsense
         {
             auto data_imu = *reinterpret_cast<const rs2_combined_motion*>(frame.frame->get_frame_data());
             size = sizeof(data_imu);
-            data_ptr = reinterpret_cast<const float*>(&data_imu);
+            data_ptr = reinterpret_cast<const float*>(frame.frame->get_frame_data());
         }
         auto buffer = create_buffer(data_ptr, size);
         auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
