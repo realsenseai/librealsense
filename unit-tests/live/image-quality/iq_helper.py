@@ -67,7 +67,7 @@ def find_roi_location(pipeline, required_ids, DEBUG_MODE=False):
     # stream until page found
     page_pts = None
     start_time = time.time()
-    while page_pts is None and time.time() - start_time < 5:
+    while page_pts is None and time.time() - start_time < 155:
         frames = pipeline.wait_for_frames()
         aruco_detectable_streams = (rs.stream.color, rs.stream.infrared) # we need one of those streams to detect ArUco markers
         frame = next(f for f in frames if f.get_profile().stream_type() in aruco_detectable_streams)
