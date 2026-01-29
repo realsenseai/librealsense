@@ -11,7 +11,7 @@ import time
 from iq_helper import find_roi_location, get_roi_from_frame, WIDTH, HEIGHT
 
 NUM_FRAMES = 100 # Number of frames to check
-DEPTH_TOLERANCE = 0.08  # Acceptable deviation from expected depth in meters
+DEPTH_TOLERANCE = 0.07  # Acceptable deviation from expected depth in meters
 FRAMES_PASS_THRESHOLD = 0.75 # Percentage of frames that needs to pass
 DEBUG_MODE = False
 
@@ -38,27 +38,6 @@ def detect_roi_with_exposure(marker_ids):
 
     raise Exception("Page not found")
 
-def average_depth_in_region(depth_image, center_x, center_y, region_size=5):
-    """
-    Samples a square region around (center_x, center_y) in depth_image,
-    ignores zero values, and returns the average depth value.
-    """
-    half = region_size // 2
-    h, w = depth_image.shape
-    values = []
-    for dy in range(-half, half + 1):
-        for dx in range(-half, half + 1):
-            x = center_x + dx
-            y = center_y + dy
-            if 0 <= x < w and 0 <= y < h:
-                v = depth_image[y, x]
-                if v > 0:
-                    values.append(v)
-    if values:
-        return np.mean(values)
-    else:
-        return 0
-
 def run_test(resolution, fps):
     try:
         global pipeline
@@ -84,6 +63,7 @@ def run_test(resolution, fps):
         bg_x, bg_y = int(WIDTH * 0.1), HEIGHT // 2
 
         pass_count = 0
+        hole_filling = rs.hole_filling_filter()
         for i in range(NUM_FRAMES):
             frames = pipeline.wait_for_frames()
             depth_frame = frames.get_depth_frame()
@@ -91,19 +71,18 @@ def run_test(resolution, fps):
             if not depth_frame:
                 continue
 
-            # Get the warped ROI from the depth frame
-            depth_image = get_roi_from_frame(depth_frame)
+            # Apply the hole filling filter
+            filled_depth_frame = hole_filling.process(depth_frame)
 
-            # Sample depths (average over region, ignore zeros)
-            raw_cube = average_depth_in_region(depth_image, cube_x, cube_y, region_size=5)
-            raw_bg = average_depth_in_region(depth_image, bg_x, bg_y, region_size=5)
+            # Get the warped ROI from the filtered depth frame
+            depth_image = get_roi_from_frame(filled_depth_frame)
+
+            # Sample depths
+            raw_cube = depth_image[cube_y, cube_x]
+            raw_bg = depth_image[bg_y, bg_x]
             depth_cube = raw_cube * depth_scale
             depth_bg = raw_bg * depth_scale
             measured_diff = depth_bg - depth_cube  # background should be further than cube
-
-            if raw_cube == 0 or raw_bg == 0:
-                log.d(f"Frame {i} - Not enough valid depth points in region (cube or bg)")
-                continue
 
             if abs(measured_diff - EXPECTED_DEPTH_DIFF) <= DEPTH_TOLERANCE:
                 pass_count += 1
@@ -113,18 +92,12 @@ def run_test(resolution, fps):
 
             if DEBUG_MODE:
                 colorizer = rs.colorizer()
-                colorized_frame = colorizer.colorize(depth_frame)
+                colorized_frame = colorizer.colorize(filled_depth_frame)
                 roi_img_disp = get_roi_from_frame(colorized_frame)
 
-                # Draw region rectangles for cube and background
-                region = 5
-                half = region // 2
-                cv2.rectangle(roi_img_disp, (cube_x - half, cube_y - half), (cube_x + half, cube_y + half), (0, 0, 255), 1)
-                cv2.rectangle(roi_img_disp, (bg_x - half, bg_y - half), (bg_x + half, bg_y + half), (0, 255, 0), 1)
-
                 # Draw points for cube and background (cv2.circle uses (x, y) order)
-                cv2.circle(roi_img_disp, (cube_x, cube_y), 3, (0, 0, 255), -1)  # Red for cube
-                cv2.circle(roi_img_disp, (bg_x, bg_y), 3, (0, 255, 0), -1)      # Green for background
+                cv2.circle(roi_img_disp, (cube_x, cube_y), 6, (0, 0, 255), -1)  # Red for cube
+                cv2.circle(roi_img_disp, (bg_x, bg_y), 6, (0, 255, 0), -1)      # Green for background
 
                 # Add labels for each point with their measured distance
                 font = cv2.FONT_HERSHEY_SIMPLEX
