@@ -311,7 +311,8 @@ namespace rs2
         invoker invoke)
     {
         // if device is MIPI device, and fw is signed - using mipi specific procedure
-        if (_is_signed && !strcmp(_dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE), "GMSL"))
+        bool is_mipi_device = !strcmp(_dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE), "GMSL");
+        if (_is_signed && is_mipi_device)
         {
             process_mipi_signed_fw();
             return;
@@ -360,7 +361,10 @@ namespace rs2
                 }
             }
 
-            backup_firmware(upd, next_progress, serial);
+            if (!is_mipi_device)
+            {
+                backup_firmware(upd, next_progress, serial);
+            }
 
             next_progress = static_cast<int>(_progress) + 10;
 
@@ -400,6 +404,11 @@ namespace rs2
                 _progress = (ceil(progress * 10) / 10 * (90 - next_progress)) + next_progress;
             });
             log("Firmware Update completed, waiting for device to reconnect");
+
+            if (is_mipi_device)
+            {
+                _dev.hardware_reset();
+            }
         }
 
         if (!check_for([this, serial]() {

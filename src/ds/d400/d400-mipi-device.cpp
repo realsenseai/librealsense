@@ -131,6 +131,25 @@ namespace librealsense
         unpause_options_watchers();
     }
 
+    void d400_mipi_device::update_flash(const std::vector<uint8_t>& image, rs2_update_progress_callback_sptr callback, int update_mode)
+    {
+        // first pausing the options watcher (if running)
+        pause_options_watchers();
+
+        try{
+            d400_device::update_flash(image, callback, update_mode);
+        }
+        catch(...)
+        {
+            unpause_options_watchers();
+            throw;
+        }
+
+        // finally, unpausing the options watcher
+        unpause_options_watchers();
+    }
+
+
     void d400_mipi_device::pause_options_watchers()
     {
         for( auto& sensor_index : _sensors_indices)

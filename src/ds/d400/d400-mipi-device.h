@@ -21,6 +21,7 @@ namespace librealsense
         void toggle_advanced_mode(bool enable) override;
         void store_sensors_indices(std::vector<int> sensors_indices) {_sensors_indices = sensors_indices;}
         void update( const void * fw_image, int fw_image_size, rs2_update_progress_callback_sptr = nullptr ) const override;
+        void update_flash(const std::vector<uint8_t>& image, rs2_update_progress_callback_sptr callback, int update_mode) override;
 
     private:
         void update_signed_firmware(const std::vector<uint8_t>& image,
