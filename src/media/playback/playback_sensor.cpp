@@ -7,7 +7,7 @@
 #include <map>
 #include "types.h"
 #include "ds/d400/d400-options.h"
-#include "media/ros/ros_reader.h"
+#include "media/ros2/ros2_reader.h"
 
 #include <rsutils/string/from.h>
 

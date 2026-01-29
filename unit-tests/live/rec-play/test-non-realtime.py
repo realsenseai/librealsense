@@ -6,6 +6,7 @@
 # test:device each(D500*)
 # Running nightly as this tests specific bug fix in a code that is seldom touched, no need to run for each push.
 # test:donotrun:!nightly
+#test:donotrun  # disabled due to rosbag upgrade
 
 import os
 import pyrealsense2 as rs2
