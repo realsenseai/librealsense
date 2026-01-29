@@ -9,11 +9,6 @@ import numpy as np
 import cv2
 import time
 from iq_helper import find_roi_location, get_roi_from_frame, WIDTH, HEIGHT
-import os
-import tempfile
-import shutil
-import uuid
-from datetime import datetime
 
 NUM_FRAMES = 100 # Number of frames to check
 DEPTH_TOLERANCE = 0.08  # Acceptable deviation from expected depth in meters
@@ -75,13 +70,6 @@ def run_test(resolution, fps):
         if not cfg.can_resolve(pipeline):
             log.i(f"Configuration {resolution[0]}x{resolution[1]} @ {fps}fps is not supported by the device")
             return
-
-        # --- Recording logic ---
-        temp_dir = tempfile.gettempdir()
-        temp_bag = os.path.join(temp_dir, f"test-basic-depth-{uuid.uuid4()}.bag")
-        cfg.enable_record_to_file(temp_bag)
-        # --- End recording logic ---
-
         profile = pipeline.start(cfg)
         time.sleep(2)
 
@@ -164,32 +152,13 @@ def run_test(resolution, fps):
         log.i(f"Depth diff passed in {pass_count}/{NUM_FRAMES} frames")
         test.check(pass_count >= min_passes)
 
-        # --- Recording file handling: success ---
-        if os.path.exists(temp_bag):
-            os.remove(temp_bag)
-        # --- End recording file handling ---
-
     except Exception as e:
         test.fail()
-        # --- Recording file handling: failure ---
-        if 'temp_bag' in locals() and os.path.exists(temp_bag):
-            # Save with unique name in current directory
-            unique_name = f"failed-basic-depth-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}.bag"
-            dest_path = os.path.join(os.getcwd(), unique_name)
-            shutil.move(temp_bag, dest_path)
-            log.i(f"Recording saved to {dest_path}")
-        # --- End recording file handling ---
         raise e
     finally:
         cv2.destroyAllWindows()
         if profile:
             pipeline.stop()
-        # Clean up temp file if it still exists
-        if 'temp_bag' in locals() and os.path.exists(temp_bag):
-            try:
-                os.remove(temp_bag)
-            except Exception:
-                pass
 
 
 log.d("context:", test.context)
