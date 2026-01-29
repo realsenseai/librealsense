@@ -1,7 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
-# # test:device each(D400*)
+# test:device each(D400*)
 
 import pyrealsense2 as rs
 from rspy import log, test
@@ -9,35 +9,34 @@ import numpy as np
 import cv2
 import time
 from iq_helper import find_roi_location, get_roi_from_frame, WIDTH, HEIGHT
-import os
-
-# Construct absolute path to the .bag file relative to this script
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BAG_FILE = os.path.join(SCRIPT_DIR, "test-basic-depth-recording-c89b0fe0.bag")  # Absolute path
-
-# Check if the .bag file exists before running the test
-if not os.path.isfile(BAG_FILE):
-    print(f"ERROR: .bag file not found: {BAG_FILE}")
-    exit(1)
 
 NUM_FRAMES = 100 # Number of frames to check
 DEPTH_TOLERANCE = 0.08  # Acceptable deviation from expected depth in meters
 FRAMES_PASS_THRESHOLD = 0.75 # Percentage of frames that needs to pass
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 EXPECTED_DEPTH_DIFF = 0.10  # Expected difference in meters between background and cube
 
-# Remove device and sensor initialization for bag file
-# dev, ctx = test.find_first_device_or_exit()
-# depth_sensor = dev.first_depth_sensor()
-
-# Remove exposure setting for bag file, just try to find ROI
+dev, ctx = test.find_first_device_or_exit()
+depth_sensor = dev.first_depth_sensor()
 
 def detect_roi_with_exposure(marker_ids):
-    # For bag file, just try to find ROI once (exposure cannot be set)
-    global pipeline
-    find_roi_location(pipeline, marker_ids, DEBUG_MODE)
-    return True
+    # Set increasingly high exposure to be able to detect ArUco markers
+    global pipeline, depth_sensor
+    exposure = 10000
+    max_exposure = 30000
+    step = 10000
+    while exposure <= max_exposure:
+        depth_sensor.set_option(rs.option.exposure, exposure)
+        try:
+            find_roi_location(pipeline, marker_ids, DEBUG_MODE)  # markers in the lab are 4,5,6,7
+            return True
+        except Exception:
+            exposure += step
+            log.d("Failed to detect markers with exposure", exposure - step,
+                  ", trying with exposure", exposure)
+
+    raise Exception("Page not found")
 
 def average_depth_in_region(depth_image, center_x, center_y, region_size=5):
     """
@@ -63,18 +62,17 @@ def average_depth_in_region(depth_image, center_x, center_y, region_size=5):
 def run_test(resolution, fps):
     try:
         global pipeline
-        pipeline = rs.pipeline()
+        pipeline = rs.pipeline(ctx)
         profile = None
         cfg = rs.config()
-        # Use the .bag file as input
-        cfg.enable_device_from_file(BAG_FILE, repeat_playback=False)
         cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, fps)
         cfg.enable_stream(rs.stream.infrared, 1, resolution[0], resolution[1], rs.format.y8, fps)  # needed for finding the ArUco markers
-        # No can_resolve for bag file
+        if not cfg.can_resolve(pipeline):
+            log.i(f"Configuration {resolution[0]}x{resolution[1]} @ {fps}fps is not supported by the device")
+            return
         profile = pipeline.start(cfg)
         time.sleep(2)
 
-        # For bag file, get depth scale from the device in the file
         depth_sensor = profile.get_device().first_depth_sensor()
         depth_scale = depth_sensor.get_depth_scale()
 
@@ -165,11 +163,23 @@ def run_test(resolution, fps):
 
 log.d("context:", test.context)
 
-# Only use the configuration that matches the bag file
 configurations = [((1280, 720), 30)]
+# on nightly we check additional arbitrary configurations
+if "nightly" in test.context:
+    configurations += [
+        ((640,480), 15),
+        ((640,480), 30),
+        ((640,480), 60),
+        ((848,480), 15),
+        ((848,480), 30),
+        ((848,480), 60),
+        ((1280,720), 5),
+        ((1280,720), 10),
+        ((1280,720), 15),
+    ]
 
 for resolution, fps in configurations:
-    test.start("Basic Depth Image Quality Test (from bag)", f"{resolution[0]}x{resolution[1]} @ {fps}fps")
+    test.start("Basic Depth Image Quality Test", f"{resolution[0]}x{resolution[1]} @ {fps}fps")
     run_test(resolution, fps)
     test.finish()
 

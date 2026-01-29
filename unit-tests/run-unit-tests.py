@@ -663,7 +663,6 @@ try:
                     failed_tests.append( test )
                 continue
             #
-            skip_live_tests = False
             if skip_live_tests:
                 if skip_disconnected:
                     log.w( test.name + ':', 'is live & no cameras were found; skipping due to --skip-disconnected' )
