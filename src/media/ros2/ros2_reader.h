@@ -79,6 +79,7 @@ namespace librealsense
         std::shared_ptr<recommended_proccesing_blocks_snapshot> read_proccesing_blocks(device_serializer::sensor_identifier sensor_id,
             std::shared_ptr<options_interface> options);
         device_snapshot read_device_description(const nanoseconds& time, bool reset = false);
+        void prepare_for_streaming();
 
         // Topic parsing helpers
         static bool is_stream_topic(const std::string& topic, stream_identifier& id);
@@ -121,7 +122,6 @@ namespace librealsense
         std::shared_ptr<frame_source>           m_frame_source;
         std::vector< rosbag2_storage::TopicMetadata > _topics_cache;
         std::shared_ptr<context>                m_context;
-        uint32_t                                m_version;
         std::map<uint32_t, std::map<rs2_option, std::string>> m_read_options_descriptions;
 
         // State management
@@ -136,5 +136,8 @@ namespace librealsense
 
         std::shared_ptr<rosbag2_storage::SerializedBagMessage> _cached_message;
         bool _cache_valid = false;  // true means _cached_message contains valid unconsumed data
+
+        // Filter topics for streaming - reapplied on reset() if set
+        std::vector<std::string> _streaming_filter_topics;
     };
 }

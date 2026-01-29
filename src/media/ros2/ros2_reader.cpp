@@ -107,8 +107,7 @@ namespace librealsense
         m_metadata_parser_map(md_constant_parser::create_metadata_parser_map()),
         m_total_duration(0),
         m_file_path(file_path + ".db3"),
-        m_context(ctx),
-        m_version(0)
+        m_context(ctx)
     {
         try
         {
@@ -228,13 +227,15 @@ namespace librealsense
     {
         _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
         _storage->open(m_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
-        m_version = read_file_version();
-        _last_frame_cache.clear();
         m_frame_source = std::make_shared<frame_source>(32);
         m_frame_source->init(m_metadata_parser_map);
         m_read_options_descriptions.clear();
-        _initialized = false;
-        read_device_description(nanoseconds(0), true);
+
+        // Reapply streaming filter if it was previously set
+        if (!_streaming_filter_topics.empty())
+        {
+            _storage->set_filter({ _streaming_filter_topics });
+        }
     }
 
     void ros2_reader::enable_stream(const std::vector<device_serializer::stream_identifier>& stream_ids)
@@ -866,52 +867,88 @@ namespace librealsense
         if (_initialized) return m_initial_device_description;
 
         _topics_cache = _storage->get_all_topics_and_types();
-        //reset(); // Ensure we scan from start
-        snapshot_collection device_extensions;
-        constexpr auto device_index = get_device_index();
 
-        // Read all stream profiles info
-        auto sensor_to_streams = read_all_stream_profiles(device_index);
-
-        // Read device info
-        auto device_info = read_info_snapshot(ros_topic::device_info_topic(get_device_index()));
-        device_extensions[RS2_EXTENSION_INFO] = device_info;
-
-        // Read sensor indices from topics cached - does not read from storage
+        //// Read sensor indices from topics cached - does not read from storage
         std::vector<sensor_snapshot> sensor_descriptions;
-        auto sensor_indices = read_sensor_indices(get_device_index());
+        constexpr auto device_index = get_device_index();
+        auto sensor_indices = read_sensor_indices(device_index);
+        
+        // filter all device info topics:
+        auto device_info_regex_str               = (rsutils::string::from() << "^/device_" << get_device_index() << "/info$").str();
+        auto sensor_info_regex_str               = (rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/info$").str();
+        auto sensor_option_regex_str             = (rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/option/[^/]+/value$").str();
+        auto sensor_option_description_regex_str = (rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/option/[^/]+/description$").str();
+        auto stream_info_regex_str               = (rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/[^/]+/info$").str();
+        auto stream_info_intrinsics_regex_str    = (rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/[^/]+/(info/camera_info|imu_intrinsic)$").str();
+        auto post_processing_blocks_regex_str    = (rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/post_processing$").str();
+        auto extrinsics_regex_str                = (rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/[^/]+/tf/\\d+$").str();
 
-        // Read all stream profiles and sensor info
+        auto regex_str = (rsutils::string::from() << "("
+            << device_info_regex_str << "|"
+            << sensor_info_regex_str << "|"
+            << sensor_option_regex_str << "|"
+            << sensor_option_description_regex_str << "|"
+            << stream_info_regex_str << "|"
+            << stream_info_intrinsics_regex_str << "|"
+            << post_processing_blocks_regex_str << "|"
+            << extrinsics_regex_str
+            << ")").str();
+        auto regex = std::regex(regex_str);
+        auto filter_topics = filter_topics_by_regex(regex);
+
+        _storage->set_filter({filter_topics});
+
+        snapshot_collection device_extensions;
         auto sensors_info = std::map<uint32_t, std::shared_ptr<info_container>>();
         auto sensors_options = std::map<uint32_t, std::shared_ptr<options_container>>();
         auto sensors_processing_blocks = std::map<uint32_t, std::shared_ptr<recommended_proccesing_blocks_snapshot>>();
-
-        for (auto& sensor_index : sensor_indices)
+        std::map<uint32_t, stream_profiles> sensor_to_streams;
+        while (has_next_cached())
         {
-            auto sensor_info_topic = ros_topic::sensor_info_topic({ device_index, sensor_index });
-            auto sensor_info = read_info_snapshot(sensor_info_topic);
-            sensors_info[sensor_index] = sensor_info;
-            auto sensor_options = read_sensor_options({ device_index, sensor_index });
-            sensors_options[sensor_index] = sensor_options;
-            auto sensor_recommended_filters = update_proccesing_blocks(sensor_index, sensor_options);
-            sensors_processing_blocks[sensor_index] = sensor_recommended_filters;
-        }
-
-        // Read extrinsics for all streams - written after all sensors info and options
-        m_extrinsics_map.clear();
-
-        for (auto& sensor_pair : sensor_to_streams)
-        {
-            uint32_t sensor_index = sensor_pair.first;
-            for (auto& stream_profile : sensor_pair.second)
+            auto msg = peek_next_cached();
+            if (!msg)
             {
-                auto stream_id = stream_identifier{ get_device_index(), sensor_index, stream_profile->get_stream_type(), static_cast<uint32_t>(stream_profile->get_stream_index())};
+                throw std::runtime_error("read_device_description: invalid message");
+            }
+            if (std::regex_match(msg->topic_name, std::regex(device_info_regex_str)))
+            {
+                auto device_info = read_info_snapshot(msg->topic_name); // Will read all device info messages
+                device_extensions[RS2_EXTENSION_INFO] = device_info;
+            }
+            else if (std::regex_match(msg->topic_name, std::regex(sensor_info_regex_str)))
+            {
+                uint32_t sensor_index = ros_topic::get_sensor_index(msg->topic_name);
+                sensors_info[sensor_index] = read_info_snapshot(msg->topic_name);
+            }
+            else if (std::regex_match(msg->topic_name, std::regex(sensor_option_regex_str)))
+            {
+                uint32_t sensor_index = ros_topic::get_sensor_index(msg->topic_name);
+                sensors_options[sensor_index] = read_sensor_options({ get_device_index(), sensor_index });
+            }
+            else if (std::regex_match(msg->topic_name, std::regex(post_processing_blocks_regex_str)))
+            {
+                uint32_t sensor_index = ros_topic::get_sensor_index(msg->topic_name);
+                auto sensor_options = sensors_options[sensor_index]; // Assuming options were already read
+                sensors_processing_blocks[sensor_index] = update_proccesing_blocks(sensor_index, sensor_options);
+            }
+            else if (std::regex_match(msg->topic_name, std::regex(extrinsics_regex_str)))
+            {
+                stream_identifier stream_id = ros_topic::get_stream_identifier(msg->topic_name);
                 uint32_t reference_id;
                 rs2_extrinsics stream_extrinsic;
                 if (try_read_stream_extrinsic(stream_id, reference_id, stream_extrinsic))
                 {
                     m_extrinsics_map[stream_id] = std::make_pair(reference_id, stream_extrinsic);
                 }
+            }
+            else if (std::regex_match(msg->topic_name, std::regex(stream_info_regex_str)))
+            {
+                stream_identifier stream_id = ros_topic::get_stream_identifier(msg->topic_name);
+                auto stream_profile = read_next_stream_profile();
+                if (!stream_profile)
+                    throw std::runtime_error(rsutils::string::from() << "Failed to read stream profile for topic: " << msg->topic_name);
+
+                sensor_to_streams[stream_id.sensor_index].push_back(stream_profile);
             }
         }
 
@@ -920,7 +957,9 @@ namespace librealsense
         {
             snapshot_collection sensor_extensions;
             sensor_extensions[RS2_EXTENSION_INFO] = sensors_info[sensor_index];
-            sensor_extensions[RS2_EXTENSION_RECOMMENDED_FILTERS] = sensors_processing_blocks[sensor_index];
+            auto proccesing_blocks = sensors_processing_blocks.find(sensor_index) != sensors_processing_blocks.end() ?
+                sensors_processing_blocks[sensor_index] : std::make_shared<recommended_proccesing_blocks_snapshot>(processing_blocks{});
+            sensor_extensions[RS2_EXTENSION_RECOMMENDED_FILTERS] = proccesing_blocks;
 
             auto& sensor_options = sensors_options[sensor_index];
             sensor_extensions[RS2_EXTENSION_OPTIONS] = sensor_options;
@@ -951,7 +990,35 @@ namespace librealsense
 
         m_initial_device_description = device_snapshot(device_extensions, sensor_descriptions, m_extrinsics_map);
         _initialized = true;
+
+        prepare_for_streaming();
+
         return m_initial_device_description;
+    }
+
+    void ros2_reader::prepare_for_streaming()
+    {
+        // Reopen storage to reset the filter, and apply relevant filters for streaming
+        _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
+        _storage->open(m_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
+
+        // Stream topic names are /device_{device_index}/sensor_{sensor_index}/{stream_type}/(image or imu)/(data or metadata)
+        auto stream_topics_regex = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/[^/]+/(image|imu|pose)/(data|metadata)$").str());
+        auto stream_topics = filter_topics_by_regex(stream_topics_regex);
+
+        // Option topics: /device_{device_index}/sensor_{sensor_index}/option/{option_name}/value
+        auto option_topics_regex = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/option/[^/]+/value$").str());
+        auto option_topics = filter_topics_by_regex(option_topics_regex);
+
+        // Notification topics: /device_{device_index}/sensor_{sensor_index}/notification/{notification_type}
+        auto notification_topics_regex = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/notification/[^/]+$").str());
+        auto notification_topics = filter_topics_by_regex(notification_topics_regex);
+
+        _streaming_filter_topics.insert(_streaming_filter_topics.end(), stream_topics.begin(), stream_topics.end());
+        _streaming_filter_topics.insert(_streaming_filter_topics.end(), option_topics.begin(), option_topics.end());
+        _streaming_filter_topics.insert(_streaming_filter_topics.end(), notification_topics.begin(), notification_topics.end());
+
+        _storage->set_filter({ _streaming_filter_topics });
     }
 
     std::shared_ptr<info_container> ros2_reader::read_info_snapshot(const std::string& topic)
