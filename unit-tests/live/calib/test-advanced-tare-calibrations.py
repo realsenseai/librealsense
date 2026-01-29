@@ -253,7 +253,7 @@ if not is_mipi_device() and not is_d555():
                 restore_calibration_table(calib_dev, None)
 
 """
-temprorary disabled on mipi devices to stabilize the lab
+temporarily disabled on mipi devices to stabilize the lab
 
 if is_mipi_device() and not is_d555():
 # mipi devices do not support OCC calibration without host assistance

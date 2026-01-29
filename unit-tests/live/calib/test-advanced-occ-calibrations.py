@@ -182,7 +182,7 @@ def run_advanced_occ_calibration_test(host_assistance, config, pipeline, calib_d
             dist_modified_gt_mm = abs(modified_avg_depth_m * 1000.0 - ground_truth_mm)
             dist_post_gt_mm = abs(post_avg_depth_m * 1000.0 - ground_truth_mm)
             log.i(f"Depth to ground truth (mm): modified={dist_modified_gt_mm:.1f} post={dist_post_gt_mm:.1f} (ground truth={ground_truth_mm:.1f} mm)")
-            # verify convergence toward ground truth, allow tollerance in case of too small modification in depth due to small distance change
+            # verify convergence toward ground truth, allow tolerance in case of too small modification in depth due to small distance change
             if dist_post_gt_mm > dist_modified_gt_mm + DEPTH_CONVERGENCE_TOLERANCE_MM and dist_modified_gt_mm > DEPTH_MODIF_THRESHOLD_MM:
                 log.e("Post-calibration average depth did not converge toward ground truth")
                 test.fail()
