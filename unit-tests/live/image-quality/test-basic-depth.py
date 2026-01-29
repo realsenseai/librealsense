@@ -65,8 +65,6 @@ def average_depth_in_region(depth_image, center_x, center_y, region_size=5):
         return 0
 
 def run_test(resolution, fps):
-    test_passed = False
-    recording_path = None
     try:
         global pipeline
         pipeline = rs.pipeline(ctx)
@@ -78,10 +76,10 @@ def run_test(resolution, fps):
             log.i(f"Configuration {resolution[0]}x{resolution[1]} @ {fps}fps is not supported by the device")
             return
 
-        # --- Recording logic: always save locally ---
-        recording_name = f"test-basic-depth-recording-{uuid.uuid4().hex[:8]}.bag"
-        recording_path = os.path.join(os.getcwd(), recording_name)
-        cfg.enable_record_to_file(recording_path)
+        # --- Recording logic ---
+        temp_dir = tempfile.gettempdir()
+        temp_bag = os.path.join(temp_dir, f"test-basic-depth-{uuid.uuid4()}.bag")
+        cfg.enable_record_to_file(temp_bag)
         # --- End recording logic ---
 
         profile = pipeline.start(cfg)
@@ -165,29 +163,34 @@ def run_test(resolution, fps):
         min_passes = int(NUM_FRAMES * FRAMES_PASS_THRESHOLD)
         log.i(f"Depth diff passed in {pass_count}/{NUM_FRAMES} frames")
         test.check(pass_count >= min_passes)
-        test_passed = pass_count >= min_passes
+
+        # --- Recording file handling: success ---
+        if os.path.exists(temp_bag):
+            os.remove(temp_bag)
+        # --- End recording file handling ---
 
     except Exception as e:
         test.fail()
-        test_passed = False
+        # --- Recording file handling: failure ---
+        if 'temp_bag' in locals() and os.path.exists(temp_bag):
+            # Save with unique name in current directory
+            unique_name = f"failed-basic-depth-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}.bag"
+            dest_path = os.path.join(os.getcwd(), unique_name)
+            shutil.move(temp_bag, dest_path)
+            log.i(f"Recording saved to {dest_path}")
+        # --- End recording file handling ---
         raise e
     finally:
         cv2.destroyAllWindows()
         if profile:
             pipeline.stop()
-        # --- Recording file handling: after pipeline is stopped ---
-        if recording_path and os.path.exists(recording_path):
+        # Clean up temp file if it still exists
+        if 'temp_bag' in locals() and os.path.exists(temp_bag):
             try:
-                if test_passed:
-                    os.remove(recording_path)
-                else:
-                    failed_name = f"failed-{os.path.basename(recording_path)}"
-                    failed_path = os.path.join(os.getcwd(), failed_name)
-                    os.rename(recording_path, failed_path)
-                    log.i(f"Recording saved to {failed_path}")
-            except Exception as file_exc:
-                log.i(f"Could not handle recording file: {file_exc}")
-        # --- End recording file handling ---
+                os.remove(temp_bag)
+            except Exception:
+                pass
+
 
 log.d("context:", test.context)
 
