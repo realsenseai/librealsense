@@ -12,6 +12,8 @@
 using namespace rs2;
 
 
+
+
 static const size_t N_STD_FRAMES = 100;
 static const int    NINETY_FIVE_PERCENT_OF_STD_PERIOD = static_cast< int >( 0.95 * N_STD_FRAMES );
 static const float  MAX_RANGE_IN_UNIT = 65536.0f;
