@@ -5,6 +5,7 @@ Subject: [PATCH] Debug ioctl fmt desc
 
 The patch is useful to profile kernel calls invocation after applying kernel patches
 
+
 ---
  drivers/media/v4l2-core/v4l2-ioctl.c | 3 +++
  1 file changed, 3 insertions(+)
