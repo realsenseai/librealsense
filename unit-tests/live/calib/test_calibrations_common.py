@@ -12,8 +12,10 @@ import ctypes
 
 # Constants for calibration
 CALIBRATION_TIMEOUT_SECONDS = 30
-OCC_TIMEOUT_MS = 9000
-TARE_TIMEOUT_MS = 10000
+OCC_TIMEOUT_MS = 6000
+TARE_TIMEOUT_MS = 7000
+OCC_TIMEOUT_MS_HA = 9000
+TARE_TIMEOUT_MS_HA = 9000
 FRAME_PROCESSING_TIMEOUT_MS = 5000
 HARDWARE_RESET_DELAY_SECONDS = 3
 
@@ -49,18 +51,22 @@ def get_calibration_device(image_width, image_height, fps):
     
     return config, pipeline, auto_calibrated_device
 
-def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground_truth, return_table=False):
+def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground_truth, host_assistance=False, return_table=False):
     """
     Main calibration function for both OCC and Tare calibrations.
     
     Args:
-        host_assistance (bool): Whether to use host assistance mode
+        config: Pipeline configuration
+        pipeline: RealSense pipeline
+        calib_dev: Auto calibrated device
         occ_calib (bool): True for OCC calibration, False for Tare calibration
         json_config (str): JSON configuration string
         ground_truth (float): Ground truth value for Tare calibration (None for OCC)
+        host_assistance (bool): Whether to use host assistance mode
+        return_table (bool): Whether to return calibration table
     
     Returns:
-        float: Health factor from calibration
+        float: Health factor from calibration (or tuple with calibration table if return_table=True)
     """
 
     conf = pipeline.start(config)
@@ -81,10 +87,12 @@ def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground
     try:
         if occ_calib:    
             log.i("Starting on-chip calibration")
-            new_calib, health = calib_dev.run_on_chip_calibration(json_config, on_calib_cb, OCC_TIMEOUT_MS)
+            timeout = OCC_TIMEOUT_MS_HA if host_assistance else OCC_TIMEOUT_MS
+            new_calib, health = calib_dev.run_on_chip_calibration(json_config, on_calib_cb, timeout)
         else:    
             log.i("Starting tare calibration")
-            new_calib, health = calib_dev.run_tare_calibration(ground_truth, json_config, on_calib_cb, TARE_TIMEOUT_MS)
+            timeout = TARE_TIMEOUT_MS_HA if host_assistance else TARE_TIMEOUT_MS            
+            new_calib, health = calib_dev.run_tare_calibration(ground_truth, json_config, on_calib_cb, timeout)
 
         calib_done = len(new_calib) > 0
         timeout_end = time.time() + CALIBRATION_TIMEOUT_SECONDS
@@ -428,10 +436,15 @@ def on_chip_calibration_json(occ_json_file, host_assistance):
         occ_json = '{\n  ' + \
                    '"calib type": 0,\n' + \
                    '"host assistance": ' + str(int(host_assistance)) + ',\n' + \
-                   '"data sampling": 1,\n' + \
-                   '"scan parameter": 0,\n' + \
+                   '"keep new value after successful scan": 1,\n' + \
+                   '"fl data sampling": 0,\n' + \
+                   '"adjust both sides": 0,\n' + \
+                   '"fl scan location": 0,\n' + \
+                   '"fy scan direction": 0,\n' + \
+                   '"white wall mode": 0,\n' + \
                    '"speed": 2,\n' + \
-                   '"apply preset": 1,\n' + \
+                   '"scan parameter": 0,\n' + \
+                   '"apply preset": 0,\n' + \
                    '"scan only": ' + str(int(host_assistance)) + ',\n' + \
                    '"interactive scan": 0,\n' + \
                    '"resize factor": 1\n' + \
