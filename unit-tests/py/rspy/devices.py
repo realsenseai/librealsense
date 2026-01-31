@@ -437,9 +437,46 @@ def by_configuration( config, exceptions=None, inclusions=None ):
         else:
             new_config.append(p)
 
+    # Special composite categories
+    # D400_CAM_SYNC: requires two D400 devices, excluding D405 (no sync port)
+    if new_config:
+        first = new_config[0]
+        first_lower = first.lower() if isinstance(first, str) else ''
+        if first_lower in ('d400_cam_sync'):
+            if len(new_config) != 1:
+                raise RuntimeError("D400_CAM_SYNC cannot be combined with other device specs")
+            effective_ignored = list(ignored_products)
+            if 'D405' not in effective_ignored:
+                effective_ignored.append('D405')
+
+            eligible = []
+            for sn in by_product_line('D400', effective_ignored):
+                if sn in exceptions:
+                    continue
+                if inclusions and sn not in inclusions:
+                    continue
+                eligible.append(sn)
+
+            # Deterministic selection to keep CI stable
+            eligible = sorted(set(eligible))
+            if len(eligible) < 2:
+                err = f"D400_CAM_SYNC requires 2 non-D405 D400 devices; found {len(eligible)}"
+                if effective_ignored:
+                    err += f" (!{effective_ignored})"
+                if exceptions:
+                    err += f" (-{exceptions})"
+                if inclusions:
+                    err += f" (+{inclusions})"
+                raise RuntimeError(err)
+
+            yield {eligible[0], eligible[1]}
+            return
+
     nothing_matched = True
     if len( new_config ) > 0 and re.fullmatch( r'each\(.+\)', new_config[0], re.IGNORECASE ):
         spec = new_config[0][5:-1]
+        if spec.lower() in ('d400_cam_sync'):
+            raise RuntimeError("each(D400_CAM_SYNC) is not supported; it always matches exactly two devices")
         for sn in by_spec( spec, ignored_products ):
             if sn in exceptions:
                 continue
