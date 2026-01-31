@@ -14,4 +14,3 @@ Validation is done on x86 NUC machines running Windows 10 and Ubuntu 16.04 LTS.
 
 Additional platforms are tested and supported on demand, driven by community requests and feedback.
 
-
