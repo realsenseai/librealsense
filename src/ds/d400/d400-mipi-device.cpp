@@ -3,6 +3,7 @@
 
 #include "context.h"
 #include <string>
+#include <fstream>
 #include "d400-mipi-device.h"
 
 namespace librealsense
