@@ -260,6 +260,8 @@ namespace librealsense
         rsutils::subscription register_options_changed_callback( options_watcher::callback && cb ) override;
         virtual void register_option_to_update( rs2_option id, std::shared_ptr< option > option );
         virtual void unregister_option_from_update( rs2_option id );
+        inline void pause_options_watcher() { _options_watcher.pause(); }
+        inline void unpause_options_watcher() { _options_watcher.unpause(); }
 
         void prepare_for_bulk_operation() override { _raw_sensor->prepare_for_bulk_operation(); }
         void finished_bulk_operation() override { _raw_sensor->finished_bulk_operation(); }

@@ -127,7 +127,7 @@ namespace rs2
         return false;
     }
 
-    void firmware_update_manager::process_mipi()
+    void firmware_update_manager::process_mipi_signed_fw()
     {
         bool is_mipi_recovery = !(strcmp(_dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID), "BBCD"));
         if (!_is_signed)
@@ -147,26 +147,50 @@ namespace rs2
                 return;
             }
         }
-        log("Burning Signed Firmware on MIPI device");
 
-        _progress = 30;
-        rs2_camera_info _dfu_port_info = (is_mipi_recovery)?(RS2_CAMERA_INFO_PHYSICAL_PORT):(RS2_CAMERA_INFO_DFU_DEVICE_PATH);
-        // Write signed firmware to appropriate file descriptor
-        std::ofstream fw_path_in_device(_dev.get_info(_dfu_port_info), std::ios::binary);
-        if (fw_path_in_device)
+        _progress = 1;
+
+        auto update_dev = _dev.as<update_device>();
+        if (!update_dev)
         {
-            fw_path_in_device.write(reinterpret_cast<const char*>(_fw.data()), _fw.size());
-        }
-        else
-        {
-            fail("Firmware Update failed - wrong path or permissions missing");
+            std::stringstream ss;
+            ss << "The firmware version could not be burnt on ";
+            ss << _dev.get_info(RS2_CAMERA_INFO_NAME) << std::endl;
+            fail(ss.str());
             return;
         }
-        log("FW update process completed successfully.");
-        LOG_INFO("FW update process completed successfully.");
-        fw_path_in_device.close();
+        // avoids same log sent multiple times
+        int log_step = 0;
+        update_dev.update(_fw, [&](const float progress)
+        {
+            _progress = progress * 100.f;
+            switch(static_cast<int>(_progress))
+            {
+            case 5:
+                if ( log_step == 0)
+                {
+                    log("Burning Signed Firmware on MIPI device");
+                    log_step = 1;
+                }
+                break;
+            case 95:
+                if ( log_step == 1 )
+                {
+                    log("Firmware Update completed, waiting for device to reconnect");
+                    log_step = 2;
+                }
+                break;
+            case 100:
+                if ( log_step == 2 )
+                {
+                    log("FW update process completed successfully");
+                    _done = true;
+                    log_step = 3;
+                }
+                break;
+            }
+        });
 
-        _progress = 100;
         if (is_mipi_recovery)
         {
             log("For GMSL MIPI device please reboot, or reload d4xx driver\n"\
@@ -176,7 +200,7 @@ namespace rs2
                      "sudo rmmod d4xx && sudo modprobe d4xx\n"\
                      "and restart the realsense-viewer");
         }
-        _done = true;
+
         // Restart the device to reconstruct with the new version information
         _dev.hardware_reset();
     }
@@ -287,9 +311,10 @@ namespace rs2
         invoker invoke)
     {
         // if device is MIPI device, and fw is signed - using mipi specific procedure
-        if (_is_signed && !strcmp(_dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE), "GMSL"))
+        bool is_mipi_device = !strcmp(_dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE), "GMSL");
+        if (_is_signed && is_mipi_device)
         {
-            process_mipi();
+            process_mipi_signed_fw();
             return;
         }
 
@@ -336,7 +361,10 @@ namespace rs2
                 }
             }
 
-            backup_firmware(upd, next_progress, serial);
+            if (!is_mipi_device)
+            {
+                backup_firmware(upd, next_progress, serial);
+            }
 
             next_progress = static_cast<int>(_progress) + 10;
 
@@ -376,6 +404,11 @@ namespace rs2
                 _progress = (ceil(progress * 10) / 10 * (90 - next_progress)) + next_progress;
             });
             log("Firmware Update completed, waiting for device to reconnect");
+
+            if (is_mipi_device)
+            {
+                _dev.hardware_reset();
+            }
         }
 
         if (!check_for([this, serial]() {

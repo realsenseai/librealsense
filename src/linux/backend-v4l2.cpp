@@ -1494,7 +1494,8 @@ namespace librealsense
               _fd(-1),
               _stop_pipe_fd{},
               _buf_dispatch(use_memory_map),
-              _frame_drop_monitor(DEFAULT_KPI_FRAME_DROPS_PERCENTAGE)
+              _frame_drop_monitor(DEFAULT_KPI_FRAME_DROPS_PERCENTAGE),
+              _are_device_capabilities_assigned(false)
         {
             _named_mtx = std::unique_ptr<named_mutex>(new named_mutex(_name, 5000));
         }
@@ -2090,6 +2091,8 @@ namespace librealsense
 
         void v4l_uvc_device::set_power_state(power_state state)
         {
+            // calling fd.open leads to state D0 (active)
+            // calling fd.close lead to state D3 (idle)
             if (state == D0 && _state == D3)
             {
                 map_device_descriptor();
@@ -2491,6 +2494,15 @@ namespace librealsense
             _fds.insert(_fds.end(),{_fd,_stop_pipe_fd[0],_stop_pipe_fd[1]});
             _max_fd = *std::max_element(_fds.begin(),_fds.end());
 
+            if (!_are_device_capabilities_assigned)
+            {
+                assign_device_capabilities();
+                _are_device_capabilities_assigned = true;
+            }
+        }
+
+        void v4l_uvc_device::assign_device_capabilities()
+        {
             v4l2_capability cap = {};
             if(xioctl(_fd, VIDIOC_QUERYCAP, &cap) < 0)
             {
@@ -2630,7 +2642,8 @@ namespace librealsense
         v4l_uvc_meta_device::v4l_uvc_meta_device(const uvc_device_info& info, bool use_memory_map):
             v4l_uvc_device(info,use_memory_map),
             _md_fd(0),
-            _md_name(info.metadata_node_id)
+            _md_name(info.metadata_node_id),
+            _are_device_capabilities_assigned(false)
         {
         }
 
@@ -2726,13 +2739,19 @@ namespace librealsense
                 return;  // Does not throw, MIPI device metadata not received through UVC, no metadata here may be valid
             }
 
-            //The minimal video/metadata nodes syncer will be implemented by using two blocking calls:
-            // 1. Obtain video node data.
-            // 2. Obtain metadata
-            //     To revert to multiplexing mode uncomment the next line
             _fds.push_back(_md_fd);
             _max_fd = *std::max_element(_fds.begin(),_fds.end());
 
+            if (!_are_device_capabilities_assigned)
+            {
+                assign_device_capabilities();
+                _are_device_capabilities_assigned = true;
+            }
+
+        }
+
+        void v4l_uvc_meta_device::assign_device_capabilities()
+        {
             v4l2_capability cap = {};
             if(xioctl(_md_fd, VIDIOC_QUERYCAP, &cap) < 0)
             {

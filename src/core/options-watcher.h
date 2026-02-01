@@ -47,6 +47,10 @@ public:
 
     void set_update_interval( std::chrono::milliseconds update_interval ) { _update_interval = update_interval; }
 
+    inline void pause() { _paused.store(true, std::memory_order_relaxed); }
+    inline void unpause() { _paused.store(false, std::memory_order_relaxed);
+                          _stopping.notify_all();}
+
 protected:
     bool should_start() const;
     bool should_stop() const;
@@ -63,6 +67,7 @@ protected:
     std::mutex _mutex;
     std::condition_variable _stopping;
     std::atomic_bool _destructing;
+    std::atomic_bool _paused;
 };
 
 
