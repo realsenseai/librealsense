@@ -160,34 +160,24 @@ namespace rs2
             return;
         }
         // avoids same log sent multiple times
-        int log_step = 0;
-        update_dev.update(_fw, [&](const float progress)
+        static constexpr std::array<std::pair<float,const char*>,3> steps = {{
+            {  5.f,  "Burning Signed Firmware on MIPI device" },
+            { 95.f,  "Firmware Update completed, waiting for device to reconnect" },
+            {100.f,  "FW update process completed successfully" }
+        }};
+
+        size_t next = 0;
+
+        update_dev.update(_fw, [&](float progress01)
         {
-            _progress = progress * 100.f;
-            switch(static_cast<int>(_progress))
+            _progress = progress01 * 100.f;
+
+            if (next < steps.size() && _progress >= steps[next].first)
             {
-            case 5:
-                if ( log_step == 0)
-                {
-                    log("Burning Signed Firmware on MIPI device");
-                    log_step = 1;
-                }
-                break;
-            case 95:
-                if ( log_step == 1 )
-                {
-                    log("Firmware Update completed, waiting for device to reconnect");
-                    log_step = 2;
-                }
-                break;
-            case 100:
-                if ( log_step == 2 )
-                {
-                    log("FW update process completed successfully");
+                log(steps[next].second);
+                if (steps[next].first >= 100.f)
                     _done = true;
-                    log_step = 3;
-                }
-                break;
+                ++next;
             }
         });
 
