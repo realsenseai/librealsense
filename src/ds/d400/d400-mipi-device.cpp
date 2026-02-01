@@ -76,6 +76,7 @@ namespace librealsense
                     {
                         if (callback)
                             callback->on_update_progress(static_cast<float>(i) / 100.f);
+                        // needed a little more than 1 second * num of iterations to complete the burning
                         std::this_thread::sleep_for( std::chrono::milliseconds( 1020 ) );
                     }
                 } );
@@ -109,6 +110,8 @@ namespace librealsense
 
     void d400_mipi_device::update( const void * fw_image, int fw_image_size, rs2_update_progress_callback_sptr progress_callback) const
     {
+        // fw update usually do not change any data member in the sdk
+        // but here we need to pause the options watchers which are non-const methods
         const_cast<d400_mipi_device*>(this)->update_non_const(fw_image, fw_image_size, progress_callback);
     }
 

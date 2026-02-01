@@ -47,8 +47,8 @@ public:
 
     void set_update_interval( std::chrono::milliseconds update_interval ) { _update_interval = update_interval; }
 
-    inline void pause() { _paused.store(true, std::memory_order_relaxed); }
-    inline void unpause() { _paused.store(false, std::memory_order_relaxed);
+    inline void pause() { _paused.store(true); }
+    inline void unpause() { _paused.store(false);
                           _stopping.notify_all();}
 
 protected:

@@ -102,7 +102,7 @@ void options_watcher::thread_loop()
             // 1. Block while paused
             _stopping.wait( lock, [this]
             {
-                return should_stop() || !_paused.load(std::memory_order_acquire);
+                return should_stop() || !_paused.load();
             });
             if (should_stop())
                 break;
@@ -110,7 +110,7 @@ void options_watcher::thread_loop()
             // 2. Periodic wait
             _stopping.wait_for( lock, _update_interval, [this]
             {
-                return should_stop() || _paused.load(std::memory_order_acquire);
+                return should_stop() || _paused.load();
             });
             // Checking for stop conditions after sleep.
             if( should_stop() )
