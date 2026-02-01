@@ -30,10 +30,10 @@ def detect_roi_with_exposure(marker_ids):
         start_time = time.time()
         depth_sensor.set_option(rs.option.exposure, exposure)
         try:
-            find_roi_location(pipeline, marker_ids, DEBUG_MODE)  # markers in the lab are 4,5,6,7
+            find_roi_location(pipeline, marker_ids, DEBUG_MODE, timeout=15)  # markers in the lab are 4,5,6,7
             return True
         except Exception as e:
-            log.d("got an exception:", str(e), "time taken:", time.time() - start_time)
+            log.d("Got an exception:", str(e), "within", time.time() - start_time)
             exposure += step
             log.d("Failed to detect markers with exposure", exposure - step,
                   ", trying with exposure", exposure)
