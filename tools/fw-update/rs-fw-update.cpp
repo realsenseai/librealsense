@@ -462,7 +462,7 @@ try
 
     if (!serial_number_arg.isSet() && devs.size() > 1)
     {
-        std::cout << std::endl << "Several devices is connected, serial number must be selected using -s <serial_number>" << std::endl;
+        std::cout << std::endl << "Several devices are connected, serial number must be selected using -s <serial_number>" << std::endl;
         return EXIT_FAILURE;
     }
 
