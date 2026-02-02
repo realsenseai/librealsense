@@ -372,7 +372,7 @@ void SqliteStorage::reset_filter()
 
 }  // namespace rosbag2_storage_plugins
 
-#include "pluginlib/class_list_macros.hpp"  // NOLINT
-PLUGINLIB_EXPORT_CLASS(
-  rosbag2_storage_plugins::SqliteStorage,
-  rosbag2_storage::storage_interfaces::ReadWriteInterface)
+//#include "pluginlib/class_list_macros.hpp"  // NOLINT
+//PLUGINLIB_EXPORT_CLASS(
+//  rosbag2_storage_plugins::SqliteStorage,
+//  rosbag2_storage::storage_interfaces::ReadWriteInterface)
