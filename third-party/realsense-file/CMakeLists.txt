@@ -37,9 +37,9 @@ target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${ROSBAG_HEADER_DIRS}
         $<$<NOT:$<BOOL:${USE_EXTERNAL_LZ4}>>:${LZ4_INCLUDE_PATH}>
-        ${HEADER_DIR_SQLITE3}
-        ${HEADER_DIR_YAML_CPP}
 )
+
+disable_third_party_warnings(${PROJECT_NAME})
 
 message(STATUS "ROSBAG2_COMPILE_FLAGS: ${ROSBAG2_COMPILE_FLAGS}")
 target_compile_definitions(${PROJECT_NAME} PUBLIC
@@ -55,11 +55,12 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   endif()
 endif()
 
-add_dependencies(${PROJECT_NAME} sqlite3)
+add_dependencies(${PROJECT_NAME} sqlite3_lib)
 add_dependencies(${PROJECT_NAME} yaml_cpp)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         $<$<BOOL:${USE_EXTERNAL_LZ4}>:lz4::lz4>
+        sqlite3_lib
 )
 
 #set_target_properties(${PROJECT_NAME} PROPERTIES VERSION "${LIBVERSION}" SOVERSION "${LIBSOVERSION}")
@@ -68,7 +69,7 @@ set_target_properties (${PROJECT_NAME} PROPERTIES FOLDER Library)
 
 set(CMAKECONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/../cmake/realsense2")
 
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS ${PROJECT_NAME} sqlite3_lib
     EXPORT realsense2Targets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
