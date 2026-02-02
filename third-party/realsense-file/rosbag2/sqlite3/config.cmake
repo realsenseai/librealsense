@@ -17,6 +17,18 @@ endif()
 
 ExternalProject_Get_Property(sqlite3 SOURCE_DIR)
 set(sqlite3_SOURCE_DIR ${SOURCE_DIR})
-set(HEADER_DIR_SQLITE3 
-    ${sqlite3_SOURCE_DIR}
-)
+set(HEADER_DIR_SQLITE3 ${sqlite3_SOURCE_DIR})
+set(SQLITE3_SOURCES "${sqlite3_SOURCE_DIR}/sqlite3.c")
+
+add_library(sqlite3_lib STATIC ${SQLITE3_SOURCES})
+set_source_files_properties(${SQLITE3_SOURCES} PROPERTIES GENERATED TRUE)
+
+add_dependencies(sqlite3_lib sqlite3)
+
+target_include_directories(sqlite3_lib PUBLIC $<BUILD_INTERFACE:${sqlite3_SOURCE_DIR}>)
+
+if(UNIX)
+    find_package(Threads REQUIRED)
+    target_link_libraries(sqlite3_lib PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+endif()
+
