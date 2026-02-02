@@ -203,6 +203,11 @@ namespace librealsense
             _depth_units_register_action = depth_units_register_action;
         }
 
+        inline void set_hardware_reset_action( std::function< void() > hardware_reset_action )
+        {
+            _hardware_reset_action = hardware_reset_action;
+        }
+
         device_interface * _dev;
         debug_interface * _debug_interface;
         sensor_base * _depth_sensor = nullptr;
@@ -213,6 +218,7 @@ namespace librealsense
         bool _blocked = false;
         std::string _block_message;
         std::function<void()> _depth_units_register_action;
+        std::function<void()> _hardware_reset_action;
 
         preset get_all() const;
         void set_all( const preset & p );

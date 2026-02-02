@@ -93,8 +93,13 @@ namespace librealsense
             unregister_from_visual_preset_option();
             unregister_from_depth_scale_option();
         }
+
         send_receive( encode_command( ds::fw_cmd::EN_ADV, enable ) );
-        send_receive( encode_command( ds::fw_cmd::HWRST ) );
+
+        if (_hardware_reset_action)
+            _hardware_reset_action();
+        else
+            send_receive( encode_command( ds::fw_cmd::HWRST ) );
 
         // register / unregister visual preset option
         if( enable )
