@@ -390,8 +390,8 @@ namespace rs2
         {
             error_message = error_to_string(e);
         }
-        populate_options(ss.str().c_str(), &_options_invalidated, error_message);
-
+        _opt_base_label = ss.str();
+        populate_options(_opt_base_label.c_str(), &_options_invalidated, error_message);
     }
 
     subdevice_model::~subdevice_model()
@@ -404,6 +404,12 @@ namespace rs2
         catch( ... )
         {
         }
+    }
+
+    void subdevice_model::repopulate_options()
+    {
+        std::string error_message;
+        populate_options(_opt_base_label.c_str(), &_options_invalidated, error_message);
     }
 
     bool subdevice_model::is_post_processing_enabled_in_config_file() const
@@ -1657,7 +1663,7 @@ namespace rs2
             auto next = supported_options[next_option];
             if (options_metadata.find(static_cast<rs2_option>(next)) != options_metadata.end())
             {
-                auto& opt_md = options_metadata[static_cast<rs2_option>(next)];
+                auto& opt_md = options_metadata.at(static_cast<rs2_option>(next));
                 opt_md.update_all_fields(error_message, notifications);
 
                 if (next == RS2_OPTION_ENABLE_AUTO_EXPOSURE)

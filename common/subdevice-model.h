@@ -145,6 +145,8 @@ namespace rs2
 
         bool is_depth_calibration_profile() const;
 
+        void repopulate_options();
+
         viewer_model& viewer;
         std::function<void()> on_frame = [] {};
 
@@ -216,6 +218,7 @@ namespace rs2
 
         bool uvmapping_calib_full = false;
         device_model* dev_model;
+        std::string _opt_base_label;
 
     private:
         bool draw_resolutions(std::string& error_message, std::string& label, std::function<void()> streaming_tooltip, float col0, float col1);

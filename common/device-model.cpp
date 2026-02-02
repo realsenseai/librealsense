@@ -864,11 +864,21 @@ namespace rs2
         bool yes_was_chosen = false;
         if (yes_no_dialog("Advanced Mode", message_text, yes_was_chosen, window, error_message))
         {
+            // meaning the user confirmed the advanced mode toggling
             if (yes_was_chosen)
             {
                 dev.as<advanced_mode>().toggle_advanced_mode(enable_advanced_mode);
                 restarting_device_info = get_device_info(dev, false);
                 view.not_model->add_log(enable_advanced_mode ? "Turning on advanced mode..." : "Turning off  advanced mode...");
+                
+                for( auto&& subdevice : subdevices )
+                {
+                    if( subdevice->s->is< rs2::depth_sensor >() )
+                    {
+                        subdevice->repopulate_options();
+                        break;
+                    }
+                }
             }
             keep_showing = false;
         }
@@ -2075,12 +2085,14 @@ namespace rs2
                             error_message = error_to_string(e);
                         }
 
+                        ImGui::PopStyleColor(1);
                         ImGui::PopItemWidth();
                         return is_clicked;
                     };
+
                     auto & visual_preset_opt_model = sub->options_metadata.at(RS2_OPTION_VISUAL_PRESET);
                     visual_preset_opt_model.custom_draw_method = draw_preset_combo_box;
-                    ImGui::PopStyleColor(1);
+                    
                     if (sub->draw_option(RS2_OPTION_VISUAL_PRESET, dev.is<playback>() || update_read_only_options, error_message, *viewer.not_model))
                     {
                         get_curr_advanced_controls = true;
