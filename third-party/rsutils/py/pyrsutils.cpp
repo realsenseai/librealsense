@@ -231,6 +231,7 @@ PYBIND11_MODULE(NAME, m) {
         .def_readwrite( "link", &eth_config::link )
         .def_readwrite( "dhcp", &eth_config::dhcp )
         .def_readwrite( "transmission_delay", &eth_config::transmission_delay )
+        .def_readwrite( "udp_ttl", &eth_config::udp_ttl )
         .def( "build_command", &eth_config::build_command )
         .def( "validate", &eth_config::validate );
 }

@@ -55,7 +55,10 @@ public:
     bool is_ready() const;
 
     // Wait until ready. Will throw if not ready within the timeout!
-    void wait_until_ready( size_t timeout_ms = 5000 ) const;
+    // In case of network message loss, device may have partial capabilities for better user experience.
+    // Will throw if allow_partial_capabilities is false and device is not fully initialized.
+    // Will return false if partial initialization allowed and initialization not fully done by timeout, true otherwise. 
+    bool wait_until_ready( size_t timeout_ms = 5000, bool allow_partial_capabilities = false ) const;
 
     // A device is offline when discovery is lost, and assumed online otherwise
     bool is_online() const;
@@ -78,6 +81,7 @@ public:
     size_t foreach_option( std::function< void( std::shared_ptr< dds_option > option ) > fn ) const;
 
     void open( const dds_stream_profiles & profiles );
+    void close( const dds_stream_profiles & profiles );
 
     void set_option_value( const std::shared_ptr< dds_option > & option, rsutils::json new_value );
     rsutils::json query_option_value( const std::shared_ptr< dds_option > & option );

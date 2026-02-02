@@ -614,8 +614,8 @@ int main(int argc, const char** argv) try
         }
 
         ImGui::End();
-        ImGui::PopStyleVar();
         ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
 
         // Fetch and process frames from queue
         viewer_model.handle_ready_frames(viewer_rect, window, static_cast<int>(device_models->size()), error_message);

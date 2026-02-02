@@ -7,11 +7,14 @@ If you don't have access to the spec, you can still operate the tool in HEX mode
 ## Usage
 After installing `librealsense` run `rs-terminal` to launch the tool in HEX mode.
 
+* `--version` - print the tool's version.
 * `-l <filename>` - load commands specification file.
 * `-d <number>` - choose device by device number
 * `-n <serial>` - choose device by serial number
 * `-a` - broadcast to all connected devices
 * `-c` - execute a sequence of FW commands listed in a file. (The file must be ANSI/UTF-8)
+* `-v` - turn on verbose logs
+* `--debug` - turn on SDK logs.
 
 Example:  
 >`rs-terminal -l cmd.xml -c sequence.txt`
@@ -25,3 +28,5 @@ oemr
 oemw /usr/tmp/tbd.bin
 gvd
 ```
+
+> Note use 'exit' command to exit the tool

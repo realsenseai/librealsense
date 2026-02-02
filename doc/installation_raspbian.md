@@ -40,10 +40,10 @@ $ sudo apt-get install -y libglu1-mesa libglu1-mesa-dev mesa-utils mesa-utils-ex
 ```
 
 ### update udev rule
-Now we need to get librealsense from the repo(https://github.com/IntelRealSense/librealsense).
+Now we need to get librealsense from the repo(https://github.com/realsenseai/librealsense).
 ```
 $ cd ~
-$ git clone https://github.com/IntelRealSense/librealsense.git
+$ git clone https://github.com/realsenseai/librealsense.git
 $ cd librealsense
 $ sudo cp config/99-realsense-libusb.rules /etc/udev/rules.d/ 
 $ sudo udevadm control --reload-rules && sudo udevadm trigger 

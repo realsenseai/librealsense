@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEngine;
 
 [ProcessingBlockDataAttribute(typeof(TemporalFilter))]
-[HelpURL("https://github.com/IntelRealSense/librealsense/blob/master/doc/post-processing-filters.md#temporal-filter")]
+[HelpURL("https://github.com/realsenseai/librealsense/blob/master/doc/post-processing-filters.md#temporal-filter")]
 public class RsTemporalFilter : RsProcessingBlock
 {
 

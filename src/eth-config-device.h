@@ -50,6 +50,8 @@ namespace librealsense
         virtual void set_mtu( uint32_t mtu );
         virtual uint32_t get_transmission_delay() const;
         virtual void set_transmission_delay( uint32_t delay );
+        virtual uint8_t get_udp_ttl() const;
+        virtual void set_udp_ttl( uint8_t ttl );
 
         // Factory reset
         virtual void restore_defaults();

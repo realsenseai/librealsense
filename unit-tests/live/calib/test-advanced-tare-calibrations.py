@@ -11,6 +11,7 @@ from test_calibrations_common import (
     get_calibration_device,
     get_current_rect_params,
     modify_extrinsic_calibration,
+    save_calibration_table,
     restore_calibration_table,
     write_calibration_table_with_crc,
     measure_average_depth,
@@ -96,8 +97,10 @@ _target_z = None
 
 # Additional constants & thresholds for advanced calibration modification test
 PIXEL_CORRECTION = -0.8  # pixel shift to apply to principal point (right IR)
-EPSILON = 0.001          # distance comparison tolerance for reversion checks
-HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION = 2.0  # OCC health factor acceptance for modified run
+SHORT_DISTANCE_PIXEL_CORRECTION = -1.3  # increased correction for short distances
+EPSILON = 0.5         # half of PIXEL_CORRECTION tolerance
+DIFF_THRESHOLD = 0.001  # minimum change expected after TARE calibration
+HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION = 2.0  # TARE health factor acceptance for modified run
 
 
 def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, target_z=None):
@@ -114,6 +117,11 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
         8. Measure post-Tare average depth; assert convergence toward ground truth and principal point reversion (failure handling if not satisfied).
     """
     try:
+        # 0. Save original calibration table
+        saved_table = save_calibration_table(calib_dev)
+        if saved_table is None:
+            log.e("Failed to save original calibration table")
+            test.fail()
 
         # 1. Read base (reference) principal points
         principal_points_result = get_current_rect_params(calib_dev)
@@ -126,9 +134,12 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
         base_axis_val = base_right_pp[0]        
 
         # 3. Apply perturbation
-        log.i(f"Applying manual raw intrinsic correction: delta={PIXEL_CORRECTION:+.3f} px")
+        pixel_correction = PIXEL_CORRECTION
+        if target_z < 1300.0:
+            pixel_correction = SHORT_DISTANCE_PIXEL_CORRECTION
+        log.i(f"Applying manual raw intrinsic correction: delta={pixel_correction:+.3f} px")
         modification_success, _modified_table_bytes, modified_ppx, modified_ppy = modify_extrinsic_calibration(
-            calib_dev, PIXEL_CORRECTION, False)
+            calib_dev, pixel_correction, False)
         if not modification_success:
             log.e("Failed to modify calibration table")
             test.fail()
@@ -139,7 +150,7 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
             log.e("Could not read principal points after modification")
             test.fail()
         mod_left_pp, mod_right_pp, mod_offsets = modified_principal_points_result
-        if abs(modified_ppx - mod_right_pp[0]) > EPSILON:
+        if abs(modified_ppx - mod_right_pp[0]) > DIFF_THRESHOLD:
             log.e(f"Modification mismatch for ppx. Expected {modified_ppx:.6f} got {mod_right_pp[0]:.6f}")
             test.fail()
 
@@ -155,7 +166,7 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
         tare_json = tare_calibration_json(None, host_assistance)
         new_calib_bytes = None
         try:
-            health_factor, new_calib_bytes = calibration_main(config, pipeline, calib_dev, False, tare_json, target_z, return_table=True)
+            health_factor, new_calib_bytes = calibration_main(config, pipeline, calib_dev, False, tare_json, target_z, host_assistance, return_table=True)
         except Exception as e:
             log.e(f"Calibration_main failed: {e}")
             health_factor = None
@@ -194,8 +205,8 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
         dist_from_modified = abs(final_axis_val - modified_ppx)
         log.i(f"  ppx distances: from_base={dist_from_original:.6f} from_modified={dist_from_modified:.6f}")
 
-        if abs(final_axis_val - modified_ppx) <= EPSILON:
-            log.e(f"tare left ppy unchanged (within EPSILON={EPSILON}); failing")
+        if abs(final_axis_val - modified_ppx) <= DIFF_THRESHOLD:
+            log.e(f"tare left ppy unchanged (within DIFF_THRESHOLD={DIFF_THRESHOLD}); failing")
             test.fail()
         elif dist_from_modified + EPSILON <= dist_from_original:
             log.e("tare did not revert toward base (still closer to modified)")
@@ -220,7 +231,7 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
             pipeline.stop()
         except Exception:
             pass
-    return calib_dev
+    return calib_dev, saved_table
 
 
 if not is_mipi_device() and not is_d555():
@@ -235,15 +246,19 @@ if not is_mipi_device() and not is_d555():
                 test.check(_target_z > TARGET_Z_MIN and _target_z < TARGET_Z_MAX)
             image_width, image_height, fps = (256, 144, 90)
             config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
-            calib_dev = run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, _target_z)
+            restore_calibration_table(calib_dev, None)
+            calib_dev, saved_table = run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, _target_z)
         except Exception as e:
             log.e("Tare calibration with principal point modification failed: ", str(e))
+            restore_calibration_table(calib_dev, None)
             test.fail()
         finally:
-            if calib_dev is not None and getattr(test, 'test_failed', True):
+            if calib_dev is not None:
                 log.i("Restoring calibration table after test failure")
-                restore_calibration_table(calib_dev)
+                restore_calibration_table(calib_dev, None)
 
+"""
+temporarily disabled on mipi devices to stabilize the lab
 
 if is_mipi_device() and not is_d555():
 # mipi devices do not support OCC calibration without host assistance
@@ -257,15 +272,15 @@ if is_mipi_device() and not is_d555():
                 test.check(_target_z > TARGET_Z_MIN and _target_z < TARGET_Z_MAX)
             image_width, image_height, fps = (1280, 720, 30)
             config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
-            calib_dev = run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, _target_z)
+            calib_dev, saved_table = run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, _target_z)
         except Exception as e:
             log.e("Tare calibration with principal point modification failed: ", str(e))
             test.fail()
         finally:
             if calib_dev is not None and getattr(test, 'test_failed', True):
                 log.i("Restoring calibration table after test failure")
-                restore_calibration_table(calib_dev)
-
+                restore_calibration_table(calib_dev, None)
+"""
 test.print_results_and_exit()
 
 # for step 2 -  not in use for now

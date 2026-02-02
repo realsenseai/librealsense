@@ -7,18 +7,22 @@
 
 ## Installation
 
-> **Note:**
->
->[`pyrealsense`](https://github.com/toinsson/pyrealsense) AKA [`pyrealsense/2.0`](https://pypi.python.org/pypi/pyrealsense/2.0) is a community supported Python wrapper for the legacy **librealsense v1.12.1**. This wrapper does not support newer versions and **does not work with the RealSense SDK 2.0**.
->
-> HOWEVER: The [`pyrealsense2`](https://pypi.org/project/pyrealsense2/) package is our official wrapper which **does** support SDK 2.0
 
-We provide a PyPI distribution which is created from this folder by running `python setup.py bdist_wheel`.
-
-Package is available at https://pypi.python.org/pypi/pyrealsense2
+Our official wrapper is  [`pyrealsense2`](https://pypi.org/project/pyrealsense2/)
+We also provide a beta package for early access to new features called [`pyrealsense2-beta`](https://pypi.org/project/pyrealsense2-beta/)
 
 To install the package, run:
 > `pip install pyrealsense2`
+
+Or
+
+> `pip install pyrealsense2-beta`
+
+Users who wish to create a python package (wheel) can create it from this folder by running 
+
+```pip install -U setuptools build hatchling```
+
+```python -m build . ```
 
 Windows users can install the RealSense SDK 2.0 from the release tab to get pre-compiled binaries of the wrapper, for both x86 and x64 architectures. (Python versions 3.9, 3.10, 3.11, 3.12 and 3.13 are supported).
 
@@ -36,7 +40,7 @@ Windows users can install the RealSense SDK 2.0 from the release tab to get pre-
 2. Install Python and its development files via apt-get
   * `sudo apt-get install python3 python3-dev`
 3. Clone the librealsense repository and navigate into the directory:
-   * `git clone https://github.com/IntelRealSense/librealsense.git`
+   * `git clone https://github.com/realsenseai/librealsense.git`
    * `cd librealsense`
 4. Configure and make:
   * `mkdir build`
@@ -72,10 +76,10 @@ Windows users can install the RealSense SDK 2.0 from the release tab to get pre-
 
 3. If you have multiple python installations on your machine you can use: `-DPYTHON_EXECUTABLE=<path to python executable>`
   For example: `-DPYTHON_EXECUTABLE=C:/Python310/python.exe`
-> The precompiled binaries shipped with [the installer](https://github.com/IntelRealSense/librealsense/releases) assume **Python 3.11**.
+> The precompiled binaries shipped with [the installer](https://github.com/realsenseai/librealsense/releases) assume **Python 3.11**.
 >The error `ImportError: DLL load failed: The specified module could not be found` might indicate versions mismatch or architecture (x86 vs x64) mismatch.
 
-4. Open `librealsense2.sln` that was created in the previous step, and build the `pyrealsense2` project
+4. Open `realsense2.sln` that was created in the previous step, and build the `pyrealsense2` project
 5. Open the output folder of the project (e.g `build\x64-Release\Release\`) and copy `pyrealsense2.pyd` into your python's `site-packages` (e.g `C:\Python310\Lib\site-packages`)
 6. Alternatively, copy the build output (`realsense2.dll` and `pyrealsense2.pyd`) next to your script.
 

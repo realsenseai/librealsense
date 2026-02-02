@@ -2,7 +2,7 @@ using Intel.RealSense;
 using UnityEngine;
 
 [ProcessingBlockDataAttribute(typeof(SpatialFilter))]
-[HelpURL("https://github.com/IntelRealSense/librealsense/blob/master/doc/post-processing-filters.md#spatial-filter")]
+[HelpURL("https://github.com/realsenseai/librealsense/blob/master/doc/post-processing-filters.md#spatial-filter")]
 public class RsSpatialFilter : RsProcessingBlock
 {
     /// <summary>

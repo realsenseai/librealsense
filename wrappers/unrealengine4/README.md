@@ -17,7 +17,7 @@ UnrealEngine4 wrapper shows how to use RealSense features via Blueprints (UE4 ve
 
 ## Getting Started
 
-Download and install [RealSense SDK 2.0](https://github.com/IntelRealSense/librealsense/releases)
+Download and install [RealSense SDK 2.0](https://github.com/realsenseai/librealsense/releases)
 
 Download wrapper and [generate project files](https://wiki.unrealengine.com/Generate_Visual_Studio_Project) for RealSenseUE.uproject
 
@@ -48,7 +48,7 @@ Check out prefab BP_RealSenseInspector, it simplifies stream configuration and m
 
 Hardware inspector allows to check connected hardware and tune sensor options via editor. This feature is for debugging only and changes are not saved automatically. It's possible to load and save configuration presets using corresponding buttons in hardware inspector dropdown or via blueprint functions. 
 
-Preset files can be downloaded [here](https://github.com/IntelRealSense/librealsense/wiki/D400-Series-Visual-Presets).
+Preset files can be downloaded [here](https://github.com/realsenseai/librealsense/wiki/D400-Series-Visual-Presets).
 
 ![alt text](doc/img/hw_inspector.jpg)
 

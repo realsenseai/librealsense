@@ -110,7 +110,7 @@ namespace librealsense
         std::vector<uint8_t> get_d500_raw_calibration_table(ds::d500_calibration_table_id table_id) const;
         std::vector<uint8_t> get_new_calibration_table() const;
 
-        bool is_camera_in_advanced_mode() const;
+        inline bool is_camera_in_advanced_mode() const { return true; } // d500 devices always in advanced mode
 
         float get_stereo_baseline_mm() const;
 
@@ -123,7 +123,7 @@ namespace librealsense
 
         void init(std::shared_ptr<context> ctx, const platform::backend_device_group& group);
         void register_features();
-
+        void set_imu_type( const std::vector< uint8_t > & gvd_buf, ds::d500_gvd_parsed_fields * parsed_fields );
         friend class d500_depth_sensor;
 
         std::shared_ptr<hw_monitor_extended_buffers> _hw_monitor;

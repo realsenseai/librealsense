@@ -129,7 +129,7 @@ This product was designed from the ground up to address conditions critical to r
 
 <p align="center"><img src="https://raw.githubusercontent.com/wiki/dorodnic/librealsense/realsense-depth.gif" width="70%" /><br><i>Point-cloud using <b>D415 RealSense camera</b></i></p>
 
-Just like opencv, RealSense technology offers open-source and cross-platform set of [APIs](https://github.com/IntelRealSense/librealsense) for getting depth data. 
+Just like opencv, RealSense technology offers open-source and cross-platform set of [APIs](https://github.com/realsenseai/librealsense) for getting depth data. 
 
 1. [electronicdesign - New RealSense Cameras Deliver Low-Cost 3D Solutions](https://www.electronicdesign.com/industrial-automation/new-intel-realsense-cameras-deliver-low-cost-3d-solutions)
 1. [Augmented World Expo - Help Your Embedded Systems See, Navigate, and Understand](https://www.youtube.com/watch?v=OOVl5dx7Bb8)

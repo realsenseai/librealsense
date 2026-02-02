@@ -27,7 +27,7 @@ Note: To keep the demo simpler, the clipping of the usable point cloud is done b
 ## Example Output
 Once the calibration is done and the target object's dimensions are calculated, the application will open as many windows as the number of devices connected each displaying a color image along with an overlay of the calculated bounding box.
 In the following example we've used two Intel® RealSense™ Depth Cameras D435 pointing at a common object placed on a 6 x 9 chessboard (checked-in with this demo folder).
-[sampleSetupAndOutput](https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/box_dimensioner_multicam/samplesetupandoutput.jpg)
+[sampleSetupAndOutput](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/box_dimensioner_multicam/samplesetupandoutput.jpg)
 
 ## References
 Rotation between two co-ordinates using Kabsch Algorithm: 

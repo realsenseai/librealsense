@@ -1,5 +1,5 @@
 // License: Apache 2.0. See LICENSE file in root directory.
-// Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 /*!
  * @file flexiblePubSubTypes.h
@@ -17,8 +17,10 @@
 
 #include "flexible.h"
 
+
 #if !defined(GEN_API_VER) || (GEN_API_VER != 1)
 #error \
+
     Generated flexible is not compatible with current installed Fast DDS. Please, regenerate it with fastddsgen.
 #endif  // GEN_API_VER
 
@@ -29,9 +31,10 @@ namespace realdds
         namespace raw
         {
 
+
             /*!
              * @brief This class represents the TopicDataType of the type flexible defined by the user in the IDL file.
-             * @ingroup FLEXIBLE
+             * @ingroup flexible
              */
             class flexiblePubSubType : public eprosima::fastdds::dds::TopicDataType
             {
@@ -67,7 +70,7 @@ namespace realdds
             #ifdef TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
                 eProsima_user_DllExport inline bool is_bounded() const override
                 {
-                    return false;
+                    return true;
                 }
 
             #endif  // TOPIC_DATA_TYPE_API_HAS_IS_BOUNDED
@@ -92,9 +95,11 @@ namespace realdds
 
                 MD5 m_md5;
                 unsigned char* m_keyBuffer;
+
             };
         }
     }
 }
 
 #endif // _FAST_DDS_GENERATED_REALDDS_TOPICS_RAW_FLEXIBLE_PUBSUBTYPES_H_
+

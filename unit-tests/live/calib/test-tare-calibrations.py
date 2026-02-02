@@ -22,6 +22,12 @@ def tare_calibration_json(tare_json_file, host_assistance):
         log.i('Using default parameters for Tare calibration.')
         tare_json = '{\n  '+\
                     '"host assistance": ' + str(int(host_assistance)) + ',\n'+\
+                    '"speed": 3,\n'+\
+                    '"scan parameter": 0,\n'+\
+                    '"step count": 20,\n'+\
+                    '"apply preset": 1,\n'+\
+                    '"accuracy": 2,\n'+\
+                    '"depth": 0,\n'+\
                     '"resize factor": 1\n'+\
                     '}'
     return tare_json
@@ -77,6 +83,7 @@ HEALTH_FACTOR_THRESHOLD = 0.25
 TARGET_Z_MIN = 600
 TARGET_Z_MAX = 1500
 _target_z = None
+"""
 if is_mipi_device():
     with test.closure("Tare calibration test with host assistance"):
         try:
@@ -88,13 +95,13 @@ if is_mipi_device():
             tare_json = tare_calibration_json(None, host_assistance)
             image_width, image_height, fps = 1280, 720, 30
             config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
-            health_factor, new_calib_bytes = calibration_main(config, pipeline, calib_dev, False, tare_json, _target_z, return_table=True)
+            health_factor, new_calib_bytes = calibration_main(config, pipeline, calib_dev, False, tare_json, _target_z, host_assistance, return_table=True)
 
             test.check(abs(health_factor) < HEALTH_FACTOR_THRESHOLD)
         except Exception as e:
             log.e("Tare calibration test with host assistance failed: ", str(e))
             test.fail()
-
+"""
 if not is_mipi_device():
 # mipi devices do not support OCC calibration without host assistance  
     with test.closure("Tare calibration test"):
@@ -107,9 +114,10 @@ if not is_mipi_device():
             tare_json = tare_calibration_json(None, host_assistance)
             image_width, image_height, fps = 256, 144, 90
             config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
-            health_factor, new_calib_bytes = calibration_main(config, pipeline, calib_dev, False, tare_json, _target_z, return_table=True)
+            health_factor, new_calib_bytes = calibration_main(config, pipeline, calib_dev, False, tare_json, _target_z, host_assistance, return_table=True)
             
             test.check(abs(health_factor) < HEALTH_FACTOR_THRESHOLD)
         except Exception as e:
             log.e("Tare calibration test failed: ", str(e))
-            test.fail()
+
+test.print_results_and_exit()

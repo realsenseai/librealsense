@@ -47,6 +47,7 @@ namespace rs2
         rsutils::type::ip_address _gateway_current, _gateway_to_set;
         uint32_t _mtu_current, _mtu_to_set;
         uint32_t _tx_delay_current, _tx_delay_to_set;
+        uint32_t _ttl_current, _ttl_to_set;
         uint32_t _link_speed_read_only;
 
         bool _window_open;

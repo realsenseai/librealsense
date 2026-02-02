@@ -698,7 +698,7 @@ void output_model::draw(ux_window& win, rect view_rect, device_models_list & dev
 
         if( is_dashboard_open )
         {
-            if( ImGui::Button( textual_icons::circle_chevron_down, collapse_dashboard_button_size ) )  // close dashboard
+            if( ImGui::Button( textual_icons::circle_chevron_right, collapse_dashboard_button_size ) )  // close dashboard
             {
                 is_dashboard_open = false;
                 config_file::instance().set( configurations::viewer::dashboard_open, is_dashboard_open );
@@ -718,7 +718,7 @@ void output_model::draw(ux_window& win, rect view_rect, device_models_list & dev
             float cursor_pos_x = ImGui::GetCursorPosX();
             ImGui::SetCursorPosX( 0 );
 
-            if( ImGui::Button( textual_icons::circle_chevron_up, collapse_dashboard_button_size ) )  // open dashboard
+            if( ImGui::Button( textual_icons::circle_chevron_left, collapse_dashboard_button_size ) )  // open dashboard
             {
                 is_dashboard_open = true;
                 config_file::instance().set( configurations::viewer::dashboard_open, is_dashboard_open );

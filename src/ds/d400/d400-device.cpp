@@ -219,7 +219,7 @@ namespace librealsense
 
     rs2_intrinsics d400_depth_sensor::get_color_intrinsics( const stream_profile & profile ) const
     {
-        if( _owner->_pid == ds::RS405_PID )
+        if( _owner->_pid == ds::RS405_PID || _owner->_pid == ds::RS401_GMSL_PID )
             return ds::get_d405_color_stream_intrinsic( *_owner->_color_calib_table_raw,
                                                         profile.width,
                                                         profile.height );
@@ -430,24 +430,24 @@ namespace librealsense
 
         // Opaque retrieval
         ds_caps val{ds_caps::CAP_UNDEFINED};
-        if (gvd_buf[active_projector])  // DepthActiveMode
+        if (gvd_buf[d400_gvd_offsets::active_projector])  // DepthActiveMode
             val |= ds_caps::CAP_ACTIVE_PROJECTOR;
-        if (gvd_buf[rgb_sensor])                           // WithRGB
+        if (gvd_buf[d400_gvd_offsets::rgb_sensor])                           // WithRGB
             val |= ds_caps::CAP_RGB_SENSOR;
-        if (gvd_buf[imu_sensor])
+        if (gvd_buf[d400_gvd_offsets::imu_sensor])
         {
             val |= ds_caps::CAP_IMU_SENSOR;
-            if (gvd_buf[imu_acc_chip_id] == I2C_IMU_BMI055_ID_ACC)
+            if (gvd_buf[d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI055_ID_ACC)
             {
                 val |= ds_caps::CAP_BMI_055;
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI055" << std::dec);
             }
-            else if (gvd_buf[imu_acc_chip_id] == I2C_IMU_BMI085_ID_ACC)
+            else if (gvd_buf[d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI085_ID_ACC)
             {
                 val |= ds_caps::CAP_BMI_085;
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI085" << std::dec);
             }
-            else if (gvd_buf[imu_acc_chip_id] == I2C_IMU_BMI088_ID_ACC)
+            else if (gvd_buf[d400_gvd_offsets::imu_acc_chip_id] == I2C_IMU_BMI088_ID_ACC)
             {
                 val |= ds_caps::CAP_BMI_088;
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI088" << std::dec);
@@ -463,20 +463,20 @@ namespace librealsense
                 LOG_DEBUG("The IMU sensor is for PID " << std::hex << _pid << " has been identified as BMI085" << std::dec);
             }
             else
-                LOG_WARNING("The IMU sensor is undefined for PID " << std::hex << _pid << " and imu_chip_id: " << gvd_buf[imu_acc_chip_id] << std::dec);
+                LOG_WARNING("The IMU sensor is undefined for PID " << std::hex << _pid << " and imu_chip_id: " << gvd_buf[d400_gvd_offsets::imu_acc_chip_id] << std::dec);
         }
-        if (0xFF != (gvd_buf[fisheye_sensor_lb] & gvd_buf[fisheye_sensor_hb]))
+        if( 0xFF != ( gvd_buf[d400_gvd_offsets::fisheye_sensor_lb] & gvd_buf[d400_gvd_offsets::fisheye_sensor_hb] ) )
             val |= ds_caps::CAP_FISHEYE_SENSOR;
-        if (0x1 == gvd_buf[depth_sensor_type])
+        if( 0x1 == gvd_buf[d400_gvd_offsets::depth_sensor_type] )
             val |= ds_caps::CAP_ROLLING_SHUTTER;  // e.g. ASRC
-        if (0x2 == gvd_buf[depth_sensor_type])
+        if( 0x2 == gvd_buf[d400_gvd_offsets::depth_sensor_type] )
             val |= ds_caps::CAP_GLOBAL_SHUTTER;   // e.g. AWGC
         // Option INTER_CAM_SYNC_MODE is not enabled in D405
         if (_pid != ds::RS405_PID)
             val |= ds_caps::CAP_INTERCAM_HW_SYNC;
-        if (gvd_buf[ip65_sealed_offset] == 0x1)
+        if (gvd_buf[d400_gvd_offsets::ip65_sealed_offset] == 0x1)
             val |= ds_caps::CAP_IP65;
-        if (gvd_buf[ir_filter_offset] == 0x1)
+        if (gvd_buf[d400_gvd_offsets::ir_filter_offset] == 0x1)
             val |= ds_caps::CAP_IR_FILTER;
         return val;
     }
@@ -503,7 +503,7 @@ namespace librealsense
 
         std::unique_ptr< frame_timestamp_reader > timestamp_reader_backup( new ds_timestamp_reader() );
         frame_timestamp_reader* timestamp_reader_from_metadata;
-        if (!val_in_range(all_device_infos.front().pid, { RS457_PID, RS430_GMSL_PID, RS415_GMSL_PID }))
+        if (!(ds::d400_mipi_device_pid.count(all_device_infos.front().pid) > 0))
             timestamp_reader_from_metadata = new ds_timestamp_reader_from_metadata(std::move(timestamp_reader_backup));
         else
             timestamp_reader_from_metadata = new ds_timestamp_reader_from_metadata_mipi(std::move(timestamp_reader_backup));
@@ -552,7 +552,7 @@ namespace librealsense
         auto raw_sensor = get_raw_depth_sensor();
         _pid = group.uvc_devices.front().pid;
 
-        _is_mipi_device = val_in_range(_pid, { RS457_PID, RS430_GMSL_PID, RS415_GMSL_PID });
+        _is_mipi_device = (ds::d400_mipi_device_pid.count(_pid) > 0);
 
         _color_calib_table_raw = [this]()
         {
@@ -620,7 +620,7 @@ namespace librealsense
             _hw_monitor->get_gvd(gvd_buff.size(), gvd_buff.data(), GVD);
 
             std::string fwv;
-            _ds_device_common->get_fw_details( gvd_buff, optic_serial, asic_serial, fwv );
+            get_fw_details( gvd_buff, optic_serial, asic_serial, fwv );
 
             _fw_version = firmware_version(fwv);
 
@@ -628,6 +628,8 @@ namespace librealsense
             if (_fw_version >= firmware_version("5.10.4.0"))
                 _device_capabilities = parse_device_capabilities( gvd_buff );
         
+            set_imu_type();
+
             //D457 Development
             advanced_mode = is_camera_in_advanced_mode();
             auto _usb_mode = usb3_type;
@@ -686,7 +688,7 @@ namespace librealsense
 
             if (_fw_version >= firmware_version("5.6.3.0"))
             {
-                _is_locked = _ds_device_common->is_locked( gvd_buff.data(), is_camera_locked_offset );
+                _is_locked = _ds_device_common->is_locked( gvd_buff.data(), d400_gvd_offsets::is_camera_locked_offset );
             }
 
             if (_fw_version >= firmware_version("5.5.8.0"))
@@ -738,7 +740,7 @@ namespace librealsense
             auto ir_filter_mask = ds_caps::CAP_IR_FILTER;
             if (val_in_range(_pid, { RS435_RGB_PID, RS435I_PID, RS455_PID }) &&
                 (_device_capabilities & ir_filter_mask) == ir_filter_mask &&
-                is_capability_supports(ds_caps::CAP_IR_FILTER, gvd_buff[gvd_version_offset]))
+                is_capability_supports(ds_caps::CAP_IR_FILTER, gvd_buff[d400_gvd_offsets::gvd_version_offset]))
             {
                 update_device_name(device_name, ds_caps::CAP_IR_FILTER);
             }
@@ -746,9 +748,15 @@ namespace librealsense
             auto ip65_mask = ds_caps::CAP_IP65;
             if (val_in_range(_pid, { RS455_PID })&&
                 (_device_capabilities & ip65_mask) == ip65_mask &&
-                is_capability_supports(ds_caps::CAP_IP65, gvd_buff[gvd_version_offset]))
+                is_capability_supports(ds_caps::CAP_IP65, gvd_buff[d400_gvd_offsets::gvd_version_offset]))
             {
                 update_device_name(device_name, ds_caps::CAP_IP65);
+            }
+
+            if(_pid == RS405_PID)
+            {
+                if( is_d401_usb_device( gvd_buff[d400_gvd_offsets::hw_type_offset] ) )
+                    update_d405_device_name( device_name );                   
             }
 
             std::shared_ptr<option> exposure_option = nullptr;
@@ -922,7 +930,7 @@ namespace librealsense
                                                   rsutils::lazy< float >( [this]() { return get_stereo_baseline_mm(); } ) ) );
             }
 
-            if (advanced_mode && _fw_version >= firmware_version("5.6.3.0"))
+            _depth_units_register_action = [this]()
             {
                 auto depth_scale = std::make_shared<depth_scale_option>(*_hw_monitor);
                 auto depth_sensor = As<d400_depth_sensor, synthetic_sensor>(&get_depth_sensor());
@@ -934,12 +942,17 @@ namespace librealsense
                 });
 
                 depth_sensor->register_option(RS2_OPTION_DEPTH_UNITS, depth_scale);
+            };
+
+            if (advanced_mode && _fw_version >= firmware_version("5.6.3.0"))
+            {
+                _depth_units_register_action();
             }
             else
             {
                 float default_depth_units = 0.001f; //meters
                 // default depth units is different for D405
-                if (_pid == RS405_PID)
+                if (_pid == RS405_PID || _pid == RS401_GMSL_PID)
                     default_depth_units = 0.0001f;  //meters
                 depth_sensor.register_option(RS2_OPTION_DEPTH_UNITS, std::make_shared<const_value_option>("Number of meters represented by a single depth unit",
                         rsutils::lazy< float >( [default_depth_units]() { return default_depth_units; } ) ) );
@@ -972,6 +985,7 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_RECOMMENDED_FIRMWARE_VERSION, _recommended_fw_version);
         register_info(RS2_CAMERA_INFO_CAMERA_LOCKED, _is_locked ? "YES" : "NO");
         register_info(RS2_CAMERA_INFO_DFU_DEVICE_PATH, group.uvc_devices.front().dfu_device_path);
+        register_info(RS2_CAMERA_INFO_IMU_TYPE, _imu_type);
 
         if (usb_modality)
         {
@@ -997,7 +1011,8 @@ namespace librealsense
         firmware_version fw_ver = firmware_version( get_info( RS2_CAMERA_INFO_FIRMWARE_VERSION ) );
         auto pid = get_pid();
 
-        if( (_is_mipi_device || pid == ds::RS455_PID) && fw_ver >= firmware_version( 5, 14, 0, 0 ) )
+        if( val_in_range( _pid, { ds::RS455_PID, ds::RS457_PID } )
+            && fw_ver >= firmware_version( 5, 14, 0, 0 ) )
             register_feature( std::make_shared< emitter_frequency_feature >( get_depth_sensor() ) );
 
         if( fw_ver >= firmware_version( 5, 11, 9, 0 ) )
@@ -1239,6 +1254,12 @@ namespace librealsense
         }
     }
 
+    // Needed because D401 and D405 share the same PID
+    void update_d405_device_name(std::string& device_name)
+    {
+        device_name = std::regex_replace( device_name, std::regex( "D405" ), "D401" ); 
+    }
+
     platform::usb_spec d400_device::get_usb_spec() const
     {
         if( supports_info( RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR ) )
@@ -1361,5 +1382,36 @@ namespace librealsense
                 std::make_shared< asic_and_projector_temperature_options >( depth_ep,
                                                                             RS2_OPTION_PROJECTOR_TEMPERATURE ) );
         }
+    }
+
+    void d400_device::set_imu_type()
+    {
+        using namespace ds;
+
+        if( ( _device_capabilities & ds_caps::CAP_BMI_055 ) == ds_caps::CAP_BMI_055 )
+            _imu_type = "BMI055";
+        else if( ( _device_capabilities & ds_caps::CAP_BMI_085 ) == ds_caps::CAP_BMI_085 )
+            _imu_type = "BMI085";
+        else if( ( _device_capabilities & ds_caps::CAP_BMI_088 ) == ds_caps::CAP_BMI_088 )
+            _imu_type = "BMI088";
+        else
+            _imu_type = "IMU_Unknown";
+    }
+
+    void d400_device::get_fw_details( const std::vector< uint8_t > & gvd_buff, std::string & optic_serial,
+                                           std::string & asic_serial, std::string & fwv ) const
+    {
+        using namespace ds::d400_gvd_offsets;
+
+        optic_serial = _hw_monitor->get_module_serial_string( gvd_buff, module_serial_offset );
+        asic_serial = _hw_monitor->get_module_serial_string( gvd_buff, module_asic_serial_offset );
+        fwv = _hw_monitor->get_firmware_version_string< uint8_t >( gvd_buff, camera_fw_version_offset );
+    }
+
+    bool d400_device::is_d401_usb_device( uint8_t gvd_hw_type ) const
+    {
+        // Per D400 GVD specification, HW type value 7 identifies D401 USB devices
+        constexpr uint8_t D401_USB_HW_TYPE = 7;
+        return gvd_hw_type == D401_USB_HW_TYPE;
     }
 }

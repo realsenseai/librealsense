@@ -13,7 +13,7 @@ The latest generation of RealSense Depth Cameras can be controlled via the RealS
 To get started controlling the RealSense Cameras with LabVIEW® in Windows 10, we have created a [VI-library](https://librealsense.realsenseai.com/Releases/RS4xx/Windows/labview_2_8_1.zip) that wraps most of the core functions of the realsense2.dll, and we have also created some simple “Hello World” VI’s to get started capturing Color, Depth Maps, and displaying Point-Clouds.  This uses LabVIEW 2016 and requires a Windows 10 laptop with a USB3 port.   
 
 
-The realsense2.dll that is included in this package is 64bit for Windows 10. Other versions (ex: 32bit) could be compiled by following the [instructions on GitHub](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation_windows.md).  Just rename them realsense2.dll and replace the file in the location used by the LabVIEW demos.
+The realsense2.dll that is included in this package is 64bit for Windows 10. Other versions (ex: 32bit) could be compiled by following the [instructions on GitHub](https://github.com/realsenseai/librealsense/blob/master/doc/installation_windows.md).  Just rename them realsense2.dll and replace the file in the location used by the LabVIEW demos.
 
 ## Getting Started:
 Unzip the package called “RealSense SDK2.0  for LabVIEW”
@@ -34,38 +34,38 @@ In this app you can also turn the projector on/off. While the stereo depth camer
 
 Another important feature is the “presets”. You can change the ASIC parameters that affect depth and color by changing them through the shown drop-down menus in the lower right of the screen. For example, try “Face2” for Depth and “D410 4” for Color which will give good results for the D415 camera. We do emphasize that the color image is the left image of the stereo pair, and it sees IR light as well as visible light. This means that when you are near sunlight that generated lots of IR light, the image will perhaps be a bit purple. Also, when the projector is on, the projector pattern will be visible.  We do however have an interesting trick that can remove this: When in 1280x720, try to select the Color preset called “Remove IR2”. This will not affect the depth adversely, as we are removing the pattern in the ASIC.   
 
-![Color + Depth](https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/labview/1.png)
+![Color + Depth](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/labview/1.png)
 
 ### RealSense Hello World: Left-Right
 You can also access directly the left and right channels of the stereo camera. We should note that only certain combinations are allowed, such as Color+Depth or Monochrome L+R. The monochrome images in this demo are 8 bit grey-scale and are after rectification by the RealSense ASIC. This is the input that will go to the stereo calculation engine inside the ASIC. It is therefore perfectly calibrated to the depth.
 
-![Color + Depth](https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/labview/2.png)
+![Color + Depth](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/labview/2.png)
 
 ### RealSense Hello World: Left-Right UnRectified
 
 This is similar to demo 2 above, but allows you to look at the raw images that are input into the ASIC before calibration and rectification. This can be useful in for debugging if depth is bad, but more importantly it can give 2MP 16bit monochrome images
 
-![Color + Depth](https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/labview/3.png)
+![Color + Depth](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/labview/3.png)
 
 ### RealSense Hello World: Point Cloud
 
 This demo builds on the Color+Depth demo, and reads the intrinsic and extrinsic parameters from the ASIC so that it can render a Point Cloud by mapping each pixel consisting of (Red, Green, Blue, Depth) to points in 3D space. Here you can rotate the 3D view of the point cloud.
 
-![Color + Depth](https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/labview/4.png)
+![Color + Depth](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/labview/4.png)
 
 ### RealSense Hello World: Point Cloud Plus
 
 This demo builds on the Point Cloud demo, by adding time stamping and also showing some simple post-processing of the Point-Cloud data to enhance it will edge-preserving temporal and spatial  filters. You can select increase the filtering by setting the alpha values to near 0, and reduce the filtering by settings alpha near 1. The step size should be less than 20 for best results.
 
-![Color + Depth](https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/labview/5.png)
+![Color + Depth](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/labview/5.png)
 
 ## Understanding the Programming:
 While all the VI’s do have embedded documentation, it should in principle all be “self-explanatory”. It is however not completely straight forward and it requires some explanation about the LibRealSense (LibRS) architecture and in particular in what sequence the commands need to be executed, as well as what parameters are valid.
 
-First we look at the hierarchy of devices, sensors, and streams. For further information about LibRS architecture, please refer to [API architecture](https://github.com/IntelRealSense/librealsense/blob/master/doc/api_arch.md)
+First we look at the hierarchy of devices, sensors, and streams. For further information about LibRS architecture, please refer to [API architecture](https://github.com/realsenseai/librealsense/blob/master/doc/api_arch.md)
 
 
-![Color + Depth](https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/labview/6.png)
+![Color + Depth](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/labview/6.png)
 
 * LibRS supports being able to connect multiple <font color="orange">**DEVICES**</font>.  For example, multiple RealSense Cameras can be connected at once.
 * Each DEVICE can have multiple <font color="green">**SENSORS**</font>. For example, the D415 has a Stereo Sensor and an extra RGB Sensor. Other devices may also have Fisheye sensors or IMU sensors.
@@ -87,4 +87,4 @@ Finally, it is VERY important that you use the Release Frame VI to release each 
 -------------------
 
 
-> **Note**: If you are looking for a different way to modify DLL file location, please refer to [#1947](https://github.com/IntelRealSense/librealsense/issues/1947) and consider trying   [github.com/ryannazaretian/librealsense/tree/master/wrappers/labview](https://github.com/ryannazaretian/librealsense/tree/master/wrappers/labview) as a possible solution. 
+> **Note**: If you are looking for a different way to modify DLL file location, please refer to [#1947](https://github.com/realsenseai/librealsense/issues/1947) and consider trying   [github.com/ryannazaretian/librealsense/tree/master/wrappers/labview](https://github.com/ryannazaretian/librealsense/tree/master/wrappers/labview) as a possible solution. 

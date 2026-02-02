@@ -444,15 +444,8 @@ namespace rs2
             std::string dev_name = dev->dev.get_info(RS2_CAMERA_INFO_NAME);
             std::string dev_serial = dev->dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
             std::string sensor_name = dev->s->get_info(RS2_CAMERA_INFO_NAME);
-            std::string stream_name = rs2_stream_to_string(profile.stream_type());
+            std::string stream_name = profile.stream_name();
             std::string stream_index_str;
-
-            // Show stream index on IR streams
-            if (profile.stream_type() == RS2_STREAM_INFRARED)
-            {
-                int stream_index = profile.stream_index();
-                stream_index_str = rsutils::string::from() << " #" << stream_index;
-            }
 
             tooltip = rsutils::string::from() << dev_name << " s.n:" << dev_serial << " | " << sensor_name << ", " << stream_name << stream_index_str << " stream";
             const auto approx_char_width = 12;
@@ -627,10 +620,6 @@ namespace rs2
             label = rsutils::string::from() << textual_icons::play << "##Resume " << profile.unique_id();
             if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
             {
-                if (p)
-                {
-                    p.resume();
-                }
                 dev->resume();
                 viewer.paused = false;
             }
@@ -645,10 +634,6 @@ namespace rs2
             label = rsutils::string::from() << textual_icons::pause << "##Pause " << profile.unique_id();
             if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
             {
-                if (p)
-                {
-                    p.pause();
-                }
                 dev->pause();
                 viewer.paused = true;
             }

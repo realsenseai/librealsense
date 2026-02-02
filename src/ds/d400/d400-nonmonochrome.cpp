@@ -35,7 +35,7 @@ namespace librealsense
 
         if ((_fw_version >= firmware_version("5.5.8.0")) && (!val_in_range(pid, { RS_USB2_PID })))
         {
-            if (!val_in_range(pid, { RS405_PID, RS455_PID }))
+            if (!val_in_range(pid, { RS405_PID, RS455_PID, RS401_GMSL_PID }))
             {
                 depth_ep.register_option(RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE,
                     std::make_shared<uvc_xu_option<uint8_t>>(get_raw_depth_sensor(),
@@ -51,7 +51,25 @@ namespace librealsense
             depth_ep.register_processing_block({ {RS2_FORMAT_BGR8} }, { {RS2_FORMAT_RGB8, RS2_STREAM_INFRARED} }, []() { return std::make_shared<bgr_to_rgb>(); });
         }
 
-        depth_ep.register_processing_block(processing_block_factory::create_pbf_vector<uyvy_converter>(RS2_FORMAT_UYVY, map_supported_color_formats(RS2_FORMAT_UYVY), RS2_STREAM_INFRARED));
+        if( _is_mipi_device )
+        {
+            // Work-around for discrepancy between the RGB YUYV descriptor and the parser. Use UYUV parser instead.
+            // Bytes are received swapped, so YUYV format is received as UYVY.
+            depth_ep.register_processing_block( processing_block_factory::create_pbf_vector< uyvy_converter >(
+                RS2_FORMAT_YUYV,
+                map_supported_color_formats( RS2_FORMAT_YUYV, false ),
+                RS2_STREAM_INFRARED ) );
+            depth_ep.register_processing_block( { { RS2_FORMAT_YUYV } },
+                                                { { RS2_FORMAT_YUYV, RS2_STREAM_INFRARED } },
+                                                []() { return std::make_shared< uyvy_to_yuyv >(); } );
+        }
+        else
+        {
+            depth_ep.register_processing_block( processing_block_factory::create_pbf_vector< uyvy_converter >(
+                RS2_FORMAT_UYVY,
+                map_supported_color_formats( RS2_FORMAT_UYVY ),
+                RS2_STREAM_INFRARED ) );
+        }
 
         if (!val_in_range(pid, { RS405_PID , RS455_PID }))
             get_depth_sensor().unregister_option(RS2_OPTION_EMITTER_ON_OFF);

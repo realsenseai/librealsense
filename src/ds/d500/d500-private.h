@@ -67,12 +67,16 @@ namespace librealsense
 
         bool d500_try_fetch_usb_device(std::vector<platform::usb_device_info>& devices,
             const platform::uvc_device_info& info, platform::usb_device_info& result);
-
-        namespace d500_gvd_offsets 
-        {
+        
+        namespace d500_gvd_offsets {
             constexpr size_t version_offset = 0;
             constexpr size_t payload_size_offset = 0x2;
             constexpr size_t crc32_offset = 0x4;
+            constexpr size_t rgb_sensor = 0x47;
+            constexpr size_t imu_sensor = 0x49;
+            constexpr size_t active_projector = 0x4a;
+            constexpr size_t is_camera_locked_offset = 0xc2;
+            constexpr size_t imu_type = 0x1e2;  // offset for start of string uint8_t[8]
             constexpr size_t optical_module_serial_offset = 0x54;
             constexpr size_t mb_module_serial_offset = 0x7a;
             constexpr size_t fw_version_offset = 0xba;
@@ -88,6 +92,7 @@ namespace librealsense
             std::string mb_module_sn;
             std::string fw_version;
             std::string safety_sw_suite_version;
+            std::string imu_type;
         };
 
         enum class d500_calibration_table_id

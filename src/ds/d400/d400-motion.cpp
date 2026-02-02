@@ -21,6 +21,7 @@
 #include "proc/auto-exposure-processor.h"
 #include <src/metadata-parser.h>
 #include <src/hid-sensor.h>
+#include <src/ds/features/gyro-sensitivity-feature.h>
 
 #include <rsutils/type/fourcc.h>
 using rsutils::type::fourcc;
@@ -122,8 +123,23 @@ namespace librealsense
         _accel_stream(new stream(RS2_STREAM_ACCEL)),
         _gyro_stream(new stream(RS2_STREAM_GYRO))
     {
-        _ds_motion_common = std::make_shared<ds_motion_common>(this, _fw_version,
-            _device_capabilities, _hw_monitor);
+        try
+        {
+            if (get_info(RS2_CAMERA_INFO_IMU_TYPE) == "IMU_Unknown")
+            {
+                throw std::runtime_error("Motion Sensor Failure - IMU type not recognized");
+            }
+            _ds_motion_common = std::make_shared<ds_motion_common>(this, _fw_version,
+                                                                   _device_capabilities, _hw_monitor);
+        } 
+        catch (const std::exception& e)
+        {
+            _has_motion_module_failed = true;
+            auto device_name = get_info( RS2_CAMERA_INFO_NAME );
+            auto serial = get_info( RS2_CAMERA_INFO_SERIAL_NUMBER );
+            LOG_ERROR( device_name << " #" << serial << " - Base Motion Sensor Failure! " << e.what() );
+        }
+
     }
 
     d400_motion::d400_motion( std::shared_ptr< const d400_info > const & dev_info )
@@ -131,39 +147,63 @@ namespace librealsense
         d400_device(dev_info),
         d400_motion_base(dev_info)
     {
-        using namespace ds;
+        try {
+            // in case d400_motion_base failed on exception
+            if (!_ds_motion_common)
+            {
+                throw std::runtime_error("Failed upstream");
+            }
 
-        std::vector<platform::hid_device_info> hid_infos = dev_info->get_group().hid_devices;
+            using namespace ds;
 
-        _ds_motion_common->init_motion(hid_infos.empty(), *_depth_stream);
-        
-        initialize_fisheye_sensor( dev_info->get_context(), dev_info->get_group() );
+            std::vector<platform::hid_device_info> hid_infos = dev_info->get_group().hid_devices;
 
-        // Try to add HID endpoint
-        auto hid_ep = create_hid_device( dev_info->get_context(), dev_info->get_group().hid_devices );
-        if (hid_ep)
-        {
-            _motion_module_device_idx = static_cast<uint8_t>(add_sensor(hid_ep));
+            _ds_motion_common->init_motion(hid_infos.empty(), *_depth_stream);
 
-            // HID metadata attributes
-            hid_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
+            initialize_fisheye_sensor( dev_info->get_context(), dev_info->get_group() );
+
+#if !defined(__APPLE__) // Motion sensors not supported on macOS
+            // Try to add HID endpoint
+            auto hid_ep = create_hid_device( dev_info->get_context(), dev_info->get_group().hid_devices );
+            if (hid_ep)
+            {
+                _motion_module_device_idx = static_cast<uint8_t>(add_sensor(hid_ep));
+
+                // HID metadata attributes
+                hid_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
+            }
+            //for FW >=5.16 the scale factor changes to 1000.0 since FW sends 32bit
+            if (_fw_version >= firmware_version( 5, 16, 0, 0))
+                get_raw_motion_sensor()->set_gyro_scale_factor( 10000.0 );
+#endif
         }
-        //for FW >=5.16 the scale factor changes to 1000.0 since FW sends 32bit
-        if (_fw_version >= firmware_version( 5, 16, 0, 0))
-            get_raw_motion_sensor()->set_gyro_scale_factor( 10000.0 );
-
+        catch (const std::exception& e)
+        {
+            _has_motion_module_failed = true;
+            auto device_name = get_info( RS2_CAMERA_INFO_NAME );
+            auto serial = get_info( RS2_CAMERA_INFO_SERIAL_NUMBER );
+            LOG_ERROR( device_name << " #" << serial << " - HID Motion Sensor Failure! " << e.what() );
+        }
     }
 
 
     ds_motion_sensor & d400_motion::get_motion_sensor()
     {
+#if defined(__APPLE__)
+        throw std::runtime_error("Motion sensors are not supported on macOS");
+#else
         return dynamic_cast< ds_motion_sensor & >( get_sensor( _motion_module_device_idx.value() ) );
+#endif
     }
 
     std::shared_ptr<hid_sensor> d400_motion::get_raw_motion_sensor()
     {
+#if defined(__APPLE__)
+        return nullptr;
+#else
         auto raw_sensor = get_motion_sensor().get_raw_sensor();
         return std::dynamic_pointer_cast< hid_sensor >( raw_sensor );
+#endif
     }
 
     d400_motion_uvc::d400_motion_uvc( std::shared_ptr< const d400_info > const & dev_info )
@@ -171,28 +211,47 @@ namespace librealsense
           d400_device(dev_info),
           d400_motion_base(dev_info)
     {
-        using namespace ds;
-
-        std::vector<platform::uvc_device_info> uvc_infos = dev_info->get_group().uvc_devices;
-
-        _ds_motion_common->init_motion(uvc_infos.empty(), *_depth_stream);
-
-        if (!uvc_infos.empty())
+        try
         {
-            // product id - D457 dev - check - must not be the front of uvc_infos vector
-            _pid = uvc_infos.front().pid;
+            // in case d400_motion_base failed on exception
+            if (!_ds_motion_common)
+            {
+                throw std::runtime_error("Failed upstream");
+            }
+
+            using namespace ds;
+
+            std::vector<platform::uvc_device_info> uvc_infos = dev_info->get_group().uvc_devices;
+
+            _ds_motion_common->init_motion(uvc_infos.empty(), *_depth_stream);
+
+            if (!uvc_infos.empty())
+            {
+                // product id - D457 dev - check - must not be the front of uvc_infos vector
+                _pid = uvc_infos.front().pid;
+            }
+
+#if !defined(__APPLE__) // Motion sensors not supported on macOS
+            // Try to add HID endpoint
+            std::shared_ptr<synthetic_sensor> sensor_ep;
+            sensor_ep = create_uvc_device(dev_info->get_context(), dev_info->get_group().uvc_devices, _fw_version);
+            if (sensor_ep)
+            {
+                _motion_module_device_idx = static_cast<uint8_t>(add_sensor(sensor_ep));
+
+                // HID metadata attributes - D457 dev - check metadata parser
+                sensor_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
+            }
+#endif
+        } 
+        catch (const std::exception& e)
+        {
+            _has_motion_module_failed = true;
+            auto device_name = get_info( RS2_CAMERA_INFO_NAME );
+            auto serial = get_info( RS2_CAMERA_INFO_SERIAL_NUMBER );
+            LOG_ERROR( device_name << " #" << serial << " - UVC Motion Sensor Failure! " << e.what() );
         }
 
-        // Try to add HID endpoint
-        std::shared_ptr<synthetic_sensor> sensor_ep;
-        sensor_ep = create_uvc_device(dev_info->get_context(), dev_info->get_group().uvc_devices, _fw_version);
-        if (sensor_ep)
-        {
-            _motion_module_device_idx = static_cast<uint8_t>(add_sensor(sensor_ep));
-
-            // HID metadata attributes - D457 dev - check metadata parser
-            sensor_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
-        }
     }
 
     void d400_motion::initialize_fisheye_sensor(std::shared_ptr<context> ctx, const platform::backend_device_group& group)
@@ -225,6 +284,13 @@ namespace librealsense
 
         // Add fisheye endpoint
         _fisheye_device_idx = add_sensor(fisheye_ep);
+    }
+
+    void d400_motion::register_gyro_sensitivity()
+    {
+        if( _fw_version >= firmware_version( 5, 16, 0, 0 ) && !_has_motion_module_failed)
+                register_feature(
+                    std::make_shared< gyro_sensitivity_feature >( get_raw_motion_sensor(), get_motion_sensor() ) );
     }
 
     void d400_motion::register_fisheye_options()

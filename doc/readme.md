@@ -6,10 +6,10 @@
 * [Build an Autonomous Mobile Robot with the RealSense D400 Series Camera, ROS*, and SAWR](https://software.intel.com/en-us/articles/build-an-autonomous-mobile-robot-with-the-intel-realsense-camera-ros-and-sawr)
 
 ## librealsense Wiki
-* [API How-To](https://github.com/IntelRealSense/librealsense/wiki/API-How-To) - List ot questions and answers related to the camera API
-* [Troubleshooting Q&A](https://github.com/IntelRealSense/librealsense/wiki/Troubleshooting-Q&A) - List of questions and answers related to camera setup
-* [Build Configuration](https://github.com/IntelRealSense/librealsense/wiki/Build-Configuration) - List of supported CMake flags
-* [Projection In RealSense SDK 2.0](https://github.com/IntelRealSense/librealsense/wiki/Projection-in-RealSense-SDK-2.0) - A comprehensive document on Projection, Deprojection, and related helper processing-blocks the SDK provides
+* [API How-To](https://github.com/realsenseai/librealsense/wiki/API-How-To) - List ot questions and answers related to the camera API
+* [Troubleshooting Q&A](https://github.com/realsenseai/librealsense/wiki/Troubleshooting-Q&A) - List of questions and answers related to camera setup
+* [Build Configuration](https://github.com/realsenseai/librealsense/wiki/Build-Configuration) - List of supported CMake flags
+* [Projection In RealSense SDK 2.0](https://github.com/realsenseai/librealsense/wiki/Projection-in-RealSense-SDK-2.0) - A comprehensive document on Projection, Deprojection, and related helper processing-blocks the SDK provides
 
 ## Documentation
 
@@ -21,7 +21,7 @@
     * `sudo apt-get install doxygen`
     * `cd doc/doxygen`
     * `doxygen doxyfile`
-  * Please also refer to [API How-To](https://github.com/IntelRealSense/librealsense/wiki/API-How-To) for further doc how to use the APIs
+  * Please also refer to [API How-To](https://github.com/realsenseai/librealsense/wiki/API-How-To) for further doc how to use the APIs
 * [Frame Management](frame_lifetime.md) - Frame Memory Management, Threading Model and Synchronization
 * [Frame Metadata](frame_metadata.md) - Support for frame-metadata attributes
 * [Post-Processing Filters](post-processing-filters.md) - Post-acquisition Depth enhancement techniques

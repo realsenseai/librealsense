@@ -9,7 +9,7 @@
 1. Make sure no RealSense device is connected
 2. Open the terminal, run:
 ```sh
-$ wget https://github.com/IntelRealSense/librealsense/raw/master/scripts/libuvc_installation.sh
+$ wget https://github.com/realsenseai/librealsense/raw/master/scripts/libuvc_installation.sh
 $ chmod +x ./libuvc_installation.sh
 $ ./libuvc_installation.sh
 ```
@@ -19,4 +19,4 @@ $ ./libuvc_installation.sh
 
 > At the moment, the script assumes Ubuntu 16 with graphic subsystem
 
-> If you encounter any problems or would like to extend the script to additional system, please [let us know via a new GitHub issue](https://github.com/IntelRealSense/librealsense/issues/new)
+> If you encounter any problems or would like to extend the script to additional system, please [let us know via a new GitHub issue](https://github.com/realsenseai/librealsense/issues/new)

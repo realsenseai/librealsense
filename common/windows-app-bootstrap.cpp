@@ -105,7 +105,7 @@ void report_error(std::string error)
         ss << error;
         ss << "\n```";
 
-        std::string link = "https://github.com/IntelRealSense/librealsense/issues/new?body=" + rs2::url_encode(ss.str());
+        std::string link = "https://github.com/realsenseai/librealsense/issues/new?body=" + rs2::url_encode(ss.str());
         rs2::open_url(link.c_str());
     }
 }

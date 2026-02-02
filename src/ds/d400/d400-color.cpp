@@ -42,8 +42,17 @@ namespace librealsense
           _color_stream(new stream(RS2_STREAM_COLOR)),
           _separate_color(true)
     {
-        create_color_device( dev_info->get_context(), dev_info->get_group() );
-        init();
+        try
+        {
+            create_color_device( dev_info->get_context(), dev_info->get_group() );
+            init();
+        } 
+        catch (const std::exception& e)
+        {
+            auto device_name = get_info( RS2_CAMERA_INFO_NAME );
+            auto serial = get_info( RS2_CAMERA_INFO_SERIAL_NUMBER );
+            LOG_ERROR( device_name << " #" << serial << " - Color Sensor Failure! " << e.what() );
+        }
     }
 
     void d400_color::create_color_device(std::shared_ptr<context> ctx, const platform::backend_device_group& group)
@@ -62,10 +71,10 @@ namespace librealsense
 
         std::vector<platform::uvc_device_info> color_devs_info;
         // end point 3 is used for color sensor
-        // except for D405, in which the color is part of the depth unit
+        // except for D405 and D401_GMSL, in which the color is part of the depth unit
         // and it will then been found in end point 0 (the depth's one)
         auto color_devs_info_mi3 = filter_by_mi(group.uvc_devices, 3);
-        if (color_devs_info_mi3.size() == 1 || _is_mipi_device)
+        if (color_devs_info_mi3.size() == 1 || (_is_mipi_device && _pid != ds::RS401_GMSL_PID) )
         {
             // means color end point in part of a separate color sensor (e.g. D435)
             if (_is_mipi_device)
@@ -111,7 +120,7 @@ namespace librealsense
             // one uvc device is seen over Windows and 3 uvc devices are seen over linux
             if (color_devs_info_mi0.size() == 1 || color_devs_info_mi0.size() == 3)
             {
-                // means color end point is part of the depth sensor (e.g. D405)
+                // means color end point is part of the depth sensor (e.g. D405, D401_GMSL)
                 color_devs_info = color_devs_info_mi0;
                 _color_device_idx = _depth_device_idx;
                 d400_device::_color_stream = _color_stream;
@@ -127,7 +136,7 @@ namespace librealsense
     {
         firmware_version fw_ver = firmware_version( get_info( RS2_CAMERA_INFO_FIRMWARE_VERSION ) );
 
-        if( fw_ver >= firmware_version( 5, 10, 9, 0 ) && _pid != ds::RS405_PID ) //D405 does not support an actual RGB sensor
+        if( fw_ver >= firmware_version( 5, 10, 9, 0 ) && _pid != ds::RS405_PID && _pid != ds::RS401_GMSL_PID ) //D405, D401_GMSL do not support an actual RGB sensor
             register_feature( std::make_shared< auto_exposure_roi_feature >( get_color_sensor(), _hw_monitor, true ) );
     }
 

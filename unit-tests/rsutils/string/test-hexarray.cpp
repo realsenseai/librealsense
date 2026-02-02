@@ -21,7 +21,7 @@ using bytearray = std::vector< byte >;
 namespace {
 
 
-constexpr bool is_little_endian()
+bool is_little_endian()
 {
     // Only since C++20
     //return ( std::endian::native == std::endian::little );

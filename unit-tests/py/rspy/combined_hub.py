@@ -2,6 +2,7 @@
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 from rspy import device_hub, log
+import time
 
 
 class CombinedHub(device_hub.device_hub):
@@ -104,8 +105,12 @@ class CombinedHub(device_hub.device_hub):
 
         success = True
         for name, hub in self.hubs.items():
-            ok = hub.enable_ports(targets[name], disable_other_ports, sleep_on_change)
+            ok = hub.enable_ports(targets[name], disable_other_ports)
             success = success and ok
+
+        # We wait for the maximum time allowed for enumeration changes.
+        if sleep_on_change and success:
+            time.sleep(sleep_on_change)
         return success
 
     def disable_ports(self, ports=None, sleep_on_change=0):
@@ -127,8 +132,13 @@ class CombinedHub(device_hub.device_hub):
 
         success = True
         for name, hub in self.hubs.items():
-            ok = hub.disable_ports(targets[name], sleep_on_change)
+            ok = hub.disable_ports(targets[name])
             success = success and ok
+
+        # We wait for the maximum time allowed for enumeration changes.
+        if sleep_on_change and success:
+            time.sleep(sleep_on_change)
+
         return success
 
     def get_port_by_location(self, location):

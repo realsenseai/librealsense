@@ -3,7 +3,7 @@ realdds is a library that ease the control of a realsense camera over network us
 realdds provides "off the shelf" types and logic that makes it easier and faster to write applications that control a camera over the network.
 It is a work in progress aimed at, ultimately, enabling remote users to do with the camera everything a user can do with a USB connected camera, and more (multiple clients for frames, etc...).
 
-realdds uses DDS topics to send and receive information to/from the camera. See [DDS-ICD](https://github.com/IntelRealSense/librealsense/blob/dds/doc/DDS/DDS%20ICD.md)
+realdds uses DDS topics to send and receive information to/from the camera. See [DDS-ICD](https://github.com/realsenseai/librealsense/blob/dds/doc/DDS/DDS%20ICD.md)
 
 Users can use realdds stand-alone, or use librealsense with the cmake `BUILD_WITH_DDS` flag on, to use DDS devices seemlessly as any other librealsense device.
 
@@ -13,7 +13,7 @@ Users can use realdds stand-alone, or use librealsense with the cmake `BUILD_WIT
 
 The **server** or **camera** is either a physical device with built in capabilities supporting these use cases, or a dedicated software operating some other device, e.g., Intel RealSense D455, giving it the required capabilities.
 
-An example software tool like this is the [dds-server](https://github.com/IntelRealSense/librealsense/tree/dds/tools/dds/dds-server)
+An example software tool like this is the [dds-server](https://github.com/realsenseai/librealsense/tree/dds/tools/dds/dds-server)
 
 ## User/Client
 
@@ -40,7 +40,7 @@ Using the discovery data, the **user** can have a complete knowledge of the came
 **Main Scenario**
 1. The **server** will create a new *device-info* writer to publish this connected device existence.
 2. Subscribed **user**s are matched for this writer.
-3. The **server** publishes *device-info* message with this device details. The *device-info* contains a *topic-root* field. All communication to and from the camera is done using topics containing this *topic-root* in their names (see [ICD](https://github.com/IntelRealSense/librealsense/blob/dds/doc/DDS/DDS%20ICD.md)).
+3. The **server** publishes *device-info* message with this device details. The *device-info* contains a *topic-root* field. All communication to and from the camera is done using topics containing this *topic-root* in their names (see [ICD](https://github.com/realsenseai/librealsense/blob/dds/doc/DDS/DDS%20ICD.md)).
 4. The **user** subscibes to the appropriate *notification* topic using the *topic-root* field (e.g., `realsense/D435I/112322073677/notification`).
 5. The **server** will recognize the subscription and will send discovery *notification* messages in this order:
     1. A *device-header* message

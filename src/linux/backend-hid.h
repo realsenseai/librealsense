@@ -7,6 +7,7 @@
 
 #include <limits.h>
 #include <list>
+#include <fstream>
 
 namespace librealsense
 {

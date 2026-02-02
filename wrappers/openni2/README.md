@@ -17,7 +17,7 @@ Current features:
 
 Download [OpenNI2 SDK](https://structure.io/openni)
 
-Download [RealSense2 SDK](https://github.com/IntelRealSense/librealsense/releases)
+Download [RealSense2 SDK](https://github.com/realsenseai/librealsense/releases)
 
 Run CMake on driver and configure SDK's:
 * OPENNI2_DIR (For linux, the path may be "/usr/include/openni2")
@@ -43,4 +43,4 @@ _Picture:_ _Configuring_ _capture_
 
 ## License
 
-This project is licensed under the [Apache](https://github.com/IntelRealSense/librealsense/blob/master/LICENSE) License, Version 2.0.
+This project is licensed under the [Apache](https://github.com/realsenseai/librealsense/blob/master/LICENSE) License, Version 2.0.

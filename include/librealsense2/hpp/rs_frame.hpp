@@ -1135,16 +1135,27 @@ namespace rs2
         * Retrieve the first color frame, if no frame is found, search for the color frame from IR stream. If one still can't be found, return an empty frame instance.
         * \return video_frame - first found color frame.
         */
-        video_frame get_color_frame() const
+        video_frame get_color_frame( const size_t index = 0 ) const
         {
-            auto f = first_or_default(RS2_STREAM_COLOR);
+            frame f;
 
-            if (!f)
+            foreach_rs( [&f, index]( const frame & frm ) {
+                if( !f && frm.get_profile().stream_type() == RS2_STREAM_COLOR &&
+                          frm.get_profile().stream_index() == index )
+                    f = frm;
+            } );
+
+            if( ! f )
             {
-                auto ir = first_or_default(RS2_STREAM_INFRARED);
-                if (ir && ir.get_profile().format() == RS2_FORMAT_RGB8)
-                    f = ir;
+                // Color frame can also come from infrared sensor
+                foreach_rs( [&f, index]( const frame & frm ) {
+                    if( !f && frm.get_profile().stream_type() == RS2_STREAM_INFRARED &&
+                              frm.get_profile().stream_index() == index &&
+                              frm.get_profile().format() == RS2_FORMAT_RGB8 )
+                        f = frm;
+                } );
             }
+
             return f;
         }
 
@@ -1169,8 +1180,9 @@ namespace rs2
             else
             {
                 foreach_rs([&f, index](const frame& frm) {
-                    if (frm.get_profile().stream_type() == RS2_STREAM_INFRARED &&
-                        frm.get_profile().stream_index() == index) f = frm;
+                    if( !f && frm.get_profile().stream_type() == RS2_STREAM_INFRARED &&
+                              frm.get_profile().stream_index() == index )
+                        f = frm;
                 });
             }
             return f;

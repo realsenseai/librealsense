@@ -19,7 +19,7 @@ The example displays a GUI for controlling the maximum distance to show from the
 
 The application should open a window and display a video stream from the camera.
 
-<p align="center"><img src="https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/align-expected.gif" alt="screenshot gif"/></p>
+<p align="center"><img src="https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/align-expected.gif" alt="screenshot gif"/></p>
 
 The window should have the following elements:
 - On the left side of the window is a vertical slider for controlling the depth clipping distance.

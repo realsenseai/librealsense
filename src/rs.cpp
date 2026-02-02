@@ -911,8 +911,9 @@ void rs2_set_option(const rs2_options* options, rs2_option option, float value, 
         if (range.min != range.max && range.step)
             VALIDATE_RANGE(value, range.min, range.max);
         if ((int)value != value)
-            throw invalid_value_exception(rsutils::string::from() << "not an integer: " << value);
-        option_ref.set(value);
+            LOG_WARNING("Float value " << value << " given to integer option " << rs2_get_option_name(options, option, error)
+                << ", truncating to " << std::trunc(value));
+        option_ref.set(std::trunc(value));
         break;
 
     case RS2_OPTION_TYPE_BOOLEAN:
@@ -4134,7 +4135,7 @@ HANDLE_EXCEPTIONS_AND_RETURN(0, fw_log_parsed_msg)
 unsigned int rs2_get_fw_log_parsed_timestamp(rs2_firmware_log_parsed_message* fw_log_parsed_msg, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(fw_log_parsed_msg);
-    return fw_log_parsed_msg->firmware_log_parsed->timestamp;
+    return static_cast<unsigned int>(fw_log_parsed_msg->firmware_log_parsed->timestamp);
 }
 HANDLE_EXCEPTIONS_AND_RETURN(0, fw_log_parsed_msg)
 
@@ -4914,6 +4915,22 @@ void rs2_set_transmission_delay( const rs2_device * device, unsigned int delay, 
     return eth_config->set_transmission_delay( delay );
 }
 HANDLE_EXCEPTIONS_AND_RETURN( , device )
+
+unsigned int rs2_get_udp_ttl( const rs2_device * device, rs2_error ** error ) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL( device );
+    auto eth_config = VALIDATE_INTERFACE( device->device, librealsense::eth_config_device );
+    return eth_config->get_udp_ttl();
+}
+HANDLE_EXCEPTIONS_AND_RETURN( 0, device )
+
+void rs2_set_udp_ttl( const rs2_device * device, unsigned int ttl, rs2_error ** error ) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL( device );
+    auto eth_config = VALIDATE_INTERFACE( device->device, librealsense::eth_config_device );
+    return eth_config->set_udp_ttl( ttl );
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, device )
 
 void rs2_restore_default_eth_config( const rs2_device * device, rs2_error ** error ) BEGIN_API_CALL
 {

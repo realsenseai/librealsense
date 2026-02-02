@@ -17,10 +17,10 @@ These Examples demonstrate how to use the python wrapper of the SDK.
 11. [Stream alignment using SW device](./align-with-software-device.py) - Demonstrates how to align depth and RGB images using a software device.
 ## Pointcloud Visualization
 
-1. [OpenCV software renderer](https://github.com/IntelRealSense/librealsense/blob/development/wrappers/python/examples/opencv_pointcloud_viewer.py)
-2. [PyGlet pointcloud renderer](https://github.com/IntelRealSense/librealsense/blob/development/wrappers/python/examples/pyglet_pointcloud_viewer.py) - requires `pip install pyglet`
+1. [OpenCV software renderer](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/opencv_pointcloud_viewer.py)
+2. [PyGlet pointcloud renderer](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/pyglet_pointcloud_viewer.py) - requires `pip install pyglet`
 
 ## Interactive Examples:
 
-1. [Distance to Object](https://github.com/IntelRealSense/librealsense/blob/jupyter/notebooks/distance_to_object.ipynb) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/IntelRealSense/librealsense/jupyter?filepath=notebooks/distance_to_object.ipynb)
-2. [Depth Filters](https://github.com/IntelRealSense/librealsense/blob/jupyter/notebooks/depth_filters.ipynb) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/IntelRealSense/librealsense/jupyter?filepath=notebooks/depth_filters.ipynb)
+1. [Distance to Object](https://github.com/realsenseai/librealsense/blob/jupyter/notebooks/distance_to_object.ipynb) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/realsenseai/librealsense/jupyter?filepath=notebooks/distance_to_object.ipynb)
+2. [Depth Filters](https://github.com/realsenseai/librealsense/blob/jupyter/notebooks/depth_filters.ipynb) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/realsenseai/librealsense/jupyter?filepath=notebooks/depth_filters.ipynb)
