@@ -1,5 +1,5 @@
 // License: Apache 2.0. See LICENSE file in root directory.
-// Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 /*!
  * @file flexible.cpp
@@ -25,13 +25,18 @@ using namespace eprosima::fastcdr::exception;
 #include <utility>
 
 
+#define realdds_topics_raw_flexible_max_cdr_typesize 32780ULL;
+
+#define realdds_topics_raw_flexible_max_key_cdr_typesize 0ULL;
+
+
 realdds::topics::raw::flexible::flexible()
 {
-    // m_data_format com.eprosima.idl.parser.typecode.EnumTypeCode@b7dd107
+    // realdds::topics::raw::flexible_data_format m_data_format
     m_data_format = realdds::topics::raw::FLEXIBLE_DATA_JSON;
-    // m_version com.eprosima.idl.parser.typecode.ArrayTypeCode@42eca56e
+    // octet m_version
     memset(&m_version, 0, (4) * 1);
-    // m_data com.eprosima.idl.parser.typecode.SequenceTypeCode@52f759d7
+    // sequence<octet, 32768> m_data
 
 
     // Just to register all known types
@@ -54,7 +59,7 @@ realdds::topics::raw::flexible::flexible(
 }
 
 realdds::topics::raw::flexible::flexible(
-        flexible&& x)
+        flexible&& x) noexcept 
 {
     m_data_format = x.m_data_format;
     m_version = std::move(x.m_version);
@@ -73,7 +78,7 @@ realdds::topics::raw::flexible& realdds::topics::raw::flexible::operator =(
 }
 
 realdds::topics::raw::flexible& realdds::topics::raw::flexible::operator =(
-        flexible&& x)
+        flexible&& x) noexcept
 {
 
     m_data_format = x.m_data_format;
@@ -99,23 +104,8 @@ bool realdds::topics::raw::flexible::operator !=(
 size_t realdds::topics::raw::flexible::getMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    size_t initial_alignment = current_alignment;
-
-
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
-
-
-    current_alignment += ((4) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
-
-
-    current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
-
-    current_alignment += (4096 * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
-
-
-
-
-    return current_alignment - initial_alignment;
+    static_cast<void>(current_alignment);
+    return realdds_topics_raw_flexible_max_cdr_typesize;
 }
 
 size_t realdds::topics::raw::flexible::getCdrSerializedSize(
@@ -129,10 +119,7 @@ size_t realdds::topics::raw::flexible::getCdrSerializedSize(
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
 
-    if ((4) > 0)
-    {
-        current_alignment += ((4) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
-    }
+    current_alignment += ((4) * 1) + eprosima::fastcdr::Cdr::alignment(current_alignment, 1);
 
     current_alignment += 4 + eprosima::fastcdr::Cdr::alignment(current_alignment, 4);
 
@@ -276,17 +263,12 @@ std::vector<uint8_t>& realdds::topics::raw::flexible::data()
     return m_data;
 }
 
+
 size_t realdds::topics::raw::flexible::getKeyMaxCdrSerializedSize(
         size_t current_alignment)
 {
-    size_t current_align = current_alignment;
-
-
-
-
-
-
-    return current_align;
+    static_cast<void>(current_alignment);
+    return realdds_topics_raw_flexible_max_key_cdr_typesize;
 }
 
 bool realdds::topics::raw::flexible::isKeyDefined()
@@ -298,8 +280,8 @@ void realdds::topics::raw::flexible::serializeKey(
         eprosima::fastcdr::Cdr& scdr) const
 {
     (void) scdr;
-       
 }
+
 
 
 

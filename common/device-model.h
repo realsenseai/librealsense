@@ -312,7 +312,7 @@ namespace rs2
                                           bool reset_delay = false );
 
         int draw_playback_panel(ux_window& window, ImFont* font, viewer_model& view);
-        bool draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message);
+        bool draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message, bool is_streaming = false);
         void draw_controls(float panel_width, float panel_height,
             ux_window& window,
             std::string& error_message,
@@ -427,6 +427,8 @@ namespace rs2
         calibration_model _calib_model;
         dds_model _dds_model;
         hdr_model _hdr_model;
+
+        bool _is_d500_device;
     };
 
     std::pair<std::string, std::string> get_device_name(const device& dev);

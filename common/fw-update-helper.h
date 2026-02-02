@@ -30,7 +30,7 @@ namespace rs2
     protected:
         void process_flow(std::function<void()> cleanup,
             invoker invoke) override;
-        void process_mipi();
+        void process_mipi_signed_fw();
         bool check_for(
             std::function<bool()> action, std::function<void()> cleanup,
             std::chrono::system_clock::duration delta);

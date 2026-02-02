@@ -8,7 +8,7 @@ using System.Linq;
 /// <summary>
 /// Manages streaming using a RealSense Device
 /// </summary>
-[HelpURL("https://github.com/IntelRealSense/librealsense/tree/master/wrappers/unity")]
+[HelpURL("https://github.com/realsenseai/librealsense/tree/master/wrappers/unity")]
 public class RsDevice : RsFrameProvider
 {
     /// <summary>

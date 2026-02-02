@@ -51,7 +51,7 @@ The core idea behind this algorithm is that areas with well defined features in 
 ## Downsample Step
 
 Downsampling is a very common first step in any depth processing algorithm. The key observation is that downsampling reduces spatial (X-Y) accuracy but preserves Z-accuracy.
-It is so widespread that the SDK offers built-in downsampling method in form of [`rs2::decimation_filter`](https://github.com/IntelRealSense/librealsense/blob/master/doc/post-processing-filters.md#decimation-filter).
+It is so widespread that the SDK offers built-in downsampling method in form of [`rs2::decimation_filter`](https://github.com/realsenseai/librealsense/blob/master/doc/post-processing-filters.md#decimation-filter).
 It's important to note that using standard OpenCV downsampling is not ideal for depth images. 
 In this example we show another correct way to implement depth downsampling. It is conceptually similar to `rs2::decimation_filter`, picking one of the non-zero depth values for every 4x4 block, but unlike `rs2::decimation_filter` it is picking the *closest* depth value instead of median value. This makes sense in context of collision avoidance, since we want to preserve the minimal distance to an object. 
 

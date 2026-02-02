@@ -2,7 +2,7 @@
 # Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
 
 # test:device each(D400*)
-# test:device each(D500*) !D555
+# test:device each(D500*)
 # test:donotrun:!nightly
 
 # See FW stability issue RSDSO-18908
@@ -12,6 +12,7 @@ import pyrealsense2 as rs
 from rspy import test
 from rspy import log
 from rspy import tests_wrapper as tw
+import time
 
 dev, _ = test.find_first_device_or_exit()
 product_line = dev.get_info(rs.camera_info.product_line)
@@ -42,6 +43,7 @@ with test.closure( 'save/load preset' ):
     depth_control_group = am_dev.get_depth_control()
     depth_control_group.textureCountThreshold = 250
     am_dev.set_depth_control( depth_control_group )
+    time.sleep(0.1) # Give camera time to handle the command
     test.check( depth_sensor.get_option( rs.option.visual_preset ) == rs.rs400_visual_preset.custom )
     
     am_dev.load_json( saved_values )

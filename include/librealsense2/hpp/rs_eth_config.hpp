@@ -249,6 +249,28 @@ namespace rs2
         }
 
         /**
+         * Get current UDP packet "time to live" (TTL)
+         */
+        uint8_t get_udp_ttl() const
+        {
+            rs2_error * e = nullptr;
+            auto result = rs2_get_udp_ttl( _dev.get(), &e );
+            error::handle( e );
+            return static_cast<uint8_t>(result);
+        }
+
+        /**
+         * Set UDP packet "time to live" (TTL)
+         * \param ttl UDP TTL value (1-255)
+         */
+        void set_udp_ttl( uint8_t ttl ) const
+        {
+            rs2_error * e = nullptr;
+            rs2_set_udp_ttl( _dev.get(), ttl, &e );
+            error::handle( e );
+        }
+
+        /**
          * Restores configuration to factory settings
          */
         void restore_defaults()

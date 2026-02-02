@@ -13,7 +13,7 @@
 
 **Note:** Due to the USB 3.0 translation layer between native hardware and virtual machine, the *librealsense* team does not support installation in a VM. \
 If you do choose to try it, we recommend using VMware Workstation Player, and not Oracle VirtualBox for proper emulation of the USB3 controller. \
-Please ensure to work with the supported Kernel versions listed [here](https://github.com/IntelRealSense/librealsense/releases/) and verify that the kernel is updated properly according to the instructions.
+Please ensure to work with the supported Kernel versions listed [here](https://github.com/realsenseai/librealsense/releases/) and verify that the kernel is updated properly according to the instructions.
 
 
 ## Prerequisites
@@ -70,10 +70,10 @@ if not the SDK will use a timer polling approach which is less sensitive for dev
 1. Clone/Download the latest stable version of _librealsense2_ in one of the following ways:
    * Clone the _librealsense2_ repo
      ```sh
-     git clone https://github.com/IntelRealSense/librealsense.git
+     git clone https://github.com/realsenseai/librealsense.git
      ```
    * Download and unzip the latest stable _librealsense2_ version from `master` branch \
-     [IntelRealSense.zip](https://github.com/IntelRealSense/librealsense/archive/master.zip)
+     [realsenseai.zip](https://github.com/realsenseai/librealsense/archive/master.zip)
 
 2. Run Realsense permissions script from _librealsense2_ root directory:
    ```sh
@@ -133,7 +133,7 @@ if not the SDK will use a timer polling approach which is less sensitive for dev
     **Note:** If you encounter the following error during compilation `gcc: internal compiler error` \
     it might indicate that you do not have enough memory or swap space on your machine. \
     Try closing memory consuming applications, and if you are running inside a VM, increase available RAM to at least 2 GB. \
-    **Note:** You can find more information about the available configuration options on [this wiki page](https://github.com/IntelRealSense/librealsense/wiki/Build-Configuration).
+    **Note:** You can find more information about the available configuration options on [this wiki page](https://github.com/realsenseai/librealsense/wiki/Build-Configuration).
 
   
 ## Troubleshooting Installation and Patch-related Issues

@@ -33,6 +33,7 @@ namespace librealsense {
             return context_settings;
 
         auto const filename = rsutils::os::get_special_folder( rsutils::os::special_folder::app_data ) + RS2_CONFIG_FILENAME;
+        LOG_DEBUG( "Loading configuration file from: " << filename );
         auto config = rsutils::json_config::load_from_file( filename );
 
         if (config.is_discarded())
@@ -44,6 +45,8 @@ namespace librealsense {
 
         // Patch the given context settings into the configuration
         config.override( context_settings, "context settings" );
+        LOG_DEBUG( "Loaded context configuration: " << config.dump(4) );
+
         return config;
     }
 

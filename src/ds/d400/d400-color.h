@@ -38,6 +38,7 @@ namespace librealsense
 
         std::shared_ptr<stream_interface> _color_stream;
         std::shared_ptr<ds_color_common> _ds_color_common;
+        uint8_t _color_device_idx = -1;
 
     private:
         void register_options();
@@ -66,7 +67,6 @@ namespace librealsense
         friend class rs435i_device;
         friend class ds_color_common;
 
-        uint8_t _color_device_idx = -1;
         bool _separate_color;
         rsutils::lazy< std::vector< uint8_t > > _color_calib_table_raw;
         std::shared_ptr< rsutils::lazy< rs2_extrinsics > > _color_extrinsic;

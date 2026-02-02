@@ -34,7 +34,7 @@ Once it detects bits and decodes the clock value embedded in the image, the samp
 
 To make sure expensive detection logic is not preventing us from getting the frames in time, detection is being done on a seperate thread. Frames are being passed to this thread, alongside their respective clock measurements, using a concurrent queue. 
 We ensure that the queue will not spill, by emptying it after each successful or unsuccessful detection attempt. 
-Please refer to [Frame Buffer Management](https://github.com/IntelRealSense/librealsense/wiki/Frame-Buffering-Management-in-RealSense-SDK-2.0) for further information.
+Please refer to [Frame Buffer Management](https://github.com/realsenseai/librealsense/wiki/Frame-Buffering-Management-in-RealSense-SDK-2.0) for further information.
 
 ## Controlling the Demo
 

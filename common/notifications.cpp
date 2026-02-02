@@ -708,7 +708,7 @@ namespace rs2
 
         ImGui::SetCursorScreenPos({ float(x + 17), float(y + 41) });
 
-        std::string link = rsutils::string::from() << "https://github.com/IntelRealSense/librealsense/wiki/Release-Notes#release-" << _version;
+        std::string link = rsutils::string::from() << "https://github.com/realsenseai/librealsense/wiki/Release-Notes#release-" << _version;
 
         ImGui::PushStyleColor(ImGuiCol_Text, alpha(light_blue, 1.f - t));
         if (ImGui::Button("What's new"))

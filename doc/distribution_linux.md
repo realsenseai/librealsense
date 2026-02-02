@@ -4,8 +4,8 @@
 **RealSense™ SDK 2.0** provides installation packages for Intel X86/AMD64/ARM-based Debian distributions in [`dpkg`](https://en.wikipedia.org/wiki/Dpkg) format for Ubuntu 20/22/24 [LTS](https://wiki.ubuntu.com/LTS).
 
 > Note: For EOL Ubuntu distributions please use the following versions:  
-Ubuntu 16 -> [2.51.1](https://github.com/IntelRealSense/librealsense/releases/tag/v2.51.1).  
-Ubuntu 18 -> [2.55.1](https://github.com/IntelRealSense/librealsense/releases/tag/v2.55.1).  
+Ubuntu 16 -> [2.51.1](https://github.com/realsenseai/librealsense/releases/tag/v2.51.1).  
+Ubuntu 18 -> [2.55.1](https://github.com/realsenseai/librealsense/releases/tag/v2.55.1).  
 The Realsense [DKMS](https://en.wikipedia.org/wiki/Dynamic_Kernel_Module_Support) kernel drivers package (`librealsense2-dkms`) supports Ubuntu LTS HWE kernels 5.15, 5.19 and 6.5. Please refer to [Ubuntu Kernel Release Schedule](https://wiki.ubuntu.com/Kernel/Support) for further details.
 
 #### Configuring and building from the source code
@@ -20,16 +20,21 @@ The steps are described in [Linux manual installation guide](./installation.md)
 ## Installing the packages:
 - Register the server's public key:
 ```
+# Ensure the directory exists
 sudo mkdir -p /etc/apt/keyrings
-curl -sSf https://librealsense.realsenseai.com/Debian/librealsense.pgp | sudo tee /etc/apt/keyrings/librealsense.pgp > /dev/null
+
+# Download and dearmor
+curl -sSf https://librealsense.realsenseai.com/Debian/librealsenseai.asc | \
+gpg --dearmor | sudo tee /etc/apt/keyrings/librealsenseai.gpg > /dev/null
 ```
+Note: The keyring contains both the new RS public key and the Intel public key for old repos, ensuring compatibility with both new and existing packages.
 
 - Make sure apt HTTPS support is installed:
 `sudo apt-get install apt-transport-https`
 
 - Add the server to the list of repositories:
 ```
-echo "deb [signed-by=/etc/apt/keyrings/librealsense.pgp] https://librealsense.realsenseai.com/Debian/apt-repo `lsb_release -cs` main" | \
+echo "deb [signed-by=/etc/apt/keyrings/librealsenseai.gpg] https://librealsense.realsenseai.com/Debian/apt-repo `lsb_release -cs` main" | \
 sudo tee /etc/apt/sources.list.d/librealsense.list
 sudo apt-get update
 ```

@@ -26,6 +26,7 @@ with test.closure("Check depth-IMU extrinsics"):
                 break
                 
         sensor = sensors['Motion Module']
+        log.d("Found Sensor: " +  sensor.get_info(rs.camera_info.name) + " of type: " + device.get_info(rs.camera_info.imu_type))
         for profile in sensor.get_stream_profiles() :
             if profile.stream_type() == rs.stream.motion: # For combined motion profiles.
                 imu_profile = profile

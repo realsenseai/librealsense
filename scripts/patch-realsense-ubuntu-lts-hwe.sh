@@ -237,7 +237,7 @@ then
 
 	# Basic build for kernel modules
 	echo -e "\e[32mPrepare kernel modules configuration\e[0m"
-	#Retpoline script manual retrieval. based on https://github.com/IntelRealSense/librealsense/issues/1493
+	#Retpoline script manual retrieval. based on https://github.com/realsenseai/librealsense/issues/1493
 	#Required since the retpoline patches were introduced into Ubuntu kernels
 	if [ ! -f scripts/ubuntu-retpoline-extract-one ]; then
 		pwd

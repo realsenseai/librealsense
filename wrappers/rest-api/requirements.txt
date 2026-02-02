@@ -1,4 +1,4 @@
-fastapi==0.115.12
+fastapi==0.120.1
 uvicorn==0.34.0
 pydantic==2.10.6
 pyrealsense2==2.56.4.9191

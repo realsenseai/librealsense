@@ -1,4 +1,4 @@
-﻿# OpenVINO Samples for Intel® RealSense™ cameras
+﻿# OpenVINO Samples for RealSense cameras
 Examples in this folder are designed to complement existing
 [SDK examples](../../examples) and demonstrate how Intel RealSense cameras can
 be used together with the OpenVINO™ toolkit in the domain of computer-vision.
@@ -143,7 +143,7 @@ place as all the model files (i.e., the current directory or alongside the .exe)
 
 1. Download the latest OpenVINO toolkit and follow the [instructions for Linux installation](https://docs.openvinotoolkit.org/latest/_docs_install_guides_installing_openvino_linux.html). These are very similar to
 the Windows instructions above.
-2. Follow [the instructions](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md) to build `librealsense` from source, but:
+2. Follow [the instructions](https://github.com/realsenseai/librealsense/blob/master/doc/installation.md) to build `librealsense` from source, but:
  * Add `-DBUILD_OPENVINO_EXAMPLES=true -DOpenCV_DIR=... -DINTEL_OPENVINO_DIR=...` to your `cmake` command
 3. Make sure you have `$LD_LIBRARY_PATH` pointing to the OpenVINO libraries when
  running the examples. Run `source $INTEL_OPENVINO_DIR/bin/setupvars.sh` to do

@@ -188,10 +188,12 @@ try
     cli::value< std::string > gateway_arg( "gateway", "1.2.3.4", "", "Gateway to use when DHCP is off" );
     cli::value< std::string > dhcp_arg( "dhcp", "on/off", "on", "DHCP dynamic IP discovery 'on' or 'off'" );
     cli::value< uint32_t > dhcp_timeout_arg( "dhcp-timeout", "seconds", 30, "Seconds before DHCP times out and falls back to a static IP" );
-    cli::value< uint32_t > link_timeout_arg( "link-timeout", "milliseconds", 4000, "Milliseconds before --eth-first link times out and falls back to USB" );
+    cli::value< uint32_t > link_timeout_arg( "link-timeout", "milliseconds", 8000, "Milliseconds before --eth-first link times out and falls back to USB. 2000-30000 in 100 ms steps" );
     cli::value< uint32_t > mtu_arg( "mtu", "bytes", 9000, "Size per Ethernet packet. 500-9000 in 500 byte steps" );
     cli::value< uint16_t > trans_delay_arg( "transmission-delay", "microseconds", 0, "Wait this much after each packet is sent before sending next one. 0-144 in 3 microsecond steps" );
-    cli::value< int > domain_id_arg( "domain-id", "0-232", 0, "DDS Domain ID to use (default is 0)" );
+    cli::value< uint16_t > udp_ttl_arg( "ttl", "1-255", 1, "UDP only. Value to use in UDP packet TTL field" );
+    cli::value< int > domain_id_arg( "domain-id", "0-232", 0, "DDS Domain to use in the camera (default is 0)" );
+    cli::value< int > sdk_domain_id_arg( "sdk-domain-id", "0-232", 0, "DDS Domain the SDK should use (default is 0). Saved in configuration file as default for future SDK use" );
     cli::flag usb_first_arg( "usb-first", "Prioritize USB and fall back to Ethernet after link timeout" );
     cli::flag eth_first_arg( "eth-first", "Prioritize Ethernet and fall back to USB after link timeout" );
     cli::flag dynamic_priority_arg( "dynamic-priority", "Dynamically prioritize the last-working connection method (the default)" );
@@ -211,20 +213,44 @@ try
                         .arg( dhcp_timeout_arg )
                         .arg( mtu_arg )
                         .arg( trans_delay_arg )
+                        .arg( udp_ttl_arg )
                         .arg( ip_arg )
                         .arg( mask_arg )
                         .arg( gateway_arg )
                         .arg( domain_id_arg )
+                        .arg( sdk_domain_id_arg )
                         .arg( no_reset_arg )
                         .process( argc, argv );
 
     g_quiet = quiet_arg.isSet();
 
+    std::cout << "rs-dds-config " << RS2_API_FULL_VERSION_STR << std::endl << std::endl;
+
+    auto const filename = rsutils::os::get_special_folder( rsutils::os::special_folder::app_data ) + RS2_CONFIG_FILENAME;
+    auto config = rsutils::json_config::load_from_file( filename );
+    if( ! config )
+        config = json::object();
+
+    if( sdk_domain_id_arg.isSet() )
+    {
+        if( sdk_domain_id_arg.getValue() < 0 || sdk_domain_id_arg.getValue() > 232 )
+            throw std::invalid_argument( "--sdk-domain-id must be 0-232" );
+        try
+        {
+            config["context"]["dds"]["domain"] = sdk_domain_id_arg.getValue();
+            std::ofstream out( filename );
+            out << std::setw( 2 ) << config;
+            out.close();
+            INFO( "SDK domain has been set to " << sdk_domain_id_arg.getValue() << " in " RS2_CONFIG_FILENAME );
+        }
+        catch( std::exception const & e )
+        {
+            std::cout << "-W-  FAILED to set SDK domain: " << e.what() << std::endl;
+        }
+    }
+
     if( disable_arg.isSet() )
     {
-        auto const filename = rsutils::os::get_special_folder( rsutils::os::special_folder::app_data ) + RS2_CONFIG_FILENAME;
-        auto config = rsutils::json_config::load_from_file( filename );
-        
         if( config.nested( "context", "dds", "enabled" ).default_value( false ) )
         {
             config["context"]["dds"].erase("enabled");
@@ -241,11 +267,6 @@ try
     }
     
     // Enable DDS in future runs
-    auto const filename = rsutils::os::get_special_folder( rsutils::os::special_folder::app_data ) + RS2_CONFIG_FILENAME;
-    auto config = rsutils::json_config::load_from_file( filename );
-    if( ! config )
-        config = json::object();
-
     if( ! config.nested( "context", "dds", "enabled" ).default_value( false ) )
     {
         config["context"]["dds"]["enabled"] = true;
@@ -357,6 +378,10 @@ try
         {
             requested.transmission_delay = trans_delay_arg.getValue();
         }
+        if( udp_ttl_arg.isSet() )
+        {
+            requested.udp_ttl = udp_ttl_arg.getValue();
+        }
     }
 
     if( ! g_quiet )
@@ -393,6 +418,7 @@ try
             INFO( indent( 8 ) << setting( "timeout, sec", current.dhcp.timeout, requested.dhcp.timeout ) );
         }
         INFO( indent( 4 ) << setting( "transmission delay, us", current.transmission_delay, requested.transmission_delay ) );
+        INFO( indent( 4 ) << setting( "UDP TTL", current.udp_ttl, requested.udp_ttl ) );
         std::cout << std::endl;
     }
 

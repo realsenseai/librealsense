@@ -39,8 +39,7 @@ namespace librealsense
         void update_flash(const std::vector<uint8_t>& image, rs2_update_progress_callback_sptr callback, int update_mode);
 
         bool is_camera_in_advanced_mode() const;
-        bool is_locked( const uint8_t * gvd_buff, uint32_t offset );
-        void get_fw_details( const std::vector<uint8_t> &gvd_buff, std::string& optic_serial, std::string& asic_serial, std::string& fwv ) const;
+        bool is_locked( const uint8_t * gvd_buff, uint32_t offset );        
 
     private:
         std::shared_ptr< uvc_sensor > get_raw_depth_sensor();

@@ -168,8 +168,9 @@ namespace rs2
             invoke([&]()
                 {
                     // Stop viewer UI
-                    _sub->stop(_viewer.not_model);
-                    if (_sub_color.get())
+                    if (_sub->streaming)
+                        _sub->stop(_viewer.not_model);
+                    if (_sub_color.get() && _sub_color->streaming)
                         _sub_color->stop(_viewer.not_model);
                 });
 

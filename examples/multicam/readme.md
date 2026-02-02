@@ -18,7 +18,7 @@ In the following snapshot we use five RealSense™ devices to produce the mosaic
 
  Alltogether the mosaic comprise of 18 simultaneous live feeds:
 
-<p align="center"><img src="https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/Multicam.gif" alt="screenshot gif"/></p>
+<p align="center"><img src="https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/Multicam.gif" alt="screenshot gif"/></p>
 
 
 ## Code Overview

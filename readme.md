@@ -12,13 +12,28 @@ The SDK allows depth and color streaming, and provides intrinsic and extrinsic c
 
 
 <p align="center">
-  <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/github/license/IntelRealSense/librealsense.svg" alt="License"></a>
-  <a href="https://github.com/IntelRealSense/librealsense/releases/latest"><img src="https://img.shields.io/github/v/release/IntelRealSense/librealsense?sort=semver" alt="Latest release"></a>
-  <a href="https://github.com/IntelRealSense/librealsense/compare/master...development"><img src="https://img.shields.io/github/commits-since/IntelRealSense/librealsense/master/development?label=commits%20since" alt="Commits since"></a>
-  <a href="https://github.com/IntelRealSense/librealsense/issues"><img src="https://img.shields.io/github/issues/IntelRealSense/librealsense.svg" alt="Issues"></a>
-  <a href="https://github.com/IntelRealSense/librealsense/actions/workflows/buildsCI.yaml?query=branch%3Adevelopment"><img src="https://github.com/IntelRealSense/librealsense/actions/workflows/buildsCI.yaml/badge.svg?branch=development" alt="GitHub CI"></a>
-  <a href="https://github.com/IntelRealSense/librealsense/network/members"><img src="https://img.shields.io/github/forks/IntelRealSense/librealsense.svg" alt="Forks"></a>
+  <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/github/license/realsenseai/librealsense.svg" alt="License"></a>
+  <a href="https://github.com/realsenseai/librealsense/releases/latest"><img src="https://img.shields.io/github/v/release/realsenseai/librealsense?sort=semver" alt="Latest release"></a>
+  <a href="https://github.com/realsenseai/librealsense/compare/master...development"><img src="https://img.shields.io/github/commits-since/realsenseai/librealsense/master/development?label=commits%20since" alt="Commits since"></a>
+  <a href="https://github.com/realsenseai/librealsense/issues"><img src="https://img.shields.io/github/issues/realsenseai/librealsense.svg" alt="Issues"></a>
+  <a href="https://github.com/realsenseai/librealsense/actions/workflows/buildsCI.yaml?query=branch%3Adevelopment"><img src="https://github.com/realsenseai/librealsense/actions/workflows/buildsCI.yaml/badge.svg?branch=development" alt="GitHub CI"></a>
+  <a href="https://github.com/realsenseai/librealsense/network/members"><img src="https://img.shields.io/github/forks/realsenseai/librealsense.svg" alt="Forks"></a>
 </p>
+
+## Important Notice
+
+We are happy to announce that the RealSense GitHub repositories have been successfully migrated to the RealSenseAI organization.
+Please make sure to update your links to the new RealSenseAI organization for both cloning the repositories and accessing specific files within them.
+
+[https://github.com/**IntelRealSense**/librealsense](https://github.com/IntelRealSense/librealsense) --> [https://github.com/**realsenseai**/librealsense](https://github.com/realsenseai/librealsense)
+
+Note: A redirection from the previous name IntelRealSense is currently in place, but we cannot guarantee how long it will remain active. We recommend that all users update their references to point to the new GitHub location.
+
+#### Branch Policy
+We have updated our branch policy:
+From now on, we will also push beta releases to the master branch, so users can access up-to-date code and features.
+In the near future, beta binaries will also be pushed to public distribution servers (e.g., APT).
+The last validated official release can be found on our Releases page on GitHub.
 
 ## Use Cases
 
@@ -37,7 +52,7 @@ Drones | Skeletal and People Tracking | Facial Authentication |
 ## Why RealSense?
 
 - **High-resolution color and depth** at close and long ranges
-- **Open source SDK** with rich examples and wrappers (Python, ROS, C#, Unity and [more...](https://github.com/IntelRealSense/librealsense/tree/master/wrappers))
+- **Open source SDK** with rich examples and wrappers (Python, ROS, C#, Unity and [more...](https://github.com/realsenseai/librealsense/tree/master/wrappers))
 - **Active developer community and defacto-standard 3D stereo camera for robotics**
 - **Cross-platform** support: Windows, Linux, macOS, Android, and Docker
 
@@ -65,7 +80,7 @@ Start developing with RealSense in minutes using either method below.
 ### 1️. Precompiled SDK
 
 This is the best option if you want to plug in your camera and get started right away.
-1. Download the latest SDK bundle from the [Releases page](https://github.com/IntelRealSense/librealsense/releases).
+1. Download the latest SDK bundle from the [Releases page](https://github.com/realsenseai/librealsense/releases).
 2. Connect your RealSense camera.
 3. Run the included tools:
     - [RealSense Viewer](./tools/realsense-viewer/): View streams, tune settings, record and playback.
@@ -82,7 +97,7 @@ This is the best option if you want to plug in your camera and get started right
 For a more custom installation, follow these steps to build the SDK from source.
 1. Clone the repository and create a build directory:
    ```bash
-   git clone https://github.com/IntelRealSense/librealsense.git
+   git clone https://github.com/realsenseai/librealsense.git
    cd librealsense
    mkdir build && cd build
    ```
@@ -182,17 +197,17 @@ For more information on the library, please follow our [examples](./examples) or
 
 | C++ | C | C# | Python | ROS 2 |Rest API |
 |-----|---|----|--------|-------|---------|
-| <div align="center"><a href="https://dev.realsenseai.com/docs/code-samples"><img src="https://librealsense.realsenseai.com/readme-media/cpp.png" width="50%" alt="" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/code-samples"><img src="https://librealsense.realsenseai.com/readme-media/c.png" width="55%" alt="" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/csharp-wrapper"><img src="https://librealsense.realsenseai.com/readme-media/c-sharp.png" width="50%" alt="" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/python2"><img src="https://librealsense.realsenseai.com/readme-media/python.png" width="30%" alt="" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/ros2-wrapper"><picture><source media="(prefers-color-scheme: dark)" srcset="https://librealsense.realsenseai.com/readme-media/ros2-dark.png"><img src="https://librealsense.realsenseai.com/readme-media/ROS2-light.png" width="80%" alt="ROS 2" /></picture></a></div> | <div align="center"><a href="https://github.com/IntelRealSense/librealsense/blob/development/wrappers/rest-api/README.md"><img src="https://librealsense.realsenseai.com/readme-media/REST_API.png" width="50%" alt="Rest API" /></a></div>|
+| <div align="center"><a href="https://dev.realsenseai.com/docs/code-samples"><img src="https://librealsense.realsenseai.com/readme-media/cpp.png" width="50%" alt="" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/code-samples"><img src="https://librealsense.realsenseai.com/readme-media/c.png" width="55%" alt="" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/csharp-wrapper"><img src="https://librealsense.realsenseai.com/readme-media/c-sharp.png" width="50%" alt="" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/python2"><img src="https://librealsense.realsenseai.com/readme-media/python.png" width="30%" alt="" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/ros2-wrapper"><picture><source media="(prefers-color-scheme: dark)" srcset="https://librealsense.realsenseai.com/readme-media/ros2-dark.png"><img src="https://librealsense.realsenseai.com/readme-media/ROS2-light.png" width="80%" alt="ROS 2" /></picture></a></div> | <div align="center"><a href="https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/README.md"><img src="https://librealsense.realsenseai.com/readme-media/REST_API.png" width="50%" alt="Rest API" /></a></div>|
 
 For more platforms and wrappers look over [here](https://dev.realsenseai.com/docs/docs-get-started).
-> Full feature support varies by platform – refer to the [release notes](https://github.com/IntelRealSense/librealsense/wiki/Release-Notes) for details.
+> Full feature support varies by platform – refer to the [release notes](https://github.com/realsenseai/librealsense/wiki/Release-Notes) for details.
 
 ## Community & Support
 
-- [📚 Wiki & Docs](https://github.com/IntelRealSense/librealsense/wiki)
-- [🐞 Report Issues](https://github.com/IntelRealSense/librealsense/issues)- Found a bug or want to contribute? Read our [contribution guidelines](./CONTRIBUTING.md).
+- [📚 Wiki & Docs](https://github.com/realsenseai/librealsense/wiki)
+- [🐞 Report Issues](https://github.com/realsenseai/librealsense/issues)- Found a bug or want to contribute? Read our [contribution guidelines](./CONTRIBUTING.md).
 
-> 🔎 Looking for legacy devices (F200, R200, LR200, ZR300)? Visit the [legacy release](https://github.com/IntelRealSense/librealsense/tree/v1.12.1).
+> 🔎 Looking for legacy devices (F200, R200, LR200, ZR300)? Visit the [legacy release](https://github.com/realsenseai/librealsense/tree/v1.12.1).
 
 ---
 <p align="center">

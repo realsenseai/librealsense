@@ -7,7 +7,7 @@ Both manual (clicking the `Check for updates` button) and automatic (when connec
 
 The Viewer will try to download and query a versions database from the Internet and will create a version update notification based on the connected device's recommended version.
 
-*The online versions database may be behind the [GitHub SW releases webpage](https://github.com/IntelRealSense/librealsense/releases) or [RealSense FW releases webpage](https://dev.realsenseai.com/docs/firmware-updates).
+*The online versions database may be behind the [GitHub SW releases webpage](https://github.com/realsenseai/librealsense/releases) or [RealSense FW releases webpage](https://dev.realsenseai.com/docs/firmware-updates).
 We recommend checking those links for getting the latest released versions.
 
 ## Offline updates

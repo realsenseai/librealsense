@@ -33,16 +33,13 @@ public:
     enum class state_t
     {
         OFFLINE,                  // disconnected by device-watcher
-        ONLINE,                   // default state, waiting for handshake (device-header)
-        WAIT_FOR_DEVICE_OPTIONS,  //   |
-        WAIT_FOR_STREAM_HEADER,   //   | handshake (initialization)
-        WAIT_FOR_STREAM_OPTIONS,  //   |
+        INITIALIZING,             // handshake with device
         READY                     // post handshake; streamable, controllable, etc.
     };
 
     void set_state( state_t );
 
-    state_t _state = state_t::ONLINE;
+    state_t _state = state_t::INITIALIZING;
     size_t _n_streams_expected = 0;  // needed only until ready
 
     topics::device_info _info;
@@ -52,6 +49,15 @@ public:
     std::shared_ptr< dds_subscriber > _subscriber;
 
     std::map< std::string, std::shared_ptr< dds_stream > > _streams;
+    // Flags to indicate received discovery messages
+    std::map< std::string, bool > _stream_header_received;
+    std::map< std::string, bool > _stream_options_received;
+    bool _device_header_received = false;
+    bool _device_options_received = false;
+    // Data stores in case streams were received out of order
+    std::map< std::string, dds_options > _stream_options_for_init;
+    std::map< std::string, rsutils::json > _stream_intrinsics_for_init;
+    std::map< std::string, dds_embedded_filters > _stream_filters_for_init;
 
     std::mutex _replies_mutex;
     std::condition_variable _replies_cv;
@@ -77,9 +83,11 @@ public:
 
     bool is_offline() const { return state_t::OFFLINE == _state; }
     bool is_online() const { return ! is_offline(); }
+    bool is_initializing() const { return state_t::INITIALIZING == _state; }
     bool is_ready() const { return state_t::READY == _state; }
 
     void open( const dds_stream_profiles & profiles );
+    void close( const dds_stream_profiles & profiles );
 
     void write_control_message( rsutils::json const &, rsutils::json * reply = nullptr );
 
@@ -133,6 +141,9 @@ private:
     void on_device_options( rsutils::json const &, dds_sample const & );
     void on_stream_header( rsutils::json const &, dds_sample const & );
     void on_stream_options( rsutils::json const &, dds_sample const & );
+    void init_stream_options_if_possible( const std::string & stream_name, std::shared_ptr< realdds::dds_stream > & stream );
+    void init_stream_filters_if_possible( const std::string & stream_name, std::shared_ptr< realdds::dds_stream > & stream );
+    void init_stream_intrinsics_if_possible( const std::string & stream_name, std::shared_ptr< realdds::dds_stream > & stream );
     void on_calibration_changed( rsutils::json const &, dds_sample const & );
 
     void on_notification( rsutils::json &&, dds_sample const & );
@@ -140,10 +151,15 @@ private:
     void on_set_filter(rsutils::json const&, dds_sample const&);
     void on_query_filter(rsutils::json const&, dds_sample const&);
 
+    void add_profiles_to_json( const realdds::dds_stream_profiles & profiles, rsutils::json & profiles_as_json ) const;
+
+    bool all_initialization_data_received() const;
+
     on_metadata_available_signal _on_metadata_available;
     on_device_log_signal _on_device_log;
     on_notification_signal _on_notification;
     on_calibration_changed_signal _on_calibration_changed;
+    dds_stream_profiles _open_profiles_list;
 };
 
 

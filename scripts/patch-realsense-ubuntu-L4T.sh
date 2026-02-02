@@ -13,18 +13,18 @@ exec 2>&3
 
 function DisplayNvidiaLicense {
     revision=$1
+    license_path="https://developer.download.nvidia.com/embedded/L4T/${revision}/Tegra_Software_License_Agreement-Tegra-Linux.txt"
+    echo -e "\nPlease notice: This script will download the kernel source (from nv-tegra, NVIDIA's public git repository) which is subject to the following license:"
+    echo -e "${license_path}\n"
 
-    # By default referencing license agreement of JP 5.0.2
-    license_path="https://developer.download.nvidia.com/embedded/L4T/${revision}/release/Tegra_Software_License_Agreement-Tegra-Linux.txt"
-
-    echo -e "\nPlease notice: This script will download the kernel source (from nv-tegra, NVIDIA's public git repository) which is subject to the following license:\n\n${license_path}\n"
-
-    license="$(curl -L -s ${license_path})\n\n"
+    license="$(curl -L -s ${license_path})"
+    [[ -z $license || "$license" == "Not found" ]] && echo "License link not found" && exit 2
 
     ## display the page ##
-    echo -e "${license}"
+    echo -e "\n${license}\n"
 
-    read -t 30 -n 1 -s -r -e -p 'Press any key to continue (or wait 30 seconds..)'
+    read -t 30 -n 1 -s -r -e -p $'\e[33mPress any key within 30 seconds to ACCEPT and continue...\e[0m'
+    echo
 }
 
 function version_lt {
@@ -76,8 +76,8 @@ fi
 # setting UBUNTU_CODENAME
 [[ -f /etc/os-release ]] && eval $(cat /etc/os-release|grep UBUNTU_CODENAME=)
 
-PATCHES_REV=""
 #Select the kernel patches revision that matches the paltform configuration
+RELEASE_STRING="release"
 case ${JETSON_L4T_VERSION} in
 	"32.2.1" | "32.2.3" | "32.3.1" | "32.4.3")
 		PATCHES_REV="4.4"		# Baseline for the patches
@@ -86,54 +86,43 @@ case ${JETSON_L4T_VERSION} in
 	"32.4.4" | "32.5" | "32.5.1" | "32.6.1" | "32.7.1")
 		PATCHES_REV="4.4.1"	# JP 4.4.1, 32.7.1 is JP 4.6.1
 	;;
-	"35.1")
-		PATCHES_REV="5.0.2"	# JP 5.0.2
+	"35.1" | "35.4.1")
+		PATCHES_REV="5.0"	# JP 5.0.2, JP 5.1.2
 		KERNEL_RELEASE="5.10"
+		[[ $JETSON_L4T_VERSION = "35.1" ]] && RELEASE_STRING="Release"
+		KBASE=./Tegra/kernel/kernel-$KERNEL_RELEASE
 	;;
-	"36.3" | "36.4" | "36.4.3" | "36.4.4")
+	"36.3" | "36.4" | "36.4.3" | "36.4.4" | "36.4.7")
 		# 36.3 --> 6.0
 		# 36.4 -> 6.1
 		# 36.4.3 --> 6.2
-		# 36.4.4 --> 6.2.1
+		# 36.4.4, 36.4.7 --> 6.2.1
 		PATCHES_REV="6.0"
 		KERNEL_RELEASE="5.15"
+		UBUNTU_CODENAME=jammy
+		KBASE=./Tegra/kernel/kernel-${UBUNTU_CODENAME}-src
 	;;
-	"38.2" | "38.2.1")
+	"38.2" | "38.2.1" | "38.2.2")
+		# for revisions 38 licence link is inconsistent
+		JETSON_L4T_REVISION_LONG="2.0"
 		# 38.2 --> 7.0
+		;&
+	"38.4")
+		# 38.4 --> 7.1
 		PATCHES_REV="7.0"
 		KERNEL_RELEASE="6.8"
+		UBUNTU_CODENAME=noble
+		KBASE=./Tegra/kernel/kernel-${UBUNTU_CODENAME}-src
 	;;
 	*)
 	echo -e "\e[41mUnsupported JetPack revision ${JETSON_L4T_VERSION} aborting script\e[0m"
-	exit;
+	exit 1;
 	;;
 esac
 echo -e "\e[32mL4T ${JETSON_L4T_VERSION} to use patches revision ${PATCHES_REV}\e[0m"
 
 # Get the required tools to build the patched modules
 sudo apt-get install build-essential git libssl-dev curl -y
-if version_lt "$PATCHES_REV" "6.0"; then
-# Get the linux kernel repo, extract the L4T tag
-	echo -e "\e[32mRetrieve the corresponding L4T git tag the kernel source tree\e[0m"
-	l4t_gh_dir=../linux-${KERNEL_RELEASE}-source-tree
-	if [[ ! -d ${l4t_gh_dir} ]]; then
-		mkdir ${l4t_gh_dir}
-		pushd ${l4t_gh_dir}
-		git init
-		git remote add origin git://nv-tegra.nvidia.com/linux-${KERNEL_RELEASE}
-		# Use NVIDIA script instead to synchronize source tree and peripherals
-		#git clone git://nv-tegra.nvidia.com/linux-${KERNEL_RELEASE}
-		popd
-	else
-		echo -e "Directory ${l4t_gh_dir} is present, skipping initialization...\e[0m"
-	fi
-
-	#Search the repository for the tag that matches the maj.min for L4T
-	pushd ${l4t_gh_dir}
-	TEGRA_TAG=$(git ls-remote --tags origin | grep ${JETSON_L4T_VERSION} | grep '[^^{}]$' | tail -n 1 | awk -F/ '{print $NF}')
-	echo -e "\e[32mThe matching L4T source tree tag is \e[47m${TEGRA_TAG}\e[0m"
-	popd
-fi
 
 #Retrieve tegra tag version for sync, required for get and sync kernel source with Jetson:
 #https://forums.developer.nvidia.com/t/r32-1-tx2-how-can-i-build-extra-module-in-the-tegra-device/72942/9
@@ -141,58 +130,54 @@ fi
 sdk_dir=$(pwd)
 echo -e "\e[32mCreate the sandbox - NVIDIA L4T source tree(s)\e[0m"
 mkdir -p ${sdk_dir}/Tegra
-TEGRA_SOURCE_SYNC_SH="source_sync.sh"
-if [[ "$PATCHES_REV" = "5.0.2" ]]; then
-	KBASE=./Tegra/sources/kernel/kernel-$KERNEL_RELEASE
-	TEGRA_SOURCE_SYNC_SH="source_sync_5.0.2.sh"
-fi
-if [[ "$PATCHES_REV" = "6.0" ]]; then
-	KBASE=./Tegra/kernel/kernel-jammy-src
-	TEGRA_SOURCE_SYNC_SH="source_sync_6.0.sh"
-	TEGRA_TAG="jetson_$JETSON_L4T_RELEASE.$JETSON_L4T_REVISION"
-fi
-if [[ "$PATCHES_REV" = "7.0" ]]; then
-	KBASE=./Tegra/kernel/kernel-noble-src
-	TEGRA_SOURCE_SYNC_SH="source_sync_7.0.sh"
-	TEGRA_TAG="jetson_$JETSON_L4T_RELEASE.$JETSON_L4T_REVISION"
-fi
+TEGRA_SOURCE_SYNC_SH="sync.sh"
+TEGRA_TAG="jetson_$JETSON_L4T_RELEASE.$JETSON_L4T_REVISION"
+
 cp ./scripts/Tegra/$TEGRA_SOURCE_SYNC_SH ${sdk_dir}/Tegra
+cp ./scripts/Tegra/${PATCHES_REV}.repos ${sdk_dir}/Tegra/repos
 
 # Display NVIDIA license
-DisplayNvidiaLicense "r${JETSON_L4T_RELEASE}_Release_v${JETSON_L4T_REVISION_LONG}"
+DisplayNvidiaLicense "r${JETSON_L4T_RELEASE}_Release_v${JETSON_L4T_REVISION_LONG}/${RELEASE_STRING}"
 
 # Download NVIDIA source
 ./Tegra/$TEGRA_SOURCE_SYNC_SH -k ${TEGRA_TAG}
 
 pushd ${KBASE} > /dev/null
 
-echo -e "\e[32mCopy LibRealSense patches to the sandbox\e[0m"
 L4T_Patches_Dir=${sdk_dir}/scripts/Tegra/LRS_Patches/
-if [ ! -d ${L4T_Patches_Dir} ]; then
+if [[ ! -d ${L4T_Patches_Dir} ]]; then
 	echo -e "\e[41mThe L4T kernel patches directory  ${L4T_Patches_Dir} was not found, aborting\e[0m"
-	exit 1
+	exit 3
 else
+	echo -e "\e[32mCopy LibRealSense patches to the sandbox\e[0m"
 	cp -r ${L4T_Patches_Dir} .
 fi
 
 #Clean the kernel WS
 echo -e "\e[32mPrepare workspace for kernel build\e[0m"
 
-if version_lt "$PATCHES_REV" "6.0"; then
-	make ARCH=arm64 mrproper -j$(($(nproc)-1)) && make ARCH=arm64 tegra_defconfig -j$(($(nproc)-1))
-else
-	make ARCH=arm64 mrproper -j$(($(nproc)-1))
-	echo -e "\e[32mUpdate the kernel tree to support HID IMU sensors\e[0m"
-	# appending config to defconfig so later .config will be generated with all necessary dependencies
-	echo 'CONFIG_HID_SENSOR_HUB=m' >> ./arch/arm64/configs/defconfig
-	echo 'CONFIG_HID_SENSOR_ACCEL_3D=m' >> ./arch/arm64/configs/defconfig
-	echo 'CONFIG_HID_SENSOR_GYRO_3D=m' >> ./arch/arm64/configs/defconfig
-	echo 'CONFIG_HID_SENSOR_IIO_COMMON=m' >> ./arch/arm64/configs/defconfig
-	echo 'CONFIG_HID_SENSOR_IIO_TRIGGER=m' >> ./arch/arm64/configs/defconfig
-	make ARCH=arm64 defconfig -j$(($(nproc)-1))
+export ARCH=arm64
+
+RUNNING_KERNEL=/lib/modules/$(uname -r)
+if [[ -L $RUNNING_KERNEL/build ]]; then
+	export KBUILD_EXTRA_SYMBOLS=$RUNNING_KERNEL/build/Module.symvers
 fi
 
-#Jetpack prior to 4.4.1 requires manual reconfiguration of kernel
+make mrproper -j$(($(nproc)-1))
+if version_lt "$PATCHES_REV" "6.0"; then
+	make tegra_defconfig -j$(($(nproc)-1))
+else
+	echo -e "\e[32mUpdate the kernel tree to support HID IMU sensors\e[0m"
+	# appending config to defconfig so later .config will be generated with all necessary dependencies
+	echo 'CONFIG_HID_SENSOR_HUB=m' >> arch/arm64/configs/defconfig
+	echo 'CONFIG_HID_SENSOR_ACCEL_3D=m' >> arch/arm64/configs/defconfig
+	echo 'CONFIG_HID_SENSOR_GYRO_3D=m' >> arch/arm64/configs/defconfig
+	echo 'CONFIG_HID_SENSOR_IIO_COMMON=m' >> arch/arm64/configs/defconfig
+	echo 'CONFIG_HID_SENSOR_IIO_TRIGGER=m' >> arch/arm64/configs/defconfig
+	make defconfig -j$(($(nproc)-1))
+fi
+
+#JetPack prior to 4.4.1 requires manual reconfiguration of kernel
 if [[ "$PATCHES_REV" = "4.4" ]]; then
 	echo -e "\e[32mUpdate the kernel tree to support HID IMU sensors\e[0m"
 	sed -i '/CONFIG_HID_SENSOR_ACCEL_3D/c\CONFIG_HID_SENSOR_ACCEL_3D=m' .config
@@ -202,22 +187,23 @@ fi
 
 #Remove previously applied patches
 git reset --hard
-echo -e "\e[32mApply Librealsense Kernel Patches\e[0m"
+echo -e "\e[32mApply LibRealSense kernel patches\e[0m"
 if version_lt "${PATCHES_REV}" "6.0"; then
 	patch -p1 < ./LRS_Patches/01-realsense-camera-formats-L4T-${PATCHES_REV}.patch
 	patch -p1 < ./LRS_Patches/02-realsense-metadata-L4T-${PATCHES_REV}.patch
-	if [[ "$PATCHES_REV" = "4.4" ]]; then # for Jetpack 4.4 and older
+	if [[ "$PATCHES_REV" = "4.4" ]]; then # for JetPack 4.4 only
 		patch -p1 < ./LRS_Patches/03-realsense-hid-L4T-4.9.patch
 	fi
-	if [[ "$PATCHES_REV" != "5.0.2" ]]; then
+	if [[ "$PATCHES_REV" != "5.0" ]]; then
 		patch -p1 < ./LRS_Patches/04-media-uvcvideo-mark-buffer-error-where-overflow.patch
 	fi
 	patch -p1 < ./LRS_Patches/05-realsense-powerlinefrequency-control-fix.patch
 else
 	patch -p1 < ${sdk_dir}/scripts/realsense-camera-formats-"${UBUNTU_CODENAME}"-master.patch
-	patch -p1 < ${sdk_dir}/scripts/realsense-metadata-"${UBUNTU_CODENAME}"-master.patch
 	[[ -f ${sdk_dir}/scripts/realsense-powerlinefrequency-control-fix-"${UBUNTU_CODENAME}".patch ]] \
 		&& patch -p1 < ${sdk_dir}/scripts/realsense-powerlinefrequency-control-fix-"${UBUNTU_CODENAME}".patch
+	[[ -f ${sdk_dir}/scripts/makefile-${UBUNTU_CODENAME}-${PATCHES_REV}.patch ]] \
+		&& patch -p1 < ${sdk_dir}/scripts/makefile-${UBUNTU_CODENAME}-${PATCHES_REV}.patch
 	sed -i s'/1.1.1/1.1.1-realsense/'g ./drivers/media/usb/uvc/uvcvideo.h
 fi
 
@@ -226,64 +212,64 @@ fi
 #2. Generates Module.symvers if it doesn’t already exist.
 # Extract the local version suffix from the running kernel (e.g., "-tegra" or "")
 KERNEL_LOCALVERSION="$(uname -r | sed -E 's/^[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?//')"
-make ARCH=arm64 prepare modules_prepare LOCALVERSION="${KERNEL_LOCALVERSION}" -j$(($(nproc)-1))
+echo -e "\e[32mPrepare\e[0m"
+make prepare modules_prepare LOCALVERSION="${KERNEL_LOCALVERSION}" -j$(($(nproc)-1))
 
 echo -e "\e[32mCompiling uvcvideo kernel module\e[0m"
-#sudo -s make -j -C $KBASE M=$KBASE/drivers/media/usb/uvc/ modules
-make -j$(($(nproc)-1)) ARCH=arm64 M=drivers/media/usb/uvc/ modules
+make -j$(($(nproc)-1)) M=drivers/media/usb/uvc/ modules
 echo -e "\e[32mCompiling v4l2-core modules\e[0m"
-#sudo -s make -j -C $KBASE M=$KBASE/drivers/media/v4l2-core modules
-make -j$(($(nproc)-1)) ARCH=arm64  M=drivers/media/v4l2-core modules
-if [[ "$PATCHES_REV" = "4.4" ]]; then # for Jetpack 4.4 and older
+make -j$(($(nproc)-1)) M=drivers/media/v4l2-core modules
+
+if [[ "$PATCHES_REV" = "4.4" ]]; then # for JetPack 4.4 only
 	echo -e "\e[32mCompiling accelerometer and gyro modules\e[0m"
-	make -j$(($(nproc)-1)) ARCH=arm64  M=drivers/iio modules
+	make -j$(($(nproc)-1)) M=drivers/iio modules
 fi
-if version_lt "$PATCHES_REV" "6.0"; then # for Jetpack 4-5
+if version_lt "$PATCHES_REV" "6.0"; then # for JetPack 4-5
 	echo -e "\e[32mCopying the patched modules to (~/) \e[0m"
 	sudo cp drivers/media/usb/uvc/uvcvideo.ko ~/${TEGRA_TAG}-uvcvideo.ko
 	sudo cp drivers/media/v4l2-core/videobuf-vmalloc.ko ~/${TEGRA_TAG}-videobuf-vmalloc.ko
 	sudo cp drivers/media/v4l2-core/videobuf-core.ko ~/${TEGRA_TAG}-videobuf-core.ko
 else
 	echo -e "\e[32mCompiling hid support, accelerometer and gyro modules\e[0m"
-	make -j$(($(nproc)-1)) ARCH=arm64  M=drivers/hid modules
-	export KBUILD_MODPOST_WARN=1
-	make -j$(($(nproc)-1)) ARCH=arm64  M=drivers/iio modules
-	echo -e "\e[32mCopying the patched modules to destination \e[0m"
+	make -j$(($(nproc)-1)) M=drivers/hid modules
+	KBUILD_EXTRA_SYMBOLS+=" drivers/hid/Module.symvers"
+	make -j$(($(nproc)-1)) M=drivers/iio modules
 fi
-if [[ "$PATCHES_REV" = "4.4" ]]; then # for Jetpack 4.4 and older
+if [[ "$PATCHES_REV" = "4.4" ]]; then # for JetPack 4.4 only
 	sudo cp drivers/iio/common/hid-sensors/hid-sensor-iio-common.ko ~/${TEGRA_TAG}-hid-sensor-iio-common.ko
 	sudo cp drivers/iio/common/hid-sensors/hid-sensor-trigger.ko ~/${TEGRA_TAG}-hid-sensor-trigger.ko
 	sudo cp drivers/iio/accel/hid-sensor-accel-3d.ko ~/${TEGRA_TAG}-hid-sensor-accel-3d.ko
 	sudo cp drivers/iio/gyro/hid-sensor-gyro-3d.ko ~/${TEGRA_TAG}-hid-sensor-gyro-3d.ko
 fi
 
-if ! version_lt "$PATCHES_REV" "6.0"; then # from Jetpack 6 onward
-	sudo mkdir -p /lib/modules/$(uname -r)/extra/
+if ! version_lt "$PATCHES_REV" "6.0"; then # from JetPack 6 onward
+	echo -e "\e[32mCopying the patched modules to $RUNNING_KERNEL/extra/\e[0m"
+	sudo mkdir -p $RUNNING_KERNEL/extra/
 	# uvc modules with formats/sku support
-	sudo cp drivers/media/usb/uvc/uvcvideo.ko /lib/modules/$(uname -r)/extra/
-	sudo cp drivers/media/v4l2-core/videodev.ko /lib/modules/$(uname -r)/extra/
+	sudo cp drivers/media/usb/uvc/uvcvideo.ko $RUNNING_KERNEL/extra/
+	sudo cp drivers/media/v4l2-core/videodev.ko $RUNNING_KERNEL/extra/
 	# iio modules for iio-hid support
-	sudo cp drivers/iio/buffer/kfifo_buf.ko /lib/modules/$(uname -r)/extra/
-	sudo cp drivers/iio/buffer/industrialio-triggered-buffer.ko /lib/modules/$(uname -r)/extra/
-	sudo cp drivers/iio/common/hid-sensors/hid-sensor-iio-common.ko /lib/modules/$(uname -r)/extra/
-	sudo cp drivers/hid/hid-sensor-hub.ko /lib/modules/$(uname -r)/extra/
-	sudo cp drivers/iio/accel/hid-sensor-accel-3d.ko /lib/modules/$(uname -r)/extra/
-	sudo cp drivers/iio/gyro/hid-sensor-gyro-3d.ko /lib/modules/$(uname -r)/extra/
-	sudo cp drivers/iio/common/hid-sensors/hid-sensor-trigger.ko /lib/modules/$(uname -r)/extra/
+	sudo cp drivers/iio/buffer/kfifo_buf.ko $RUNNING_KERNEL/extra/
+	sudo cp drivers/iio/buffer/industrialio-triggered-buffer.ko $RUNNING_KERNEL/extra/
+	sudo cp drivers/iio/common/hid-sensors/hid-sensor-iio-common.ko $RUNNING_KERNEL/extra/
+	sudo cp drivers/hid/hid-sensor-hub.ko $RUNNING_KERNEL/extra/
+	sudo cp drivers/iio/accel/hid-sensor-accel-3d.ko $RUNNING_KERNEL/extra/
+	sudo cp drivers/iio/gyro/hid-sensor-gyro-3d.ko $RUNNING_KERNEL/extra/
+	sudo cp drivers/iio/common/hid-sensors/hid-sensor-trigger.ko $RUNNING_KERNEL/extra/
 	# set depmod search path to include "extra" modules
 	sudo sed -i 's/search updates/search extra updates/g' /etc/depmod.d/ubuntu.conf
 fi
-popd
-echo -e "\e[32mMove the modified modules into the modules tree\e[0m"
-if [[ "$PATCHES_REV" = "4.4" ]]; then # for Jetpack 4.4 and older
-#Optional - create kernel modules directories in kernel tree
-	sudo mkdir -p /lib/modules/`uname -r`/kernel/drivers/iio/accel
-	sudo mkdir -p /lib/modules/`uname -r`/kernel/drivers/iio/gyro
-	sudo mkdir -p /lib/modules/`uname -r`/kernel/drivers/iio/common/hid-sensors
-	sudo cp  ~/${TEGRA_TAG}-hid-sensor-accel-3d.ko     /lib/modules/`uname -r`/kernel/drivers/iio/accel/hid-sensor-accel-3d.ko
-	sudo cp  ~/${TEGRA_TAG}-hid-sensor-gyro-3d.ko      /lib/modules/`uname -r`/kernel/drivers/iio/gyro/hid-sensor-gyro-3d.ko
-	sudo cp  ~/${TEGRA_TAG}-hid-sensor-iio-common.ko   /lib/modules/`uname -r`/kernel/drivers/iio/common/hid-sensors/hid-sensor-iio-common.ko
-	sudo cp  ~/${TEGRA_TAG}-hid-sensor-trigger.ko      /lib/modules/`uname -r`/kernel/drivers/iio/common/hid-sensors/hid-sensor-trigger.ko
+popd > /dev/null
+if [[ "$PATCHES_REV" = "4.4" ]]; then # for JetPack 4.4 only
+	echo -e "\e[32mMove the modified modules into the modules tree\e[0m"
+	#Optional - create kernel modules directories in kernel tree
+	sudo mkdir -p $RUNNING_KERNEL/kernel/drivers/iio/accel
+	sudo mkdir -p $RUNNING_KERNEL/drivers/iio/gyro
+	sudo mkdir -p $RUNNING_KERNEL/drivers/iio/common/hid-sensors
+	sudo cp  ~/${TEGRA_TAG}-hid-sensor-accel-3d.ko     $RUNNING_KERNEL/kernel/drivers/iio/accel/hid-sensor-accel-3d.ko
+	sudo cp  ~/${TEGRA_TAG}-hid-sensor-gyro-3d.ko      $RUNNING_KERNEL/kernel/drivers/iio/gyro/hid-sensor-gyro-3d.ko
+	sudo cp  ~/${TEGRA_TAG}-hid-sensor-iio-common.ko   $RUNNING_KERNEL/kernel/drivers/iio/common/hid-sensors/hid-sensor-iio-common.ko
+	sudo cp  ~/${TEGRA_TAG}-hid-sensor-trigger.ko      $RUNNING_KERNEL/kernel/drivers/iio/common/hid-sensors/hid-sensor-trigger.ko
 fi
 
 # update kernel module dependencies
@@ -293,16 +279,16 @@ sudo depmod
 # when using our jetson drivers instructions
 UVCVIDEO_PATH=$(modinfo -F filename uvcvideo)
 if [[ -z "$UVCVIDEO_PATH" ]]; then
-    UVCVIDEO_PATH="/lib/modules/$(uname -r)/updates/uvcvideo.ko"
+    UVCVIDEO_PATH="$RUNNING_KERNEL/updates/uvcvideo.ko"
     echo -e "\e[33mCould not find the uvcvideo kernel module.\nIt will be loaded into updates folder: $UVCVIDEO_PATH.\e[0m"
 fi
 
 echo -e "\e[32mInsert the modified kernel modules\e[0m"
+
 if version_lt "$PATCHES_REV" "6.0"; then
 	try_module_insert uvcvideo              ~/${TEGRA_TAG}-uvcvideo.ko                $UVCVIDEO_PATH
-	try_load_module  uvcvideo
-	try_load_module  hid-sensor-gyro-3d
-	try_load_module  hid-sensor-accel-3d
+	try_module_insert hid_sensor_gyro_3d    ~/${TEGRA_TAG}-hid-sensor-gyro-3d.ko      $RUNNING_KERNEL/kernel/drivers/iio/gyro/hid-sensor-gyro-3d.ko
+	try_module_insert hid_sensor_accel_3d   ~/${TEGRA_TAG}-hid-sensor-accel-3d.ko     $RUNNING_KERNEL/kernel/drivers/iio/accel/hid-sensor-accel-3d.ko
 else
 	# for JP6.0 we will try to remove old modules and then load updated ones
 	echo -e "\e[32mUnload kernel modules\e[0m"
@@ -312,24 +298,15 @@ else
 	try_unload_module hid_sensor_trigger
 	try_unload_module industrialio_triggered_buffer
 	try_unload_module kfifo_buf
+	try_unload_module videodev
 	echo -e "\e[32mLoad modified kernel modules\e[0m"
+	try_load_module videodev
 	try_load_module kfifo_buf
 	try_load_module industrialio_triggered_buffer
 	try_load_module hid_sensor_trigger
 	try_load_module hid_sensor_gyro_3d
 	try_load_module hid_sensor_accel_3d
 	try_load_module uvcvideo
-	echo -e "\e[32mDone\e[0m"
 fi
-if [[ "$PATCHES_REV" = "4.4" ]]; then # for Jetpack 4.4 and older
-	try_module_insert hid_sensor_accel_3d   ~/${TEGRA_TAG}-hid-sensor-accel-3d.ko     /lib/modules/`uname -r`/kernel/drivers/iio/accel/hid-sensor-accel-3d.ko
-	try_module_insert hid_sensor_gyro_3d    ~/${TEGRA_TAG}-hid-sensor-gyro-3d.ko      /lib/modules/`uname -r`/kernel/drivers/iio/gyro/hid-sensor-gyro-3d.ko
-	#Preventively unload all HID-related modules
-	try_unload_module hid_sensor_accel_3d
-	try_unload_module hid_sensor_gyro_3d
-	try_unload_module hid_sensor_trigger
-	try_unload_module hid_sensor_trigger
-	try_module_insert hid_sensor_trigger    ~/${TEGRA_TAG}-hid-sensor-trigger.ko      /lib/modules/`uname -r`/kernel/drivers/iio/common/hid-sensors/hid-sensor-trigger.ko
-	try_module_insert hid_sensor_iio_common ~/${TEGRA_TAG}-hid-sensor-iio-common.ko   /lib/modules/`uname -r`/kernel/drivers/iio/common/hid-sensors/hid-sensor-iio-common.ko
-fi
+echo -e "\e[32mDone\e[0m"
 echo -e "\e[92m\n\e[1mScript has completed. Please consult the installation guide for further instruction.\n\e[0m"

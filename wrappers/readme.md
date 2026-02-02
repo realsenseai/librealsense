@@ -13,11 +13,12 @@
 * [OpenNI2](./openni2) - OpenNI2 integration
 * [Unreal Engine 4](./unrealengine4) - Unreal Engine 4 integration
 * [Rest API](./rest-api) - Rest API wrapper
+* [NodeJS](https://github.com/realsenseai/librealsense/tree/v2.53.1/wrappers/nodejs#librealsense2-nodejs-wrapper) - NodeJS wrapper, last supported version was v2.53.1
 
-If you are interested in official support for a language / framework, please let us know via [a new Issue](https://github.com/IntelRealSense/librealsense/issues/new)
+If you are interested in official support for a language / framework, please let us know via [a new Issue](https://github.com/realsenseai/librealsense/issues/new)
 
 ## Community Projects:
 
 * Community contributions to add Java wrappers: [Java by edwinRNDR](https://github.com/edwinRNDR/librealsense/tree/master/wrappers/java) and [Java by cansik](https://github.com/cansik/librealsense-java).
-Check the authors' notes: ([edwinRNDR](https://github.com/IntelRealSense/librealsense/issues/1594#issuecomment-429216051)) and [cansik](https://github.com/cansik/librealsense-java#-important).
+Check the authors' notes: ([edwinRNDR](https://github.com/realsenseai/librealsense/issues/1594#issuecomment-429216051)) and [cansik](https://github.com/cansik/librealsense-java#-important).
 > A warm **thank you** to [@edwinRNDR](https://github.com/edwinRNDR) and [@cansik](https://github.com/cansik) for further expanding RealSense eco-system!

@@ -214,10 +214,10 @@ with test.closure( 'Set Census'):
 
 with test.closure( 'Set Amp Factor'):
     af = am_dev.get_amp_factor()
-    af.a_factor = 0.123
+    af.a_factor = 0.12
     am_dev.set_amp_factor( af )
     new_af = am_dev.get_amp_factor()
-    test.check_approx_abs( new_af.a_factor, 0.123, 0.01 )
+    test.check_approx_abs( new_af.a_factor, 0.12, 0.005 )
 
 with test.closure( 'Return to Default Visual Preset' ):
     depth_sensor.set_option( rs.option.visual_preset, int(rs.rs400_visual_preset.default ) )

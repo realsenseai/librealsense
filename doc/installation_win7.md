@@ -1,12 +1,12 @@
 # Windows 7 Installation
 
-> **Note:** RealSense products are being regularly validated and receive official support for Windows 10 and Linux eco-systems. Not all product features are enabled on Windows 7. 
+> **Note:** RealSense products are being regularly validated and receive official support for Windows 10/11 and Linux eco-systems. Not all product features are enabled on Windows 7 and it is no longer maintained. 
 
-> We are constantly expanding the list of supported platforms, devices and features based on customer and community feedback. If your use case is not yet covered, please open [a new issue](https://github.com/IntelRealSense/librealsense/issues/new)
+> We are constantly expanding the list of supported platforms, devices and features based on customer and community feedback. If your use case is not yet covered, please open [a new issue](https://github.com/realsenseai/librealsense/issues/new)
 
 ## Getting Started
 
-1. Download [RealSense SDK Installer for Windows 7](https://github.com/IntelRealSense/librealsense/releases/download/v2.16.1/Intel.RealSense.SDK.Win7.exe)
+1. Download [RealSense SDK Installer for Windows 7](https://github.com/realsenseai/librealsense/releases/download/v2.16.1/Intel.RealSense.SDK.Win7.exe)
 2. Connect the camera (the device must be connected to install the driver)
 3. Check the device manager:<br />![dev_man](img/win7/device_manager.png)<br />
 > Out of the box Windows 7 will not recognize the D4xx cameras using the inbox driver. 

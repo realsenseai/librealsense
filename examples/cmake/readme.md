@@ -6,7 +6,7 @@ This sample demonstrates how to create a basic librealsense application using CM
 Currently this sample is supported only by Linux OS.
 
 ## Prerequisite
-Install the SDK or build it from source  ([Linux](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md))
+Install the SDK or build it from source  ([Linux](https://github.com/realsenseai/librealsense/blob/master/doc/distribution_linux.md))
 
 ## Expected Output
 ![cmake_example](https://user-images.githubusercontent.com/18511514/48919868-06bb9400-ee9e-11e8-9c93-5bca41d5954c.PNG)

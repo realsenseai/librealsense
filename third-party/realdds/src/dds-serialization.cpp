@@ -726,6 +726,10 @@ static void override_udp_settings( eprosima::fastdds::rtps::UDPTransportDescript
     j.nested( "max-message-size" ).get_ex( udp.maxMessageSize );
     if( ! parse_ip_list( j, "whitelist", &udp.interfaceWhiteList ) )
         LOG_WARNING( "invalid UDP whitelist in settings" );
+    uint8_t tmp_ttl(0);
+    j.nested( "ttl" ).get_ex( tmp_ttl );
+    if( tmp_ttl != 0 )  // 0 means "system default"
+        udp.TTL = tmp_ttl;
 }
 
 

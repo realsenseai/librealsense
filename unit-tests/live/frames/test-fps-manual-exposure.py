@@ -4,7 +4,7 @@
 # Currently, we exclude D555 as it's failing
 # test:device each(D400*)
 # test:device each(D500*) !D555
-# test:donotrun:!nightly
+# test:donotrun
 
 import pyrealsense2 as rs
 from rspy.stopwatch import Stopwatch

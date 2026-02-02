@@ -944,6 +944,7 @@ namespace librealsense
             const uint8_t GVD_PID_OFFSET    = 4;
 
             const uint8_t GVD_PID_D457      = 0x12;
+            const uint8_t GVD_PID_D401_GMSL = 0x13;
             const uint8_t GVD_PID_D430_GMSL = 0x0F;
             const uint8_t GVD_PID_D415_GMSL = 0x06;
 
@@ -999,6 +1000,10 @@ namespace librealsense
 
                         case(GVD_PID_D415_GMSL):
                             device_pid = D415_GMSL_PID;
+                            break;
+
+                        case(GVD_PID_D401_GMSL):
+                            device_pid = D401_GMSL_PID;
                             break;
 
                         default:
@@ -1108,7 +1113,7 @@ namespace librealsense
             ind = (ind - first_video_index) % camera_video_nodes; // offset from first mipi video node and assume 6 nodes per mipi camera
             if (ind == 0 || ind == 2 || ind == 4)
                 mi = 0; // video node indicator
-            else if (ind == 1 | ind == 3 || ind == 5)
+            else if (ind == 1 || ind == 3 || ind == 5)
                 mi = 3; // metadata node indicator
             else if (ind == 6)
                 mi = 4; // IMU node indicator
@@ -1489,7 +1494,8 @@ namespace librealsense
               _fd(-1),
               _stop_pipe_fd{},
               _buf_dispatch(use_memory_map),
-              _frame_drop_monitor(DEFAULT_KPI_FRAME_DROPS_PERCENTAGE)
+              _frame_drop_monitor(DEFAULT_KPI_FRAME_DROPS_PERCENTAGE),
+              _are_device_capabilities_assigned(false)
         {
             _named_mtx = std::unique_ptr<named_mutex>(new named_mutex(_name, 5000));
         }
@@ -2085,6 +2091,8 @@ namespace librealsense
 
         void v4l_uvc_device::set_power_state(power_state state)
         {
+            // calling fd.open leads to state D0 (active)
+            // calling fd.close lead to state D3 (idle)
             if (state == D0 && _state == D3)
             {
                 map_device_descriptor();
@@ -2106,7 +2114,8 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN || errno == EBUSY)
                     return false;
 
-                throw linux_backend_exception("set_xu(...). xioctl(UVCIOC_CTRL_QUERY) failed");
+                throw linux_backend_exception(rsutils::string::from() << "set_xu(...). xioctl(UVCIOC_CTRL_QUERY) failed on control "
+                                              << static_cast< int >( control ));
             }
 
             return true;
@@ -2121,7 +2130,8 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN || errno == EBUSY)
                     return false;
 
-                throw linux_backend_exception("get_xu(...). xioctl(UVCIOC_CTRL_QUERY) failed");
+                throw linux_backend_exception(rsutils::string::from() << "get_xu(...). xioctl(UVCIOC_CTRL_QUERY) failed on control "
+                                              << static_cast< int >( control ));
             }
 
             return true;
@@ -2146,7 +2156,8 @@ namespace librealsense
             xquery.data = (__u8 *)&size;
 
             if(-1 == ioctl(_fd,UVCIOC_CTRL_QUERY,&xquery)){
-                throw linux_backend_exception("xioctl(UVC_GET_LEN) failed");
+                throw linux_backend_exception(rsutils::string::from() << "xioctl(UVCIOC_CTRL_QUERY) failed on control "
+                                              << static_cast< int >( control ));
             }
 
             assert(size<=len);
@@ -2210,7 +2221,9 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN || errno == EBUSY)
                     return false;
 
-                throw linux_backend_exception("xioctl(VIDIOC_G_CTRL) failed");
+                throw linux_backend_exception(rsutils::string::from()
+                                              << "xioctl(VIDIOC_G_CTRL) failed on option " << rs2_option_to_string(opt)
+                                              << ", errno=" << errno );
             }
 
             if (RS2_OPTION_ENABLE_AUTO_EXPOSURE==opt)  { control.value = (V4L2_EXPOSURE_MANUAL==control.value) ? 0 : 1; }
@@ -2249,7 +2262,9 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN || errno == EBUSY)
                     return false;
 
-                throw linux_backend_exception("xioctl(VIDIOC_S_CTRL) failed");
+                throw linux_backend_exception(rsutils::string::from()
+                                              << "xioctl(VIDIOC_S_CTRL) failed on option " << rs2_option_to_string(opt)
+                                              << ", value=" << value << ", errno=" << errno );
             }
 
             if (!pend_for_ctrl_status_event())
@@ -2486,6 +2501,15 @@ namespace librealsense
             _fds.insert(_fds.end(),{_fd,_stop_pipe_fd[0],_stop_pipe_fd[1]});
             _max_fd = *std::max_element(_fds.begin(),_fds.end());
 
+            if (!_are_device_capabilities_assigned)
+            {
+                assign_device_capabilities();
+                _are_device_capabilities_assigned = true;
+            }
+        }
+
+        void v4l_uvc_device::assign_device_capabilities()
+        {
             v4l2_capability cap = {};
             if(xioctl(_fd, VIDIOC_QUERYCAP, &cap) < 0)
             {
@@ -2625,7 +2649,8 @@ namespace librealsense
         v4l_uvc_meta_device::v4l_uvc_meta_device(const uvc_device_info& info, bool use_memory_map):
             v4l_uvc_device(info,use_memory_map),
             _md_fd(0),
-            _md_name(info.metadata_node_id)
+            _md_name(info.metadata_node_id),
+            _are_device_capabilities_assigned(false)
         {
         }
 
@@ -2721,13 +2746,19 @@ namespace librealsense
                 return;  // Does not throw, MIPI device metadata not received through UVC, no metadata here may be valid
             }
 
-            //The minimal video/metadata nodes syncer will be implemented by using two blocking calls:
-            // 1. Obtain video node data.
-            // 2. Obtain metadata
-            //     To revert to multiplexing mode uncomment the next line
             _fds.push_back(_md_fd);
             _max_fd = *std::max_element(_fds.begin(),_fds.end());
 
+            if (!_are_device_capabilities_assigned)
+            {
+                assign_device_capabilities();
+                _are_device_capabilities_assigned = true;
+            }
+
+        }
+
+        void v4l_uvc_meta_device::assign_device_capabilities()
+        {
             v4l2_capability cap = {};
             if(xioctl(_md_fd, VIDIOC_QUERYCAP, &cap) < 0)
             {
@@ -2915,7 +2946,9 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN) // TODO: Log?
                     return false;
 
-                throw linux_backend_exception("xioctl(VIDIOC_G_EXT_CTRLS) failed");
+                throw linux_backend_exception(rsutils::string::from()
+                                              << "xioctl(VIDIOC_G_EXT_CTRLS) failed on option " << rs2_option_to_string(opt)
+                                              << ", errno=" << errno );
             }
 
             if (opt == RS2_OPTION_ENABLE_AUTO_EXPOSURE)
@@ -2938,7 +2971,9 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN) // TODO: Log?
                     return false;
 
-                throw linux_backend_exception("xioctl(VIDIOC_S_EXT_CTRLS) failed");
+                throw linux_backend_exception(rsutils::string::from()
+                                              << "xioctl(VIDIOC_S_EXT_CTRLS) failed on option " << rs2_option_to_string(opt)
+                                              << ", value=" << value << ", errno=" << errno );
             }
 
             return true;
@@ -2969,7 +3004,9 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN) // TODO: Log?
                     return false;
 
-                throw linux_backend_exception("xioctl(VIDIOC_S_EXT_CTRLS) failed");
+                throw linux_backend_exception(rsutils::string::from()
+                                              << "xioctl(VIDIOC_S_EXT_CTRLS) failed on control "
+                                              << static_cast< int >( control ) << ", errno=" << errno );
             }
             return true;
         }
@@ -3007,7 +3044,7 @@ namespace librealsense
             // sending error on ioctl failure
             if (errno == EIO || errno == EAGAIN) // TODO: Log?
                 return false;
-            throw linux_backend_exception("xioctl(VIDIOC_G_EXT_CTRLS) failed");
+            throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_G_EXT_CTRLS) failed on control " << control);
         }
 
         control_range v4l_mipi_device::get_xu_range(const extension_unit& xu, uint8_t control, int len) const
@@ -3114,9 +3151,8 @@ namespace librealsense
 
         std::shared_ptr<uvc_device> v4l_backend::create_uvc_device(uvc_device_info info) const
         {
-            bool mipi_device = (D457_PID == info.pid ||
-                                D430_GMSL_PID == info.pid ||
-                                D415_GMSL_PID == info.pid);
+            bool mipi_device = (mipi_devices_pid.count(info.pid) > 0);
+
             auto v4l_uvc_dev =        mipi_device ?         std::make_shared<v4l_mipi_device>(info) :
                               ((!info.has_metadata_node) ?  std::make_shared<v4l_uvc_device>(info) :
                                                             std::make_shared<v4l_uvc_meta_device>(info));

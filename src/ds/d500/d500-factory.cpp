@@ -41,6 +41,48 @@ using rsutils::string::hexdump;
 
 namespace librealsense
 {
+    // default d500 device
+    // used only as fallback for partial device creation when enabled by config
+    class rs500_device
+        : public d500_device
+        , public ds_advanced_mode_base
+        , public extended_firmware_logger_device
+    {
+    public:
+        rs500_device( std::shared_ptr< const d500_info > const & dev_info )
+            : device( dev_info )
+            , backend_device( dev_info )
+            , d500_device( dev_info )
+            , ds_advanced_mode_base()
+            , extended_firmware_logger_device( dev_info, d500_device::_hw_monitor, get_firmware_logs_command() )
+        {
+            ds_advanced_mode_base::initialize_advanced_mode( this );
+        }
+
+        std::shared_ptr< matcher > create_matcher( const frame_holder & frame ) const override;
+
+        std::vector< tagged_profile > get_profiles_tags() const override
+        {
+            std::vector< tagged_profile > tags;
+            auto usb_spec = get_usb_spec();
+            if( usb_spec >= platform::usb3_type || usb_spec == platform::usb_undefined )
+            {
+                tags.push_back( { RS2_STREAM_DEPTH, -1, 1280, 720, RS2_FORMAT_Z16, 30,profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
+                tags.push_back( { RS2_STREAM_INFRARED, 1, 1280, 720, RS2_FORMAT_RGB8, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
+                tags.push_back(
+                    { RS2_STREAM_INFRARED, 2, 1280, 720, RS2_FORMAT_RGB8, 30, profile_tag::PROFILE_TAG_SUPERSET } );
+            }
+            else
+            {
+                tags.push_back( { RS2_STREAM_DEPTH, -1, 640, 480, RS2_FORMAT_Z16, 15, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
+                tags.push_back( { RS2_STREAM_INFRARED, 1, 640, 480, RS2_FORMAT_RGB8, 15, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
+                tags.push_back(
+                    { RS2_STREAM_INFRARED, 2, 640, 480, RS2_FORMAT_RGB8, 15, profile_tag::PROFILE_TAG_SUPERSET } );
+            }
+            return tags;
+        };
+    };
+
     class rs_d585_device : public d500_active,
         public d500_color,
         public d500_motion,
@@ -74,7 +116,7 @@ namespace librealsense
             tags.push_back({ RS2_STREAM_INFRARED, -1, 1280, 960, RS2_FORMAT_Y8, 30, profile_tag::PROFILE_TAG_SUPERSET });
             tags.push_back({ RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_200, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_100, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
-
+            
             return tags;
         };
 
@@ -142,6 +184,7 @@ namespace librealsense
             tags.push_back({ RS2_STREAM_INFRARED, -1, 1280, 720, RS2_FORMAT_Y8, 30, profile_tag::PROFILE_TAG_SUPERSET });
             tags.push_back({ RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_200, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_100, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+            tags.push_back({ RS2_STREAM_OCCUPANCY, -1, 256, 320, RS2_FORMAT_Y8, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
 
             return tags;
         };
@@ -262,17 +305,28 @@ public:
         auto dev_info = std::dynamic_pointer_cast< const d500_info >( shared_from_this() );
 
         auto pid = _group.uvc_devices.front().pid;
-        switch( pid )
+
+        try
         {
-        case ds::D555_PID:
-            return std::make_shared< d555_device >( dev_info );
-        case ds::D585_PID:
-            return std::make_shared<rs_d585_device>( dev_info );
-        case ds::D585S_PID:
-            return std::make_shared<rs_d585s_device>( dev_info );
-        default:
-            throw std::runtime_error( rsutils::string::from() << "unsupported D500 PID 0x" << hexdump( pid ) );
+            switch( pid )
+            {
+            case ds::D555_PID:
+                return std::make_shared< d555_device >( dev_info );
+            case ds::D585_PID:
+                return std::make_shared< rs_d585_device >( dev_info );
+            case ds::D585S_PID:
+                return std::make_shared< rs_d585s_device >( dev_info );
+            default:
+                throw std::runtime_error( rsutils::string::from() << "unsupported D500 PID 0x" << hexdump( pid ) );
+            }
         }
+        catch( const std::exception & e )
+        {
+            LOG_ERROR( rsutils::string::from() << "Failed to create device for PID 0x" << std::hex << std::setw( 4 )
+                                               << std::setfill( '0' ) << (int)pid << "! (" << e.what() << ")" );
+            // Create a device with partial capabilities instead of failing
+            return std::make_shared< rs500_device >( dev_info );
+        }        
     }
 
     std::vector<std::shared_ptr<d500_info>> d500_info::pick_d500_devices(
@@ -336,6 +390,18 @@ public:
     inline std::shared_ptr<matcher> create_composite_matcher(std::vector<std::shared_ptr<matcher>> matchers)
     {
         return std::make_shared<timestamp_composite_matcher>(matchers);
+    }
+
+    std::shared_ptr< matcher > rs500_device::create_matcher( const frame_holder & frame ) const
+    {
+        std::vector< stream_interface * > streams;
+        if( _depth_stream )
+            streams.push_back( _depth_stream.get() );
+        if( _left_ir_stream )
+            streams.push_back( _left_ir_stream.get() );
+        if( _right_ir_stream )
+            streams.push_back( _right_ir_stream.get() );
+        return matcher_factory::create( RS2_MATCHER_DEFAULT, streams );
     }
 
     std::shared_ptr<matcher> rs_d585_device::create_matcher(const frame_holder& frame) const

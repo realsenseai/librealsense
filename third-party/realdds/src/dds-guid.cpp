@@ -61,8 +61,11 @@ std::ostream & operator<<( std::ostream & os, print_guid const & g )
             else
                 os << print_raw_guid_prefix( g._guid.guidPrefix, g._base_prefix );
         }
-        os << '.';  // FastDDS uses '|'
-        os << rsutils::string::in_hex( g._guid.entityId.to_uint32() );
+        if( g._print_entity )
+        {
+            os << '.';  // FastDDS uses '|'
+            os << rsutils::string::in_hex( g._guid.entityId.to_uint32() );
+        }
     }
     else
     {

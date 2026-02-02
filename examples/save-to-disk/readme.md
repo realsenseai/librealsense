@@ -6,7 +6,7 @@ This sample demonstrates how to configure the camera for streaming in a textual 
 
 ## Expected Output
 The application should run for about a second and exit after saving PNG and CSV file to disk: 
-![expected output](https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/save-to-disk-expected.PNG)
+![expected output](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/save-to-disk-expected.PNG)
 
 ## Code Overview 
 

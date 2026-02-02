@@ -40,6 +40,7 @@ std::ostream & operator<<( std::ostream &, ip_3 const & );
 
 struct eth_config_v3;
 struct eth_config_v4;
+struct eth_config_v5;
 
 
 struct eth_config
@@ -65,11 +66,13 @@ struct eth_config
         unsigned timeout;  // The threshold to wait valid ip when DHCP is on [s]
     } dhcp;
     unsigned transmission_delay; // Delay between packets [us]
+    unsigned udp_ttl;            // UDP packet "time to live"
 
     eth_config() {}
     explicit eth_config( std::vector< uint8_t > const & hwm_response_without_code );
     eth_config( eth_config_v3 const & );
     eth_config( eth_config_v4 const & );
+    eth_config( eth_config_v5 const & );
 
     bool operator==( eth_config const & ) const noexcept;
     bool operator!=( eth_config const & ) const noexcept;

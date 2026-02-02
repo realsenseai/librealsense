@@ -32,7 +32,7 @@ RUN apt-get update \
 
 # Download sources
 WORKDIR /usr/src
-RUN curl https://codeload.github.com/IntelRealSense/librealsense/tar.gz/refs/tags/v$LIBRS_VERSION -o librealsense.tar.gz 
+RUN curl https://codeload.github.com/realsenseai/librealsense/tar.gz/refs/tags/v$LIBRS_VERSION -o librealsense.tar.gz 
 RUN tar -zxf librealsense.tar.gz \
     && rm librealsense.tar.gz 
 RUN ln -s /usr/src/librealsense-$LIBRS_VERSION /usr/src/librealsense

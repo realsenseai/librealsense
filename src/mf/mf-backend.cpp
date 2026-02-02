@@ -22,6 +22,15 @@
 
 namespace {
 
+static inline std::string utf8_from_wchar( const wchar_t* w )
+{
+    if( !w ) return {};
+    int size_needed = WideCharToMultiByte( CP_UTF8, 0, w, -1, NULL, 0, NULL, NULL );
+    if( size_needed <= 0 ) return {};
+    std::string str( size_needed - 1, '\0' );
+    WideCharToMultiByte( CP_UTF8, 0, w, -1, &str[0], size_needed, NULL, NULL );
+    return str;
+}
 
 void debug_dev_broadcast( DEV_BROADCAST_HDR const * p_hdr, char const * context )
 {
@@ -29,8 +38,9 @@ void debug_dev_broadcast( DEV_BROADCAST_HDR const * p_hdr, char const * context 
     {
     case DBT_DEVTYP_DEVICEINTERFACE: {
         auto p_actual = reinterpret_cast< DEV_BROADCAST_DEVICEINTERFACE const * >( p_hdr );
+        std::string name = utf8_from_wchar( p_actual->dbcc_name );
         LOG_DEBUG( "device change event: " << context << ": DEVICEINTERFACE: \""
-                                           << p_actual->dbcc_name << "\"" );
+                                           << name << "\"" );
         break;
     }
     case DBT_DEVTYP_HANDLE: {
@@ -47,7 +57,8 @@ void debug_dev_broadcast( DEV_BROADCAST_HDR const * p_hdr, char const * context 
     }
     case DBT_DEVTYP_PORT: {
         auto p_actual = reinterpret_cast< DEV_BROADCAST_PORT const * >( p_hdr );
-        LOG_DEBUG( "device change event: " << context << ": PORT: \"" << p_actual->dbcp_name
+        std::string name = utf8_from_wchar( p_actual->dbcp_name );
+        LOG_DEBUG( "device change event: " << context << ": PORT: \"" << name
                                            << "\"" );
         break;
     }

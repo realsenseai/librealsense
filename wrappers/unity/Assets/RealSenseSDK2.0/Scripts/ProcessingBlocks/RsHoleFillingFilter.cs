@@ -2,7 +2,7 @@
 using UnityEngine;
 
 [ProcessingBlockDataAttribute(typeof(HoleFillingFilter))]
-[HelpURL("https://github.com/IntelRealSense/librealsense/blob/master/doc/post-processing-filters.md#hole-filling-filter")]
+[HelpURL("https://github.com/realsenseai/librealsense/blob/master/doc/post-processing-filters.md#hole-filling-filter")]
 public class RsHoleFillingFilter : RsProcessingBlock
 {
     /// <summary>	

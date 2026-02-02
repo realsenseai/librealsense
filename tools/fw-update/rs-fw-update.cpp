@@ -188,60 +188,6 @@ bool is_fw_compatible(const rs2::device& dev, const std::vector< uint8_t >& fw_i
     return true;
 }
 
-int write_fw_to_mipi_device(rs2::context& ctx, rs2::cli::value<std::string>& serial_number_arg, const rs2::device& dev, const std::vector< uint8_t >& fw_image)
-{
-    // Write firmware to appropriate file descriptor
-    std::cout << std::endl << "Update can take up to 2 minutes" << std::endl;
-    std::ofstream fw_path_in_device( dev.get_info( RS2_CAMERA_INFO_DFU_DEVICE_PATH ), std::ios::binary );
-
-    if( fw_path_in_device )
-    {
-        if (!is_fw_compatible(dev, fw_image))
-            return EXIT_FAILURE;
-
-        bool burn_done = false;
-        std::thread show_progress_thread(
-            [&burn_done]()
-            {
-                for( int i = 0; i < 101 && !burn_done; ++i ) // Show percentage [0-100]
-                {
-                    printf( "%d%%\r", i );
-                    std::cout.flush();
-                    std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-                }
-            } );
-
-        try
-        {
-            fw_path_in_device.write(reinterpret_cast<const char*>(fw_image.data()), fw_image.size());
-        }
-        catch (...)
-        {
-            // Nothing to do, file goodbit is false
-        }
-        burn_done = true;
-        show_progress_thread.join();
-        printf( "    \r" ); // Delete progress, as it is not accurate, don't leave 85% when writing done
-        if( ! fw_path_in_device.good() )
-        {
-            std::cout << std::endl << "Firmware Update failed - write to device error" << std::endl;
-            return EXIT_FAILURE;
-        }
-    }
-    else
-    {
-        std::cout << std::endl << "Firmware Update failed - wrong path or permissions missing" << std::endl;
-        return EXIT_FAILURE;
-    }
-    std::cout << std::endl << "Firmware update done" << std::endl;
-
-    done = true;
-
-    waiting_for_device_to_reconnect(ctx, serial_number_arg);
-
-    return EXIT_SUCCESS;
-}
-
 bool is_mipi_device(const rs2::device& dev)
 {
     bool is_mipi_device = false;
@@ -252,6 +198,185 @@ bool is_mipi_device(const rs2::device& dev)
             is_mipi_device = true;
     }
     return is_mipi_device;
+}
+
+int update_recovery_device(rs2::context& ctx, rs2::cli::value<std::string>& file_arg)
+{
+    std::vector<uint8_t> fw_image = read_firmware_data(file_arg.isSet(), file_arg.getValue());
+
+    std::cout << std::endl << "Update to FW: " << file_arg.getValue() << std::endl;
+    auto devs = ctx.query_devices();
+    rs2::device recovery_device;
+
+    for (auto&& d : devs)
+    {
+        if (!d.is_in_recovery_mode())
+            continue;
+        auto sn = d.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
+        if (!selected_serial_number.empty() && sn != selected_serial_number)
+            continue;
+        if (recovery_device)
+        {
+            std::cout << std::endl << "More than one recovery device is connected; serial number must be specified" << std::endl << std::endl;
+            return EXIT_FAILURE;
+        }
+        recovery_device = d;
+    }
+    if (!recovery_device)
+    {
+        std::cout << std::endl << "No recovery devices were found!" << std::endl << std::endl;
+        return EXIT_FAILURE;
+    }
+    try
+    {
+        auto update_serial_number = recovery_device.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
+        bool d457_recovery_device = strcmp(recovery_device.get_info(RS2_CAMERA_INFO_PRODUCT_ID), "BBCD") == 0;
+        volatile bool recovery_device_found = false;
+        ctx.set_devices_changed_callback([&](rs2::event_information& info) {
+            for (auto&& d : info.get_new_devices())
+            {
+                if (d.is_in_recovery_mode())
+                    continue;
+                auto recovery_sn = d.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
+                if (recovery_sn == update_serial_number)
+                {
+                    {
+                        std::lock_guard< std::mutex > lk(mutex);
+                        recovery_device_found = true;
+                    }
+                    cv.notify_one();
+                    break;
+                }
+            }
+            });
+        std::cout << std::endl << "Recovering device: " << std::endl;
+        print_device_info(recovery_device);
+
+        std::string camera_name = recovery_device.get_info(RS2_CAMERA_INFO_NAME);
+        // on D555 check FW compatibility also sends FW to the device
+        if (camera_name.find("D555") != std::string::npos &&
+            (!is_fw_compatible(recovery_device, fw_image)))
+            return EXIT_FAILURE;
+
+        update(recovery_device, fw_image);
+        std::cout << "Waiting for new device..." << std::endl;
+        if (!d457_recovery_device)
+        {
+            std::unique_lock< std::mutex > lk(mutex);
+            if (!recovery_device_found
+                && !cv.wait_for(lk, std::chrono::seconds(WAIT_FOR_DEVICE_TIMEOUT), [&]() {
+                    return recovery_device_found;
+                    }))
+            {
+                std::cout << "... timed out!" << std::endl;
+                return EXIT_FAILURE;
+            }
+        }
+        std::cout << std::endl << "Recovery done" << std::endl;
+        if (d457_recovery_device)
+        {
+            std::cout << std::endl << "For GMSL device please reload d4xx driver:" << std::endl;
+            std::cout << "sudo rmmod d4xx && sudo modprobe d4xx" << std::endl;
+            std::cout << "or reboot the system" << std::endl;
+        }
+        return EXIT_SUCCESS;
+    }
+    catch (...)
+    {
+        std::cout << std::endl << "Failed to recover device" << std::endl;
+        return EXIT_FAILURE;
+    }
+}
+
+void backup_flash(rs2::device& d, rs2::cli::value<std::string>& backup_arg)
+{
+    std::cout << std::endl << "Trying to back-up device flash" << std::endl;
+
+    std::vector< uint8_t > flash;
+    if (ISATTY(FILENO(stdout)))
+    {
+        flash = d.as< rs2::updatable >().create_flash_backup([&](const float progress) {
+            printf("\rFlash backup progress: %d[%%]", (int)(progress * 100));
+            std::cout.flush();
+            });
+    }
+    else
+        flash = d.as<rs2::updatable>().create_flash_backup([&](const float progress) {});
+
+    if (flash.empty())
+    {
+        std::cout << std::endl << "Backup flash is not supported";
+    }
+    else
+    {
+        auto temp = backup_arg.getValue();
+        std::ofstream file(temp.c_str(), std::ios::binary);
+        try
+        {
+            file.write((const char*)flash.data(), flash.size());
+        }
+        catch (...)
+        {
+            // Nothing to do, file goodbit is false
+        }
+        if (!file.good())
+        {
+            std::cout << std::endl << "Creating backup file failed";
+        }
+    }
+}
+
+void update_unsigned_fw(rs2::device& d, const std::vector<uint8_t>& fw_image)
+{
+    std::cout << std::endl << "Unsigned Firmware update started. Please don't disconnect device!" << std::endl << std::endl;
+
+    if (ISATTY(FILENO(stdout)))
+    {
+        d.as<rs2::updatable>().update_unsigned(fw_image, [&](const float progress)
+            {
+                printf("\rUnsigned Firmware update progress: %d[%%]", (int)(progress * 100));
+                std::cout.flush();
+            });
+    }
+    else
+        d.as<rs2::updatable>().update_unsigned(fw_image, [&](const float progress) {});
+
+    std::cout << std::endl << std::endl << "Unsigned Firmware update done" << std::endl;
+    done = true;
+}
+
+int update_signed_fw(rs2::device& d, const std::vector<uint8_t>& fw_image)
+{
+    if (!is_fw_compatible(d, fw_image))
+        return EXIT_FAILURE;
+
+    if (!is_mipi_device(d))
+    {
+        auto upd = d.as<rs2::updatable>();
+        upd.enter_update_state();
+    }
+
+    // Some devices may immediately get in an update state
+    // this if statement is also relevant for mipi devices
+    if (d.is< rs2::update_device >())
+    {
+        new_fw_update_device = d;
+    }
+    else
+    {
+        std::unique_lock<std::mutex> lk(mutex);
+        if (!cv.wait_for(lk, std::chrono::seconds(WAIT_FOR_DEVICE_TIMEOUT), [&] { return new_fw_update_device; }))
+        {
+            std::cout << std::endl << "Failed to locate a device in FW update mode" << std::endl;
+            return EXIT_FAILURE;
+        }
+    }
+
+    new_device = rs2::device();  // otherwise the wait will exit right away
+    update(new_fw_update_device, fw_image);
+
+    done = true;
+    return EXIT_SUCCESS;
 }
 
 int main(int argc, char** argv)
@@ -310,90 +435,7 @@ try
     // Recovery
     if (recover_arg.isSet())
     {
-        std::vector<uint8_t> fw_image = read_firmware_data(file_arg.isSet(), file_arg.getValue());
-
-        std::cout << std::endl << "Update to FW: " << file_arg.getValue() << std::endl;
-        auto devs = ctx.query_devices();
-        rs2::device recovery_device;
-
-        for (auto&& d : devs)
-        {
-            if (!d.is_in_recovery_mode())
-                continue;
-            auto sn = d.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
-            if (!selected_serial_number.empty() && sn != selected_serial_number)
-                continue;
-            if (recovery_device)
-            {
-                std::cout << std::endl << "More than one recovery device is connected; serial number must be specified" << std::endl << std::endl;
-                return EXIT_FAILURE;
-            }
-            recovery_device = d;
-        }
-        if (!recovery_device)
-        {
-            std::cout << std::endl << "No recovery devices were found!" << std::endl << std::endl;
-            return EXIT_FAILURE;
-        }
-        try
-        {
-            update_serial_number = recovery_device.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
-            bool d457_recovery_device = strcmp(recovery_device.get_info(RS2_CAMERA_INFO_PRODUCT_ID), "BBCD") == 0;
-            volatile bool recovery_device_found = false;
-            ctx.set_devices_changed_callback([&](rs2::event_information& info) {
-                for (auto&& d : info.get_new_devices())
-                {
-                    if (d.is_in_recovery_mode()) 
-                        continue;
-                    auto recovery_sn = d.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
-                    if (recovery_sn == update_serial_number)
-                    {
-                        {
-                            std::lock_guard< std::mutex > lk(mutex);
-                            recovery_device_found = true;
-                        }
-                        cv.notify_one();
-                        break;
-                    }
-                }
-                });
-            std::cout << std::endl << "Recovering device: " << std::endl;
-            print_device_info(recovery_device);
-            
-            std::string camera_name = recovery_device.get_info(RS2_CAMERA_INFO_NAME);
-            // on D555 check FW compatibility also sends FW to the device
-            if (camera_name.find("D555") != std::string::npos &&
-                (!is_fw_compatible(recovery_device, fw_image)))
-                return EXIT_FAILURE;
-
-            update(recovery_device, fw_image);
-            std::cout << "Waiting for new device..." << std::endl;
-            if (!d457_recovery_device)
-            {
-                std::unique_lock< std::mutex > lk(mutex);
-                if (!recovery_device_found
-                    && !cv.wait_for(lk, std::chrono::seconds(WAIT_FOR_DEVICE_TIMEOUT), [&]() {
-                        return recovery_device_found;
-                        }))
-                {
-                    std::cout << "... timed out!" << std::endl;
-                    return EXIT_FAILURE;
-                }
-            }
-            std::cout << std::endl << "Recovery done" << std::endl;
-            if (d457_recovery_device)
-            {
-                std::cout << std::endl << "For GMSL device please reload d4xx driver:" << std::endl;
-                std::cout << "sudo rmmod d4xx && sudo modprobe d4xx" << std::endl;
-                std::cout << "or reboot the system" << std::endl;
-            }
-            return EXIT_SUCCESS;
-        }
-        catch (...)
-        {
-            std::cout << std::endl << "Failed to recover device" << std::endl;
-            return EXIT_FAILURE;
-        }
+        update_recovery_device(ctx, file_arg);
     }
 
     // Update device
@@ -420,7 +462,7 @@ try
 
     if (!serial_number_arg.isSet() && devs.size() > 1)
     {
-        std::cout << std::endl << "More than one device is connected, serial number must be selected" << std::endl << std::endl;
+        std::cout << std::endl << "Several devices are connected, serial number must be selected using -s <serial_number>" << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -447,6 +489,12 @@ try
         if (!d.is< rs2::updatable >() || !d.supports(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID))
             continue;
 
+        if (devs.size() > 1 && selected_serial_number.empty())
+        {
+            std::cout << "Please use the serial number argument to specify which device needs firmware update. " << std::endl;
+            return EXIT_FAILURE;
+        }
+
         if (devs.size() != 1)
         {
             auto sn = d.get_info(d.supports(RS2_CAMERA_INFO_SERIAL_NUMBER) ? RS2_CAMERA_INFO_SERIAL_NUMBER
@@ -468,40 +516,8 @@ try
 
         if (backup_arg.isSet())
         {
-            std::cout << std::endl << "Trying to back-up device flash" << std::endl;
+            backup_flash(d, backup_arg);
 
-            std::vector< uint8_t > flash;
-            if (ISATTY(FILENO(stdout)))
-            {
-                flash = d.as< rs2::updatable >().create_flash_backup([&](const float progress) {
-                    printf("\rFlash backup progress: %d[%%]", (int)(progress * 100));
-                    std::cout.flush();
-                    });
-            }
-            else
-                flash = d.as<rs2::updatable>().create_flash_backup([&](const float progress) {});
-
-            if (flash.empty())
-            {
-                std::cout << std::endl << "Backup flash is not supported";
-            }
-            else
-            {
-                auto temp = backup_arg.getValue();
-                std::ofstream file(temp.c_str(), std::ios::binary);
-                try
-                {
-                    file.write((const char*)flash.data(), flash.size());
-                }
-                catch (...)
-                {
-                    // Nothing to do, file goodbit is false
-                }
-                if (!file.good())
-                {
-                    std::cout << std::endl << "Creating backup file failed";
-                }
-            }
         }
 
         // FW DFU
@@ -512,60 +528,15 @@ try
             std::cout << std::endl << "Updating device FW: " << std::endl;
             print_device_info(d);
 
-            // If device is D457 connected by MIPI connector
-            if( is_mipi_device( d ) && !unsigned_arg.isSet())
-            {
-                return write_fw_to_mipi_device(ctx, serial_number_arg, d, fw_image );
-            }
-
             if (unsigned_arg.isSet())
             {
-
-                std::cout << std::endl << "Unsigned Firmware update started. Please don't disconnect device!" << std::endl << std::endl;
-
-                if (ISATTY(FILENO(stdout)))
-                {
-                    d.as<rs2::updatable>().update_unsigned(fw_image, [&](const float progress)
-                        {
-                            printf("\rUnsigned Firmware update progress: %d[%%]", (int)(progress * 100));
-                            std::cout.flush();
-                        });
-                }
-                else
-                    d.as<rs2::updatable>().update_unsigned(fw_image, [&](const float progress) {});
-
-                std::cout << std::endl << std::endl << "Unsigned Firmware update done" << std::endl;
-
-                done = true;
+                update_unsigned_fw(d, fw_image);
             }
             else
             {
-                if (!is_fw_compatible(d, fw_image))
-                    return EXIT_FAILURE;
-
-                auto upd = d.as<rs2::updatable>();
-                upd.enter_update_state();
-
-                // Some devices may immediately get in an update state?
-                if (d.is< rs2::update_device >())
-                {
-                    new_fw_update_device = d;
-                }
-                else
-                {
-                    std::unique_lock<std::mutex> lk(mutex);
-                    if (!cv.wait_for(lk, std::chrono::seconds(WAIT_FOR_DEVICE_TIMEOUT), [&] { return new_fw_update_device; }))
-                    {
-                        std::cout << std::endl << "Failed to locate a device in FW update mode" << std::endl;
-                        return EXIT_FAILURE;
-                    }
-                }
-
-                new_device = rs2::device();  // otherwise the wait will exit right away
-                update(new_fw_update_device, fw_image);
-
-                done = true;
-                break;
+                int result = update_signed_fw(d, fw_image);
+                if (result != EXIT_SUCCESS)
+                    return result;
             }
         }
     }

@@ -1,6 +1,6 @@
 # Depth Quality Tool
 
-<p align="center"><img src="https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/depth-quality-glimpse.gif" /></p>
+<p align="center"><img src="https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/depth-quality-glimpse.gif" /></p>
 
 
 ## Overview

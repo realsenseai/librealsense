@@ -153,7 +153,7 @@ The `stream-profiles` is a mapping from `stream-name` to a `profile`. The `profi
 
 If the `stream-name` or `profile` are not found, this should result in an error.
 
-If a field called `reset` is set to `true` (the default -- the above JSON therefore has it at `true`), any previous `open-streams` are forgotten and the server resets all sensors to default profiles before processing the `stream-profiles` (which can be empty).
+If a field called `reset` is set to `true` (defaults to `false` -- the above JSON therefore has it at `false`), any previous `open-streams` are forgotten and the server resets all sensors to default profiles before processing the `stream-profiles` (which can be empty).
 
 Multiple streams can be configured by a single `open-streams`. If these streams share a `sensor-name` (see [initialization](initialization.md#stream-header)), they must be compatible or an error will result.
 

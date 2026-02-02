@@ -7,7 +7,7 @@ libdir= ${prefix}/lib/x86_64-linux-gnu
 Name: realsense2-gl
 Description: Intel(R) RealSense(tm) GLSL Extension Module
 Version: @REALSENSE-GL_VERSION_STRING@
-URL: https://github.com/IntelRealSense/librealsense
+URL: https://github.com/realsenseai/librealsense
 Requires.private: @LRS_LIB_NAME@
 Libs: -L${libdir} -l@LRS_LIB_NAME@
 Libs.private: @LRS_PKG_LIBS@

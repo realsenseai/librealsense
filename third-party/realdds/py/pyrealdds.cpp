@@ -180,9 +180,10 @@ PYBIND11_MODULE(NAME, m) {
                      []( std::string const & raw_guid ) { return realdds::guid_from_string( raw_guid ); } )
         .def( "__bool__", []( dds_guid const & self ) { return self != realdds::unknown_guid; } )
         .def( "__str__",
-              []( dds_guid const & self ) { return rsutils::string::from( realdds::print_guid( (self) ) ).str(); } )
+              []( dds_guid const & self )
+              { return rsutils::string::from( realdds::print_guid( self, realdds::unknown_guid, true ) ).str(); } )
         .def( "__repr__",
-              []( dds_guid const & self ) { return rsutils::string::from( realdds::print_raw_guid( ( self ) ) ).str(); } )
+              []( dds_guid const & self ) { return rsutils::string::from( realdds::print_raw_guid( self ) ).str(); } )
         // Following two (hash and ==) are needed if we want to be able to use guids as dictionary keys
         .def( "__hash__",
               []( dds_guid const & self )
@@ -562,7 +563,7 @@ PYBIND11_MODULE(NAME, m) {
               []( SampleIdentity const & self )
               {
                   std::ostringstream os;
-                  os << realdds::print_guid( self.writer_guid() );
+                  os << realdds::print_guid( self.writer_guid(), realdds::unknown_guid, true );
                   os << '.';
                   os << self.sequence_number();
                   return os.str();
@@ -580,7 +581,7 @@ PYBIND11_MODULE(NAME, m) {
                   std::ostringstream os;
                   os << "<sample #" << self.sample_identity.sequence_number();
                   os << " @ " << realdds::time_to_string( self.reception_timestamp );
-                  os << " from " << realdds::print_guid( self.sample_identity.writer_guid() );
+                  os << " from " << realdds::print_guid( self.sample_identity.writer_guid(), realdds::unknown_guid, true );
                   os << ">";
                   return os.str();
               } );
@@ -779,7 +780,7 @@ PYBIND11_MODULE(NAME, m) {
                   os << "<" SNAME ".message.participant_entities_info";
                   if( self.is_valid() )
                   {
-                      os << " " << realdds::print_guid( self.gid() );
+                      os << " " << realdds::print_guid( self.gid(), realdds::unknown_guid, true );
                       if( ! self.nodes().empty() )
                           os << " ";
                       for( auto & node : self.nodes() )
@@ -1224,7 +1225,7 @@ PYBIND11_MODULE(NAME, m) {
         .def( "wait_until_ready",
               &dds_device::wait_until_ready,
               py::call_guard< py::gil_scoped_release >(),
-              "timeout-ms"_a = 5000 )
+              "timeout-ms"_a = 5000, py::arg_v( "allow_partial_capabilities", false, "False" ) )
         .def( "wait_until_online",
               &dds_device::wait_until_online,
               py::call_guard< py::gil_scoped_release >(),

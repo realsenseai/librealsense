@@ -10,7 +10,7 @@ This sample demonstrates how to use data from gyroscope and accelerometer to com
 In this example, we use complemetary filter to aggregate data from gyroscope and accelerometer. For more information, you can look at this [tutorial](http://www.pieter-jan.com/node/11) by Pieter-Jan or this [presentation](https://github.com/jcarrus/MakeMITSelfBalancingRobot/blob/master/segspecs/filter.pdf) by Shane Colton, among other resources available online.
 
 ## Expected Output
-![expected output](https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/imu.gif)
+![expected output](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/imu.gif)
 
 The application should open a window with a 3D model of the camera, approximating the physical orientation. In addition, you should be able to interact with the camera using your mouse, for rotating, zooming, and panning.
 
@@ -32,7 +32,7 @@ We define 3 auxilary functions: `draw_axes` and `draw_floor`, which draw axes an
 Rendering the 3D model of the camera is encapsulated inside `camera_renderer` class. It holds vertexes of the camera model and applies rotation according to `theta`.
 
 Calculation of the rotation angle, based on gyroscope and accelerometer data, is handled by the class `rotation_estimator`.
-The class holds `theta` itself, which is updated on each IMU frame. We will process IMU frames asynchronously and therefore a mutex `theta_mtx` is needed ([learn more](https://github.com/IntelRealSense/librealsense/tree/master/examples/callback)).
+The class holds `theta` itself, which is updated on each IMU frame. We will process IMU frames asynchronously and therefore a mutex `theta_mtx` is needed ([learn more](https://github.com/realsenseai/librealsense/tree/master/examples/callback)).
 
 `rotation_estimator` also holds the parameter `alpha`, which is used to combine gyroscope and accelerometer data in the calculation of `theta`.
 The first iteration needs separate handling and therfore `first` is defined.

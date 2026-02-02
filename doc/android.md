@@ -1,4 +1,4 @@
->:pushpin: The SDK 2.0 delivers cross-platform open source libraries & tools that allow users to develop on multiple Operating Systems & development environments.  RealSense has validated SDK2.0 on Windows and Linux platforms. Please check [latest Release](https://github.com/IntelRealSense/librealsense/releases) for the build versions.  While RealSense has not explicitly validated SDK2.0 on Android platforms, it is expected to work on Android as well. Please refer to the build instructions in the section below. Calibration and firmware update tools that would be used in production and manufacturing processes are not available on Android at this time.  Please contact your Intel representative for additional information.
+>:pushpin: The SDK 2.0 delivers cross-platform open source libraries & tools that allow users to develop on multiple Operating Systems & development environments.  RealSense has validated SDK2.0 on Windows and Linux platforms. Please check [latest Release](https://github.com/realsenseai/librealsense/releases) for the build versions.  While RealSense has not explicitly validated SDK2.0 on Android platforms, it is expected to work on Android as well. Please refer to the build instructions in the section below. Calibration and firmware update tools that would be used in production and manufacturing processes are not available on Android at this time.  Please contact your Intel representative for additional information.
 
 # Intel&reg; RealSense&trade; SDK 2.0 for Android OS
 
@@ -6,7 +6,7 @@ Using the Android wrapper allows you to build both native (C/C++) and Java appli
 In order to do that a RealSense Android App need to include `librealsense.aar` (Android Archive) in it's dependencies.
 The AAR file is responsible to acquire camera access permissions and it also provides a JNI based RealSense Java API.
 
-> Previous Android solution was limited to rooted devices only, but is still available [here](https://github.com/IntelRealSense/librealsense/tree/v2.18.1/doc/android)
+> Previous Android solution was limited to rooted devices only, but is still available [here](https://github.com/realsenseai/librealsense/tree/v2.18.1/doc/android)
 
 ## Ingredients
 Before jumping to the instructions section please ensure you have all the required accessories. 

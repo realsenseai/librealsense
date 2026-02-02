@@ -235,6 +235,21 @@ namespace librealsense
         _curr_config = tmp_config;
     }
 
+    uint8_t eth_config_device::get_udp_ttl() const
+    {
+        validate_support();
+        return _curr_config.udp_ttl;
+    }
+
+    void eth_config_device::set_udp_ttl( uint8_t ttl )
+    {
+        validate_support();
+        rsutils::type::eth_config tmp_config = _curr_config;
+        tmp_config.udp_ttl = ttl;
+        save_eth_config_to_device( tmp_config );
+        _curr_config = tmp_config;
+    }
+
     // Factory reset
     void eth_config_device::restore_defaults()
     {

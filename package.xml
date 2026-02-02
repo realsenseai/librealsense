@@ -15,7 +15,7 @@
   <maintainer email="ashraf.kattoura@realsenseai.com">Ashraf Kattoura</maintainer>
   <maintainer email="nir.azkiel@realsenseai.com">Nir Azkiel</maintainer>
 
-  <url type="website">https://github.com/IntelRealSense/librealsense/</url>
+  <url type="website">https://github.com/realsenseai/librealsense/</url>
 
   <author email="rsswsdk@realsensecloud.onmicrosoft.com">LibRealSense ROS Team</author>
 

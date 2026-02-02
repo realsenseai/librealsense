@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # SPDX-FileCopyrightText: Copyright (c) 2012-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
@@ -28,7 +29,6 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 #
 # This script sync's NVIDIA's version of
 # 1. the kernel source
@@ -38,12 +38,11 @@
 #
 # Usage:
 # By default it will download all the listed sources
-# ./source_sync.sh
+# ./sync.sh
 # Use the -t <TAG> option to provide the TAG to be used to sync all the sources.
 # Use the -k <TAG> option to download only the kernel and device tree repos and optionally sync to TAG
 # For detailed usage information run with -h option.
 #
-
 
 # verify that git is installed
 if  ! which git > /dev/null  ; then
@@ -52,47 +51,17 @@ if  ! which git > /dev/null  ; then
   exit 1
 fi
 
+# script name, dir
+SCRIPT_NAME=`readlink -f $0`
+SCRIPT_DIR=`dirname $SCRIPT_NAME`
 # source dir
-LDK_DIR=$(cd `dirname $0` && pwd)
-# script name
-SCRIPT_NAME=`basename $0`
+LDK_DIR=$SCRIPT_DIR
 # info about sources.
 # NOTE: *Add only kernel repos here. Add new repos separately below. Keep related repos together*
 # NOTE: nvethrnetrm.git should be listed after "linux-nv-oot.git" due to nesting of sync path
-SOURCE_INFO="
-k:kernel/kernel-jammy-src:nv-tegra.nvidia.com/3rdparty/canonical/linux-jammy.git:
-k:nvgpu:nv-tegra.nvidia.com/linux-nvgpu.git:
-k:nvidia-oot:nv-tegra.nvidia.com/linux-nv-oot.git:
-k:hwpm:nv-tegra.nvidia.com/linux-hwpm.git:
-k:nvethernetrm:nv-tegra.nvidia.com/kernel/nvethernetrm.git:
-k:hardware/nvidia/t23x/nv-public:nv-tegra.nvidia.com/device/hardware/nvidia/t23x-public-dts.git:
-k:hardware/nvidia/tegra/nv-public:nv-tegra.nvidia.com/device/hardware/nvidia/tegra-public-dts.git:
-k:nvdisplay:nv-tegra.nvidia.com/tegra/kernel-src/nv-kernel-display-driver.git:
-k:dtc-src/1.4.5:nv-tegra.nvidia.com/3rdparty/dtc-src/1.4.5.git:
-o:tegra/argus-cam-libav/argus_cam_libavencoder:nv-tegra.nvidia.com/tegra/argus-cam-libav/argus_cam_libavencoder.git:
-o:tegra/cuda-src/nvsample_cudaprocess:nv-tegra.nvidia.com/tegra/cuda-src/nvsample_cudaprocess.git:
-o:tegra/gfx-src/nv-xconfig:nv-tegra.nvidia.com/tegra/gfx-src/nv-xconfig.git:
-o:tegra/gst-src/gst-egl:nv-tegra.nvidia.com/tegra/gst-src/gst-egl.git:
-o:tegra/gst-src/gst-jpeg:nv-tegra.nvidia.com/tegra/gst-src/gst-jpeg.git:
-o:tegra/gst-src/gst-nvarguscamera:nv-tegra.nvidia.com/tegra/gst-src/gst-nvarguscamera.git:
-o:tegra/gst-src/gst-nvcompositor:nv-tegra.nvidia.com/tegra/gst-src/gst-nvcompositor.git:
-o:tegra/gst-src/gst-nvtee:nv-tegra.nvidia.com/tegra/gst-src/gst-nvtee.git:
-o:tegra/gst-src/gst-nvv4l2camera:nv-tegra.nvidia.com/tegra/gst-src/gst-nvv4l2camera.git:
-o:tegra/gst-src/gst-nvvidconv:nv-tegra.nvidia.com/tegra/gst-src/gst-nvvidconv.git:
-o:tegra/gst-src/gst-nvvideo4linux2:nv-tegra.nvidia.com/tegra/gst-src/gst-nvvideo4linux2.git:
-o:tegra/gst-src/nvgstapps:nv-tegra.nvidia.com/tegra/gst-src/nvgstapps.git:
-o:tegra/gst-src/libgstnvcustomhelper:nv-tegra.nvidia.com/tegra/gst-src/libgstnvcustomhelper.git:
-o:tegra/gst-src/libgstnvdrmvideosink:nv-tegra.nvidia.com/tegra/gst-src/libgstnvdrmvideosink.git:
-o:tegra/gst-src/libgstnvvideosinks:nv-tegra.nvidia.com/tegra/gst-src/libgstnvvideosinks.git:
-o:tegra/v4l2-src/libv4l2_nvargus:nv-tegra.nvidia.com/tegra/v4l2-src/libv4l2_nvargus.git:
-o:tegra/nv-sci-src/nvsci_headers:nv-tegra.nvidia.com/tegra/nv-sci-src/nvsci_headers.git:
-o:tegra/optee-src/atf:nv-tegra.nvidia.com/tegra/optee-src/atf.git:
-o:tegra/optee-src/nv-optee:nv-tegra.nvidia.com/tegra/optee-src/nv-optee.git:
-o:tegra/v4l2-src/v4l2_libs:nv-tegra.nvidia.com/tegra/v4l2-src/v4l2_libs.git:
-"
+source $SCRIPT_DIR/repos
 
 # exit on error on sync
-EOE=0
 # after processing SOURCE_INFO
 NSOURCES=0
 declare -a SOURCE_INFO_PROCESSED
@@ -109,8 +78,7 @@ function Usages {
 
 	echo "Use: $1 [options]"
 	echo "Available general options are,"
-	echo "     -h     :     help"
-	echo "     -e     : exit on sync error"
+	echo "     -h : help"
 	echo "     -d [DIR] : root of source is DIR"
 	echo "     -t [TAG] : Git tag that will be used to sync all the sources"
 	echo ""
@@ -176,61 +144,48 @@ function DownloadAndSync {
 	local REPO_URL="$3"
 	local TAG="$4"
 	local OPT="$5"
-	local RET=0
-
-	if [ -d "${LDK_SOURCE_DIR}" ]; then
-		echo "Directory for $WHAT, ${LDK_SOURCE_DIR}, already exists!"
-		pushd "${LDK_SOURCE_DIR}" > /dev/null
-		git status 2>&1 >/dev/null
-		if [ $? -ne 0 ]; then
-			echo "But the directory is not a git repository -- clean it up first"
-			echo ""
-			echo ""
-			popd > /dev/null
-			return 1
-		fi
-		git fetch --all 2>&1 >/dev/null
-		popd > /dev/null
-	else
-		echo "Downloading default $WHAT source..."
-
-		git clone "$REPO_URL" -n ${LDK_SOURCE_DIR} 2>&1 >/dev/null
-		if [ $? -ne 0 ]; then
-			echo "$2 source sync failed!"
-			echo ""
-			echo ""
-			return 1
-		fi
-
-		echo "The default $WHAT source is downloaded in: ${LDK_SOURCE_DIR}"
-	fi
 
 	if [ -z "$TAG" ]; then
-		echo "Please enter a tag to sync $2 source to"
-		echo -n "(enter nothing to skip): "
+		echo -n "Please enter a tag to sync $2 source to (enter nothing to skip): "
 		read TAG
-		TAG=$(echo $TAG)
 		UpdateTags $OPT $TAG
 	fi
 
-	if [ ! -z "$TAG" ]; then
-		pushd ${LDK_SOURCE_DIR} > /dev/null
-		git tag -l 2>/dev/null | grep -q -P "^$TAG\$"
-		if [ $? -eq 0 ]; then
-			echo "Syncing up with tag $TAG..."
-			git checkout -b mybranch_$(date +%Y-%m-%d-%s) $TAG
-			echo "$2 source sync'ed to tag $TAG successfully!"
-		else
-			echo "Couldn't find tag $TAG"
-			echo "$2 source sync to tag $TAG failed!"
-			RET=1
+	if [ -d "${LDK_SOURCE_DIR}" ]; then
+		echo "Directory for $WHAT: ${LDK_SOURCE_DIR}, already exists!"
+		if ! git -C ${LDK_SOURCE_DIR} status 2>&1 >/dev/null; then
+			echo -e "\e[33m...but the directory is not a git repository -- clean it up first\e[0m\n"
+			false
 		fi
-		popd > /dev/null
+		ACTUAL_REPO=$(git -C ${LDK_SOURCE_DIR} config remote.origin.url)
+		if [[ $REPO_URL != $ACTUAL_REPO ]]; then
+			echo -e "\e[33mRepo URL are different:"
+			echo config: $REPO_URL
+			echo actual: $ACTUAL_REPO
+			echo -e "Consider removing ${LDK_SOURCE_DIR} folder and start all over\e[0m"
+		fi
+		git -C ${LDK_SOURCE_DIR} tag -l 2>/dev/null | grep -q -P "^$TAG\$" || \
+			git -C ${LDK_SOURCE_DIR} fetch --all 2>&1 >/dev/null || true
+	else
+		echo "Downloading default $WHAT source..."
+		if ! git clone "$REPO_URL" -n ${LDK_SOURCE_DIR} 2>&1 >/dev/null; then
+			echo -e "\e[31msource sync with ${REPO_URL} failed!\e]0m\n"
+			false
+		fi
+		echo "The default $WHAT source is downloaded in: ${LDK_SOURCE_DIR}"
 	fi
-	echo ""
-	echo ""
 
-	return "$RET"
+	if [ ! -z "$TAG" ]; then
+		if git -C ${LDK_SOURCE_DIR} tag -l 2>/dev/null | grep -q -P "^$TAG\$"; then
+			echo "Syncing up with tag $TAG..."
+			git -C ${LDK_SOURCE_DIR} checkout -b mybranch_$(date +%Y-%m-%d-%s) $TAG
+			echo -e "\e[32m$2 source sync'ed to tag $TAG successfully!\e[0m"
+		else
+			echo -e "\e[31mCouldn't find tag $TAG. $2 source sync to tag $TAG failed!\e[0m"
+			false
+		fi
+	fi
+	return 0
 }
 
 # prepare processing ....
@@ -260,9 +215,6 @@ while getopts "$GETOPT" opt; do
 					LDK_DIR="$OPTARG"
 					;;
 			esac
-			;;
-		e)
-			EOE=1
 			;;
 		h)
 			Usages "$SCRIPT_NAME"
@@ -321,7 +273,6 @@ while getopts "$GETOPT" opt; do
 done
 shift $((OPTIND-1))
 
-GRET=0
 for ((i=0; i < NSOURCES; i++)); do
 	OPT=$(echo "${SOURCE_INFO_PROCESSED[i]}" | cut -f 1 -d ':')
 	WHAT=$(echo "${SOURCE_INFO_PROCESSED[i]}" | cut -f 2 -d ':')
@@ -330,15 +281,13 @@ for ((i=0; i < NSOURCES; i++)); do
 	DNLOAD=$(echo "${SOURCE_INFO_PROCESSED[i]}" | cut -f 5 -d ':')
 
 	if [ $DALL -eq 1 -o "x${DNLOAD}" == "xy" ]; then
-		DownloadAndSync "$WHAT" "${LDK_DIR}/${WHAT}" "git://${REPO}" "${TAG}" "${OPT}"
-		tRET=$?
-		let GRET=GRET+tRET
-		if [ $tRET -ne 0 -a $EOE -eq 1 ]; then
-			exit $tRET
-		fi
+		DownloadAndSync "$WHAT" "${LDK_DIR}/${WHAT}" "https://${REPO}" "${TAG}" "${OPT}"
+		echo
 	fi
 done
 
-ln -sf ../../../../../../nvethernetrm ${LDK_DIR}/nvidia-oot/drivers/net/ethernet/nvidia/nvethernet/nvethernetrm
+if [[ -d ${LDK_DIR}/nvidia-oot/drivers/net/ethernet/nvidia/nvethernet ]]; then
+	ln -sf ../../../../../../nvethernetrm ${LDK_DIR}/nvidia-oot/drivers/net/ethernet/nvidia/nvethernet/nvethernetrm
+fi
 
-exit $GRET
+exit 0

@@ -6255,7 +6255,7 @@ MonoBehaviour:
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
           m_IntArgument: 0
           m_FloatArgument: 0
-          m_StringArgument: https://github.com/IntelRealSense/librealsense/tree/master/wrappers/unity
+          m_StringArgument: https://github.com/realsenseai/librealsense/tree/master/wrappers/unity
           m_BoolArgument: 0
         m_CallState: 2
     m_TypeName: UnityEngine.UI.Button+ButtonClickedEvent, UnityEngine.UI, Version=1.0.0.0,

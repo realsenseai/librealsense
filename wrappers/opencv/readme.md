@@ -1,5 +1,5 @@
-# OpenCV Samples for Intel® RealSense™ cameras
-Examples in this folder are designed to complement existing [SDK examples](../../examples) and demonstrate how Intel RealSense cameras can be used together with `opencv` in domain of computer-vision. 
+# OpenCV Samples for RealSense cameras
+Examples in this folder are designed to complement existing [SDK examples](../../examples) and demonstrate how RealSense cameras can be used together with `opencv` in domain of computer-vision. 
 
 > RealSense examples have been designed and tested with OpenCV 3.4,
 > Working with latest OpenCV 4 requires minor code changes
@@ -40,7 +40,7 @@ First, download and install `CMake` from [cmake.org/download](https://cmake.org/
 7. Press `Ctrl+Shift+B` to build solution
 
 #### Building the OpenCV Samples VisualStudio project
-1. Clone or download librealsense sources from [github.com/IntelRealSense/librealsense](https://github.com/IntelRealSense/librealsense) into a local directory (`C:/git/librealsense`)
+1. Clone or download librealsense sources from [github.com/realsenseai/librealsense](https://github.com/realsenseai/librealsense) into a local directory (`C:/git/librealsense`)
 2. Run `cmake-gui` and fill source code and binaries locations and press `Configure`
 3. Make sure you check the `BUILD_CV_EXAMPLES` flag and click `Configure` again:
 
@@ -65,5 +65,5 @@ First, download and install `CMake` from [cmake.org/download](https://cmake.org/
 > Please use `git checkout 3.4` to use version 3.4
 
 2. Run `export OpenCV_DIR=~/opencv/build` (`~/opencv/build` is the folder containing `OpenCVConfig.cmake`)
-3. Follow [the instructions](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md) to build `librealsense` from source
+3. Follow [the instructions](https://github.com/realsenseai/librealsense/blob/master/doc/installation.md) to build `librealsense` from source
 4. Add `-DBUILD_CV_EXAMPLES=true` to your `cmake` command

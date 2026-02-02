@@ -31,7 +31,7 @@ set PATH=%PATH%;%PCL_ROOT%\bin;%OPENNI2_REDIST64%
 
 5. If you had Visual Studio openned, please restart it to make sure new environment variables are in effect. 
 
-6. Clone or download librealsense sources from [github.com/IntelRealSense/librealsense](https://github.com/IntelRealSense/librealsense) into a local directory (`C:/git/librealsense`)
+6. Clone or download librealsense sources from [github.com/realsenseai/librealsense](https://github.com/realsenseai/librealsense) into a local directory (`C:/git/librealsense`)
 7. Run `cmake-gui` and fill source code and binaries locations and press `Configure`
 8. Make sure ``BUILD_SHARED_LIBS` is checked (linking to librealsense staticly will cause problems with PCL linkage)
 9. Check the `BUILD_PCL_EXAMPLES` flag and click `Configure` again:
@@ -57,7 +57,7 @@ sudo add-apt-repository ppa:v-launchpad-jochen-sprickerhof-de/pcl
 sudo apt-get update
 sudo apt-get install libpcl-all
 ```
-2. Follow [the instructions](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md) to build `librealsense` from source
+2. Follow [the instructions](https://github.com/realsenseai/librealsense/blob/master/doc/installation.md) to build `librealsense` from source
 3. Add `-DBUILD_PCL_EXAMPLES=true` to your `cmake` command
 4. Run `./wrappers/pcl/pcl/rs-pcl` or just `rs-pcl` if you have previously executed `sudo make install`
 
