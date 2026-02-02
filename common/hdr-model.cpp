@@ -187,8 +187,10 @@ hdr_model::hdr_model( rs2::device dev )
     try
     {
         auto depth_sensor = dev.first< rs2::depth_sensor >();
-        _exp_range = depth_sensor.get_option_range( RS2_OPTION_EXPOSURE );
-        _gain_range = depth_sensor.get_option_range( RS2_OPTION_GAIN );
+        if( depth_sensor.supports( RS2_OPTION_EXPOSURE ) )
+            _exp_range = depth_sensor.get_option_range( RS2_OPTION_EXPOSURE );
+        if( depth_sensor.supports( RS2_OPTION_GAIN ) )
+            _gain_range = depth_sensor.get_option_range( RS2_OPTION_GAIN );
 
         _hdr_supported = check_HDR_support();
         if (_hdr_supported)

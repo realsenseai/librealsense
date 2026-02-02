@@ -31,8 +31,8 @@ AUTO_HDR_CONFIG = {
             {"iterations": "1", "controls": {"depth-ae": "1"}},
             {"iterations": "2", "controls": {"depth-ae-exp": "2000", "depth-ae-gain": "30"}},
             {"iterations": "2", "controls": {"depth-ae-exp": "-2000", "depth-ae-gain": "20"}},
-            {"iterations": "3", "controls": {"depth-ae-exp": "3000", "depth-ae-gain": "10"}},
-            {"iterations": "3", "controls": {"depth-ae-exp": "-3000", "depth-ae-gain": "40"}},
+            {"iterations": "3", "controls": {"depth-ae-exp": "2500", "depth-ae-gain": "10"}},
+            {"iterations": "3", "controls": {"depth-ae-exp": "-2500", "depth-ae-gain": "40"}},
         ]
     }
 }

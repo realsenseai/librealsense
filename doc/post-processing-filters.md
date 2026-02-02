@@ -73,14 +73,14 @@ Hole Filling| Control the data that will be used to fill the invalid pixels | [0
 
 ### Rotation filter
 
-The rotation filter transforms depth and IR frames by rotating them by specified angles: 0°, 90°, 180°, and -90°.
+The rotation filter transforms depth and IR frames by rotating them by specified angles: 0Â°, 90Â°, 180Â°, and -90Â°.
 This allows re-orienting frames to fit the required perspective for various applications.
 
 After the resulted frame is produced, the frame intrinsic parameters are recalculated to account for rotation.
 
 Controls | Operation |  Range | Default
 :------: | :-------- | :---- | :----:
-Rotation| The frame rotation in degrees | Discrete steps: 0, 90, 180, -90| 0° 
+Rotation| The frame rotation in degrees | Discrete steps: 0, 90, 180, -90| 0Â° 
 
 ## Design and Implementation
 Post-processing modules are encapsulated into self-contained processing blocks, that provide for the following key requirements:
@@ -108,9 +108,9 @@ At the same time the recommended scheme used in librealsense tools and demos is 
 Note that even though the filter order in the demos is predefined, each filter is controlled individually and can be toggled on/off at run-time.
 
 Demos and tools that have the post-processing code blocks embedded:
-1. [RealSense-Viewer](https://github.com/IntelRealSense/librealsense/tree/master/tools/realsense-viewer)
-2. [Depth Quality Tool](https://github.com/IntelRealSense/librealsense/tree/master/tools/depth-quality)
-2. [Post-Processing Demo](https://github.com/IntelRealSense/librealsense/tree/master/examples/post-processing)
+1. [RealSense-Viewer](https://github.com/realsenseai/librealsense/tree/master/tools/realsense-viewer)
+2. [Depth Quality Tool](https://github.com/realsenseai/librealsense/tree/master/tools/depth-quality)
+2. [Post-Processing Demo](https://github.com/realsenseai/librealsense/tree/master/examples/post-processing)
 
 Filter initialization and activation flows:
 Using `C` API calls:

@@ -45,6 +45,7 @@ void dds_model::load_eth_config_from_device()
 
     _mtu_current = _eth_device.get_mtu();
     _tx_delay_current = _eth_device.get_transmission_delay();
+    _ttl_current = _eth_device.get_udp_ttl();
 
     _link_speed_read_only = _eth_device.get_link_speed();
 }
@@ -74,6 +75,7 @@ void dds_model::save_eth_config_in_device( std::string & error_message, bool res
 
             _eth_device.set_mtu( _mtu_to_set );
             _eth_device.set_transmission_delay( _tx_delay_to_set );
+            _eth_device.set_udp_ttl( static_cast< uint8_t >( _ttl_to_set ) );
         }
 
         if( ! _no_reset )
@@ -119,6 +121,7 @@ void dds_model::reset_to_current_device_values()
 
     _mtu_to_set = _mtu_current;
     _tx_delay_to_set = _tx_delay_current;
+    _ttl_to_set = _ttl_current;
 }
 
 bool dds_model::has_changed_values() const
@@ -127,7 +130,7 @@ bool dds_model::has_changed_values() const
         _link_priority_to_set != _link_priority_current || _link_timeout_to_set != _link_timeout_current ||
         _dhcp_enabled_to_set != _dhcp_enabled_current || _dhcp_timeout_to_set != _dhcp_timeout_current ||
         _ip_to_set != _ip_current || _netmask_to_set != _netmask_current || _gateway_to_set != _gateway_current ||
-        _mtu_to_set != _mtu_current || _tx_delay_to_set != _tx_delay_current;
+        _mtu_to_set != _mtu_current || _tx_delay_to_set != _tx_delay_current || _ttl_to_set != _ttl_current;
 }
 
 void rs2::dds_model::ip_input_text( std::string label, ip_address & ip ) const
@@ -242,12 +245,16 @@ void dds_model::render_dds_config_window( ux_window & window, std::string & erro
             {
                 ImGui::SameLine();
                 ImGui::SetCursorPosX( ImGui::GetCursorPosX() + 50 );
-                ImGui::Text( "Link Timeout (seconds)" );
+                ImGui::Text( "Link Timeout [ms]" );
                 ImGui::SameLine();
                 int tempTimeout = static_cast< int >( _link_timeout_to_set );
-                if( ImGui::InputInt( "##Link Timeout (seconds)", &tempTimeout ) )
+                if( ImGui::InputInt( "##Link Timeout", &tempTimeout, 100 ) )
                 {
-                    _link_timeout_to_set = static_cast< uint32_t >( std::max( 0, tempTimeout ) );
+                    if( tempTimeout < 2000 )
+                        tempTimeout = 2000;
+                    if( tempTimeout > 30000 )
+                        tempTimeout = 30000;
+                    _link_timeout_to_set = static_cast< uint32_t >( tempTimeout );
                 }
             }
             ImGui::RadioButton( "USB First", reinterpret_cast< int * >( &connection_priority ), 1 );
@@ -330,6 +337,20 @@ void dds_model::render_dds_config_window( ux_window & window, std::string & erro
                     temp_delay = 144;
                 _tx_delay_to_set = static_cast< uint32_t >( temp_delay );
             }
+
+            ImGui::Text( "UDP TTL [hops]" );
+            ImGui::SameLine();
+            int temp_ttl = static_cast< int >( _ttl_to_set );
+            if( ImGui::InputInt( "##UDP TTL", &temp_ttl ) )
+            {
+                if( temp_ttl < 0 )
+                    temp_ttl = 0;
+                if( temp_ttl > 255 )
+                    temp_ttl = 255;
+                _ttl_to_set = static_cast< uint32_t >( temp_ttl );
+            }
+            ImGui::SameLine();
+            ImGui::Text( "(0 means system default)" );
         }
         
         ImGui::Separator();

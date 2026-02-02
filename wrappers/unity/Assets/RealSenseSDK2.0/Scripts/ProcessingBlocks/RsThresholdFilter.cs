@@ -2,7 +2,7 @@
 using UnityEngine;
 
 [ProcessingBlockDataAttribute(typeof(ThresholdFilter))]
-[HelpURL("https://github.com/IntelRealSense/librealsense/blob/master/doc/post-processing-filters.md#hole-filling-filter")]
+[HelpURL("https://github.com/realsenseai/librealsense/blob/master/doc/post-processing-filters.md#hole-filling-filter")]
 public class RsThresholdFilter : RsProcessingBlock
 {
     /// <summary>

@@ -15,7 +15,7 @@ This folder offers P/Invoke based bindings for most SDK APIs, together with a co
 
 To work with Intel RealSense from .NET you will need two libraries next to your application - `realsense2` and `Intel.RealSense.dll`.
 
-In order to get the native `realsense2` library you can either build the SDK [from source using CMake](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation_windows.md) or [install the latest release](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_windows.md).
+In order to get the native `realsense2` library you can either build the SDK [from source using CMake](https://github.com/realsenseai/librealsense/blob/master/doc/installation_windows.md) or [install the latest release](https://github.com/realsenseai/librealsense/blob/master/doc/distribution_windows.md).
 
 Next, build the managed class library project:
 

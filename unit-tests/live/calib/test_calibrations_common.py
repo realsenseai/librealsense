@@ -12,8 +12,10 @@ import ctypes
 
 # Constants for calibration
 CALIBRATION_TIMEOUT_SECONDS = 30
-OCC_TIMEOUT_MS = 9000
-TARE_TIMEOUT_MS = 10000
+OCC_TIMEOUT_MS = 6000
+TARE_TIMEOUT_MS = 7000
+OCC_TIMEOUT_MS_HA = 9000
+TARE_TIMEOUT_MS_HA = 9000
 FRAME_PROCESSING_TIMEOUT_MS = 5000
 HARDWARE_RESET_DELAY_SECONDS = 3
 
@@ -49,18 +51,22 @@ def get_calibration_device(image_width, image_height, fps):
     
     return config, pipeline, auto_calibrated_device
 
-def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground_truth, return_table=False):
+def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground_truth, host_assistance=False, return_table=False):
     """
     Main calibration function for both OCC and Tare calibrations.
     
     Args:
-        host_assistance (bool): Whether to use host assistance mode
+        config: Pipeline configuration
+        pipeline: RealSense pipeline
+        calib_dev: Auto calibrated device
         occ_calib (bool): True for OCC calibration, False for Tare calibration
         json_config (str): JSON configuration string
         ground_truth (float): Ground truth value for Tare calibration (None for OCC)
+        host_assistance (bool): Whether to use host assistance mode
+        return_table (bool): Whether to return calibration table
     
     Returns:
-        float: Health factor from calibration
+        float: Health factor from calibration (or tuple with calibration table if return_table=True)
     """
 
     conf = pipeline.start(config)
@@ -81,10 +87,12 @@ def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground
     try:
         if occ_calib:    
             log.i("Starting on-chip calibration")
-            new_calib, health = calib_dev.run_on_chip_calibration(json_config, on_calib_cb, OCC_TIMEOUT_MS)
+            timeout = OCC_TIMEOUT_MS_HA if host_assistance else OCC_TIMEOUT_MS
+            new_calib, health = calib_dev.run_on_chip_calibration(json_config, on_calib_cb, timeout)
         else:    
             log.i("Starting tare calibration")
-            new_calib, health = calib_dev.run_tare_calibration(ground_truth, json_config, on_calib_cb, TARE_TIMEOUT_MS)
+            timeout = TARE_TIMEOUT_MS_HA if host_assistance else TARE_TIMEOUT_MS            
+            new_calib, health = calib_dev.run_tare_calibration(ground_truth, json_config, on_calib_cb, timeout)
 
         calib_done = len(new_calib) > 0
         timeout_end = time.time() + CALIBRATION_TIMEOUT_SECONDS
@@ -240,17 +248,86 @@ def get_current_rect_params(auto_calib_device):
         log.e(f"Error reading principal points: {e}")
         return None
         
-def restore_calibration_table(device):
+def save_calibration_table(device):
+    """Save the current calibration table for later restoration.
+    
+    Args:
+        device: auto_calibrated_device or regular device
+        
+    Returns:
+        bytes: Calibration table as bytes, or None on failure
+    """
+    try:
+        # Handle both device types
+        if isinstance(device, rs.auto_calibrated_device):
+            auto_calib_device = device
+        else:
+            auto_calib_device = rs.auto_calibrated_device(device)
+            
+        if not auto_calib_device:
+            log.e("Device does not support auto calibration")
+            return None
+            
+        calib_table = auto_calib_device.get_calibration_table()
+        if calib_table is not None:
+            saved_table = bytes(calib_table)
+            log.d(f"Saved calibration table ({len(saved_table)} bytes)")
+            return saved_table
+        else:
+            log.e("Failed to retrieve calibration table")
+            return None
+    except Exception as e:
+        log.e(f"Error saving calibration table: {e}")
+        return None
+
+
+def restore_calibration_table(device, saved_table=None):
+    """Restore calibration table from saved data or factory reset.
+    
+    Args:
+        device: auto_calibrated_device or regular device
+        saved_table (bytes): Previously saved calibration table. If None, uses factory reset.
+        
+    Returns:
+        bool: True if restoration successful, False otherwise
+    """
     global _global_original_calib_table
 
-    # Get the auto calibrated device interface
-    auto_calib_device = rs.auto_calibrated_device(device)
-    if not auto_calib_device:
-        log.e("Device does not support auto calibration")
-        return False
+    try:
+        # Handle both device types
+        if isinstance(device, rs.auto_calibrated_device):
+            auto_calib_device = device
+        else:
+            auto_calib_device = rs.auto_calibrated_device(device)
+            
+        if not auto_calib_device:
+            log.e("Device does not support auto calibration")
+            return False
 
-    auto_calib_device.reset_to_factory_calibration()
-    return True
+        # Option 1: Factory reset
+        if saved_table is None:
+            log.i("Restoring factory calibration")
+            auto_calib_device.reset_to_factory_calibration()
+            return True
+            
+        # Option 2: Restore from saved table
+        log.i(f"Restoring saved calibration table ({len(saved_table)} bytes)")
+        calib_list = list(saved_table)
+        auto_calib_device.set_calibration_table(calib_list)
+        auto_calib_device.write_calibration()
+        
+        # Verify restoration
+        current_table = auto_calib_device.get_calibration_table()
+        if current_table and bytes(current_table) == saved_table:
+            log.d("Calibration table restored and verified successfully")
+            return True
+        else:
+            log.w("Calibration table restored but verification failed")
+            return True  # Still return True as write succeeded
+            
+    except Exception as e:
+        log.e(f"Error restoring calibration table: {e}")
+        return False
 
 def get_calibration_table(device):
     """Get current calibration table from device"""

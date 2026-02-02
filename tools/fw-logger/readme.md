@@ -3,7 +3,7 @@
 ## Goal
 `rs-fw-logger` tool is a console application for collecting internal camera logs.
 If you are suspecting that you have an issue that is related to the camera’s firmware, please use this tool and provide the output together with the FW version number when you are creating an issue.
-In order to run this, ensure that your camera is streaming. This can be done using the [realsense-viewer](https://github.com/IntelRealSense/librealsense/tree/development/tools/realsense-viewer) or [rs-capture Sample](https://github.com/IntelRealSense/librealsense/tree/development/examples/capture)
+In order to run this, ensure that your camera is streaming. This can be done using the [realsense-viewer](https://github.com/realsenseai/librealsense/tree/development/tools/realsense-viewer) or [rs-capture Sample](https://github.com/realsenseai/librealsense/tree/development/examples/capture)
 
 ## Command Line Parameters
 |Flag   |Description   |Default| Range|

@@ -87,6 +87,8 @@ namespace rs2
         static const textual_icon angle_left{ u8"\uf107" };
         static const textual_icon circle{ u8"\uf111" };
         static const textual_icon minus_square_o{ u8"\uf120" };
+        static const textual_icon circle_chevron_left{ u8"\uf137" };
+        static const textual_icon circle_chevron_right{ u8"\uf138" };
         static const textual_icon circle_chevron_up{ u8"\uf139" };
         static const textual_icon circle_chevron_down{ u8"\uf13a" };
         static const textual_icon ellipsis_h{ u8"\uf141" };

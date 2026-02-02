@@ -41,7 +41,7 @@ The following diagram specifies the frame flow in the system and indicates where
 
 * First copy is a mandatory step in the SDK and it's purpose is passing the frame content ownership from the digital media controller (WMF/V4L2) into librealsense.
 
-* Second reconstruction of the frame is optional and a subject of frame manipulation needed by the user, examples for it are: pixel format representation conversions and more.. (See some of the implemented filters [here](https://github.com/IntelRealSense/librealsense/blob/master/doc/post-processing-filters.md) )
+* Second reconstruction of the frame is optional and a subject of frame manipulation needed by the user, examples for it are: pixel format representation conversions and more.. (See some of the implemented filters [here](https://github.com/realsenseai/librealsense/blob/master/doc/post-processing-filters.md) )
 
   This filters / post processing blocks can be concatenated and each one will get the last processed frame as input and output a new frame.
 

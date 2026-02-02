@@ -97,6 +97,8 @@ void init_eth_config(py::module &m) {
         .def( "set_mtu", []( const rs2::eth_config_device & self, uint32_t mtu ) { self.set_mtu( mtu ); }, "Set MTU (Maximum Transmission Unit)", "mtu"_a )
         .def( "get_transmission_delay", &rs2::eth_config_device::get_transmission_delay, "Get transmission delay in microseconds" )
         .def( "set_transmission_delay", []( const rs2::eth_config_device & self, uint32_t delay ) { self.set_transmission_delay( delay ); }, "Set transmission delay", "delay"_a )
+        .def( "get_udp_ttl", &rs2::eth_config_device::get_udp_ttl, "Get UDP TTL (Time To Live)" )
+        .def( "set_udp_ttl", []( const rs2::eth_config_device & self, uint8_t ttl ) { self.set_udp_ttl( ttl ); }, "Set UDP TTL (Time To Live)", "ttl"_a )
         .def( "restore_defaults", &rs2::eth_config_device::restore_defaults, "Restores configuration to factory settings" );
 
     // Add utility functions as module-level functions

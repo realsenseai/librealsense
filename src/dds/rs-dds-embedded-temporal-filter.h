@@ -41,6 +41,7 @@ namespace librealsense {
         const std::string ALPHA_OPTION_NAME = "Alpha";
         const std::string DELTA_OPTION_NAME = "Delta";
         const std::string PERSISTENCY_OPTION_NAME = "Persistency";
+        const int32_t PERSISTENCY_MAX_LEN = 30;
     };
 
 }  // namespace librealsense

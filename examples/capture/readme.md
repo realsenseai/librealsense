@@ -7,7 +7,7 @@ We use OpenGL for cross-platform rendering and GLFW for window management.
 If you are using OpenCV, `imshow` is a good alternative. 
 
 ## Expected Output
-![expected output](https://raw.githubusercontent.com/wiki/IntelRealSense/librealsense/res/capture-expected.png)
+![expected output](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/capture-expected.png)
 
 ## Code Overview 
 

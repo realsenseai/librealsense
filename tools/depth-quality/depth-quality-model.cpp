@@ -1008,6 +1008,8 @@ namespace rs2
                                                            int(depth_profile.width() * (0.5f + 0.5f*_roi_percent)),
                                                            int(depth_profile.height() * (0.5f + 0.5f*_roi_percent)) },
                                                             _roi_percent);
+
+                        sub->streaming_map[RS2_STREAM_DEPTH] = true;
                     }
                 }
 

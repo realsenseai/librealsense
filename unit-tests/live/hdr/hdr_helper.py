@@ -132,6 +132,8 @@ def perform_auto_hdr_test(hdr_config, test_title, resolution=(640, 480)):
         cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, 30)
         pipe.start(cfg)
         log.d(f"Batch size: {batch_size}")
+        valid_batch = True
+        had_any_valid_batch = False # initially, the AE calculated on seq id 0, can cause expected_exposure < 1, but we expect stabilization
         i = 0
         while i < batch_size * 5:
             data = pipe.wait_for_frames()
@@ -162,6 +164,10 @@ def perform_auto_hdr_test(hdr_config, test_title, resolution=(640, 480)):
             expected_exposure = seq_id_0_exp + int(current_controls["depth-ae-exp"])
             expected_gain = seq_id_0_gain + int(current_controls["depth-ae-gain"])
 
+            if expected_exposure < 1:
+                expected_exposure = 1 # if AE didn't stabilize, we can get exposure values where seq_id_0_exp + delta < 1
+                valid_batch = False
+
             test.check(frame_exposure == expected_exposure,
                        f"Exposure - Expected: {expected_exposure}, Actual: {frame_exposure}")
             test.check(frame_gain == expected_gain, f"Gain - Expected: {expected_gain}, Actual: {frame_gain}")
@@ -171,9 +177,14 @@ def perform_auto_hdr_test(hdr_config, test_title, resolution=(640, 480)):
                 test.check(seq_id_counts == expected_iterations,
                            f"Sequence ID counts do not match expected: {seq_id_counts} != {expected_iterations}")
                 seq_id_counts.clear()
+                if valid_batch:
+                    had_any_valid_batch = True
+                valid_batch = True
 
                 log.d("----")
             i += 1
+
+        test.check(had_any_valid_batch, "No valid batch was captured where all expected exposures were >= 1")
 
         pipe.stop()
 

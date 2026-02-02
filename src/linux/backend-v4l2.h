@@ -392,6 +392,7 @@ namespace librealsense
             virtual void stop_data_capture() override;
             virtual void acquire_metadata(buffers_mgr & buf_mgr,fd_set &fds, bool compressed_format = false) override;
             virtual void set_metadata_attributes(buffers_mgr& buf_mgr, __u32 bytesused, uint8_t* md_start);
+            void assign_device_capabilities();
             void subscribe_to_ctrl_event(uint32_t control_id);
             void unsubscribe_from_ctrl_event(uint32_t control_id);
             bool pend_for_ctrl_status_event();
@@ -459,6 +460,7 @@ namespace librealsense
             int _fd = 0;
             frame_drop_monitor _frame_drop_monitor;           // used to check the frames drops kpi
             v4l2_video_md_syncer _video_md_syncer;
+            bool _are_device_capabilities_assigned;
 
         private:
             int _stop_pipe_fd[2]; // write to _stop_pipe_fd[1] and read from _stop_pipe_fd[0]
@@ -477,29 +479,41 @@ namespace librealsense
 
         protected:
 
-            void streamon() const;
-            void streamoff() const;
-            void negotiate_kernel_buffers(size_t num) const;
-            void allocate_io_buffers(size_t num);
-            void map_device_descriptor();
-            void unmap_device_descriptor();
-            void set_format(stream_profile profile);
-            void prepare_capture_buffers();
-            virtual void acquire_metadata(buffers_mgr & buf_mgr,fd_set &fds, bool compressed_format=false);
+            virtual void streamon() const override;
+            virtual void streamoff() const override;
+            virtual void negotiate_kernel_buffers(size_t num) const override;
+            virtual void allocate_io_buffers(size_t num) override;
+            virtual void map_device_descriptor() override;
+            virtual void unmap_device_descriptor() override;
+            virtual void set_format(stream_profile profile) override;
+            virtual void prepare_capture_buffers() override;
+            virtual void acquire_metadata(buffers_mgr & buf_mgr,fd_set &fds, bool compressed_format=false) override;
+            void assign_device_capabilities();
             // checking if metadata is streamed
-            virtual inline bool is_metadata_streamed() const { return _md_fd > 0;}
-            virtual inline std::shared_ptr<buffer> get_md_buffer(__u32 index) const {return _md_buffers[index];}
+            virtual inline bool is_metadata_streamed() const override { return _md_fd > 0;}
+            virtual inline std::shared_ptr<buffer> get_md_buffer(__u32 index) const override {return _md_buffers[index];}
             int _md_fd = -1;
             std::string _md_name = "";
             v4l2_buf_type _md_type = LOCAL_V4L2_BUF_TYPE_META_CAPTURE;
 
             std::vector<std::shared_ptr<buffer>> _md_buffers;
+
+        private:
+            bool _are_device_capabilities_assigned;
         };
 
 
         const uint16_t D457_PID      = 0xABCD;
         const uint16_t D430_GMSL_PID = 0xABCE;
         const uint16_t D415_GMSL_PID = 0xABCF;
+        const uint16_t D401_GMSL_PID = 0xABCC;
+
+        static const std::set<std::uint16_t> mipi_devices_pid = {
+            D457_PID,
+            D430_GMSL_PID,
+            D415_GMSL_PID,
+            D401_GMSL_PID
+        };
 
         // D457 Development. To be merged into underlying class
         class v4l_mipi_device : public v4l_uvc_meta_device

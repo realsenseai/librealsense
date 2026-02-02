@@ -13,7 +13,7 @@ Install `OpenCV` and `opencv_contrib` as described in the [official guide](https
 
 In step 5, along with configuring `OPENCV_EXTRA_MODULES_PATH`, check the `OPENCV_ENABLE_NONFREE` option.
 
-For additional guidelines on building librealsene with OpenCV please follow [OpenCV Samples for Intel RealSense cameras](https://github.com/IntelRealSense/librealsense/blob/master/wrappers/opencv/readme.md). 
+For additional guidelines on building librealsene with OpenCV please follow [OpenCV Samples for Intel RealSense cameras](https://github.com/realsenseai/librealsense/blob/master/wrappers/opencv/readme.md). 
 
 When configuring CMake for librealsense, in addition to checking `BUILD_CV_EXAMPLES`, check the `BUILD_CV_KINFU_EXAMPLE` flag. Also, ensure that `BUILD_GRAPHICAL_EXAMPLES` is checked.
 

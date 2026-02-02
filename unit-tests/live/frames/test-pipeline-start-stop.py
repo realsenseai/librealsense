@@ -2,8 +2,7 @@
 # Copyright(c) 2023-2024 RealSense, Inc. All Rights Reserved.
 
 # test:donotrun:!nightly
-# Currently, we exclude D457 as it's failing
-# test:device each(D400*) !D457
+# test:device each(D400*)
 # test:device each(D500*) 
 # On D455 and other units with IMU it takes ~4 seconds per iteration
 # test:timeout 220

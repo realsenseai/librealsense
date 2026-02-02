@@ -31,13 +31,14 @@ namespace rs2
                                             bool * options_invalidated,
                                             std::string & error_message )
     {
-        for (rs2::option_value option : s->get_supported_option_values())
-        {
-            options_metadata[option->id]
-                = create_option_model( option, opt_base_label, this, s, options_invalidated, error_message );
-        }
         try
         {
+            for( rs2::option_value option : s->get_supported_option_values() )
+            {
+                options_metadata[option->id]
+                    = create_option_model( option, opt_base_label, this, s, options_invalidated, error_message );
+            }
+
             s->on_options_changed( [this]( const options_list & list )
             {
                 for( auto changed_option : list )
@@ -826,21 +827,19 @@ namespace rs2
     {
         bool res = false;
 
-        if (!ui.is_multiple_resolutions)
-        {
-            return false;
-        }
-
         std::vector<rs2_stream> relevant_streams = { RS2_STREAM_DEPTH, RS2_STREAM_INFRARED };
         for (auto&& stream_type : relevant_streams)
         {
             // resolution
             // Draw combo-box with all resolution options for this stream type
-            res &= draw_resolutions_combo_box_multiple_resolutions(error_message, label, streaming_tooltip, col0, col1, stream_type);
+            res |= draw_resolutions_combo_box_multiple_resolutions(error_message, label, streaming_tooltip, col0, col1, stream_type);
 
-            // stream and formats
-            // Draw combo-box with all format options for current stream type
-            res &= draw_formats_combo_box_multiple_resolutions(error_message, label, streaming_tooltip, col0, col1, stream_type);
+            if (draw_streams_selector) 
+            {
+                // stream and formats
+                // Draw combo-box with all format options for current stream type
+                res |= draw_formats_combo_box_multiple_resolutions(error_message, label, streaming_tooltip, col0, col1, stream_type);
+            }
         }
 
         return res;
@@ -864,22 +863,19 @@ namespace rs2
         auto col0 = ImGui::GetCursorPosX();
         auto col1 = 9.f * (float)config_file::instance().get( configurations::window::font_size );
 
-        if (ui.is_multiple_resolutions && !strcmp(s->get_info(RS2_CAMERA_INFO_NAME), "Stereo Module"))
+        if (ui.is_multiple_resolutions)
         {
             if (draw_fps_selector)
             {
                 res |= draw_fps(error_message, label, streaming_tooltip, col0, col1);
             }
 
-            if (draw_streams_selector)
+            if (!streaming)
             {
-                if (!streaming)
-                {
-                    ImGui::Text("Available Streams:");
-                }
-
-                res |= draw_res_stream_formats(error_message, label, streaming_tooltip, col0, col1);
+                ImGui::Text("Available Streams:");
             }
+
+            res |= draw_res_stream_formats(error_message, label, streaming_tooltip, col0, col1);
         }
         else
         {
@@ -1514,11 +1510,21 @@ namespace rs2
     void subdevice_model::pause()
     {
         _pause = true;
+        auto playback_dev = dev.as<rs2::playback>();
+        if (playback_dev && playback_dev.current_status() == RS2_PLAYBACK_STATUS_PLAYING)
+        {
+            playback_dev.pause();
+        }
     }
 
     void subdevice_model::resume()
     {
         _pause = false;
+        auto playback_dev = dev.as<rs2::playback>();
+        if (playback_dev && playback_dev.current_status() == RS2_PLAYBACK_STATUS_PAUSED)
+        {
+            playback_dev.resume();
+        }
     }
 
     //The function decides if specific frame should be sent to the syncer

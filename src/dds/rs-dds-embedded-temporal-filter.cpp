@@ -62,74 +62,32 @@ namespace librealsense {
         if (get_option_handler(option_id))
             throw std::runtime_error("option '" + option->get_name() + "' already exists in sensor");
 
-        // In below implementation: 
-        // - setting one option leads to 
-        //   * setting the new value for one option, and
-        //   * sending also the other current values for the other filter's values
+        // In below implementation:
+        // - setting one option leads to
+        //   * setting the new value for one option in the device,
+        //   * setting the value also in the DDS filter
         // - getting one option leads to:
         //   * returning only the relevant option's value
         //   * the getting of the filter's options communicating with the device by DDS
         //     is not necessary, since the value is already automatically updated by the set action reply
-        // 
-        // Create different option types based on the option name
-        if (option->get_name() == PERSISTENCY_OPTION_NAME)
-        {
-            // Create a ptr_option-style option for persistency with descriptions like temporal filter
-            auto temporal_persistence_control = std::make_shared<rs_dds_option_items_desc<int32_t>>(
-                option,
-                std::map<float, std::string>{
-                    {0.f, "Disabled"},
-                    {1.f, "Valid in 8/8"},
-                    {2.f, "Valid in 2/last 3"},
-                    {3.f, "Valid in 2/last 4"},
-                    {4.f, "Valid in 2/8"},
-                    {5.f, "Valid in 1/last 2"},
-                    {6.f, "Valid in 1/last 5"},
-                    {7.f, "Valid in 1/8"},
-                    {8.f, "Always on"}
-                },
-                [=](json value) // set_option cb for the filter's options
-                {
-                    // create a proper option json with name and value
-                    json option_with_value = dds_option_to_name_and_value_json(option, value);
-                    // validate values
-                    validate_filter_option(option_with_value);
-                    // set updated options to the remote device
-                    _set_ef_cb(option_with_value);
-                    // Delegate to DDS filter
-                    _dds_ef->set_options(option_with_value);
-                },
-                [=]() -> json // get_option cb for the filter's options
-                {
-                    return option->get_value();
-                });
-
-            register_option(option_id, temporal_persistence_control);
-            _options_watcher.register_option(option_id, temporal_persistence_control);
-        }
-        else
-        {
-            // For other options, use the regular rs_dds_option
-            auto opt = std::make_shared< rs_dds_option >(
-                option,
-                [=](json value) // set_option cb for the filter's options
-                {
-                    // create a proper option json with name and value
-                    json option_with_value = dds_option_to_name_and_value_json(option, value);
-                    // validate values
-                    validate_filter_option(option_with_value);
-                    // set updated options to the remote device
-                    _set_ef_cb(option_with_value);
-                    // Delegate to DDS filter
-                    _dds_ef->set_options(option_with_value);
-                },
-                [=]() -> json // get_option cb for the filter's options
-                {
-                    return option->get_value();
-                });
-            register_option(option_id, opt);
-            _options_watcher.register_option(option_id, opt);
-        }
+        auto opt = std::make_shared< rs_dds_option >(
+            option,
+            [=]( json value )  // set_option cb for the filter's options
+            {
+                // create a proper option json with name and value
+                json option_with_value = dds_option_to_name_and_value_json( option, value );
+                // validate values
+                validate_filter_option( option_with_value );
+                // set updated options to the remote device
+                _set_ef_cb( option_with_value );
+                // Delegate to DDS filter
+                _dds_ef->set_options( option_with_value );
+            },
+            [=]() -> json  // get_option cb for the filter's options
+            { return option->get_value(); } );
+        register_option( option_id, opt );
+        _options_watcher.register_option( option_id, opt );
+        
     }
 
     void rs_dds_embedded_temporal_filter::validate_filter_option(rsutils::json option_j) const
@@ -218,17 +176,13 @@ namespace librealsense {
     void rs_dds_embedded_temporal_filter::validate_persistency_option(rsutils::json opt_j) const
     {
         auto dds_persistency = find_dds_option_by_name(_dds_ef->get_options(), PERSISTENCY_OPTION_NAME);
-        int32_t persistency_val = opt_j[PERSISTENCY_OPTION_NAME].get<int32_t>();
-        // Check range using DDS option
-        if (!dds_persistency->get_minimum_value().is_null() && persistency_val < dds_persistency->get_minimum_value().get<int32_t>())
+        std::string persistency_val = opt_j[PERSISTENCY_OPTION_NAME].get<std::string>();
+        // Check range not relevant for string
+        // Checking that len is no more than max len to avoid DDS errors
+        if( persistency_val.size() > PERSISTENCY_MAX_LEN )
         {
-            throw std::invalid_argument("Persistency value " + std::to_string(persistency_val) +
-                " is below minimum " + std::to_string(dds_persistency->get_minimum_value().get<int32_t>()));
-        }
-        if (!dds_persistency->get_maximum_value().is_null() && persistency_val > dds_persistency->get_maximum_value().get<int32_t>())
-        {
-            throw std::invalid_argument("Persistency value " + std::to_string(persistency_val) +
-                " is above maximum " + std::to_string(dds_persistency->get_maximum_value().get<int32_t>()));
+            throw std::invalid_argument("Persistency value " + (persistency_val) +
+                " is too long ");
         }
     }
 

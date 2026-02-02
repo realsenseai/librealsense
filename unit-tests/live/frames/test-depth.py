@@ -22,8 +22,7 @@ DEBUG_MODE = False
 # Defines how far in cm do pixels have to be, to be considered in a different distance
 # for example, 5 for 5cm, will define the range 100-104 cm as one (as 100)
 DETAIL_LEVEL = 5 
-BLACK_PIXEL_THRESHOLD = 0.8 # Fail if more than 80% pixels are zero
-DEPTH_PERCENTAGE = 0.5  # Percentage of pixels that need to have different values to be considered meaningful
+BLACK_PIXEL_THRESHOLD = 0.5 # Fail if more than 50% pixels are zero
 FRAMES_TO_CHECK = 30 # Number of frames to check for meaningful depth
 
 dev, ctx = test.find_first_device_or_exit()
@@ -110,12 +109,11 @@ def get_distances(depth_frame):
     return dists, total
 
 
-def is_depth_meaningful(save_image=False, show_image=False):
+def is_depth_fill_rate_enough(save_image=False, show_image=False):
     """
-    Checks if the camera is showing a frame with a meaningful depth.
-    DETAIL_LEVEL is setting how close distances need to be, to be considered the same
+    Checks if the camera is showing a frame with a enough depth fill rate.
 
-    returns true if frame shows meaningful depth
+    returns true if frame depth fill rate is enough
     """
     frames = pipeline.wait_for_frames()
     depth = frames.get_depth_frame()
@@ -137,14 +135,13 @@ def is_depth_meaningful(save_image=False, show_image=False):
     dists_no_zero = {k: v for k, v in dists.items() if k != 0}
     if save_image or show_image:
         frames_to_image(depth, color, save_image, show_image)
-    # If any distance is the same on more than DEPTH_PERCENTAGE of the pixels, there is no meaningful depth
     # Find the largest non-zero depth bin
     max_nonzero_count = max(dists_no_zero.values()) if dists_no_zero else 0
     max_nonzero_percent = 100.0 * max_nonzero_count / total if total > 0 else 0
-    meaningful_depth = not (max_nonzero_count > total * DEPTH_PERCENTAGE)
     fill_rate = 100.0 * (total - num_blank_pixels) / total if total > 0 else 0
-    log.i(f"Depth fill rate: {fill_rate:.1f}% (blank pixels: {num_blank_pixels}/{total}), meaningful depth: {meaningful_depth} (largest bin: {max_nonzero_percent:.1f}% - max allowed {DEPTH_PERCENTAGE * 100:.1f}%)")
-    return meaningful_depth, num_blank_pixels
+    fill_rate_ok = fill_rate > (1 - BLACK_PIXEL_THRESHOLD) * 100.0
+    log.i(f"Depth fill rate: {fill_rate:.1f}% (blank pixels: {num_blank_pixels}/{total}")
+    return fill_rate_ok, num_blank_pixels
 
 
 ################################################################################################
@@ -160,7 +157,7 @@ has_depth = False
 
 # we check a few different frames to try and detect depth
 for frame_num in range(FRAMES_TO_CHECK):
-    has_depth, laser_black_pixels = is_depth_meaningful(save_image=DEBUG_MODE, show_image=DEBUG_MODE)
+    has_depth, laser_black_pixels = is_depth_fill_rate_enough(save_image=DEBUG_MODE, show_image=DEBUG_MODE)
     if has_depth:
         break
 

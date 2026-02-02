@@ -116,7 +116,7 @@ namespace rs2
 
     void open_issue(std::string body)
     {
-        std::string link = "https://github.com/IntelRealSense/librealsense/issues/new?body=" + url_encode(body);
+        std::string link = "https://github.com/realsenseai/librealsense/issues/new?body=" + url_encode(body);
         open_url(link.c_str());
     }
 
@@ -406,6 +406,9 @@ namespace rs2
                     auto value = dev.get_info(info);
                     infos.push_back({ std::string(rs2_camera_info_to_string(info)),
                                       std::string(value) });
+
+                    if( info == RS2_CAMERA_INFO_PRODUCT_LINE )
+                        _is_d500_device = strcmp( value, "D500" ) == 0;
                 }
             }
             catch (...)
@@ -894,20 +897,27 @@ namespace rs2
                 }
                 else
                 {
-                    ImGui::TextColored(redish, "Device is not in advanced mode");
-                    std::string button_text = rsutils::string::from() << "Turn on Advanced Mode" << "##" << id;
-                    static bool show_yes_no_modal = false;
-                    if (ImGui::Button(button_text.c_str(), ImVec2{ 226, 0 }))
+                    if( _is_d500_device )  // D500 cannot toggle Advanced Mode
                     {
-                        show_yes_no_modal = true;
+                        ImGui::TextColored( redish, "Device FW does not support advanced mode" );
                     }
-                    if (ImGui::IsItemHovered())
+                    else
                     {
-                        RsImGui::CustomTooltip("Advanced mode is a persistent camera state unlocking calibration formats and depth generation controls\nYou can always reset the camera to factory defaults by disabling advanced mode");
-                    }
-                    if (show_yes_no_modal)
-                    {
-                        show_yes_no_modal = prompt_toggle_advanced_mode(true, "\t\tAre you sure you want to turn on Advanced Mode?\t\t", restarting_device_info, view, window, error_message);
+                        ImGui::TextColored( redish, "Device is not in advanced mode" );
+                        std::string button_text = rsutils::string::from() << "Turn on Advanced Mode" << "##" << id;
+                        static bool show_yes_no_modal = false;
+                        if (ImGui::Button(button_text.c_str(), ImVec2{ 226, 0 }))
+                        {
+                            show_yes_no_modal = true;
+                        }
+                        if (ImGui::IsItemHovered())
+                        {
+                            RsImGui::CustomTooltip("Advanced mode is a persistent camera state unlocking calibration formats and depth generation controls\nYou can always reset the camera to factory defaults by disabling advanced mode");
+                        }
+                        if (show_yes_no_modal)
+                        {
+                            show_yes_no_modal = prompt_toggle_advanced_mode(true, "\t\tAre you sure you want to turn on Advanced Mode?\t\t", restarting_device_info, view, window, error_message);
+                        }
                     }
                 }
             }
@@ -1346,12 +1356,13 @@ namespace rs2
                 {
                     const bool is_advanced_mode_enabled = adv.is_enabled();
                     bool selected = is_advanced_mode_enabled;
-                    if (ImGui::MenuItem("Advanced Mode", nullptr, &selected))
+                    // D500 cannot toggle Advanced Mode
+                    if( ! _is_d500_device && ImGui::MenuItem( "Advanced Mode", nullptr, &selected ) )
                     {
                         show_advanced_mode_popup = true;
-                    }
 
-                    ImGui::Separator();
+                        ImGui::Separator();
+                    }
                 }
 
                 if (ImGui::Selectable("Hardware Reset"))
@@ -2132,7 +2143,8 @@ namespace rs2
             }
             else
             {
-                require_advanced_mode_enable_prompt = true;
+                if( ! _is_d500_device )
+                    require_advanced_mode_enable_prompt = true;
             }
         }}, load_button_disabled);
         if (ImGui::IsItemHovered())

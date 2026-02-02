@@ -2,7 +2,7 @@
 # Copyright(c) 2025 RealSense Inc. All Rights Reserved.
 
 # Currently only D555 supports DDS configuration natively
-# test:device each(D555)
+# test:device D555
 
 import pyrealsense2 as rs
 import pyrsutils as rsutils
@@ -39,6 +39,31 @@ with test.closure("Test link timeout configuration"):
     set_eth_config( new_config )
     updated_config = get_eth_config()
     test.check( updated_config.link.timeout == orig_config.link.timeout * 2 )
+
+    if new_config.header.version >= 5:
+        new_config.link.timeout = 1000
+        try:
+            set_eth_config( new_config )
+        except ValueError as e:
+            test.check_exception( e, ValueError, "Link timeout should be 2000-30000. Current 1000" )
+        else:
+            test.unreachable()
+
+        new_config.link.timeout = 31000
+        try:
+            set_eth_config( new_config )
+        except ValueError as e:
+            test.check_exception( e, ValueError, "Link timeout should be 2000-30000. Current 31000" )
+        else:
+            test.unreachable()
+
+        new_config.link.timeout = 2345
+        try:
+            set_eth_config( new_config )
+        except ValueError as e:
+            test.check_exception( e, ValueError, "Link timeout must be divisible by 100. Current 2345" )
+        else:
+            test.unreachable()
 
 with test.closure("Test MTU configuration"):
     new_config.link.mtu = 4000
@@ -102,6 +127,29 @@ with test.closure("Test transmission delay configuration"):
         else:
             test.unreachable()
     new_config.transmission_delay = orig_config.transmission_delay # Restore field that might fail other tests, depending header version.
+
+with test.closure("Test UDP TTL configuration"):
+    new_config.udp_ttl = 128
+    if new_config.header.version < 5:
+        try:
+            set_eth_config( new_config )
+        except ValueError as e:
+            test.check_exception( e, ValueError, "Camera FW does not support changing UDP TTL value." )
+        else:
+            test.unreachable()
+    else:
+        set_eth_config( new_config )
+        updated_config = get_eth_config()
+        test.check( updated_config.udp_ttl == 128 )
+
+        new_config.udp_ttl = 300
+        try:
+            set_eth_config( new_config )
+        except ValueError as e:
+            test.check_exception( e, ValueError, "UDP TTL should be 1-255 (or 0 for system default). Current 300" )
+        else:
+            test.unreachable()
+    new_config.udp_ttl = orig_config.udp_ttl # Restore field that might fail other tests, depending header version.
 
 with test.closure("Test configuration failures"): # Failures depending on version tested separately
     new_config.header.version = 2

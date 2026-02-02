@@ -11,6 +11,7 @@
 #include <realdds/dds-defines.h>
 #include <realdds/dds-metadata-syncer.h>
 #include <realdds/dds-embedded-filter.h>
+#include <realdds/dds-stream-profile.h>
 
 #include <rsutils/json-fwd.h>
 #include <memory>
@@ -98,7 +99,7 @@ public:
 protected:
     void register_converters();
     stream_profiles init_stream_profiles() override;
-    void calculate_bandwidth( const std::shared_ptr< librealsense::video_stream_profile > & vsp );
+    void log_bandwidth( const std::shared_ptr< librealsense::video_stream_profile > & vsp ) const;
 
     std::shared_ptr< realdds::dds_video_stream_profile >
     find_profile( sid_index sidx, realdds::dds_video_stream_profile const & profile ) const;
@@ -106,6 +107,8 @@ protected:
     std::shared_ptr< realdds::dds_motion_stream_profile >
     find_profile( sid_index sidx, realdds::dds_motion_stream_profile const & profile ) const;
 
+    realdds::dds_stream_profiles find_dds_profiles( const librealsense::stream_profiles & source_profiles ) const;
+    
     void handle_video_data( std::vector< uint8_t > &&,
                             realdds::dds_time &&,
                             realdds::dds_sample &&,

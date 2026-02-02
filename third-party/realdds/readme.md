@@ -39,7 +39,7 @@ Consumes data produced by a server: a *stream* is the client to a stream-server,
 
 #### ROS2
 
-[ROS2](https://docs.ros.org/) is one of the clients for which effort has been expended in order to be compliant. This is direct-to-ROS compliance that does not require use of a custom node (based on librealsense) for translation (as the [ROS Wrapper for Intel® RealSense™ cameras](https://github.com/IntelRealSense/realsense-ros) is): ROS is a DDS participant like any other Client.
+[ROS2](https://docs.ros.org/) is one of the clients for which effort has been expended in order to be compliant. This is direct-to-ROS compliance that does not require use of a custom node (based on librealsense) for translation (as the [ROS Wrapper for Intel® RealSense™ cameras](https://github.com/realsenseai/realsense-ros) is): ROS is a DDS participant like any other Client.
 
 Specifically, at this time, the requirement is that ROS nodes should be able to:
 1. See any streams that RealDDS exposes

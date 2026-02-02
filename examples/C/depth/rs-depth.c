@@ -1,5 +1,5 @@
 // License: Apache 2.0. See LICENSE file in root directory.
-// Copyright(c) 2017-24 Intel Corporation. All Rights Reserved.
+// Copyright(c) 2017-24 RealSense, Inc. All Rights Reserved.
 
 /* Include the librealsense C header files */
 #include <librealsense2/rs.h>

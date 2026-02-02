@@ -36,7 +36,6 @@ def get_max_enum_time_by_device( dev ):
         return MAX_ENUM_TIME_D400
     elif dev.get_info( rs.camera_info.product_line ) == "D500":
         if dev.get_info( rs.camera_info.connection_type) == "DDS":
-            print(18)
             return MAX_ENUM_TIME_D500 + 3  # some extra time for discovery and initialization for DDS
         return MAX_ENUM_TIME_D500
     return 0

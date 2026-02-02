@@ -481,6 +481,8 @@ EXPORTS
     rs2_set_mtu
     rs2_get_transmission_delay
     rs2_set_transmission_delay
+    rs2_get_udp_ttl
+    rs2_set_udp_ttl
     rs2_restore_default_eth_config
 
     rs2_query_embedded_filters

@@ -232,10 +232,9 @@ with test.remote.fork( nested_indent='  S' ) as remote:
         test.check_false( d2.is_ready() )
 
     #############################################################################################
-    with test.closure( "Offline device shouldn't accept controls" ):
-        test.check_throws( lambda:
-            d1.query_option_value( d1.streams()[0].options()[0] ),
-            RuntimeError, 'device is offline' )
+    with test.closure( "Offline device doesn't have streams or options" ):
+        test.check( len( d1.streams() ) == 0 )
+        test.check( len( d1.options() ) == 0 )
 
     #############################################################################################
     with test.closure( "Unbroadcast server still sends out init messages" ):

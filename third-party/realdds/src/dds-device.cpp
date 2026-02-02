@@ -37,10 +37,10 @@ bool dds_device::is_online() const
 }
 
 
-void dds_device::wait_until_ready( size_t timeout_ms ) const
+bool dds_device::wait_until_ready( size_t timeout_ms, bool allow_partial_capabilities ) const
 {
     if( is_ready() )
-        return;
+        return true;
 
     if( ! timeout_ms )
         DDS_THROW( runtime_error, "device is " << ( is_online() ? "not ready" : "offline" ) );
@@ -51,7 +51,14 @@ void dds_device::wait_until_ready( size_t timeout_ms ) const
     do
     {
         if( timer.has_expired() )
+        {
+            if( allow_partial_capabilities && _impl->is_initializing() )
+            {
+                _impl->set_state( impl::state_t::READY );
+                return false;
+            }
             DDS_THROW( runtime_error, "[" << debug_name() << "] timeout waiting to get ready" );
+        }
         std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
         if( was_online )
         {
@@ -62,6 +69,8 @@ void dds_device::wait_until_ready( size_t timeout_ms ) const
             was_online = is_online();
     }
     while( ! is_ready() );
+
+    return true;
 }
 
 
@@ -126,7 +135,7 @@ void dds_device::on_discovery_restored( topics::device_info const & new_info )
         DDS_THROW( runtime_error, "device serial number cannot change" );
 
     _impl->_info = new_info;
-    _impl->set_state( impl::state_t::ONLINE );
+    _impl->set_state( impl::state_t::INITIALIZING );
     // NOTE: still not ready - pending handshake/reinitialization
 }
 
@@ -192,6 +201,12 @@ void dds_device::open( const dds_stream_profiles & profiles )
     _impl->open( profiles );
 }
 
+void dds_device::close( const dds_stream_profiles & profiles )
+{
+    wait_until_ready( 0 );  // throw if not
+    _impl->close( profiles );
+}
+
 void dds_device::set_option_value( const std::shared_ptr< dds_option > & option, json new_value )
 {
     wait_until_ready( 0 );  // throw if not
@@ -206,13 +221,13 @@ json dds_device::query_option_value( const std::shared_ptr< dds_option > & optio
 
 void dds_device::set_embedded_filter(const std::shared_ptr< dds_embedded_filter >& filter, const json& options_value)
 {
-    wait_until_ready(0);  // throw if not
+    wait_until_ready( 0 );  // throw if not
     _impl->set_embedded_filter(filter, options_value);
 }
 
 json dds_device::query_embedded_filter(const std::shared_ptr< dds_embedded_filter >& filter)
 {
-    wait_until_ready(0);  // throw if not
+    wait_until_ready( 0 );  // throw if not
     return _impl->query_embedded_filter(filter);
 }
 

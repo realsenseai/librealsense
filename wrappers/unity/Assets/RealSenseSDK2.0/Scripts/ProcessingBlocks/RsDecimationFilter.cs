@@ -2,7 +2,7 @@
 using UnityEngine;
 
 [ProcessingBlockDataAttribute(typeof(DecimationFilter))]
-[HelpURL("https://github.com/IntelRealSense/librealsense/blob/master/doc/post-processing-filters.md#decimation-filter")]
+[HelpURL("https://github.com/realsenseai/librealsense/blob/master/doc/post-processing-filters.md#decimation-filter")]
 public class RsDecimationFilter : RsProcessingBlock
 {
     public Stream _streamFilter = Stream.Depth;

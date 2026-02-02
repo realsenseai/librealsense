@@ -40,6 +40,7 @@ def extract_version_from_filename(file_path):
     Extracts the version string from a filename like:
     FlashGeneratedImage_Image5_16_7_0.bin -> 5.16.7
     FlashGeneratedImage_RELEASE_DS5_5_16_3_1.bin -> 5.16.3.1
+    d555e_20251107_7_56_19919_4144.img -> 7.56.19919.4144
 
     Args:
         file_path (str): Full path to the file.
@@ -52,18 +53,26 @@ def extract_version_from_filename(file_path):
         return None
 
     filename = os.path.basename(file_path)
-    match = re.search(r'_(\d+)_(\d+)_(\d+)_(\d+).(bin|img)', filename)
-    if match:
-        groups = match.groups()[:-1] # exclude the file extension
-        if groups[3] == '0':
-            version_str = ".".join(groups[:3])
-        else:
-            version_str = ".".join(groups)
-        return rsutils.version(version_str)
-    else:
-        log.i(f"Version not found in filename: {filename}")
 
-    return None
+    # Match *last* 4 numeric groups before .img/.bin
+    # following matching patterns for cases:
+    # FlashGeneratedImage_Image5_16_7_0.bin -> 5.16.7
+    # FlashGeneratedImage_RELEASE_DS5_5_16_3_1.bin -> 5.16.3.1
+    match = re.search(r'(\d+)_(\d+)_(\d+)_(\d+)\.(bin|img)$', filename)
+    if not match:
+        # Match patterns like d555e_20251107_7_56_19919_4144.img -> 7.56.19919.4144
+        match = re.search(r'_(\d+)_(\d+)_(\d+)_(\d+).(bin|img)', filename)
+        if not match:
+            log.i(f"Version not found in filename: {filename}")
+            return None
+
+    a, b, c, d, _ = match.groups()
+
+    # Drop the last part only if it equals "0"
+    if d == "0":
+        return rsutils.version(f"{a}.{b}.{c}")
+    else:
+        return rsutils.version(f"{a}.{b}.{c}.{d}")
 
 
 def get_update_counter(device):

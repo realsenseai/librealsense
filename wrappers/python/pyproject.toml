@@ -41,7 +41,7 @@ classifiers = [
 path = "pyrealsense2/_version.py"
 
 [project.urls]
-homepage = "https://github.com/IntelRealSense/librealsense"
+homepage = "https://github.com/realsenseai/librealsense"
 
 [tool.hatch.build]
 artifacts = [

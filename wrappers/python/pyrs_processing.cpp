@@ -203,10 +203,10 @@ void init_processing(py::module &m) {
     // rs2::rates_printer
 
     py::class_<rs2::embedded_filter, rs2::options> embedded_filter(m, "embedded_filter", "Define the embedded filter workflow.");
-    embedded_filter
-        .def(BIND_DOWNCAST(embedded_filter, embedded_decimation_filter))
-        .def(BIND_DOWNCAST(embedded_filter, embedded_temporal_filter))
-        .def("__bool__", &rs2::embedded_filter::operator bool);   // Called to implement truth value testing in Python 3
+    embedded_filter.def( BIND_DOWNCAST( embedded_filter, embedded_decimation_filter ) )
+        .def( BIND_DOWNCAST( embedded_filter, embedded_temporal_filter ) )
+        .def( "__bool__", &rs2::embedded_filter::operator bool )  // Called to implement truth value testing in Python 3
+        .def( "get_type", &rs2::embedded_filter::get_type, "Get the embedded filter type" );
 
     py::class_<rs2::embedded_decimation_filter, rs2::embedded_filter> embedded_decimation_filter(m, "embedded_decimation_filter",
         "Define the embedded decimation filter workflow.");

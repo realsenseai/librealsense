@@ -42,6 +42,7 @@ namespace librealsense
         const uint16_t RS400_MIPI_RECOVERY_PID = 0xbbcd; // D4XX MIPI DFU Recovery
         const uint16_t RS430_GMSL_PID = 0xabce; // D430 GMSL
         const uint16_t RS415_GMSL_PID = 0xabcf; // D415 GMSL
+        const uint16_t RS401_GMSL_PID = 0xabcc; // D401 GMSL
 
         // d400 Devices supported by the current version
         static const std::set<std::uint16_t> rs400_sku_pid = {
@@ -70,7 +71,8 @@ namespace librealsense
             ds::RS455_PID,
             ds::RS457_PID,
             ds::RS430_GMSL_PID,
-            ds::RS415_GMSL_PID
+            ds::RS415_GMSL_PID,
+            ds::RS401_GMSL_PID
         };
 
         static const std::set<std::uint16_t> d400_multi_sensors_pid = {
@@ -86,13 +88,15 @@ namespace librealsense
             ds::RS455_PID,
             ds::RS457_PID,
             ds::RS430_GMSL_PID,
-            ds::RS415_GMSL_PID
+            ds::RS415_GMSL_PID,
+            ds::RS401_GMSL_PID
         };
 
         static const std::set<std::uint16_t> d400_mipi_device_pid = {
             ds::RS457_PID,
             ds::RS430_GMSL_PID,
-            ds::RS415_GMSL_PID
+            ds::RS415_GMSL_PID,
+            ds::RS401_GMSL_PID
         };
 
         static const std::set<std::uint16_t> d400_hid_sensors_pid = {
@@ -149,6 +153,7 @@ namespace librealsense
             { RS400_MIPI_RECOVERY_PID,   "Intel RealSense D4XX MIPI Recovery"},
             { RS430_GMSL_PID,       "Intel RealSense D430" },
             { RS415_GMSL_PID,       "Intel RealSense D415" },
+            { RS401_GMSL_PID,       "Intel RealSense D401" },
         };
 
         static std::map<uint16_t, std::string> d400_device_to_fw_min_version = {
@@ -180,7 +185,8 @@ namespace librealsense
             {RS457_PID, "5.16.8.0" },
             {RS400_MIPI_RECOVERY_PID, "5.16.0.1" },
             {RS430_GMSL_PID, "5.16.8.0" },
-            {RS415_GMSL_PID, "5.17.1.1" }
+            {RS415_GMSL_PID, "5.17.1.1" },
+            {RS401_GMSL_PID, "5.17.2.100" } // TO BE UPDATED!!!
         };
 
         std::vector<platform::uvc_device_info> filter_d400_device_by_capability(
@@ -205,6 +211,27 @@ namespace librealsense
             uint8_t min_gvd_version = cap->second;
             return min_gvd_version <= cur_gvd_version;
         }
+
+        namespace d400_gvd_offsets 
+        {
+            constexpr size_t version_offset = 0;
+            constexpr size_t gvd_version_offset = 2;
+            constexpr size_t camera_fw_version_offset = 12;
+            constexpr size_t is_camera_locked_offset = 25;
+            constexpr size_t module_serial_offset = 48;
+            constexpr size_t module_asic_serial_offset = 64;
+            constexpr size_t fisheye_sensor_lb = 112;
+            constexpr size_t fisheye_sensor_hb = 113;
+            constexpr size_t imu_acc_chip_id = 124;
+            constexpr size_t hw_type_offset = 158;
+            constexpr size_t ip65_sealed_offset = 161;
+            constexpr size_t ir_filter_offset = 164;
+            constexpr size_t depth_sensor_type = 166;
+            constexpr size_t active_projector = 170;
+            constexpr size_t rgb_sensor = 174;
+            constexpr size_t imu_sensor = 178;
+            constexpr size_t motion_module_fw_version_offset = 212;
+        } 
 
         std::string extract_firmware_version_string( const std::vector< uint8_t > & fw_image );
 

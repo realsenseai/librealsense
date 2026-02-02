@@ -1,6 +1,7 @@
 //// License: Apache 2.0. See LICENSE file in root directory.
 //// Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
 
+#include "context.h"
 #include "ds-private.h"
 
 using namespace std;
@@ -116,6 +117,12 @@ namespace librealsense
             res += "param:\t" + std::to_string(param) + "\n";
             res += "crc32:\t" + std::to_string(crc32) + "\n";
             return res;
+        }
+
+        bool is_partial_device_allowed( const std::shared_ptr< context > & ctx )
+        {
+            auto settings = ctx->get_settings();
+            return settings.nested( "partial-device-allowed" ).default_value< bool >( false );
         }
     } // librealsense::ds
 } // namespace librealsense
