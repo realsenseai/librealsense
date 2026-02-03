@@ -89,7 +89,7 @@ pipeline.start(config)
 profile = pipeline.get_active_profile()
 depth_profile = rs.video_stream_profile(profile.get_stream(rs.stream.depth))
 depth_intrinsics = depth_profile.get_intrinsics()
-w, h = depth_intrinsics.width, depth_intrinsics.height
+w_original, h_original = depth_intrinsics.width, depth_intrinsics.height
 
 # Processing blocks
 pc = rs.pointcloud()
@@ -145,7 +145,7 @@ def mouse_cb(event, x, y, flags, param):
 
 
 cv2.namedWindow(state.WIN_NAME, cv2.WINDOW_AUTOSIZE)
-cv2.resizeWindow(state.WIN_NAME, w, h)
+cv2.resizeWindow(state.WIN_NAME, w_original, h_original)
 cv2.setMouseCallback(state.WIN_NAME, mouse_cb)
 
 
@@ -273,7 +273,7 @@ def pointcloud(out, verts, texcoords, color, painter=True):
     out[i[m], j[m]] = color[u[m], v[m]]
 
 
-out = np.empty((h, w, 3), dtype=np.uint8)
+out = np.empty((h_original, w_original, 3), dtype=np.uint8)
 
 while True:
     # Grab camera data
