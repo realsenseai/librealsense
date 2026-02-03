@@ -19,6 +19,7 @@
 #include <src/labeled-points.h>
 
 #include <rsutils/string/from.h>
+#include <fstream>   // for std::ifstream
 
 namespace librealsense
 {
@@ -298,9 +299,7 @@ namespace librealsense
         }
         else if (stream_id.stream_type == RS2_STREAM_MOTION)
         {
-            auto data_imu = *reinterpret_cast<const rs2_combined_motion*>(frame.frame->get_frame_data());
-            size = sizeof(data_imu);
-            data_ptr = reinterpret_cast<const float*>(frame.frame->get_frame_data());
+            size = sizeof(rs2_combined_motion);
         }
         auto buffer = create_buffer(data_ptr, size);
         auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
