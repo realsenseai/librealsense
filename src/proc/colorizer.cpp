@@ -11,6 +11,23 @@
 #include "colorizer.h"
 #include "disparity-transform.h"
 
+
+#ifdef _WIN32
+#include <intrin.h>
+#define cpuid(info, x) __cpuidex(info, x, 0)
+#else
+#include <cpuid.h>
+
+extern cpuid(int info[4], int info_type); // in colorizer.cpp
+#endif
+
+bool has_avx2()
+{
+	int info[4];
+	cpuid(info, 7);
+	return (info[1] & ((int)1 << 5)) != 0;
+}
+
 namespace librealsense
 {
     static color_map hue{ {
@@ -277,7 +294,21 @@ namespace librealsense
                 auto pixels = (float)_hist_data[MAX_DEPTH - 1];
                 return (hist_data / pixels);
             };
-
+#if defined(__AVX2__) and !defined(ANDROID)
+           auto coloring_function_avx = [&, this] ( const short unsigned int* data) {
+                __m256 hist_data = _mm256_set_ps( (float) _hist_data[(int)*(data+7)],
+                                                  (float) _hist_data[(int)*(data+6)],
+                                                  (float) _hist_data[(int)*(data+5)],
+                                                  (float) _hist_data[(int)*(data+4)],
+                                                  (float) _hist_data[(int)*(data+3)],
+                                                  (float) _hist_data[(int)*(data+2)],
+                                                  (float) _hist_data[(int)*(data+1)],
+                                                  (float) _hist_data[(int)*(data+0)] );
+                __m256 pixels = _mm256_set1_ps(   (float) _hist_data[MAX_DEPTH - 1 ] );
+                __m256 f = _mm256_div_ps( hist_data, pixels );
+                return f;
+            };
+#endif
             if (depth_format == RS2_FORMAT_DISPARITY32)
             {
                 auto depth_data = reinterpret_cast<const float*>(depth.get_data());
@@ -288,7 +319,14 @@ namespace librealsense
             {
                 auto depth_data = reinterpret_cast<const uint16_t*>(depth.get_data());
                 update_histogram(_hist_data, depth_data, w, h);
+#if defined(__AVX2__) and !defined(ANDROID)
+		if (has_avx2()) 
+			make_rgb_data_avx2<uint16_t>(depth_data, rgb_data, w, h, coloring_function_avx);
+		else
+                	make_rgb_data<uint16_t>(depth_data, rgb_data, w, h, coloring_function);
+#else
                 make_rgb_data<uint16_t>(depth_data, rgb_data, w, h, coloring_function);
+#endif
             }
         };
 
