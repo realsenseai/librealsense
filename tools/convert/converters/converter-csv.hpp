@@ -59,16 +59,16 @@ namespace rs2 {
                 rs2_stream _streamType;
                 std::string _filePath;
                 std::map<std::pair<rs2_stream, int>, std::vector<motion_pose_frame_record>> _imu_pose_collection;
-                bool _sub_workers_joined;
-                std::mutex _m;
-                std::condition_variable _cv;
-
 
             public:
 
                 converter_csv(const std::string& filePath, rs2_stream streamType = rs2_stream::RS2_STREAM_ANY);
 
                 void convert(rs2::frame& frame) override;
+
+                void wait() override { }
+
+                void flush() override;
                 
                 std::string name() const override
                 {
