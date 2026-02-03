@@ -108,6 +108,13 @@ OniStatus Rs2Stream::setProperty(int propertyId, const void* data, int dataSize)
 			}
 			break;
 		}
+		
+		case ONI_STREAM_PROPERTY_MIRRORING:
+		{
+			// Doesn't do anything, but prevents certain 3D scanning applications from crashing.
+			return ONI_STATUS_OK;
+			break;
+		}
 
 		default:
 		{
@@ -402,11 +409,11 @@ OniBool Rs2Stream::isPropertySupported(int propertyId)
 		case ONI_STREAM_PROPERTY_MAX_VALUE:				// int
 		case ONI_STREAM_PROPERTY_MIN_VALUE:				// int
 		case ONI_STREAM_PROPERTY_STRIDE:				// int
-		case ONI_STREAM_PROPERTY_MIRRORING:				// OniBool
 			return true;
 
 		
 		case ONI_STREAM_PROPERTY_NUMBER_OF_FRAMES:		// int
+		case ONI_STREAM_PROPERTY_MIRRORING:				// OniBool
 			return false;
 
 		case ONI_STREAM_PROPERTY_AUTO_WHITE_BALANCE:	// OniBool
