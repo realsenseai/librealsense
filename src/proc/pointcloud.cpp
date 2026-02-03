@@ -28,15 +28,23 @@
 
 namespace librealsense
 {
-    template<class MAP_DEPTH> void deproject_depth(float * points, const rs2_intrinsics & intrin, const uint16_t * depth, MAP_DEPTH map_depth)
+    void pointcloud::preprocess()
     {
-        for (int y = 0; y < intrin.height; ++y)
+        _pre_compute_map_x.resize(_depth_intrinsics->width*_depth_intrinsics->height);
+        _pre_compute_map_y.resize(_depth_intrinsics->width*_depth_intrinsics->height);
+
+        for (int y = 0; y < _depth_intrinsics->height; ++y)
         {
-            for (int x = 0; x < intrin.width; ++x)
+            for (int x = 0; x < _depth_intrinsics->width; ++x)
             {
                 const float pixel[] = { (float)x, (float)y };
-                rs2_deproject_pixel_to_point(points, &intrin, pixel, map_depth(*depth++));
-                points += 3;
+                float point[3];
+
+                const rs2_intrinsics & intrin = *_depth_intrinsics;
+                rs2_deproject_pixel_to_point(point, &intrin, pixel, 1);
+
+                _pre_compute_map_x[y*_depth_intrinsics->width + x] = point[0];
+                _pre_compute_map_y[y*_depth_intrinsics->width + x] = point[1];
             }
         }
     }
@@ -44,9 +52,27 @@ namespace librealsense
     const float3 * pointcloud::depth_to_points(rs2::points output, 
         const rs2_intrinsics &depth_intrinsics, const rs2::depth_frame& depth_frame)
     {
+
         auto image = output.get_vertices();
         auto depth_scale = depth_frame.get_units();
-        deproject_depth((float*)image, depth_intrinsics, (const uint16_t*)depth_frame.get_data(), [depth_scale](uint16_t z) { return depth_scale * z; });
+
+        const uint16_t* depth = (const uint16_t*)depth_frame.get_data();
+        float* points = (float*)image;
+
+        for (int y = 0; y < depth_intrinsics.height; ++y)
+        {
+            for (int x = 0; x < depth_intrinsics.width; ++x)
+            {
+                float z = depth_scale * (*depth++);
+
+                points[0] = z * _pre_compute_map_x[y*depth_intrinsics.width + x];
+                points[1] = z * _pre_compute_map_y[y*depth_intrinsics.width + x];
+                points[2] = z;
+
+                points += 3;
+            }
+        }
+
         return (float3*)image;
     }
 
