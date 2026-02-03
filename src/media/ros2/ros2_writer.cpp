@@ -17,13 +17,8 @@
 #include <src/core/device-interface.h>
 #include <src/points.h>
 #include <src/labeled-points.h>
-#include <rcutils/time.h>
+
 #include <rsutils/string/from.h>
-#include <cstdlib>
-#include <cstring>
-#include <sstream>
-#include <fstream>   // for std::ifstream
-#include "rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp"
 
 namespace librealsense
 {
