@@ -4,8 +4,10 @@ project(RealSenseKinfuExample)
 
 find_package(glfw3 3.3 REQUIRED)
 find_package(OpenGL REQUIRED)
+find_package(OpenCV 4 REQUIRED)
+find_package(realsense2 REQUIRED)
 
-set(DEPENDENCIES glfw ${OPENGL_LIBRARIES} ${DEPENDENCIES})
+set(DEPENDENCIES glfw ${OPENGL_LIBRARIES} ${DEPENDENCIES} ${OpenCV_LIBRARIES} pthread realsense2::realsense2)
 
 add_executable(rs-kinfu rs-kinfu.cpp ../../../examples/example.hpp)
 set_property(TARGET rs-kinfu PROPERTY CXX_STANDARD 11)
