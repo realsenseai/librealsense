@@ -52,9 +52,11 @@ public class RealSense : ModuleRules
 		{
 			string RealSenseDirectory = "C:/Program Files (x86)/Intel RealSense SDK 2.0";
 			PublicIncludePaths.Add(Path.Combine(RealSenseDirectory, "include"));
-			PublicLibraryPaths.Add(Path.Combine(RealSenseDirectory, "lib", "x64"));
-			PublicLibraryPaths.Add(Path.Combine(RealSenseDirectory, "bin", "x64"));
-			PublicAdditionalLibraries.Add("realsense2.lib");
+			PublicAdditionalLibraries.Add(Path.Combine(RealSenseDirectory, "lib", "x64", "realsense2.lib"));
+			
+			string Destination = Path.Combine("$(BinaryOutputDir)", "realsense2.dll");
+			string Source = Path.Combine(RealSenseDirectory, "bin", "x64", "realsense2.dll");
+			RuntimeDependencies.Add(Destination, Source);
 		}
 	}
 }
