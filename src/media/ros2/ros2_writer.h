@@ -1,26 +1,17 @@
 // License: Apache 2.0 See LICENSE file in root directory.
 // Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
+
 #pragma once
-
-#include <core/serialization.h>
-#include <string>
-#include <memory>
-#include <map>
-#include <set>
-
-#include <src/core/info-interface.h>
-#include <src/core/options-interface.h>
-
-// rosbag2 storage headers (vendored third-party)
 #include <rosbag2_storage/serialized_bag_message.hpp>
 #include <rosbag2_storage/storage_interfaces/read_write_interface.hpp>
 #include <rosbag2_storage/topic_metadata.hpp>
-#include <rosbag2_storage/storage_options.hpp>  // for storage options struct
+#include <rosbag2_storage/storage_options.hpp>
+#include <rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp>
 
 #include <media/ros/ros_file_format.h> // reuse ros_topic naming + helpers
-#include <src/core/frame-interface.h>
-#include <src/core/stream-profile-interface.h>
-#include <src/option.h>
+
+#include <rsutils/string/from.h>
+
 
 namespace librealsense
 {

@@ -1,60 +1,53 @@
 // License: Apache 2.0 See LICENSE file in root directory.
 // Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
+
 #pragma once
 
 #include <core/serialization.h>
-#include <string>
-#include <memory>
-#include <vector>
-#include <map>
-#include <set>
 
-// Reuse core interfaces
-#include <src/core/info-interface.h>
-#include <src/core/options-interface.h>
-#include <src/core/frame-interface.h>
-#include <src/source.h>
-
-// rosbag2 storage headers
 #include <rosbag2_storage/storage_interfaces/read_write_interface.hpp>
 #include <rosbag2_storage/serialized_bag_message.hpp>
 #include <rosbag2_storage/topic_metadata.hpp>
+#include <rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp>
 
-#include <media/ros/ros_file_format.h> // helpers for topic names
-#include <src/core/info.h>
-#include <src/core/options-container.h>
+#include <media/ros/ros_file_format.h> // reuse ros_topic naming + helpers
+
+#include <rsutils/string/from.h>
+
 
 namespace librealsense
 {
     using namespace device_serializer;
+
     class context;
+    class frame_source;
+    class info_container;
+    class options_interface;
+    class options_container;
     class processing_block_interface;
     class recommended_proccesing_blocks_snapshot;
 
     class ros2_reader : public reader
     {
     public:
-        ros2_reader(const std::string& file_path, const std::shared_ptr<context> ctx);
-        virtual ~ros2_reader() = default;
-
-        // Interface Implementations
+        ros2_reader(const std::string& file, const std::shared_ptr<context> ctx);
         device_snapshot query_device_description(const nanoseconds& time) override;
         std::shared_ptr<serialized_data> read_next_data() override;
         void seek_to_time(const nanoseconds& seek_time) override;
         std::vector<std::shared_ptr<serialized_data>> fetch_last_frames(const nanoseconds& seek_time) override;
         nanoseconds query_duration() const override;
         void reset() override;
-        void enable_stream(const std::vector<stream_identifier>& stream_ids) override;
-        void disable_stream(const std::vector<stream_identifier>& stream_ids) override;
+        virtual void enable_stream(const std::vector<device_serializer::stream_identifier>& stream_ids) override;
+        virtual void disable_stream(const std::vector<device_serializer::stream_identifier>& stream_ids) override;
         const std::string& get_file_name() const override;
 
+    private:
         // We use a simple caching mechanism to have a lookahead functionality
         // needed in some cases to tell what is the next message without missing it
         bool has_next_cached() const;
         std::shared_ptr<rosbag2_storage::SerializedBagMessage> read_next_cached();
         std::shared_ptr<rosbag2_storage::SerializedBagMessage> peek_next_cached();
 
-    private:
         static std::vector<std::string> split_string(const std::string& s, char delimiter);
         static std::string get_value(const std::map<std::string, std::string>& kv, const std::string& key);
         std::vector<std::string> filter_topics_by_regex(const std::regex& re) const;

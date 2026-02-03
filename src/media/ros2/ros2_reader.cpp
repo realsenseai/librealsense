@@ -2,27 +2,24 @@
 // Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 #include "ros2_reader.h"
-#include <rcutils/time.h>
-#include <rsutils/string/from.h>
-#include <cstdlib>
-#include <cstring>
-#include <algorithm>
-#include <sstream>
-#include <limits>
-#include "rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp"
-#include <regex>
-#include "core/video-frame.h"
-#include "core/motion-frame.h"
-#include "core/pose-frame.h"
-#include "stream.h"
-#include "source.h"
 #include "image.h"
-#include <src/context.h>
+#include "ds/ds-device-common.h"
+#include "ds/d400/d400-private.h"
+#include "ds/d500/d500-private.h"
 #include <src/depth-sensor.h>
+#include <src/core/pose-frame.h>
+#include <src/core/motion-frame.h>
+#include <src/core/video-frame.h>
 #include <src/color-sensor.h>
 #include <src/safety-sensor.h>
 #include <src/depth-mapping-sensor.h>
-#include <src/sensor.h>
+#include <src/points.h>
+#include <src/labeled-points.h>
+#include <src/context.h>
+
+#include <rsutils/string/from.h>
+#include <cstring>
+
 
 namespace librealsense
 {
@@ -103,10 +100,10 @@ namespace librealsense
         return payload_str;
     }
 
-    ros2_reader::ros2_reader(const std::string& file_path, const std::shared_ptr<context> ctx) :
+    ros2_reader::ros2_reader(const std::string& file, const std::shared_ptr<context> ctx) :
         m_metadata_parser_map(md_constant_parser::create_metadata_parser_map()),
         m_total_duration(0),
-        m_file_path(file_path + ".db3"),
+        m_file_path(file + ".db3"),
         m_context(ctx)
     {
         try
@@ -839,7 +836,7 @@ namespace librealsense
     {
         if (topic.find("/image/data") == std::string::npos && 
             topic.find("/imu/data") == std::string::npos &&
-            topic.find("/pose/transform/data") == std::string::npos)
+            topic.find("/occupancy/data") == std::string::npos)
         {
             return false;
         }
@@ -1018,7 +1015,7 @@ namespace librealsense
         _storage->open(m_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
 
         // Stream topic names are /device_{device_index}/sensor_{sensor_index}/{stream_type}/(image or imu)/(data or metadata)
-        auto stream_topics_regex = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/[^/]+/(image|imu|pose)/(data|metadata)$").str());
+        auto stream_topics_regex = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/[^/]+/(image|imu|occupancy)/(data|metadata)$").str());
         auto stream_topics = filter_topics_by_regex(stream_topics_regex);
 
         // Option topics: /device_{device_index}/sensor_{sensor_index}/option/{option_name}/value
