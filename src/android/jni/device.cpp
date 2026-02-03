@@ -161,3 +161,114 @@ Java_com_intel_realsense_librealsense_Device_nIsDeviceExtendableTo(JNIEnv *env, 
     handle_error(env, e);
     return rv > 0;
 }
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_intel_realsense_librealsense_AutoCalibratedDevice_nRunOnChipCalibration(JNIEnv *env, jclass type, jlong handle, jstring json_cont, jobject result_object, jint timeout, jboolean oneButtonCallibration) {
+    rs2_device *rs2Device = reinterpret_cast<rs2_device *>(handle);
+    rs2_error *e = NULL;
+    float health = MAXFLOAT;
+
+
+    jclass clazz = env->GetObjectClass(result_object);
+
+    //Calibration data
+    jfieldID calibration_data_field = env->GetFieldID(clazz, "mCalibrationData", "Ljava/nio/ByteBuffer;");
+    jobject calibration_data = env->GetObjectField(result_object, calibration_data_field);
+
+    //Get the memory address of the bytebuffer
+    auto new_table_buffer = (uint8_t *) (*env).GetDirectBufferAddress(calibration_data);
+    auto new_table_buffer_size = (size_t) (*env).GetDirectBufferCapacity(calibration_data);
+
+    //Convert the input jstring to the format that the library requires
+    auto json_ptr = (*env).GetStringUTFChars(json_cont, NULL);
+    auto json = std::string(json_ptr);
+
+    //Run the on chip calibration
+    auto result = rs2_run_on_chip_calibration(rs2Device, json.c_str(), json.size(), &health,
+                                              nullptr, nullptr, timeout, &e);
+
+    handle_error(env, e);
+
+    //If it didn't fail, copy the new calibration data to the buffer
+    if (result != NULL && result->buffer.size() <= new_table_buffer_size)
+    {
+        std::copy(result->buffer.begin(), result->buffer.end(), new_table_buffer);
+
+        //Set the health result
+        jfieldID health_field = env->GetFieldID(clazz, "mHealth", "F");
+        env->SetFloatField(result_object, health_field, health);
+
+        if(oneButtonCallibration)
+        {
+            //Seperate the health values from the returned result
+            int h_both = static_cast<int>(health);
+            int h_1 = (h_both & 0x00000FFF);
+            int h_2 = (h_both & 0x00FFF000) >> 12;
+            int sign = (h_both & 0x0F000000) >> 24;
+
+            float health_1 = h_1 / 1000.0f;
+
+            if (sign & 1)
+                health_1 = -health_1;
+
+            float health_2 = h_2 / 1000.0f;
+            if (sign & 2)
+                health_2 = -health_2;
+
+            //Set health1 result
+            jfieldID health1Field = env->GetFieldID(clazz, "mHealth1", "F");
+            env->SetFloatField(result_object, health1Field, health_1);
+
+            //Set health2 result
+            jfieldID health2Field = env->GetFieldID(clazz, "mHealth2", "F");
+            env->SetFloatField(result_object, health2Field, health_2);
+        }
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_intel_realsense_librealsense_AutoCalibratedDevice_nSetTable(JNIEnv *env, jclass type, jlong handle, jobject table, jboolean write) {
+    rs2_device *rs2Device = reinterpret_cast<rs2_device *>(handle);
+    rs2_error *e = NULL;
+
+    //Get the memory address of the bytebuffer
+    uint8_t *new_table_buffer = static_cast<uint8_t *>((*env).GetDirectBufferAddress(table));
+    size_t new_table_buffer_size = (*env).GetDirectBufferCapacity(table);
+
+    //Check the buffer is valid
+    if (new_table_buffer != nullptr) {
+
+        //Populate the calibration from the buffer
+        rs2_set_calibration_table(rs2Device, new_table_buffer, new_table_buffer_size, &e);
+
+        handle_error(env, e);
+
+        //Save the new calibration if required
+        if (write) {
+            rs2_write_calibration(rs2Device, &e);
+            handle_error(env, e);
+        }
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_intel_realsense_librealsense_AutoCalibratedDevice_nGetTable(JNIEnv *env, jclass type, jlong handle, jobject table) {
+
+        rs2_device *rs2Device = reinterpret_cast<rs2_device *>(handle);
+        rs2_error *e = NULL;
+
+        //Get the calibration data from the device
+        const rs2_raw_data_buffer *buffer = rs2_get_calibration_table(rs2Device, &e);
+
+        handle_error(env, e);
+
+        //Copy the results to the buffer
+        uint8_t *new_table_buffer = (uint8_t *) env->GetDirectBufferAddress(table);
+        size_t new_table_buffer_size = (size_t) env->GetDirectBufferCapacity(table);
+        if (buffer->buffer.size() <= new_table_buffer_size)
+            std::copy(buffer->buffer.begin(), buffer->buffer.end(), new_table_buffer);
+
+}

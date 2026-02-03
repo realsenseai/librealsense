@@ -52,6 +52,7 @@ public class Device extends LrsClass {
             case UPDATE_DEVICE: return (T) new UpdateDevice(mHandle);
             case DEBUG: return (T) new DebugProtocol(mHandle);
             case FW_LOGGER: return (T) new FwLogger(mHandle);
+            case AUTO_CALIBRATED_DEVICE: return (T) new AutoCalibratedDevice(mHandle);
         }
         throw new RuntimeException("this device is not extendable to " + extension.name());
     }
