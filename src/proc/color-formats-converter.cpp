@@ -39,8 +39,7 @@ void cpuid(int info[4], int info_type) {
 bool has_avx()
 {
     int info[4];
-    cpuid(info, 0);
-    cpuid(info, 0x80000000);
+    cpuid(info, 1);
     return (info[2] & ((int)1 << 28)) != 0;
 }
 
