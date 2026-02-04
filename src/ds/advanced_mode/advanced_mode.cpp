@@ -70,8 +70,8 @@ namespace librealsense
 
         // _depth_units_register_action not needed for d500 devices 
         // since advanced mode toggling is not enabled
-        if (auto d400_dev = dynamic_cast<d400_device*>(this))
-        {
+        if (auto d400_dev = dynamic_cast<d400_device*>(_dev))
+        {   
             auto& depth_units_action = d400_dev->_depth_units_register_action;
             if (depth_units_action) 
             {
@@ -81,7 +81,7 @@ namespace librealsense
         
         ds_advanced_mode_base::set_hardware_reset_action([this]()
         {
-            dynamic_cast<device_interface*>(this)->hardware_reset();
+            _dev->hardware_reset();
         });
     }
 
