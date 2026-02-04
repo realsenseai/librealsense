@@ -2114,7 +2114,8 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN || errno == EBUSY)
                     return false;
 
-                throw linux_backend_exception("set_xu(...). xioctl(UVCIOC_CTRL_QUERY) failed");
+                throw linux_backend_exception(rsutils::string::from() << "set_xu(...). xioctl(UVCIOC_CTRL_QUERY) failed on control "
+                                              << static_cast< int >( control ));
             }
 
             return true;
@@ -2129,7 +2130,8 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN || errno == EBUSY)
                     return false;
 
-                throw linux_backend_exception("get_xu(...). xioctl(UVCIOC_CTRL_QUERY) failed");
+                throw linux_backend_exception(rsutils::string::from() << "get_xu(...). xioctl(UVCIOC_CTRL_QUERY) failed on control "
+                                              << static_cast< int >( control ));
             }
 
             return true;
@@ -2154,7 +2156,8 @@ namespace librealsense
             xquery.data = (__u8 *)&size;
 
             if(-1 == ioctl(_fd,UVCIOC_CTRL_QUERY,&xquery)){
-                throw linux_backend_exception("xioctl(UVC_GET_LEN) failed");
+                throw linux_backend_exception(rsutils::string::from() << "xioctl(UVCIOC_CTRL_QUERY) failed on control "
+                                              << static_cast< int >( control ));
             }
 
             assert(size<=len);
@@ -2218,7 +2221,9 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN || errno == EBUSY)
                     return false;
 
-                throw linux_backend_exception("xioctl(VIDIOC_G_CTRL) failed");
+                throw linux_backend_exception(rsutils::string::from()
+                                              << "xioctl(VIDIOC_G_CTRL) failed on option " << rs2_option_to_string(opt)
+                                              << ", errno=" << errno );
             }
 
             if (RS2_OPTION_ENABLE_AUTO_EXPOSURE==opt)  { control.value = (V4L2_EXPOSURE_MANUAL==control.value) ? 0 : 1; }
@@ -2257,7 +2262,9 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN || errno == EBUSY)
                     return false;
 
-                throw linux_backend_exception("xioctl(VIDIOC_S_CTRL) failed");
+                throw linux_backend_exception(rsutils::string::from()
+                                              << "xioctl(VIDIOC_S_CTRL) failed on option " << rs2_option_to_string(opt)
+                                              << ", value=" << value << ", errno=" << errno );
             }
 
             if (!pend_for_ctrl_status_event())
@@ -2939,7 +2946,9 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN) // TODO: Log?
                     return false;
 
-                throw linux_backend_exception("xioctl(VIDIOC_G_EXT_CTRLS) failed");
+                throw linux_backend_exception(rsutils::string::from()
+                                              << "xioctl(VIDIOC_G_EXT_CTRLS) failed on option " << rs2_option_to_string(opt)
+                                              << ", errno=" << errno );
             }
 
             if (opt == RS2_OPTION_ENABLE_AUTO_EXPOSURE)
@@ -2962,7 +2971,9 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN) // TODO: Log?
                     return false;
 
-                throw linux_backend_exception("xioctl(VIDIOC_S_EXT_CTRLS) failed");
+                throw linux_backend_exception(rsutils::string::from()
+                                              << "xioctl(VIDIOC_S_EXT_CTRLS) failed on option " << rs2_option_to_string(opt)
+                                              << ", value=" << value << ", errno=" << errno );
             }
 
             return true;
@@ -2993,7 +3004,9 @@ namespace librealsense
                 if (errno == EIO || errno == EAGAIN) // TODO: Log?
                     return false;
 
-                throw linux_backend_exception("xioctl(VIDIOC_S_EXT_CTRLS) failed");
+                throw linux_backend_exception(rsutils::string::from()
+                                              << "xioctl(VIDIOC_S_EXT_CTRLS) failed on control "
+                                              << static_cast< int >( control ) << ", errno=" << errno );
             }
             return true;
         }
@@ -3031,7 +3044,7 @@ namespace librealsense
             // sending error on ioctl failure
             if (errno == EIO || errno == EAGAIN) // TODO: Log?
                 return false;
-            throw linux_backend_exception("xioctl(VIDIOC_G_EXT_CTRLS) failed");
+            throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_G_EXT_CTRLS) failed on control " << control);
         }
 
         control_range v4l_mipi_device::get_xu_range(const extension_unit& xu, uint8_t control, int len) const
