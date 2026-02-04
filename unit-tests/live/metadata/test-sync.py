@@ -29,10 +29,13 @@ def detect_frame_drops(frames_dict, prev_frame_counters):
         current_frame_counters[stream_name] = current_counter
         
         prev_counter = prev_frame_counters[stream_name]
-        if prev_counter is not None and current_counter > prev_counter + 1:
+        if prev_counter is not None and current_counter != prev_counter + 1:
             # Frame drop detected
             dropped_frames = current_counter - prev_counter - 1
-            log.w(f"Frame drop detected on {stream_name}: {dropped_frames} frames dropped")
+            if dropped_frames > 0:
+                log.w(f"Frame drop detected on {stream_name}: {dropped_frames} frames dropped")
+            else:
+                log.w(f"Frame drop detected on {stream_name}: current {current_counter}, previous {prev_counter}")
             frame_drop_detected = True
     
     return frame_drop_detected, current_frame_counters
