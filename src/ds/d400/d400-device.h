@@ -133,6 +133,7 @@ namespace librealsense
         bool is_d401_usb_device( uint8_t gvd_hw_type ) const;
 
         friend class d400_depth_sensor;
+        friend class ds_advanced_mode_base;
 
         std::shared_ptr<hw_monitor> _hw_monitor;
         firmware_version            _fw_version;

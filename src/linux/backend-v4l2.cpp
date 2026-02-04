@@ -2156,7 +2156,7 @@ namespace librealsense
             xquery.data = (__u8 *)&size;
 
             if(-1 == ioctl(_fd,UVCIOC_CTRL_QUERY,&xquery)){
-                throw linux_backend_exception(rsutils::string::from() << "xioctl(UVC_GET_LEN) failed on control "
+                throw linux_backend_exception(rsutils::string::from() << "xioctl(UVCIOC_CTRL_QUERY) failed on control "
                                               << static_cast< int >( control ));
             }
 
@@ -2222,7 +2222,7 @@ namespace librealsense
                     return false;
 
                 throw linux_backend_exception(rsutils::string::from()
-                                              << "xioctl(VIDIOC_G_EXT_CTRLS) failed on option " << rs2_option_to_string(opt)
+                                              << "xioctl(VIDIOC_G_CTRL) failed on option " << rs2_option_to_string(opt)
                                               << ", errno=" << errno );
             }
 
@@ -2263,7 +2263,7 @@ namespace librealsense
                     return false;
 
                 throw linux_backend_exception(rsutils::string::from()
-                                              << "xioctl(VIDIOC_S_EXT_CTRLS) failed on option " << rs2_option_to_string(opt)
+                                              << "xioctl(VIDIOC_S_CTRL) failed on option " << rs2_option_to_string(opt)
                                               << ", value=" << value << ", errno=" << errno );
             }
 

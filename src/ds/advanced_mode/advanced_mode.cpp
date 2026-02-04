@@ -67,6 +67,22 @@ namespace librealsense
         }
 
         device_specific_initialization();
+
+        // _depth_units_register_action not needed for d500 devices 
+        // since advanced mode toggling is not enabled
+        if (auto d400_dev = dynamic_cast<d400_device*>(this))
+        {
+            auto& depth_units_action = d400_dev->_depth_units_register_action;
+            if (depth_units_action) 
+            {
+                ds_advanced_mode_base::set_depth_units_register_action(depth_units_action);
+            }
+        }
+        
+        ds_advanced_mode_base::set_hardware_reset_action([this]()
+        {
+            dynamic_cast<device_interface*>(this)->hardware_reset();
+        });
     }
 
     void ds_advanced_mode_base::device_specific_initialization()
@@ -101,7 +117,6 @@ namespace librealsense
         else
             send_receive( encode_command( ds::fw_cmd::HWRST ) );
 
-        // register / unregister visual preset option
         if( enable )
         {
             register_to_visual_preset_option();

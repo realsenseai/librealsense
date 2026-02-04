@@ -274,11 +274,6 @@ namespace librealsense
         return static_cast<float>(RS2_RS400_VISUAL_PRESET_MEDIUM_DENSITY);
     }
 
-    bool d500_device::is_camera_in_advanced_mode() const
-    {
-        return _ds_device_common->is_camera_in_advanced_mode();
-    }
-
     float d500_device::get_stereo_baseline_mm() const // to be d500 adapted
     {
         using namespace ds;
@@ -452,7 +447,6 @@ namespace librealsense
 
         std::string pid_hex_str, usb_type_str;
         d500_gvd_parsed_fields gvd_parsed_fields;
-        bool advanced_mode = false;
         bool usb_modality = true;
         group_multiple_fw_calls(depth_sensor, [&]() {
             
@@ -544,7 +538,6 @@ namespace librealsense
             depth_sensor.register_option(RS2_OPTION_STEREO_BASELINE, std::make_shared<const_value_option>("Distance in mm between the stereo imagers",
                     rsutils::lazy< float >( [this]() { return get_stereo_baseline_mm(); } ) ) );
 
-            if (advanced_mode)
             {
                 auto depth_scale = std::make_shared<depth_scale_option>(*_hw_monitor);
                 auto depth_sensor = As<d500_depth_sensor, synthetic_sensor>(&get_depth_sensor());
@@ -556,12 +549,6 @@ namespace librealsense
                 });
 
                 depth_sensor->register_option(RS2_OPTION_DEPTH_UNITS, depth_scale);
-            }
-            else
-            {
-                float default_depth_units = 0.001f; //meters
-                depth_sensor.register_option(RS2_OPTION_DEPTH_UNITS, std::make_shared<const_value_option>("Number of meters represented by a single depth unit",
-                        rsutils::lazy< float >( [default_depth_units]() { return default_depth_units; } ) ) );
             }
 
             // defining the temperature options
@@ -691,7 +678,6 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_FIRMWARE_VERSION, gvd_parsed_fields.fw_version);        
         register_info(RS2_CAMERA_INFO_PHYSICAL_PORT, group.uvc_devices.front().device_path);
         register_info(RS2_CAMERA_INFO_DEBUG_OP_CODE, std::to_string(static_cast<int>(fw_cmd::GET_FW_LOGS)));
-        register_info(RS2_CAMERA_INFO_ADVANCED_MODE, ((advanced_mode) ? "YES" : "NO"));
         register_info(RS2_CAMERA_INFO_PRODUCT_ID, pid_hex_str);
         register_info(RS2_CAMERA_INFO_PRODUCT_LINE, "D500");
         // Uncomment once D500 recommended FW exist

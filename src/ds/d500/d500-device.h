@@ -110,7 +110,7 @@ namespace librealsense
         std::vector<uint8_t> get_d500_raw_calibration_table(ds::d500_calibration_table_id table_id) const;
         std::vector<uint8_t> get_new_calibration_table() const;
 
-        bool is_camera_in_advanced_mode() const;
+        inline bool is_camera_in_advanced_mode() const { return true; } // d500 devices always in advanced mode
 
         float get_stereo_baseline_mm() const;
 
