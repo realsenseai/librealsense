@@ -70,9 +70,10 @@ def run_test(resolution, fps):
     prev_frame_counters = {'depth': None, 'ir1': None, 'ir2': None, 'color': None}
     frames_to_skip = 0
     consecutive_drops = 0
+    unskipped_frames = 0
 
     try:
-        for frame_count in range(1, 101):
+        while unskipped_frames < 100:
             frames = pipeline.wait_for_frames()
             depth_frame = frames.get_depth_frame()
             ir1_frame = frames.get_infrared_frame(1)
@@ -93,6 +94,7 @@ def run_test(resolution, fps):
             # Check for frame drops
             frames_dict = {'depth': depth_frame, 'ir1': ir1_frame, 'ir2': ir2_frame, 'color': color_frame}
             frame_drop_detected, current_frame_counters = detect_frame_drops(frames_dict, prev_frame_counters)
+            unskipped_frames += 1
             
             # Handle frame drops
             if frame_drop_detected and not frames_to_skip:
