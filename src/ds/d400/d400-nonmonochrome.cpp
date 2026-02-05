@@ -57,7 +57,8 @@ namespace librealsense
             // Bytes are received swapped, so YUYV format is received as UYVY.
             depth_ep.register_processing_block( processing_block_factory::create_pbf_vector< uyvy_converter >(
                 RS2_FORMAT_YUYV,
-                map_supported_color_formats( RS2_FORMAT_YUYV, false ),
+                map_supported_color_formats( RS2_FORMAT_YUYV, false,
+                                            {RS2_FORMAT_Y8}), // avoids from converting YUYV format to Y8 also - leads to discrepancies)
                 RS2_STREAM_INFRARED ) );
             depth_ep.register_processing_block( { { RS2_FORMAT_YUYV } },
                                                 { { RS2_FORMAT_YUYV, RS2_STREAM_INFRARED } },

@@ -96,7 +96,8 @@ protected:
     int add_sensor(const std::shared_ptr<sensor_interface>& sensor_base);
     int assign_sensor(const std::shared_ptr<sensor_interface>& sensor_base, uint8_t idx);
     void register_stream_to_extrinsic_group(const stream_interface& stream, uint32_t groupd_index);
-    std::vector<rs2_format> map_supported_color_formats(rs2_format source_format, bool should_map_source_format = true);
+    std::vector<rs2_format> map_supported_color_formats(rs2_format source_format, bool should_map_source_format = true
+            , const std::vector<rs2_format>& undesired_formats = {});
 
     explicit device( std::shared_ptr< const device_info > const &, bool device_changed_notifications = true );
 

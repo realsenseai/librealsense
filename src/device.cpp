@@ -194,7 +194,8 @@ void device::register_stream_to_extrinsic_group(const stream_interface& stream, 
     }
 }
 
-std::vector< rs2_format > device::map_supported_color_formats( rs2_format source_format, bool should_map_source_format )
+std::vector< rs2_format > device::map_supported_color_formats( rs2_format source_format, bool should_map_source_format,
+                                                               const std::vector<rs2_format>& undesired_formats )
 {
     // Mapping from source color format to all of the compatible target color formats.
 
@@ -217,6 +218,17 @@ std::vector< rs2_format > device::map_supported_color_formats( rs2_format source
 
     if( should_map_source_format )
         target_formats.push_back( source_format );
+
+    if (!undesired_formats.empty())
+    {
+        // erases values that are in undersired_formats from target_formats
+        target_formats.erase(
+                std::remove_if(target_formats.begin(), target_formats.end(),
+                    [&](rs2_format format) {
+                        return std::find(undesired_formats.begin(), undesired_formats.end(), format) != undesired_formats.end();
+                    }),
+                target_formats.end());
+    }
 
     return target_formats;
 }
