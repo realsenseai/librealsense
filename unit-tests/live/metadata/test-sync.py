@@ -83,6 +83,13 @@ def run_test(resolution, fps):
                 log.e("One or more frames are missing")
                 continue
 
+            # Skip frames during recovery
+            if frames_to_skip > 0:
+                frames_to_skip -= 1
+                if frames_to_skip == 0:
+                    prev_frame_counters = {'depth': None, 'ir1': None, 'ir2': None, 'color': None}
+                continue
+
             # Check for frame drops
             frames_dict = {'depth': depth_frame, 'ir1': ir1_frame, 'ir2': ir2_frame, 'color': color_frame}
             frame_drop_detected, current_frame_counters = detect_frame_drops(frames_dict, prev_frame_counters)
@@ -97,14 +104,7 @@ def run_test(resolution, fps):
                 log.w(f"Frame drop at frame {frame_count}, skipping next {frames_to_skip} frames")
                 prev_frame_counters = current_frame_counters
                 continue
-            
-            # Skip frames during recovery
-            if frames_to_skip > 0:
-                frames_to_skip -= 1
-                if frames_to_skip == 0:
-                    prev_frame_counters = {'depth': None, 'ir1': None, 'ir2': None, 'color': None}
-                continue
-            
+
             prev_frame_counters = current_frame_counters
             consecutive_drops = 0
 
