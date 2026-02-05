@@ -8,6 +8,7 @@ project( ${LRS_TARGET} LANGUAGES CXX C )
 set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${REPO_ROOT})
 
+# see cmake/lrs_options.cmake for cmake options
 include(CMake/lrs_options.cmake)
 include(CMake/connectivity_check.cmake)
 #Deprecation message, should be removed in future releases
