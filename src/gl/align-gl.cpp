@@ -93,10 +93,6 @@ void align_gl::align_z_to_other(rs2::video_frame& aligned,
     auto extr = prof.get_extrinsics_to(other_profile);
 
     render(p, depth, intr, extr, aligned_tex);
-
-    //aligned.get_data();
-    aligned = _upload->process(aligned);
-    aligned = _upload->process(aligned);
 }
 
 // From: https://jamesgregson.blogspot.com/2011/11/matching-calibrated-cameras-with-opengl.html
