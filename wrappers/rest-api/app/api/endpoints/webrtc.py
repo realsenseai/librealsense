@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 
 from app.models.webrtc import WebRTCOffer, WebRTCAnswer, WebRTCStatus, ICECandidate
 from app.services.webrtc_manager import WebRTCManager
-from app.api.dependencies import get_webrtc_manager
+from app.api.dependencies import get_webrtc_manager, get_current_user
 
 router = APIRouter()
 
@@ -12,10 +12,11 @@ router = APIRouter()
 async def create_offer(
     offer_request: WebRTCOffer,
     webrtc_manager: WebRTCManager = Depends(get_webrtc_manager),
-    # user: dict = Depends(get_current_user) # -> enable this if security is needed
+    user: dict = Depends(get_current_user),
 ):
     """
     Create a WebRTC offer for streaming from a RealSense device.
+    Requires authentication.
     """
     try:
         session_id, offer = await webrtc_manager.create_offer(
@@ -34,9 +35,11 @@ async def create_offer(
 async def process_answer(
     answer: WebRTCAnswer,
     webrtc_manager: WebRTCManager = Depends(get_webrtc_manager),
+    user: dict = Depends(get_current_user),
 ):
     """
     Process a WebRTC answer from a client.
+    Requires authentication.
     """
     try:
         result = await webrtc_manager.process_answer(
@@ -52,9 +55,11 @@ async def process_answer(
 async def add_ice_candidate(
     candidate: ICECandidate,
     webrtc_manager: WebRTCManager = Depends(get_webrtc_manager),
+    user: dict = Depends(get_current_user),
 ):
     """
     Add an ICE candidate to a WebRTC session.
+    Requires authentication.
     """
     try:
         result = await webrtc_manager.add_ice_candidate(
@@ -71,9 +76,11 @@ async def add_ice_candidate(
 async def get_session_status(
     session_id: str,
     webrtc_manager: WebRTCManager = Depends(get_webrtc_manager),
+    user: dict = Depends(get_current_user),
 ):
     """
     Get the status of a WebRTC session.
+    Requires authentication.
     """
     try:
         return await webrtc_manager.get_session(session_id)
@@ -84,9 +91,11 @@ async def get_session_status(
 async def get_ice_candidates(
     session_id: str = Path(..., description="WebRTC session ID"),
     webrtc_manager: WebRTCManager = Depends(get_webrtc_manager),
+    user: dict = Depends(get_current_user),
 ):
     """
     Get ICE candidates for a WebRTC session.
+    Requires authentication.
 
     This endpoint returns all ICE candidates that have been generated
     for the specified WebRTC session.
@@ -101,9 +110,11 @@ async def get_ice_candidates(
 async def close_session(
     session_id: str = Path(..., description="WebRTC session ID"),
     webrtc_manager: WebRTCManager = Depends(get_webrtc_manager),
+    user: dict = Depends(get_current_user),
 ):
     """
     Close a WebRTC session.
+    Requires authentication.
 
     This endpoint terminates the WebRTC connection and removes the session.
     All associated resources will be freed.

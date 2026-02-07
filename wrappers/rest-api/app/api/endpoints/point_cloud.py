@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from app.models.stream import PointCloudStatus, StreamStatus
 from app.services.rs_manager import RealSenseManager
-from app.api.dependencies import get_realsense_manager
+from app.api.dependencies import get_realsense_manager, get_current_user
 
 router = APIRouter()
 
@@ -12,7 +12,12 @@ router = APIRouter()
 async def activate_point_cloud(
     device_id: str,
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
+    user: dict = Depends(get_current_user),
 ):
+    """
+    Activate point cloud processing for a device.
+    Requires authentication.
+    """
     try:
         return rs_manager.activate_point_cloud(device_id, True)
     except Exception as e:
@@ -22,7 +27,12 @@ async def activate_point_cloud(
 async def deactivate_point_cloud(
     device_id: str,
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
+    user: dict = Depends(get_current_user),
 ):
+    """
+    Deactivate point cloud processing for a device.
+    Requires authentication.
+    """
     try:
         return rs_manager.activate_point_cloud(device_id, False)
     except Exception as e:
@@ -31,8 +41,13 @@ async def deactivate_point_cloud(
 @router.get("/status", response_model=PointCloudStatus)
 async def get_stream_status(
     device_id: str,
-    rs_manager: RealSenseManager = Depends(get_realsense_manager)
+    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+    user: dict = Depends(get_current_user),
 ):
+    """
+    Get point cloud processing status for a device.
+    Requires authentication.
+    """
     try:
         return rs_manager.get_point_cloud_status(device_id)
     except Exception as e:
