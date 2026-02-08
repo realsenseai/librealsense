@@ -1467,9 +1467,13 @@ namespace rs2
 
     void subdevice_model::wait_for_stop()
     {
-        std::lock_guard< std::mutex > lock(_stop_mutex);
-        if (_stop_future.valid())
-            _stop_future.get();
+        std::future< void > local;
+        {
+            std::lock_guard< std::mutex > lock(_stop_mutex);
+            local = std::move(_stop_future);
+        }
+        if (local.valid())
+            local.get();
     }
 
     void subdevice_model::stop(std::shared_ptr<notifications_model> not_model)
@@ -1526,9 +1530,10 @@ namespace rs2
                 }
                 catch (const std::exception& e)
                 {
-                    viewer.not_model->add_log(
-                        rsutils::string::from() << "Error stopping sensor: " << e.what(),
-                        RS2_LOG_SEVERITY_WARN);
+                    if (viewer.not_model)
+                        viewer.not_model->add_log(
+                            rsutils::string::from() << "Error stopping sensor: " << e.what(),
+                            RS2_LOG_SEVERITY_WARN);
                 }
                 catch (...) {}
             });
