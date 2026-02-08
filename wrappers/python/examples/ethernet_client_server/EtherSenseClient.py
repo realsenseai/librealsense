@@ -20,29 +20,39 @@ def main(argv):
     multi_cast_message(mc_ip_address, port, 'EtherSensePing')
         
 
-#UDP client for each camera server 
+#UDP client for each camera server
 class ImageClient(asyncore.dispatcher):
-    def __init__(self, server, source):   
+    def __init__(self, server, source):
         asyncore.dispatcher.__init__(self, server)
         self.address = server.getsockname()[0]
         self.port = source[1]
         self.buffer = bytearray()
         self.windowName = self.port
-        # open cv window which is unique to the port 
+        # open cv window which is unique to the port
         cv2.namedWindow("window"+str(self.windowName))
         self.remainingBytes = 0
         self.frame_id = 0
-       
+
+    def recv_exact(self, n):
+        """Helper to receive exactly n bytes, looping until complete or connection closes"""
+        data = bytearray()
+        while len(data) < n:
+            packet = self.recv(n - len(data))
+            if not packet:
+                raise ConnectionError("Connection closed while reading frame header")
+            data.extend(packet)
+        return bytes(data)
+
     def handle_read(self):
         if self.remainingBytes == 0:
             # get the expected frame size
-            self.frame_length = struct.unpack('<I', self.recv(4))[0]
+            self.frame_length = struct.unpack('<I', self.recv_exact(4))[0]
             # get the timestamp of the current frame
-            self.timestamp = struct.unpack('<d', self.recv(8))
+            self.timestamp = struct.unpack('<d', self.recv_exact(8))[0]
             # get metadata size (shape and dtype info)
-            metadata_size = struct.unpack('<I', self.recv(4))[0]
+            metadata_size = struct.unpack('<I', self.recv_exact(4))[0]
             # get metadata (shape and dtype as JSON)
-            metadata_bytes = self.recv(metadata_size)
+            metadata_bytes = self.recv_exact(metadata_size)
             self.metadata = json.loads(metadata_bytes.decode('utf-8'))
             self.remainingBytes = self.frame_length
 

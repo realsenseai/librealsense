@@ -79,7 +79,7 @@ class EtherSenseServer(asyncore.dispatcher):
         if depth is not None:
 	    # SECURITY FIX: Use numpy tobytes instead of pickle for safe serialization
 	    # Send metadata (shape and dtype) separately from the raw data
-            metadata = json.dumps({'shape': depth.shape, 'dtype': str(depth.dtype)}).encode('utf-8')
+            metadata = json.dumps({'shape': depth.shape, 'dtype': depth.dtype.str}).encode('utf-8')
             metadata_size = struct.pack('<I', len(metadata))
             data = depth.tobytes()
 	    # capture the lenght of the data portion of the message
@@ -87,7 +87,7 @@ class EtherSenseServer(asyncore.dispatcher):
 	    # include the current timestamp for the frame
             ts = struct.pack('<d', timestamp)
 	    # for the message for transmission
-            self.frame_data = ''.join([length, ts, metadata_size, metadata, data])
+            self.frame_data = b''.join([length, ts, metadata_size, metadata, data])
 
     def handle_write(self):
 	# first time the handle_write is called
