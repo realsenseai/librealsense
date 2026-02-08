@@ -3,6 +3,7 @@
 
 #test:timeout 1500
 #test:donotrun:!nightly
+#test:donotrun  # disabled due to rosbag upgrade
 
 import pyrealsense2 as rs, os
 from rspy import log, test, repo
