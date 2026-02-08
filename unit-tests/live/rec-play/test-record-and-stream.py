@@ -3,8 +3,6 @@
 
 # test:device each(D400*)
 # test:device each(D500*)
-# Running nightly as this tests specific bug fix in a code that is seldom touched, no need to run for each push.
-# test:donotrun:!nightly
 
 #The test flow is a result of a fixed bug - viewer crashed when starting stream after finishing record session
 

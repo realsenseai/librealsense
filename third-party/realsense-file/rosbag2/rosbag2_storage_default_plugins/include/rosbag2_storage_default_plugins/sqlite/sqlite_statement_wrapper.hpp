@@ -53,9 +53,15 @@ public:
   {
 public:
     using RowType = std::tuple<Columns ...>;
-    class Iterator : public std::iterator<std::input_iterator_tag, RowType>
+    class Iterator
     {
 public:
+      using iterator_category = std::input_iterator_tag;
+      using value_type = RowType;
+      using difference_type = std::ptrdiff_t;
+      using pointer = RowType*;
+      using reference = RowType&;
+
       static const int POSITION_END = -1;
       Iterator(std::shared_ptr<SqliteStatementWrapper> statement, int position)
       : statement_(statement), next_row_idx_(position), cached_row_idx_(POSITION_END - 1)
