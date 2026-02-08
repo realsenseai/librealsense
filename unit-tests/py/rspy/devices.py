@@ -2,7 +2,9 @@
 # Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
 
 import sys, os, re, platform
+import sys, os, re, platform, subprocess
 from time import perf_counter as timestamp
+from datetime import datetime
 
 
 def usage():
@@ -56,6 +58,7 @@ import time
 
 _device_by_sn = dict()
 _context = None
+_wireshark_process = None
 
 
 class Device:
@@ -143,6 +146,55 @@ class Device:
     @property
     def is_dds(self):
         return self._is_dds
+
+
+def _start_wireshark_capture():
+    """
+    Start a Wireshark capture process
+    :return: The Wireshark process object, or None if capture could not be started
+    """
+    global _wireshark_process
+    try:
+        # Generate a timestamped filename for the capture
+        timestamp_str = datetime.now().strftime( '%Y%m%d_%H%M%S' )
+        capture_file = os.path.join( 'C:\\temp', f'wireshark_capture_{timestamp_str}.pcapng' )
+        
+        # Start tshark (Wireshark command-line tool) in the background
+        # tshark will capture all network traffic and save to the file
+        _wireshark_process = subprocess.Popen(
+            ['C:\\Program Files\\Wireshark\\tshark', '-i', 'Ethernet 7', '-w', capture_file],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        log.d( f'Wireshark capture started, saving to: {capture_file}' )
+        return capture_file
+    except FileNotFoundError:
+        log.w( 'Wireshark (tshark) not found. Make sure Wireshark is installed and tshark is in PATH' )
+        _wireshark_process = None
+        return None
+    except Exception as e:
+        log.e( f'Failed to start Wireshark capture: {e}' )
+        _wireshark_process = None
+        return None
+
+
+def _stop_wireshark_capture():
+    """
+    Stop the Wireshark capture process
+    """
+    global _wireshark_process
+    if _wireshark_process:
+        try:
+            _wireshark_process.terminate()
+            _wireshark_process.wait( timeout=5 )
+            log.d( 'Wireshark capture stopped and saved' )
+        except subprocess.TimeoutExpired:
+            log.w( 'Wireshark process did not terminate gracefully, killing it' )
+            _wireshark_process.kill()
+        except Exception as e:
+            log.e( f'Error stopping Wireshark capture: {e}' )
+        finally:
+            _wireshark_process = None
 
 
 def wait_until_all_ports_disabled( timeout = 5 ):
@@ -240,60 +292,70 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
     if not rs:
         return
     #
-    # Before we can start a context and query devices, we need to enable all the ports
-    # on the hub, if any:
-    if hub:
-        if not hub.is_connected():
-            hub.connect(hub_reset)
-        if recycle_ports:
-            hub.disable_ports( sleep_on_change = 5 )
-            hub.enable_ports()  # Enable without sleeping - we'll poll ourselves
-    #
-    # Get all devices, and store by serial-number
-    global _device_by_sn, _context, _port_to_sn
-    settings = {'dds' : { 'enabled' : True }}  # explicitly enable dds in case there's an issue with the config file
-    if disable_dds:
-        settings['dds']['enabled'] = False
+    # Start Wireshark capture before creating context
+    capture_file = _start_wireshark_capture()
     
-    if log.is_debug_on(): # change to check --rslog in the future once D555 discovery is stable
-        rs.log_to_console(rs.log_severity.debug) # enable debug logging to see device removal/addition
+    try:
+        #
+        # Before we can start a context and query devices, we need to enable all the ports
+        # on the hub, if any:
+        if hub:
+            if not hub.is_connected():
+                hub.connect(hub_reset)
+            if recycle_ports:
+                hub.disable_ports( sleep_on_change = 5 )
+                hub.enable_ports()  # Enable without sleeping - we'll poll ourselves
+        #
+        # Get all devices, and store by serial-number
+        global _device_by_sn, _context, _port_to_sn
+        settings = {'dds' : { 'enabled' : True }}  # explicitly enable dds in case there's an issue with the config file
+        if disable_dds:
+            settings['dds']['enabled'] = False
         
-    _context = rs.context( settings )
-    _device_by_sn = dict()
-    query_start_time = timestamp()
-    detected_sns = set()
-
-    log.debug_indent()
-    # Poll for devices appearing over time
-    while (timestamp() - query_start_time) < MAX_ENUMERATION_TIME:
-        try:
-            devices = _context.query_devices()
-            for dev in devices:
-                try:
-                    sn = dev.get_info( rs.camera_info.firmware_update_id )
-                except RuntimeError as e:
-                    log.e( f'Found device but trying to get fw-update-id failed: {e}' )
-                    continue
-                
-                if sn not in detected_sns:
-                    # New device detected
-                    detected_sns.add(sn)
-                    device = Device( sn, dev )
-                    _device_by_sn[sn] = device
-                    detection_time = timestamp() - query_start_time
-                    log.d( '... port {}:'.format( device.port is None and '?' or device.port ), sn, dev, f'(detected after {detection_time:.2f}s)' )
+        if log.is_debug_on(): # change to check --rslog in the future once D555 discovery is stable
+            rs.log_to_console(rs.log_severity.debug) # enable debug logging to see device removal/addition
             
-        except RuntimeError as e:
-            log.d( 'FAILED to query devices:', e )
-        
-        time.sleep( 1 )
-    if log.is_debug_on(): # change to check --rslog in the future once D555 discovery is stable
-        rs.log_to_console(rs.log_severity.none) # disable debug logging
+        _context = rs.context( settings )
+        _device_by_sn = dict()
+        query_start_time = timestamp()
+        detected_sns = set()
 
-    log.debug_unindent()
-    #
-    if monitor_changes:
-        _context.set_devices_changed_callback( _device_change_callback )
+        log.debug_indent()
+        # Poll for devices appearing over time
+        while (timestamp() - query_start_time) < MAX_ENUMERATION_TIME:
+            try:
+                devices = _context.query_devices()
+                for dev in devices:
+                    try:
+                        sn = dev.get_info( rs.camera_info.firmware_update_id )
+                    except RuntimeError as e:
+                        log.e( f'Found device but trying to get fw-update-id failed: {e}' )
+                        continue
+                    
+                    if sn not in detected_sns:
+                        # New device detected
+                        detected_sns.add(sn)
+                        device = Device( sn, dev )
+                        _device_by_sn[sn] = device
+                        detection_time = timestamp() - query_start_time
+                        log.d( '... port {}:'.format( device.port is None and '?' or device.port ), sn, dev, f'(detected after {detection_time:.2f}s)' )
+                
+            except RuntimeError as e:
+                log.d( 'FAILED to query devices:', e )
+            
+            time.sleep( 1 )
+        if log.is_debug_on(): # change to check --rslog in the future once D555 discovery is stable
+            rs.log_to_console(rs.log_severity.none) # disable debug logging
+
+        log.debug_unindent()
+        #
+        if monitor_changes:
+            _context.set_devices_changed_callback( _device_change_callback )
+    finally:
+        # Stop Wireshark capture at end of function
+        _stop_wireshark_capture()
+        if capture_file:
+            log.d( f'Wireshark capture saved to: {capture_file}' )
 
 
 def _device_change_callback( info ):
@@ -820,5 +882,3 @@ if __name__ == '__main__':
     finally:
         # Disconnect from the hub -- if we don't it might crash on Linux...
         hub.disconnect()
-
-
