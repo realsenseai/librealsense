@@ -28,6 +28,8 @@
 #
 # Skip conditions:
 # - Test is skipped if device firmware version <= latest released version
+# - Test aborts if downgrade firmware fails check_firmware_compatibility()
+#   (uses d400_device_to_fw_min_version from src/ds/d400/d400-private.h internally)
 
 import pyrealsense2 as rs
 import pyrsutils as rsutils
@@ -44,7 +46,39 @@ from urllib.error import URLError, HTTPError
 
 # Firmware configuration
 FW_RELEASES_URL = "https://dev.realsenseai.com/docs/firmware-releases-d400"
+# Artifactory path to D400 firmware builds (ED/NIGHTLY hosts both nightly and release builds as RELEASE_DS5_*.zip)
 ARTIFACTORY_FW_BASE_URL = "https://rsartifactory.realsenseai.com/artifactory/realsense_generic_dev-il-local/FW/RS400/ED/NIGHTLY"
+
+def check_fw_compatibility(device, fw_image_path):
+    """
+    Check if a firmware image is compatible with the device using the SDK's
+    built-in check_firmware_compatibility() API.  Internally this uses
+    d400_device_to_fw_min_version from src/ds/d400/d400-private.h, so it
+    stays in sync with the SDK without hardcoding version tables.
+
+    Args:
+        device: pyrealsense2 device object
+        fw_image_path: path to the firmware .bin file
+
+    Returns:
+        True if the firmware image is compatible, False otherwise.
+        Returns None if the check could not be performed.
+    """
+    try:
+        updatable = device.as_updatable()
+    except Exception as e:
+        log.w(f"Device cannot be cast to updatable — skipping compatibility check: {e}")
+        return None
+    try:
+        with open(fw_image_path, 'rb') as f:
+            fw_image = bytearray(f.read())
+        compatible = updatable.check_firmware_compatibility(fw_image)
+        return compatible
+    except Exception as e:
+        # check_firmware_compatibility() only supports signed images;
+        # unsigned FlashGeneratedImage binaries are expected to fail here
+        log.d(f"check_firmware_compatibility() not available for this image: {e}")
+        return None
 
 
 def get_latest_fw_version_from_releases():
@@ -128,9 +162,10 @@ def download_firmware_file(url, dest_path):
             os.makedirs(dest_dir, exist_ok=True)
         
         log.i(f"Downloading firmware from {url}...")
+        import shutil
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=120) as response, open(dest_path, 'wb') as out_file:
-            out_file.write(response.read())
+            shutil.copyfileobj(response, out_file)
         log.i(f"Downloaded firmware to {dest_path}")
         return True
     except (URLError, HTTPError) as e:
@@ -155,9 +190,12 @@ def download_and_extract_fw(version):
     version_underscored = version.replace('.', '_')
     fw_bin = f"FlashGeneratedImage_RELEASE_DS5_{version_underscored}.bin"
     fw_path = os.path.join(tempfile.gettempdir(), fw_bin)
-    if os.path.exists(fw_path):
-        log.i(f"Using cached firmware: {fw_path}")
+    if os.path.exists(fw_path) and os.path.getsize(fw_path) > 0:
+        log.i(f"Using cached firmware: {fw_path} ({os.path.getsize(fw_path)} bytes)")
         return fw_path
+    elif os.path.exists(fw_path):
+        log.w(f"Removing invalid cached firmware (0 bytes): {fw_path}")
+        os.remove(fw_path)
     
     fw_url = get_fw_download_url(version)
     fw_zip = os.path.join(tempfile.gettempdir(), f"RELEASE_DS5_{version_underscored}.zip")
@@ -197,7 +235,7 @@ def download_and_extract_fw(version):
         return None
 
 # Timeout settings
-FW_UPDATE_TIMEOUT = 360  # Maximum time to wait for firmware update completion (seconds)
+FW_UPDATE_TIMEOUT = 280  # Maximum time to wait for firmware update completion (seconds)
 DEVICE_STABILIZE_TIME = 5  # Time to wait after firmware update for device to stabilize (seconds)
 
 def find_rs_fw_update_tool():
@@ -300,6 +338,17 @@ restore_image_file = download_and_extract_fw(restore_fw_version)
 if not restore_image_file:
     log.f(f"Failed to download original camera firmware {restore_fw_version} from Artifactory — cannot guarantee restore")
 
+# Safety check: use the SDK's check_firmware_compatibility() to verify the downgrade
+# image is above the device's minimum supported FW (d400_device_to_fw_min_version in d400-private.h)
+compat = check_fw_compatibility(device, downgrade_fw_path)
+if compat is False:
+    log.f(f"Downgrade firmware {downgrade_fw_version} is not compatible with {product_name} "
+          f"— aborting to avoid bricking the device")
+elif compat is True:
+    log.i(f"Firmware compatibility check passed for {downgrade_fw_version}")
+else:
+    log.w(f"Could not verify firmware compatibility — proceeding with caution")
+
 ################################################################################################
 
 test.start("Perform firmware downgrade using rs-fw-update")
@@ -311,11 +360,11 @@ test.start("Perform firmware downgrade using rs-fw-update")
 # - Tool returns success exit code
 
 log.i("Starting firmware downgrade...")
-log.i(f"Command: {rs_fw_update_tool} -u -f {downgrade_fw_path}")
+log.i(f"Command: {rs_fw_update_tool} -s {device_serial} -u -f {downgrade_fw_path}")
 
 try:
     result = subprocess.run(
-        [rs_fw_update_tool, '-u', '-f', downgrade_fw_path],
+        [rs_fw_update_tool, '-s', device_serial, '-u', '-f', downgrade_fw_path],
         capture_output=True,
         text=True,
         timeout=FW_UPDATE_TIMEOUT
@@ -385,7 +434,7 @@ try:
         log.i(f"Firmware Version: {actual_fw_version}")
         log.i(f"Expected Version: {downgrade_fw_version}")
         
-        version_matches = (actual_fw_version == downgrade_fw_version)
+        version_matches = (rsutils.version(actual_fw_version) == downgrade_version)
         test.check(version_matches,
                   f"Firmware version should be {downgrade_fw_version}, got {actual_fw_version}")
         
@@ -414,7 +463,7 @@ log.i(f"Using image: {restore_image_file}")
 
 try:
     result = subprocess.run(
-        [rs_fw_update_tool, '-u', '-f', restore_image_file],
+        [rs_fw_update_tool, '-s', device_serial, '-u', '-f', restore_image_file],
         capture_output=True,
         text=True,
         timeout=FW_UPDATE_TIMEOUT
