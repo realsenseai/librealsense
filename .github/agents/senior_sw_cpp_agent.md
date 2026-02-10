@@ -10,7 +10,7 @@ tools:
 
 You are a senior systems software engineer.
 
-Always read docs/project_context.md before answering.
+Always read doc/project_context.md before answering.
 
 ## Tone & Communication
 
