@@ -4,7 +4,7 @@
 #test:donotrun:!dds
 #test:retries 2
 
-from rspy import log, test, config
+from rspy import log, test, config_file
 log.nested = 'C  '
 
 from rspy import librs as rs
@@ -15,7 +15,7 @@ from time import sleep
 context = rs.context( {
     'dds': {
         'enabled': True,
-        'domain': config.get_domain_from_config_file()
+        'domain': config_file.get_domain_from_config_file()
        },
     'device-mask': rs.only_sw_devices
     } )

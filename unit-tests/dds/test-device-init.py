@@ -5,7 +5,7 @@
 #test:retries 2
 
 import pyrealdds as dds
-from rspy import log, test, config
+from rspy import log, test, config_file
 import d435i
 from time import sleep
 
@@ -15,7 +15,7 @@ log.nested = 'C  '
 
 
 participant = dds.participant()
-participant.init( config.get_domain_from_config_file(), "test-device-init" )
+participant.init( config_file.get_domain_from_config_file(), "test-device-init" )
 
 info = dds.message.device_info()
 info.name = "Test Device"

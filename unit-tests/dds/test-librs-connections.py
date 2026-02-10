@@ -4,7 +4,7 @@
 #test:donotrun:!dds
 #test:retries 2
 
-from rspy import log, test, config
+from rspy import log, test, config_file
 log.nested = 'C  '
 
 import d435i
@@ -30,7 +30,7 @@ with test.remote( remote_script, nested_indent="  S" ) as remote:
         context = rs.context( {
             'dds': {
                 'enabled': True,
-                'domain': config.get_domain_from_config_file(),
+                'domain': config_file.get_domain_from_config_file(),
                 'participant': 'librs'
                 },
             'device-mask': rs.only_sw_devices

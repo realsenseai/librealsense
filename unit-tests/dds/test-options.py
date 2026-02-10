@@ -5,7 +5,7 @@
 #test:retries 2
 
 import pyrealdds as dds
-from rspy import log, test, config
+from rspy import log, test, config_file
 
 info = dds.message.device_info()
 info.name = "Test Device"
@@ -17,7 +17,7 @@ with test.remote.fork( nested_indent=None ) as remote:
         dds.debug( log.is_debug_on(), log.nested )
 
         participant = dds.participant()
-        participant.init( config.get_domain_from_config_file(), "server" )
+        participant.init( config_file.get_domain_from_config_file(), "server" )
 
 
         def test_no_options():
@@ -104,7 +104,7 @@ with test.remote.fork( nested_indent=None ) as remote:
     log.nested = 'C  '
 
     participant = dds.participant()
-    participant.init( config.get_domain_from_config_file(), "test-options" )
+    participant.init( config_file.get_domain_from_config_file(), "test-options" )
 
 
     #############################################################################################

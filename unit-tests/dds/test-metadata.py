@@ -11,7 +11,7 @@
 #test:donotrun:linux
 
 import pyrealdds as dds
-from rspy import log, test, config
+from rspy import log, test, config_file
 import d435i
 
 
@@ -21,7 +21,7 @@ with test.remote.fork( nested_indent='  S' ) as remote:
         dds.debug( log.is_debug_on(), log.nested )
 
         participant = dds.participant()
-        participant.init( config.get_domain_from_config_file(), "server" )
+        participant.init( config_file.get_domain_from_config_file(), "server" )
 
         # set up a server device with a single color stream
         device_server = dds.device_server( participant, d435i.device_info.topic_root )
@@ -75,7 +75,7 @@ with test.remote.fork( nested_indent='  S' ) as remote:
     log.nested = 'C  '
 
     participant = dds.participant()
-    participant.init( config.get_domain_from_config_file(), "client" )
+    participant.init( config_file.get_domain_from_config_file(), "client" )
 
     # set up the client device and keep all its streams - this is connected directly and we can get notifications on it!
     device_direct = dds.device( participant, d435i.device_info )
@@ -183,7 +183,7 @@ with test.remote.fork( nested_indent='  S' ) as remote:
         from rspy import librs as rs
         if log.is_debug_on():
             rs.log_to_console( rs.log_severity.debug )
-        context = rs.context( { 'dds': { 'enabled': True, 'domain': config.get_domain_from_config_file(), 'participant': 'librs' }} )
+        context = rs.context( { 'dds': { 'enabled': True, 'domain': config_file.get_domain_from_config_file(), 'participant': 'librs' }} )
         device = rs.wait_for_devices( context, rs.only_sw_devices, n=1. )
         sensors = device.sensors
         test.check_equal( len(sensors), 1, on_fail=test.RAISE )

@@ -5,7 +5,7 @@
 #test:retries 2
 
 import pyrealdds as dds
-from rspy import log, test, config
+from rspy import log, test, config_file
 from time import sleep
 from rspy.stopwatch import Stopwatch
 import threading
@@ -14,7 +14,7 @@ dds.debug( log.is_debug_on() )
 
 
 participant = dds.participant()
-participant.init( config.get_domain_from_config_file(), "client" )
+participant.init( config_file.get_domain_from_config_file(), "client" )
 
 
 def image_id( image ):

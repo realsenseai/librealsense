@@ -4,7 +4,7 @@
 #test:donotrun:!dds
 #test:device D400*
 
-from rspy import log, repo, test, config
+from rspy import log, repo, test, config_file
 import time
 
 
@@ -12,7 +12,7 @@ with test.closure( 'Run rs-dds-adapter', on_fail=test.ABORT ):
     adapter_path = repo.find_built_exe( 'tools/dds/dds-adapter', 'rs-dds-adapter' )
     if test.check( adapter_path ):
         import subprocess, signal
-        cmd = [adapter_path, '--domain-id', str(config.get_domain_from_config_file())]
+        cmd = [adapter_path, '--domain-id', str(config_file.get_domain_from_config_file())]
         if log.is_debug_on():
             cmd.append( '--debug' )
         adapter_process = subprocess.Popen( cmd,
@@ -25,7 +25,7 @@ if log.is_debug_on():
     rs.log_to_console( rs.log_severity.debug )
 
 with test.closure( 'Initialize librealsense context', on_fail=test.ABORT ):
-    context = rs.context( { 'dds': { 'enabled': True, 'domain': config.get_domain_from_config_file(), 'participant': 'client' }} )
+    context = rs.context( { 'dds': { 'enabled': True, 'domain': config_file.get_domain_from_config_file(), 'participant': 'client' }} )
 
 with test.closure( 'Wait for a device', on_fail=test.ABORT ):
     # Note: takes time for a device to enumerate, and more to get it discovered
