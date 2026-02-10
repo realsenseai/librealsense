@@ -2,14 +2,14 @@
 # Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
 
 import pyrealdds as dds
-from rspy import log, test
+from rspy import log, test, config
 import pyrealsense2 as rs
 
 dds.debug( log.is_debug_on(), log.nested )
 
 
 participant = dds.participant()
-participant.init( 123, "formats-conversion-server" )
+participant.init( config.get_domain_from_config_file(), "formats-conversion-server" )
 
 device_info = dds.message.device_info.from_json({
     "name": "formats-conversion-device",

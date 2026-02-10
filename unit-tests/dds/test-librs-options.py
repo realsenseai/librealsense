@@ -4,7 +4,7 @@
 #test:donotrun:!dds
 #test:retries 2
 
-from rspy import log, test
+from rspy import log, test, config
 with test.remote.fork( nested_indent=None ) as remote:
     if remote is None:  # we're the fork
         import pyrealdds as dds
@@ -12,7 +12,7 @@ with test.remote.fork( nested_indent=None ) as remote:
 
         with test.closure( 'Start the server participant' ):
             participant = dds.participant()
-            participant.init( 123, 'server' )
+            participant.init( config.get_domain_from_config_file(), 'server' )
 
         with test.closure( 'Create the server' ):
             device_info = dds.message.device_info.from_json({
@@ -57,7 +57,7 @@ with test.remote.fork( nested_indent=None ) as remote:
         rs.log_to_console( rs.log_severity.debug )
 
     with test.closure( 'Initialize librealsense context', on_fail=test.ABORT ):
-        context = rs.context( { 'dds': { 'enabled': True, 'domain': 123, 'participant': 'client' }} )
+        context = rs.context( { 'dds': { 'enabled': True, 'domain': config.get_domain_from_config_file(), 'participant': 'client' }} )
 
     with test.closure( 'Find the server', on_fail=test.ABORT ):
         dev = rs.wait_for_devices( context, rs.only_sw_devices, n=1. )

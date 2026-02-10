@@ -2,7 +2,7 @@
 # Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
 
 import pyrealdds as dds
-from rspy import log, test
+from rspy import log, test, config
 
 dds.debug( log.is_debug_on(), log.nested )
 
@@ -16,7 +16,7 @@ settings = { "device" :
                          }
                    }
              }
-participant.init( 123, f'client-{log.nested.strip()}', settings )
+participant.init( config.get_domain_from_config_file(), f'client-{log.nested.strip()}', settings )
 
 
 info = dds.message.device_info()

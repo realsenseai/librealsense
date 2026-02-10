@@ -4,7 +4,7 @@
 #test:donotrun:!dds
 #test:retries 2
 
-from rspy import log, test
+from rspy import log, test, config
 import pyrealdds as dds
 dds.debug( log.is_debug_on() )
 
@@ -17,7 +17,7 @@ with test.remote.fork( nested_indent=None ) as remote:
 
         with test.closure( 'Start the server participant' ):
             participant = dds.participant()
-            participant.init( 123, 'server' )
+            participant.init( config.get_domain_from_config_file(), 'server' )
 
         with test.closure( 'Create the server' ):
             device_info.name = 'Some device'
@@ -51,7 +51,7 @@ with test.remote.fork( nested_indent=None ) as remote:
 
     with test.closure( 'Start the client participant' ):
         participant = dds.participant()
-        participant.init( 123, 'client' )
+        participant.init( config.get_domain_from_config_file(), 'client' )
 
     with test.closure( 'Wait for the device' ):
         device_info.name = 'Device1'

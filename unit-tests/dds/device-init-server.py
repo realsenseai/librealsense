@@ -2,7 +2,7 @@
 # Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
 
 import pyrealdds as dds
-from rspy import log, test
+from rspy import log, test, config
 import d435i
 import threading
 from time import sleep
@@ -19,7 +19,7 @@ settings = { "device" :
                          }
                    }
              }
-participant.init( 123, "device-init-server", settings )
+participant.init( config.get_domain_from_config_file(), "device-init-server", settings )
 
 
 def test_one_stream():

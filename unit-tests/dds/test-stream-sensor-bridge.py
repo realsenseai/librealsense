@@ -4,12 +4,12 @@
 #test:donotrun:!dds
 
 import pyrealdds as dds
-from rspy import log, test
+from rspy import log, test, config
 dds.debug( log.is_debug_on() )
 from time import sleep
 
 participant = dds.participant()
-participant.init( 123, "test-stream-sensor-bridge" )
+participant.init( config.get_domain_from_config_file(), "test-stream-sensor-bridge" )
 
 # set up a server device with a bridge
 import d435i

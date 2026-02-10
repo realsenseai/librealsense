@@ -4,7 +4,7 @@
 #test:donotrun:!dds
 #test:retries 2
 
-from rspy import log, test
+from rspy import log, test, config
 from rspy import librs as rs
 
 if log.is_debug_on():
@@ -14,7 +14,7 @@ log.nested = 'C  '
 context = rs.context( {
     'dds': {
         'enabled': True,
-        'domain': 123,
+        'domain': config.get_domain_from_config_file(),
         'participant': 'test-formats-conversion'
         },
     'device-mask': rs.only_sw_devices

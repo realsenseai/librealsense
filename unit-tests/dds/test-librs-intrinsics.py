@@ -4,7 +4,7 @@
 #test:donotrun:!dds
 #test:retries 2
 
-from rspy import log, test
+from rspy import log, test, config
 
 with test.remote.fork( nested_indent=None ) as remote:
     if remote is None:  # we're the fork
@@ -16,7 +16,7 @@ with test.remote.fork( nested_indent=None ) as remote:
         dds.debug( log.is_debug_on(), log.nested )
 
         participant = dds.participant()
-        participant.init( 123, "intrinsics-server" )
+        participant.init( config.get_domain_from_config_file(), "intrinsics-server" )
 
         # These are the servers currently broadcast
         servers = dict()
@@ -77,7 +77,7 @@ with test.remote.fork( nested_indent=None ) as remote:
     if log.is_debug_on():
         rs.log_to_console( rs.log_severity.debug )
 
-    context = rs.context( { 'dds': { 'enabled': True, 'domain': 123 }} )
+    context = rs.context( { 'dds': { 'enabled': True, 'domain': config.get_domain_from_config_file() }} )
 
     #############################################################################################
     #

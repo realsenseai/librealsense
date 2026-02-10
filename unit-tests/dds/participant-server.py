@@ -2,7 +2,7 @@
 # Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
 
 import pyrealdds as server
-from rspy import log, test
+from rspy import log, test, config
 
 
 server.debug( log.is_debug_on(), log.nested )
@@ -15,7 +15,7 @@ test.start( "participant-init" )
 participant = server.participant()
 test.check( not participant )
 
-participant.init( 123, "test-participant-server" )
+participant.init( config.get_domain_from_config_file(), "test-participant-server" )
 
 test.check( participant )
 test.check( participant.is_valid() )
