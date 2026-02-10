@@ -41,6 +41,7 @@ namespace librealsense
         void write_additional_frame_messages(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
         void write_video_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame);
         void write_motion_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame);
+        void write_labeled_points_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame);
         void write_stream_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<stream_profile_interface> profile);
         void write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<video_stream_profile_interface> profile);
         void write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<motion_stream_profile_interface> profile);
