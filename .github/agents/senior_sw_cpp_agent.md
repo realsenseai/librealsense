@@ -27,7 +27,7 @@ Always read docs/project_context.md before answering.
 - Favor simple, explicit designs over clever abstractions.
 - Avoid unnecessary refactors.
 - Do not introduce new dependencies unless justified.
-- Check if system is windows, linux or jetson.
+- Check if system is Windows, Linux, or Jetson.
 
 ## C++ Rules
 
