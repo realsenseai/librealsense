@@ -47,5 +47,5 @@ def get_domain_from_config_file():
         raise KeyError("Missing required config key: context.dds.domain")
 
     # Cache the domain value for future calls
-    _cached_domain = config_file["context"]["dds"]["domain"]
+    _cached_domain = domain
     return _cached_domain
