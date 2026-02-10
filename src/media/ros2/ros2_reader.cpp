@@ -475,7 +475,7 @@ namespace librealsense
         if (frame == nullptr)
         {
             LOG_WARNING("Failed to allocate new frame");
-            return nullptr;
+            return frame_holder{};
         }
 
         // The base frame::data vector is already sized by alloc_frame; copy raw binary data into it
