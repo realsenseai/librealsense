@@ -305,10 +305,9 @@ namespace librealsense
 
     void ros2_writer::write_labeled_points_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame)
     {
-        // TODO : test and add on reader
         auto labeled_points_frame = dynamic_cast<librealsense::labeled_points*>(frame.frame);
         if (!labeled_points_frame)
-            throw invalid_value_exception("null pointer recieved from dynamic pointer casting.");
+            throw invalid_value_exception("null pointer received from dynamic pointer casting.");
 
         auto size = labeled_points_frame->get_vertex_count() * labeled_points_frame->get_bpp() / 8;
         auto p_data = frame->get_frame_data();
