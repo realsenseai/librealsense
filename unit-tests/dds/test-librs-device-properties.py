@@ -19,7 +19,7 @@ from time import sleep
 context = rs.context( {
     'dds': {
         'enabled': True,
-        'domain': config_file.get_domain_from_config_file(),
+        'domain': config_file.get_domain_from_config_file_or_default(),
         'participant': 'device-properties-client'
        },
     'device-mask': rs.only_sw_devices

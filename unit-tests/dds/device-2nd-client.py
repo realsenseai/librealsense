@@ -16,7 +16,7 @@ settings = { "device" :
                          }
                    }
              }
-participant.init( config_file.get_domain_from_config_file(), f'client-{log.nested.strip()}', settings )
+participant.init( config_file.get_domain_from_config_file_or_default(), f'client-{log.nested.strip()}', settings )
 
 
 info = dds.message.device_info()

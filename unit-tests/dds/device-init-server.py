@@ -19,7 +19,7 @@ settings = { "device" :
                          }
                    }
              }
-participant.init( config_file.get_domain_from_config_file(), "device-init-server", settings )
+participant.init( config_file.get_domain_from_config_file_or_default(), "device-init-server", settings )
 
 
 def test_one_stream():

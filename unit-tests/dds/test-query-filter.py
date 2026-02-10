@@ -17,7 +17,7 @@ with test.remote.fork( nested_indent=None ) as remote:
 
         with test.closure( 'Start the server participant' ):
             participant = dds.participant()
-            participant.init( config_file.get_domain_from_config_file(), 'server' )
+            participant.init( config_file.get_domain_from_config_file_or_default(), 'server' )
 
         with test.closure( 'Create the server' ):
             device_info.name = 'Some device'
@@ -54,7 +54,7 @@ with test.remote.fork( nested_indent=None ) as remote:
 
     with test.closure( 'Start the client participant' ):
         participant = dds.participant()
-        participant.init( config_file.get_domain_from_config_file(), 'client' )
+        participant.init( config_file.get_domain_from_config_file_or_default(), 'client' )
 
     with test.closure( 'Wait for the device' ):
         device_info.name = 'Device1'

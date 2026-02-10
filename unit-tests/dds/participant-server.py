@@ -15,7 +15,7 @@ test.start( "participant-init" )
 participant = server.participant()
 test.check( not participant )
 
-participant.init( config_file.get_domain_from_config_file(), "test-participant-server" )
+participant.init( config_file.get_domain_from_config_file_or_default(), "test-participant-server" )
 
 test.check( participant )
 test.check( participant.is_valid() )

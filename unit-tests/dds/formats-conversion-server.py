@@ -9,7 +9,7 @@ dds.debug( log.is_debug_on(), log.nested )
 
 
 participant = dds.participant()
-participant.init( config_file.get_domain_from_config_file(), "formats-conversion-server" )
+participant.init( config_file.get_domain_from_config_file_or_default(), "formats-conversion-server" )
 
 device_info = dds.message.device_info.from_json({
     "name": "formats-conversion-device",

@@ -9,7 +9,7 @@ dds.debug( log.is_debug_on() )
 from time import sleep
 
 participant = dds.participant()
-participant.init( config_file.get_domain_from_config_file(), "test-stream-sensor-bridge" )
+participant.init( config_file.get_domain_from_config_file_or_default(), "test-stream-sensor-bridge" )
 
 # set up a server device with a bridge
 import d435i

@@ -3,7 +3,6 @@
 
 import os
 import json
-import time
 
 # Cache for domain value to avoid re-reading config file
 _cached_domain = None
@@ -31,12 +30,8 @@ def get_config_file():
     
     return config
     
-def generate_domain_from_time():
-    """Generate a domain ID based on current time seconds to ensure uniqueness."""
-    current_seconds = int(time.time()) % 232  # Keep it within DDS domain range (0-232)
-    return current_seconds
     
-def get_domain_from_config_file():
+def get_domain_from_config_file_or_default():
     global _cached_domain
     
     # Return cached value if already read
@@ -46,9 +41,8 @@ def get_domain_from_config_file():
     try:
         # Read from file and cache the result
         config_file = get_config_file()
-        domain = (config_file.get("context", {})
-                             .get("dds", {})
-                             .get("domain"))
+        domain = config_file["context"]["dds"]["domain"]
+
         if domain is None:
             raise KeyError("Missing required config key: context.dds.domain")
 
@@ -56,8 +50,8 @@ def get_domain_from_config_file():
         _cached_domain = domain
     
     except FileNotFoundError:
-        # Fallback: generate domain from current time if config file not found
-        _cached_domain = generate_domain_from_time()
+        # Fallback to default domain if config file is missing
+        _cached_domain = 0
     
     finally:
         return _cached_domain

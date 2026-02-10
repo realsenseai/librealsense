@@ -16,7 +16,7 @@ with test.remote.fork( nested_indent='  S' ) as remote:
             participant = dds.participant()
             test.check( not participant )
 
-            participant.init( config_file.get_domain_from_config_file(), 'participant-server' )
+            participant.init( config_file.get_domain_from_config_file_or_default(), 'participant-server' )
 
             test.check( participant )
             test.check( participant.is_valid() )
@@ -53,7 +53,7 @@ with test.remote.fork( nested_indent='  S' ) as remote:
                 participants_changed.set()
 
         participant = dds.participant()
-        participant.init( config_file.get_domain_from_config_file(), 'participant-client' )
+        participant.init( config_file.get_domain_from_config_file_or_default(), 'participant-client' )
 
         listener = participant.create_listener()
         listener.on_participant_added( on_participant_added )

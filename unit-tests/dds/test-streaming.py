@@ -15,7 +15,7 @@ import json
 import flexible
 
 participant = dds.participant()
-participant.init( config_file.get_domain_from_config_file(), "test-streaming" )
+participant.init( config_file.get_domain_from_config_file_or_default(), "test-streaming" )
 
 
 sample1 = { 'id' : 'test-message', 'n' : 1, 'content' : { 'int' : 1, 'float' : 2.0, 'array' : [ 1, 2.0, 'hello' ] } }

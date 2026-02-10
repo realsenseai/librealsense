@@ -14,7 +14,7 @@ log.nested = 'C  '
 context = rs.context( {
     'dds': {
         'enabled': True,
-        'domain': config_file.get_domain_from_config_file(),
+        'domain': config_file.get_domain_from_config_file_or_default(),
         'participant': 'test-formats-conversion'
         },
     'device-mask': rs.only_sw_devices

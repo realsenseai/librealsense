@@ -11,7 +11,7 @@ dds.debug( log.is_debug_on(), log.nested )
 
 
 participant = dds.participant()
-participant.init( config_file.get_domain_from_config_file(), "device-broadcaster" )
+participant.init( config_file.get_domain_from_config_file_or_default(), "device-broadcaster" )
 
 # These are the servers currently broadcast
 servers = dict()

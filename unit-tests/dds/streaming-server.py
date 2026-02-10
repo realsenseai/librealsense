@@ -9,7 +9,7 @@ dds.debug( log.is_debug_on(), log.nested )
 
 
 participant = dds.participant()
-participant.init( config_file.get_domain_from_config_file(), "streaming-server" )
+participant.init( config_file.get_domain_from_config_file_or_default(), "streaming-server" )
 
 
 # From here down, we're in "interactive" mode (see test-device-init.py)
