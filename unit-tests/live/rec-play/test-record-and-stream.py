@@ -57,7 +57,7 @@ def try_streaming(default_profile):
     return frame_queue
 
 
-def play_recording(default_profile):
+def play_recording(file_name, default_profile):
     global depth_sensor
 
     playback = ctx.load_device(file_name)
@@ -68,7 +68,7 @@ def play_recording(default_profile):
 ################################################################################################
 with test.closure("Record, stream and playback using sensor interface with frame queue"):
     temp_dir = tempfile.mkdtemp()
-    file_name = os.path.join(temp_dir, "recording.bag")
+    file_name = os.path.join(temp_dir, "recording")
 
     dev, ctx = test.find_first_device_or_exit()
     depth_sensor = dev.first_depth_sensor()
@@ -78,6 +78,6 @@ with test.closure("Record, stream and playback using sensor interface with frame
     # after we finish recording we close the sensor and then open it again and try streaming
     try_streaming(default_profile)
 
-    play_recording(default_profile)
+    play_recording(file_name + ".db3", default_profile)
 ################################################################################################
 test.print_results_and_exit()

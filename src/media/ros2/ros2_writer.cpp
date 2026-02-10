@@ -15,6 +15,7 @@
 #include "core/motion-frame.h"
 #include <src/core/sensor-interface.h>
 #include <src/core/device-interface.h>
+#include <src/core/depth-frame.h>
 #include <src/points.h>
 #include <src/labeled-points.h>
 
@@ -41,7 +42,7 @@ namespace librealsense
         }
 
         _storage->open(file, rosbag2_storage::storage_interfaces::IOFlag::READ_WRITE);
-
+        m_file_path += ".db3"; // rosbag2 sqlite plugin appends .db3 internally, so this is for consistency
         if (!_storage)
             throw std::runtime_error(rsutils::string::from() << "Failed to open rosbag2 storage for uri '" << file
                 << "' using storage id 'sqlite3'");
@@ -127,29 +128,42 @@ namespace librealsense
         if (!frame || !frame.frame)
             return;
 
+        const void* p_data = nullptr;
+        size_t size = 0;
+
         if (Is<video_frame>(frame.frame))
         {
-            write_video_frame(stream_id, timestamp, std::move(frame));
+            auto vid_frame = As<video_frame>(frame.frame);
+            p_data = vid_frame->get_frame_data();
+            size = vid_frame->get_stride() * vid_frame->get_height();
+        }
+        else if (Is<motion_frame>(frame.frame))
+        {
+            auto motion = As<motion_frame>(frame.frame);
+            p_data = motion->get_frame_data();
+            size = (stream_id.stream_type == RS2_STREAM_MOTION) ? sizeof(rs2_combined_motion) : 3 * sizeof(float);
+        }
+        else if (Is<labeled_points>(frame.frame))
+        {
+            auto lp = As<labeled_points>(frame.frame);
+            p_data = lp->get_frame_data();
+            size = lp->get_vertex_count() * lp->get_bpp() / 8;
+        }
+        else
+        {
+            LOG_WARNING("Unsupported frame type for stream " << stream_id.stream_type << ". Only video, motion, and labeled points frames are supported. Skipping frame.");
             return;
         }
 
-        if (Is<motion_frame>(frame.frame))
-        {
-            write_motion_frame(stream_id, timestamp, std::move(frame));
-            return;
-        }
-
-        /*if (Is<pose_frame>(frame.frame))
-        {
-            write_pose_frame(stream_id, timestamp, std::move(frame));
-            return;
-        }
-
-        if (Is<labeled_points>(frame.frame))
-        {
-            write_labeled_points_frame(stream_id, timestamp, std::move(frame));
-            return;
-        }*/
+        auto buffer = create_buffer(p_data, size);
+        auto topic = ros_topic::frame_data_topic(stream_id);
+        ensure_topic(topic, "librealsense/raw_frame");
+        auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
+        msg->serialized_data = buffer;
+        msg->time_stamp = static_cast<rcutils_time_point_value_t>(timestamp.count());
+        msg->topic_name = topic;
+        _storage->write(msg);
+        write_additional_frame_messages(stream_id, timestamp, frame);
     }
 
     void ros2_writer::write_snapshot(uint32_t device_index, const nanoseconds& timestamp, rs2_extension type, const std::shared_ptr<extension_snapshot>& snapshot)
@@ -265,50 +279,6 @@ namespace librealsense
         }
     }
 
-    void ros2_writer::write_video_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame)
-    {
-        auto vid_frame = dynamic_cast<librealsense::video_frame*>(frame.frame);
-        if (!vid_frame)
-            throw std::runtime_error("Frame is not video frame");
-        auto size = vid_frame->get_stride() * vid_frame->get_height();
-        auto p_data = vid_frame->get_frame_data();
-        auto buffer = create_buffer(p_data, size);
-        auto image_topic = ros_topic::frame_data_topic(stream_id);
-        ensure_topic(image_topic, "librealsense/raw_frame");
-        auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
-        msg->serialized_data = buffer;
-        msg->time_stamp = static_cast<rcutils_time_point_value_t>(timestamp.count());
-        msg->topic_name = image_topic;
-        _storage->write(msg);
-        write_additional_frame_messages(stream_id, timestamp, frame);
-    }
-
-    void ros2_writer::write_motion_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame)
-    {
-        auto motion_frame = dynamic_cast<librealsense::motion_frame*>(frame.frame);
-        if (!motion_frame)
-            throw std::runtime_error("Frame is not motion frame");
-        auto fi = motion_frame;
-        auto topic = ros_topic::frame_data_topic(stream_id);
-        ensure_topic(topic, "librealsense/raw_motion_frame");
-        auto size = fi->get_frame_data_size();
-        auto data_ptr = reinterpret_cast<const float*>(frame.frame->get_frame_data());
-        if (stream_id.stream_type == RS2_STREAM_ACCEL || stream_id.stream_type == RS2_STREAM_GYRO)
-        {
-            size = 3 * sizeof(float);
-        }
-        else if (stream_id.stream_type == RS2_STREAM_MOTION)
-        {
-            size = sizeof(rs2_combined_motion);
-        }
-        auto buffer = create_buffer(data_ptr, size);
-        auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
-        msg->serialized_data = buffer;
-        msg->time_stamp = static_cast<rcutils_time_point_value_t>(timestamp.count());
-        msg->topic_name = topic;
-        _storage->write(msg);
-        write_additional_frame_messages(stream_id, timestamp, frame);
-    }
 
     void ros2_writer::write_stream_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<stream_profile_interface> profile)
     {

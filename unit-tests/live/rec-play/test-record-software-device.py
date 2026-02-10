@@ -138,7 +138,7 @@ H = 480
 BPP = 2
 
 temp_dir = tempfile.mkdtemp()
-filename = os.path.join(temp_dir, "recording.bag")
+filename = os.path.join(temp_dir, "recording")
 
 video_frame = rs.software_video_frame()
 motion_frame = rs.software_motion_frame()
@@ -165,7 +165,7 @@ video_frame = prepare_depth_frame(pixels, BPP, depth_stream_profile)
 motion_frame = prepare_motion_frame(motion_frame_data, motion_stream_profile)
 
 record_frames(filename, sd, sync, video_frame, motion_frame, sensor, stream_profiles)
-play_frames(filename)
+play_frames(filename + ".db3")
 
 test.finish()
 ################################################################################################
