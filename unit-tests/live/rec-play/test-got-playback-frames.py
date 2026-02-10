@@ -125,7 +125,7 @@ def stop_sensor( sensor ):
 # (requires that no files are being held open inside this directory. Important to not keep any handle open to a file
 # in this directory, any handle as such must be set to None)
 temp_dir = tempfile.TemporaryDirectory( prefix='recordings_' )
-file_name = temp_dir.name + os.sep + 'rec.bag'
+file_name = temp_dir.name + os.sep + 'rec'
 
 ################################################################################################
 test.start("Trying to record and playback using pipeline interface")
@@ -143,7 +143,7 @@ try:
     # we create a new pipeline and use it to playback from the file we just recoded to
     pipeline = rs.pipeline(ctx)
     cfg = rs.config()
-    cfg.enable_device_from_file(file_name)
+    cfg.enable_device_from_file(file_name + ".db3")
     pipeline.start(cfg)
     # if the record-playback worked we will get frames, otherwise the next line will timeout and throw
     pipeline.wait_for_frames()
@@ -187,7 +187,7 @@ try:
     test.check( len(color_filters) > 0 )
     test.check( len(depth_filters) > 0 )
 
-    playback = ctx.load_device( file_name )
+    playback = ctx.load_device( file_name + ".db3" )
 
     depth_sensor = playback.first_depth_sensor()
     color_sensor = playback.first_color_sensor()
@@ -251,7 +251,7 @@ try:
 
     recorder = None
 
-    playback = ctx.load_device( file_name )
+    playback = ctx.load_device( file_name + ".db3" )
 
     depth_sensor = playback.first_depth_sensor()
     color_sensor = playback.first_color_sensor()

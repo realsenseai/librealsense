@@ -24,7 +24,7 @@ from playback_helper import PlaybackStatusVerifier
 # (requires that no files are being held open inside this directory. Important to not keep any handle open to a file
 # in this directory, any handle as such must be set to None)
 temp_dir = tempfile.TemporaryDirectory( prefix='recordings_' )
-file_name = temp_dir.name + os.sep + 'rec.bag'
+file_name = temp_dir.name + os.sep + 'rec'
 
 stop_detected = False
 STREAMING_DURATION = 3
@@ -91,7 +91,7 @@ test.start("Immediate pause & test")
 try:
     timeout = record_with_pause( file_name, iterations = 1, pause_delay = 0, resume_delay = 0 )
     pipeline = rs.pipeline()
-    device_playback = playback( pipeline, file_name )
+    device_playback = playback( pipeline, file_name + ".db3" )
     psv = PlaybackStatusVerifier( device_playback );
     psv.wait_for_status(timeout, rs.playback_status.stopped)
 except Exception:
@@ -110,7 +110,7 @@ test.start("Immediate pause & delayed resume test")
 try:
     timeout = record_with_pause( file_name, iterations = 1, pause_delay = 0, resume_delay = 5 )
     pipeline = rs.pipeline()
-    device_playback = playback( pipeline, file_name )
+    device_playback = playback( pipeline, file_name + ".db3" )
     psv = PlaybackStatusVerifier( device_playback );
     psv.wait_for_status( timeout, rs.playback_status.stopped )
 except Exception:
@@ -128,7 +128,7 @@ test.start("delayed pause & delayed resume test")
 try:
     timeout = record_with_pause( file_name, iterations = 1, pause_delay = 3, resume_delay = 2 )
     pipeline = rs.pipeline()
-    device_playback = playback( pipeline, file_name )
+    device_playback = playback( pipeline, file_name + ".db3" )
     psv = PlaybackStatusVerifier( device_playback );
     psv.wait_for_status( timeout, rs.playback_status.stopped )
 except Exception:
@@ -147,7 +147,7 @@ test.start("multiple delay & pause test")
 try:
     timeout = record_with_pause( file_name, iterations = 2, pause_delay = 0, resume_delay = 2 )
     pipeline = rs.pipeline()
-    device_playback = playback( pipeline, file_name )
+    device_playback = playback( pipeline, file_name + ".db3" )
     psv = PlaybackStatusVerifier( device_playback );
     psv.wait_for_status( timeout, rs.playback_status.stopped )
 except Exception:
