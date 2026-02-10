@@ -237,6 +237,7 @@ def download_and_extract_fw(version):
 # Timeout settings
 FW_UPDATE_TIMEOUT = 280  # Maximum time to wait for firmware update completion (seconds)
 DEVICE_STABILIZE_TIME = 5  # Time to wait after firmware update for device to stabilize (seconds)
+POST_RESTORE_STABILIZE_TIME = 15  # Extra time to allow device to settle after restore (seconds)
 
 def find_rs_fw_update_tool():
     """
@@ -339,7 +340,7 @@ if not restore_image_file:
     log.f(f"Failed to download original camera firmware {restore_fw_version} from Artifactory — cannot guarantee restore")
 
 # Safety check: use the SDK's check_firmware_compatibility() to verify the downgrade
-# image is above the device's minimum supported FW (d400_device_to_fw_min_version in d400-private.h)
+# image is above the device's minimum supported FW (d400_device_to_fw_min_version in d400-pr
 compat = check_fw_compatibility(device, downgrade_fw_path)
 if compat is False:
     log.f(f"Downgrade firmware {downgrade_fw_version} is not compatible with {product_name} "
@@ -361,6 +362,9 @@ test.start("Perform firmware downgrade using rs-fw-update")
 
 log.i("Starting firmware downgrade...")
 log.i(f"Command: {rs_fw_update_tool} -s {device_serial} -u -f {downgrade_fw_path}")
+
+# Release device and context before firmware update (same as test-fw-update.py)
+del device
 
 try:
     result = subprocess.run(
@@ -506,7 +510,27 @@ try:
                       f"Firmware should be restored to {restore_fw_version}, got {restored_fw_version}")
         else:
             test.check(False, f"Device {device_serial} should be available after firmware restore")
-            
+
+        log.i(f"Waiting {POST_RESTORE_STABILIZE_TIME}s for device to stabilize after restore...")
+        time.sleep(POST_RESTORE_STABILIZE_TIME)
+
+        stable_ctx = rs.context()
+        stable_device = None
+        for d in stable_ctx.query_devices():
+            if d.get_info(rs.camera_info.serial_number) == device_serial:
+                stable_device = d
+                break
+
+        if stable_device:
+            stable_fw_version = stable_device.get_info(rs.camera_info.firmware_version)
+            log.i(f"Device stable after restore; FW={stable_fw_version}")
+        else:
+            log.w(f"Device {device_serial} not found after stabilization wait")
+
+        # Release all device/context references so the next test starts clean
+        del stable_device, stable_ctx
+        del restored_device, devices, ctx
+
 except subprocess.TimeoutExpired:
     log.e(f"Firmware restore timed out after {FW_UPDATE_TIMEOUT}s")
     test.check(False, "Firmware restore should complete within timeout")
