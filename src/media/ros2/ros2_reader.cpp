@@ -103,7 +103,7 @@ namespace librealsense
     ros2_reader::ros2_reader(const std::string& file, const std::shared_ptr<context> ctx) :
         m_metadata_parser_map(md_constant_parser::create_metadata_parser_map()),
         m_total_duration(0),
-        m_file_path(file + ".db3"),
+        m_file_path(file),
         m_context(ctx)
     {
         try
@@ -153,7 +153,7 @@ namespace librealsense
                     continue;
                 }
                 LOG_DEBUG("Next message is a frame");
-                return read_frame_data(msg, sid);
+                return create_frame(msg);
             }
 
             // 2. Options
@@ -226,7 +226,7 @@ namespace librealsense
         _storage->open(m_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
         m_frame_source = std::make_shared<frame_source>(32);
         m_frame_source->init(m_metadata_parser_map);
-        m_read_options_descriptions.clear();
+        _cache_valid = false;
 
         // Reapply streaming filter if it was previously set
         if (!_streaming_filter_topics.empty())
@@ -248,6 +248,53 @@ namespace librealsense
     const std::string& ros2_reader::get_file_name() const 
     {
         return m_file_path;
+    }
+
+    std::shared_ptr< serialized_frame > ros2_reader::create_frame(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg)
+    {
+        nanoseconds timestamp(msg->time_stamp);
+        stream_identifier stream_id = ros_topic::get_stream_identifier(msg->topic_name);
+
+        if (!msg->serialized_data->buffer || msg->serialized_data->buffer_length == 0)
+        {
+            throw std::runtime_error("Frame data message has no payload");
+        }
+
+        // Read metadata from the next message (metadata immediately follows frame data)
+        frame_additional_data additional_data{};
+        read_frame_metadata(additional_data);
+
+        // For depth frames, set depth_units from the recorded sensor options
+        if (stream_id.stream_type == RS2_STREAM_DEPTH)
+        {
+            for (auto& sensor_snap : m_initial_device_description.get_sensors_snapshots())
+            {
+                auto options_snapshot = sensor_snap.get_sensor_extensions_snapshots().find(RS2_EXTENSION_OPTIONS);
+                if (options_snapshot)
+                {
+                    auto options_api = As<options_interface>(options_snapshot);
+                    if (options_api && options_api->supports_option(RS2_OPTION_DEPTH_UNITS))
+                    {
+                        additional_data.depth_units = options_api->get_option(RS2_OPTION_DEPTH_UNITS).query();
+                        break;
+                    }
+                }
+            }
+        }
+
+        auto frame = alloc_and_fill_frame(msg, stream_id, std::move(additional_data));
+
+        if (frame.frame == nullptr)
+        {
+            return std::make_shared<serialized_invalid_frame>(timestamp, stream_id);
+        }
+
+        auto data = std::make_shared<serialized_frame>(timestamp, stream_id, std::move(frame));
+
+        // Update cache for fetch_last_frames
+        _last_frame_cache[stream_id] = data;
+
+        return data;
     }
 
     nanoseconds ros2_reader::get_file_duration()
@@ -414,46 +461,30 @@ namespace librealsense
         return sensor_options;
     }
 
-    std::shared_ptr< serialized_data > ros2_reader::read_frame_data(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg, const stream_identifier& stream_id)
+    frame_holder ros2_reader::alloc_and_fill_frame(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg,
+        const stream_identifier& stream_id,
+        frame_additional_data additional_data) const
     {
-        nanoseconds ts(msg->time_stamp);
-
-        // Parse the actual frame data from msg->serialized_data
-        if (!msg->serialized_data || !msg->serialized_data->buffer || msg->serialized_data->buffer_length == 0)
-        {
-            throw std::runtime_error("Frame data message has no payload");
-        }
-
-        // Read metadata from the next message (metadata immediately follows frame data)
-        frame_additional_data additional_data{};
-        read_frame_metadata(additional_data);
-        
-        rs2_extension frame_ext = frame_source::stream_to_frame_types(stream_id.stream_type);
-        frame_holder frame = m_frame_source->alloc_frame(
+        auto frame_ext = frame_source::stream_to_frame_types(stream_id.stream_type);
+        frame_interface* frame = m_frame_source->alloc_frame(
             { stream_id.stream_type, stream_id.stream_index, frame_ext },
             msg->serialized_data->buffer_length,
             std::move(additional_data),
-            true
-        );
+            true);
 
         if (frame == nullptr)
         {
             LOG_WARNING("Failed to allocate new frame");
-            return nullptr;
+            return frame_holder{};
         }
 
-        // Copy the raw binary data into the frame's data buffer
-        auto frame_data = const_cast<uint8_t*>(frame->get_frame_data());
-        std::memcpy(frame_data, msg->serialized_data->buffer, msg->serialized_data->buffer_length);
+        // The base frame::data vector is already sized by alloc_frame; copy raw binary data into it
+        auto base_frame = static_cast<librealsense::frame*>(frame);
+        std::memcpy(base_frame->data.data(), msg->serialized_data->buffer, msg->serialized_data->buffer_length);
 
-        setup_frame(frame.frame, stream_id);
+        setup_frame(frame, stream_id);
 
-        auto data = std::make_shared<serialized_frame>(ts, stream_id, std::move(frame));
-
-        // Update cache for fetch_last_frames
-        _last_frame_cache[stream_id] = data;
-
-        return data;
+        return frame_holder{ frame };
     }
 
     std::shared_ptr<processing_block_interface> ros2_reader::create_processing_block(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg, bool& depth_to_disparity, std::shared_ptr<options_interface> options)
@@ -560,8 +591,12 @@ namespace librealsense
                     return; // Not a video stream
 
                 auto video_frame_ptr = dynamic_cast<video_frame*>(frame_ptr);
-                if (!video_frame_ptr) 
-                    throw std::runtime_error("Profile is video stream but frame is not video frame"); // Not supposed to happen
+                if (!video_frame_ptr)
+                {
+                    if (dynamic_cast<labeled_points*>(frame_ptr))
+                        return;
+                    throw std::runtime_error("Profile is video stream but frame is not video frame");
+                }
 
                 int width = vsp->get_width();
                 int height = vsp->get_height();
@@ -836,7 +871,8 @@ namespace librealsense
     {
         if (topic.find("/image/data") == std::string::npos && 
             topic.find("/imu/data") == std::string::npos &&
-            topic.find("/occupancy/data") == std::string::npos)
+            topic.find("/occupancy/data") == std::string::npos &&
+            topic.find("/labeled_points/data") == std::string::npos)
         {
             return false;
         }
@@ -1015,7 +1051,7 @@ namespace librealsense
         _storage->open(m_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
 
         // Stream topic names are /device_{device_index}/sensor_{sensor_index}/{stream_type}/(image or imu)/(data or metadata)
-        auto stream_topics_regex = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/[^/]+/(image|imu|occupancy)/(data|metadata)$").str());
+        auto stream_topics_regex = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/[^/]+/(image|imu|occupancy|labeled_points)/(data|metadata)$").str());
         auto stream_topics = filter_topics_by_regex(stream_topics_regex);
 
         // Option topics: /device_{device_index}/sensor_{sensor_index}/option/{option_name}/value
@@ -1103,18 +1139,48 @@ namespace librealsense
 
     std::string ros2_reader::read_option_description(const uint32_t sensor_index, const rs2_option& id)
     {
-        if (m_read_options_descriptions[sensor_index].find(id) == m_read_options_descriptions[sensor_index].end())
-        {
-            auto msg = read_next_cached();
-            if (!msg || !msg->serialized_data || !msg->serialized_data->buffer)
+        static const auto is_topic_description_topic = [](const std::string& topic, uint32_t sensor_index, rs2_option id)
             {
-                LOG_ERROR("read_option_description: invalid message");
-                return "";
-            }
+                return topic == ros_topic::option_description_topic({ get_device_index(), sensor_index }, id);
+            };
+
+        const auto find_description = [this](uint32_t sensor_index, rs2_option id) -> const std::string*
+            {
+                auto sensor_it = m_read_options_descriptions.find(sensor_index);
+                if (sensor_it == m_read_options_descriptions.end())
+                    return nullptr;
+
+                auto option_it = sensor_it->second.find(id);
+                if (option_it == sensor_it->second.end())
+                    return nullptr;
+
+                return &option_it->second;
+            };
+
+        auto msg = peek_next_cached();
+        if (!msg || !msg->serialized_data || !msg->serialized_data->buffer)
+        {
+            LOG_ERROR("read_option_description: invalid message");
+            return "";
+        }
+
+        if (is_topic_description_topic(msg->topic_name, sensor_index, id))
+        {
+            // If the next message is the description topic, read it and return the description
+            msg = read_next_cached();
             auto description = read_string(msg);
             m_read_options_descriptions[sensor_index][id] = description;
+            return description;
         }
-        return m_read_options_descriptions[sensor_index][id];
+
+        if (auto description = find_description(sensor_index, id))
+        {
+            return *description;
+        }
+
+        // Not expected to reach here - no description available and next message is not the description topic.
+        LOG_WARNING("Option description for sensor " << sensor_index << " option " << id << " not found. Returning empty description.");
+        return "";
     }
 
     bool ros2_reader::has_next_cached() const
