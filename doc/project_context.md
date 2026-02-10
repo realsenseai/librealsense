@@ -195,7 +195,7 @@ User Application
 ### API Contracts
 
 - **C API stability**: Public C API maintains ABI compatibility within major versions
-- **Error handling**: All operations return status codes; exceptions used internally only
+- **Error handling**: C API functions report failures via `rs2_error*` out-parameters; the C++ wrapper typically throws `rs2::error` exceptions on failure
 - **Stream format support**: Not all formats supported on all platforms/devices
 - **Synchronization guarantees**: Synchronized streams maintain timestamp correlation
 
