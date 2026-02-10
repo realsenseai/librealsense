@@ -1279,18 +1279,17 @@ namespace rs2
                 std::string path = "";
                 std::string default_path = config_file::instance().get(configurations::record::default_path);
                 if (!ends_with(default_path, "/") && !ends_with(default_path, "\\")) default_path += "/";
-                std::string default_filename = rs2::get_timestamped_file_name() + ".bag";
+                std::string default_filename = rs2::get_timestamped_file_name();
                 if (recording_setting == 0 && default_path.size() > 1 )
                 {
                     path = default_path + default_filename;
                 }
                 else
                 {
-                    if (const char* ret = file_dialog_open(file_dialog_mode::save_file, "ROS-bag\0*.bag\0",
+                    if (const char* ret = file_dialog_open(file_dialog_mode::save_file, "ROS2-bag\0*.db3\0",
                         default_path.c_str(), default_filename.c_str()))
                     {
                         path = ret;
-                        if (!ends_with(rsutils::string::to_lower(path), ".bag")) path += ".bag";
                     }
                 }
 
@@ -1299,7 +1298,7 @@ namespace rs2
         }}, disable_record_button_logic(is_streaming, is_playback_device));
         ImGui::PopFont();
         ImGui::PushFont(window.get_font());
-        if (ImGui::IsItemHovered())
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         {
             std::string record_button_hover_text = get_record_button_hover_text(is_streaming);
             RsImGui::CustomTooltip("%s", record_button_hover_text.c_str());
@@ -1522,7 +1521,7 @@ namespace rs2
 
         ImGui::PushStyleColor(ImGuiCol_Text, record_button_color);
         ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, record_button_color);
-        RsImGui::RsImButton([&]() {ImGui::ButtonEx(is_recording ? "Stop" : "Record", device_panel_icons_size);}, !is_streaming);
+        RsImGui::RsImButton([&]() {ImGui::ButtonEx(is_recording ? "Stop" : "Record", device_panel_icons_size);}, disable_record_button_logic(is_streaming, is_playback_device));
         if (ImGui::IsItemHovered() && is_streaming) window.link_hovered();
         ImGui::PopStyleColor(2);
 
