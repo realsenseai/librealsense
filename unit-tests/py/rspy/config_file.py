@@ -43,7 +43,6 @@ def get_domain_from_config_file():
                          .get("dds", {})
                          .get("domain"))
     if domain is None:
-        print("domain not found")
         raise KeyError("Missing required config key: context.dds.domain")
 
     # Cache the domain value for future calls
