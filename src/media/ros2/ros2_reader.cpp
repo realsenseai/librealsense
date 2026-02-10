@@ -226,7 +226,6 @@ namespace librealsense
         _storage->open(m_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
         m_frame_source = std::make_shared<frame_source>(32);
         m_frame_source->init(m_metadata_parser_map);
-        m_read_options_descriptions.clear();
 
         // Reapply streaming filter if it was previously set
         if (!_streaming_filter_topics.empty())
@@ -1103,18 +1102,48 @@ namespace librealsense
 
     std::string ros2_reader::read_option_description(const uint32_t sensor_index, const rs2_option& id)
     {
-        if (m_read_options_descriptions[sensor_index].find(id) == m_read_options_descriptions[sensor_index].end())
-        {
-            auto msg = read_next_cached();
-            if (!msg || !msg->serialized_data || !msg->serialized_data->buffer)
+        static const auto is_topic_description_topic = [](const std::string& topic, uint32_t sensor_index, rs2_option id)
             {
-                LOG_ERROR("read_option_description: invalid message");
-                return "";
-            }
+                return topic == ros_topic::option_description_topic({ get_device_index(), sensor_index }, id);
+            };
+
+        const auto find_description = [this](uint32_t sensor_index, rs2_option id) -> const std::string*
+            {
+                auto sensor_it = m_read_options_descriptions.find(sensor_index);
+                if (sensor_it == m_read_options_descriptions.end())
+                    return nullptr;
+
+                auto option_it = sensor_it->second.find(id);
+                if (option_it == sensor_it->second.end())
+                    return nullptr;
+
+                return &option_it->second;
+            };
+
+        auto msg = peek_next_cached();
+        if (!msg || !msg->serialized_data || !msg->serialized_data->buffer)
+        {
+            LOG_ERROR("read_option_description: invalid message");
+            return "";
+        }
+
+        if (is_topic_description_topic(msg->topic_name, sensor_index, id))
+        {
+            // If the next message is the description topic, read it and return the description
+            msg = read_next_cached();
             auto description = read_string(msg);
             m_read_options_descriptions[sensor_index][id] = description;
+            return description;
         }
-        return m_read_options_descriptions[sensor_index][id];
+
+        if (auto description = find_description(sensor_index, id))
+        {
+            return *description;
+        }
+
+        // Not expected to reach here - no description available and next message is not the description topic.
+        LOG_WARNING("Option description for sensor " << sensor_index << " option " << id << " not found. Returning empty description.");
+        return "";
     }
 
     bool ros2_reader::has_next_cached() const
