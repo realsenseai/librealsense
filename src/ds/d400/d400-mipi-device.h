@@ -24,6 +24,7 @@ namespace librealsense
         void update_flash(const std::vector<uint8_t>& image, rs2_update_progress_callback_sptr callback, int update_mode) override;
 
     private:
+        friend class options_watcher_pause_guard;
         void update_signed_firmware(const std::vector<uint8_t>& image,
                           rs2_update_progress_callback_sptr callback);
         static void simulate_device_reconnect(std::shared_ptr<const device_info> dev_info);
@@ -33,5 +34,26 @@ namespace librealsense
         void pause_options_watchers();
         void unpause_options_watchers();
         std::vector<int> _sensors_indices;
+    };
+
+    class options_watcher_pause_guard
+    {
+    public:
+        explicit options_watcher_pause_guard(d400_mipi_device& dev)
+            : _dev(dev)
+        {
+            _dev.pause_options_watchers();
+        }
+
+        ~options_watcher_pause_guard() noexcept
+        {
+            _dev.unpause_options_watchers();
+        }
+
+        options_watcher_pause_guard(const options_watcher_pause_guard&) = delete;
+        options_watcher_pause_guard& operator=(const options_watcher_pause_guard&) = delete;
+
+    private:
+        d400_mipi_device& _dev;
     };
 }

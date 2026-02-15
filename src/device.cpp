@@ -207,7 +207,6 @@ std::vector< rs2_format > device::map_supported_color_formats( rs2_format source
         target_formats.push_back(RS2_FORMAT_Y8);
         break;
     case RS2_FORMAT_YUYV:
-        target_formats.push_back(RS2_FORMAT_Y8);
         break;
     case RS2_FORMAT_UYVY:
         break;

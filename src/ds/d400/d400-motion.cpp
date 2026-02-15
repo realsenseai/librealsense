@@ -21,6 +21,7 @@
 #include "proc/auto-exposure-processor.h"
 #include <src/metadata-parser.h>
 #include <src/hid-sensor.h>
+#include <src/ds/features/gyro-sensitivity-feature.h>
 
 #include <rsutils/type/fourcc.h>
 using rsutils::type::fourcc;
@@ -133,6 +134,7 @@ namespace librealsense
         } 
         catch (const std::exception& e)
         {
+            _has_motion_module_failed = true;
             auto device_name = get_info( RS2_CAMERA_INFO_NAME );
             auto serial = get_info( RS2_CAMERA_INFO_SERIAL_NUMBER );
             LOG_ERROR( device_name << " #" << serial << " - Base Motion Sensor Failure! " << e.what() );
@@ -175,8 +177,9 @@ namespace librealsense
                 get_raw_motion_sensor()->set_gyro_scale_factor( 10000.0 );
 #endif
         }
-        catch (const std::exception& e) 
+        catch (const std::exception& e)
         {
+            _has_motion_module_failed = true;
             auto device_name = get_info( RS2_CAMERA_INFO_NAME );
             auto serial = get_info( RS2_CAMERA_INFO_SERIAL_NUMBER );
             LOG_ERROR( device_name << " #" << serial << " - HID Motion Sensor Failure! " << e.what() );
@@ -243,6 +246,7 @@ namespace librealsense
         } 
         catch (const std::exception& e)
         {
+            _has_motion_module_failed = true;
             auto device_name = get_info( RS2_CAMERA_INFO_NAME );
             auto serial = get_info( RS2_CAMERA_INFO_SERIAL_NUMBER );
             LOG_ERROR( device_name << " #" << serial << " - UVC Motion Sensor Failure! " << e.what() );
@@ -280,6 +284,13 @@ namespace librealsense
 
         // Add fisheye endpoint
         _fisheye_device_idx = add_sensor(fisheye_ep);
+    }
+
+    void d400_motion::register_gyro_sensitivity()
+    {
+        if( _fw_version >= firmware_version( 5, 16, 0, 0 ) && !_has_motion_module_failed)
+                register_feature(
+                    std::make_shared< gyro_sensitivity_feature >( get_raw_motion_sensor(), get_motion_sensor() ) );
     }
 
     void d400_motion::register_fisheye_options()

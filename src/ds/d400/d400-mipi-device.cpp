@@ -16,6 +16,7 @@ namespace librealsense
 
     void d400_mipi_device::hardware_reset()
     {
+        options_watcher_pause_guard guard(*this);
         d400_device::hardware_reset();
         simulate_device_reconnect(this->get_device_info());
     }
@@ -118,41 +119,16 @@ namespace librealsense
 
     void d400_mipi_device::update_non_const( const void * fw_image, int fw_image_size, rs2_update_progress_callback_sptr progress_callback )
     {
-        // first pausing the options watcher (if running)
-        pause_options_watchers();
-
-        try{
-            std::vector<uint8_t> fw_image_vec (static_cast<const uint8_t*>(fw_image), static_cast<const uint8_t*>(fw_image) + fw_image_size);
-            update_signed_firmware(fw_image_vec, progress_callback);
-        }
-        catch(...)
-        {
-            unpause_options_watchers();
-            throw;
-        }
-
-        // finally, unpausing the options watcher
-        unpause_options_watchers();
+        options_watcher_pause_guard guard(*this);
+        std::vector<uint8_t> fw_image_vec (static_cast<const uint8_t*>(fw_image), static_cast<const uint8_t*>(fw_image) + fw_image_size);
+        update_signed_firmware(fw_image_vec, progress_callback);
     }
 
     void d400_mipi_device::update_flash(const std::vector<uint8_t>& image, rs2_update_progress_callback_sptr callback, int update_mode)
     {
-        // first pausing the options watcher (if running)
-        pause_options_watchers();
-
-        try{
-            d400_device::update_flash(image, callback, update_mode);
-        }
-        catch(...)
-        {
-            unpause_options_watchers();
-            throw;
-        }
-
-        // finally, unpausing the options watcher
-        unpause_options_watchers();
+        options_watcher_pause_guard guard(*this);
+        d400_device::update_flash(image, callback, update_mode);
     }
-
 
     void d400_mipi_device::pause_options_watchers()
     {

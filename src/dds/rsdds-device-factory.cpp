@@ -44,18 +44,19 @@ class rsdds_watcher_singleton
 
 public:
     rsdds_watcher_singleton( std::shared_ptr< realdds::dds_participant > const & participant,
+                             size_t initialization_timeout_ms = 5000,
                              bool partial_device_allowed = false )
         : _device_watcher( std::make_shared< realdds::dds_device_watcher >( participant ) )
     {
         assert( _device_watcher->is_stopped() );
 
         _device_watcher->on_device_added(
-            [this, partial_device_allowed]( std::shared_ptr< realdds::dds_device > const & dev )
+            [this, initialization_timeout_ms, partial_device_allowed]( std::shared_ptr< realdds::dds_device > const & dev )
             {
                 try
                 {
-                    size_t default_timeout_ms = 5000; // Default timeout of wait_until_ready function
-                    if( ! dev->wait_until_ready( default_timeout_ms, partial_device_allowed ) )  // make sure handshake was (even partially) performed, might throw
+                    // Make sure handshake was (even partially) performed, might throw
+                    if( ! dev->wait_until_ready( initialization_timeout_ms, partial_device_allowed ) )
                         LOG_ERROR( "Discovered DDS device " << dev->debug_name()
                                    << " failed to be ready within timeout, using partial capabilities." );
                     _callbacks.raise( dev, true );
@@ -155,8 +156,9 @@ rsdds_device_factory::rsdds_device_factory( std::shared_ptr< context > const & c
                                       << "A DDS participant '" << _participant->name() << "' already exists in domain "
                                       << domain_id << "; cannot create '" << participant_name << "'" );
         }
+        size_t device_initialization_timeout = dds_settings.nested( "device-initialization-timeout-ms" ).default_value< size_t >( 5000 );
         bool partial_capabilities_allowed = ctx->get_settings().nested( "partial-device-allowed" ).default_value< bool >( false );
-        _watcher_singleton = domain.device_watcher.instance( _participant, partial_capabilities_allowed );
+        _watcher_singleton = domain.device_watcher.instance( _participant, device_initialization_timeout, partial_capabilities_allowed );
         _subscription = _watcher_singleton->subscribe(
             [liveliness = std::weak_ptr< context >( ctx ),
              cb = std::move( cb )]( std::shared_ptr< realdds::dds_device > const & dev, bool added )

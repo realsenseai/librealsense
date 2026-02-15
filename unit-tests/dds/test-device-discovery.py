@@ -4,7 +4,7 @@
 #test:donotrun:!dds
 #test:retries 2
 
-from rspy import log, test
+from rspy import log, test, config_file
 import pyrealdds as dds
 from time import sleep
 import re
@@ -14,7 +14,7 @@ with test.remote.fork( nested_indent='  S' ) as remote:
         dds.debug( log.is_debug_on(), log.nested )
 
         participant = dds.participant()
-        participant.init( 123, 'server' )
+        participant.init( config_file.get_domain_from_config_file_or_default(), 'server' )
 
         def create_device_info( props ):
             global broadcasters, publisher
@@ -63,7 +63,7 @@ with test.remote.fork( nested_indent='  S' ) as remote:
 
 
     participant = dds.participant()
-    participant.init( 123, "client" )
+    participant.init( config_file.get_domain_from_config_file_or_default(), "client" )
 
 
     # We listen directly on the device-info topic

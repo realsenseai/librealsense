@@ -300,6 +300,8 @@ dds_device_proxy::dds_device_proxy( std::shared_ptr< const device_info > const &
                     LOG_ERROR( e.what() );
                 }
             }
+            // Add locally handled options. Do it only after all dds options are added to avoid duplicates.
+            sensor_info.proxy->add_local_options();
 
             auto recommended_filters_names = get_recommended_filters_names(stream);
             for( auto & filter_name : recommended_filters_names )

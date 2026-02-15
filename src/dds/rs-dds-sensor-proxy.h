@@ -5,6 +5,7 @@
 #include "sid_index.h"
 #include <src/frame.h>
 #include <src/software-sensor.h>
+#include <src/global_timestamp_reader.h>
 #include <src/proc/formats-converter.h>
 #include <src/core/options-watcher.h>
 
@@ -37,7 +38,7 @@ class dds_device_proxy;
 class roi_sensor_interface;
 
 
-class dds_sensor_proxy : public software_sensor
+class dds_sensor_proxy : public software_sensor, public global_time_interface
 {
     using super = software_sensor;
 
@@ -83,6 +84,7 @@ public:
     void close() override;
 
     void add_option( std::shared_ptr< realdds::dds_option > option );
+    void add_local_options(); // Should be called after all dds options are added
 
     void add_processing_block( std::string const & filter_name );
     virtual void add_embedded_filter(std::shared_ptr< realdds::dds_embedded_filter > embedded_filter);
@@ -96,6 +98,10 @@ public:
     rsutils::subscription register_options_changed_callback( options_watcher::callback && ) override;
     stream_profiles get_active_streams() const override;
 
+    // global_time_interface
+public:
+    virtual double get_device_time_ms() override;  // Returns time in miliseconds.
+
 protected:
     void register_converters();
     stream_profiles init_stream_profiles() override;
@@ -108,7 +114,7 @@ protected:
     find_profile( sid_index sidx, realdds::dds_motion_stream_profile const & profile ) const;
 
     realdds::dds_stream_profiles find_dds_profiles( const librealsense::stream_profiles & source_profiles ) const;
-    
+
     void handle_video_data( std::vector< uint8_t > &&,
                             realdds::dds_time &&,
                             realdds::dds_sample &&,
@@ -126,6 +132,9 @@ protected:
 
     void add_processing_block_settings( const std::string & filter_name,
                                         std::shared_ptr< librealsense::processing_block_interface > & ppb ) const;
+
+    void update_timestamp_if_needed( librealsense::frame_additional_data & data );
+    bool _handle_global_timestamp_locally = false;
 
     friend class dds_device_proxy;  // Currently calls handle_new_metadata
 };

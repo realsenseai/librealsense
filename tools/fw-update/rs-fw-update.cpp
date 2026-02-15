@@ -534,7 +534,9 @@ try
             }
             else
             {
-                return update_signed_fw(d, fw_image);
+                int result = update_signed_fw(d, fw_image);
+                if (result != EXIT_SUCCESS)
+                    return result;
             }
         }
     }

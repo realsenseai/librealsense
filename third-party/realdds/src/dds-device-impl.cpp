@@ -53,8 +53,10 @@ void dds_device::impl::set_state( state_t new_state )
     if( new_state == _state )
         return;
 
-    if( state_t::OFFLINE == new_state )  // Discovery lost
+    if( state_t::OFFLINE == new_state ) // Discovery lost
     {
+        // Close dds entities that are not needed when offline, and will be re-created when back online. Avoids traffic when not needed.
+        // Note - do not close the control writer, as it gives us our GUID, which we want to keep constant.
         if( _notifications_reader )
         {
             _notifications_reader->stop();
@@ -65,7 +67,7 @@ void dds_device::impl::set_state( state_t new_state )
         reset();
     }
 
-    if( state_t::INITIALIZING == new_state )  // Discovery restored
+    if( state_t::INITIALIZING == new_state ) // Discovery restored
     {
         create_notifications_reader();
     }
