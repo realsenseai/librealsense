@@ -26,6 +26,9 @@ namespace librealsense
 {
     using namespace device_serializer;
 
+    // CDR encapsulation header: 2 bytes representation identifier + 2 bytes options
+    static constexpr size_t CDR_HEADER_SIZE = 4;
+
     ros2_writer::ros2_writer(const std::string& file, bool compress_while_record) : m_file_path(file)
     {
         LOG_INFO("Compression while record is set to " << (compress_while_record ? "ON" : "OFF"));
@@ -55,7 +58,6 @@ namespace librealsense
         write_file_version();
     }
 
-    // TODO: All topic names need to be changed to have the writer play natively on ROS2
     void ros2_writer::ensure_topic(const std::string& name, const std::string& type)
     {
         if (_topics.find(name) != _topics.end())
@@ -63,12 +65,12 @@ namespace librealsense
         rosbag2_storage::TopicMetadata md;
         md.name = name;
         md.type = type;
-        md.serialization_format = "cdr"; // placeholder; we store raw bytes
+        md.serialization_format = "cdr";
         _storage->create_topic(md);
         _topics.emplace(name, md);
     }
 
-    std::shared_ptr<rcutils_uint8_array_t> ros2_writer::create_buffer(const void* data, size_t size)
+    std::shared_ptr<rcutils_uint8_array_t> ros2_writer::create_buffer(size_t size)
     {
         auto buffer = std::shared_ptr<rcutils_uint8_array_t>(new rcutils_uint8_array_t(),
             [](rcutils_uint8_array_t* arr) {
@@ -79,15 +81,10 @@ namespace librealsense
                 delete arr;
             });
 
-        // Initialize the array with the allocator
         rcutils_allocator_t alloc = rcutils_get_default_allocator();
         auto ret = rcutils_uint8_array_init(buffer.get(), size, &alloc);
         if (ret != RCUTILS_RET_OK)
             throw std::runtime_error("Failed to initialize rosbag2 buffer");
-
-        // Now copy the data
-        std::memcpy(buffer->buffer, data, size);
-        buffer->buffer_length = size;
 
         return buffer;
     }
@@ -95,8 +92,20 @@ namespace librealsense
 
     void ros2_writer::write_string(std::string const& topic, const nanoseconds& ts, std::string const& payload)
     {
-        ensure_topic(topic, "librealsense/string");
-        auto buffer = create_buffer(payload.data(), payload.size());
+        // Use std_msgs/msg/String for ROS2 native compatibility instead of custom librealsense type
+        ensure_topic(topic, "std_msgs/msg/String");
+
+        // CDR serialize the std_msgs/msg/String message
+        // Format: CDR header + 4-byte string length + string data (null terminated)
+        size_t str_len = payload.size();
+        size_t total_size = CDR_HEADER_SIZE + 4 + str_len + 1;
+        auto buffer = create_buffer(total_size);
+
+        eprosima::fastcdr::FastBuffer fb(reinterpret_cast<char*>(buffer->buffer), total_size);
+        eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
+        cdr.serialize_encapsulation();
+        cdr << payload; // FastCDR serializes strings with length prefix
+        buffer->buffer_length = static_cast<size_t>(cdr.getSerializedDataLength());
 
         auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
         msg->serialized_data = buffer;
@@ -104,8 +113,6 @@ namespace librealsense
         msg->topic_name = topic;
         _storage->write(msg);
     }
-
-    
 
     void ros2_writer::write_device_description(const librealsense::device_snapshot& device_description)
     {
@@ -123,41 +130,135 @@ namespace librealsense
         }
     }
 
+    template<typename RosMsg>
+    std::shared_ptr<rcutils_uint8_array_t> ros2_writer::serialize_to_cdr(const RosMsg& ros_msg)
+    {
+        auto estimated_size = RosMsg::getCdrSerializedSize(ros_msg) + CDR_HEADER_SIZE;
+        auto buffer = create_buffer(estimated_size);
+        eprosima::fastcdr::FastBuffer fb(reinterpret_cast<char*>(buffer->buffer), estimated_size);
+        eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
+        cdr.serialize_encapsulation();
+        ros_msg.serialize(cdr);
+        buffer->buffer_length = static_cast<size_t>(cdr.getSerializedDataLength());
+        return buffer;
+    }
+
     void ros2_writer::write_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame)
     {
         if (!frame || !frame.frame)
             return;
 
-        const void* p_data = nullptr;
-        size_t size = 0;
+        std::shared_ptr<rcutils_uint8_array_t> buffer;
+        std::string topic;
+        std::string msg_type;
+
+        // Build ROS2 timestamp from nanoseconds
+        auto ns_count = timestamp.count();
+        int32_t stamp_sec = static_cast<int32_t>(ns_count / 1000000000LL);
+        uint32_t stamp_nsec = static_cast<uint32_t>(ns_count % 1000000000LL);
+        auto stream_name = ros2_topic::stream_name(stream_id.stream_type, stream_id.stream_index);
 
         if (Is<video_frame>(frame.frame))
         {
             auto vid_frame = As<video_frame>(frame.frame);
-            p_data = vid_frame->get_frame_data();
-            size = vid_frame->get_stride() * vid_frame->get_height();
+            sensor_msgs::msg::Image img;
+            img.header().stamp().sec(stamp_sec);
+            img.header().stamp().nanosec(stamp_nsec);
+            img.header().frame_id(stream_name);
+            img.is_bigendian(is_big_endian());
+            img.width(vid_frame->get_width());
+            img.height(vid_frame->get_height());
+            img.step(vid_frame->get_stride());
+
+            std::string encoding;
+            convert(vid_frame->get_stream()->get_format(), encoding);
+            img.encoding(std::move(encoding));
+
+            auto data_size = vid_frame->get_stride() * vid_frame->get_height();
+            auto raw = vid_frame->get_frame_data();
+            img.data(std::vector<uint8_t>(raw, raw + data_size));
+
+            buffer = serialize_to_cdr(img);
+            topic = ros2_topic::frame_data_topic(stream_id);
+            msg_type = "sensor_msgs/msg/Image";
         }
         else if (Is<motion_frame>(frame.frame))
         {
             auto motion = As<motion_frame>(frame.frame);
-            p_data = motion->get_frame_data();
-            size = (stream_id.stream_type == RS2_STREAM_MOTION) ? sizeof(rs2_combined_motion) : 3 * sizeof(float);
+            sensor_msgs::msg::Imu imu;
+            imu.header().stamp().sec(stamp_sec);
+            imu.header().stamp().nanosec(stamp_nsec);
+            imu.header().frame_id(stream_name);
+            imu.orientation_covariance().fill(0.0);
+            imu.angular_velocity_covariance().fill(0.0);
+            imu.linear_acceleration_covariance().fill(0.0);
+
+            if (stream_id.stream_type == RS2_STREAM_MOTION)
+            {
+                auto data = reinterpret_cast<const rs2_combined_motion*>(motion->get_frame_data());
+                imu.orientation().x(data->orientation.x);
+                imu.orientation().y(data->orientation.y);
+                imu.orientation().z(data->orientation.z);
+                imu.orientation().w(data->orientation.w);
+                imu.angular_velocity().x(data->angular_velocity.x);
+                imu.angular_velocity().y(data->angular_velocity.y);
+                imu.angular_velocity().z(data->angular_velocity.z);
+                imu.linear_acceleration().x(data->linear_acceleration.x);
+                imu.linear_acceleration().y(data->linear_acceleration.y);
+                imu.linear_acceleration().z(data->linear_acceleration.z);
+            }
+            else
+            {
+                // Per ROS convention, orientation_covariance[0] = -1 indicates orientation is unknown
+                imu.orientation_covariance()[0] = -1.0;
+
+                auto data = reinterpret_cast<const float*>(motion->get_frame_data());
+                if (stream_id.stream_type == RS2_STREAM_GYRO)
+                {
+                    imu.angular_velocity().x(data[0]);
+                    imu.angular_velocity().y(data[1]);
+                    imu.angular_velocity().z(data[2]);
+                }
+                else // ACCEL
+                {
+                    imu.linear_acceleration().x(data[0]);
+                    imu.linear_acceleration().y(data[1]);
+                    imu.linear_acceleration().z(data[2]);
+                }
+            }
+
+            buffer = serialize_to_cdr(imu);
+            topic = ros2_topic::frame_data_topic(stream_id);
+            msg_type = "sensor_msgs/msg/Imu";
         }
         else if (Is<labeled_points>(frame.frame))
         {
             auto lp = As<labeled_points>(frame.frame);
-            p_data = lp->get_frame_data();
-            size = lp->get_vertex_count() * lp->get_bpp() / 8;
+            sensor_msgs::msg::Image img;
+            img.header().stamp().sec(stamp_sec);
+            img.header().stamp().nanosec(stamp_nsec);
+            img.header().frame_id(stream_name);
+            img.is_bigendian(is_big_endian());
+
+            auto data_size = static_cast<uint32_t>(lp->get_vertex_count() * lp->get_bpp() / 8);
+            auto raw = lp->get_frame_data();
+            img.data(std::vector<uint8_t>(raw, raw + data_size));
+            img.encoding(rs2_format_to_string(lp->get_stream()->get_format()));
+            img.width(data_size);
+            img.height(1);
+            img.step(data_size);
+
+            buffer = serialize_to_cdr(img);
+            topic = ros2_topic::frame_data_topic(stream_id);
+            msg_type = "sensor_msgs/msg/Image";
         }
         else
         {
-            LOG_WARNING("Unsupported frame type for stream " << stream_id.stream_type << ". Only video, motion, and labeled points frames are supported. Skipping frame.");
+            LOG_WARNING("Unsupported frame type for stream " << stream_id.stream_type << ". Skipping frame.");
             return;
         }
 
-        auto buffer = create_buffer(p_data, size);
-        auto topic = ros_topic::frame_data_topic(stream_id);
-        ensure_topic(topic, "librealsense/raw_frame");
+        ensure_topic(topic, msg_type);
         auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
         msg->serialized_data = buffer;
         msg->time_stamp = static_cast<rcutils_time_point_value_t>(timestamp.count());
@@ -183,9 +284,25 @@ namespace librealsense
 
     void ros2_writer::write_file_version()
     {
-        auto file_version_topic = ros_topic::file_version_topic();
-        ensure_topic(file_version_topic, "librealsense/file_version"); // this is how we give the topic a type - it indicates what kind of data is stored there
-        write_string(file_version_topic, nanoseconds{ 0 }, std::to_string(get_file_version()));
+        auto file_version_topic = ros2_topic::file_version_topic();
+        // Use std_msgs/msg/UInt32 for file version for ROS2 native compatibility  
+        ensure_topic(file_version_topic, "std_msgs/msg/UInt32");
+        
+        // CDR serialize the UInt32 message
+        size_t total_size = CDR_HEADER_SIZE + sizeof(uint32_t);
+        auto buffer = create_buffer(total_size);
+        
+        eprosima::fastcdr::FastBuffer fb(reinterpret_cast<char*>(buffer->buffer), total_size);
+        eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
+        cdr.serialize_encapsulation();
+        cdr << static_cast<uint32_t>(get_file_version());
+        buffer->buffer_length = static_cast<size_t>(cdr.getSerializedDataLength());
+
+        auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
+        msg->serialized_data = buffer;
+        msg->time_stamp = 0;
+        msg->topic_name = file_version_topic;
+        _storage->write(msg);
     }
 
     void ros2_writer::write_frame_metadata(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame)
@@ -210,8 +327,8 @@ namespace librealsense
             }
         }
 
-        auto metadata_topic = ros_topic::frame_metadata_topic(stream_id);
-        ensure_topic(metadata_topic, "librealsense/frame_metadata");
+        auto metadata_topic = ros2_topic::frame_metadata_topic(stream_id);
+        // write_string already ensures the topic with std_msgs/msg/String type
         write_string(metadata_topic, timestamp, metadata_payload);
     }
 
@@ -240,15 +357,15 @@ namespace librealsense
             if (i < 2) payload += ",";
         }
         
-        auto topic = ros_topic::stream_extrinsic_topic(stream_id, reference_id);
-        ensure_topic(topic, "librealsense/extrinsics");
+        auto topic = ros2_topic::stream_extrinsic_topic(stream_id, reference_id);
+        // write_string already ensures the topic with std_msgs/msg/String type
         write_string(topic, get_static_file_info_timestamp(), payload);
         m_extrinsics_msgs.insert(stream_id);
     }
 
     void ros2_writer::write_notification(const sensor_identifier& sensor_id, const nanoseconds& ts, const notification& n)
     {
-        std::string topic = ros_topic::notification_topic(sensor_id, n.category);
+        std::string topic = ros2_topic::notification_topic(sensor_id, n.category);
         std::string payload = rsutils::string::from() << "category=" << rs2_notification_category_to_string(n.category)
             << ";severity=" << rs2_log_severity_to_string(n.severity)
             << ";description=" << n.description
@@ -282,8 +399,9 @@ namespace librealsense
 
     void ros2_writer::write_stream_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<stream_profile_interface> profile)
     {
-        auto topic = ros_topic::stream_info_topic({ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) });
-        ensure_topic(topic, "librealsense/stream_info");
+        auto stream_id = device_serializer::stream_identifier{ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) };
+        auto topic = ros2_topic::stream_info_topic(stream_id);
+        // write_string will ensure the topic with std_msgs/msg/String type
         std::string payload = rsutils::string::from()
             << "is_recommended=" << ((profile->get_tag() & profile_tag::PROFILE_TAG_DEFAULT) ? "true" : "false") << ";"
             << "encoding=" << librealsense::get_string(profile->get_format()) << ";"
@@ -295,8 +413,8 @@ namespace librealsense
     void ros2_writer::write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<video_stream_profile_interface> profile)
     {
         write_stream_info(timestamp, sensor_id, profile);
-        auto topic = ros_topic::video_stream_info_topic({ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) });
-        ensure_topic(topic, "librealsense/camera_info");
+        auto topic = ros2_topic::video_stream_info_topic({ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) });
+        // write_string will ensure the topic with std_msgs/msg/String type
         rs2_intrinsics intrinsics{};
         try {
             intrinsics = profile->get_intrinsics();
@@ -338,8 +456,8 @@ namespace librealsense
             LOG_ERROR("Error trying to get intrinsc data for stream " << profile->get_stream_type() << ", " << profile->get_stream_index());
         }
 
-        std::string topic = ros_topic::imu_intrinsic_topic({ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) });
-        ensure_topic(topic, "librealsense/imu_intrinsic");
+        std::string topic = ros2_topic::imu_intrinsic_topic({ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) });
+        // write_string will ensure the topic with std_msgs/msg/String type
         std::string payload = "data=";
         for (size_t i = 0; i < 3; ++i)
         {
@@ -367,10 +485,6 @@ namespace librealsense
         write_string(topic, timestamp, payload);
     }
 
-    void ros2_writer::write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<pose_stream_profile_interface> profile)
-    {
-        write_stream_info(timestamp, sensor_id, profile);
-    }
     void ros2_writer::write_extension_snapshot(uint32_t device_id, const nanoseconds& timestamp, rs2_extension type, std::shared_ptr<librealsense::extension_snapshot> snapshot)
     {
         const auto ignored = 0u;
@@ -393,11 +507,11 @@ namespace librealsense
             {
                 if (is_device)
                 {
-                    write_vendor_info(ros_topic::device_info_topic(device_id), timestamp, info);
+                    write_vendor_info(ros2_topic::device_info_topic(device_id), timestamp, info);
                 }
                 else
                 {
-                    write_vendor_info(ros_topic::sensor_info_topic({ device_id, sensor_id }), timestamp, info);
+                    write_vendor_info(ros2_topic::sensor_info_topic({ device_id, sensor_id }), timestamp, info);
                 }
             }
             break;
@@ -456,13 +570,13 @@ namespace librealsense
     {
         float value = option.query();
         //One message for value
-        write_string(ros_topic::option_value_topic(sensor_id, type), timestamp, std::to_string(value));
+        write_string(ros2_topic::option_value_topic(sensor_id, type), timestamp, std::to_string(value));
         //Another message for description, should be written once per topic
         if (m_written_options_descriptions[sensor_id.sensor_index].find(type) == m_written_options_descriptions[sensor_id.sensor_index].end())
         {
             const char* desc = option.get_description();
             std::string description = desc ? std::string(desc) : (rsutils::string::from() << "Read only option " << librealsense::get_string(type));
-            write_string(ros_topic::option_description_topic(sensor_id, type), get_static_file_info_timestamp(), description);
+            write_string(ros2_topic::option_description_topic(sensor_id, type), get_static_file_info_timestamp(), description);
             m_written_options_descriptions[sensor_id.sensor_index].insert(type);
         }
     }
@@ -528,7 +642,7 @@ namespace librealsense
             }
             try
             {
-                write_string(ros_topic::post_processing_blocks_topic(sensor_id), timestamp, name);
+                write_string(ros2_topic::post_processing_blocks_topic(sensor_id), timestamp, name);
             }
             catch (std::exception& e)
             {
