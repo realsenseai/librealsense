@@ -627,7 +627,7 @@ namespace librealsense
             _recommended_fw_version = firmware_version(D4XX_RECOMMENDED_FIRMWARE_VERSION);
             if (_fw_version >= firmware_version("5.10.4.0"))
                 _device_capabilities = parse_device_capabilities( gvd_buff );
-        
+
             set_imu_type();
 
             //D457 Development
@@ -903,7 +903,23 @@ namespace librealsense
 
             }
 
-            if ((_device_capabilities & ds_caps::CAP_INTERCAM_HW_SYNC) == ds_caps::CAP_INTERCAM_HW_SYNC)
+            auto external_sync_xu_control = std::make_shared<uvc_xu_option<uint8_t>>( raw_depth_sensor, depth_xu,
+                                                                                   DS5_EXTERNAL_SYNC, "External sync");
+            try
+            {
+               auto external_sync_mode = external_sync_xu_control->query();
+               _device_capabilities |= ds_caps::CAP_EXTERNAL_SYNC_XU;
+            }
+            catch( const std::exception & )
+            {
+                // do nothing - just not adding the capability if the XU control is not accessible
+            }
+
+            if ((_device_capabilities & ds_caps::CAP_EXTERNAL_SYNC_XU) == ds_caps::CAP_EXTERNAL_SYNC_XU)
+            {
+                depth_sensor.register_option( RS2_OPTION_INTER_CAM_SYNC_MODE, external_sync_xu_control );
+            }
+            else if ((_device_capabilities & ds_caps::CAP_INTERCAM_HW_SYNC) == ds_caps::CAP_INTERCAM_HW_SYNC)
             {
                 if (_fw_version >= firmware_version("5.12.12.100") && (_device_capabilities & ds_caps::CAP_GLOBAL_SHUTTER) == ds_caps::CAP_GLOBAL_SHUTTER)
                 {
