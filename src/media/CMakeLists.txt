@@ -20,6 +20,7 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/ros/ros_reader.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros/ros_writer.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros/ros_file_format.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_file_format.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.h"
