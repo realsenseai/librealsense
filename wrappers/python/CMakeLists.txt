@@ -140,11 +140,11 @@ if( BUILD_LEGACY_PYBACKEND )
         PROPERTIES
             FOLDER Library/Python
         )
-    target_include_directories(pybackend2 PRIVATE ${PROJECT_SOURCE_DIR}/include)
+    target_include_directories(pybackend2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
     if(${FORCE_RSUSB_BACKEND})
         if(APPLE)
-            target_include_directories(pybackend2 PRIVATE ${PROJECT_SOURCE_DIR}/third-party/hidapi/)
+            target_include_directories(pybackend2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/hidapi/)
         endif()
     endif()
 
