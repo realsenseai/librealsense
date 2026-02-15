@@ -61,6 +61,7 @@ namespace librealsense
         const uint8_t DS5_THERMAL_COMPENSATION              = 0xF;
         const uint8_t DS5_EMITTER_FREQUENCY                 = 0x10;
         const uint8_t DS5_DEPTH_AUTO_EXPOSURE_MODE          = 0x11;
+        const uint8_t DS5_EXTERNAL_SYNC                     = 0x12;
 
         // DS5 fisheye XU identifiers
         const uint8_t FISHEYE_EXPOSURE                      = 1;
@@ -211,6 +212,7 @@ namespace librealsense
             CAP_IP65 = (1u << 9),
             CAP_IR_FILTER = (1u << 10),
             CAP_BMI_088 = (1u << 11),
+            CAP_EXTERNAL_SYNC_XU = ( 1u << 12 ),  // Support external synchronization via XU
             CAP_MAX
         };
 
