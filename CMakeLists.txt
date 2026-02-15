@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.10)
 
 set( LRS_TARGET realsense2 )
@@ -76,6 +75,11 @@ if(BUILD_WITH_DDS)
 	include(CMake/external_fastdds.cmake)
 
 	target_link_libraries( ${LRS_TARGET} PRIVATE realdds )
+else()
+    # Even without full DDS support, we need fastcdr for ROS2 bag file serialization
+    message(STATUS "Building with FastCDR for ROS2 bag support")
+    include(CMake/external_fastcdr.cmake)
+    target_link_libraries( ${LRS_TARGET} PRIVATE fastcdr )
 endif()
 
 # configure the project according to OS specific requirments
