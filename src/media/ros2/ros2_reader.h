@@ -10,7 +10,14 @@
 #include <rosbag2_storage/topic_metadata.hpp>
 #include <rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp>
 
-#include <media/ros/ros_file_format.h> // reuse ros_topic naming + helpers
+#include "ros2_file_format.h" // local ros2-native copy with ROS2 topic helpers
+
+//#include <realdds/topics/ros2/sensor_msgs/msg/Image.h>
+#include "ros2-msg-types/sensor_msgs/msg/Image.h"
+//#include <realdds/topics/ros2/sensor_msgs/msg/Imu.h>
+#include "ros2-msg-types/sensor_msgs/msg/Imu.h"
+#include <fastcdr/Cdr.h>
+#include <fastcdr/FastBuffer.h>
 
 #include <rsutils/string/from.h>
 
@@ -54,6 +61,7 @@ namespace librealsense
         static std::map< std::string, std::string > parse_msg_payload(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg);
         static void register_camera_infos(std::shared_ptr<info_container> infos, const std::map<std::string, std::string>& kv);
         static std::string read_string(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg);
+
         nanoseconds get_file_duration();
 
         uint32_t read_file_version();
@@ -80,7 +88,6 @@ namespace librealsense
         std::shared_ptr<info_container> read_info_snapshot(const std::string& topic);
         std::shared_ptr<stream_profile_interface> read_next_stream_profile();
         std::set<uint32_t> read_sensor_indices(uint32_t device_index) const;
-        std::map<uint32_t, stream_profiles> read_all_stream_profiles(uint32_t device_index);
 
         // Stream profile parsing helpers
         rs2_motion_device_intrinsic parse_motion_intrinsics(const std::map<std::string, std::string>& kv) const;
@@ -94,8 +101,8 @@ namespace librealsense
         void read_frame_metadata(frame_additional_data& additional_data);
         void setup_frame(frame_interface* frame_ptr, const stream_identifier& sid) const;
         
-        // Allocates a frame of the given extension type, copies raw data from msg, and sets up the stream profile
-        frame_holder alloc_and_fill_frame(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg,
+        // Allocates a frame of the given extension type, copies raw data, and sets up the stream profile
+        frame_holder alloc_and_fill_frame(const uint8_t* data, size_t data_size,
             const stream_identifier& stream_id, frame_additional_data additional_data) const;
 
         std::pair<rs2_option, std::shared_ptr<librealsense::option>> create_option(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg);
@@ -135,5 +142,6 @@ namespace librealsense
 
         // Filter topics for streaming - reapplied on reset() if set
         std::vector<std::string> _streaming_filter_topics;
+
     };
 }

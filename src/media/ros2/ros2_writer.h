@@ -8,7 +8,12 @@
 #include <rosbag2_storage/storage_options.hpp>
 #include <rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp>
 
-#include <media/ros/ros_file_format.h> // reuse ros_topic naming + helpers
+#include "ros2_file_format.h" // local ros2-native copy with ROS2 topic helpers
+
+#include "ros2-msg-types/sensor_msgs/msg/Image.h"
+#include "ros2-msg-types/sensor_msgs/msg/Imu.h"
+#include <fastcdr/Cdr.h>
+#include <fastcdr/FastBuffer.h>
 
 #include <rsutils/string/from.h>
 
@@ -35,7 +40,7 @@ namespace librealsense
         void write_extrinsics(const stream_identifier& stream_id, frame_interface* frame);
         void write_string( std::string const & topic, const device_serializer::nanoseconds & ts, std::string const & payload );
         void ensure_topic( const std::string & name, const std::string & type );
-        std::shared_ptr<rcutils_uint8_array_t> create_buffer(const void* data, size_t size);
+        std::shared_ptr<rcutils_uint8_array_t> create_buffer(size_t size);
 
         void write_notification(const sensor_identifier& sensor_id, const nanoseconds& timestamp, const notification& n) override;
         void write_additional_frame_messages(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
@@ -64,6 +69,9 @@ namespace librealsense
         void write_sensor_option(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, rs2_option type, const librealsense::option& option);
         void write_sensor_options(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<options_interface> options);
         void write_sensor_processing_blocks(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<recommended_proccesing_blocks_interface> proccesing_blocks);
+
+        template<typename RosMsg>
+        std::shared_ptr<rcutils_uint8_array_t> serialize_to_cdr(const RosMsg& msg);
 
         static uint8_t is_big_endian();
         std::string m_file_path;
