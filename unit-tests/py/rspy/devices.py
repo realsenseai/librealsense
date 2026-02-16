@@ -310,13 +310,20 @@ def _device_change_callback( info ):
         log.d( 'device added:', sn, handle )
         if sn in _device_by_sn:
             device = _device_by_sn[sn]
-            device._dev = handle     # Because it has a new handle!
-            device._removed = False
+            # Check if connection type changed (e.g., USB -> DDS)
+            old_connection_type = device._connection_type
+            new_connection_type = handle.supports(rs.camera_info.connection_type) and handle.get_info(rs.camera_info.connection_type) or None
+            if new_connection_type and new_connection_type != old_connection_type:
+                # Device reappeared with different connection type (e.g., USB camera now exposed via DDS adapter)
+                # This is likely a test artifact - don't replace the physical device with the virtual one
+                log.d( f'ignoring device {sn} with changed connection type: {old_connection_type} -> {new_connection_type}' )
+            else:
+                # Same connection type, just update the handle (device was recycled/reset)
+                device._dev = handle
+                device._removed = False
         else:
-            # shouldn't see new devices...
-            # we do not wish to add it to the list of devices, 
-            # because we only want devices that were present at the time of query() - but we do want to log it
-            # could happen on DDS simulated devices
+            # New device not in initial map - ignore it
+            # Could be DDS simulated devices created during tests
             log.d( 'ignoring new device...' )
 
 def all():
@@ -552,20 +559,30 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
     if hub:
         #
         ports = [ get( sn ).port for sn in serial_numbers ]
+        # DDS (and other non-hub) devices have port=None; filter them out of hub operations
+        hub_ports = [ p for p in ports if p is not None ]
         #
         if recycle:
             #
-            log.d( 'recycling ports via hub:', ports )
-            #
-            enabled_devices = enabled()
-            hub.disable_ports( )
-            _wait_until_removed( enabled_devices, timeout = timeout )
-            #
-            hub.enable_ports( ports )
+            if hub_ports:
+                # Only recycle if there are actual hub devices to manage
+                log.d( 'recycling ports via hub:', ports )
+                #
+                # Only wait for removal of devices that are actually on hub ports (exclude DDS devices)
+                enabled_devices = { sn for sn in enabled() if get( sn ).port is not None }
+                hub.disable_ports( )
+                _wait_until_removed( enabled_devices, timeout = timeout )
+                #
+                hub.enable_ports( hub_ports )
+            else:
+                log.d( 'no hub ports to recycle; leaving hub as-is' )
             #
         else:
             #
-            hub.enable_ports( ports, disable_other_ports = True )
+            if hub_ports:
+                hub.enable_ports( hub_ports, disable_other_ports = True )
+            else:
+                log.d( 'no hub ports to enable; leaving hub as-is' )
         #
         _wait_for( serial_numbers, timeout = timeout )
         #
