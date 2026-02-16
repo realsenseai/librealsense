@@ -23,7 +23,7 @@ from test_calibrations_common import (
 
 # Constants & thresholds (reintroduce after import fix)
 PIXEL_CORRECTION = -1.0  # pixel shift to apply to principal point
-SHORT_DISTANCE_PIXEL_CORRECTION = -1.3
+SHORT_DISTANCE_PIXEL_CORRECTION = -1.8
 EPSILON = 0.5         # half of PIXEL_CORRECTION tolerance
 DIFF_THRESHOLD = 0.001  # minimum change expected after OCC calibration
 HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION = 2
