@@ -236,8 +236,7 @@ def hdr_running_hdr_merge_after_hdr_restart():
         cfg = rs.config()
         cfg.enable_stream(rs.stream.depth)
         pipe = rs.pipeline(ctx)
-        if not safe_start_pipe(pipe, cfg):
-            test.fail("Failed to start the pipeline after maximum retries.")
+        pipe.start(cfg)
 
         frames_to_stream = 10
 
