@@ -299,7 +299,6 @@ namespace librealsense
 
         bool is_imu_topic = (msg->topic_name.find("/imu/") != std::string::npos);
 
-        // Temp buffers for deserialized data (must outlive alloc_and_fill_frame call)
         sensor_msgs::msg::Image img;
         rs2_combined_motion combined_motion{};
         float motion_xyz[3]{};

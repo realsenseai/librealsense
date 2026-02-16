@@ -10,11 +10,9 @@
 #include <rosbag2_storage/topic_metadata.hpp>
 #include <rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp>
 
-#include "ros2_file_format.h" // local ros2-native copy with ROS2 topic helpers
+#include "ros2_file_format.h"
 
-//#include <realdds/topics/ros2/sensor_msgs/msg/Image.h>
 #include "ros2-msg-types/sensor_msgs/msg/Image.h"
-//#include <realdds/topics/ros2/sensor_msgs/msg/Imu.h>
 #include "ros2-msg-types/sensor_msgs/msg/Imu.h"
 #include <fastcdr/Cdr.h>
 #include <fastcdr/FastBuffer.h>

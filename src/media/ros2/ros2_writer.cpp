@@ -92,7 +92,7 @@ namespace librealsense
 
     void ros2_writer::write_string(std::string const& topic, const nanoseconds& ts, std::string const& payload)
     {
-        // Use std_msgs/msg/String for ROS2 native compatibility instead of custom librealsense type
+        // Use std_msgs/msg/String as type for ROS2 native compatibility
         ensure_topic(topic, "std_msgs/msg/String");
 
         // CDR serialize the std_msgs/msg/String message
@@ -104,7 +104,7 @@ namespace librealsense
         eprosima::fastcdr::FastBuffer fb(reinterpret_cast<char*>(buffer->buffer), total_size);
         eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
         cdr.serialize_encapsulation();
-        cdr << payload; // FastCDR serializes strings with length prefix
+        cdr << payload;
         buffer->buffer_length = static_cast<size_t>(cdr.getSerializedDataLength());
 
         auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
@@ -258,6 +258,7 @@ namespace librealsense
             return;
         }
 
+        // msg_type is for ROS2 native compatibility
         ensure_topic(topic, msg_type);
         auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
         msg->serialized_data = buffer;
@@ -328,7 +329,6 @@ namespace librealsense
         }
 
         auto metadata_topic = ros2_topic::frame_metadata_topic(stream_id);
-        // write_string already ensures the topic with std_msgs/msg/String type
         write_string(metadata_topic, timestamp, metadata_payload);
     }
 
@@ -358,7 +358,6 @@ namespace librealsense
         }
         
         auto topic = ros2_topic::stream_extrinsic_topic(stream_id, reference_id);
-        // write_string already ensures the topic with std_msgs/msg/String type
         write_string(topic, get_static_file_info_timestamp(), payload);
         m_extrinsics_msgs.insert(stream_id);
     }
@@ -401,7 +400,6 @@ namespace librealsense
     {
         auto stream_id = device_serializer::stream_identifier{ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) };
         auto topic = ros2_topic::stream_info_topic(stream_id);
-        // write_string will ensure the topic with std_msgs/msg/String type
         std::string payload = rsutils::string::from()
             << "is_recommended=" << ((profile->get_tag() & profile_tag::PROFILE_TAG_DEFAULT) ? "true" : "false") << ";"
             << "encoding=" << librealsense::get_string(profile->get_format()) << ";"
@@ -414,7 +412,6 @@ namespace librealsense
     {
         write_stream_info(timestamp, sensor_id, profile);
         auto topic = ros2_topic::video_stream_info_topic({ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) });
-        // write_string will ensure the topic with std_msgs/msg/String type
         rs2_intrinsics intrinsics{};
         try {
             intrinsics = profile->get_intrinsics();
@@ -457,7 +454,6 @@ namespace librealsense
         }
 
         std::string topic = ros2_topic::imu_intrinsic_topic({ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) });
-        // write_string will ensure the topic with std_msgs/msg/String type
         std::string payload = "data=";
         for (size_t i = 0; i < 3; ++i)
         {

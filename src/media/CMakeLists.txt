@@ -1,7 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2019 RealSense, Inc. All Rights Reserved.
 
-# Add include path for ROS2 message types (needed for local includes between message types)
+# Include path for ROS2 message types
 target_include_directories(${LRS_TARGET} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types")
 
 target_sources(${LRS_TARGET}
@@ -25,7 +25,7 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.cpp"
-        # ROS2 message types for CDR serialization (minimal subset, not full DDS)
+        # ROS2 message types for CDR serialization
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/builtin_interfaces/msg/Time.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/builtin_interfaces/msg/Time.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/std_msgs/msg/Header.h"
