@@ -362,13 +362,12 @@ void dds_sensor_proxy::handle_video_data( std::vector< uint8_t > && buffer,
         = static_cast< rs2_time_t >( realdds::time_to_double( dds_sample.reception_timestamp ) * SECONDS_TO_MILLISEC );
     data.timestamp               // in ms
         = static_cast< rs2_time_t >( realdds::time_to_double( timestamp ) * SECONDS_TO_MILLISEC );
-    data.last_timestamp = streaming.last_timestamp.exchange( data.timestamp );
     data.timestamp_domain;  // from metadata, or leave default (hardware domain)
     data.depth_units;       // from metadata
     data.frame_number;      // filled in only once metadata is known
     data.raw_size = static_cast< uint32_t >( buffer.size() );
 
-    update_timestamp_if_needed( data );
+    update_timestamp_if_needed( data, streaming );
 
     auto vid_profile = dynamic_cast< video_stream_profile_interface * >( profile.get() );
     if( ! vid_profile )
@@ -415,13 +414,12 @@ void dds_sensor_proxy::handle_motion_data( realdds::topics::imu_msg && imu,
         = static_cast< rs2_time_t >( realdds::time_to_double( sample.reception_timestamp ) * SECONDS_TO_MILLISEC );
     data.timestamp               // in ms
         = static_cast< rs2_time_t >( realdds::time_to_double( imu.timestamp() ) * SECONDS_TO_MILLISEC );
-    data.last_timestamp = streaming.last_timestamp.exchange( data.timestamp );
     data.timestamp_domain;  // leave default (hardware domain)
     data.last_frame_number = streaming.last_frame_number.fetch_add( 1 );
     data.frame_number = data.last_frame_number + 1;
     data.raw_size = sizeof( rs2_combined_motion );
 
-    update_timestamp_if_needed( data );
+    update_timestamp_if_needed( data, streaming );
 
     auto new_frame_interface = allocate_new_frame( RS2_EXTENSION_MOTION_FRAME, profile.get(), std::move( data ) );
     if( ! new_frame_interface )
@@ -754,7 +752,7 @@ void dds_sensor_proxy::add_local_options()
 }
 
 
-void dds_sensor_proxy::update_timestamp_if_needed( librealsense::frame_additional_data & data )
+void dds_sensor_proxy::update_timestamp_if_needed( librealsense::frame_additional_data & data, streaming_impl & streaming )
 {
     if( _handle_global_timestamp_locally &&
         // If handling locally then we know the option is of global_time_option type
@@ -770,6 +768,9 @@ void dds_sensor_proxy::update_timestamp_if_needed( librealsense::frame_additiona
         if( is_tf_ready )
             data.timestamp_domain = RS2_TIMESTAMP_DOMAIN_GLOBAL_TIME; // timestamp not changed if not ready, so leave domain
     }
+
+    // Update here when final data.timestamp is set
+    data.last_timestamp = streaming.last_timestamp.exchange( data.timestamp );
 }
 
 
