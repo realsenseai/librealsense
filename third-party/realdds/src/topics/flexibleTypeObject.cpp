@@ -1,5 +1,5 @@
 // License: Apache 2.0. See LICENSE file in root directory.
-// Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 /*!
  * @file flexibleTypeObject.cpp
@@ -15,6 +15,7 @@ namespace { char dummy; }
 
 #include <realdds/topics/flexible/flexible.h>
 #include "flexibleTypeObject.h"
+#include <mutex>
 #include <utility>
 #include <sstream>
 #include <fastrtps/rtps/common/SerializedPayload.h>
@@ -29,20 +30,24 @@ using namespace eprosima::fastrtps::rtps;
 
 void registerflexibleTypes()
 {
-    TypeObjectFactory *factory = TypeObjectFactory::get_instance();
-    factory->add_type_object("realdds::topics::raw::flexible_data_format", realdds::topics::raw::Getflexible_data_formatIdentifier(true),
-            realdds::topics::raw::Getflexible_data_formatObject(true));
-    factory->add_type_object("realdds::topics::raw::flexible_data_format", realdds::topics::raw::Getflexible_data_formatIdentifier(false),
-            realdds::topics::raw::Getflexible_data_formatObject(false));
+    static std::once_flag once_flag;
+    std::call_once(once_flag, []()
+            {
+                TypeObjectFactory *factory = TypeObjectFactory::get_instance();
+                factory->add_type_object("realdds::topics::raw::flexible_data_format", realdds::topics::raw::Getflexible_data_formatIdentifier(true),
+                        realdds::topics::raw::Getflexible_data_formatObject(true));
+                factory->add_type_object("realdds::topics::raw::flexible_data_format", realdds::topics::raw::Getflexible_data_formatIdentifier(false),
+                        realdds::topics::raw::Getflexible_data_formatObject(false));
 
-    factory->add_type_object("realdds::topics::raw::flexible", realdds::topics::raw::GetflexibleIdentifier(true),
-            realdds::topics::raw::GetflexibleObject(true));
-    factory->add_type_object("realdds::topics::raw::flexible", realdds::topics::raw::GetflexibleIdentifier(false),
-            realdds::topics::raw::GetflexibleObject(false));
+                factory->add_type_object("realdds::topics::raw::flexible", realdds::topics::raw::GetflexibleIdentifier(true),
+                        realdds::topics::raw::GetflexibleObject(true));
+                factory->add_type_object("realdds::topics::raw::flexible", realdds::topics::raw::GetflexibleIdentifier(false),
+                        realdds::topics::raw::GetflexibleObject(false));
 
 
 
 
+            });
 }
 
 namespace realdds {
@@ -355,7 +360,7 @@ namespace realdds {
                 mst_data.common().member_flags().IS_MUST_UNDERSTAND(false);
                 mst_data.common().member_flags().IS_KEY(false);
                 mst_data.common().member_flags().IS_DEFAULT(false); // Doesn't apply
-                mst_data.common().member_type_id(*TypeObjectFactory::get_instance()->get_sequence_identifier("uint8_t", 4096, false));
+                mst_data.common().member_type_id(*TypeObjectFactory::get_instance()->get_sequence_identifier("uint8_t", 32768, false));
 
 
                 MD5 data_hash("data");
@@ -456,7 +461,7 @@ namespace realdds {
                 cst_data.common().member_flags().IS_MUST_UNDERSTAND(false);
                 cst_data.common().member_flags().IS_KEY(false);
                 cst_data.common().member_flags().IS_DEFAULT(false); // Doesn't apply
-                cst_data.common().member_type_id(*TypeObjectFactory::get_instance()->get_sequence_identifier("uint8_t", 4096, true));
+                cst_data.common().member_type_id(*TypeObjectFactory::get_instance()->get_sequence_identifier("uint8_t", 32768, true));
 
 
                 cst_data.detail().name("data");

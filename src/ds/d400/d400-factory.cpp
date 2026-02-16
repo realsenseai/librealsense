@@ -34,7 +34,6 @@
 
 #include <src/ds/features/auto-exposure-limit-feature.h>
 #include <src/ds/features/gain-limit-feature.h>
-#include <src/ds/features/gyro-sensitivity-feature.h>
 
 namespace librealsense
 {
@@ -848,9 +847,7 @@ namespace librealsense
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
 #if !defined(__APPLE__) // Motion sensors not supported on macOS
-            if( _fw_version >= firmware_version( 5, 16, 0, 0 ) )
-                register_feature(
-                    std::make_shared< gyro_sensitivity_feature >( get_raw_motion_sensor(), get_motion_sensor() ) );
+            register_gyro_sensitivity();
 #endif
         }
 
@@ -898,7 +895,7 @@ namespace librealsense
             , firmware_logger_device( dev_info, d400_device::_hw_monitor, get_firmware_logs_command(), get_flash_logs_command())
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
-            register_feature(std::make_shared< gyro_sensitivity_feature >(get_raw_motion_sensor(), get_motion_sensor()));
+            register_gyro_sensitivity();
         }
 
 
@@ -1061,9 +1058,7 @@ namespace librealsense
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
 #if !defined(__APPLE__) // Motion sensors not supported on macOS
-            if( _fw_version >= firmware_version( 5, 16, 0, 0 ) )
-                register_feature(
-                    std::make_shared< gyro_sensitivity_feature >( get_raw_motion_sensor(), get_motion_sensor() ) );
+            register_gyro_sensitivity();
 #endif
         }
 
@@ -1367,9 +1362,12 @@ namespace librealsense
     {
         std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get() };
         // TODO - A proper matcher for High-FPS sensor is required
-        std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(), 
-                                                      _ds_motion_common->get_gyro_stream().get()};
-        streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        if (!_has_motion_module_failed)
+        {
+            std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
+                                                          _ds_motion_common->get_gyro_stream().get()};
+            streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        }
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 
@@ -1377,9 +1375,12 @@ namespace librealsense
     {
         std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get() };
         // TODO - A proper matcher for High-FPS sensor is required
-        std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
-                                                      _ds_motion_common->get_gyro_stream().get() };
-        streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        if (!_has_motion_module_failed)
+        {
+            std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
+                                                          _ds_motion_common->get_gyro_stream().get()};
+            streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        }
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 
@@ -1418,9 +1419,12 @@ namespace librealsense
     std::shared_ptr<matcher> rs455_device::create_matcher(const frame_holder& frame) const
     {
         std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get() };
-        std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
-                                                      _ds_motion_common->get_gyro_stream().get()};
-        streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        if (!_has_motion_module_failed)
+        {
+            std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
+                                                          _ds_motion_common->get_gyro_stream().get()};
+            streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        }
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 }

@@ -17,7 +17,7 @@ module realdds
             {
                 flexible_data_format data_format;
                 octet version[4];  // in decreasing importance, so version[0] is highest
-                sequence<octet,4096> data;  // bound to 4K
+                sequence<octet,32768> data;  // bound to 32KB
             };
         };
     };

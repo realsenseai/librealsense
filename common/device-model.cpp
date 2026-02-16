@@ -864,11 +864,21 @@ namespace rs2
         bool yes_was_chosen = false;
         if (yes_no_dialog("Advanced Mode", message_text, yes_was_chosen, window, error_message))
         {
+            // meaning the user confirmed the advanced mode toggling
             if (yes_was_chosen)
             {
                 dev.as<advanced_mode>().toggle_advanced_mode(enable_advanced_mode);
                 restarting_device_info = get_device_info(dev, false);
                 view.not_model->add_log(enable_advanced_mode ? "Turning on advanced mode..." : "Turning off  advanced mode...");
+                
+                for( auto&& subdevice : subdevices )
+                {
+                    if( subdevice->s->is< rs2::depth_sensor >() )
+                    {
+                        subdevice->repopulate_options();
+                        break;
+                    }
+                }
             }
             keep_showing = false;
         }
@@ -876,7 +886,7 @@ namespace rs2
     }
 
 
-    bool device_model::draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message)
+    bool device_model::draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message, bool is_streaming)
     {
         bool was_set = false;
 
@@ -900,6 +910,10 @@ namespace rs2
                     if( _is_d500_device )  // D500 cannot toggle Advanced Mode
                     {
                         ImGui::TextColored( redish, "Device FW does not support advanced mode" );
+                    }
+                    else if (is_streaming)
+                    {
+                        ImGui::TextColored( redish, "Advanced mode cannot be enabled\nwhen streaming" );
                     }
                     else
                     {
@@ -1356,7 +1370,7 @@ namespace rs2
                     const bool is_advanced_mode_enabled = adv.is_enabled();
                     bool selected = is_advanced_mode_enabled;
                     // D500 cannot toggle Advanced Mode
-                    if( ! _is_d500_device && ImGui::MenuItem( "Advanced Mode", nullptr, &selected ) )
+                    if( ! _is_d500_device && ImGui::MenuItem( "Advanced Mode", nullptr, &selected, !is_streaming ) )
                     {
                         show_advanced_mode_popup = true;
 
@@ -2074,11 +2088,14 @@ namespace rs2
                             error_message = error_to_string(e);
                         }
 
+                        ImGui::PopStyleColor(1);
                         ImGui::PopItemWidth();
                         return is_clicked;
                     };
-                    sub->options_metadata[RS2_OPTION_VISUAL_PRESET].custom_draw_method = draw_preset_combo_box;
-                    ImGui::PopStyleColor(1);
+
+                    auto & visual_preset_opt_model = sub->options_metadata.at(RS2_OPTION_VISUAL_PRESET);
+                    visual_preset_opt_model.custom_draw_method = draw_preset_combo_box;
+                    
                     if (sub->draw_option(RS2_OPTION_VISUAL_PRESET, dev.is<playback>() || update_read_only_options, error_message, *viewer.not_model))
                     {
                         get_curr_advanced_controls = true;
@@ -2717,7 +2734,7 @@ namespace rs2
                 }
                 if (dev.is<advanced_mode>() && sub->s->is<depth_sensor>())
                 {
-                    if (draw_advanced_controls(viewer, window, error_message))
+                    if (draw_advanced_controls(viewer, window, error_message, is_streaming))
                     {
                         sub->_options_invalidated = true;
                         selected_file_preset.clear();
