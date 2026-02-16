@@ -61,7 +61,7 @@ namespace librealsense
         auto md = (librealsense::metadata_intel_basic*)(f->additional_data.metadata_blob.data());
         if(_has_metadata[pin_index] && md)
         {
-            return (double)(md->header.timestamp)*TIMESTAMP_USEC_TO_MSEC;
+            return (double)(md->header.timestamp)*MICROSEC_TO_MILLISEC;
         }
         else
         {
@@ -140,7 +140,7 @@ namespace librealsense
         auto md = (librealsense::md_occupancy*)(f->additional_data.metadata_blob.data() + platform::uvc_header_size);
         if (_has_metadata[0] && md)
         {
-            return (double)(md->frame_timestamp) * TIMESTAMP_USEC_TO_MSEC;
+            return (double)(md->frame_timestamp) * MICROSEC_TO_MILLISEC;
         }
         else
         {
@@ -191,7 +191,7 @@ namespace librealsense
         auto md = (librealsense::md_safety_info*)(f->additional_data.metadata_blob.data() + platform::uvc_header_size);
         if (_has_metadata[0] && md)
         {
-            return (double)(md->frame_timestamp) * TIMESTAMP_USEC_TO_MSEC;
+            return (double)(md->frame_timestamp) * MICROSEC_TO_MILLISEC;
         }
         else
         {
@@ -246,7 +246,7 @@ namespace librealsense
         auto md = (librealsense::metadata_mipi_depth_raw*)(f->additional_data.metadata_blob.data());
         if(_has_metadata[pin_index] && md)
         {
-            return (double)(md->header.header.timestamp) * TIMESTAMP_USEC_TO_MSEC;
+            return (double)(md->header.header.timestamp) * MICROSEC_TO_MILLISEC;
         }
         else
         {
@@ -307,7 +307,7 @@ namespace librealsense
         auto md = (librealsense::metadata_mipi_rgb_raw*)(f->additional_data.metadata_blob.data());
         if(_has_metadata[pin_index] && md)
         {
-            return (double)(md->header.header.timestamp) * TIMESTAMP_USEC_TO_MSEC;
+            return (double)(md->header.header.timestamp) * MICROSEC_TO_MILLISEC;
         }
         else
         {
@@ -365,7 +365,7 @@ namespace librealsense
         auto md = (librealsense::metadata_hid_raw*)(f->additional_data.metadata_blob.data());
         if(md)
         {
-            return (double)(md->header.timestamp) * TIMESTAMP_USEC_TO_MSEC;
+            return (double)(md->header.timestamp) * MICROSEC_TO_MILLISEC;
         }
         else
         {
@@ -457,7 +457,7 @@ namespace librealsense
         // See d400_iio_hid_timestamp_reader description
         auto timestamp = *((uint32_t*)((const uint8_t*)f->get_frame_data() + timestamp_offset));
         // TODO - verify units with custom report
-        return static_cast<rs2_time_t>(timestamp) * TIMESTAMP_USEC_TO_MSEC;
+        return static_cast<rs2_time_t>(timestamp) * MICROSEC_TO_MILLISEC;
     }
 
     bool ds_custom_hid_timestamp_reader::has_metadata(const std::shared_ptr<frame_interface>& frame) const

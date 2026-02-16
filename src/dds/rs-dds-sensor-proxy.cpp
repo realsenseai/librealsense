@@ -39,6 +39,7 @@
 
 #include "rs-dds-depth-sensor-proxy.h"
 
+#include <cmath>
 
 using namespace realdds;
 using rsutils::json;
@@ -358,9 +359,9 @@ void dds_sensor_proxy::handle_video_data( std::vector< uint8_t > && buffer,
     frame_additional_data data;  // with NO metadata by default!
     data.system_time = time_service::get_time();  // time of arrival in system clock
     data.backend_timestamp                        // time when the underlying backend (DDS) received it
-        = static_cast<rs2_time_t>(realdds::time_to_double( dds_sample.reception_timestamp ) * 1e3);
+        = static_cast< rs2_time_t >( realdds::time_to_double( dds_sample.reception_timestamp ) * SECONDS_TO_MILLISEC );
     data.timestamp               // in ms
-        = static_cast< rs2_time_t >( realdds::time_to_double( timestamp ) * 1e3 );
+        = static_cast< rs2_time_t >( realdds::time_to_double( timestamp ) * SECONDS_TO_MILLISEC );
     data.last_timestamp = streaming.last_timestamp.exchange( data.timestamp );
     data.timestamp_domain;  // from metadata, or leave default (hardware domain)
     data.depth_units;       // from metadata
@@ -411,9 +412,9 @@ void dds_sensor_proxy::handle_motion_data( realdds::topics::imu_msg && imu,
     frame_additional_data data;  // with NO metadata by default!
     data.system_time = time_service::get_time();  // time of arrival in system clock
     data.backend_timestamp                        // time when the underlying backend (DDS) received it
-        = static_cast<rs2_time_t>(realdds::time_to_double( sample.reception_timestamp ) * 1e3);
+        = static_cast< rs2_time_t >( realdds::time_to_double( sample.reception_timestamp ) * SECONDS_TO_MILLISEC );
     data.timestamp               // in ms
-        = static_cast< rs2_time_t >( realdds::time_to_double( imu.timestamp() ) * 1e3 );
+        = static_cast< rs2_time_t >( realdds::time_to_double( imu.timestamp() ) * SECONDS_TO_MILLISEC );
     data.last_timestamp = streaming.last_timestamp.exchange( data.timestamp );
     data.timestamp_domain;  // leave default (hardware domain)
     data.last_frame_number = streaming.last_frame_number.fetch_add( 1 );
@@ -760,8 +761,12 @@ void dds_sensor_proxy::update_timestamp_if_needed( librealsense::frame_additiona
         std::dynamic_pointer_cast< global_time_option >( _options_by_id[RS2_OPTION_GLOBAL_TIME_ENABLED] )->is_true() )
     {
         // Override with global timestamp if time keeper ready
+        // Timekeeper updates clock wraps around every 32bit microseconds. Truncate our 64bit input to match.
+        uint64_t timestamp_us = static_cast< uint64_t >( data.timestamp * MILLISEC_TO_MICROSEC );
+        uint64_t truncated_timestamp_us = timestamp_us % static_cast< uint64_t >( std::pow( 2, 32 ) );
+        double truncated_timestamp_ms = truncated_timestamp_us * MICROSEC_TO_MILLISEC;
         bool is_tf_ready = false;
-        data.timestamp = _tf_keeper->get_system_hw_time( data.timestamp, is_tf_ready );
+        data.timestamp = _tf_keeper->get_system_hw_time( truncated_timestamp_ms, is_tf_ready );
         if( is_tf_ready )
             data.timestamp_domain = RS2_TIMESTAMP_DOMAIN_GLOBAL_TIME; // timestamp not changed if not ready, so leave domain
     }
@@ -783,7 +788,7 @@ double dds_sensor_proxy::get_device_time_ms()
             throw std::runtime_error( rsutils::string::from() << "Error getting device time: " << code );
 
         uint32_t ts_micro = *reinterpret_cast< uint32_t const * >( res.data() + sizeof( code ) );
-        return ts_micro * TIMESTAMP_USEC_TO_MSEC;
+        return ts_micro * MICROSEC_TO_MILLISEC;
     }
     else
         throw std::runtime_error( "Expected owner to be dds-device-proxy" );
