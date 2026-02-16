@@ -133,6 +133,7 @@ namespace librealsense
         bool is_d401_usb_device( uint8_t gvd_hw_type ) const;
 
         friend class d400_depth_sensor;
+        friend class ds_advanced_mode_base;
 
         std::shared_ptr<hw_monitor> _hw_monitor;
         firmware_version            _fw_version;
@@ -160,6 +161,8 @@ namespace librealsense
         std::shared_ptr<auto_exposure_limit_option> _ae_limit_value_control;
         bool _is_mipi_device;
         std::string _imu_type;
+
+        std::function<void()> _depth_units_register_action;
     };
 
     class ds5u_device : public d400_device

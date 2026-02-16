@@ -2,6 +2,7 @@
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 # test:device D400* !D457
+# test:device each(D500*)
 
 import pyrealsense2 as rs
 from rspy import test, log

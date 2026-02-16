@@ -58,7 +58,7 @@ def detect_a4_page(img, required_ids):
     return np.array(values, dtype=np.float32)
 
 
-def find_roi_location(pipeline, required_ids, DEBUG_MODE=False):
+def find_roi_location(pipeline, required_ids, DEBUG_MODE=False, timeout=5):
     """
     Returns a matrix that transforms from frame to region of interest
     This matrix will later be used with cv2.warpPerspective()
@@ -67,7 +67,7 @@ def find_roi_location(pipeline, required_ids, DEBUG_MODE=False):
     # stream until page found
     page_pts = None
     start_time = time.time()
-    while page_pts is None and time.time() - start_time < 5:
+    while page_pts is None and time.time() - start_time < timeout:
         frames = pipeline.wait_for_frames()
         aruco_detectable_streams = (rs.stream.color, rs.stream.infrared) # we need one of those streams to detect ArUco markers
         frame = next(f for f in frames if f.get_profile().stream_type() in aruco_detectable_streams)
@@ -81,7 +81,6 @@ def find_roi_location(pipeline, required_ids, DEBUG_MODE=False):
 
     if page_pts is None:
         log.e("Failed to detect page within timeout")
-        test.fail()
         raise Exception("Page not found")
 
     # page found - use it to calculate transformation matrix from frame to region of interest

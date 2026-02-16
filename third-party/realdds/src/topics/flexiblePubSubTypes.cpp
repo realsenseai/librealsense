@@ -1,5 +1,5 @@
 // License: Apache 2.0. See LICENSE file in root directory.
-// Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 /*!
  * @file flexiblePubSubTypes.cpp
@@ -53,15 +53,15 @@ namespace realdds {
                 // Object that serializes the data.
                 eprosima::fastcdr::Cdr ser(fastbuffer, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
                 payload->encapsulation = ser.endianness() == eprosima::fastcdr::Cdr::BIG_ENDIANNESS ? CDR_BE : CDR_LE;
-                // Serialize encapsulation
-                ser.serialize_encapsulation();
 
                 try
                 {
+                    // Serialize encapsulation
+                    ser.serialize_encapsulation();
                     // Serialize the object.
                     p_type->serialize(ser);
                 }
-                catch (eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
+                catch (eprosima::fastcdr::exception::Exception& /*exception*/)
                 {
                     return false;
                 }
@@ -77,7 +77,7 @@ namespace realdds {
             {
                 try
                 {
-                    //Convert DATA to pointer of your type
+                    // Convert DATA to pointer of your type
                     flexible* p_type = static_cast<flexible*>(data);
 
                     // Object that manages the raw buffer.
@@ -93,7 +93,7 @@ namespace realdds {
                     // Deserialize the object.
                     p_type->deserialize(deser);
                 }
-                catch (eprosima::fastcdr::exception::NotEnoughMemoryException& /*exception*/)
+                catch (eprosima::fastcdr::exception::Exception& /*exception*/)
                 {
                     return false;
                 }
@@ -164,6 +164,9 @@ namespace realdds {
 
         } //End of namespace raw
 
+
     } //End of namespace topics
 
+
 } //End of namespace realdds
+

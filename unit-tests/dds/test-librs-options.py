@@ -4,7 +4,7 @@
 #test:donotrun:!dds
 #test:retries 2
 
-from rspy import log, test
+from rspy import log, test, config_file
 with test.remote.fork( nested_indent=None ) as remote:
     if remote is None:  # we're the fork
         import pyrealdds as dds
@@ -12,7 +12,7 @@ with test.remote.fork( nested_indent=None ) as remote:
 
         with test.closure( 'Start the server participant' ):
             participant = dds.participant()
-            participant.init( 123, 'server' )
+            participant.init( config_file.get_domain_from_config_file_or_default(), 'server' )
 
         with test.closure( 'Create the server' ):
             device_info = dds.message.device_info.from_json({
@@ -57,14 +57,14 @@ with test.remote.fork( nested_indent=None ) as remote:
         rs.log_to_console( rs.log_severity.debug )
 
     with test.closure( 'Initialize librealsense context', on_fail=test.ABORT ):
-        context = rs.context( { 'dds': { 'enabled': True, 'domain': 123, 'participant': 'client' }} )
+        context = rs.context( { 'dds': { 'enabled': True, 'domain': config_file.get_domain_from_config_file_or_default(), 'participant': 'client' }} )
 
     with test.closure( 'Find the server', on_fail=test.ABORT ):
         dev = rs.wait_for_devices( context, rs.only_sw_devices, n=1. )
         for s in dev.query_sensors():
             break
         options = test.info( "supported options", s.get_supported_options() )
-        test.check_equal( len(options), 7 )  # 'Frames Queue Size' gets added to all sensors!!?!?!
+        test.check_equal( len(options), 8 )  # 'Frames Queue Size' and 'Global Time Enabled' gets added by SDK
 
     with test.closure( 'Play with integer option' ):
         io = next( o for o in options if str(o) == 'Integer Option' )

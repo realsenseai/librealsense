@@ -198,6 +198,15 @@ namespace librealsense
         void set_color_power_line_frequency(const power_line_frequency_control& val);
 
         bool supports_option( const sensor_base * sensor, rs2_option opt ) const;
+        inline void set_depth_units_register_action( std::function< void() > depth_units_register_action )
+        {
+            _depth_units_register_action = depth_units_register_action;
+        }
+
+        inline void set_hardware_reset_action( std::function< void() > hardware_reset_action )
+        {
+            _hardware_reset_action = hardware_reset_action;
+        }
 
         device_interface * _dev;
         debug_interface * _debug_interface;
@@ -208,6 +217,8 @@ namespace librealsense
         bool _amplitude_factor_support = false;
         bool _blocked = false;
         std::string _block_message;
+        std::function<void()> _depth_units_register_action;
+        std::function<void()> _hardware_reset_action;
 
         preset get_all() const;
         void set_all( const preset & p );
@@ -221,6 +232,8 @@ namespace librealsense
 
         void register_to_visual_preset_option();
         void unregister_from_visual_preset_option();
+        void register_to_depth_scale_option();
+        void unregister_from_depth_scale_option();
 
         template<class T>
         void set(const T& strct, EtAdvancedModeRegGroup cmd) const
