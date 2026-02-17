@@ -1324,8 +1324,8 @@ namespace rs2
             : embedded_filter(filter.get())
         {
             rs2_error* e = nullptr;
-            if (rs2_is_embedded_filter_extendable_to(_embedded_filter.get(), 
-                RS2_EXTENSION_DECIMATION_EMBEDDED_FILTER, &e) == 0 || e)
+            if (!_embedded_filter || (rs2_is_embedded_filter_extendable_to(_embedded_filter.get(), 
+                RS2_EXTENSION_DECIMATION_EMBEDDED_FILTER, &e) == 0 && !e))
             {
                 _embedded_filter.reset();
             }
@@ -1341,8 +1341,8 @@ namespace rs2
             : embedded_filter(filter.get())
         {
             rs2_error* e = nullptr;
-            if (rs2_is_embedded_filter_extendable_to(_embedded_filter.get(), 
-                RS2_EXTENSION_TEMPORAL_EMBEDDED_FILTER, &e) == 0 || e)
+            if (!_embedded_filter || (rs2_is_embedded_filter_extendable_to(_embedded_filter.get(), 
+                RS2_EXTENSION_TEMPORAL_EMBEDDED_FILTER, &e) == 0 && !e))
             {
                 _embedded_filter.reset();
             }

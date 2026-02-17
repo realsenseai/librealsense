@@ -220,7 +220,7 @@ namespace rs2
             : stream_profile(sp)
         {
             rs2_error* e = nullptr;
-            if ((rs2_stream_profile_is(sp.get(), RS2_EXTENSION_VIDEO_PROFILE, &e) == 0 && !e))
+            if (!sp || (rs2_stream_profile_is(sp.get(), RS2_EXTENSION_VIDEO_PROFILE, &e) == 0 && !e))
             {
                 _profile = nullptr;
             }
@@ -301,7 +301,7 @@ namespace rs2
             : stream_profile(sp)
         {
             rs2_error* e = nullptr;
-            if ((rs2_stream_profile_is(sp.get(), RS2_EXTENSION_MOTION_PROFILE, &e) == 0 && !e))
+            if (!sp || (rs2_stream_profile_is(sp.get(), RS2_EXTENSION_MOTION_PROFILE, &e) == 0 && !e))
             {
                 _profile = nullptr;
             }
@@ -333,7 +333,7 @@ namespace rs2
             : stream_profile(sp)
         {
             rs2_error* e = nullptr;
-            if ((rs2_stream_profile_is(sp.get(), RS2_EXTENSION_POSE_PROFILE, &e) == 0 && !e))
+            if (!sp || (rs2_stream_profile_is(sp.get(), RS2_EXTENSION_POSE_PROFILE, &e) == 0 && !e))
             {
                 _profile = nullptr;
             }
