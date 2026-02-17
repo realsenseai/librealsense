@@ -675,7 +675,7 @@ def hw_reset( serial_numbers, timeout = MAX_ENUMERATION_TIME ):
     :return: True if all devices have come back online before timeout
     """
     # we can wait for usb and dds devices to be removed, but not for mipi devices
-    removable_devs_sns = {sn for sn in serial_numbers if
+    removable_devs_sns = {sn for sn in serial_numbers if 
                           _device_by_sn[sn].port is not None or _device_by_sn[sn].is_dds}
 
     _wait_for(serial_numbers, timeout=timeout) # make sure devices are added before doing hw reset

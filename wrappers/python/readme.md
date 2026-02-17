@@ -24,9 +24,10 @@ Users who wish to create a python package (wheel) can create it from this folder
 
 ```python -m build . ```
 
-Windows users can install the RealSense SDK 2.0 from the release tab to get pre-compiled binaries of the wrapper, for both x86 and x64 architectures. (Python versions 3.9, 3.10, 3.11, 3.12 and 3.13 are supported).
+Windows users can install the RealSense SDK 2.0 from the release tab to get pre-compiled binaries of the wrapper, for both x86 and x64 architectures. (Python versions 3.10, 3.11, 3.12, 3.13 and 3.14 are supported).
 
 > **Note:**
+> EOL Python 3.9 distributables can be found for pyrealsense2 versions <= 2.57.4
 > EOL Python 3.8 distributables can be found for pyrealsense2 versions <= 2.55.2
 > EOL Python 3.7 distributables can be found for pyrealsense2 versions <= 2.55.1
 
