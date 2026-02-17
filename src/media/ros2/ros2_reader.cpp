@@ -270,11 +270,7 @@ namespace librealsense
 
         bool is_imu_topic = (msg->topic_name.find("/imu/") != std::string::npos);
 
-        sensor_msgs::msg::Image img;
-        rs2_combined_motion combined_motion{};
-        float motion_xyz[3]{};
-        const uint8_t* data_ptr;
-        size_t data_size;
+        std::vector<uint8_t> data;
 
         if (is_imu_topic)
         {
@@ -282,6 +278,7 @@ namespace librealsense
 
             if (stream_id.stream_type == RS2_STREAM_MOTION)
             {
+                rs2_combined_motion combined_motion{};
                 combined_motion.orientation = {
                     (imu.orientation().x()), (imu.orientation().y()),
                     (imu.orientation().z()), (imu.orientation().w()) };
@@ -291,34 +288,34 @@ namespace librealsense
                 combined_motion.linear_acceleration = {
                     (imu.linear_acceleration().x()), (imu.linear_acceleration().y()),
                     (imu.linear_acceleration().z()) };
-                data_ptr = reinterpret_cast<const uint8_t*>(&combined_motion);
-                data_size = sizeof(rs2_combined_motion);
+                auto ptr = reinterpret_cast<const uint8_t*>(&combined_motion);
+                data.assign(ptr, ptr + sizeof(combined_motion));
             }
-            else if (stream_id.stream_type == RS2_STREAM_GYRO)
+            else
             {
-                motion_xyz[0] = static_cast<float>(imu.angular_velocity().x());
-                motion_xyz[1] = static_cast<float>(imu.angular_velocity().y());
-                motion_xyz[2] = static_cast<float>(imu.angular_velocity().z());
-                data_ptr = reinterpret_cast<const uint8_t*>(motion_xyz);
-                data_size = sizeof(motion_xyz);
-            }
-            else // ACCEL
-            {
-                motion_xyz[0] = static_cast<float>(imu.linear_acceleration().x());
-                motion_xyz[1] = static_cast<float>(imu.linear_acceleration().y());
-                motion_xyz[2] = static_cast<float>(imu.linear_acceleration().z());
-                data_ptr = reinterpret_cast<const uint8_t*>(motion_xyz);
-                data_size = sizeof(motion_xyz);
+                data.resize(3 * sizeof(float));
+                auto motion_xyz = reinterpret_cast<float*>(data.data());
+                if (stream_id.stream_type == RS2_STREAM_GYRO)
+                {
+                    motion_xyz[0] = static_cast<float>(imu.angular_velocity().x());
+                    motion_xyz[1] = static_cast<float>(imu.angular_velocity().y());
+                    motion_xyz[2] = static_cast<float>(imu.angular_velocity().z());
+                }
+                else // ACCEL
+                {
+                    motion_xyz[0] = static_cast<float>(imu.linear_acceleration().x());
+                    motion_xyz[1] = static_cast<float>(imu.linear_acceleration().y());
+                    motion_xyz[2] = static_cast<float>(imu.linear_acceleration().z());
+                }
             }
         }
         else
         {
-            img = deserialize_message<sensor_msgs::msg::Image>(msg);
-            data_ptr = img.data().data();
-            data_size = img.data().size();
+            auto img = deserialize_message<sensor_msgs::msg::Image>(msg);
+            data = std::move(img.data());
         }
 
-        auto frame = alloc_and_fill_frame(data_ptr, data_size, stream_id, std::move(additional_data));
+        auto frame = alloc_and_move_frame(std::move(data), stream_id, std::move(additional_data));
 
         if (frame.frame == nullptr)
         {
@@ -468,14 +465,14 @@ namespace librealsense
         return sensor_options;
     }
 
-    frame_holder ros2_reader::alloc_and_fill_frame(const uint8_t* data, size_t data_size,
+    frame_holder ros2_reader::alloc_and_move_frame(std::vector<uint8_t>&& data,
         const stream_identifier& stream_id,
         frame_additional_data additional_data) const
     {
         auto frame_ext = frame_source::stream_to_frame_types(stream_id.stream_type);
         frame_interface* frame = m_frame_source->alloc_frame(
             { stream_id.stream_type, stream_id.stream_index, frame_ext },
-            data_size,
+            data.size(),
             std::move(additional_data),
             true);
 
@@ -485,10 +482,9 @@ namespace librealsense
             return frame_holder{};
         }
 
-        // The base frame::data vector is already sized by alloc_frame; copy raw binary data into it
+        // Move the deserialized data directly — avoids a full memcpy of image data
         auto base_frame = static_cast<librealsense::frame*>(frame);
-        if (data && data_size > 0)
-            std::memcpy(base_frame->data.data(), data, data_size);
+        base_frame->data = std::move(data);
 
         setup_frame(frame, stream_id);
 
@@ -542,38 +538,44 @@ namespace librealsense
         convert(get_value(kv, SYSTEM_TIME_MD_STR), additional_data.system_time);
         additional_data.timestamp = std::stod(get_value(kv, TIMESTAMP_MD_STR));
 
-        // Read all RS2_FRAME_METADATA values and populate metadata_blob
-        
+        // Iterate only the keys present in the map, matching them to RS2 metadata types
         uint32_t total_md_size = 0;
+        constexpr uint32_t size_of_enum = sizeof(rs2_frame_metadata_value);
+        constexpr uint32_t size_of_data = sizeof(rs2_metadata_type);
 
-        for (int i = 0; i < RS2_FRAME_METADATA_COUNT; i++)
+        // Build a static reverse lookup: metadata name string -> enum value
+        static const auto& name_to_md = []() -> const std::map<std::string, rs2_frame_metadata_value>& {
+            static std::map<std::string, rs2_frame_metadata_value> m;
+            for (int i = 0; i < RS2_FRAME_METADATA_COUNT; i++)
+            {
+                auto md_type = static_cast<rs2_frame_metadata_value>(i);
+                m[librealsense::get_string(md_type)] = md_type;
+            }
+            return m;
+        }();
+
+        for (const auto& entry : kv)
         {
-            rs2_frame_metadata_value md_type = static_cast<rs2_frame_metadata_value>(i);
-            std::string md_name = librealsense::get_string(md_type);
-            
+            auto it = name_to_md.find(entry.first);
+            if (it == name_to_md.end())
+                continue;  // not a metadata key (e.g. Frame number, Timestamp Domain, etc.)
+
+            if (total_md_size + size_of_enum + size_of_data > additional_data.metadata_blob.size())
+                break;
+
             try
             {
                 rs2_metadata_type md_value;
-                convert(get_value(kv, md_name), md_value);
-                
-                uint32_t size_of_enum = sizeof(rs2_frame_metadata_value);
-                uint32_t size_of_data = sizeof(rs2_metadata_type);
-                if (total_md_size + size_of_enum + size_of_data > additional_data.metadata_blob.size())
-                {
-                    continue; //stop adding metadata to frame
-                }
+                convert(entry.second, md_value);
 
-                // Write the type
+                auto md_type = it->second;
                 std::memcpy(additional_data.metadata_blob.data() + total_md_size, &md_type, size_of_enum);
                 total_md_size += size_of_enum;
-                
-                // Write the value
                 std::memcpy(additional_data.metadata_blob.data() + total_md_size, &md_value, size_of_data);
                 total_md_size += size_of_data;
             }
             catch (const std::exception&)
             {
-                // Metadata not found or conversion failed, skip
                 continue;
             }
         }
