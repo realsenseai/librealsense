@@ -45,6 +45,7 @@ using namespace realdds;
 using tools::lrs_device_controller;
 using field = rsutils::ios::field;
 
+static constexpr const double MILLISEC_TO_SEC = 0.001;
 
 #define CREATE_SERVER_IF_NEEDED( X )                                                                                   \
     if( server )                                                                                                       \
@@ -716,7 +717,7 @@ lrs_device_controller::lrs_device_controller( rs2::device dev, std::shared_ptr< 
                         imu->message.gyro_data().y( xyz[1] );
                         imu->message.gyro_data().z( xyz[2] );
                         imu->message.timestamp(  // in sec.nsec
-                            static_cast< long double >( f.get_timestamp() ) / 1e3 );
+                            static_cast< long double >( f.get_timestamp() ) * MILLISEC_TO_SEC );
                         std::unique_lock< std::mutex > lock( imu->mutex );
                         motion->publish_motion( std::move( imu->message ) );
 
@@ -734,7 +735,7 @@ lrs_device_controller::lrs_device_controller( rs2::device dev, std::shared_ptr< 
                             return;
 
                         dds_time const timestamp  // in sec.nsec
-                            ( static_cast< long double >( f.get_timestamp() ) / 1e3 );
+                            ( static_cast< long double >( f.get_timestamp() ) * MILLISEC_TO_SEC );
 
                         realdds::topics::image_msg image;
                         image.set_height( video->get_image_header().height );

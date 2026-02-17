@@ -53,7 +53,9 @@ template<typename T> T rad2deg(T val) { return T(val * r2d); }
 namespace librealsense {
 
 
-    static const double TIMESTAMP_USEC_TO_MSEC = 0.001;
+    static constexpr const double SECONDS_TO_MILLISEC  = 1000.0;
+    static constexpr const double MILLISEC_TO_MICROSEC = 1000.0;
+    static constexpr const double MICROSEC_TO_MILLISEC = 0.001;
 
     ///////////////////////////////////
     // Utility types for general use //
