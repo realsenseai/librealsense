@@ -760,8 +760,9 @@ void dds_sensor_proxy::update_timestamp_if_needed( librealsense::frame_additiona
     {
         // Override with global timestamp if time keeper ready
         // Timekeeper updates clock wraps around every 32bit microseconds. Truncate our 64bit input to match.
+        static constexpr const uint64_t TRUNCATION_LIMIT = 0x100000000ULL;
         uint64_t timestamp_us = static_cast< uint64_t >( data.timestamp * MILLISEC_TO_MICROSEC );
-        uint64_t truncated_timestamp_us = timestamp_us % static_cast< uint64_t >( std::pow( 2, 32 ) );
+        uint64_t truncated_timestamp_us = timestamp_us % TRUNCATION_LIMIT;
         double truncated_timestamp_ms = truncated_timestamp_us * MICROSEC_TO_MILLISEC;
         bool is_tf_ready = false;
         double updated_timestamp_ms = _tf_keeper->get_system_hw_time( truncated_timestamp_ms, is_tf_ready );
