@@ -11,7 +11,6 @@
 #include "proc/hdr-merge.h"
 #include "proc/sequence-id-filter.h"
 #include "ros2_writer.h"
-#include "core/pose-frame.h"
 #include "core/motion-frame.h"
 #include <src/core/sensor-interface.h>
 #include <src/core/device-interface.h>
@@ -19,15 +18,11 @@
 #include <src/points.h>
 #include <src/labeled-points.h>
 
-#include <rsutils/string/from.h>
 #include <fstream>   // for std::ifstream
 
 namespace librealsense
 {
     using namespace device_serializer;
-
-    // CDR encapsulation header: 2 bytes representation identifier + 2 bytes options
-    static constexpr size_t CDR_HEADER_SIZE = 4;
 
     ros2_writer::ros2_writer(const std::string& file, bool compress_while_record) : m_file_path(file)
     {
@@ -70,13 +65,13 @@ namespace librealsense
         _topics.emplace(name, md);
     }
 
-    std::shared_ptr<rcutils_uint8_array_t> ros2_writer::create_buffer(size_t size)
+    std::shared_ptr<rcutils_uint8_array_t> ros2_writer::create_buffer(size_t size) const
     {
         auto buffer = std::shared_ptr<rcutils_uint8_array_t>(new rcutils_uint8_array_t(),
             [](rcutils_uint8_array_t* arr) {
                 if (arr) {
                     rcutils_ret_t ret = rcutils_uint8_array_fini(arr);
-                    (void)ret; // Cast to void to suppress unusued warning
+                    (void)ret; // Cast to void to suppress unused warning
                 } 
                 delete arr;
             });
@@ -92,26 +87,7 @@ namespace librealsense
 
     void ros2_writer::write_string(std::string const& topic, const nanoseconds& ts, std::string const& payload)
     {
-        // Use std_msgs/msg/String as type for ROS2 native compatibility
-        ensure_topic(topic, "std_msgs/msg/String");
-
-        // CDR serialize the std_msgs/msg/String message
-        // Format: CDR header + 4-byte string length + string data (null terminated)
-        size_t str_len = payload.size();
-        size_t total_size = CDR_HEADER_SIZE + 4 + str_len + 1;
-        auto buffer = create_buffer(total_size);
-
-        eprosima::fastcdr::FastBuffer fb(reinterpret_cast<char*>(buffer->buffer), total_size);
-        eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
-        cdr.serialize_encapsulation();
-        cdr << payload;
-        buffer->buffer_length = static_cast<size_t>(cdr.getSerializedDataLength());
-
-        auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
-        msg->serialized_data = buffer;
-        msg->time_stamp = static_cast<rcutils_time_point_value_t>(ts.count());
-        msg->topic_name = topic;
-        _storage->write(msg);
+        write_message(topic, "std_msgs/msg/String", ts, cdr_string{ payload });
     }
 
     void ros2_writer::write_device_description(const librealsense::device_snapshot& device_description)
@@ -130,27 +106,10 @@ namespace librealsense
         }
     }
 
-    template<typename RosMsg>
-    std::shared_ptr<rcutils_uint8_array_t> ros2_writer::serialize_to_cdr(const RosMsg& ros_msg)
-    {
-        auto estimated_size = RosMsg::getCdrSerializedSize(ros_msg) + CDR_HEADER_SIZE;
-        auto buffer = create_buffer(estimated_size);
-        eprosima::fastcdr::FastBuffer fb(reinterpret_cast<char*>(buffer->buffer), estimated_size);
-        eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
-        cdr.serialize_encapsulation();
-        ros_msg.serialize(cdr);
-        buffer->buffer_length = static_cast<size_t>(cdr.getSerializedDataLength());
-        return buffer;
-    }
-
     void ros2_writer::write_frame(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_holder&& frame)
     {
         if (!frame || !frame.frame)
             return;
-
-        std::shared_ptr<rcutils_uint8_array_t> buffer;
-        std::string topic;
-        std::string msg_type;
 
         // Build ROS2 timestamp from nanoseconds
         auto ns_count = timestamp.count();
@@ -178,9 +137,7 @@ namespace librealsense
             auto raw = vid_frame->get_frame_data();
             img.data(std::vector<uint8_t>(raw, raw + data_size));
 
-            buffer = serialize_to_cdr(img);
-            topic = ros2_topic::frame_data_topic(stream_id);
-            msg_type = "sensor_msgs/msg/Image";
+            write_message(ros2_topic::frame_data_topic(stream_id), "sensor_msgs/msg/Image", timestamp, img);
         }
         else if (Is<motion_frame>(frame.frame))
         {
@@ -227,9 +184,7 @@ namespace librealsense
                 }
             }
 
-            buffer = serialize_to_cdr(imu);
-            topic = ros2_topic::frame_data_topic(stream_id);
-            msg_type = "sensor_msgs/msg/Imu";
+            write_message(ros2_topic::frame_data_topic(stream_id), "sensor_msgs/msg/Imu", timestamp, imu);
         }
         else if (Is<labeled_points>(frame.frame))
         {
@@ -248,9 +203,7 @@ namespace librealsense
             img.height(1);
             img.step(data_size);
 
-            buffer = serialize_to_cdr(img);
-            topic = ros2_topic::frame_data_topic(stream_id);
-            msg_type = "sensor_msgs/msg/Image";
+            write_message(ros2_topic::frame_data_topic(stream_id), "sensor_msgs/msg/Image", timestamp, img);
         }
         else
         {
@@ -258,13 +211,6 @@ namespace librealsense
             return;
         }
 
-        // msg_type is for ROS2 native compatibility
-        ensure_topic(topic, msg_type);
-        auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
-        msg->serialized_data = buffer;
-        msg->time_stamp = static_cast<rcutils_time_point_value_t>(timestamp.count());
-        msg->topic_name = topic;
-        _storage->write(msg);
         write_additional_frame_messages(stream_id, timestamp, frame);
     }
 
@@ -285,25 +231,8 @@ namespace librealsense
 
     void ros2_writer::write_file_version()
     {
-        auto file_version_topic = ros2_topic::file_version_topic();
-        // Use std_msgs/msg/UInt32 for file version for ROS2 native compatibility  
-        ensure_topic(file_version_topic, "std_msgs/msg/UInt32");
-        
-        // CDR serialize the UInt32 message
-        size_t total_size = CDR_HEADER_SIZE + sizeof(uint32_t);
-        auto buffer = create_buffer(total_size);
-        
-        eprosima::fastcdr::FastBuffer fb(reinterpret_cast<char*>(buffer->buffer), total_size);
-        eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
-        cdr.serialize_encapsulation();
-        cdr << static_cast<uint32_t>(get_file_version());
-        buffer->buffer_length = static_cast<size_t>(cdr.getSerializedDataLength());
-
-        auto msg = std::make_shared< rosbag2_storage::SerializedBagMessage >();
-        msg->serialized_data = buffer;
-        msg->time_stamp = 0;
-        msg->topic_name = file_version_topic;
-        _storage->write(msg);
+        cdr_uint32 version_msg{ get_file_version() };
+        write_message(ros2_topic::file_version_topic(), "std_msgs/msg/UInt32", nanoseconds(0), version_msg);
     }
 
     void ros2_writer::write_frame_metadata(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame)
@@ -401,7 +330,6 @@ namespace librealsense
         auto stream_id = device_serializer::stream_identifier{ sensor_id.device_index, sensor_id.sensor_index, profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) };
         auto topic = ros2_topic::stream_info_topic(stream_id);
         std::string payload = rsutils::string::from()
-            << "is_recommended=" << ((profile->get_tag() & profile_tag::PROFILE_TAG_DEFAULT) ? "true" : "false") << ";"
             << "encoding=" << librealsense::get_string(profile->get_format()) << ";"
             << "fps=" << profile->get_framerate();
         

@@ -2,22 +2,11 @@
 // Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 #pragma once
-
-#include <core/serialization.h>
-
-#include <rosbag2_storage/storage_interfaces/read_write_interface.hpp>
 #include <rosbag2_storage/serialized_bag_message.hpp>
 #include <rosbag2_storage/topic_metadata.hpp>
 #include <rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp>
 
 #include "ros2_file_format.h"
-
-#include "ros2-msg-types/sensor_msgs/msg/Image.h"
-#include "ros2-msg-types/sensor_msgs/msg/Imu.h"
-#include <fastcdr/Cdr.h>
-#include <fastcdr/FastBuffer.h>
-
-#include <rsutils/string/from.h>
 
 
 namespace librealsense
@@ -58,7 +47,23 @@ namespace librealsense
         std::vector<std::string> filter_topics_by_regex(const std::regex& re) const;
         static std::map< std::string, std::string > parse_msg_payload(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg);
         static void register_camera_infos(std::shared_ptr<info_container> infos, const std::map<std::string, std::string>& kv);
-        static std::string read_string(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg);
+
+        template<typename T>
+        static T deserialize_message(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg)
+        {
+            if (!msg || !msg->serialized_data || !msg->serialized_data->buffer || msg->serialized_data->buffer_length == 0)
+                throw std::runtime_error("Invalid message for deserialize_message, expected non-empty payload");
+
+            // Deserialize the message using Fast CDR
+            eprosima::fastcdr::FastBuffer fb(
+                reinterpret_cast<char*>(msg->serialized_data->buffer),
+                msg->serialized_data->buffer_length);
+            eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
+            cdr.read_encapsulation();
+            T data{};
+            data.deserialize(cdr);
+            return data;
+        }
 
         nanoseconds get_file_duration();
 

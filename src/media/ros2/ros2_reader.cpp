@@ -17,7 +17,6 @@
 #include <src/labeled-points.h>
 #include <src/context.h>
 
-#include <rsutils/string/from.h>
 #include <cstring>
 
 
@@ -55,7 +54,7 @@ namespace librealsense
 
     std::map< std::string, std::string > ros2_reader::parse_msg_payload(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg)
     {
-        auto payload_str = read_string(msg);
+        auto payload_str = deserialize_message<cdr_string>(msg).value;
         std::map< std::string, std::string > kv_map;
         auto pairs = split_string(payload_str, ';');
         for (const auto& pair : pairs)
@@ -88,22 +87,6 @@ namespace librealsense
                 LOG_ERROR(rsutils::string::from() << "Exception in register_camera_infos: " << e.what());
             }
         }
-    }
-
-    std::string ros2_reader::read_string(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg)
-    {
-        std::string payload_str;
-        if (msg && msg->serialized_data && msg->serialized_data->buffer && msg->serialized_data->buffer_length > 0)
-        {
-            // CDR deserialize the std_msgs/msg/String message
-            eprosima::fastcdr::FastBuffer fb(
-                reinterpret_cast<char*>(msg->serialized_data->buffer),
-                msg->serialized_data->buffer_length);
-            eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
-            cdr.read_encapsulation();
-            cdr >> payload_str;
-        }
-        return payload_str;
     }
 
     ros2_reader::ros2_reader(const std::string& file, const std::shared_ptr<context> ctx) :
@@ -140,7 +123,7 @@ namespace librealsense
         while (has_next_cached())
         {
             auto msg = read_next_cached();
-            if (!msg || !msg->serialized_data)
+            if (!msg)
             {
                 LOG_ERROR("read_next_data: invalid message");
                 continue;
@@ -263,11 +246,6 @@ namespace librealsense
         nanoseconds timestamp(msg->time_stamp);
         stream_identifier stream_id = ros2_topic::get_stream_identifier(msg->topic_name);
 
-        if (!msg->serialized_data->buffer || msg->serialized_data->buffer_length == 0)
-        {
-            throw std::runtime_error("Frame data message has no payload");
-        }
-
         // Read metadata from the next message (metadata immediately follows frame data)
         frame_additional_data additional_data{};
         read_frame_metadata(additional_data);
@@ -290,13 +268,6 @@ namespace librealsense
             }
         }
 
-        // CDR-deserialize to extract raw frame data
-        eprosima::fastcdr::FastBuffer fb(
-            reinterpret_cast<char*>(msg->serialized_data->buffer),
-            msg->serialized_data->buffer_length);
-        eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
-        cdr.read_encapsulation();
-
         bool is_imu_topic = (msg->topic_name.find("/imu/") != std::string::npos);
 
         sensor_msgs::msg::Image img;
@@ -307,8 +278,7 @@ namespace librealsense
 
         if (is_imu_topic)
         {
-            sensor_msgs::msg::Imu imu;
-            imu.deserialize(cdr);
+            auto imu = deserialize_message<sensor_msgs::msg::Imu>(msg);
 
             if (stream_id.stream_type == RS2_STREAM_MOTION)
             {
@@ -343,7 +313,7 @@ namespace librealsense
         }
         else
         {
-            img.deserialize(cdr);
+            img = deserialize_message<sensor_msgs::msg::Image>(msg);
             data_ptr = img.data().data();
             data_size = img.data().size();
         }
@@ -375,7 +345,6 @@ namespace librealsense
         auto kv = parse_msg_payload(msg);
         auto encoding = get_value(kv, "encoding");
         auto fps = static_cast<uint32_t>(std::stoul(get_value(kv, "fps")));
-        //auto is_recommended = (kv.find("is_recommended")->second == "true");
 
         rs2_format format;
         convert(encoding, format);
@@ -448,17 +417,13 @@ namespace librealsense
 
     std::pair<rs2_option, std::shared_ptr<librealsense::option>> ros2_reader::create_option(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg)
     {
-        if (!msg->serialized_data || !msg->serialized_data->buffer)
-        {
-            throw std::runtime_error("create_option: invalid message");
-        }
         auto value_topic = msg->topic_name;
         std::string option_name = ros2_topic::get_option_name(value_topic);
         device_serializer::sensor_identifier sensor_id = ros2_topic::get_sensor_identifier(value_topic);
         rs2_option id;
         std::replace(option_name.begin(), option_name.end(), '_', ' ');
         convert(option_name, id);
-        auto message_payload = read_string(msg);
+        auto message_payload = deserialize_message<cdr_string>(msg).value;
         float value = std::stof(message_payload);
         std::string description = read_option_description(sensor_id.sensor_index, id);
         return std::make_pair(id, std::make_shared<const_value_option>(description, value));
@@ -532,7 +497,7 @@ namespace librealsense
 
     std::shared_ptr<processing_block_interface> ros2_reader::create_processing_block(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg, bool& depth_to_disparity, std::shared_ptr<options_interface> options)
     {
-        std::string name = read_string(msg);
+        std::string name = deserialize_message<cdr_string>(msg).value;
         if (name == "Disparity Filter")
         {
             // What was recorded was the extension type (without its settings!), but we need to create different
@@ -656,18 +621,7 @@ namespace librealsense
     uint32_t ros2_reader::read_file_version()
     {
         auto msg = read_next_cached();
-        if (!msg || !msg->serialized_data || !msg->serialized_data->buffer)
-            throw std::runtime_error("Failed to read file version");
-        
-        // CDR deserialize the std_msgs/msg/UInt32 message
-        eprosima::fastcdr::FastBuffer fb(
-            reinterpret_cast<char*>(msg->serialized_data->buffer),
-            msg->serialized_data->buffer_length);
-        eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
-        cdr.read_encapsulation();
-        uint32_t version;
-        cdr >> version;
-        return version;
+        return deserialize_message<cdr_uint32>(msg).value;
     }
 
     bool ros2_reader::try_read_stream_extrinsic(const stream_identifier& stream_id, uint32_t& group_id, rs2_extrinsics& extrinsic)
@@ -1214,7 +1168,7 @@ namespace librealsense
             };
 
         auto msg = peek_next_cached();
-        if (!msg || !msg->serialized_data || !msg->serialized_data->buffer)
+        if (!msg)
         {
             LOG_ERROR("read_option_description: invalid message");
             return "";
@@ -1224,7 +1178,7 @@ namespace librealsense
         {
             // If the next message is the description topic, read it and return the description
             msg = read_next_cached();
-            auto description = read_string(msg);
+            auto description = deserialize_message<cdr_string>(msg).value;
             m_read_options_descriptions[sensor_index][id] = description;
             return description;
         }

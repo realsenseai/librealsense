@@ -3,19 +3,10 @@
 
 #pragma once
 #include <rosbag2_storage/serialized_bag_message.hpp>
-#include <rosbag2_storage/storage_interfaces/read_write_interface.hpp>
 #include <rosbag2_storage/topic_metadata.hpp>
-#include <rosbag2_storage/storage_options.hpp>
 #include <rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp>
 
-#include "ros2_file_format.h" // local ros2-native copy with ROS2 topic helpers
-
-#include "ros2-msg-types/sensor_msgs/msg/Image.h"
-#include "ros2-msg-types/sensor_msgs/msg/Imu.h"
-#include <fastcdr/Cdr.h>
-#include <fastcdr/FastBuffer.h>
-
-#include <rsutils/string/from.h>
+#include "ros2_file_format.h"
 
 
 namespace librealsense
@@ -40,14 +31,13 @@ namespace librealsense
         void write_extrinsics(const stream_identifier& stream_id, frame_interface* frame);
         void write_string( std::string const & topic, const device_serializer::nanoseconds & ts, std::string const & payload );
         void ensure_topic( const std::string & name, const std::string & type );
-        std::shared_ptr<rcutils_uint8_array_t> create_buffer(size_t size);
+        std::shared_ptr<rcutils_uint8_array_t> create_buffer(size_t size) const;
 
         void write_notification(const sensor_identifier& sensor_id, const nanoseconds& timestamp, const notification& n) override;
         void write_additional_frame_messages(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
         void write_stream_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<stream_profile_interface> profile);
         void write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<video_stream_profile_interface> profile);
         void write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<motion_stream_profile_interface> profile);
-        void write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<pose_stream_profile_interface> profile);
         void write_extension_snapshot(uint32_t device_id, const nanoseconds& timestamp, rs2_extension type, std::shared_ptr<librealsense::extension_snapshot> snapshot);
         void write_extension_snapshot(uint32_t device_id, uint32_t sensor_id, const nanoseconds& timestamp, rs2_extension type, std::shared_ptr<librealsense::extension_snapshot> snapshot);
 
@@ -70,8 +60,29 @@ namespace librealsense
         void write_sensor_options(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<options_interface> options);
         void write_sensor_processing_blocks(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<recommended_proccesing_blocks_interface> proccesing_blocks);
 
-        template<typename RosMsg>
-        std::shared_ptr<rcutils_uint8_array_t> serialize_to_cdr(const RosMsg& msg);
+        // CDR encapsulation header: 2 bytes representation identifier + 2 bytes options
+        static constexpr size_t CDR_HEADER_SIZE = 4;
+
+        template<typename T>
+        void write_message(const std::string& topic, const std::string& msg_type, const nanoseconds& timestamp, const T& data)
+        {
+            // Serialize
+            auto total_size = T::getCdrSerializedSize(data) + CDR_HEADER_SIZE;
+            auto buffer = create_buffer(total_size);
+            eprosima::fastcdr::FastBuffer fb(reinterpret_cast<char*>(buffer->buffer), total_size);
+            eprosima::fastcdr::Cdr cdr(fb, eprosima::fastcdr::Cdr::DEFAULT_ENDIAN, eprosima::fastcdr::Cdr::DDS_CDR);
+            cdr.serialize_encapsulation();
+            data.serialize(cdr);
+            buffer->buffer_length = static_cast<size_t>(cdr.getSerializedDataLength());
+
+            // Write to storage
+            ensure_topic(topic, msg_type);
+            auto msg = std::make_shared<rosbag2_storage::SerializedBagMessage>();
+            msg->serialized_data = buffer;
+            msg->time_stamp = static_cast<rcutils_time_point_value_t>(timestamp.count());
+            msg->topic_name = topic;
+            _storage->write(msg);
+        }
 
         static uint8_t is_big_endian();
         std::string m_file_path;

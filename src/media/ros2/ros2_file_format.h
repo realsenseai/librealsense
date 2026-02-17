@@ -6,14 +6,15 @@
 #include <chrono>
 #include "librealsense2/rs.h"
 #include "sensor_msgs/image_encodings.h"
+#include "ros2-msg-types/sensor_msgs/msg/Imu.h"
+#include "ros2-msg-types/sensor_msgs/msg/Image.h"
+#include <fastcdr/Cdr.h>
+#include <fastcdr/FastBuffer.h>
 #include "metadata-parser.h"
 #include "option.h"
 #include "core/serialization.h"
 #include <regex>
 #include "stream.h"
-#include "types.h"
-#include <vector>
-#include <algorithm>
 
 #include <rsutils/string/from.h>
 
@@ -407,4 +408,19 @@ namespace librealsense
     {
         return device_serializer::nanoseconds::min();
     }
+
+    // Lightweight CDR wrappers matching the ROS msg serialize/deserialize interface
+    struct cdr_string {
+        std::string value;
+        void serialize(eprosima::fastcdr::Cdr& cdr) const { cdr << value; }
+        void deserialize(eprosima::fastcdr::Cdr& cdr) { cdr >> value; }
+        static size_t getCdrSerializedSize(const cdr_string& s, size_t = 0) { return 4 + s.value.size() + 1; }
+    };
+
+    struct cdr_uint32 {
+        uint32_t value = 0;
+        void serialize(eprosima::fastcdr::Cdr& cdr) const { cdr << value; }
+        void deserialize(eprosima::fastcdr::Cdr& cdr) { cdr >> value; }
+        static size_t getCdrSerializedSize(const cdr_uint32&, size_t = 0) { return sizeof(uint32_t); }
+    };
 }
