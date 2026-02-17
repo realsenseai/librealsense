@@ -764,9 +764,12 @@ void dds_sensor_proxy::update_timestamp_if_needed( librealsense::frame_additiona
         uint64_t truncated_timestamp_us = timestamp_us % static_cast< uint64_t >( std::pow( 2, 32 ) );
         double truncated_timestamp_ms = truncated_timestamp_us * MICROSEC_TO_MILLISEC;
         bool is_tf_ready = false;
-        data.timestamp = _tf_keeper->get_system_hw_time( truncated_timestamp_ms, is_tf_ready );
+        double updated_timestamp_ms = _tf_keeper->get_system_hw_time( truncated_timestamp_ms, is_tf_ready );
         if( is_tf_ready )
+        {
+            data.timestamp = updated_timestamp_ms;
             data.timestamp_domain = RS2_TIMESTAMP_DOMAIN_GLOBAL_TIME; // timestamp not changed if not ready, so leave domain
+        }
     }
 
     // Update here when final data.timestamp is set
