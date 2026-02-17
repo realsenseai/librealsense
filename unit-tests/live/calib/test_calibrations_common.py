@@ -369,7 +369,7 @@ def write_calibration_table_with_crc(device, modified_data):
         log.e(f"-E- Error writing calibration table: {e}")
         return False, str(e)
 
-def modify_extrinsic_calibration(device, pixel_correction, modify_ppy=True):
+def modify_intrinsic_calibration(device, pixel_correction, modify_ppy=True):
     """Modify either raw right intrinsic ppx or ppy by pixel_correction (in pixels).
 
     Args:

@@ -10,7 +10,7 @@ from test_calibrations_common import (
     is_mipi_device,
     get_calibration_device,
     get_current_rect_params,
-    modify_extrinsic_calibration,
+    modify_intrinsic_calibration,
     save_calibration_table,
     restore_calibration_table,
     write_calibration_table_with_crc,
@@ -18,9 +18,7 @@ from test_calibrations_common import (
     is_d555
 )
 
-#disabled until we stabilize lab
 #test:donotrun
-
 def tare_calibration_json(tare_json_file, host_assistance):
     tare_json = None
     if tare_json_file is not None:
@@ -138,7 +136,7 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
         if target_z < 1300.0:
             pixel_correction = SHORT_DISTANCE_PIXEL_CORRECTION
         log.i(f"Applying manual raw intrinsic correction: delta={pixel_correction:+.3f} px")
-        modification_success, _modified_table_bytes, modified_ppx, modified_ppy = modify_extrinsic_calibration(
+        modification_success, _modified_table_bytes, modified_ppx, modified_ppy = modify_intrinsic_calibration(
             calib_dev, pixel_correction, False)
         if not modification_success:
             log.e("Failed to modify calibration table")
