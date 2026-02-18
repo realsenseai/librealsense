@@ -53,8 +53,18 @@ def to_signed(value):
 def test_json_load(config, test_title):
     global batch_size
     with test.closure(test_title):
-        prior_config = json.loads(am.serialize_json())
-        am.load_json(json.dumps(config))  # json dumps just stringify the object
+        try:
+            prior_config = json.loads(am.serialize_json())
+        except RuntimeError as e:
+            log.e(f"Failed to serialize current configuration: {e}")
+            raise
+        
+        try:
+            am.load_json(json.dumps(config))  # json dumps just stringify the object
+        except RuntimeError as e:
+            log.e(f"Failed to load HDR configuration. Ensure device supports HDR and advanced mode is enabled: {e}")
+            raise
+        
         hdr_config_read = json.loads(am.serialize_json())  # jsonify, note this JSON contains also other keys (params)
 
         # go over the read data and convert all values to signed integers
@@ -208,6 +218,23 @@ def load_and_perform_test(hdr_config, test_title, resolution=(640, 480)):
 
 device, ctx = test.find_first_device_or_exit()
 am = rs.rs400_advanced_mode(device)
+
+# Ensure advanced mode is enabled
+if not am.is_enabled():
+    log.d("Enabling advanced mode...")
+    am.toggle_advanced_mode(True)
+    # Device needs to reboot after enabling advanced mode
+    # Wait for device to reconnect
+    import time
+    time.sleep(3)
+    # Re-acquire device after reboot
+    devices = ctx.query_devices()
+    if len(devices) == 0:
+        test.fail("Device not found after enabling advanced mode")
+    device = devices[0]
+    am = rs.rs400_advanced_mode(device)
+    log.d("Advanced mode enabled")
+
 sensor = device.first_depth_sensor()
 batch_size = 0  # updated on test_json_load
 pipe = rs.pipeline(ctx)
