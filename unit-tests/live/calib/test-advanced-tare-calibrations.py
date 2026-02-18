@@ -179,7 +179,9 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
         if not write_ok:
             log.e("Failed to write tare calibration table to device")
             test.fail()
-
+        # Allow time for device to apply the new calibration table
+        time.sleep(1.0)
+        
         final_principal_points_result = get_current_rect_params(calib_dev)
         if final_principal_points_result is None:
             log.e("Could not read final principal points")

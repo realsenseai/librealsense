@@ -151,7 +151,7 @@ def run_advanced_occ_calibration_test(host_assistance, config, pipeline, calib_d
             test.fail()
 
         # Allow time for device to apply the new calibration table
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         final_principal_points_result = get_current_rect_params(calib_dev)
         if final_principal_points_result is None:

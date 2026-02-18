@@ -299,7 +299,6 @@ def restore_calibration_table(device, saved_table=None):
             auto_calib_device = device
         else:
             auto_calib_device = rs.auto_calibrated_device(device)
-            
         if not auto_calib_device:
             log.e("Device does not support auto calibration")
             return False
@@ -308,14 +307,15 @@ def restore_calibration_table(device, saved_table=None):
         if saved_table is None:
             log.i("Restoring factory calibration")
             auto_calib_device.reset_to_factory_calibration()
+            time.sleep(1)
             return True
-            
+
         # Option 2: Restore from saved table
         log.i(f"Restoring saved calibration table ({len(saved_table)} bytes)")
         calib_list = list(saved_table)
         auto_calib_device.set_calibration_table(calib_list)
         auto_calib_device.write_calibration()
-        
+        time.sleep(1)
         # Verify restoration
         current_table = auto_calib_device.get_calibration_table()
         if current_table and bytes(current_table) == saved_table:
@@ -324,7 +324,6 @@ def restore_calibration_table(device, saved_table=None):
         else:
             log.w("Calibration table restored but verification failed")
             return True  # Still return True as write succeeded
-            
     except Exception as e:
         log.e(f"Error restoring calibration table: {e}")
         return False
