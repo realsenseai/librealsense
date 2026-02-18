@@ -11,53 +11,58 @@ This documentation describes the infrastructure added to support unit tests that
 #### `find_two_devices_by_product_line_or_exit(product_line)`
 Finds exactly two devices of the specified product line and ensures they have different serial numbers.
 
+**IMPORTANT:** This function integrates with the `devices` module to properly support Acroname hubs and port management.
+
 **Parameters:**
-- `product_line`: The product line to search for (e.g., `rs.product_line.D400`)
+- `product_line`: The product line to search for as a string (e.g., `"D400"`, `"L500"`)
 
 **Returns:**
-- Tuple of `(dev1, dev2, context)` where dev1 and dev2 are two different devices
+- Tuple of `(dev1, dev2, serial_numbers)` where dev1 and dev2 are two different devices, and serial_numbers is a list of their serial numbers
 
 **Behavior:**
 - If fewer than 2 devices are found, the test exits gracefully (skip, not fail)
 - Displays clear message: "Test requires 2 devices; found X device(s)"
 - Verifies devices have different serial numbers
+- Works with Acroname hubs through the devices module
 
 **Example:**
 ```python
-import pyrealsense2 as rs
 from rspy import test
 
-dev1, dev2, ctx = test.find_two_devices_by_product_line_or_exit(rs.product_line.D400)
+dev1, dev2, sns = test.find_two_devices_by_product_line_or_exit("D400")
 # dev1 and dev2 are guaranteed to be different devices
 ```
 
 #### `find_any_two_devices_or_exit()`
 Finds any two RealSense devices regardless of product line, ensuring they have different serial numbers.
 
+**IMPORTANT:** This function integrates with the `devices` module to properly support Acroname hubs and port management.
+
 **Parameters:**
 - None
 
 **Returns:**
-- Tuple of `(dev1, dev2, context)` where dev1 and dev2 are two different devices (may be different product lines)
+- Tuple of `(dev1, dev2, serial_numbers)` where dev1 and dev2 are two different devices (may be different product lines), and serial_numbers is a list of their serial numbers
 
 **Example:**
 ```python
 from rspy import test
 
-dev1, dev2, ctx = test.find_any_two_devices_or_exit()
+dev1, dev2, sns = test.find_any_two_devices_or_exit()
 # dev1 and dev2 can be D400 + L500, D435 + D455, etc.
 ```
 
 #### `two_devices` Context Manager Class
 Provides a clean context manager interface for two-device tests with automatic device discovery and cleanup.
 
+**IMPORTANT:** This context manager integrates with the `devices` module to properly support Acroname hubs and port management.
+
 **Usage (Same Product Line):**
 ```python
-import pyrealsense2 as rs
 from rspy import test
 
 # Find two D400 devices
-with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+with test.two_devices("D400") as (dev1, dev2):
     # Both devices are D400 series
     sn1 = dev1.get_info(rs.camera_info.serial_number)
     sn2 = dev2.get_info(rs.camera_info.serial_number)
@@ -79,6 +84,7 @@ with test.two_devices() as (dev1, dev2):
 - Graceful failure handling
 - Pythonic and familiar pattern
 - Flexible: works with same or different product lines
+- **Works with Acroname hubs** through devices module integration
 
 ### 2. Device Configuration Enhancement (unit-tests/py/rspy/devices.py)
 
@@ -164,7 +170,7 @@ The repeated spec (`D400*` appears twice) tells the infrastructure to allocate T
 import pyrealsense2 as rs
 from rspy import test
 
-with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+with test.two_devices("D400") as (dev1, dev2):
     # Your test code here
     # dev1 and dev2 are both D400 devices
     
@@ -206,10 +212,9 @@ with test.two_devices() as (dev1, dev2):
 For tests needing more control:
 
 ```python
-import pyrealsense2 as rs
 from rspy import test
 
-dev1, dev2, ctx = test.find_two_devices_by_product_line_or_exit(rs.product_line.D400)
+dev1, dev2, sns = test.find_two_devices_by_product_line_or_exit("D400")
 
 # Your test code with manual device management
 ```
@@ -316,6 +321,13 @@ Warning: test-live-d400-two-devices-streaming: Test requires 2 devices; found 1 
 - Automatic resource management
 - Clean syntax reduces boilerplate
 
+### Why Integrate with Devices Module?
+- **Acroname Hub Support**: The devices module manages port enabling/disabling through Acroname hubs
+- Without integration, two-device tests would fail when devices are connected through a hub
+- Uses global device context instead of creating new rs.context() instances
+- Proper port management and device lifecycle handling
+- Consistent with single-device test infrastructure
+
 ### Why Skip Instead of Fail?
 - Tests shouldn't fail due to hardware unavailability
 - Allows running test suite in various environments
@@ -340,9 +352,10 @@ Warning: test-live-d400-two-devices-streaming: Test requires 2 devices; found 1 
 ## Files Modified/Created
 
 1. **unit-tests/py/rspy/test.py**
-   - Added `find_two_devices_by_product_line_or_exit()` function
-   - Added `find_any_two_devices_or_exit()` function (product-agnostic)
+   - Added `find_two_devices_by_product_line_or_exit()` function (integrates with devices module)
+   - Added `find_any_two_devices_or_exit()` function (product-agnostic, integrates with devices module)
    - Added `two_devices` context manager class (supports optional product_line parameter)
+   - **Key Change**: All functions use `devices` module instead of creating new `rs.context()` for Acroname hub support
 
 2. **unit-tests/py/rspy/devices.py**
    - Enhanced `by_configuration()` to support repeated device specs
@@ -354,14 +367,23 @@ Warning: test-live-d400-two-devices-streaming: Test requires 2 devices; found 1 
    - Serves as template for future two-device tests
    - Includes extensive inline documentation
    - D400-specific test
+   - Works with Acroname hubs
 
 4. **unit-tests/live/frames/test-two-devices-frame-drops.py** (NEW)
    - Advanced frame drop detection test
    - Product-agnostic (works with any two devices)
    - Tests frame counter metadata
    - Multi-sensor and multi-resolution testing
+   - Works with Acroname hubs
 
-5. **unit-tests/TWO_DEVICE_TESTS.md** (NEW)
+5. **unit-tests/live/frames/test-two-devices-multi-stream.py** (NEW)
+   - Multi-stream simultaneous test (depth + color + IR)
+   - Product-agnostic (works with any two devices)
+   - Stress testing with long duration
+   - Stream independence verification
+   - Works with Acroname hubs
+
+6. **unit-tests/TWO_DEVICE_TESTS.md** (NEW)
    - Complete documentation and user guide
 
 ## Backward Compatibility

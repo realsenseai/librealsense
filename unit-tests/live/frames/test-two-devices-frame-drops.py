@@ -19,7 +19,7 @@ The test works with ANY two RealSense devices (same or different product lines).
 It automatically finds common stream profiles supported by both devices and tests those.
 For example, it can test:
   - D400 + D400 (same product line)
-  - D400 + L500 (different product lines)
+  - D400 + D500 (different product lines)
   - D455 + D435i (different models, same product line)
 
 The test iterates through all common stream profiles supported by both devices
