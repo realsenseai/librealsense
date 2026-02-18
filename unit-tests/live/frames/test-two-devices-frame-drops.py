@@ -1,11 +1,12 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Test configuration: Requires TWO D400 devices connected simultaneously
-#test:device D400* D400*
+# Test configuration: Requires ANY TWO RealSense devices connected simultaneously
+# Devices can be same or different product lines (e.g., D400 + D400, or D400 + L500)
+#test:device * *
 
 """
-Test simultaneous streaming from two D400 devices with frame drop detection.
+Test simultaneous streaming from two RealSense devices with frame drop detection.
 
 This test validates:
 1. Two devices can stream simultaneously with the same configuration
@@ -13,6 +14,13 @@ This test validates:
 3. All available sensors can stream concurrently from both devices
 4. All supported resolutions and frame rates work correctly
 5. No significant frame drops occur during 5-second streaming sessions
+
+The test works with ANY two RealSense devices (same or different product lines).
+It automatically finds common stream profiles supported by both devices and tests those.
+For example, it can test:
+  - D400 + D400 (same product line)
+  - D400 + L500 (different product lines)
+  - D455 + D435i (different models, same product line)
 
 The test iterates through all common stream profiles supported by both devices
 and verifies data integrity using frame counter metadata.
@@ -207,12 +215,17 @@ def stream_and_check_frames(dev1, dev2, config_description, stream_configs):
 # Test: Stream all common profiles and check for frame drops
 #
 with test.closure("Two devices - frame drop detection across all profiles"):
-    with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+    with test.two_devices() as (dev1, dev2):
         
         sn1 = dev1.get_info(rs.camera_info.serial_number)
         sn2 = dev2.get_info(rs.camera_info.serial_number)
         
-        log.i(f"Testing devices: {sn1} and {sn2}")
+        name1 = dev1.get_info(rs.camera_info.name) if dev1.supports(rs.camera_info.name) else "Unknown"
+        name2 = dev2.get_info(rs.camera_info.name) if dev2.supports(rs.camera_info.name) else "Unknown"
+        
+        log.i(f"Testing devices:")
+        log.i(f"  Device 1: {name1} (SN: {sn1})")
+        log.i(f"  Device 2: {name2} (SN: {sn2})")
         
         # Get common profiles
         log.i("Finding common stream profiles...")
@@ -286,7 +299,7 @@ with test.closure("Two devices - frame drop detection across all profiles"):
 # Test: Stream ALL sensors simultaneously (depth + color + infrared)
 #
 with test.closure("Two devices - all sensors streaming simultaneously"):
-    with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+    with test.two_devices() as (dev1, dev2):
         
         sn1 = dev1.get_info(rs.camera_info.serial_number)
         sn2 = dev2.get_info(rs.camera_info.serial_number)
@@ -352,7 +365,7 @@ with test.closure("Two devices - all sensors streaming simultaneously"):
 # Test: High-resolution streaming from both devices
 #
 with test.closure("Two devices - high resolution streaming"):
-    with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+    with test.two_devices() as (dev1, dev2):
         
         log.i("Testing high-resolution streaming")
         
@@ -387,7 +400,7 @@ with test.closure("Two devices - high resolution streaming"):
 # Test: High frame rate streaming from both devices
 #
 with test.closure("Two devices - high frame rate streaming"):
-    with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+    with test.two_devices() as (dev1, dev2):
         
         log.i("Testing high frame rate streaming")
         

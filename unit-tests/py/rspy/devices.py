@@ -394,10 +394,15 @@ def by_spec( spec, ignored_products ):
     """
     Helper function for by_configuration. Yields all serial-numbers matching the given spec
     :param spec: A product name/line (as a string) we want to get serial number of, or an actual s/n
+                 Special case: '*' means any/all devices
     :param ignored_products: List of products we want to ignore. e.g. ['D455', 'D457', etc.]
     :return: A set of device serial-numbers
     """
-    if spec.endswith( '*' ):
+    if spec == '*':
+        # Special case: '*' means all devices
+        for sn in enabled():
+            yield sn
+    elif spec.endswith( '*' ):
         for sn in by_product_line( spec[:-1], ignored_products ):
             yield sn
     elif get( spec ):
