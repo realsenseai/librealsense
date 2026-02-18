@@ -159,6 +159,94 @@ def find_devices_by_product_line_or_exit( product_line ):
     return devices_list
 
 
+def find_two_devices_by_product_line_or_exit( product_line ):
+    """
+    Find exactly two devices of the specified product line, ensuring they have different serial numbers.
+    
+    This is the main entry point for tests that require two RealSense devices simultaneously.
+    If fewer than two devices are available, the test will be skipped (not failed) with a clear message.
+    
+    :param product_line: The product line of the wanted devices (e.g., rs.product_line.D400)
+    :return: A tuple of (dev1, dev2, context) where dev1 and dev2 are two different devices
+    
+    Example usage:
+        import pyrealsense2 as rs
+        dev1, dev2, ctx = test.find_two_devices_by_product_line_or_exit(rs.product_line.D400)
+        # dev1 and dev2 are guaranteed to have different serial numbers
+    """
+    import pyrealsense2 as rs
+    c = rs.context()
+    devices_list = c.query_devices(product_line)
+    
+    if devices_list.size() < 2:
+        log.f( f"Test requires 2 devices; found {devices_list.size()} device(s) of {product_line} product line" )
+    
+    # Get the first two devices
+    dev1 = devices_list[0]
+    dev2 = devices_list[1]
+    
+    # Verify they have different serial numbers (sanity check)
+    sn1 = dev1.get_info(rs.camera_info.serial_number) if dev1.supports(rs.camera_info.serial_number) else None
+    sn2 = dev2.get_info(rs.camera_info.serial_number) if dev2.supports(rs.camera_info.serial_number) else None
+    
+    if sn1 and sn2 and sn1 == sn2:
+        log.f( f"Found two devices but they have the same serial number: {sn1}" )
+    
+    log.d( 'found 2 devices:' )
+    log.d( '  device 1:', dev1, 'SN:', sn1 )
+    log.d( '  device 2:', dev2, 'SN:', sn2 )
+    log.d( 'in', rs )
+    
+    return dev1, dev2, c
+
+
+class two_devices:
+    """
+    Context manager for tests that require two RealSense devices simultaneously.
+    
+    This provides a clean interface for multi-device tests with automatic device discovery
+    and graceful failure handling when insufficient devices are available.
+    
+    Usage example:
+        import pyrealsense2 as rs
+        from rspy import test
+        
+        with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+            # Your test code here using dev1 and dev2
+            # Both devices are guaranteed to have different serial numbers
+            sn1 = dev1.get_info(rs.camera_info.serial_number)
+            sn2 = dev2.get_info(rs.camera_info.serial_number)
+            test.check(sn1 != sn2, "Serial numbers should be different")
+    
+    The context manager handles device cleanup automatically at the end of the 'with' block.
+    If fewer than 2 devices are found, the test will exit gracefully (skip, not fail).
+    """
+    
+    def __init__(self, product_line):
+        """
+        :param product_line: The product line of devices to search for (e.g., rs.product_line.D400)
+        """
+        self.product_line = product_line
+        self.dev1 = None
+        self.dev2 = None
+        self.context = None
+    
+    def __enter__(self):
+        """
+        Called when entering the 'with' statement. Discovers and returns two devices.
+        """
+        self.dev1, self.dev2, self.context = find_two_devices_by_product_line_or_exit(self.product_line)
+        return self.dev1, self.dev2
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Called when exiting the 'with' statement. Cleanup happens here if needed.
+        """
+        # Device cleanup is handled by pyrealsense2 automatically
+        # This method is here for future extensibility (e.g., explicit device reset)
+        pass
+
+
 def print_stack():
     """
     Function for printing the current call stack. Used when an assertion fails
