@@ -28,7 +28,7 @@ This is the cleanest approach for most two-device tests:
     import pyrealsense2 as rs
     from rspy import test
     
-    with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+    with test.two_devices("D400") as (dev1, dev2):
         # Your test code here
         # dev1 and dev2 are guaranteed to be different devices
         sn1 = dev1.get_info(rs.camera_info.serial_number)
@@ -42,7 +42,7 @@ For tests that need more control over device lifecycle:
     import pyrealsense2 as rs
     from rspy import test
     
-    dev1, dev2, ctx = test.find_two_devices_by_product_line_or_exit(rs.product_line.D400)
+    dev1, dev2, sns = test.find_two_devices_by_product_line_or_exit("D400")
     # Your test code here
     # Manual cleanup if needed
 
@@ -73,7 +73,7 @@ import time
 #
 with test.closure("Two devices discovery and serial number verification"):
     # The two_devices context manager handles device discovery and validation
-    with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+    with test.two_devices("D400") as (dev1, dev2):
         
         # Verify devices are valid
         test.check(dev1 is not None, "Device 1 should be valid")
@@ -99,7 +99,7 @@ with test.closure("Two devices discovery and serial number verification"):
 # Test 2: Verify both devices can stream simultaneously
 #
 with test.closure("Simultaneous streaming from two devices"):
-    with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+    with test.two_devices("D400") as (dev1, dev2):
         
         # Create two separate pipelines
         pipe1 = rs.pipeline()
@@ -175,7 +175,7 @@ with test.closure("Simultaneous streaming from two devices"):
 # Test 3: Verify devices can stream sequentially (stop one, start other)
 #
 with test.closure("Sequential streaming - stop and start"):
-    with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+    with test.two_devices("D400") as (dev1, dev2):
         
         sn1 = dev1.get_info(rs.camera_info.serial_number)
         sn2 = dev2.get_info(rs.camera_info.serial_number)
@@ -228,7 +228,7 @@ with test.closure("Sequential streaming - stop and start"):
 # Test 4: Verify device sensor information is independent
 #
 with test.closure("Verify independent device sensor information"):
-    with test.two_devices(rs.product_line.D400) as (dev1, dev2):
+    with test.two_devices("D400") as (dev1, dev2):
         
         # Get depth sensors from both devices
         depth_sensor1 = dev1.first_depth_sensor()
