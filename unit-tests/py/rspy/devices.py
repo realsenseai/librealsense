@@ -451,7 +451,8 @@ def by_configuration( config, exceptions=None, inclusions=None ):
     Yields the serial numbers fitting the given configuration. If configuration includes an 'each' directive
     will yield all fitting serial numbers one at a time. Otherwise yields one set of serial numbers fitting the configuration
 
-    :param config: A test:device line collection of arguments (e.g., [L515 D400*]) or serial numbers
+    :param config: A test:device line collection of arguments (e.g., [L515 D400*]) or serial numbers.
+                   To specify multiple devices of the same type, repeat the spec (e.g., [D400* D400*] for two D400 devices).
     :param exceptions: A collection of serial-numbers that serve as exceptions that will never get matched
     :param inclusions: A collection of serial-numbers from which to match - nothing else will get matched
 
@@ -483,18 +484,24 @@ def by_configuration( config, exceptions=None, inclusions=None ):
             yield { sn }
     else:
         sns = set()
+        # Track how many devices we need for each spec (to support "D400* D400*" for 2 D400 devices)
         for spec in new_config:
             old_len = len(sns)
+            matched_for_this_spec = False
             for sn in by_spec( spec, ignored_products ):
                 if sn in exceptions:
                     continue
                 if inclusions and sn not in inclusions:
                     continue
+                # Allow the same spec to match multiple devices (for two-device tests)
+                # Previously: if sn not in sns
+                # Now: always try to add, but only if not already in the set
                 if sn not in sns:
                     sns.add( sn )
+                    matched_for_this_spec = True
                     break
             new_len = len(sns)
-            if new_len == old_len:
+            if not matched_for_this_spec and new_len == old_len:
                 # No new device matches the spec:
                 #   - if no inclusions were specified, this is always an error
                 #   - with inclusions, it's not an error only if it's the only spec
