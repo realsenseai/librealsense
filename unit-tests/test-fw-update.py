@@ -165,6 +165,7 @@ log.d( 'current FW version:', current_fw_version )
 
 # Determine which firmware to use based on product
 bundled_fw_version = rsutils.version("")
+same_version = False
 custom_fw_path = None
 custom_fw_version = None
 if product_line == "D400" and args.custom_fw_d400:
@@ -215,6 +216,7 @@ else:
 
 if (current_fw_version == bundled_fw_version and not custom_fw_path) or \
    (current_fw_version == custom_fw_version):
+    same_version = True
     if recovered or 'nightly' not in test.context:
         log.d('versions are same; skipping FW update')
         test.finish()
@@ -247,8 +249,13 @@ log.d( 'running:', cmd )
 sys.stdout.flush()
 subprocess.run( cmd )   # may throw
 
-# make sure update worked
-time.sleep(3) # MIPI devices do not re-enumerate so we need to give them some time to restart
+# if we updated to the different version, FW might need time to flash a new ISP FW,
+# otherwise 3 seconds should be enough to allow devices to reboot and enumerate again
+sleep_time = 60 if not same_version else 3
+log.d("Sleeping for", sleep_time, "seconds to allow device to reboot and enumerate after FW update...")
+time.sleep(sleep_time) 
+
+# make sure update worked and check FW version and update counter
 device, ctx = test.find_first_device_or_exit()
 current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
 
