@@ -1,0 +1,95 @@
+name: Feature Request
+description: Suggest an idea or enhancement for this project
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature!
+        
+        Before submitting, please check if a similar feature request already exists in [our issues](https://github.com/IntelRealSense/librealsense/issues).
+  
+  - type: dropdown
+    id: camera-model
+    attributes:
+      label: Camera Model (if applicable)
+      description: Which Intel RealSense camera is this feature for?
+      multiple: true
+      options:
+        - All cameras
+        - D405
+        - D415
+        - D435
+        - D435i
+        - D455
+        - D457
+        - D555
+        - N/A - SDK/Software feature
+        - Other (please specify in description)
+  
+  - type: dropdown
+    id: feature-area
+    attributes:
+      label: Feature Area
+      description: Which area does this feature request relate to?
+      multiple: true
+      options:
+        - Camera API
+        - Firmware
+        - Python Wrapper
+        - .NET Wrapper
+        - ROS2
+        - Depth Processing
+        - Calibration
+        - Recording/Playback
+        - Tools (Viewer, DQT, etc.)
+        - Build System
+        - Documentation
+        - Other (specify in description)
+  
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: A clear and concise description of what the problem is
+      placeholder: "I'm always frustrated when..."
+  
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: Describe your preferred solution
+    validations:
+      required: true
+  
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or features you've considered
+  
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Critical - Blocking my project
+        - High - Important for my use case
+        - Medium - Would be nice to have
+        - Low - Minor improvement
+  
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe your use case and how this feature would help
+      placeholder: Explain how you would use this feature
+  
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, mockups, or examples about the feature request here

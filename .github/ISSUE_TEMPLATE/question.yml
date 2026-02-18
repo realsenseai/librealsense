@@ -1,0 +1,111 @@
+name: Question / Help Wanted
+description: Ask a question or request help with using Intel RealSense
+title: "[Question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reaching out!
+        
+        Before asking a question, please check:
+        - [SDK Examples](https://github.com/IntelRealSense/librealsense/tree/master/examples)
+        - [Documentation](https://github.com/IntelRealSense/librealsense/tree/master/doc)
+        - [Troubleshooting Q&A](https://github.com/IntelRealSense/librealsense/wiki/Troubleshooting-Q%26A)
+        - [Existing Issues](https://github.com/IntelRealSense/librealsense/issues)
+        
+        For general discussions, consider using [GitHub Discussions](https://github.com/IntelRealSense/librealsense/discussions) instead.
+  
+  - type: dropdown
+    id: camera-model
+    attributes:
+      label: Camera Model (if applicable)
+      description: Which Intel RealSense camera is your question about?
+      multiple: true
+      options:
+        - General question (no specific camera)
+        - D405
+        - D415
+        - D435
+        - D435i
+        - D455
+        - D457
+        - D555
+        - L515
+        - L535
+        - SR305
+        - T265
+        - Other (please specify in description)
+  
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      description: What is your question about?
+      multiple: true
+      options:
+        - Installation / Setup
+        - Basic Usage
+        - Depth Streaming
+        - Color Streaming
+        - IMU / Motion Data
+        - Point Cloud
+        - Alignment
+        - Post-Processing
+        - Calibration
+        - Recording / Playback
+        - Multiple Cameras
+        - Performance Optimization
+        - Python Wrapper
+        - .NET Wrapper
+        - ROS/ROS2 Integration
+        - Hardware Compatibility
+        - Firmware
+        - Error Messages
+        - Other (specify in description)
+  
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: Please provide a clear and detailed question
+      placeholder: What would you like to know?
+    validations:
+      required: true
+  
+  - type: textarea
+    id: context
+    attributes:
+      label: Context / What You've Tried
+      description: What have you already tried? Include any relevant code, configuration, or debugging steps
+      placeholder: |
+        - I've tried...
+        - I've looked at...
+        - Here's my code...
+  
+  - type: input
+    id: sdk-version
+    attributes:
+      label: LibRealSense SDK Version (if applicable)
+      placeholder: e.g., 2.54.0
+  
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System (if applicable)
+      options:
+        - Windows 10
+        - Windows 11
+        - Ubuntu 18.04
+        - Ubuntu 20.04
+        - Ubuntu 22.04
+        - Ubuntu 24.04
+        - Other Linux
+        - MacOS
+        - N/A
+  
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or code snippets that might help

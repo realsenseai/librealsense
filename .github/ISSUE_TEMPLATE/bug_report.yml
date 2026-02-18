@@ -1,0 +1,179 @@
+name: Bug Report
+description: File a bug report to help us improve
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+        
+        Before opening a new issue, please check:
+        - [SDK Examples](https://github.com/IntelRealSense/librealsense/tree/master/examples)
+        - [Documentation](https://github.com/IntelRealSense/librealsense/tree/master/doc)
+        - [Troubleshooting Q&A](https://github.com/IntelRealSense/librealsense/wiki/Troubleshooting-Q%26A)
+        - [Existing Issues](https://github.com/IntelRealSense/librealsense/issues)
+  
+  - type: dropdown
+    id: camera-model
+    attributes:
+      label: Camera Model
+      description: Which Intel RealSense camera are you using?
+      options:
+        - D405
+        - D415
+        - D435
+        - D435i
+        - D455
+        - D457
+        - D555
+        - L515
+        - L535
+        - SR305
+        - T265
+        - Other (please specify in description)
+    validations:
+      required: true
+  
+  - type: input
+    id: firmware-version
+    attributes:
+      label: Firmware Version
+      description: Open RealSense Viewer, click on the camera info icon to find this
+      placeholder: e.g., 5.16.0.1
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating System
+      description: What OS are you running?
+      options:
+        - Windows 10
+        - Windows 11
+        - Ubuntu 18.04
+        - Ubuntu 20.04
+        - Ubuntu 22.04
+        - Ubuntu 24.04
+        - Other Linux (specify in description)
+        - MacOS
+    validations:
+      required: true
+  
+  - type: input
+    id: kernel-version
+    attributes:
+      label: Kernel Version (Linux Only)
+      description: Output of `uname -r`
+      placeholder: e.g., 5.15.0-91-generic
+  
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: What hardware are you running on?
+      options:
+        - PC (AMD64/x86_64)
+        - Raspberry Pi
+        - NVIDIA Jetson
+        - Other ARM (specify in description)
+        - Other (specify in description)
+    validations:
+      required: true
+  
+  - type: input
+    id: sdk-version
+    attributes:
+      label: LibRealSense SDK Version
+      description: Which version of librealsense are you using?
+      placeholder: e.g., 2.54.0
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      description: Which programming language/wrapper are you using?
+      multiple: true
+      options:
+        - C
+        - C++
+        - Python
+        - C# (.NET)
+        - Node.js
+        - LabVIEW
+        - OpenCV
+        - PCL
+        - ROS1
+        - ROS2
+        - Unity
+        - Other (specify in description)
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: segment
+    attributes:
+      label: Application Segment
+      description: What is your use case?
+      options:
+        - Robotics
+        - Augmented Reality (AR)
+        - Virtual Reality (VR)
+        - 3D Scanning
+        - Computer Vision
+        - Industrial/Manufacturing
+        - Healthcare
+        - Education/Research
+        - Other (specify in description)
+  
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+      description: Please provide a clear and detailed description of the bug
+      placeholder: What happened? What did you expect to happen?
+    validations:
+      required: true
+  
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Please provide detailed steps to reproduce the issue
+      placeholder: |
+        1. Initialize camera with...
+        2. Start streaming with...
+        3. Call function...
+        4. Observe error...
+    validations:
+      required: true
+  
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe the expected behavior
+  
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened, include error messages if applicable
+  
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Log Output
+      description: Please copy and paste any relevant log output
+      render: shell
+  
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here (screenshots, videos, code snippets, etc.)
