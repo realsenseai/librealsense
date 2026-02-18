@@ -414,6 +414,8 @@ namespace librealsense
         std::string value;
         void serialize(eprosima::fastcdr::Cdr& cdr) const { cdr << value; }
         void deserialize(eprosima::fastcdr::Cdr& cdr) { cdr >> value; }
+        // ROS2 uses CDR string serialization which includes a 4-byte length prefix and a null terminator at the end of the string
+        // overall 4 (length prefix) + string length + 1 (null terminator)
         static size_t getCdrSerializedSize(const cdr_string& s, size_t = 0) { return 4 + s.value.size() + 1; }
     };
 
