@@ -3,7 +3,7 @@
 
 #test:device each(D400*)
 #test:device each(D500*)
-# Note - currently there is an issue with D555 domain, we want test-detect-D555 to run first, test-fw-update second, test-metadata third, updating priorities
+#Setting priority to run after test-fw-update
 #test:priority 2
 #test:flag windows
 

@@ -1,8 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
-# we want this test to run first so that all tests run with updated FW versions, so we give it priority 0
-# Note - currently there is an issue with D555 domain, we want test-detect-D555 to run first, test-fw-update second, test-metadata third, updating priorities
+#We want this test to run right after camera detection phase, so that all tests will run with updated FW versions, so we give it high priority
 #test:priority 1
 #test:timeout 500
 #test:donotrun:gha

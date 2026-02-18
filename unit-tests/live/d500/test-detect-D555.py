@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # There is currently an issue with D555, sometimes the domain id in the configuration resets to 0.
-# Note - currently there is an issue with D555 domain, we want test-detect-D555 to run first, test-fw-update second, test-metadata third, updating priorities
+# We want this test to run first and restore the domain, so other tests will be able to detect the camera.
 # test:priority 0
 # test:device D555
 # test:donotrun:!dds
@@ -10,7 +10,6 @@
 import pyrealsense2 as rs
 from rspy import test, log, config_file
 import pyrsutils as rsutils
-import time
 
 # Make sure D555 is detected on CI machines (DDS connection)
 # To run locally with other devices use `--device` flag
