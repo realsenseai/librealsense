@@ -2,7 +2,8 @@
 # Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
 # we want this test to run first so that all tests run with updated FW versions, so we give it priority 0
-#test:priority 0
+# Note - currently there is an issue with D555 domain, we want test-detect-D555 to run first, test-fw-update second, test-metadata third, updating priorities
+#test:priority 1
 #test:timeout 500
 #test:donotrun:gha
 #test:device each(D400*)

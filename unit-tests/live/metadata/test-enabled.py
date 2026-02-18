@@ -3,7 +3,8 @@
 
 #test:device each(D400*)
 #test:device each(D500*)
-#test:priority 1
+# Note - currently there is an issue with D555 domain, we want test-detect-D555 to run first, test-fw-update second, test-metadata third, updating priorities
+#test:priority 2
 #test:flag windows
 
 import pyrealsense2 as rs
