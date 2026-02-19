@@ -271,12 +271,31 @@ namespace rs2
 
             auto dev_name = get_device_name(dev);
 
-            // TODO - D436, D401_GMSL, D415_GMSL.
-            // Don't suggest to update FW as it doesn't support D436. Revert after next release with bundle supporting FW
-            // 0x1156 is pid for D436
-            // 0xABCC is pid for D401_GMSL
-            // 0xABCF is pid for D415_GMSL
-            if( ( dev.is<update_device>() || is_upgradeable( fw, recommended_fw_ver) ) && pid != "1156" && pid != "ABCC" && pid != "ABCF") //0x1156 is pid for D436
+            // Don't suggest to update FW as the bundle fw doesn't support
+            std::vector<std::string> recommended_fw_blacklisted_pid;
+            recommended_fw_blacklisted_pid.push_back("1156"); // D436
+            recommended_fw_blacklisted_pid.push_back("ABCC"); // D401_GMSL
+            recommended_fw_blacklisted_pid.push_back("ABCF"); // D415_GMSL
+
+            bool is_pid_backlisted = (std::find(recommended_fw_blacklisted_pid.begin(), recommended_fw_blacklisted_pid.end(), pid)
+                    != recommended_fw_blacklisted_pid.end());
+
+            bool is_mipi_device = dev.supports(RS2_CAMERA_INFO_CONNECTION_TYPE)
+                                  && (std::string(dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE)) == "GMSL");
+
+            bool is_mipi_recovery = (pid == "BBCD");
+            bool recommend_fw = false;
+            // bellow logic has been added because all mipi devices are update_device
+            if (is_mipi_device)
+            {
+                recommend_fw = is_mipi_recovery || is_upgradeable( fw, recommended_fw_ver);
+            }
+            else
+            {
+                recommend_fw = dev.is<update_device>() || is_upgradeable( fw, recommended_fw_ver);
+            }
+
+            if( recommend_fw && !is_pid_backlisted )
             {
                 std::stringstream msg;
 
