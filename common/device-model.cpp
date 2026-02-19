@@ -206,6 +206,38 @@ namespace rs2
         }
     }
 
+    bool device_model::should_bundle_fw_be_recommended(const std::string& pid, const std::string& fw, const std::string& recommended_fw_ver) const
+    {
+        bool recommend_fw = false;
+
+        // Don't suggest to update FW as the bundle fw doesn't support
+        std::vector<std::string> recommended_fw_blacklisted_pid;
+        recommended_fw_blacklisted_pid.push_back("1156"); // D436
+        recommended_fw_blacklisted_pid.push_back("ABCC"); // D401_GMSL
+        recommended_fw_blacklisted_pid.push_back("ABCF"); // D415_GMSL
+
+        bool is_pid_backlisted = (std::find(recommended_fw_blacklisted_pid.begin(), recommended_fw_blacklisted_pid.end(), pid)
+                != recommended_fw_blacklisted_pid.end());
+
+        bool is_mipi_device = dev.supports(RS2_CAMERA_INFO_CONNECTION_TYPE)
+                              && (std::string(dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE)) == "GMSL");
+
+        bool is_mipi_recovery = (pid == "BBCD");
+
+        // bellow logic has been added because all mipi devices are update_device
+        if (is_mipi_device)
+        {
+            recommend_fw = is_mipi_recovery || is_upgradeable( fw, recommended_fw_ver);
+        }
+        else
+        {
+            recommend_fw = dev.is<update_device>() || is_upgradeable( fw, recommended_fw_ver);
+        }
+
+        return ( recommend_fw && !is_pid_backlisted );
+    }
+
+
     bool device_model::check_for_bundled_fw_update(const rs2::context &ctx, std::shared_ptr<notifications_model> not_model , bool reset_delay )
     {
         // LibRS can have a "bundled" FW binary downloaded during CMake. That's the version
@@ -270,32 +302,7 @@ namespace rs2
             }
 
             auto dev_name = get_device_name(dev);
-
-            // Don't suggest to update FW as the bundle fw doesn't support
-            std::vector<std::string> recommended_fw_blacklisted_pid;
-            recommended_fw_blacklisted_pid.push_back("1156"); // D436
-            recommended_fw_blacklisted_pid.push_back("ABCC"); // D401_GMSL
-            recommended_fw_blacklisted_pid.push_back("ABCF"); // D415_GMSL
-
-            bool is_pid_backlisted = (std::find(recommended_fw_blacklisted_pid.begin(), recommended_fw_blacklisted_pid.end(), pid)
-                    != recommended_fw_blacklisted_pid.end());
-
-            bool is_mipi_device = dev.supports(RS2_CAMERA_INFO_CONNECTION_TYPE)
-                                  && (std::string(dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE)) == "GMSL");
-
-            bool is_mipi_recovery = (pid == "BBCD");
-            bool recommend_fw = false;
-            // bellow logic has been added because all mipi devices are update_device
-            if (is_mipi_device)
-            {
-                recommend_fw = is_mipi_recovery || is_upgradeable( fw, recommended_fw_ver);
-            }
-            else
-            {
-                recommend_fw = dev.is<update_device>() || is_upgradeable( fw, recommended_fw_ver);
-            }
-
-            if( recommend_fw && !is_pid_backlisted )
+            if( should_bundle_fw_be_recommended(pid, fw, recommended_fw_ver) )
             {
                 std::stringstream msg;
 
