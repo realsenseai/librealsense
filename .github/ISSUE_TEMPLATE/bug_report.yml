@@ -32,6 +32,15 @@ body:
       required: true
   
   - type: input
+    id: sdk-version
+    attributes:
+      label: LibRealSense SDK Version
+      description: Which version of librealsense are you using?
+      placeholder: e.g., 2.54.0
+    validations:
+      required: true
+
+  - type: input
     id: firmware-version
     attributes:
       label: Firmware Version
@@ -52,6 +61,9 @@ body:
         - Ubuntu 20.04
         - Ubuntu 22.04
         - Ubuntu 24.04
+        - Nvidia Jetson JP5
+        - Nvidia Jetson JP6
+        - Nvidia Jetson JP7
         - Other Linux (specify in description)
         - MacOS
     validations:
@@ -63,6 +75,13 @@ body:
       label: Kernel Version (Linux Only)
       description: Output of `uname -r`
       placeholder: e.g., 5.15.0-91-generic
+
+  - type: input
+    id: mipi-driver-version
+    attributes:
+      label: MIPI Driver Version (NVIDIA Jetson Only)
+      description: use `modinfo d4xx` to find this
+      placeholder: e.g., 1.0.1.33
   
   - type: dropdown
     id: platform
@@ -72,7 +91,8 @@ body:
       options:
         - PC (AMD64/x86_64)
         - Raspberry Pi
-        - NVIDIA Jetson
+        - NVIDIA Jetson Xavier AGX
+        - NVIDIA Jetson Orin AGX
         - Other ARM (specify in description)
         - Other (specify in description)
     validations:
@@ -89,15 +109,6 @@ body:
         - USB2
         - Ethernet/DDS
         - Other (specify in description)
-    validations:
-      required: true
-  
-  - type: input
-    id: sdk-version
-    attributes:
-      label: LibRealSense SDK Version
-      description: Which version of librealsense are you using?
-      placeholder: e.g., 2.54.0
     validations:
       required: true
   
