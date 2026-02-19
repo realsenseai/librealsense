@@ -79,7 +79,7 @@ namespace librealsense
     };
 
     class rs401_gmsl_device : public d400_color,
-                              public d400_nonmonochrome,
+                              //public d400_nonmonochrome,
                               public d400_mipi_device,
                               public firmware_logger_device
     {
@@ -89,7 +89,7 @@ namespace librealsense
             , backend_device( dev_info, register_device_notifications )
             , d400_device( dev_info )
             , d400_color( dev_info )
-            , d400_nonmonochrome( dev_info )
+            //, d400_nonmonochrome( dev_info )
             , d400_mipi_device()
             , firmware_logger_device( dev_info, d400_device::_hw_monitor, get_firmware_logs_command(), get_flash_logs_command() )
         {
