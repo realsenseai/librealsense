@@ -31,10 +31,6 @@ body:
         - D455
         - D457
         - D555
-        - L515
-        - L535
-        - SR305
-        - T265
         - Other (please specify in description)
   
   - type: dropdown

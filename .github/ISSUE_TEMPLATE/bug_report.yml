@@ -27,10 +27,6 @@ body:
         - D455
         - D457
         - D555
-        - L515
-        - L535
-        - SR305
-        - T265
         - Other (please specify in description)
     validations:
       required: true
@@ -78,6 +74,20 @@ body:
         - Raspberry Pi
         - NVIDIA Jetson
         - Other ARM (specify in description)
+        - Other (specify in description)
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: connection-type
+    attributes:
+      label: Connection Type
+      description: What is your camera connection to host
+      options:
+        - USB3
+        - GMSL/MIPI
+        - USB2
+        - Ethernet/DDS
         - Other (specify in description)
     validations:
       required: true
