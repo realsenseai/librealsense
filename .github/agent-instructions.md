@@ -79,11 +79,10 @@ The project uses **CMake**. Key build options are defined in `CMake/lrs_options.
 | `BUILD_WITH_DDS` | OFF | Enable DDS (FastDDS) support |
 | `FORCE_RSUSB_BACKEND` | OFF | Use RS USB backend (required for Win7/macOS/Android) |
 | `BUILD_TOOLS` | ON | Build tools (fw-updater, etc.) |
-| `BUILD_PYTHON_BINDINGS` | OFF | Build pyrealsense pythoin bindings |
 
 ## Testing
 
-Tests use a proprietary Python-based test framework orchestrated by `unit-tests/run-unit-tests.py`. To run tests, build with `-DBUILD_UNIT_TESTS=ON -DBUILD_PYTHON_BINDINGS=ON`, then from the `unit-tests/` directory run `py -3 run-unit-tests.py -s`. Use `--help` to see all available options.
+Tests use a custom Python-based test framework orchestrated by `unit-tests/run-unit-tests.py`. To run tests, build with `-DBUILD_UNIT_TESTS=ON -DBUILD_PYTHON_BINDINGS=ON`, then from the `unit-tests/` directory run `py -3 run-unit-tests.py -s`. Use `--help` to see all available options.
 
 ## Naming Conventions
 

@@ -13,7 +13,7 @@
 
 ## Test Framework
 
-- librealsense uses a **proprietary Python-based test framework**
+- librealsense uses a **custom Python-based test framework**
 - The test orchestrator is `unit-tests/run-unit-tests.py`
 - Tests must be run **from the `unit-tests/` directory**
 
