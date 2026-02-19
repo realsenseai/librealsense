@@ -265,7 +265,9 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
 
     log.debug_indent()
     # Poll for devices appearing over time
-    while (timestamp() - query_start_time) < MAX_ENUMERATION_TIME:
+    wait_time = MAX_ENUMERATION_TIME if hub else 1 # When no hub connected we can assume the device is connected and powered
+    d555_found = False
+    while (timestamp() - query_start_time) < wait_time:
         try:
             devices = _context.query_devices()
             for dev in devices:
@@ -274,7 +276,7 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
                 except RuntimeError as e:
                     log.e( f'Found device but trying to get fw-update-id failed: {e}' )
                     continue
-                
+
                 if sn not in detected_sns:
                     # New device detected
                     detected_sns.add(sn)
@@ -282,11 +284,27 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
                     _device_by_sn[sn] = device
                     detection_time = timestamp() - query_start_time
                     log.d( '... port {}:'.format( device.port is None and '?' or device.port ), sn, dev, f'(detected after {detection_time:.2f}s)' )
+
+                    name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
+                    d555_found = "D555" in name
             
         except RuntimeError as e:
             log.d( 'FAILED to query devices:', e )
         
         time.sleep( 1 )
+
+    if hub and not d555_found:
+        # All CI machines with a D555 connected have a hub. Detect camera even in case domain have reset to 0 so applicable tests will run.
+        ctx = rs.context( { "dds" : { "enabled" : True, "domain" : 0 } } )
+        devices = ctx.query_devices(int(rs.product_line.sw_only) | int(rs.product_line.any))
+        for dev in devices:
+            name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
+            if "D555" in name: 
+                log.i("Found D555 device with domain 0, not same as in configuration file")
+                sn = dev.get_info( rs.camera_info.firmware_update_id ) # Supported by D555 devices
+                device = Device( sn, dev )
+                _device_by_sn[sn] = device
+
     if log.is_debug_on(): # change to check --rslog in the future once D555 discovery is stable
         rs.log_to_console(rs.log_severity.none) # disable debug logging
 
