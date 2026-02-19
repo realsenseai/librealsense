@@ -9,12 +9,12 @@ body:
         Thanks for reaching out!
         
         Before asking a question, please check:
-        - [SDK Examples](https://github.com/IntelRealSense/librealsense/tree/master/examples)
-        - [Documentation](https://github.com/IntelRealSense/librealsense/tree/master/doc)
-        - [Troubleshooting Q&A](https://github.com/IntelRealSense/librealsense/wiki/Troubleshooting-Q%26A)
-        - [Existing Issues](https://github.com/IntelRealSense/librealsense/issues)
+        - [SDK Examples](https://github.com/realsenseai/librealsense/tree/master/examples)
+        - [Documentation](https://github.com/realsenseai/librealsense/tree/master/doc)
+        - [Troubleshooting Q&A](https://github.com/realsenseai/librealsense/wiki/Troubleshooting-Q%26A)
+        - [Existing Issues](https://github.com/realsenseai/librealsense/issues)
         
-        For general discussions, consider using [GitHub Discussions](https://github.com/IntelRealSense/librealsense/discussions) instead.
+        For general discussions, consider using [GitHub Discussions](https://github.com/realsenseai/librealsense/discussions) instead.
   
   - type: dropdown
     id: camera-model
@@ -54,7 +54,7 @@ body:
         - Performance Optimization
         - Python Wrapper
         - .NET Wrapper
-        - ROS/ROS2 Integration
+        - ROS2 Integration
         - Hardware Compatibility
         - Firmware
         - Error Messages
@@ -96,6 +96,9 @@ body:
         - Ubuntu 20.04
         - Ubuntu 22.04
         - Ubuntu 24.04
+        - Nvidia Jetson JP5
+        - Nvidia Jetson JP6
+        - Nvidia Jetson JP7
         - Other Linux
         - MacOS
         - N/A

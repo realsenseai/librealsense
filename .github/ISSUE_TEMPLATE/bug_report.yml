@@ -9,10 +9,10 @@ body:
         Thanks for taking the time to fill out this bug report!
         
         Before opening a new issue, please check:
-        - [SDK Examples](https://github.com/IntelRealSense/librealsense/tree/master/examples)
-        - [Documentation](https://github.com/IntelRealSense/librealsense/tree/master/doc)
-        - [Troubleshooting Q&A](https://github.com/IntelRealSense/librealsense/wiki/Troubleshooting-Q%26A)
-        - [Existing Issues](https://github.com/IntelRealSense/librealsense/issues)
+        - [SDK Examples](https://github.com/realsenseai/librealsense/tree/master/examples)
+        - [Documentation](https://github.com/realsenseai/librealsense/tree/master/doc)
+        - [Troubleshooting Q&A](https://github.com/realsenseai/librealsense/wiki/Troubleshooting-Q%26A)
+        - [Existing Issues](https://github.com/realsenseai/librealsense/issues)
   
   - type: dropdown
     id: camera-model
