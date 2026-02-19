@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: GitHub Discussions
-    url: https://github.com/IntelRealSense/librealsense/discussions
+    url: https://github.com/realsenseai/librealsense/discussions
     about: For general questions and community discussions
   - name: Documentation
-    url: https://github.com/IntelRealSense/librealsense/tree/master/doc
+    url: https://github.com/realsenseai/librealsense/tree/master/doc
     about: Browse the official documentation
