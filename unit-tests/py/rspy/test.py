@@ -159,6 +159,137 @@ def find_devices_by_product_line_or_exit( product_line ):
     return devices_list
 
 
+def find_two_devices_by_product_line_or_exit( product_line ):
+    """
+    Find exactly two devices of the specified product line, ensuring they have different serial numbers.
+    
+    This function integrates with the devices module to properly support Acroname hubs.
+    If fewer than two devices are available, the test will be skipped (not failed) with a clear message.
+    
+    :param product_line: The product line of the wanted devices (e.g., "D400", "D500")
+    :return: A tuple of (dev1, dev2, serial_numbers) where dev1 and dev2 are two different devices
+    
+    Example usage:
+        dev1, dev2, sns = test.find_two_devices_by_product_line_or_exit("D400")
+        # dev1 and dev2 are guaranteed to have different serial numbers
+    """
+    from rspy import devices
+    import pyrealsense2 as rs
+    
+    # Get all enabled devices of this product line
+    enabled_sns = devices.enabled()
+    matching_sns = []
+    
+    for sn in enabled_sns:
+        dev = devices.get(sn)
+        if dev and dev.product_line == product_line:
+            matching_sns.append(sn)
+    
+    if len(matching_sns) < 2:
+        log.f( f"Test requires 2 devices; found {len(matching_sns)} device(s) of {product_line} product line" )
+    
+    # Get the first two devices
+    sn1 = matching_sns[0]
+    sn2 = matching_sns[1]
+    dev1 = devices.get(sn1).handle
+    dev2 = devices.get(sn2).handle
+    
+    log.d( 'found 2 devices:' )
+    log.d( '  device 1:', dev1, 'SN:', sn1 )
+    log.d( '  device 2:', dev2, 'SN:', sn2 )
+    
+    return dev1, dev2, [sn1, sn2]
+
+
+def find_any_two_devices_or_exit():
+    """
+    Find any two RealSense devices, regardless of product line, ensuring they have different serial numbers.
+    
+    This function integrates with the devices module to properly support Acroname hubs.
+    If fewer than two devices are available, the test will be skipped (not failed) with a clear message.
+    
+    :return: A tuple of (dev1, dev2, serial_numbers) where dev1 and dev2 are two different devices
+    
+    Example usage:
+        from rspy import test
+        dev1, dev2, sns = test.find_any_two_devices_or_exit()
+        # dev1 and dev2 may be different product lines
+    """
+    from rspy import devices
+    import pyrealsense2 as rs
+    
+    # Get all enabled devices
+    enabled_sns = list(devices.enabled())
+    
+    if len(enabled_sns) < 2:
+        log.f( f"Test requires 2 devices; found {len(enabled_sns)} device(s)" )
+    
+    # Get the first two devices
+    sn1 = enabled_sns[0]
+    sn2 = enabled_sns[1]
+    dev1 = devices.get(sn1).handle
+    dev2 = devices.get(sn2).handle
+    
+    log.d( 'found 2 devices:' )
+    log.d( '  device 1:', dev1, 'SN:', sn1 )
+    log.d( '  device 2:', dev2, 'SN:', sn2 )
+    
+    return dev1, dev2, [sn1, sn2]
+
+
+class two_devices:
+    """
+    Context manager for tests that require two RealSense devices simultaneously.
+    
+    This provides a clean interface for multi-device tests with automatic device discovery
+    and graceful failure handling when insufficient devices are available.
+    
+    Integrates with the devices module to properly support Acroname hubs and port management.
+    
+    Usage examples:
+        from rspy import test
+        
+        # Two devices of the same product line:
+        with test.two_devices("D400") as (dev1, dev2):
+            # Your test code here...
+        
+        # Any two devices regardless of product line:
+        with test.two_devices() as (dev1, dev2):
+            # dev1 and dev2 may be different product lines (e.g., D400 + D500)
+    
+    The context manager handles device cleanup automatically at the end of the 'with' block.
+    If fewer than 2 devices are found, the test will exit gracefully (skip, not fail).
+    """
+    
+    def __init__(self, product_line=None):
+        """
+        :param product_line: Optional. The product line of devices to search for (e.g., "D400", "D500").
+                            If None, will find any two devices regardless of product line.
+        """
+        self.product_line = product_line
+        self.dev1 = None
+        self.dev2 = None
+        self.serial_numbers = None
+    
+    def __enter__(self):
+        """
+        Called when entering the 'with' statement. Discovers and returns two devices.
+        """
+        if self.product_line is not None:
+            self.dev1, self.dev2, self.serial_numbers = find_two_devices_by_product_line_or_exit(self.product_line)
+        else:
+            self.dev1, self.dev2, self.serial_numbers = find_any_two_devices_or_exit()
+        return self.dev1, self.dev2
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Called when exiting the 'with' statement. Cleanup happens here if needed.
+        """
+        # Device cleanup is handled by pyrealsense2 and the devices module
+        # This method is here for future extensibility (e.g., explicit device reset)
+        pass
+
+
 def print_stack():
     """
     Function for printing the current call stack. Used when an assertion fails
