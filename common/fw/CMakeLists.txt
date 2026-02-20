@@ -81,10 +81,3 @@ function(target_binary url version sha1 symbol ext)
 endfunction()
 
 target_binary( "${D4XX_FW_URL}"  "${D4XX_FW_VERSION}"  "${D4XX_FW_SHA1}" D4XX_FW_Image .bin)
-
-
-install(TARGETS ${PROJECT_NAME} EXPORT realsense2Targets
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-
