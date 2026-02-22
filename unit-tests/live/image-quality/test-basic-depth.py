@@ -63,11 +63,11 @@ def sample_region(image, x, y, size=SAMPLE_REGION_SIZE):
     return np.mean(filtered)
 
 
-def draw_debug(filled_depth_frame, cube_x, cube_y, bg_x, bg_y,
+def draw_debug(depth_frame, cube_x, cube_y, bg_x, bg_y,
                depth_cube, depth_bg, measured_diff):
     # original debug visualization moved here, with added sampled-region rectangles
     colorizer = rs.colorizer()
-    colorized_frame = colorizer.colorize(filled_depth_frame)
+    colorized_frame = colorizer.colorize(depth_frame)
     roi_img_disp = get_roi_from_frame(colorized_frame)
 
     # Draw points for cube and background (cv2.circle uses (x, y) order)
@@ -89,9 +89,9 @@ def draw_debug(filled_depth_frame, cube_x, cube_y, bg_x, bg_y,
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 0.5
     thickness = 1
-    cube_label = f"cube: {depth_cube:.2f}m"
-    bg_label = f"bg: {depth_bg:.2f}m"
-    diff_label = f"diff: {measured_diff:.3f}m (exp: {EXPECTED_DEPTH_DIFF:.2f}m)"
+    cube_label = f"cube: {depth_cube:.2f}mm"
+    bg_label = f"bg: {depth_bg:.2f}mm"
+    diff_label = f"diff: {measured_diff:.3f}mm (exp: {EXPECTED_DEPTH_DIFF:.2f}mm)"
 
     cv2.putText(roi_img_disp, cube_label, (cube_x + 10, cube_y - 10),
                 font, font_scale, (0, 0, 255), thickness, cv2.LINE_AA)
@@ -131,7 +131,6 @@ def run_test(resolution, fps):
         bg_x, bg_y = int(WIDTH * 0.1), HEIGHT // 2
 
         pass_count = 0
-        hole_filling = rs.hole_filling_filter()
         for i in range(NUM_FRAMES):
             frames = pipeline.wait_for_frames()
             depth_frame = frames.get_depth_frame()
@@ -139,12 +138,8 @@ def run_test(resolution, fps):
             if not depth_frame:
                 continue
 
-            # Apply the hole filling filter
-            filled_depth_frame = depth_frame
-
             # Get the warped ROI from the filtered depth frame
-            depth_image = get_roi_from_frame(filled_depth_frame)
-            # depth_image = get_roi_from_frame(depth_frame)
+            depth_image = get_roi_from_frame(depth_frame)
 
             # Sample depths using region averaging
             raw_cube = sample_region(depth_image, cube_x, cube_y)
@@ -159,11 +154,11 @@ def run_test(resolution, fps):
             if abs(measured_diff - EXPECTED_DEPTH_DIFF) <= DEPTH_TOLERANCE:
                 pass_count += 1
             else:
-                log.d(f"Frame {i} - Depth diff: {measured_diff:.3f}m too far from "
-                      f"{EXPECTED_DEPTH_DIFF:.3f}m (cube: {depth_cube:.3f}m, bg: {depth_bg:.3f}m)")
+                log.d(f"Frame {i} - Depth diff: {measured_diff:.3f}mm too far from "
+                      f"{EXPECTED_DEPTH_DIFF:.3f}mm (cube: {depth_cube:.3f}mm, bg: {depth_bg:.3f}mm)")
 
             if DEBUG_MODE:
-                draw_debug(filled_depth_frame, cube_x, cube_y, bg_x, bg_y, depth_cube, depth_bg, measured_diff)
+                draw_debug(depth_frame, cube_x, cube_y, bg_x, bg_y, depth_cube, depth_bg, measured_diff)
 
         # wait for close
         # if DEBUG_MODE:
