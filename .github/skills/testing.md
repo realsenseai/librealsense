@@ -44,17 +44,17 @@ The `-s` flag directs test output to stdout. You can also specify the build outp
 
 ```bash
 # When only one build configuration exists:
-py -3 run-unit-tests.py -s
+python3 run-unit-tests.py -s
 
 # When both Debug and Release exist, specify the build output directory:
-py -3 run-unit-tests.py -s <build-output-dir>
-# e.g., py -3 run-unit-tests.py -s C:\work\git\librealsense\build\Release
+python3 run-unit-tests.py -s <build-output-dir>
+# e.g., python3 run-unit-tests.py -s C:\work\git\librealsense\build\Release
 ```
 
 For full usage and all available flags:
 
 ```bash
-py -3 run-unit-tests.py --help
+python3 run-unit-tests.py --help
 ```
 
 ## Running Specific Tests
@@ -64,9 +64,9 @@ py -3 run-unit-tests.py --help
 Use `-r` / `--regex` to run tests whose names match a regular expression:
 
 ```bash
-py -3 run-unit-tests.py -s -r "test-hdr"
-py -3 run-unit-tests.py -s -r "test-metadata"
-py -3 run-unit-tests.py -s --regex "test-stream.*"
+python3 run-unit-tests.py -s -r "test-hdr"
+python3 run-unit-tests.py -s -r "test-metadata"
+python3 run-unit-tests.py -s --regex "test-stream.*"
 ```
 
 ### Skip Tests by Name (Regex)
@@ -74,7 +74,7 @@ py -3 run-unit-tests.py -s --regex "test-stream.*"
 Use `--skip-regex` to exclude tests whose names match:
 
 ```bash
-py -3 run-unit-tests.py -s --skip-regex "test-fw-update"
+python3 run-unit-tests.py -s --skip-regex "test-fw-update"
 ```
 
 ### By Tag
@@ -84,10 +84,10 @@ Use `-t` / `--tag` to run tests with a specific tag. Tags are assigned automatic
 - Directory location: e.g., tests in `unit-tests/live/` get the `live` tag
 
 ```bash
-py -3 run-unit-tests.py -s -t live          # run only live tests
-py -3 run-unit-tests.py -s -t py            # run only Python tests
-py -3 run-unit-tests.py -s -t exe           # run only compiled C++ tests
-py -3 run-unit-tests.py -s -t live -t exe   # run tests that have BOTH tags
+python3 run-unit-tests.py -s -t live          # run only live tests
+python3 run-unit-tests.py -s -t py            # run only Python tests
+python3 run-unit-tests.py -s -t exe           # run only compiled C++ tests
+python3 run-unit-tests.py -s -t live -t exe   # run tests that have BOTH tags
 ```
 
 ### By Device
@@ -95,45 +95,45 @@ py -3 run-unit-tests.py -s -t live -t exe   # run tests that have BOTH tags
 Run tests only on a specific device (implies `--live`):
 
 ```bash
-py -3 run-unit-tests.py -s --device "D435"
-py -3 run-unit-tests.py -s --device "D455"
-py -3 run-unit-tests.py -s --exclude-device "D405"
+python3 run-unit-tests.py -s --device "D435"
+python3 run-unit-tests.py -s --device "D455"
+python3 run-unit-tests.py -s --exclude-device "D405"
 ```
 
 ### Live vs Non-Live
 
 ```bash
-py -3 run-unit-tests.py -s --live           # only tests requiring hardware
-py -3 run-unit-tests.py -s --not-live       # only tests that don't need hardware
+python3 run-unit-tests.py -s --live           # only tests requiring hardware
+python3 run-unit-tests.py -s --not-live       # only tests that don't need hardware
 ```
 
 ## Listing Available Tests and Tags
 
 ```bash
 # List all available tests
-py -3 run-unit-tests.py --list-tests
+python3 run-unit-tests.py --list-tests
 
 # List all available tags
-py -3 run-unit-tests.py --list-tags
+python3 run-unit-tests.py --list-tags
 
 # List tests with their tags
-py -3 run-unit-tests.py --list-tests --list-tags
+python3 run-unit-tests.py --list-tests --list-tags
 ```
 
 ## Output Control
 
 ```bash
-py -3 run-unit-tests.py -s               # direct output to stdout (not log files)
-py -3 run-unit-tests.py -v               # verbose — dump log on errors
-py -3 run-unit-tests.py -q               # quiet — rely on exit status only
-py -3 run-unit-tests.py --rslog          # enable LibRS debug logging in tests
+python3 run-unit-tests.py -s               # direct output to stdout (not log files)
+python3 run-unit-tests.py -v               # verbose — dump log on errors
+python3 run-unit-tests.py -q               # quiet — rely on exit status only
+python3 run-unit-tests.py --rslog          # enable LibRS debug logging in tests
 ```
 
 ## Repeating and Retrying
 
 ```bash
-py -3 run-unit-tests.py --repeat 3       # repeat each test 3 times
-py -3 run-unit-tests.py --retry 2        # retry failed tests up to 2 times
+python3 run-unit-tests.py --repeat 3       # repeat each test 3 times
+python3 run-unit-tests.py --retry 2        # retry failed tests up to 2 times
 ```
 
 ## Recording and Playback (Mock Hardware)
@@ -164,14 +164,14 @@ cmake .. -DBUILD_UNIT_TESTS=ON -DUNIT_TESTS_ARGS="-t live -r test-streaming"
 ## Using a Custom Test Directory
 
 ```bash
-py -3 run-unit-tests.py --test-dir /path/to/custom/tests
+python3 run-unit-tests.py --test-dir /path/to/custom/tests
 ```
 
 ## Custom Firmware for Testing
 
 ```bash
-py -3 run-unit-tests.py --custom-fw-d400 /path/to/firmware.bin
-py -3 run-unit-tests.py --custom-fw-d555 /path/to/firmware.bin
+python3 run-unit-tests.py --custom-fw-d400 /path/to/firmware.bin
+python3 run-unit-tests.py --custom-fw-d555 /path/to/firmware.bin
 ```
 
 ## Troubleshooting
