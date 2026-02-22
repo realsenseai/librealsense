@@ -37,7 +37,7 @@ Navigate to the `unit-tests/` directory and run:
 
 ```bash
 cd unit-tests
-py -3 run-unit-tests.py -s
+python3 run-unit-tests.py -s
 ```
 
 The `-s` flag directs test output to stdout. You can also specify the build output directory (required when both Debug and Release builds exist, to avoid ambiguity):
