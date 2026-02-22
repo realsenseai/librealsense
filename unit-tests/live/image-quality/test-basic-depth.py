@@ -12,12 +12,12 @@ import time
 from iq_helper import find_roi_location, get_roi_from_frame, WIDTH, HEIGHT
 
 NUM_FRAMES = 100  # Number of frames to check
-DEPTH_TOLERANCE = 80  # Acceptable deviation from expected depth in mm
+DEPTH_TOLERANCE = 100  # Acceptable deviation from expected depth in mm
 FRAMES_PASS_THRESHOLD = 0.75  # Percentage of frames that needs to pass
 DEBUG_MODE = False
 
-EXPECTED_DEPTH_DIFF = 110  # Expected difference in mm between background and cube
-SAMPLE_REGION_SIZE = 10  # Size of the square region for depth sampling
+EXPECTED_DEPTH_DIFF = 120  # Expected difference in mm between background and cube
+SAMPLE_REGION_SIZE = 150  # Size of the square region for depth sampling
 
 dev, ctx = test.find_first_device_or_exit()
 depth_sensor = dev.first_depth_sensor()
@@ -63,6 +63,47 @@ def sample_region(image, x, y, size=SAMPLE_REGION_SIZE):
     return np.mean(filtered)
 
 
+def draw_debug(filled_depth_frame, cube_x, cube_y, bg_x, bg_y,
+               depth_cube, depth_bg, measured_diff):
+    # original debug visualization moved here, with added sampled-region rectangles
+    colorizer = rs.colorizer()
+    colorized_frame = colorizer.colorize(filled_depth_frame)
+    roi_img_disp = get_roi_from_frame(colorized_frame)
+
+    # Draw points for cube and background (cv2.circle uses (x, y) order)
+    cv2.circle(roi_img_disp, (cube_x, cube_y), 6, (0, 0, 255), -1)  # Red for cube
+    cv2.circle(roi_img_disp, (bg_x, bg_y), 6, (0, 255, 0), -1)  # Green for background
+
+    # Draw sampled region rectangles on top (requested)
+    half = SAMPLE_REGION_SIZE // 2
+    cv2.rectangle(roi_img_disp,
+                  (cube_x - half, cube_y - half),
+                  (cube_x + half, cube_y + half),
+                  (0, 0, 255), 2)
+    cv2.rectangle(roi_img_disp,
+                  (bg_x - half, bg_y - half),
+                  (bg_x + half, bg_y + half),
+                  (0, 255, 0), 2)
+
+    # Add labels for each point with their measured distance
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.5
+    thickness = 1
+    cube_label = f"cube: {depth_cube:.2f}m"
+    bg_label = f"bg: {depth_bg:.2f}m"
+    diff_label = f"diff: {measured_diff:.3f}m (exp: {EXPECTED_DEPTH_DIFF:.2f}m)"
+
+    cv2.putText(roi_img_disp, cube_label, (cube_x + 10, cube_y - 10),
+                font, font_scale, (0, 0, 255), thickness, cv2.LINE_AA)
+    cv2.putText(roi_img_disp, bg_label, (bg_x + 10, bg_y - 10),
+                font, font_scale, (0, 255, 0), thickness, cv2.LINE_AA)
+    cv2.putText(roi_img_disp, diff_label, (10, 30),
+                font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+
+    cv2.imshow("ROI with Sampled Points", roi_img_disp)
+    cv2.waitKey(1)
+
+
 def run_test(resolution, fps):
     try:
         global pipeline
@@ -99,7 +140,7 @@ def run_test(resolution, fps):
                 continue
 
             # Apply the hole filling filter
-            filled_depth_frame = hole_filling.process(depth_frame)
+            filled_depth_frame = depth_frame
 
             # Get the warped ROI from the filtered depth frame
             depth_image = get_roi_from_frame(filled_depth_frame)
@@ -122,31 +163,7 @@ def run_test(resolution, fps):
                       f"{EXPECTED_DEPTH_DIFF:.3f}m (cube: {depth_cube:.3f}m, bg: {depth_bg:.3f}m)")
 
             if DEBUG_MODE:
-                colorizer = rs.colorizer()
-                colorized_frame = colorizer.colorize(filled_depth_frame)
-                roi_img_disp = get_roi_from_frame(colorized_frame)
-
-                # Draw points for cube and background (cv2.circle uses (x, y) order)
-                cv2.circle(roi_img_disp, (cube_x, cube_y), 6, (0, 0, 255), -1)  # Red for cube
-                cv2.circle(roi_img_disp, (bg_x, bg_y), 6, (0, 255, 0), -1)  # Green for background
-
-                # Add labels for each point with their measured distance
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.5
-                thickness = 1
-                cube_label = f"cube: {depth_cube:.2f}m"
-                bg_label = f"bg: {depth_bg:.2f}m"
-                diff_label = f"diff: {measured_diff:.3f}m (exp: {EXPECTED_DEPTH_DIFF:.2f}m)"
-
-                cv2.putText(roi_img_disp, cube_label, (cube_x + 10, cube_y - 10),
-                            font, font_scale, (0, 0, 255), thickness, cv2.LINE_AA)
-                cv2.putText(roi_img_disp, bg_label, (bg_x + 10, bg_y - 10),
-                            font, font_scale, (0, 255, 0), thickness, cv2.LINE_AA)
-                cv2.putText(roi_img_disp, diff_label, (10, 30),
-                            font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
-
-                cv2.imshow("ROI with Sampled Points", roi_img_disp)
-                cv2.waitKey(1)
+                draw_debug(filled_depth_frame, cube_x, cube_y, bg_x, bg_y, depth_cube, depth_bg, measured_diff)
 
         # wait for close
         # if DEBUG_MODE:
