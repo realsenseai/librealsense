@@ -45,7 +45,8 @@ def time_to_first_frame(sensor, profile, max_delay_allowed):
     return first_frame_time
 
 
-# The device starts at D0 (Operational) state, allow time for it to get into idle state
+# The device power up at D0 (Operational) state, allow time for it to get into idle state
+# Note, it goes back to idle after streaming ends, no need to sleep between depth and color streaming.
 time.sleep(3)
 
 
@@ -56,13 +57,13 @@ ctx = rs.context( { "dds" : { "enabled" : False } } )
 devs = ctx.devices
 if len(devs) == 0:
     # No devices found, try to find a device with DDS enabled
-    device_creation_stopwatch.reset()
     ctx = rs.context( { "dds" : { "enabled" : True } } )
+    device_creation_stopwatch.reset() # Start measuring after the DDS participant creation
     devs = ctx.devices
-dev = devs[0]
 device_creation_time = device_creation_stopwatch.get_elapsed()
+dev = devs[0]
 is_dds = dev.supports(rs.camera_info.connection_type) and dev.get_info(rs.camera_info.connection_type) == "DDS"
-max_time_for_device_creation = 1 if not is_dds else 5  # currently, DDS devices take longer time to complete
+max_time_for_device_creation = 1 if not is_dds else 5  # Querying for DDS devices can block with default max wait of 5 seconds.
 print("Device creation time is: {:.3f} [sec] max allowed is: {:.1f} [sec] ".format(device_creation_time, max_time_for_device_creation))
 test.check(device_creation_time < max_time_for_device_creation)
 test.finish()
