@@ -37,6 +37,7 @@ if __name__ == '__main__':
 # we assume that if paramiko is not installed, unifi is not in use
 try:
     import paramiko
+    import socket
 except ModuleNotFoundError:
     log.d( 'no paramiko library is available' )
     raise
@@ -180,21 +181,35 @@ class UniFiSwitch(device_hub.device_hub):
         """
         return "enabled" if self.is_port_enabled(port) else "disabled"
 
-    def _run_command(self, command):
+    def _run_command(self, command, timeout=30, retries=1):
         """
         Run a command on the switch
         :param command: the command to run
+        :param timeout: seconds to wait for a response before retrying
+        :param retries: number of times to retry on timeout before raising TimeoutError
         :return: the output of the command
         """
         if not self.is_connected():
             raise Exception("Not connected to switch.")
-        stdin, stdout, stderr = self.client.exec_command(command)
-        out = stdout.read().decode().strip()
-        err = stderr.read().decode().strip()
-        if err:
-            log.f(f"Error running command '{command}': {err}")
-        # print(f"executed \"{command}\" successfully")
-        return out
+        for attempt in range(retries + 1):
+            stdin, stdout, stderr = self.client.exec_command(command)
+            stdout.channel.settimeout(timeout)
+            stderr.channel.settimeout(timeout)
+            try:
+                out = stdout.read().decode().strip()
+                err = stderr.read().decode().strip()
+            except socket.timeout:
+                stdout.close()
+                stderr.close()
+                stdin.close()
+                if attempt < retries:
+                    log.w(f"Command '{command}' timed out after {timeout} seconds, retrying ({attempt + 1}/{retries})...")
+                    continue
+                raise TimeoutError(f"Command '{command}' timed out after {timeout} seconds ({retries + 1} attempts)")
+            if err:
+                log.f(f"Error running command '{command}': {err}")
+            # print(f"executed \"{command}\" successfully")
+            return out
 
     def enable_ports(self, ports=None, disable_other_ports=False, sleep_on_change=0):
         log.d(f"Enabling ports {ports if ports is not None else 'all'} on Unifi Switch"
