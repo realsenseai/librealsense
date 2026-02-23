@@ -20,8 +20,9 @@ import platform
 # Set maximum delay for first frame according to product line
 dev, ctx = test.find_first_device_or_exit()
 
-# The device starts at D0 (Operational) state, allow time for it to get into idle state
-time.sleep( 3 )
+# The device power up at D0 (Operational) state, allow time for it to get into idle state
+# Note, it goes back to idle after streaming ends, no need to sleep between depth and color streaming.
+time.sleep(3)
 
 product_line = dev.get_info(rs.camera_info.product_line)
 if product_line == "D400":
