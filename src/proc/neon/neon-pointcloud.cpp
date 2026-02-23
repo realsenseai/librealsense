@@ -180,9 +180,9 @@ namespace librealsense
             p_x = vfmaq_f32(ppx, p_x, fx);
             p_y = vfmaq_f32(ppy, p_y, fy);
 
-            // zero the x and y if z is zero
+            // zero the x and y if original depth z is zero
             {
-                const uint32x4_t gt_zero = vcgtq_f32(p_z, zero);
+                const uint32x4_t gt_zero = vcgtq_f32(xyz.val[2], zero);
                 p_x = vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(p_x), gt_zero));
                 p_y = vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(p_y), gt_zero));
             }
