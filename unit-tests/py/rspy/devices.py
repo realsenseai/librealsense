@@ -260,13 +260,14 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
         
     _context = rs.context( settings )
     _device_by_sn = dict()
-    query_start_time = timestamp()
     detected_sns = set()
 
     log.debug_indent()
+
     # Wait for devices appearing to enumerate
     wait_time = MAX_ENUMERATION_TIME if hub else 1 # When no hub connected we can assume the device is connected and powered
     time.sleep( wait_time )
+
     d555_found = False
     try:
         devices = _context.query_devices()
@@ -282,8 +283,7 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
                 detected_sns.add(sn)
                 device = Device( sn, dev )
                 _device_by_sn[sn] = device
-                detection_time = timestamp() - query_start_time
-                log.d( '... port {}:'.format( device.port is None and '?' or device.port ), sn, dev, f'(detected after {detection_time:.2f}s)' )
+                log.d( '... port {}:'.format( device.port is None and '?' or device.port ), sn, dev, 'detected and added to devices list' )
 
                 name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
                 d555_found = "D555" in name        
