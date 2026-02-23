@@ -194,10 +194,14 @@ class UniFiSwitch(device_hub.device_hub):
         for attempt in range(retries + 1):
             stdin, stdout, stderr = self.client.exec_command(command)
             stdout.channel.settimeout(timeout)
+            stderr.channel.settimeout(timeout)
             try:
                 out = stdout.read().decode().strip()
                 err = stderr.read().decode().strip()
             except socket.timeout:
+                stdout.close()
+                stderr.close()
+                stdin.close()
                 if attempt < retries:
                     log.w(f"Command '{command}' timed out after {timeout} seconds, retrying ({attempt + 1}/{retries})...")
                     continue
