@@ -539,7 +539,7 @@ try:
         from rspy import devices
         register_signal_handlers(close_hubs)
         disable_dds = "dds" not in context
-        devices.query( hub_reset = hub_reset, disable_dds=disable_dds ) #resets the device
+        devices.query( hub_reset = hub_reset, disable_dds = disable_dds, rslog = rslog ) #resets the device
         devices.map_unknown_ports()
         #
         # Under a development environment (i.e., without a hub), we may only have one device connected
