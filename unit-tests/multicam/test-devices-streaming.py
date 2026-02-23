@@ -36,15 +36,6 @@ log.i(f"\n{'='*80}")
 log.i(f"TESTING MULTIPLE CONNECTED DEVICES - Found {device_count} device(s)")
 log.i(f"{'='*80}\n")
 
-if device_count == 0:
-    log.e("No devices found - test cannot proceed")
-    test.fail()
-    test.print_results_and_exit()
-elif device_count == 1:
-    log.e("Only 1 device found - test requires at least 2 devices")
-    test.fail()
-    test.print_results_and_exit()
-
 def get_common_multi_stream_config(*devs):
     """
     Find a multi-stream configuration that works on all provided devices.
@@ -366,7 +357,10 @@ if device_count >= 2:
                 test.check(all_streams_ok, 
                           "All streams should receive frames independently without interference")
 else:
-    log.i("Skipping multi-stream test (requires at least 2 devices)")
+    # Insufficient devices - fail the test
+    with test.closure(f"Multiple devices test - insufficient devices"):
+        log.e(f"Test requires at least 2 devices; found {device_count} device(s)")
+        test.check(False, f"Insufficient devices for multi-device test (need 2+, found {device_count})")
 
 
 # Print test summary
