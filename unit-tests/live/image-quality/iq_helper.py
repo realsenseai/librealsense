@@ -102,5 +102,24 @@ def get_roi_from_frame(frame):
     return warped
 
 
+SAMPLE_REGION_SIZE = 150  # Default size of the square region for depth sampling
+
+
+def sample_depth_region(image, x, y, size=SAMPLE_REGION_SIZE, min_value=600):
+    """Sample a square region of given size around (x, y) and return the average value, filtering out values below min_value."""
+    half = size // 2
+    h, w = image.shape
+    x_min = max(x - half, 0)
+    x_max = min(x + half + 1, w)
+    y_min = max(y - half, 0)
+    y_max = min(y + half + 1, h)
+    region = image[y_min:y_max, x_min:x_max]
+    filtered = region[region > min_value]
+    if filtered.size == 0:
+        log.w(f"No valid depth samples in region at ({x},{y})")
+        return 0.0
+    return np.mean(filtered)
+
+
 def is_color_close(actual, expected, tolerance):
     return all(abs(int(a) - int(e)) <= tolerance for a, e in zip(actual, expected))

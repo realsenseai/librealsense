@@ -8,7 +8,7 @@ import pyrealsense2 as rs
 from rspy import log, test
 import numpy as np
 import cv2
-from iq_helper import find_roi_location, get_roi_from_frame, is_color_close, WIDTH, HEIGHT
+from iq_helper import find_roi_location, get_roi_from_frame, is_color_close, sample_depth_region, SAMPLE_REGION_SIZE, WIDTH, HEIGHT
 
 NUM_FRAMES = 100  # Number of frames to check
 COLOR_TOLERANCE = 60  # Acceptable per-channel deviation in RGB values
@@ -17,7 +17,6 @@ FRAMES_PASS_THRESHOLD = 0.7  # Percentage of frames that needs to pass
 DEBUG_MODE = False
 
 EXPECTED_DEPTH_DIFF = 110  # Expected difference in mm between background and cube
-SAMPLE_REGION_SIZE = 10  # Size of the square region for depth sampling
 
 # Expected colors for the two sampling points
 EXPECTED_CUBE_COLOR = (35, 35, 35)  # blackish - center cube
@@ -37,6 +36,17 @@ def draw_debug(a4_page_bgr, depth_cube, depth_bg, measured_diff):
     # Draw points for cube and background
     cv2.circle(a4_page_bgr, (cube_x, cube_y), 6, (0, 0, 255), -1)  # Red for cube
     cv2.circle(a4_page_bgr, (bg_x, bg_y), 6, (0, 255, 0), -1)  # Green for background
+
+    # Draw sampled region rectangles
+    half = SAMPLE_REGION_SIZE // 2
+    cv2.rectangle(a4_page_bgr,
+                  (cube_x - half, cube_y - half),
+                  (cube_x + half, cube_y + half),
+                  (0, 0, 255), 2)
+    cv2.rectangle(a4_page_bgr,
+                  (bg_x - half, bg_y - half),
+                  (bg_x + half, bg_y + half),
+                  (0, 255, 0), 2)
 
     # Add labels for each point with their measured distance
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -61,23 +71,6 @@ def draw_debug(a4_page_bgr, depth_cube, depth_bg, measured_diff):
 
 
 dev, ctx = test.find_first_device_or_exit()
-
-
-def sample_region(image, x, y, size=SAMPLE_REGION_SIZE):
-    """Sample a square region of given size around (x, y) and return the average value, filtering for valid depth values."""
-    half = size // 2
-    h, w = image.shape
-    x_min = max(x - half, 0)
-    x_max = min(x + half + 1, w)
-    y_min = max(y - half, 0)
-    y_max = min(y + half + 1, h)
-    region = image[y_min:y_max, x_min:x_max]
-    # Filter out invalid depth values (0) and values that are too close (under 30cm)
-    filtered = region[region > 300]
-    if filtered.size == 0:
-        log.w(f"No valid depth samples in region at ({x},{y})")
-        return 0.0
-    return np.mean(filtered)
 
 
 def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
@@ -117,8 +110,6 @@ def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
         # find region of interest (page) and get the transformation matrix
         find_roi_location(pipeline, (4, 5, 6, 7), DEBUG_MODE)  # markers in the lab are 4,5,6,7
 
-        hole_filling = rs.hole_filling_filter()
-
         for i in range(NUM_FRAMES):
             frames = pipeline.wait_for_frames()
             aligned_frames = align.process(frames)
@@ -131,11 +122,8 @@ def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
                 log.d(f"Frame {i}: Missing depth or color frame, skipping")
                 continue
 
-            # Apply hole filling filter to depth
-            filled_depth_frame = hole_filling.process(depth_frame)
-
             color_frame_roi = get_roi_from_frame(color_frame)
-            depth_frame_roi = get_roi_from_frame(filled_depth_frame)
+            depth_frame_roi = get_roi_from_frame(depth_frame)
 
             # Check cube color (center - should be black)
             cube_b, cube_g, cube_r = (int(v) for v in color_frame_roi[cube_y, cube_x])
@@ -154,8 +142,8 @@ def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
                 log.d(f"Frame {i} - Background color at ({bg_x},{bg_y}) sampled: {bg_pixel} too far from expected {EXPECTED_BG_COLOR}")
 
             # Sample depths using region averaging
-            raw_cube = sample_region(depth_frame_roi, cube_x, cube_y)
-            raw_bg = sample_region(depth_frame_roi, bg_x, bg_y)
+            raw_cube = sample_depth_region(depth_frame_roi, cube_x, cube_y)
+            raw_bg = sample_depth_region(depth_frame_roi, bg_x, bg_y)
 
             if not raw_bg or not raw_cube:
                 continue
@@ -173,7 +161,7 @@ def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
             if DEBUG_MODE:
                 # To see the depth on top of the color, blend the images
                 colorizer = rs.colorizer()
-                depth_image = get_roi_from_frame(colorizer.colorize(filled_depth_frame))
+                depth_image = get_roi_from_frame(colorizer.colorize(depth_frame))
                 color_image = color_frame_roi
 
                 alpha = 0.3  # transparency factor
