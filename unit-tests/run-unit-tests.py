@@ -272,6 +272,7 @@ if not to_stdout:
     libci.logdir = logdir
         
 n_tests = 0
+n_failed_tests = 0
 
 # Figure out which sys.path we want the tests to see, assuming we have Python tests
 # PYTHONPATH is what Python will ADD to sys.path for child processes BEFORE any standard python paths
@@ -497,7 +498,7 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
 
 
 def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
-    global n_tests, retries
+    global n_tests, n_failed_tests, retries
     n_tests += 1
     retry_count = max(test.config.retries, retries)
     for retry in range( retry_count + 1 ):
@@ -513,6 +514,7 @@ def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
         if test_wrapper_( test, configuration, repetition, retry, retry_count, serial_numbers ):
             return True
 
+    n_failed_tests += 1
     return False
 
 
@@ -733,7 +735,7 @@ try:
     #
     else:
         if failed_tests:
-            log.out( log.red + str( len(failed_tests) ) + log.reset, 'of', n_tests, 'test(s)',
+            log.out( log.red + str( n_failed_tests ) + log.reset, 'of', n_tests, 'test(s)',
                      log.red + 'failed!' + log.reset + log.clear_eos )
             log.d( 'Failed tests:\n    ' + '\n    '.join( [test.name for test in failed_tests] ))
             sys.exit( 1 )
