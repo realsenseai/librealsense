@@ -224,40 +224,6 @@ def find_devices_or_exit( count, product_line=None ):
     return device_handles, selected_sns
 
 
-def find_two_devices_by_product_line_or_exit( product_line ):
-    """
-    Find exactly two devices of the specified product line, ensuring they have different serial numbers.
-    
-    This is a convenience wrapper around find_devices_or_exit() for backward compatibility.
-    
-    :param product_line: The product line of the wanted devices (e.g., "D400", "D500")
-    :return: A tuple of (dev1, dev2, serial_numbers) where dev1 and dev2 are two different devices
-    
-    Example usage:
-        dev1, dev2, sns = test.find_two_devices_by_product_line_or_exit("D400")
-        # dev1 and dev2 are guaranteed to have different serial numbers
-    """
-    device_handles, serial_numbers = find_devices_or_exit( 2, product_line )
-    return device_handles[0], device_handles[1], serial_numbers
-
-
-def find_any_two_devices_or_exit():
-    """
-    Find any two RealSense devices, regardless of product line, ensuring they have different serial numbers.
-    
-    This is a convenience wrapper around find_devices_or_exit() for backward compatibility.
-    
-    :return: A tuple of (dev1, dev2, serial_numbers) where dev1 and dev2 are two different devices
-    
-    Example usage:
-        from rspy import test
-        dev1, dev2, sns = test.find_any_two_devices_or_exit()
-        # dev1 and dev2 may be different product lines
-    """
-    device_handles, serial_numbers = find_devices_or_exit( 2 )
-    return device_handles[0], device_handles[1], serial_numbers
-
-
 class multicam:
     """
     Context manager for tests that require multiple RealSense devices simultaneously.

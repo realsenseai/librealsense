@@ -11,34 +11,36 @@ This test enumerates all devices and verifies basic functionality without extens
 """
 
 import pyrealsense2 as rs
-from rspy import test, log, devices
+from rspy import test, log
 
-# Ensure we have device information
-if not devices.all():
-    devices.query(recycle_ports=False)
+# Query devices directly using pyrealsense2 context
+ctx = rs.context()
+device_list = ctx.query_devices()
+device_count = len(device_list)
 
-# Get all enabled devices
-all_sns = list(devices.enabled())
+log.i(f"Found {device_count} connected device(s)")
 
-log.i(f"Found {len(all_sns)} connected device(s)")
-
-if len(all_sns) == 0:
-    log.w("No devices connected - skipping test")
+if device_count == 0:
+    log.e("No devices connected - test cannot proceed")
+    test.fail()
 else:
     #
     # Enumerate and verify all devices
     #
     with test.closure("Device enumeration and basic verification"):
         
-        for i, sn in enumerate(all_sns, 1):
-            dev = devices.get(sn).handle
+        for i in range(device_count):
+            dev = device_list[i]
             
             # Get basic info
+            sn = dev.get_info(rs.camera_info.serial_number) if dev.supports(rs.camera_info.serial_number) else "Unknown"
             name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else "Unknown"
-            log.i(f"Device {i}: {name} (SN: {sn})")
+            log.i(f"Device {i+1}: {name} (SN: {sn})")
             
             # Verify device is responsive
             sensors = dev.query_sensors()
-            test.check(len(sensors) > 0, f"Device {i} should have sensors")
+            test.check(len(sensors) > 0, f"Device {i+1} should have sensors")
         
-        log.i(f"All {len(all_sns)} devices verified successfully")
+        log.i(f"All {device_count} devices verified successfully")
+
+test.print_results_and_exit()

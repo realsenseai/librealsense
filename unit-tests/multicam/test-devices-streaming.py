@@ -18,7 +18,7 @@ See README.md for documentation on writing multi-device tests.
 """
 
 import pyrealsense2 as rs
-from rspy import test, log, devices
+from rspy import test, log
 import time
 from collections import defaultdict
 
@@ -27,24 +27,23 @@ STREAM_DURATION_SEC = 10  # Longer duration for multi-stream stress test
 MAX_FRAME_DROP_PERCENTAGE = 5.0  # Allow up to 5% frame drops
 STABILIZATION_TIME_SEC = 3  # Time to allow auto-exposure to settle
 
-# Ensure we have device information
-if not devices.all():
-    log.d('Device database empty; querying for devices...')
-    devices.query(recycle_ports=False)
-
-# Get all enabled devices
-all_device_sns = list(devices.enabled())
-device_count = len(all_device_sns)
+# Query devices directly using pyrealsense2 context
+ctx = rs.context()
+device_list = ctx.query_devices()
+device_count = len(device_list)
 
 log.i(f"\n{'='*80}")
 log.i(f"TESTING MULTIPLE CONNECTED DEVICES - Found {device_count} device(s)")
 log.i(f"{'='*80}\n")
 
 if device_count == 0:
-    log.w("No devices found - skipping all tests")
+    log.e("No devices found - test cannot proceed")
+    test.fail()
     test.print_results_and_exit()
 elif device_count == 1:
-    log.w("Only 1 device found - some tests will be skipped")
+    log.e("Only 1 device found - test requires at least 2 devices")
+    test.fail()
+    test.print_results_and_exit()
 
 def get_common_multi_stream_config(*devs):
     """
