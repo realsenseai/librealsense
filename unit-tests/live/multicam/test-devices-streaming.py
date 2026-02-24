@@ -137,14 +137,13 @@ def get_common_multi_stream_config(*devs):
     return stream_configs
 
 
-def stream_multi_and_check_frames(*devs, stream_configs, duration_sec=STREAM_DURATION_SEC):
+def setup_pipelines(devs, stream_configs):
     """
-    Stream multiple stream types from all devices simultaneously and check for frame drops.
+    Create and configure pipelines for all devices with the specified stream configurations.
     
-    :param devs: Variable number of device objects
+    :param devs: List of device objects
     :param stream_configs: List of (stream_type, width, height, format, fps) tuples
-    :param duration_sec: How long to stream in seconds
-    :return: Tuple of (success, list of drop_percentages, stats)
+    :return: Tuple of (pipes, cfgs, device_info)
     """
     pipes = []
     cfgs = []
@@ -157,7 +156,6 @@ def stream_multi_and_check_frames(*devs, stream_configs, duration_sec=STREAM_DUR
         
         pipe = rs.pipeline()
         cfg = rs.config()
-        
         cfg.enable_device(sn)
         
         pipes.append(pipe)
@@ -171,123 +169,189 @@ def stream_multi_and_check_frames(*devs, stream_configs, duration_sec=STREAM_DUR
             cfg.enable_stream(stream_type, width, height, format, fps)
         log.i(f"  - {stream_type} {width}x{height} @ {fps}fps {format}")
     
+    return pipes, cfgs, device_info
+
+
+def stabilize_streams(pipes):
+    """
+    Allow auto-exposure to stabilize by collecting and discarding initial frames.
+    
+    :param pipes: List of pipeline objects
+    """
+    log.i(f"Stabilizing for {STABILIZATION_TIME_SEC} seconds...")
+    stabilization_frames = int(STABILIZATION_TIME_SEC * 30)  # Assume ~30fps
+    for _ in range(stabilization_frames):
+        try:
+            for pipe in pipes:
+                pipe.wait_for_frames(timeout_ms=5000)
+        except Exception as e:
+            log.w(f"  Exception during stabilization: {e}")
+
+
+def collect_frames(pipes, duration_sec):
+    """
+    Collect frames from all pipelines for the specified duration.
+    
+    :param pipes: List of pipeline objects
+    :param duration_sec: How long to stream in seconds
+    :return: Tuple of (all_frame_counters, all_framesets_received, all_stream_frame_counts, actual_duration)
+    """
+    all_frame_counters = [defaultdict(list) for _ in pipes]
+    all_framesets_received = [0] * len(pipes)
+    all_stream_frame_counts = [defaultdict(int) for _ in pipes]
+    
+    log.i(f"Streaming for {duration_sec} seconds...")
+    start_time = time.time()
+    
+    while time.time() - start_time < duration_sec:
+        try:
+            for i, pipe in enumerate(pipes):
+                frameset = pipe.wait_for_frames(timeout_ms=5000)
+                all_framesets_received[i] += 1
+                
+                for frame in frameset:
+                    stream_type = frame.get_profile().stream_type()
+                    all_stream_frame_counts[i][stream_type] += 1
+                    
+                    if frame.supports_frame_metadata(rs.frame_metadata_value.frame_counter):
+                        counter = frame.get_frame_metadata(rs.frame_metadata_value.frame_counter)
+                        all_frame_counters[i][stream_type].append(counter)
+                    
+        except Exception as e:
+            log.w(f"  Exception during streaming: {e}")
+            break
+    
+    actual_duration = time.time() - start_time
+    return all_frame_counters, all_framesets_received, all_stream_frame_counts, actual_duration
+
+
+def analyze_device_drops(frame_counters, stream_frame_counts, device_name):
+    """
+    Analyze frame drops for a single device across all streams.
+    
+    :param frame_counters: Dict of stream_type -> list of frame counters
+    :param stream_frame_counts: Dict of stream_type -> total frame count
+    :param device_name: Name/identifier for logging
+    :return: Tuple of (overall_drop_percentage, per_stream_stats_dict)
+    """
+    total_expected = 0
+    total_received = 0
+    per_stream_stats = {}
+    
+    for stream_type, counters in frame_counters.items():
+        if len(counters) < 2:
+            log.w(f"  {device_name} {stream_type}: insufficient frames ({len(counters)})")
+            continue
+        
+        # Calculate expected frames based on counter range
+        counter_range = counters[-1] - counters[0]
+        expected = counter_range + 1
+        received = len(counters)
+        dropped = expected - received
+        
+        total_expected += expected
+        total_received += received
+        
+        drop_pct = (dropped / expected * 100) if expected > 0 else 0
+        
+        per_stream_stats[stream_type] = {
+            'expected': expected,
+            'received': received,
+            'dropped': dropped,
+            'drop_pct': drop_pct,
+            'total_frames': stream_frame_counts.get(stream_type, 0)
+        }
+        
+        log.d(f"  {device_name} {stream_type}: {received}/{expected} frames, "
+              f"{dropped} dropped ({drop_pct:.2f}%)")
+    
+    if total_expected > 0:
+        overall_drop_pct = ((total_expected - total_received) / total_expected * 100)
+    else:
+        overall_drop_pct = 0.0
+        
+    return overall_drop_pct, per_stream_stats
+
+
+def aggregate_results(all_frame_counters, all_framesets_received, all_stream_frame_counts, 
+                     device_info, actual_duration):
+    """
+    Aggregate and analyze results from all devices.
+    
+    :param all_frame_counters: List of frame counter dicts (one per device)
+    :param all_framesets_received: List of frameset counts (one per device)
+    :param all_stream_frame_counts: List of stream frame count dicts (one per device)
+    :param device_info: List of device info dicts
+    :param actual_duration: Actual streaming duration in seconds
+    :return: Tuple of (success, drop_percentages, stats_dict)
+    """
+    log.i(f"Streaming completed after {actual_duration:.2f} seconds")
+    for i, info in enumerate(device_info):
+        log.i(f"Device {i+1} ({info['name']}): {all_framesets_received[i]} framesets")
+    
+    # Log per-stream frame counts for all devices
+    for i, (info, stream_counts) in enumerate(zip(device_info, all_stream_frame_counts)):
+        log.d(f"Device {i+1} frame counts by stream:")
+        for stream_type, count in stream_counts.items():
+            log.d(f"  {stream_type}: {count} frames")
+    
+    # Analyze drops for all devices
+    drop_percentages = []
+    all_stats = []
+    
+    for i, (frame_counters, stream_counts, info) in enumerate(zip(all_frame_counters, all_stream_frame_counts, device_info)):
+        drop_pct, stream_stats = analyze_device_drops(frame_counters, stream_counts, f"Dev{i+1}({info['sn']})")
+        drop_percentages.append(drop_pct)
+        
+        dev_stats = {
+            'name': info['name'],
+            'sn': info['sn'],
+            'framesets': all_framesets_received[i],
+            'drop_pct': drop_pct,
+            'streams': stream_stats
+        }
+        all_stats.append(dev_stats)
+    
+    success = all(dp <= MAX_FRAME_DROP_PERCENTAGE for dp in drop_percentages)
+    
+    stats = {
+        'devices': all_stats,
+        'duration': actual_duration
+    }
+    
+    return success, drop_percentages, stats
+
+
+def stream_multi_and_check_frames(*devs, stream_configs, duration_sec=STREAM_DURATION_SEC):
+    """
+    Stream multiple stream types from all devices simultaneously and check for frame drops.
+    
+    :param devs: Variable number of device objects
+    :param stream_configs: List of (stream_type, width, height, format, fps) tuples
+    :param duration_sec: How long to stream in seconds
+    :return: Tuple of (success, list of drop_percentages, stats)
+    """
+    # Setup phase: Create and configure pipelines
+    pipes, cfgs, device_info = setup_pipelines(devs, stream_configs)
+    
     try:
         # Start all pipelines
         for i, (pipe, cfg, info) in enumerate(zip(pipes, cfgs, device_info)):
             log.d(f"Starting pipeline on {info['name']} (SN: {info['sn']})...")
             pipe.start(cfg)
         
-        # Allow auto-exposure to stabilize
-        log.i(f"Stabilizing for {STABILIZATION_TIME_SEC} seconds...")
-        stabilization_frames = int(STABILIZATION_TIME_SEC * 30)  # Assume ~30fps
-        for _ in range(stabilization_frames):
-            try:
-                for pipe in pipes:
-                    pipe.wait_for_frames(timeout_ms=5000)
-            except Exception as e:
-                log.w(f"  Exception during stabilization: {e}")
+        # Stabilization phase: Allow auto-exposure to settle
+        stabilize_streams(pipes)
         
-        # Collect frame counters for each device and stream
-        all_frame_counters = [defaultdict(list) for _ in devs]
-        all_framesets_received = [0] * len(devs)
-        all_stream_frame_counts = [defaultdict(int) for _ in devs]
+        # Collection phase: Stream and collect frame data
+        all_frame_counters, all_framesets_received, all_stream_frame_counts, actual_duration = \
+            collect_frames(pipes, duration_sec)
         
-        log.i(f"Streaming for {duration_sec} seconds...")
-        start_time = time.time()
-        
-        while time.time() - start_time < duration_sec:
-            try:
-                for i, pipe in enumerate(pipes):
-                    frameset = pipe.wait_for_frames(timeout_ms=5000)
-                    all_framesets_received[i] += 1
-                    
-                    for frame in frameset:
-                        stream_type = frame.get_profile().stream_type()
-                        all_stream_frame_counts[i][stream_type] += 1
-                        
-                        if frame.supports_frame_metadata(rs.frame_metadata_value.frame_counter):
-                            counter = frame.get_frame_metadata(rs.frame_metadata_value.frame_counter)
-                            all_frame_counters[i][stream_type].append(counter)
-                        
-            except Exception as e:
-                log.w(f"  Exception during streaming: {e}")
-                break
-        
-        actual_duration = time.time() - start_time
-        
-        log.i(f"Streaming completed after {actual_duration:.2f} seconds")
-        for i, info in enumerate(device_info):
-            log.i(f"Device {i+1} ({info['name']}): {all_framesets_received[i]} framesets")
-        
-        # Log per-stream frame counts for all devices
-        for i, (info, stream_counts) in enumerate(zip(device_info, all_stream_frame_counts)):
-            log.d(f"Device {i+1} frame counts by stream:")
-            for stream_type, count in stream_counts.items():
-                log.d(f"  {stream_type}: {count} frames")
-        
-        # Analyze frame drops
-        def analyze_drops(frame_counters, stream_frame_counts, device_name):
-            total_expected = 0
-            total_received = 0
-            per_stream_stats = {}
-            
-            for stream_type, counters in frame_counters.items():
-                if len(counters) < 2:
-                    log.w(f"  {device_name} {stream_type}: insufficient frames ({len(counters)})")
-                    continue
-                
-                # Calculate expected frames based on counter range
-                counter_range = counters[-1] - counters[0]
-                expected = counter_range + 1
-                received = len(counters)
-                dropped = expected - received
-                
-                total_expected += expected
-                total_received += received
-                
-                drop_pct = (dropped / expected * 100) if expected > 0 else 0
-                
-                per_stream_stats[stream_type] = {
-                    'expected': expected,
-                    'received': received,
-                    'dropped': dropped,
-                    'drop_pct': drop_pct,
-                    'total_frames': stream_frame_counts.get(stream_type, 0)
-                }
-                
-                log.d(f"  {device_name} {stream_type}: {received}/{expected} frames, "
-                      f"{dropped} dropped ({drop_pct:.2f}%)")
-            
-            if total_expected > 0:
-                overall_drop_pct = ((total_expected - total_received) / total_expected * 100)
-            else:
-                overall_drop_pct = 0.0
-                
-            return overall_drop_pct, per_stream_stats
-        
-        # Analyze drops for all devices
-        drop_percentages = []
-        all_stats = []
-        
-        for i, (frame_counters, stream_counts, info) in enumerate(zip(all_frame_counters, all_stream_frame_counts, device_info)):
-            drop_pct, stream_stats = analyze_drops(frame_counters, stream_counts, f"Dev{i+1}({info['sn']})")
-            drop_percentages.append(drop_pct)
-            
-            dev_stats = {
-                'name': info['name'],
-                'sn': info['sn'],
-                'framesets': all_framesets_received[i],
-                'drop_pct': drop_pct,
-                'streams': stream_stats
-            }
-            all_stats.append(dev_stats)
-        
-        success = all(dp <= MAX_FRAME_DROP_PERCENTAGE for dp in drop_percentages)
-        
-        stats = {
-            'devices': all_stats,
-            'duration': actual_duration
-        }
+        # Analysis phase: Aggregate results and analyze drops
+        success, drop_percentages, stats = aggregate_results(
+            all_frame_counters, all_framesets_received, all_stream_frame_counts,
+            device_info, actual_duration
+        )
         
         return success, drop_percentages, stats
         
