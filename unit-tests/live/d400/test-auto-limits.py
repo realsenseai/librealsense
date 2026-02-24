@@ -6,7 +6,8 @@
 # test:type USB
 
 import pyrealsense2 as rs
-from rspy import test
+import pyrsutils as rsutils
+from rspy import test, log
 
 # 1. Scenario 1:
     #          - Change control value few times
