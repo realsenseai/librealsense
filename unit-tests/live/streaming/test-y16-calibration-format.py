@@ -2,6 +2,8 @@
 # Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
 
 # test:device D400*
+# Y16 is not streamed with metadata over GMSL causing all frames to drop
+# test:type !GMSL
 # test:device each(D555)
 # This test checks streaming y16 profile
 

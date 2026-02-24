@@ -2,8 +2,7 @@
 # Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
 
 # LibCI doesn't have D435i so //test:device D435I// is disabled for now
-#test:device:jetson D457
-#test:device:!jetson D455
+#test:device: D455
 
 import pyrealsense2 as rs
 from rspy import test

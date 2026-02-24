@@ -1,9 +1,9 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2020 RealSense, Inc. All Rights Reserved.
 
-# Currently, we exclude D555 as it's failing
+# Currently, we exclude D457 and D555 as it's failing
 
-# test:device D400*
+# test:device D400* !D457
 # test:donotrun:!nightly
 
 import platform
