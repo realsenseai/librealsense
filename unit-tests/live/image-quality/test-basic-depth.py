@@ -127,7 +127,6 @@ def run_test(resolution, fps):
             raw_cube = sample_depth_region(depth_image, cube_x, cube_y)
             raw_bg = sample_depth_region(depth_image, bg_x, bg_y)
             if not raw_bg or not raw_cube:
-                i -= 1
                 continue
             depth_cube = raw_cube  # * depth_scale
             depth_bg = raw_bg  # * depth_scale

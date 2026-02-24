@@ -200,7 +200,7 @@ configurations = [((1280, 720), 30)]
 # on nightly we check additional arbitrary configurations
 if "nightly" in test.context or "weekly" in test.context:
     configurations += [
-        ((640, 480), 15),  # currently fails
+        ((640, 480), 15),
         ((640, 480), 30),
         ((640, 480), 60),
         ((848, 480), 15),
