@@ -9,7 +9,7 @@ from rspy import log, test
 import numpy as np
 import cv2
 import time
-from iq_helper import find_roi_location, get_roi_from_frame, sample_depth_region, SAMPLE_REGION_SIZE, WIDTH, HEIGHT
+from iq_helper import find_roi_location, get_roi_from_frame, get_avg_depth_from_region, SAMPLE_REGION_SIZE, WIDTH, HEIGHT
 
 NUM_FRAMES = 100  # Number of frames to check
 DEPTH_TOLERANCE = 100  # Acceptable deviation from expected depth in mm
@@ -124,8 +124,8 @@ def run_test(resolution, fps):
             depth_image = get_roi_from_frame(depth_frame)
 
             # Sample depths using region averaging
-            raw_cube = sample_depth_region(depth_image, cube_x, cube_y)
-            raw_bg = sample_depth_region(depth_image, bg_x, bg_y)
+            raw_cube = get_avg_depth_from_region(depth_image, cube_x, cube_y)
+            raw_bg = get_avg_depth_from_region(depth_image, bg_x, bg_y)
             if not raw_bg or not raw_cube:
                 continue
             depth_cube = raw_cube  # * depth_scale

@@ -105,8 +105,8 @@ def get_roi_from_frame(frame):
 SAMPLE_REGION_SIZE = 150  # Default size of the square region for depth sampling
 
 
-def sample_depth_region(image, x, y, size=SAMPLE_REGION_SIZE, min_value=600):
-    """Sample a square region of given size around (x, y) and return the average value, filtering out values below min_value."""
+def get_avg_depth_from_region(image, x, y, size=SAMPLE_REGION_SIZE, min_value=600):
+    """Sample a square region of given size around (x, y) and return the average depth value, filtering out values below min_value."""
     half = size // 2
     h, w = image.shape
     x_min = max(x - half, 0)
