@@ -444,6 +444,22 @@ def devices_by_test_config( test, exceptions ):
     :param test: The test (of class type Test) we're interested in
     """
     global forced_configurations, device_set
+    
+    # Special handling for multicam tests - enable all ports and use all devices
+    if hasattr(test, 'path_to_script') and 'multicam' in test.path_to_script:
+        log.d( f'{test.name}: multicam test detected - enabling all ports and using all devices' )
+        if devices.hub:
+            devices.enable_all()
+            import time
+            time.sleep(2)  # Give devices time to enumerate
+        all_devices = set(devices.enabled())
+        if device_set:
+            all_devices = all_devices.intersection(device_set)
+        if all_devices:
+            # Return a single configuration with all devices
+            yield ['*'], all_devices
+        return
+    
     for configuration in ( forced_configurations  or  test.config.configurations ):
         try:
             for serial_numbers in devices.by_configuration( configuration, exceptions, device_set ):

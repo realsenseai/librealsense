@@ -2,6 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Test configuration: Device enumeration test that works with all connected devices
+# Minimal config (* = at least 1 device) then enable all hub ports to discover all devices
 #test:device *
 
 """
@@ -13,7 +14,7 @@ This test enumerates all devices and verifies basic functionality without extens
 import pyrealsense2 as rs
 from rspy import test, log
 
-# Query devices directly using pyrealsense2 context
+# Query all connected devices directly via RealSense context
 ctx = rs.context()
 device_list = ctx.query_devices()
 device_count = len(device_list)
@@ -21,8 +22,9 @@ device_count = len(device_list)
 log.i(f"Found {device_count} connected device(s)")
 
 if device_count == 0:
-    log.e("No devices connected - test cannot proceed")
-    test.fail()
+    with test.closure("No devices found"):
+        log.e("No devices connected - test cannot proceed")
+        test.check(False, "At least one device required")
 else:
     #
     # Enumerate and verify all devices
@@ -44,3 +46,4 @@ else:
         log.i(f"All {device_count} devices verified successfully")
 
 test.print_results_and_exit()
+
