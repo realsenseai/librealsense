@@ -252,50 +252,68 @@ namespace librealsense
 
                 uint32_t depth_texture;
                 uint32_t hist_texture = _cm_texture;
+                bool generate_depth_texture = false;
+                bool generate_histogram_texture = false;
+                const void *frame_data = nullptr;
 
                 if (auto input_frame = f.as<rs2::gl::gpu_frame>())
                 {
                     depth_texture = input_frame.get_texture_id(0);
-                    hist_texture = input_frame.get_texture_id(1);
+
+                    try
+                    {
+                        hist_texture = input_frame.get_texture_id(1);
+                    }
+                    catch(const std::exception& e)
+                    {
+                        LOG_DEBUG("Histogram Texture is not available. Generating one.");
+                        generate_histogram_texture = true;
+                        frame_data = input_frame.get_data();
+                    }
                 }
                 else
+                {
+                    generate_depth_texture = true;
+                    generate_histogram_texture = true;
+                    frame_data = f.get_data();
+                }
+                if (generate_depth_texture)
                 {
                     glGenTextures(1, &depth_texture);
                     glBindTexture(GL_TEXTURE_2D, depth_texture);
 
                     if (disparity)
                     {
-                        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, _width, _height, 0, GL_RED, GL_FLOAT, f.get_data());
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, _width, _height, 0, GL_RED, GL_FLOAT, frame_data);
                     }
                     else
                     {
-                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, _width, _height, 0, GL_RG, GL_UNSIGNED_BYTE, f.get_data());
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, _width, _height, 0, GL_RG, GL_UNSIGNED_BYTE, frame_data);
                     }
 
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                }
+                if (generate_histogram_texture && _equalize)
+                {
+                    glGenTextures(1, &hist_texture);
+                    glBindTexture(GL_TEXTURE_2D, hist_texture);
 
-                    if (_equalize)
+                    if (disparity)
                     {
-                        glGenTextures(1, &hist_texture);
-                        glBindTexture(GL_TEXTURE_2D, hist_texture);
-
-                        if (disparity)
-                        {
-                            update_histogram(_hist_data, reinterpret_cast<const float*>(f.get_data()), _width, _height);
-                            populate_floating_histogram(_fhist_data, _hist_data);
-                            glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, MAX_DISPARITY, 1, 0, GL_RED, GL_FLOAT, _fhist_data);
-                        }
-                        else
-                        {
-                            update_histogram(_hist_data, reinterpret_cast<const uint16_t*>(f.get_data()), _width, _height);
-                            populate_floating_histogram(_fhist_data, _hist_data);
-                            glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, 0xFF, 0xFF, 0, GL_RED, GL_FLOAT, _fhist_data);
-                        }
-
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                        update_histogram(_hist_data, reinterpret_cast<const float*>(frame_data), _width, _height);
+                        populate_floating_histogram(_fhist_data, _hist_data);
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, MAX_DISPARITY, 1, 0, GL_RED, GL_FLOAT, _fhist_data);
                     }
+                    else
+                    {
+                        update_histogram(_hist_data, reinterpret_cast<const uint16_t*>(frame_data), _width, _height);
+                        populate_floating_histogram(_fhist_data, _hist_data);
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, 0xFF, 0xFF, 0, GL_RED, GL_FLOAT, _fhist_data);
+                    }
+
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
                 }
                 
                 if( auto gf = dynamic_cast< gpu_addon_interface * >( (frame_interface *)res.get() ) )
