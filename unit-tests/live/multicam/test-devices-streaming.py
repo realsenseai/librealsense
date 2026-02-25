@@ -71,8 +71,13 @@ def get_common_multi_stream_config(*devs):
     
     All streams will use the same resolution and FPS for simplicity.
     """
-    # Use a common resolution that most devices support
-    target_width, target_height, target_fps = 640, 480, 30
+    # Try common resolutions in order of preference
+    # 640x360 added as fallback to support safety camera profiles
+    target_resolutions = [
+        (640, 480, 30),  # Standard VGA resolution
+        (640, 360, 30),  # Fallback for safety cameras and other devices
+    ]
+    target_fps = 30
     
     # Build profile sets for each device
     all_profiles = []
@@ -102,9 +107,12 @@ def get_common_multi_stream_config(*devs):
         for dev_prof in all_profiles[1:]:
             common_depth = common_depth.intersection(dev_prof[depth_key])
         
-        if (target_width, target_height, target_fps) in common_depth:
-            stream_configs.append((rs.stream.depth, target_width, target_height, rs.format.z16, target_fps))
-            log.d(f"  Added Depth stream: {target_width}x{target_height} @ {target_fps}fps")
+        # Try each resolution until we find a common one
+        for target_width, target_height, target_fps in target_resolutions:
+            if (target_width, target_height, target_fps) in common_depth:
+                stream_configs.append((rs.stream.depth, target_width, target_height, rs.format.z16, target_fps))
+                log.d(f"  Added Depth stream: {target_width}x{target_height} @ {target_fps}fps")
+                break
     
     # Try to add Color stream (try multiple formats)
     color_formats = [rs.format.rgb8, rs.format.bgr8, rs.format.rgba8, rs.format.bgra8, rs.format.yuyv]
@@ -115,9 +123,14 @@ def get_common_multi_stream_config(*devs):
             for dev_prof in all_profiles[1:]:
                 common_color = common_color.intersection(dev_prof[color_key])
             
-            if (target_width, target_height, target_fps) in common_color:
-                stream_configs.append((rs.stream.color, target_width, target_height, color_format, target_fps))
-                log.d(f"  Added Color stream: {target_width}x{target_height} @ {target_fps}fps {color_format}")
+            # Try each resolution until we find a common one
+            for target_width, target_height, target_fps in target_resolutions:
+                if (target_width, target_height, target_fps) in common_color:
+                    stream_configs.append((rs.stream.color, target_width, target_height, color_format, target_fps))
+                    log.d(f"  Added Color stream: {target_width}x{target_height} @ {target_fps}fps {color_format}")
+                    break
+            if stream_configs and stream_configs[-1][0] == rs.stream.color:
+                # Successfully added color stream, don't try other formats
                 break
     
     # Try to add Infrared stream (usually index 1)
@@ -126,9 +139,13 @@ def get_common_multi_stream_config(*devs):
         common_ir = all_profiles[0][ir_key]
         for dev_prof in all_profiles[1:]:
             common_ir = common_ir.intersection(dev_prof[ir_key])
-        if (target_width, target_height, target_fps) in common_ir:
-            stream_configs.append((rs.stream.infrared, target_width, target_height, rs.format.y8, target_fps))
-            log.d(f"  Added Infrared stream: {target_width}x{target_height} @ {target_fps}fps")
+        
+        # Try each resolution until we find a common one
+        for target_width, target_height, target_fps in target_resolutions:
+            if (target_width, target_height, target_fps) in common_ir:
+                stream_configs.append((rs.stream.infrared, target_width, target_height, rs.format.y8, target_fps))
+                log.d(f"  Added Infrared stream: {target_width}x{target_height} @ {target_fps}fps")
+                break
     
     # Try to add second Infrared stream if available (index 2)
     # Note: We can't add multiple streams of same type with different indices via simple enable_stream
