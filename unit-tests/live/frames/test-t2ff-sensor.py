@@ -82,8 +82,8 @@ dp = next(p for p in
           and p.format() == rs.format.z16
           and p.is_default())
 first_depth_frame_delay = time_to_first_frame(ds, dp, max_delay_for_depth_frame)
-test.check(first_frame_time != -1,"depth frames did not arrive for" + max_delay_for_depth_frame + " seconds")
-if (first_frame_time > -1):
+test.check(first_depth_frame_delay != -1, "depth frames did not arrive for {:.1f} seconds".format(max_delay_for_depth_frame))
+if first_depth_frame_delay > -1:
     print("Time until first depth frame is: {:.3f} [sec] max allowed is: {:.1f} [sec] ".format(first_depth_frame_delay, max_delay_for_depth_frame))
     test.check(first_depth_frame_delay < max_delay_for_depth_frame)
 test.finish()
@@ -106,8 +106,8 @@ if cs:
               and p.format() == rs.format.rgb8
               and p.is_default())
     first_color_frame_delay = time_to_first_frame(cs, cp, max_delay_for_color_frame)
-    test.check(first_frame_time != -1,"color frames did not arrive for" + max_delay_for_color_frame + " seconds")
-    if (first_frame_time > -1):
+    test.check(first_color_frame_delay != -1, "color frames did not arrive for {:.1f} seconds".format(max_delay_for_color_frame))
+    if first_color_frame_delay > -1:
         print("Time until first color frame is: {:.3f} [sec] max allowed is: {:.1f} [sec] ".format(first_color_frame_delay, max_delay_for_color_frame))
         test.check(first_color_frame_delay < max_delay_for_color_frame)
 test.finish()
