@@ -1,11 +1,13 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
 
-# LibCI doesn't have D435i so //test:device D435I// is disabled for now
-# test:device D455
+# Supported on D400 USB devices with FW version 5.12.10.11 and above. https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-device.cpp#L1026
+# test:device D400*
+# test:type USB
 
 import pyrealsense2 as rs
-from rspy import test
+import pyrsutils as rsutils
+from rspy import test, log
 
 # 1. Scenario 1:
     #          - Change control value few times
@@ -14,16 +16,22 @@ from rspy import test
     #          - Check that control limit value is the latest value
 # 2. Scenario 2:
     #       - Init 2 devices
-    #        - toggle on both dev1 and dev2 and set two distinct values for the auto-exposure /gain.
+    #        - toggle on both dev1 and dev2 and set two distinct values for the auto-exposure/gain.
     #        - toggle both dev1and dev2 off.
     #        2.1. toggle dev1 on :
-    #                  * verify that the limit value is the value that was stored(cached) in dev1.
-    #                  * verify that for dev2 both the limitand the toggle values are similar to those of dev1
+    #                  * verify that the limit value is the value that was stored (cached) in dev1.
+    #                  * verify that for dev2 both the limit and the toggle values are similar to those of dev1
     #        2.2. toggle dev2 on :
-    #                  * verify that the limit value is the value that was stored(cached) in dev2.
+    #                  * verify that the limit value is the value that was stored (cached) in dev2.
 
 ctx = rs.context()
 device_list = ctx.query_devices()
+
+fw_version = rsutils.version(device_list.front().get_info(rs.camera_info.firmware_version))
+if fw_version < rsutils.version(5,12,10,11):
+    log.i(f"FW version {fw_version} does not support AUTO EXPOSURE LIMIT option, skipping test...")
+    test.print_results_and_exit()
+    
 #############################################################################################
 with test.closure("Auto Exposure toggle one device"):
     # Scenario 1:

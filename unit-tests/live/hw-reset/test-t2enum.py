@@ -1,7 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
 
-# test:device each(D400*) !D457  # D457 device is known for HW reset issues..
+# test:device each(D400*)
 # test:device each(D500*)
 # test:donotrun:!nightly
 
