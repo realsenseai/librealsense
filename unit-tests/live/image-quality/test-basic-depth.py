@@ -9,7 +9,7 @@ from rspy import log, test
 import numpy as np
 import cv2
 import time
-from iq_helper import find_roi_location, get_roi_from_frame, WIDTH, HEIGHT
+from iq_helper import find_roi_location, get_roi_from_frame, get_avg_depth_from_region, SAMPLE_REGION_SIZE, WIDTH, HEIGHT
 
 NUM_FRAMES = 100  # Number of frames to check
 DEPTH_TOLERANCE = 100  # Acceptable deviation from expected depth in mm
@@ -17,7 +17,6 @@ FRAMES_PASS_THRESHOLD = 0.75  # Percentage of frames that needs to pass
 DEBUG_MODE = False
 
 EXPECTED_DEPTH_DIFF = 120  # Expected difference in mm between background and cube
-SAMPLE_REGION_SIZE = 150  # Size of the square region for depth sampling
 
 dev, ctx = test.find_first_device_or_exit()
 depth_sensor = dev.first_depth_sensor()
@@ -44,23 +43,6 @@ def detect_roi_with_exposure(marker_ids):
                   ", trying with exposure", exposure)
 
     raise Exception("Page not found")
-
-
-def sample_region(image, x, y, size=SAMPLE_REGION_SIZE):
-    """Sample a square region of given odd size around (x, y) and return the average value, filtering for positive values under 1m."""
-    half = size // 2
-    h, w = image.shape
-    x_min = max(x - half, 0)
-    x_max = min(x + half + 1, w)
-    y_min = max(y - half, 0)
-    y_max = min(y + half + 1, h)
-    region = image[y_min:y_max, x_min:x_max]
-    # log.d(f"Sampled region at ({x},{y}), size={size}:", region)
-    filtered = region[region > 600] # filter out invalid depth values (0) and values that are too close (under 60cm)
-    if filtered.size == 0:
-        log.w("No valid depth samples in region at ({x},{y})".format(x=x, y=y))
-        return 0.0
-    return np.mean(filtered)
 
 
 def draw_debug(depth_frame, cube_x, cube_y, bg_x, bg_y,
@@ -142,10 +124,9 @@ def run_test(resolution, fps):
             depth_image = get_roi_from_frame(depth_frame)
 
             # Sample depths using region averaging
-            raw_cube = sample_region(depth_image, cube_x, cube_y)
-            raw_bg = sample_region(depth_image, bg_x, bg_y)
+            raw_cube = get_avg_depth_from_region(depth_image, cube_x, cube_y)
+            raw_bg = get_avg_depth_from_region(depth_image, bg_x, bg_y)
             if not raw_bg or not raw_cube:
-                i -= 1
                 continue
             depth_cube = raw_cube  # * depth_scale
             depth_bg = raw_bg  # * depth_scale
