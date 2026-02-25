@@ -21,12 +21,12 @@ def time_to_first_frame(sensor, profile, max_delay_allowed):
     If the frame arrives it will return the seconds it took since open() call
     If no frame it will return 'max_delay_allowed'
     """
-    first_frame_time = max_delay_allowed
+    first_frame_time = -1
     open_call_stopwatch = Stopwatch()
 
     def frame_cb(frame):
         nonlocal first_frame_time, open_call_stopwatch
-        if first_frame_time == max_delay_allowed:
+        if first_frame_time == -1:
             first_frame_time = open_call_stopwatch.get_elapsed()
 
     open_call_stopwatch.reset()
@@ -36,7 +36,7 @@ def time_to_first_frame(sensor, profile, max_delay_allowed):
     # Wait condition:
     # 1. first frame did not arrive yet
     # 2. timeout of 'max_delay_allowed' + 1 extra second reached.
-    while first_frame_time == max_delay_allowed and open_call_stopwatch.get_elapsed() < max_delay_allowed + 1:
+    while first_frame_time == -1 and open_call_stopwatch.get_elapsed() < max_delay_allowed + 1:
         time.sleep(0.05)
 
     sensor.stop()
@@ -82,8 +82,10 @@ dp = next(p for p in
           and p.format() == rs.format.z16
           and p.is_default())
 first_depth_frame_delay = time_to_first_frame(ds, dp, max_delay_for_depth_frame)
-print("Time until first depth frame is: {:.3f} [sec] max allowed is: {:.1f} [sec] ".format(first_depth_frame_delay, max_delay_for_depth_frame))
-test.check(first_depth_frame_delay < max_delay_for_depth_frame)
+test.check(first_frame_time != -1,"depth frames did not arrive for" + max_delay_for_depth_frame + " seconds")
+if (first_frame_time > -1):
+    print("Time until first depth frame is: {:.3f} [sec] max allowed is: {:.1f} [sec] ".format(first_depth_frame_delay, max_delay_for_depth_frame))
+    test.check(first_depth_frame_delay < max_delay_for_depth_frame)
 test.finish()
 
 
@@ -104,8 +106,10 @@ if cs:
               and p.format() == rs.format.rgb8
               and p.is_default())
     first_color_frame_delay = time_to_first_frame(cs, cp, max_delay_for_color_frame)
-    print("Time until first color frame is: {:.3f} [sec] max allowed is: {:.1f} [sec] ".format(first_color_frame_delay, max_delay_for_color_frame))
-    test.check(first_color_frame_delay < max_delay_for_color_frame)
+    test.check(first_frame_time != -1,"color frames did not arrive for" + max_delay_for_color_frame + " seconds")
+    if (first_frame_time > -1):
+        print("Time until first color frame is: {:.3f} [sec] max allowed is: {:.1f} [sec] ".format(first_color_frame_delay, max_delay_for_color_frame))
+        test.check(first_color_frame_delay < max_delay_for_color_frame)
 test.finish()
 
 
