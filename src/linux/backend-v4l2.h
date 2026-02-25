@@ -432,6 +432,7 @@ namespace librealsense
             static bool get_info_from_v4l_video_path(const std::string& v4l_video_path, const std::string& dev_name, uvc_device_info& info, bool is_mipi_rs_enum_nodes_empty,
                                                  const std::vector<std::pair <std::string, std::string>>& v4l_to_dev_video_paths);
             static std::vector<path_and_identifier> collect_dev_video_path_and_identifier();
+            static uint16_t assign_mipi_mi(const std::string& name);
 
             power_state _state = D3;
             std::string _name = "";
