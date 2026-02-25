@@ -10,6 +10,12 @@ import time
 
 # This test is checking that timestamps of depth, infrared and color frames are consistent
 
+# Test parameters
+TS_TOLERANCE_MS = 1.5  # Tolerance for timestamp differences in ms
+TS_TOLERANCE_MICROSEC = TS_TOLERANCE_MS * 1000
+SKIP_FRAMES_AFTER_DROP = 10  # Frames to skip after detecting drops
+
+
 def detect_frame_drops(frames_dict, prev_frame_counters):
     """Detect frame drops using hardware frame counters"""
     frame_drop_detected = False
@@ -23,25 +29,29 @@ def detect_frame_drops(frames_dict, prev_frame_counters):
         current_frame_counters[stream_name] = current_counter
         
         prev_counter = prev_frame_counters[stream_name]
-        if prev_counter is not None and current_counter > prev_counter + 1:
+        if prev_counter is not None and current_counter != prev_counter + 1:
             # Frame drop detected
             dropped_frames = current_counter - prev_counter - 1
-            log.w(f"Frame drop detected on {stream_name}: {dropped_frames} frames dropped")
+            if dropped_frames > 0:
+                log.w(f"Frame drop detected on {stream_name}: {dropped_frames} frames dropped")
+            else:
+                log.w(f"Frame drop detected on {stream_name}: current {current_counter}, previous {prev_counter}")
             frame_drop_detected = True
     
     return frame_drop_detected, current_frame_counters
 
-# Test parameters
-TS_TOLERANCE_MS = 1.5  # Tolerance for timestamp differences in ms
-TS_TOLERANCE_MICROSEC = TS_TOLERANCE_MS * 1000
-SKIP_FRAMES_AFTER_DROP = 10  # Frames to skip after detecting drops
-with test.closure("Verify syncronized frames"):
+
+def run_test(resolution, fps):
     device, ctx = test.find_first_device_or_exit()
+    pipeline = rs.pipeline(ctx)
     cfg = rs.config()
-    cfg.enable_stream(rs.stream.depth)
-    cfg.enable_stream(rs.stream.infrared, 1)
-    cfg.enable_stream(rs.stream.infrared, 2)
-    cfg.enable_stream(rs.stream.color, 640, 480, rs.format.yuyv, 30)  # setting VGA since it fails with HD resolution
+    cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, fps)
+    cfg.enable_stream(rs.stream.infrared, 1, resolution[0], resolution[1], rs.format.y8, fps)
+    cfg.enable_stream(rs.stream.infrared, 2, resolution[0], resolution[1], rs.format.y8, fps)
+    cfg.enable_stream(rs.stream.color, resolution[0], resolution[1], rs.format.yuyv, fps)
+    if not cfg.can_resolve(pipeline):
+        log.i(f"Configuration {resolution[0]}x{resolution[1]} @ {fps}fps is not supported by the device")
+        return
 
     depth_sensor = device.first_depth_sensor()
     color_sensor = device.first_color_sensor()
@@ -53,18 +63,18 @@ with test.closure("Verify syncronized frames"):
         else:
             log.f(f"Sensor {sensor.name} does not support global time option")
 
-    pipe = rs.pipeline(ctx)
-    pipe.start(cfg)
+    pipeline.start(cfg)
     time.sleep(5)  # Longer stabilization to prevent initial frame drop issues
 
     # Frame drop detection state
     prev_frame_counters = {'depth': None, 'ir1': None, 'ir2': None, 'color': None}
     frames_to_skip = 0
     consecutive_drops = 0
+    unskipped_frames = 0
 
     try:
-        for frame_count in range(1, 101):
-            frames = pipe.wait_for_frames()
+        while unskipped_frames < 100:
+            frames = pipeline.wait_for_frames()
             depth_frame = frames.get_depth_frame()
             ir1_frame = frames.get_infrared_frame(1)
             ir2_frame = frames.get_infrared_frame(2)
@@ -74,12 +84,20 @@ with test.closure("Verify syncronized frames"):
                 log.e("One or more frames are missing")
                 continue
 
+            # Skip frames during recovery
+            if frames_to_skip > 0:
+                frames_to_skip -= 1
+                if frames_to_skip == 0:
+                    prev_frame_counters = {'depth': None, 'ir1': None, 'ir2': None, 'color': None}
+                continue
+
             # Check for frame drops
             frames_dict = {'depth': depth_frame, 'ir1': ir1_frame, 'ir2': ir2_frame, 'color': color_frame}
             frame_drop_detected, current_frame_counters = detect_frame_drops(frames_dict, prev_frame_counters)
+            unskipped_frames += 1
             
             # Handle frame drops
-            if frame_drop_detected:
+            if frame_drop_detected and not frames_to_skip:
                 consecutive_drops += 1
                 if consecutive_drops > 20:
                     log.f(f"Continuous frame drops detected ({consecutive_drops} consecutive). Hardware issue.")
@@ -88,14 +106,7 @@ with test.closure("Verify syncronized frames"):
                 log.w(f"Frame drop at frame {frame_count}, skipping next {frames_to_skip} frames")
                 prev_frame_counters = current_frame_counters
                 continue
-            
-            # Skip frames during recovery
-            if frames_to_skip > 0:
-                frames_to_skip -= 1
-                if frames_to_skip == 0:
-                    prev_frame_counters = {'depth': None, 'ir1': None, 'ir2': None, 'color': None}
-                continue
-            
+
             prev_frame_counters = current_frame_counters
             consecutive_drops = 0
 
@@ -118,6 +129,25 @@ with test.closure("Verify syncronized frames"):
                 test.check_approx_abs(frame_timestamps['depth'], frame_timestamps['color'], TS_TOLERANCE_MICROSEC)
 
     finally:
-        pipe.stop()
+        pipeline.stop()
+
+
+configurations = [
+        ((640, 480), 15),
+        ((640, 480), 30),
+        ((640, 480), 60),
+        ((848, 480), 15),
+        ((848, 480), 30),
+        ((848, 480), 60),
+        ((1280, 720), 5),
+        ((1280, 720), 10),
+        ((1280, 720), 15),
+        ((1280, 720), 30),
+    ]
+
+for resolution, fps in configurations:
+    test.start("Timestamp Synchronization Test", f"{resolution[0]}x{resolution[1]} @ {fps}fps")
+    run_test(resolution, fps)
+    test.finish()
 
 test.print_results_and_exit()
