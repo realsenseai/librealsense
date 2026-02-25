@@ -17,6 +17,7 @@
 #include <array>
 #include <unordered_map>
 #include <fstream>
+#include <future>
 
 #include "objects-in-frame.h"
 #include "processing-block-model.h"
@@ -110,6 +111,7 @@ namespace rs2
         bool is_paused() const;
         void pause();
         void resume();
+        void wait_for_stop();
 
         void update_ui(std::vector<stream_profile> profiles_vec);
         void get_sorted_profiles(std::vector<stream_profile>& profiles);
@@ -245,5 +247,7 @@ namespace rs2
         const float SHORT_RANGE_MAX_DISTANCE = 4.0f;  // 4 meters
         rs2_extrinsics _extrinsics_from_depth;
         std::atomic_bool _destructing;
+        std::mutex _stop_mutex;
+        std::future<void> _stop_future;
     };
 }

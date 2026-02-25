@@ -397,6 +397,7 @@ namespace rs2
     subdevice_model::~subdevice_model()
     {
         _destructing = true;
+        wait_for_stop();
         try
         {
             s->on_options_changed( []( const options_list & list ) {} );
@@ -1471,11 +1472,23 @@ namespace rs2
         return results;
     }
 
+    void subdevice_model::wait_for_stop()
+    {
+        std::future< void > local;
+        {
+            std::lock_guard< std::mutex > lock(_stop_mutex);
+            local = std::move(_stop_future);
+        }
+        if (local.valid())
+            local.get();
+    }
+
     void subdevice_model::stop(std::shared_ptr<notifications_model> not_model)
     {
         if (not_model)
             not_model->add_log("Stopping streaming");
 
+        // --- Immediate UI state (synchronous) ---
         streaming = false;
         _pause = false;
 
@@ -1496,17 +1509,41 @@ namespace rs2
             viewer.disable_measurements();
         }
 
-        s->stop();
+        // --- Heavy operations (background) ---
+        // Chain with any prior pending stop without blocking the caller:
+        // move the old future into the lambda so it waits internally.
+        std::lock_guard< std::mutex > lock(_stop_mutex);
+        auto prev_stop = std::move(_stop_future);
 
-        _options_invalidated = true;
-
-        queues.foreach([&](frame_queue& q)
+        auto sensor_ptr = s;
+        _stop_future = std::async(std::launch::async, [this, sensor_ptr, prev_stop = std::move(prev_stop)]() mutable
             {
-                frame f;
-                while (q.poll_for_frame(&f));
-            });
+                try
+                {
+                    if (prev_stop.valid())
+                        prev_stop.get();
 
-        s->close();
+                    sensor_ptr->stop();
+
+                    _options_invalidated = true;
+
+                    queues.foreach([&](frame_queue& q)
+                        {
+                            frame f;
+                            while (q.poll_for_frame(&f));
+                        });
+
+                    sensor_ptr->close();
+                }
+                catch (const std::exception& e)
+                {
+                    if (viewer.not_model)
+                        viewer.not_model->add_log(
+                            rsutils::string::from() << "Error stopping sensor: " << e.what(),
+                            RS2_LOG_SEVERITY_WARN);
+                }
+                catch (...) {}
+            });
     }
 
     bool subdevice_model::is_paused() const
@@ -1588,6 +1625,7 @@ namespace rs2
 
     void subdevice_model::play(const std::vector<stream_profile>& profiles, viewer_model& viewer, std::shared_ptr<rs2::asynchronous_syncer> syncer)
     {
+        wait_for_stop();
         avoid_streaming_on_embedded_filters_not_matching_configuration();
         set_extrinsics_from_depth_if_needed();
 

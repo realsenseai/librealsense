@@ -521,6 +521,14 @@ namespace rs2
                             }
                         });
 
+                    // Wait for all background stop operations to complete before FW update
+                    std::for_each(fw_update_manager->get_device_model().subdevices.begin(),
+                        fw_update_manager->get_device_model().subdevices.end(),
+                        [](const std::shared_ptr<subdevice_model>& sm)
+                        {
+                            sm->wait_for_stop();
+                        });
+
                     auto _this = shared_from_this();
                     auto invoke = [_this](std::function<void()> action) {
                         _this->invoke(action);
