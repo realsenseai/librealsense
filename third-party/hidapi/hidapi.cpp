@@ -1,6 +1,7 @@
 /* This file is adapted version of the hidapi.c file from http://github.com/signal11/hidapi,
  modified for a cxx compiler. It only compiles for the MacOS platform */
 
+#include <CoreFoundation/CFBase.h>
 #include <IOKit/hid/IOHIDManager.h>
 #include <IOKit/hid/IOHIDKeys.h>
 #include <IOKit/IOKitLib.h>
@@ -659,76 +660,64 @@ static void *read_thread(void *param)
  */
 hidapi_device * HID_API_EXPORT hid_open_path(const char *path)
 {
-    hidapi_device *dev = NULL;
-    io_registry_entry_t entry = MACH_PORT_NULL;
-
-    dev = new_hid_device();
-
     /* Set up the HID Manager if it hasn't been done */
-    if (hid_init() < 0)
-        return NULL;
+    if (hid_init() < 0) return NULL;
 
-    bool return_error = false;
+    hidapi_device *dev = new_hid_device();
 
     /* Get the IORegistry entry for the given path */
-    entry = IORegistryEntryFromPath(kIOMasterPortDefault, path);
+    io_registry_entry_t entry = IORegistryEntryFromPath(kIOMainPortDefault, path);
     if (entry == MACH_PORT_NULL) {
-        /* Path wasn't valid (maybe device was removed?) */
-        return_error = true;
+        /* Path wasn't valid (Device disconnected) */
+        free_hid_device(dev);
+        return NULL;
     }
 
     /* Create an IOHIDDevice for the entry */
     dev->device_handle = IOHIDDeviceCreate(kCFAllocatorDefault, entry);
     if (dev->device_handle == NULL) {
         /* Error creating the HID device */
-        return_error = true;
+        IOObjectRelease(entry);
+        free_hid_device(dev);
+        return NULL;
     }
 
     /* Open the IOHIDDevice */
     IOReturn ret = IOHIDDeviceOpen(dev->device_handle, kIOHIDOptionsTypeSeizeDevice);
-    if (ret == kIOReturnSuccess) {
-        char str[32];
-
-        /* Create the buffers for receiving data */
-        dev->max_input_report_len = (CFIndex) get_max_report_length(dev->device_handle);
-        dev->input_report_buf = reinterpret_cast<uint8_t*>(calloc(dev->max_input_report_len, sizeof(uint8_t)));
-
-        /* Create the Run Loop Mode for this device.
-         printing the reference seems to work. */
-        sprintf(str, "HIDAPI_%p", dev->device_handle);
-        dev->run_loop_mode =
-        CFStringCreateWithCString(NULL, str, kCFStringEncodingASCII);
-
-        /* Attach the device to a Run Loop */
-        IOHIDDeviceRegisterInputReportCallback(
-                                               dev->device_handle, dev->input_report_buf, dev->max_input_report_len,
-                                               &hid_report_callback, dev);
-        IOHIDDeviceRegisterRemovalCallback(dev->device_handle, hid_device_removal_callback, dev);
-
-        /* Start the read thread */
-        pthread_create(&dev->thread, NULL, read_thread, dev);
-
-        /* Wait here for the read thread to be initialized. */
-        pthread_barrier_wait(&dev->barrier);
-
+    if (ret != kIOReturnSuccess) {
+        CFRelease(dev->device_handle);
         IOObjectRelease(entry);
-        return dev;
-    }
-    else {
-        return_error = true;;
-    }
-
-    if (return_error)
-    {
-        if (dev->device_handle != NULL)
-            CFRelease(dev->device_handle);
-
-        if (entry != MACH_PORT_NULL)
-            IOObjectRelease(entry);
-
         free_hid_device(dev);
         return NULL;
     }
+
+    IOObjectRelease(entry);
+
+    char str[32];
+
+    /* Create the buffers for receiving data */
+    dev->max_input_report_len = (CFIndex) get_max_report_length(dev->device_handle);
+    dev->input_report_buf = reinterpret_cast<uint8_t*>(calloc(dev->max_input_report_len, sizeof(uint8_t)));
+
+    /* Create the Run Loop Mode for this device.
+       printing the reference seems to work. */
+    sprintf(str, "HIDAPI_%p", dev->device_handle);
+    dev->run_loop_mode =
+        CFStringCreateWithCString(NULL, str, kCFStringEncodingASCII);
+
+    /* Attach the device to a Run Loop */
+    IOHIDDeviceRegisterInputReportCallback(
+        dev->device_handle, dev->input_report_buf, dev->max_input_report_len,
+        &hid_report_callback, dev);
+    IOHIDDeviceRegisterRemovalCallback(dev->device_handle, hid_device_removal_callback, dev);
+
+    /* Start the read thread */
+    pthread_create(&dev->thread, NULL, read_thread, dev);
+
+    /* Wait here for the read thread to be initialized. */
+    pthread_barrier_wait(&dev->barrier);
+
+    return dev;
 }
 
 static int set_report(hidapi_device *dev, IOHIDReportType type, const unsigned char *data, size_t length)
