@@ -1298,30 +1298,30 @@ namespace rs2
     {
         // Check if D555 at depth resolution of 1280x800
         std::string dev_name = "";
-        if( dev.supports( RS2_CAMERA_INFO_NAME ) )
-            dev_name = dev.get_info( RS2_CAMERA_INFO_NAME );
+        if (dev.supports(RS2_CAMERA_INFO_NAME))
+            dev_name = dev.get_info(RS2_CAMERA_INFO_NAME);
 
-        if( dev_name.find( "D555" ) != std::string::npos )
+        if (dev_name.find("D555") != std::string::npos)
         {
             // More efficient to check resolution before format
-            if( ui.selected_res_id > 0 && res_values.size() > ui.selected_res_id &&  // Verify res_values is initialized
-                res_values[ui.selected_res_id].first == 1280 && res_values[ui.selected_res_id].second == 800 )
+            if (ui.selected_res_id > 0 && res_values.size() > ui.selected_res_id &&  // Verify res_values is initialized
+                res_values[ui.selected_res_id].first == 1280 && res_values[ui.selected_res_id].second == 800)
             {
-                for( auto it = stream_enabled.begin(); it != stream_enabled.end(); ++it )
+                for (auto it = stream_enabled.begin(); it != stream_enabled.end(); ++it)
                 {
-                    if( it->second )
+                    if (it->second)
                     {
                         int selected_format_index = -1;
-                        if( ui.selected_format_id.count( it->first ) > 0 )
-                            selected_format_index = ui.selected_format_id.at( it->first );
+                        if (ui.selected_format_id.count(it->first) > 0)
+                            selected_format_index = ui.selected_format_id.at(it->first);
 
-                        if( format_values.count( it->first ) > 0 && selected_format_index > -1 )
+                        if (format_values.count(it->first) > 0 && selected_format_index > -1)
                         {
-                            auto formats = format_values.at( it->first );
-                            if( formats.size() > selected_format_index )
+                            auto formats = format_values.at(it->first);
+                            if (formats.size() > selected_format_index)
                             {
                                 auto format = formats[selected_format_index];
-                                if( format == RS2_FORMAT_Z16 )
+                                if (format == RS2_FORMAT_Z16)
                                     return true;
                             }
                         }
@@ -1335,10 +1335,14 @@ namespace rs2
 
     bool subdevice_model::is_multiple_resolutions_supported() const
     {
-        std::string product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
-        std::string sensor_name = s->get_info(RS2_CAMERA_INFO_NAME);
+        if (dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE) && s->supports(RS2_CAMERA_INFO_NAME) )
+        {
+            std::string product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
+            std::string sensor_name = s->get_info(RS2_CAMERA_INFO_NAME);
 
-        return product_line == "D500" && sensor_name == "Stereo Module";
+            return product_line == "D500" && sensor_name == "Stereo Module";
+        }
+        return false;
     }
 
     std::pair<int, int> subdevice_model::get_max_resolution(rs2_stream stream) const
@@ -1753,36 +1757,39 @@ namespace rs2
 
     void subdevice_model::set_extrinsics_from_depth_if_needed()
     {
-        std::string pid = dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
-        std::string sensor_name = s->get_info(RS2_CAMERA_INFO_NAME);
-        if (pid == "0B6B" && sensor_name == "Depth Mapping Camera")
+        if (dev.supports(RS2_CAMERA_INFO_PRODUCT_ID) && s->supports(RS2_CAMERA_INFO_NAME))
         {
-            //_labeled_point_cloud_to_depth_extrinsics
-            stream_profile depth_profile;
+            std::string pid = dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
+            std::string sensor_name = s->get_info(RS2_CAMERA_INFO_NAME);
+            if (pid == "0B6B" && sensor_name == "Depth Mapping Camera")
+            {
+                //_labeled_point_cloud_to_depth_extrinsics
+                stream_profile depth_profile;
 
-            auto depth_sensor = dev.first<rs2::depth_sensor>();
-            auto profiles = depth_sensor.get_stream_profiles();
-            for (auto&& p : profiles)
-            {
-                if (p.stream_type() == RS2_STREAM_DEPTH)
+                auto depth_sensor = dev.first<rs2::depth_sensor>();
+                auto profiles = depth_sensor.get_stream_profiles();
+                for (auto&& p : profiles)
                 {
-                    depth_profile = p;
-                    break;
+                    if (p.stream_type() == RS2_STREAM_DEPTH)
+                    {
+                        depth_profile = p;
+                        break;
+                    }
                 }
-            }
-            stream_profile lpc_profile;
-            profiles = s->get_stream_profiles();
-            for (auto&& p : profiles)
-            {
-                if (p.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
+                stream_profile lpc_profile;
+                profiles = s->get_stream_profiles();
+                for (auto&& p : profiles)
                 {
-                    lpc_profile = p;
-                    break;
+                    if (p.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
+                    {
+                        lpc_profile = p;
+                        break;
+                    }
                 }
+                if (depth_profile && lpc_profile)
+                    _extrinsics_from_depth = depth_profile.get_extrinsics_to(lpc_profile);
             }
-            if (depth_profile && lpc_profile)
-                _extrinsics_from_depth = depth_profile.get_extrinsics_to(lpc_profile);
-        }
+        }        
     }
 
 }
