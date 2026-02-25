@@ -106,7 +106,7 @@ if cs:
               and p.format() == rs.format.rgb8
               and p.is_default())
     first_color_frame_delay = time_to_first_frame(cs, cp, max_delay_for_color_frame)
-    test.check(first_frame_time != -1,"color frames did not arrive for" + max_delay_for_color_frame + " seconds")
+    test.check(first_frame_time != -1, f"color frames did not arrive for {max_delay_for_color_frame} seconds")
     if (first_frame_time > -1):
         print("Time until first color frame is: {:.3f} [sec] max allowed is: {:.1f} [sec] ".format(first_color_frame_delay, max_delay_for_color_frame))
         test.check(first_color_frame_delay < max_delay_for_color_frame)
