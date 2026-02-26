@@ -1,5 +1,16 @@
 # Copilot Instructions for librealsense
 
+## Skills
+
+Detailed how-to guides for common tasks are maintained as skill files under `.github/skills/`. **Always consult the relevant skill before performing the corresponding task.** Currently available skills:
+
+| Skill file | When to use |
+|---|---|
+| `.github/skills/build.md` | Building the project (CMake configure, compile, flags) |
+| `.github/skills/testing.md` | Running, filtering, and debugging unit tests |
+
+If a skill file exists for the task at hand, follow its instructions precisely. New skills may be added to this folder over time — check its contents before assuming none applies.
+
 ## Project Overview
 
 **librealsense** is the Intel® RealSense™ cross-platform open-source SDK for working with Intel RealSense depth cameras (D400, D500 series and others). It provides C, C++, Python, C#, and other language bindings.
@@ -51,7 +62,7 @@
 
 ## Build System
 
-The project uses **CMake**. Key build options are defined in `CMake/lrs_options.cmake`. Platform-specific configuration lives in:
+See `.github/skills/build.md` for full build instructions. The project uses **CMake**. Key build options are defined in `CMake/lrs_options.cmake`. Platform-specific configuration lives in:
 - `CMake/windows_config.cmake` — Windows (MSVC)
 - `CMake/unix_config.cmake` — Linux / macOS
 - `CMake/android_config.cmake` — Android NDK
@@ -82,7 +93,7 @@ The project uses **CMake**. Key build options are defined in `CMake/lrs_options.
 
 ## Testing
 
-Tests use a custom Python-based test framework orchestrated by `unit-tests/run-unit-tests.py`. To run tests, build with `-DBUILD_UNIT_TESTS=ON -DBUILD_PYTHON_BINDINGS=ON`, then from the `unit-tests/` directory run `py -3 run-unit-tests.py -s`. Use `--help` to see all available options.
+See `.github/skills/testing.md` for full instructions. Tests use a custom Python-based test framework orchestrated by `unit-tests/run-unit-tests.py`. Build with `-DBUILD_UNIT_TESTS=ON -DBUILD_PYTHON_BINDINGS=ON` first, then from the `unit-tests/` directory run `python run-unit-tests.py`.
 
 ## Naming Conventions
 
