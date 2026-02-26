@@ -95,6 +95,7 @@ librealsense-log.txt
 .vscode/*
 /unit-tests/.idea
 /unit-tests/BrainStemLog.txt
+BrainStemLog.txt
 
 # agents
 .github/agents/

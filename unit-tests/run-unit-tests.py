@@ -445,9 +445,12 @@ def devices_by_test_config( test, exceptions ):
     """
     global forced_configurations, device_set
     
-    # Special handling for multicam tests - enable all ports and use all devices
-    if hasattr(test, 'path_to_script') and 'multicam' in test.path_to_script:
-        log.d( f'{test.name}: multicam test detected - enabling all ports and using all devices' )
+    # Special handling for multicam tests with wildcard configuration - enable all ports
+    if (hasattr(test, 'path_to_script') and 'multicam' in test.path_to_script and 
+        (forced_configurations is None) and 
+        test.config.configurations and 
+        test.config.configurations[0] == ['*']):
+        log.d( f'{test.name}: multicam test with wildcard detected - enabling all ports and using all devices' )
         if devices.hub:
             devices.enable_all()
             import time
@@ -459,6 +462,9 @@ def devices_by_test_config( test, exceptions ):
             # Return a single configuration with all devices
             yield ['*'], all_devices
         return
+    
+    # For multicam tests with specific configurations, use normal port enabling
+    # so only matching devices are enumerated
     
     for configuration in ( forced_configurations  or  test.config.configurations ):
         try:
