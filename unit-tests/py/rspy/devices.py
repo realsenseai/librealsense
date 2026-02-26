@@ -399,9 +399,16 @@ def by_spec( spec, ignored_products ):
     :return: A set of device serial-numbers
     """
     if spec == '*':
-        # Special case: '*' means all devices
-        for sn in enabled():
-            yield sn
+        # Special case: '*' means all devices, except ignored products
+        global _device_by_sn
+        for device in _device_by_sn.values():
+            if not device.enabled:
+                continue
+            for ignored_product in ignored_products:
+                if ignored_product in device.name:
+                    break
+            else:
+                yield device.serial_number
     elif spec.endswith( '*' ):
         for sn in by_product_line( spec[:-1], ignored_products ):
             yield sn

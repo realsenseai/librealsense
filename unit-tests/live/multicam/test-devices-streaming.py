@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Test configuration: Requires at least 2 devices
-#test:device * *
+#test:multi_device *
 
 """
 Multi-stream operation test for all connected devices.

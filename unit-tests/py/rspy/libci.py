@@ -93,6 +93,7 @@ class TestConfig( ABC ):  # Abstract Base Class
         self._retries = 0
         self._context = context
         self._donotrun = False
+        self._multi_device = False
 
     def debug_dump( self ):
         if self._donotrun:
@@ -146,6 +147,10 @@ class TestConfig( ABC ):  # Abstract Base Class
     @property
     def donotrun( self ):
         return  self._donotrun
+
+    @property
+    def multi_device( self ):
+        return self._multi_device
 
 class TestConfigFromText( TestConfig ):
     """
@@ -224,6 +229,19 @@ class TestConfigFromText( TestConfig ):
                             self._configurations.append( params )
                 else:
                     self._configurations.append( params )
+            elif directive == 'multi_device':
+                # Similar to 'device' but indicates this test requires multiple devices
+                self._multi_device = True
+                params_lower_list = text_params.lower().split()
+                if not params:
+                    log.e( source + '+' + str( line['index'] ) + ': multi_device directive with no devices listed' )
+                else:
+                    # For '*', we need to ensure at least 2 devices by adding '* *' configuration
+                    if len(params) == 1 and params[0] == '*':
+                        self._configurations.append( ['*', '*'] )
+                    else:
+                        # For specific devices, add them as a single configuration
+                        self._configurations.append( params )
             elif directive == 'priority':
                 if len( params ) == 1 and params[0].isdigit():
                     self._priority = int( params[0] )
