@@ -3,9 +3,9 @@
 
 
 #test:device D400*
-#test:device D585S
-# Running nightly as this tests specific bug fix in a code that is seldom touched, no need to run for each push.
-# test:donotrun:!nightly
+#test:device D500*
+# Running weekly as this tests specific bug fix in a code that is seldom touched, no need to run for each push.
+# test:donotrun:!weekly
 
 # Objective:
 #
