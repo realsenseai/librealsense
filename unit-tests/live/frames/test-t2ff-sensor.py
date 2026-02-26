@@ -19,7 +19,7 @@ def time_to_first_frame(sensor, profile, max_delay_allowed):
     """
     Wait for the first frame for 'max_delay_allowed' + 1 extra second
     If the frame arrives it will return the seconds it took since open() call
-    If no frame it will return 'max_delay_allowed'
+    If no frame it will return -1
     """
     first_frame_time = -1
     open_call_stopwatch = Stopwatch()
@@ -82,7 +82,7 @@ dp = next(p for p in
           and p.format() == rs.format.z16
           and p.is_default())
 first_depth_frame_delay = time_to_first_frame(ds, dp, max_delay_for_depth_frame)
-test.check(first_depth_frame_delay != -1, "depth frames did not arrive for " + str(max_delay_for_depth_frame) + " seconds")
+test.check(first_depth_frame_delay != -1, "depth frames did not arrive for " + str(max_delay_for_depth_frame + 1) + " second(s)")
 if (first_depth_frame_delay > -1):
     print("Time until first depth frame is: {:.3f} [sec] max allowed is: {:.1f} [sec] ".format(first_depth_frame_delay, max_delay_for_depth_frame))
     test.check(first_depth_frame_delay < max_delay_for_depth_frame)
@@ -106,7 +106,7 @@ if cs:
               and p.format() == rs.format.rgb8
               and p.is_default())
     first_color_frame_delay = time_to_first_frame(cs, cp, max_delay_for_color_frame)
-    test.check(first_color_frame_delay != -1, "color frames did not arrive for " + str(max_delay_for_color_frame) + " seconds")
+    test.check(first_color_frame_delay != -1, "color frames did not arrive for " + str(max_delay_for_color_frame + 1) + " second(s)")
     if (first_color_frame_delay > -1):
         print("Time until first color frame is: {:.3f} [sec] max allowed is: {:.1f} [sec] ".format(first_color_frame_delay, max_delay_for_color_frame))
         test.check(first_color_frame_delay < max_delay_for_color_frame)

@@ -49,7 +49,7 @@ python3 run-unit-tests.py -s
 # When both Debug and Release exist, specify the build output directory:
 python3 run-unit-tests.py -s <build-output-dir>
 # e.g. (Windows):
-python run-unit-tests.py -r <pattern> ..\ build\Debug
+python3 run-unit-tests.py -s ..\build\Debug
 ```
 
 > **Multiple `.pyd` files**: if the runner raises `found more than one possible pyrealsense2`, either pass the specific config dir as above, or delete the stale `.pyd` (the one not matching the active Python interpreter version, e.g. remove `pyrealsense2.cp313-win_amd64.pyd` when running Python 3.14).
