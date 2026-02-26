@@ -445,6 +445,29 @@ def devices_by_test_config( test, exceptions ):
     :param test: The test (of class type Test) we're interested in
     """
     global forced_configurations, device_set
+    
+    # Special handling for multi-device tests with wildcard configuration - enable all ports
+    if (test.config.multi_device and 
+        (forced_configurations is None) and 
+        test.config.configurations and 
+        test.config.configurations[0] == ['*', '*']):
+        log.d( f'{test.name}: multi-device test with wildcard detected - enabling all ports and using all devices' )
+        if devices.hub:
+            devices.enable_all()
+            import time
+            time.sleep(2)  # Give devices time to enumerate
+        all_devices = set(devices.enabled())
+        if device_set:
+            all_devices = all_devices.intersection(device_set)
+        # Multi-device tests require at least 2 devices
+        if len(all_devices) >= 2:
+            # Return a single configuration with all devices
+            yield ['*', '*'], all_devices
+        elif len(all_devices) == 1:
+            log.w( log.yellow + test.name + log.reset + ': multi-device test requires at least 2 devices, but only 1 found' )
+        # If no devices or insufficient devices, don't yield anything (test will be skipped)
+        return
+    
     for configuration in ( forced_configurations  or  test.config.configurations ):
         try:
             for serial_numbers in devices.by_configuration( configuration, exceptions, device_set ):

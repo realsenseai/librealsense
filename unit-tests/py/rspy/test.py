@@ -159,6 +159,128 @@ def find_devices_by_product_line_or_exit( product_line ):
     return devices_list
 
 
+def find_devices_or_exit( count, product_line=None ):
+    """
+    Find exactly N devices, optionally filtered by product line, ensuring they have different serial numbers.
+    
+    This function integrates with the devices module to properly support Acroname hubs.
+    If fewer than the requested number of devices are available, the test will fail.
+    
+    :param count: Number of devices required
+    :param product_line: Optional. The product line to filter by (e.g., "D400", "D500"). If None, any devices.
+    :return: A tuple of (device_list, serial_numbers) where device_list contains the device handles
+    
+    Example usage:
+        devs, sns = test.find_devices_or_exit(3, "D400")
+        # devs is a list of 3 D400 devices with different serial numbers
+        
+        devs, sns = test.find_devices_or_exit(4)
+        # devs is a list of any 4 devices
+    """
+    from rspy import devices
+    import pyrealsense2 as rs
+    
+    # If the device database is empty, query for devices
+    # This happens when tests run as subprocesses and haven't called devices.query() yet
+    if not devices.all():
+        log.d( 'Device database empty; querying for devices...' )
+        devices.query( recycle_ports=False )
+    
+    # Get all enabled devices, optionally filtered by product line
+    enabled_sns = devices.enabled()
+    matching_sns = []
+    
+    for sn in enabled_sns:
+        dev = devices.get(sn)
+        if dev:
+            if product_line is None or dev.product_line == product_line:
+                matching_sns.append(sn)
+    
+    # Check if we have enough devices
+    if len(matching_sns) < count:
+        global n_tests, test_failed, n_failed_tests
+        n_tests += 1
+        test_failed = True
+        n_failed_tests += 1
+        
+        if product_line:
+            error_msg = f"Test requires {count} devices; found {len(matching_sns)} device(s) of {product_line} product line"
+        else:
+            error_msg = f"Test requires {count} devices; found {len(matching_sns)} device(s)"
+        
+        log.e( error_msg )
+        failed_tests.append( ('Insufficient devices',) )
+        print_results()
+        sys.exit(1)
+    
+    # Get the first N devices
+    selected_sns = matching_sns[:count]
+    device_handles = [devices.get(sn).handle for sn in selected_sns]
+    
+    log.d( f'found {count} devices:' )
+    for i, sn in enumerate(selected_sns, 1):
+        log.d( f'  device {i}: {device_handles[i-1]} SN: {sn}' )
+    
+    return device_handles, selected_sns
+
+
+class multicam:
+    """
+    Context manager for tests that require multiple RealSense devices simultaneously.
+    
+    This provides a clean interface for multi-device tests with automatic device discovery
+    and graceful failure handling when insufficient devices are available.
+    
+    Integrates with the devices module to properly support Acroname hubs and port management.
+    
+    Usage examples:
+        from rspy import test
+        
+        # Three D400 devices:
+        with test.multicam(3, "D400") as devices:
+            dev1, dev2, dev3 = devices
+            # Your test code here...
+        
+        # Any five devices regardless of product line:
+        with test.multicam(5) as devices:
+            # devices is a list of 5 device handles
+            for dev in devices:
+                # process each device...
+        
+        # Four devices, unpacked individually:
+        with test.multicam(4, "D500") as (dev1, dev2, dev3, dev4):
+            # Your test code here...
+    
+    The context manager handles device cleanup automatically at the end of the 'with' block.
+    If fewer devices than requested are found, the test will exit gracefully (skip, not fail).
+    """
+    
+    def __init__(self, count, product_line=None):
+        """
+        :param count: Number of devices required
+        :param product_line: Optional. The product line of devices to search for (e.g., "D400", "D500").
+                            If None, will find any devices regardless of product line.
+        """
+        self.count = count
+        self.product_line = product_line
+        self.devices = None
+        self.serial_numbers = None
+    
+    def __enter__(self):
+        """
+        Called when entering the 'with' statement. Discovers and returns devices.
+        """
+        self.devices, self.serial_numbers = find_devices_or_exit(self.count, self.product_line)
+        return self.devices
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Called when exiting the 'with' statement. Cleanup happens here if needed.
+        """
+        # Device cleanup is handled by pyrealsense2 and the devices module
+        pass
+
+
 def print_stack():
     """
     Function for printing the current call stack. Used when an assertion fails
