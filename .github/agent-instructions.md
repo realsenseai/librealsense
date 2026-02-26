@@ -42,6 +42,7 @@
 
 ## Code Conventions
 
+- **Copyright header**: every new source file must include `# License: Apache 2.0. See LICENSE file in root directory.` followed by `# Copyright(c) <current year> RealSense, Inc. All Rights Reserved.` — always use the actual current year, not the year of a nearby file being used as a template
 - The core library compiles as **C++14** (`cxx_std_14` — see `CMake/lrs_macros.cmake`)
 - The public interface only requires **C++11** (`cxx_std_11`)
 - Examples and wrappers generally use **C++11**
