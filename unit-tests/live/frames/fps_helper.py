@@ -68,7 +68,7 @@ def check_fps_dict(measured_fps, expected_fps):
     return all_fps_ok
 
 
-def generate_callbacks(sensor_profiles_dict, profile_name_fps_dict):
+def generate_callbacks(sensor_profiles_dict, profile_name_fps_dict, profile_prev_frame_dict):
     """
     Creates callable functions for each sensor to be triggered when a new frame arrives
     Used to count frames received for measuring fps
@@ -87,10 +87,14 @@ def generate_callbacks(sensor_profiles_dict, profile_name_fps_dict):
         counted_frame_number = profile_name_fps_dict[frame.profile.stream_name()] + 1  # frame number counted in test
         frame_number = frame.get_frame_number()  # the actual frame number from the metadata
         frame_ts = frame.get_timestamp()
-        log.d(f"frame {profile_name} #{counted_frame_number} accepted with frame number {frame_number} and ts {frame_ts}")
+        if profile_prev_frame_dict[frame.profile.stream_name()] != -1:
+            if frame_number > profile_prev_frame_dict[frame.profile.stream_name()] + 1:
+                log.w( f'Frame drop detected. Current frame number {frame_number} previous was {profile_prev_frame_dict[frame.profile.stream_name()]}' )
+        profile_prev_frame_dict[frame.profile.stream_name()] = frame_number
+        # log.d(f"frame {profile_name} #{counted_frame_number} accepted with frame number {frame_number} and ts {frame_ts}")
         if count_frames:
             profile_name_fps_dict[profile_name] += 1
-        log.d(f"frame {profile_name} #{counted_frame_number} callback finished")
+        # log.d(f"frame {profile_name} #{counted_frame_number} callback finished")
 
     sensor_function_dict = {sensor_key: on_frame_received for sensor_key in sensor_profiles_dict}
     return sensor_function_dict
@@ -112,11 +116,18 @@ def measure_fps(sensor_profiles_dict):
                              for profiles in sensor_profiles_dict.values()
                              for profile in profiles}
 
+    # initialize previous frame to -1 to detect if no frame was received
+    profile_prev_frame_dict = {profile.stream_name(): -1
+                             for profiles in sensor_profiles_dict.values()
+                             for profile in profiles}
+
     # generate sensor-callable dictionary
-    funcs_dict = generate_callbacks(sensor_profiles_dict, profile_name_fps_dict)
+    funcs_dict = generate_callbacks(sensor_profiles_dict, profile_name_fps_dict, profile_prev_frame_dict)
 
     for sensor, profiles in sensor_profiles_dict.items():
-        log.d(f"Opening sensor {sensor.name} with profiles: {[p.stream_name() for p in profiles]}")
+        log.d(f"Opening sensor {sensor.name} with profiles: {[p.stream_name() + 
+                                                             ((" " + str(p.as_video_stream_profile().width()) + "x" + str(p.as_video_stream_profile().height())) if p.as_video_stream_profile() else "") +
+                                                             "@" + str(p.fps()) for p in profiles]}")
         sensor.open(profiles)
         log.d(f"Starting sensor {sensor.name}")
         sensor.start(funcs_dict[sensor])
