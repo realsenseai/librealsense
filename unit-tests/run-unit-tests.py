@@ -458,9 +458,13 @@ def devices_by_test_config( test, exceptions ):
         all_devices = set(devices.enabled())
         if device_set:
             all_devices = all_devices.intersection(device_set)
-        if all_devices:
+        # Multi-device tests require at least 2 devices
+        if len(all_devices) >= 2:
             # Return a single configuration with all devices
             yield ['*', '*'], all_devices
+        elif len(all_devices) == 1:
+            log.w( log.yellow + test.name + log.reset + ': multi-device test requires at least 2 devices, but only 1 found' )
+        # If no devices or insufficient devices, don't yield anything (test will be skipped)
         return
     
     for configuration in ( forced_configurations  or  test.config.configurations ):
