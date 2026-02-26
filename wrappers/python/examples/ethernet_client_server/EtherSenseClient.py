@@ -3,10 +3,10 @@ import pyrealsense2 as rs
 import sys, getopt
 import asyncore
 import numpy as np
-import pickle
 import socket
 import struct
 import cv2
+import json
 
 
 print('Number of arguments:', len(sys.argv), 'arguments.')
@@ -20,27 +20,42 @@ def main(argv):
     multi_cast_message(mc_ip_address, port, 'EtherSensePing')
         
 
-#UDP client for each camera server 
+#UDP client for each camera server
 class ImageClient(asyncore.dispatcher):
-    def __init__(self, server, source):   
+    def __init__(self, server, source):
         asyncore.dispatcher.__init__(self, server)
         self.address = server.getsockname()[0]
         self.port = source[1]
         self.buffer = bytearray()
         self.windowName = self.port
-        # open cv window which is unique to the port 
+        # open cv window which is unique to the port
         cv2.namedWindow("window"+str(self.windowName))
         self.remainingBytes = 0
         self.frame_id = 0
-       
+
+    def recv_exact(self, n):
+        """Helper to receive exactly n bytes, looping until complete or connection closes"""
+        data = bytearray()
+        while len(data) < n:
+            packet = self.recv(n - len(data))
+            if not packet:
+                raise ConnectionError("Connection closed while reading frame header")
+            data.extend(packet)
+        return bytes(data)
+
     def handle_read(self):
         if self.remainingBytes == 0:
             # get the expected frame size
-            self.frame_length = struct.unpack('<I', self.recv(4))[0]
+            self.frame_length = struct.unpack('<I', self.recv_exact(4))[0]
             # get the timestamp of the current frame
-            self.timestamp = struct.unpack('<d', self.recv(8))
+            self.timestamp = struct.unpack('<d', self.recv_exact(8))[0]
+            # get metadata size (shape and dtype info)
+            metadata_size = struct.unpack('<I', self.recv_exact(4))[0]
+            # get metadata (shape and dtype as JSON)
+            metadata_bytes = self.recv_exact(metadata_size)
+            self.metadata = json.loads(metadata_bytes.decode('utf-8'))
             self.remainingBytes = self.frame_length
-        
+
         # request the frame data until the frame is completely in buffer
         data = self.recv(self.remainingBytes)
         self.buffer += data
@@ -50,9 +65,10 @@ class ImageClient(asyncore.dispatcher):
             self.handle_frame()
 
     def handle_frame(self):
-        # convert the frame from string to numerical data
-        imdata = pickle.loads(self.buffer)
-        bigDepth = cv2.resize(imdata, (0,0), fx=2, fy=2, interpolation=cv2.INTER_NEAREST) 
+        # SECURITY FIX: Use numpy frombuffer instead of pickle.loads to prevent arbitrary code execution
+        # Reconstruct numpy array from raw bytes and metadata
+        imdata = np.frombuffer(self.buffer, dtype=self.metadata['dtype']).reshape(self.metadata['shape'])
+        bigDepth = cv2.resize(imdata, (0,0), fx=2, fy=2, interpolation=cv2.INTER_NEAREST)
         cv2.putText(bigDepth, str(self.timestamp), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (65536), 2, cv2.LINE_AA)
         cv2.imshow("window"+str(self.windowName), bigDepth)
         cv2.waitKey(1)
