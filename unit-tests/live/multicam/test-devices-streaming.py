@@ -431,11 +431,11 @@ if device_count >= 2:
         log.i("=" * 80)
         
         if success:
-            log.i(f"\n✓ PASS - Multi-stream test successful!")
+            log.i(f"\nPASS - Multi-stream test successful!")
             for i, drop_pct in enumerate(drop_percentages, 1):
                 log.i(f"  Device {i} drop rate: {drop_pct:.2f}%")
         else:
-            log.w(f"\n✗ FAIL - Excessive frame drops detected!")
+            log.w(f"\nFAIL - Excessive frame drops detected!")
             for i, drop_pct in enumerate(drop_percentages, 1):
                 log.w(f"  Device {i} drop rate: {drop_pct:.2f}% (max: {MAX_FRAME_DROP_PERCENTAGE}%)")
         
@@ -455,9 +455,9 @@ if device_count >= 2:
                     all_streams_ok = False
         
         if all_streams_ok:
-            log.i("✓ All streams received adequate frame counts (independence verified)")
+            log.i("PASS - All streams received adequate frame counts (independence verified)")
         else:
-            log.w("✗ Some streams received fewer frames than expected")
+            log.w("FAIL - Some streams received fewer frames than expected")
         
         test.check(all_streams_ok, 
                     "All streams should receive frames independently without interference")
