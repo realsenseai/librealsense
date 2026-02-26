@@ -48,8 +48,11 @@ python3 run-unit-tests.py -s
 
 # When both Debug and Release exist, specify the build output directory:
 python3 run-unit-tests.py -s <build-output-dir>
-# e.g., python3 run-unit-tests.py -s C:\work\git\librealsense\build\Release
+# e.g. (Windows):
+python3 run-unit-tests.py -s ..\build\Debug
 ```
+
+> **Multiple `.pyd` files**: if the runner raises `found more than one possible pyrealsense2`, either pass the specific config dir as above, or delete the stale `.pyd` (the one not matching the active Python interpreter version, e.g. remove `pyrealsense2.cp313-win_amd64.pyd` when running Python 3.14).
 
 For full usage and all available flags:
 
@@ -68,6 +71,8 @@ python3 run-unit-tests.py -s -r "test-hdr"
 python3 run-unit-tests.py -s -r "test-metadata"
 python3 run-unit-tests.py -s --regex "test-stream.*"
 ```
+
+> **Important — test name construction**: test names are built from the full subdirectory path plus the basename, e.g. `live/frames/test-t2ff-sensor.py` becomes `test-live-frames-t2ff-sensor`. The `-r` pattern is matched against this full constructed name, so use a suffix like `-r t2ff-sensor` rather than `-r test-t2ff-sensor` (the latter is a prefix of the basename, not a substring of the full name and will not match).
 
 ### Skip Tests by Name (Regex)
 
