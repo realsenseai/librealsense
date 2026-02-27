@@ -4,15 +4,13 @@ cmake_minimum_required(VERSION 3.10)  # source_group(TREE)
 project( rsutils )
 
 add_library( ${PROJECT_NAME} STATIC "" )
-# We cannot directly interface with nlohmann_json (doesn't work on bionic)
-#target_link_libraries( ${PROJECT_NAME} PUBLIC nlohmann_json )
+target_link_libraries( ${PROJECT_NAME} PRIVATE nlohmann_json )
 target_compile_features( ${PROJECT_NAME} PUBLIC cxx_std_14 )
 set_target_properties( ${PROJECT_NAME} PROPERTIES FOLDER Library )
 
 target_include_directories( ${PROJECT_NAME}
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/third-party/json/include>
 )
 
 # Headers -----------------------------------------------------------------------------------
