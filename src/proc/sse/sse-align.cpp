@@ -52,7 +52,7 @@ inline void distorte_x_y<RS2_DISTORTION_MODIFIED_BROWN_CONRADY>(const __m128& x,
     auto d_x0 = _mm_add_ps(x_f0, _mm_add_ps(_mm_mul_ps(two, _mm_mul_ps(c[2], _mm_mul_ps(x_f0, y_f0))), r4_0));
 
     auto r5_0 = _mm_mul_ps(c[2], _mm_add_ps(r2_0, _mm_mul_ps(two, _mm_mul_ps(y_f0, y_f0))));
-    auto d_y0 = _mm_add_ps(y_f0, _mm_add_ps(_mm_mul_ps(two, _mm_mul_ps(c[3], _mm_mul_ps(x_f0, y_f0))), r4_0));
+    auto d_y0 = _mm_add_ps(y_f0, _mm_add_ps(_mm_mul_ps(two, _mm_mul_ps(c[3], _mm_mul_ps(x_f0, y_f0))), r5_0));
 
     *distorted_x = d_x0;
     *distorted_y = d_y0;
@@ -167,8 +167,8 @@ inline void get_texture_map_sse(const uint16_t * depth,
         auto res1_0 = _mm_shuffle_ps(uuvv1_0, uuvv1_0, _MM_SHUFFLE(3, 1, 2, 0));
         auto res2_0 = _mm_shuffle_ps(uuvv2_0, uuvv2_0, _MM_SHUFFLE(3, 1, 2, 0));
 
-        auto res1_int0 = _mm_cvtps_epi32(res1_0);
-        auto res2_int0 = _mm_cvtps_epi32(res2_0);
+        auto res1_int0 = _mm_cvttps_epi32(res1_0);
+        auto res2_int0 = _mm_cvttps_epi32(res2_0);
 
         _mm_stream_si128(&res[0], res1_int0);
         _mm_stream_si128(&res[1], res2_int0);
@@ -184,8 +184,8 @@ inline void get_texture_map_sse(const uint16_t * depth,
         auto res1 = _mm_shuffle_ps(uuvv1_1, uuvv1_1, _MM_SHUFFLE(3, 1, 2, 0));
         auto res2 = _mm_shuffle_ps(uuvv2_1, uuvv2_1, _MM_SHUFFLE(3, 1, 2, 0));
 
-        auto res1_int1 = _mm_cvtps_epi32(res1);
-        auto res2_int1 = _mm_cvtps_epi32(res2);
+        auto res1_int1 = _mm_cvttps_epi32(res1);
+        auto res2_int1 = _mm_cvttps_epi32(res2);
 
         _mm_stream_si128(&res[0], res1_int1);
         _mm_stream_si128(&res[1], res2_int1);
