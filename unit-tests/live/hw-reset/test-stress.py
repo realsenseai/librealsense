@@ -1,10 +1,10 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Failes on D585S and D555
+# Fails on D585S and D555
 
 # test:device each(D400*)
-## test:device each(D500*)
+# test:device each(D500*) !D585S !D555S
 # test:donotrun:!nightly
 # test:timeout 360
 # test:timeout:weekly 3600
@@ -54,9 +54,7 @@ def get_max_enum_time( d ):
     if pl == "D400":
         return MAX_ENUM_TIME_D400
     if pl == "D500":
-        is_dds = ( d.supports( rs.camera_info.connection_type )
-                   and d.get_info( rs.camera_info.connection_type ) == "DDS" )
-        return MAX_ENUM_TIME_D500_DDS if is_dds else MAX_ENUM_TIME_D500
+        return MAX_ENUM_TIME_D500_DDS if is_dds else MAX_ENUM_TIME_D500  # is_dds: module-level
     return MAX_ENUM_TIME_D400  # safe fallback
 
 
