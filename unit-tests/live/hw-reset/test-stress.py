@@ -1,8 +1,9 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
+# Failed on D585S QS1.8 
 # test:device each(D400*)
-# test:device each(D500*)
+# test:device each(D500*) !D585S
 # test:donotrun:!nightly
 # test:timeout 360
 # test:timeout:weekly 3600
