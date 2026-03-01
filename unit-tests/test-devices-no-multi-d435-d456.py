@@ -1,8 +1,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Test configuration: Enumerate D435 and D455 devices only (without multi_device directive)
-#test:device D435 D455
+# Test configuration: Enumerate D435 and D456 devices only (without multi_device directive)
+#test:device D435 D456
 
 """
 Device enumeration test specifically for D435 and D455 devices using standard #test:device directive.
@@ -20,9 +20,7 @@ from rspy import test, log
 ctx = rs.context()
 all_devices = ctx.query_devices()
 
-device_list = all_devices
-
-device_count = len(device_list)
+device_count = len(all_devices)
 
 log.i(f"Found {device_count} D435/D455 device(s) ({len(all_devices)} total connected)")
 
