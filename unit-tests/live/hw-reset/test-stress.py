@@ -26,8 +26,7 @@ MAX_ENUM_TIME_D400     = 10   # [sec] increased vs single-shot KPI to allow for 
 MAX_ENUM_TIME_D500     = 15   # [sec]
 MAX_ENUM_TIME_D500_DDS = 18   # [sec] extra time for DDS discovery / initialization
 
-dev             = None   # original handle — kept stable for info.was_removed() matching
-dev_for_reset   = None   # always the latest live handle — used for hardware_reset() calls
+dev             = None   # current live handle — used for both was_removed() matching and hardware_reset()
 device_removed  = False
 device_added    = False
 new_dev_handle  = None   # updated by callback so each iteration gets the fresh handle
@@ -63,7 +62,6 @@ def get_max_enum_time( d ):
 test.start( "HW reset stress test" )
 
 dev, ctx = test.find_first_device_or_exit()
-dev_for_reset = dev
 ctx.set_devices_changed_callback( device_changed )
 
 is_dds      = ( dev.supports( rs.camera_info.connection_type )
@@ -90,7 +88,7 @@ for i in range( 1, iterations + 1 ):
     new_dev_handle = None
 
     log.d( f"[{i}/{iterations}] Sending HW-reset" )
-    dev_for_reset.hardware_reset()
+    dev.hardware_reset()
 
     # --- wait for removal ---
     t = Timer( REMOVAL_TIMEOUT )
@@ -120,8 +118,8 @@ for i in range( 1, iterations + 1 ):
         # Cannot continue — no valid device handle for further resets
         break
 
-    # Update only the reset handle for the next iteration; keep dev unchanged for was_removed() matching
-    dev_for_reset = new_dev_handle
+    # Update dev to the fresh handle so was_removed() and hardware_reset() stay in sync
+    dev = new_dev_handle
     log.d( f"[{i}/{iterations}] OK" )
 
 log.i( f"Completed {i} of {iterations} iterations" )

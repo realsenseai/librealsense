@@ -69,6 +69,12 @@ python3 run-unit-tests.py -s -r "test-metadata"
 python3 run-unit-tests.py -s --regex "test-stream.*"
 ```
 
+**Test name derivation**: the orchestrator builds a test's name from its path relative to `unit-tests/`, replacing directory separators with `-` and stripping the leading `test-` from the filename. For example:
+- `live/hw-reset/test-stress.py` → `test-live-hw-reset-stress`
+- `func/test-hdr.py` → `test-func-hdr`
+
+So when using `-r`, omit the `test-` filename prefix and join subdirectories with `-`.
+
 ### Skip Tests by Name (Regex)
 
 Use `--skip-regex` to exclude tests whose names match:
@@ -135,8 +141,20 @@ python3 run-unit-tests.py --debug          # enable framework debug output; also
 Some tests are marked `# test:donotrun:!nightly` and are **skipped by default**. Pass `--context nightly` to enable them:
 
 ```bash
-python3 run-unit-tests.py --context nightly -r hw-reset-stress ../build/Debug
+python3 run-unit-tests.py --context nightly -r hw-reset-stress ../build/Release
 ```
+
+## Running Weekly Tests
+
+Weekly tests use a higher iteration count / longer timeout (controlled by `'weekly' in test.context` inside the test). The `--context` flag accepts a **space-separated list**, so to run a nightly-guarded test with weekly behaviour pass **both** contexts:
+
+```bash
+# 'nightly' satisfies the test:donotrun:!nightly guard
+# 'weekly' activates higher iteration counts and longer timeouts inside the test
+python3 run-unit-tests.py --context "nightly weekly" -r hw-reset-stress ../build/Release
+```
+
+Passing `--context weekly` alone is **not sufficient** — the `test:donotrun:!nightly` directive will still filter the test out.
 
 ## Repeating and Retrying
 
