@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Test configuration: Enumerate D435 and D456 devices only (without multi_device directive)
-#test:device D435 D456
+#test:device D400* D400*
 
 """
 Device enumeration test specifically for D435 and D455 devices using standard #test:device directive.
