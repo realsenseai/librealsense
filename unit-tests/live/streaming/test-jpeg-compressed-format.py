@@ -3,6 +3,7 @@
 
 # test:device D555
 # test:donotrun:!dds
+# test:donotrun:!nightly
 
 
 import pyrealsense2 as rs

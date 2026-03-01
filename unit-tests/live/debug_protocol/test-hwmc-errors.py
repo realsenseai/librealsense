@@ -1,6 +1,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
 
+# Not frequently changing, using FW return codes. Can be checked weekly.
+# test:donotrun:!weekly
 # test:device each(D400*)
 # test:device each(D500*)
 

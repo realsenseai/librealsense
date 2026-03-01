@@ -2,8 +2,8 @@
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 # DDS devices have not implemented firmware_logger interface yet
-##test:donotrun:!dds
 #test:device each(D500*) !D555
+#test:donotrun:!nightly
 
 from rspy import log, test
 from rspy import librs as rs

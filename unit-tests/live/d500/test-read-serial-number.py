@@ -1,6 +1,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
 
+# GVD structure and HWM don't often change
+# test:donotrun:!weekly
 # test:device D500*
 
 import pyrealsense2 as rs
