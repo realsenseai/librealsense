@@ -21,6 +21,7 @@ ctx = rs.context()
 all_devices = ctx.query_devices()
 
 device_count = len(all_devices)
+device_list = all_devices
 
 log.i(f"Found {device_count} D435/D455 device(s) ({len(all_devices)} total connected)")
 
