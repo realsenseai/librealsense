@@ -3,7 +3,6 @@
 
 # test:donotrun:!weekly
 # test:device D400*
-# test:device D500*
 # test:timeout 14400
 # CI timeout set to 4 hours to accommodate comprehensive testing of all
 # supported resolution and FPS combinations across depth, color, and IR streams
@@ -518,7 +517,7 @@ def test_stream_fps_accuracy_generic(device, stream_name, stream_type, formats, 
     if not fps_measurements:
         return False, 0.0, {"error": f"No FPS measurements collected after {test_stopwatch.get_elapsed():.1f}s (expected {expected_fps} FPS, warmup: {warmup_frames} frames, got {frame_count} total frames)"}
     
-    # For very low FPS (≤6), allow single measurement if we have a minimal reasonable frame count
+    # For very low FPS (<=6), allow single measurement if we have a minimal reasonable frame count
     # Relaxed from 10 to MIN_FRAME_COUNT_LOW_FPS (default 5) because per-frame measurement now provides limited data
     # in short-duration configuration tests (e.g., 3s) where <10 frames may be expected (~18 frames max at 6 FPS)
     if expected_fps <= 6 and len(fps_measurements) == 1 and frame_count >= MIN_FRAME_COUNT_LOW_FPS:
@@ -527,7 +526,7 @@ def test_stream_fps_accuracy_generic(device, stream_name, stream_type, formats, 
         fps_min = fps_max = actual_avg_fps
         fps_std = 0.0
     elif len(fps_measurements) < 2:
-        return False, 0.0, {"error": f"Insufficient FPS measurements: {len(fps_measurements)} (need ≥2 for statistics, or ≥1 with ≥{MIN_FRAME_COUNT_LOW_FPS} frames for ≤6 FPS). Got {frame_count} frames in {test_stopwatch.get_elapsed():.1f}s with warmup={warmup_frames}, interval={measurement_interval}"}
+        return False, 0.0, {"error": f"Insufficient FPS measurements: {len(fps_measurements)} (need >=2 for statistics, or >=1 with >={MIN_FRAME_COUNT_LOW_FPS} frames for <=6 FPS). Got {frame_count} frames in {test_stopwatch.get_elapsed():.1f}s with warmup={warmup_frames}, interval={measurement_interval}"}
     else:
         actual_avg_fps = sum(fps_measurements) / len(fps_measurements)
         fps_min = min(fps_measurements)
@@ -899,7 +898,7 @@ def print_fps_test_summary(stream_type_name, supported_fps_rates, all_fps_result
             acceptable_tests = sum(1 for r in all_fps_results if r['passed'] and r['deviation'] > 0.10)
             
             log.i(f"\nPerformance Categories:")
-            log.i(f"  Excellent (≤5% deviation): {excellent_tests} tests")
+            log.i(f"  Excellent (<=5% deviation): {excellent_tests} tests")
             log.i(f"  Good (5-10% deviation): {good_tests} tests")
             log.i(f"  Acceptable (>10% deviation): {acceptable_tests} tests")
             log.i(f"  Failed: {failed_tests} tests")
@@ -1152,7 +1151,7 @@ def print_configuration_test_summary(stream_type_name, all_results, all_passed, 
         acceptable_tests = sum(1 for r in successful_results if r['deviation'] > 0.10)
         
         log.i(f"\nPerformance Categories:")
-        log.i(f"  Excellent (≤5% deviation): {excellent_tests} configurations")
+        log.i(f"  Excellent (<=5% deviation): {excellent_tests} configurations")
         log.i(f"  Good (5-10% deviation): {good_tests} configurations")
         log.i(f"  Acceptable (>10% deviation): {acceptable_tests} configurations")
         log.i(f"  Failed: {failed_tests} configurations")
