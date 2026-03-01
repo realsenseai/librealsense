@@ -20,7 +20,7 @@ env = None
 if platform.system() == 'Linux' and not os.environ.get( 'DISPLAY' ):
     xvfb = shutil.which( 'xvfb-run' )
     if not xvfb:
-        log.e( 'No DISPLAY and xvfb-run not found; install xvfb (apt install xvfb)' )
+        log.f( 'No DISPLAY and xvfb-run not found; install xvfb (apt install xvfb)' )
         test.print_results_and_exit()
     log.d( 'no DISPLAY set; using xvfb-run with software rendering' )
     cmd += [xvfb, '-a']
