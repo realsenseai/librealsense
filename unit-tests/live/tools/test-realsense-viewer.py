@@ -3,7 +3,7 @@
 
 #test:device D400*
 
-import subprocess
+import os, platform, shutil, subprocess
 from rspy import log, repo, test
 
 #############################################################################################
@@ -13,16 +13,33 @@ from rspy import log, repo, test
 # tools/realsense-viewer/tests/. Using the --auto flag allows us to run all tests one by one.
 # If we want to run a specific test / test group, we can use the -r flag
 
+# Headless Linux: use xvfb-run for a virtual display and Mesa software rendering
+cmd = []
+env = None
+# Headless Linux: use xvfb-run for a virtual display and Mesa software rendering
+if platform.system() == 'Linux' and not os.environ.get( 'DISPLAY' ):
+    xvfb = shutil.which( 'xvfb-run' )
+    if not xvfb:
+        log.e( 'No DISPLAY and xvfb-run not found; install xvfb (apt install xvfb)' )
+        test.print_results_and_exit()
+    log.d( 'no DISPLAY set; using xvfb-run with software rendering' )
+    cmd += [xvfb, '-a']
+    env = dict( os.environ, LIBGL_ALWAYS_SOFTWARE='1' )
+
 test.start( "Run realsense-viewer GUI tests" )
 viewer_tests = repo.find_built_exe( 'tools/realsense-viewer', 'realsense-viewer-tests' )
 test.check( viewer_tests )
 if viewer_tests:
-    log.d( 'running:', viewer_tests, '--auto' )
-    p = subprocess.run( [viewer_tests, '--auto'],
+    cmd += [viewer_tests, '--auto']
+    log.d( 'running:', *cmd )
+    p = subprocess.run( cmd,
                         stdout=None,
                         stderr=subprocess.STDOUT,
                         timeout=300,
-                        check=False )
+                        check=False,
+                        env=env )
+    if p.returncode != 0:
+        log.e( 'realsense-viewer-tests exited with code', p.returncode )
     test.check( p.returncode == 0 )
 else:
     log.e( 'realsense-viewer-tests was not found!' )
