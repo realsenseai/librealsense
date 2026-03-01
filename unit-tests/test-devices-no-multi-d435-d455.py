@@ -34,6 +34,7 @@ log.i(f"Found {device_count} D435/D455 device(s) ({len(all_devices)} total conne
 #
 with test.closure("Device enumeration and basic verification"):
     
+    test.check(device_count == 2)
     for i in range(device_count):
         dev = device_list[i]
         
