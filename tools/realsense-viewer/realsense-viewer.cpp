@@ -8,7 +8,10 @@
 
 #include <common/cli.h>
 
+#include "realsense-viewer.h"
+
 #include <cstdarg>
+#include <functional>
 #include <thread>
 #include <iostream>
 #include <algorithm>
@@ -288,7 +291,10 @@ void refresh_devices(std::mutex& m,
 }
 
 
-int main(int argc, const char** argv) try
+int run_viewer( int argc, const char ** argv,
+                std::function< void( rs2::device_models_list &, rs2::viewer_model & ) > on_setup,
+                std::function< bool() >                                                  keep_alive,
+                std::function< void() >                                                  on_teardown )
 {
     rs2::cli cmd( "realsense-viewer" );
     auto settings = cmd.process( argc, argv );
@@ -369,6 +375,9 @@ int main(int argc, const char** argv) try
             device_names, *device_models, viewer_model, error_message);
         return true;
     };
+
+    if( on_setup )
+        on_setup( *device_models, viewer_model );
 
     // Closing the window
     while (window)
@@ -619,7 +628,14 @@ int main(int argc, const char** argv) try
 
         // Fetch and process frames from queue
         viewer_model.handle_ready_frames(viewer_rect, window, static_cast<int>(device_models->size()), error_message);
+
+        // Check if we need to close the window
+        if( keep_alive && !keep_alive() )
+            glfwSetWindowShouldClose( static_cast< GLFWwindow * >( window ), GLFW_TRUE );
         }
+
+    if( on_teardown )
+        on_teardown();
 
     // Stopping post processing filter rendering thread
     viewer_model.ppf.stop();
@@ -633,14 +649,4 @@ int main(int argc, const char** argv) try
         }
 
     return EXIT_SUCCESS;
-}
-catch (const error & e)
-{
-    std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
-    return EXIT_FAILURE;
-}
-catch (const std::exception& e)
-{
-    std::cerr << e.what() << std::endl;
-    return EXIT_FAILURE;
 }

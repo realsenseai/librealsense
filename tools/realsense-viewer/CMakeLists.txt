@@ -6,18 +6,14 @@ project(realsense-viewer)
 
 if(WIN32)
     add_executable( ${PROJECT_NAME} WIN32 "" )
-    target_link_libraries( ${PROJECT_NAME} OpenGL::GL)
 else()
     add_executable( ${PROJECT_NAME} "" )
-    target_link_libraries( ${PROJECT_NAME} OpenGL::GL dl) # Check the platform and conditionally link OpenGL and libdl (for linux)
 endif()
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 include_directories(${CMAKE_BINARY_DIR})
-
-using_easyloggingpp( ${PROJECT_NAME} SHARED )
 
 include(../../common/CMakeLists.txt)
 
@@ -168,14 +164,9 @@ if(DEFINED INTEL_OPENVINO_DIR  AND  IS_DIRECTORY ${INTEL_OPENVINO_DIR})
 endif()
 
 # config-ui
+target_sources( ${PROJECT_NAME} PRIVATE ${RS_VIEWER_CPP} viewer-main.cpp )
 if(WIN32)
-    target_sources( ${PROJECT_NAME}
-        PRIVATE
-            ${RS_VIEWER_CPP}
-            ${CMAKE_CURRENT_SOURCE_DIR}/res/resource.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/res/realsense-viewer.rc
-            ../../common/windows-app-bootstrap.cpp
-        )
+    target_sources( ${PROJECT_NAME} PRIVATE ../../common/windows-app-bootstrap.cpp )
 
     source_group("3rd Party" FILES
         ../../third-party/tinyfiledialogs/tinyfiledialogs.c
@@ -197,14 +188,37 @@ if(WIN32)
     #list(TRANSFORM DELAYED PREPEND " /DELAYLOAD:")  - Requires cmake v3.12
     PREPEND(DELAYED " /DELAYLOAD:" ${DELAYED})
     string(REPLACE ";" " " LD_FLAGS_STR "${DELAYED}")
-    set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${LD_FLAGS_STR}")
-
-else()
-    target_sources( ${PROJECT_NAME}
-        PRIVATE
-            ${RS_VIEWER_CPP}
-        )
 endif()
+
+set(RS_VIEWER_LIBS ${GTK3_LIBRARIES} Threads::Threads realsense2-gl)
+
+# Shared config applied to both realsense-viewer and realsense-viewer-tests
+macro(viewer_target_config _target)
+    # Link OpenGL (all platforms) and libdl (linux)
+    target_link_libraries(${_target} OpenGL::GL)
+    using_easyloggingpp(${_target} SHARED)
+    target_include_directories(${_target} PRIVATE ../../src)
+    if(WIN32)
+        target_sources(${_target} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/res/resource.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/res/realsense-viewer.rc)
+        set_target_properties(${_target} PROPERTIES LINK_FLAGS "${LD_FLAGS_STR}")
+    else()
+        target_link_libraries(${_target} dl)
+    endif()
+    if(CHECK_FOR_UPDATES)
+        message( STATUS "Check for updates capability added to ${_target}" )
+        add_dependencies(${_target} libcurl)
+        set(RS_VIEWER_LIBS ${RS_VIEWER_LIBS} curl)
+    endif()
+    if(IMPORT_DEPTH_CAM_FW)
+        add_definitions(-DINTERNAL_FW)
+        target_link_libraries(${_target} fw)
+    endif()
+    target_link_libraries(${_target} ${DEPENDENCIES} ${RS_VIEWER_LIBS} tclap)
+    set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 FOLDER Tools)
+endmacro()
+viewer_target_config(${PROJECT_NAME})
 
 if(OPENVINO2019)
     target_compile_definitions(realsense-viewer PRIVATE OPENVINO2019)
@@ -227,29 +241,6 @@ include_directories(
     )
 
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 11)
-
-set(RS_VIEWER_LIBS ${GTK3_LIBRARIES} Threads::Threads realsense2-gl)
-
-if (CHECK_FOR_UPDATES)
-    message( STATUS "Check for updates capability added to realsense-viewer" )
-    add_dependencies(${PROJECT_NAME} libcurl)
-    set(RS_VIEWER_LIBS ${RS_VIEWER_LIBS} curl)
-endif()
-
-if (IMPORT_DEPTH_CAM_FW)
-    add_definitions(-DINTERNAL_FW)
-    target_link_libraries(${PROJECT_NAME} fw)
-endif()
-
-target_link_libraries( ${PROJECT_NAME} ${DEPENDENCIES} ${RS_VIEWER_LIBS} tclap )
-
-set_target_properties (${PROJECT_NAME} PROPERTIES
-    FOLDER Tools
-)
-
-target_include_directories(${PROJECT_NAME} PRIVATE ../../src)
-
 install(
     TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -259,4 +250,41 @@ install(DIRECTORY presets/
     DESTINATION $ENV{HOME}/Documents/librealsense2/presets
     FILES_MATCHING PATTERN "*.preset"
 )
+
+if(BUILD_VIEWER_TESTS)
+    include(FetchContent)
+    FetchContent_Declare(imgui_test_engine
+        GIT_REPOSITORY https://github.com/ocornut/imgui_test_engine.git
+        GIT_TAG v1.90.8 GIT_SHALLOW ON)
+    FetchContent_MakeAvailable(imgui_test_engine)
+    set(TE_DIR ${imgui_test_engine_SOURCE_DIR}/imgui_test_engine)
+
+    set(VIEWER_TEST_SOURCES
+        tests/viewer-test-main.cpp
+        tests/viewer-test-helpers.cpp
+        tests/test-device.cpp
+        tests/test-streaming.cpp
+        tests/test-controls.cpp
+    )
+    file(GLOB TE_SOURCES ${TE_DIR}/*.cpp)
+
+    add_executable(realsense-viewer-tests
+        ${RS_VIEWER_CPP} ${VIEWER_TEST_SOURCES} ${TE_SOURCES})
+    viewer_target_config(realsense-viewer-tests)
+
+    target_compile_definitions(realsense-viewer-tests PRIVATE
+        IMGUI_ENABLE_TEST_ENGINE IMGUI_TEST_ENGINE_ENABLE_STD_FUNCTION
+        IMGUI_TEST_ENGINE_ENABLE_COROUTINE_STDTHREAD_IMPL=1)
+    target_include_directories(realsense-viewer-tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR} ${TE_DIR} ${TE_DIR}/thirdparty/Str)
+
+    # Suppress warnings in third-party test engine sources
+    if(MSVC)
+        set_source_files_properties(${TE_SOURCES} PROPERTIES COMPILE_OPTIONS "/W0")
+    else()
+        set_source_files_properties(${TE_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
+    endif()
+
+    source_group("Test Files" FILES ${VIEWER_TEST_SOURCES})
+endif()
 endif()
