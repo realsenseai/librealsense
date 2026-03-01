@@ -1,8 +1,6 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
-# Our commits can only seldom affect image quality (unless specifically processing the frames) no need to run for each commit
-# test:donotrun:!nightly
 # test:device each(D400*)
 # test:timeout 1500
 

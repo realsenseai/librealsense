@@ -3,7 +3,7 @@
 
 # DDS devices have not implemented firmware_logger interface yet. Only D400 devices use legacy logging format
 # test:device each(D400*)
-# test:donotrun:!nighlty
+# test:donotrun:!nightly
 
 from rspy import log, test
 from rspy import librs as rs

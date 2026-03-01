@@ -2,7 +2,7 @@
 # Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
 # test:timeout 1500
-# Moving to weekly as this test non live records in a code that is seldom touched
+# Moving to weekly as this test is non live and use known records in a code that is seldom touched
 # test:donotrun:!weekly
 
 import pyrealsense2 as rs, os
