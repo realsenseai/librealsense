@@ -6,6 +6,7 @@
 #include "viewer.h"
 #include "device-model.h"
 #include "imgui_te_engine.h"
+#include "imgui_te_context.h"
 
 #include <vector>
 #include <memory>

@@ -278,6 +278,13 @@ if(BUILD_VIEWER_TESTS)
     target_include_directories(realsense-viewer-tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR} ${TE_DIR} ${TE_DIR}/thirdparty/Str)
 
+    # Suppress warnings in third-party test engine sources
+    if(MSVC)
+        set_source_files_properties(${TE_SOURCES} PROPERTIES COMPILE_OPTIONS "/W0")
+    else()
+        set_source_files_properties(${TE_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
+    endif()
+
     source_group("Test Files" FILES ${VIEWER_TEST_SOURCES})
 endif()
 endif()
