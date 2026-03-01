@@ -984,7 +984,9 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_PRODUCT_LINE, "D400");
         register_info(RS2_CAMERA_INFO_RECOMMENDED_FIRMWARE_VERSION, _recommended_fw_version);
         register_info(RS2_CAMERA_INFO_CAMERA_LOCKED, _is_locked ? "YES" : "NO");
-        register_info(RS2_CAMERA_INFO_DFU_DEVICE_PATH, group.uvc_devices.front().dfu_device_path);
+        // Only register DFU device path if it's populated (primarily for MIPI devices)
+        if (!group.uvc_devices.front().dfu_device_path.empty())
+            register_info(RS2_CAMERA_INFO_DFU_DEVICE_PATH, group.uvc_devices.front().dfu_device_path);
         register_info(RS2_CAMERA_INFO_IMU_TYPE, _imu_type);
 
         if (usb_modality)
