@@ -18,8 +18,10 @@ import fps_helper
 
 delta_Hz = 1
 tested_fps = [5, 6, 15, 30, 60, 90]
-time_to_test_fps = [25, 20, 13, 10, 5, 4]
+time_to_test_fps = [8, 8, 5, 4, 3, 2] # Get enough frames to check FPS stability
 test.check_equal( len(tested_fps), len(time_to_test_fps) )
+
+fps_helper.TIME_FOR_STEADY_STATE = 1.2 # t2ff KPI is 1 second + some extra.
 
 dev, _ = test.find_first_device_or_exit()
 product_line = dev.get_info(rs.camera_info.product_line)

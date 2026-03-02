@@ -1,8 +1,9 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
-#test:timeout 1500
-#test:donotrun:!nightly
+# test:timeout 1500
+# Moving to weekly as this test is non live and use known records in a code that is seldom touched
+# test:donotrun:!weekly
 
 import pyrealsense2 as rs, os
 from rspy import log, test, repo
@@ -11,7 +12,7 @@ import time
 
 # repo.build
 file_name = os.path.join(repo.build, 'unit-tests', 'recordings', 'all_combinations_depth_color.bag' )
-log.d( 'deadlock file:', file_name )
+log.d( 'recorded file:', file_name )
 frames_in_bag_file = 64
 number_of_iterations = 250
 

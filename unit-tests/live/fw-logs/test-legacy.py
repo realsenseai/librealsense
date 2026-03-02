@@ -1,9 +1,9 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
-# DDS devices have not implemented firmware_logger interface yet
-##test:donotrun:!dds
-#test:device each(D400*)
+# DDS devices have not implemented firmware_logger interface yet. Only D400 devices use legacy logging format
+# test:device each(D400*)
+# test:donotrun:!nightly
 
 from rspy import log, test
 from rspy import librs as rs
