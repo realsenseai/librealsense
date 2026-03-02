@@ -125,8 +125,13 @@ def measure_fps(sensor_profiles_dict):
     funcs_dict = generate_callbacks(sensor_profiles_dict, profile_name_fps_dict, profile_prev_frame_dict)
 
     for sensor, profiles in sensor_profiles_dict.items():
-        vp = p.as_video_stream_profile()
-        log.d(f"Opening sensor {sensor.name} with profiles: {[p.stream_name() + ((" " + str(vp.width()) + "x" + str(vp.height())) if vp else "") + "@" + str(p.fps()) for p in profiles]}")
+        profiles_str = []
+        for p in profiles:
+            vp = p.as_video_stream_profile()
+            resolution = ((" " + str(vp.width()) + "x" + str(vp.height())) if vp else "")
+            fps = "@" + str(p.fps())
+            profiles_str.append( p.stream_name() + resolution + fps )
+        log.d(f"Opening sensor {sensor.name} with profiles: {profiles_str}")
         sensor.open(profiles)
         log.d(f"Starting sensor {sensor.name}")
         sensor.start(funcs_dict[sensor])
