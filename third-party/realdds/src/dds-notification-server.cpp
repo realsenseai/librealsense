@@ -61,7 +61,8 @@ dds_notification_server::dds_notification_server( std::shared_ptr< dds_publisher
                       _new_instant_notification = false;
                   }
               }
-          } )
+          },
+          rsutils::concurrency::thread_category_network, "dds-notif" )
 {
     auto topic = topics::flexible_msg::create_topic( publisher->get_participant(), topic_name.c_str() );
     _writer = std::make_shared< dds_topic_writer >( topic, publisher );

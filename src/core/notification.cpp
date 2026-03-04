@@ -24,7 +24,7 @@ notification::notification( rs2_notification_category category,
 
 
 notifications_processor::notifications_processor()
-    : _dispatcher( 10 )
+    : _dispatcher( 10, rsutils::concurrency::thread_category_dispatch, "notif-d" )
 {
 }
 

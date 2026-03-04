@@ -493,3 +493,7 @@ EXPORTS
     rs2_get_embedded_filter_type
     rs2_is_embedded_filter_extendable_to
     rs2_embedded_filter_type_to_string
+
+    rs2_thread_category_to_string
+    rs2_set_thread_start_callback
+    rs2_set_thread_start_callback_cpp

@@ -3,6 +3,7 @@
 
 #include "context.h"
 #include "d400-mipi-device.h"
+#include <rsutils/concurrency/thread-utils.h>
 
 namespace librealsense
 {
@@ -31,7 +32,9 @@ namespace librealsense
         auto non_const_device_info = std::const_pointer_cast<librealsense::device_info>(dev_info);
         std::vector< std::shared_ptr< device_info > > devices{ non_const_device_info };
         auto ctx = std::weak_ptr< context >(dev_info->get_context());
-        std::thread fake_notification(
+        rsutils::concurrency::create_thread(
+            rsutils::concurrency::thread_category_device_monitoring,
+            "mipi-reconn",
             [ctx, devs = std::move(devices)]()
             {
                 try
@@ -50,7 +53,6 @@ namespace librealsense
                     LOG_ERROR(e.what());
                     return;
                 }
-            });
-        fake_notification.detach();
+            }).detach();
     }
 }

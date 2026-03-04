@@ -12,7 +12,7 @@ namespace librealsense
         _monitor([this](dispatcher::cancellable_timer cancellable_timer)
             {
                 polling(cancellable_timer);
-            }),
+            }, rsutils::concurrency::thread_category_device_monitoring, "thermal-mon"),
         _poll_intervals_ms(2000), // Temperature check routine to be invoked every 2 sec
         _thermal_threshold_deg(2.f),
         _temp_base(0.f),

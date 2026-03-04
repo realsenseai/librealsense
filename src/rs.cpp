@@ -11,6 +11,7 @@
 #include "core/debug.h"
 #include "core/motion.h"
 #include "core/extension.h"
+#include <rsutils/concurrency/thread-utils.h>
 #include "media/playback/playback-device-info.h"
 #include "media/record/record_device.h"
 #include <media/ros/ros_writer.h>
@@ -1902,6 +1903,77 @@ void rs2_log_to_callback( rs2_log_severity min_severity, rs2_log_callback_ptr on
     );
 }
 HANDLE_EXCEPTIONS_AND_RETURN( , min_severity, on_log, arg )
+
+// librealsense wrapper around a C function for thread-start callback
+class on_thread_start_callback : public rs2_thread_start_callback
+{
+    rs2_thread_start_callback_ptr _on_thread_start;
+    void * _user_arg;
+
+public:
+    on_thread_start_callback( rs2_thread_start_callback_ptr on_thread_start, void * user_arg )
+        : _on_thread_start( on_thread_start )
+        , _user_arg( user_arg )
+    {
+    }
+
+    void on_thread_start( rs2_thread_category category, const char * name ) noexcept override
+    {
+        if( _on_thread_start )
+        {
+            try
+            {
+                _on_thread_start( category, name, _user_arg );
+            }
+            catch( ... )
+            {
+                std::cerr << "Exception in thread-start callback!" << std::endl;
+            }
+        }
+    }
+    void release() override { delete this; }
+};
+
+// Compile-time verification that rsutils::concurrency::thread_category values match rs2_thread_category.
+// These two enums must stay in sync — rsutils owns the internal definition (no dependency on public API),
+// and rs2_thread_category is the public C API mirror.
+static_assert( static_cast< int >( rsutils::concurrency::thread_category_usb_io )            == static_cast< int >( RS2_THREAD_CATEGORY_USB_IO ) );
+static_assert( static_cast< int >( rsutils::concurrency::thread_category_video_capture )     == static_cast< int >( RS2_THREAD_CATEGORY_VIDEO_CAPTURE ) );
+static_assert( static_cast< int >( rsutils::concurrency::thread_category_sensor_io )         == static_cast< int >( RS2_THREAD_CATEGORY_SENSOR_IO ) );
+static_assert( static_cast< int >( rsutils::concurrency::thread_category_frame_processing )  == static_cast< int >( RS2_THREAD_CATEGORY_FRAME_PROCESSING ) );
+static_assert( static_cast< int >( rsutils::concurrency::thread_category_device_monitoring ) == static_cast< int >( RS2_THREAD_CATEGORY_DEVICE_MONITORING ) );
+static_assert( static_cast< int >( rsutils::concurrency::thread_category_dispatch )          == static_cast< int >( RS2_THREAD_CATEGORY_DISPATCH ) );
+static_assert( static_cast< int >( rsutils::concurrency::thread_category_network )           == static_cast< int >( RS2_THREAD_CATEGORY_NETWORK ) );
+static_assert( static_cast< int >( rsutils::concurrency::thread_category_utility )           == static_cast< int >( RS2_THREAD_CATEGORY_UTILITY ) );
+
+void rs2_set_thread_start_callback( rs2_thread_start_callback_ptr callback, void * arg, rs2_error ** error ) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL( callback );
+    // Wrap the C function pointer + user data into a C++ callback object, then delegate to the _cpp version
+    rs2_thread_start_callback_sptr cb_ptr{ new on_thread_start_callback( callback, arg ) };
+    rsutils::concurrency::set_thread_start_callback(
+        [cb = std::move( cb_ptr )]( rsutils::concurrency::thread_category category, std::string const & name )
+        {
+            cb->on_thread_start( static_cast< rs2_thread_category >( category ), name.c_str() );
+        } );
+}
+HANDLE_EXCEPTIONS_AND_RETURN( , callback, arg )
+
+void rs2_set_thread_start_callback_cpp( rs2_thread_start_callback * callback, rs2_error ** error ) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL( callback );
+    rs2_thread_start_callback_sptr cb_ptr{ callback,
+                                           []( rs2_thread_start_callback * p )
+                                           {
+                                               p->release();
+                                           } };
+    rsutils::concurrency::set_thread_start_callback(
+        [cb = std::move( cb_ptr )]( rsutils::concurrency::thread_category category, std::string const & name )
+        {
+            cb->on_thread_start( static_cast< rs2_thread_category >( category ), name.c_str() );
+        } );
+}
+HANDLE_EXCEPTIONS_AND_RETURN( , callback )
 
 
 unsigned rs2_get_log_message_line_number( rs2_log_message const* msg, rs2_error** error ) BEGIN_API_CALL

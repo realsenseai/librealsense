@@ -213,7 +213,9 @@ namespace librealsense
                 _last = backend_device_group( _backend->query_uvc_devices(),
                                               _backend->query_usb_devices(),
                                               _backend->query_hid_devices() );
-                _thread = std::thread([this]() { run(); });
+                _thread = rsutils::concurrency::create_thread(
+                    rsutils::concurrency::thread_category_device_monitoring, "win-dev-mon",
+                    [this]() { run(); });
             }
 
             void stop() override

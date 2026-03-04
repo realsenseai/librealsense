@@ -28,6 +28,7 @@
 #include <realdds/topics/ros2/parameter-events-msg.h>
 
 #include <rsutils/number/crc32.h>
+#include <rsutils/concurrency/thread-utils.h>
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <rsutils/json.h>
 #include <rsutils/string/hexarray.h>
@@ -637,7 +638,7 @@ lrs_device_controller::frame_to_streaming_server( rs2::frame const & f, rs2::str
 lrs_device_controller::lrs_device_controller( rs2::device dev, std::shared_ptr< realdds::dds_device_server > dds_device_server )
     : _rs_dev( dev )
     , _dds_device_server( dds_device_server )
-    , _control_dispatcher( QUEUE_MAX_SIZE )
+    , _control_dispatcher( QUEUE_MAX_SIZE, rsutils::concurrency::thread_category_network, "dds-ctrl-d" )
 {
     if( ! _dds_device_server )
         throw std::runtime_error( "Empty dds_device_server" );

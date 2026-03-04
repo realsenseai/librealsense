@@ -6,6 +6,8 @@
 #include <realdds/dds-subscriber.h>
 #include <realdds/dds-utilities.h>
 
+#include <rsutils/concurrency/thread-utils.h>
+
 #include <fastdds/dds/subscriber/Subscriber.hpp>
 #include <fastdds/dds/subscriber/DataReader.hpp>
 #include <fastdds/dds/topic/Topic.hpp>
@@ -44,7 +46,8 @@ void dds_topic_reader_thread::run( qos const & rqos )
     _reader = DDS_API_CALL( _subscriber->get()->create_datareader( _topic->get(), rqos ) );
     _stopped = std::make_shared< eprosima::fastdds::dds::GuardCondition >();
     
-    _th = std::thread(
+    _th = rsutils::concurrency::create_thread(
+        rsutils::concurrency::thread_category_network, "dds-reader",
         [this,
          weak = std::weak_ptr< dds_topic_reader >( shared_from_this() ),  // detect lifetime
          name = _topic->get()->get_name(),

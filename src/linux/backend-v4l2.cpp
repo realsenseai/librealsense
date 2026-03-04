@@ -1599,7 +1599,9 @@ namespace librealsense
                 streamon();
 
                 _is_capturing = true;
-                _thread = std::unique_ptr<std::thread>(new std::thread([this](){ capture_loop(); }));
+                _thread = std::unique_ptr<std::thread>(new std::thread(rsutils::concurrency::create_thread(
+                    rsutils::concurrency::thread_category_video_capture, "v4l2-cap",
+                    [this](){ capture_loop(); })));
 
                 // Starting the video/metadata syncer
                 _video_md_syncer.start();

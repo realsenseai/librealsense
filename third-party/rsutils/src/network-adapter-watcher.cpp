@@ -4,6 +4,7 @@
 #include <rsutils/os/network-adapter-watcher.h>
 #include <rsutils/shared-ptr-singleton.h>
 #include <rsutils/signal.h>
+#include <rsutils/concurrency/thread-utils.h>
 #include <rsutils/easylogging/easyloggingpp.h>
 
 #if ! defined( __APPLE__ ) && ! defined( __ANDROID__ )
@@ -110,7 +111,8 @@ public:
         }
         else
         {
-            _th = std::thread(
+            _th = rsutils::concurrency::create_thread(
+                rsutils::concurrency::thread_category_network, "net-adp-mon",
                 [this]
                 {
                     // We're going to wait on the following handles:

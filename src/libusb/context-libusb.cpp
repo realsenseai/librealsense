@@ -89,7 +89,9 @@ namespace librealsense
                     _event_handler.join();
                     _kill_handler_thread = 0;
                 }
-                _event_handler = std::thread([this]() {
+                _event_handler = rsutils::concurrency::create_thread(
+                    rsutils::concurrency::thread_category_usb_io, "libusb-evts",
+                    [this]() {
                     while (!_kill_handler_thread)
                         libusb_handle_events_completed(_ctx, &_kill_handler_thread);
                 });

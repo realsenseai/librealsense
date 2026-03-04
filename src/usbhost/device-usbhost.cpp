@@ -100,13 +100,16 @@ namespace librealsense
                     auto type = e->get_type();
                     if(type == RS2_USB_ENDPOINT_INTERRUPT || type == RS2_USB_ENDPOINT_BULK)
                     {
-                        _dispatchers[e->get_address()] = std::make_shared<dispatcher>(10);
+                        _dispatchers[e->get_address()] = std::make_shared<dispatcher>(10,
+                            rsutils::concurrency::thread_category_usb_io,
+                            "usbh-ep" + std::to_string(e->get_address()));
                         auto d = _dispatchers.at(e->get_address());
                         d->start();
                     }
                 }
             }
-            _dispatcher = std::make_shared<dispatcher>(10);
+            _dispatcher = std::make_shared<dispatcher>(10,
+                rsutils::concurrency::thread_category_usb_io, "usbh-ctrl");
             _dispatcher->start();
         }
 

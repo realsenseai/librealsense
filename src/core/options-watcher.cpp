@@ -69,7 +69,9 @@ void options_watcher::start()
 {
     if( ! _updater.joinable() ) // If not already started
     {
-        _updater = std::thread( [this]() {
+        _updater = rsutils::concurrency::create_thread(
+            rsutils::concurrency::thread_category_device_monitoring, "opt-watcher",
+            [this]() {
             update_options();
             thread_loop();
         } );

@@ -593,6 +593,26 @@ const char * get_string( rs2_eth_link_priority value )
 #undef CASE
 }
 
+const char * get_string( rs2_thread_category value )
+{
+#define CASE( X ) STRCASE( THREAD_CATEGORY, X )
+    switch( value )
+    {
+    CASE( USB_IO )
+    CASE( VIDEO_CAPTURE )
+    CASE( SENSOR_IO )
+    CASE( FRAME_PROCESSING )
+    CASE( DEVICE_MONITORING )
+    CASE( DISPATCH )
+    CASE( NETWORK )
+    CASE( UTILITY )
+    default:
+        assert( ! is_valid( value ) );
+        return UNKNOWN_VALUE;
+    }
+#undef CASE
+}
+
 std::string const & get_string( rs2_option const option )
 {
     if( options_registry::is_option_registered( option ) )
@@ -1026,3 +1046,4 @@ const char * rs2_calib_location_to_string(rs2_calib_location calib_location) { r
 const char * rs2_embedded_filter_type_to_string(rs2_embedded_filter_type embedded_filter_type) { return librealsense::get_string(embedded_filter_type); }
 const char * rs2_gyro_sensitivity_to_string( rs2_gyro_sensitivity mode ){return librealsense::get_string( mode );}
 const char * rs2_eth_link_priority_to_string( rs2_eth_link_priority priority ){return librealsense::get_string( priority );}
+const char * rs2_thread_category_to_string( rs2_thread_category category ) { return librealsense::get_string( category ); }
