@@ -56,8 +56,26 @@ SqliteWrapper::SqliteWrapper(
         rc << "): " << sqlite3_errstr(rc);
       throw SqliteException{errmsg.str()};
     }
-    prepare_statement("PRAGMA journal_mode = WAL;")->execute_and_reset();
-    prepare_statement("PRAGMA synchronous = NORMAL;")->execute_and_reset();
+    // RealSense recording performance optimizations:
+    // The original rosbag2 settings (WAL + synchronous=NORMAL) cause periodic FPS drops
+    // when recording multiple streams, because SQLite blocks on disk flushes.
+    //
+    // MEMORY journal: SQLite uses a "journal" — a temporary copy of data before changes —
+    //   to recover from crashes. By default this journal is a file on disk.
+    //   MEMORY keeps it in RAM instead, avoiding disk I/O for journal writes.
+    //   Risk: if the process crashes (killed/segfault) or computer loses power
+    //   mid-recording, the .db3 file may be corrupt — but for sensor recording
+    //   you'd just re-record.
+    prepare_statement("PRAGMA journal_mode = MEMORY;")->execute_and_reset();
+    // synchronous=OFF: don't wait for the OS to confirm data is written to disk (no fsync).
+    //   Data goes to the OS cache and gets flushed to disk in the background.
+    //   Same tradeoff as above: power loss could corrupt the file, but that's acceptable
+    //   for sensor recording where you'd just re-record.
+    prepare_statement("PRAGMA synchronous = OFF;")->execute_and_reset();
+    // Larger page cache (64MB instead of the default ~2MB).
+    //   Keeps more data in memory, reducing disk reads during write-heavy workloads.
+    //   Negative value means the size is in KB.
+    prepare_statement("PRAGMA cache_size = -64000;")->execute_and_reset();
   }
 
   sqlite3_extended_result_codes(db_ptr, 1);
