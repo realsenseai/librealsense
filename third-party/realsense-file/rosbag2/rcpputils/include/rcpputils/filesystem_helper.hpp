@@ -194,8 +194,14 @@ public:
       throw std::system_error{ec, "cannot get file size"};
     }
 
+#ifdef _WIN32
+    // Use _stat64 on Windows to support files >2GB
+    struct _stat64 stat_buffer;
+    const auto rc = _stat64(path_.c_str(), &stat_buffer);
+#else
     struct stat stat_buffer;
     const auto rc = stat(path_.c_str(), &stat_buffer);
+#endif
 
     if (rc != 0) {
       std::error_code ec{errno, std::system_category()};

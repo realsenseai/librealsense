@@ -104,8 +104,7 @@ namespace librealsense
         void read_frame_metadata(frame_additional_data& additional_data);
         void setup_frame(frame_interface* frame_ptr, const stream_identifier& sid) const;
         
-        // Allocates a frame of the given extension type, copies raw data, and sets up the stream profile
-        frame_holder alloc_and_fill_frame(const uint8_t* data, size_t data_size,
+        frame_holder alloc_and_move_frame(std::vector<uint8_t>&& data,
             const stream_identifier& stream_id, frame_additional_data additional_data) const;
 
         std::pair<rs2_option, std::shared_ptr<librealsense::option>> create_option(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg);
