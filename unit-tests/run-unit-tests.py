@@ -12,15 +12,20 @@ sys.path.append( os.path.join( current_dir, 'py' ))
 from rspy import log, file, repo, libci
 from rspy.signals import register_signal_handlers
 
-# Python's default list of paths to look for modules includes user-intalled. We want
-# to avoid those to take only the pyrealsense2 we actually compiled!
+# Python's default list of paths to look for modules includes user-installed. We want
+# to avoid those to take only the pyrealsense2/pyrealdds/pyrsutils we actually compiled!
 #
-# Rather than rebuilding the whole sys.path, we instead remove:
+# Rather than rebuilding the whole sys.path, we instead remove only the user site-packages
+# directories that actually contain our compiled packages. This preserves other user-installed
+# packages (e.g. paramiko, pykush) that tests depend on.
 from site import getusersitepackages   # not the other stuff, like quit(), exit(), etc.!
-#log.d( 'site packages=', getusersitepackages() )
+_user_site = getusersitepackages()
+_compiled_pkg_names = { 'pyrealsense2', 'pyrealdds', 'pyrsutils' }
+#log.d( 'site packages=', _user_site )
 #log.d( 'sys.path=', sys.path )
-#log.d( 'removing', [p for p in sys.path if file.is_inside( p, getusersitepackages() )])
-sys.path = [p for p in sys.path if not file.is_inside( p, getusersitepackages() )]
+sys.path = [p for p in sys.path
+            if not file.is_inside( p, _user_site )
+            or not any( os.path.exists( os.path.join( p, pkg ) ) for pkg in _compiled_pkg_names )]
 #log.d( 'modified=', sys.path )
 
 
@@ -272,6 +277,7 @@ if not to_stdout:
     libci.logdir = logdir
         
 n_tests = 0
+n_failed_tests = 0
 
 # Figure out which sys.path we want the tests to see, assuming we have Python tests
 # PYTHONPATH is what Python will ADD to sys.path for child processes BEFORE any standard python paths
@@ -497,7 +503,7 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
 
 
 def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
-    global n_tests, retries
+    global n_tests, n_failed_tests, retries
     n_tests += 1
     retry_count = max(test.config.retries, retries)
     for retry in range( retry_count + 1 ):
@@ -513,6 +519,7 @@ def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
         if test_wrapper_( test, configuration, repetition, retry, retry_count, serial_numbers ):
             return True
 
+    n_failed_tests += 1
     return False
 
 
@@ -539,7 +546,7 @@ try:
         from rspy import devices
         register_signal_handlers(close_hubs)
         disable_dds = "dds" not in context
-        devices.query( hub_reset = hub_reset, disable_dds=disable_dds ) #resets the device
+        devices.query( hub_reset = hub_reset, disable_dds = disable_dds, rslog = rslog ) #resets the device
         devices.map_unknown_ports()
         #
         # Under a development environment (i.e., without a hub), we may only have one device connected
@@ -698,8 +705,9 @@ try:
                         log.debug_indent()
                         should_reset = not no_reset
                         devices.enable_only( serial_numbers, recycle=should_reset )
-                    except RuntimeError as e:
+                    except (RuntimeError, TimeoutError, OSError) as e:
                         log.w( log.red + test.name + log.reset + ': ' + str( e ) )
+                        test_ok = False
                     else:
                         register_signal_handlers()
                         test_ok = test_wrapper( test, configuration, repetition, serial_numbers ) and test_ok
@@ -733,7 +741,7 @@ try:
     #
     else:
         if failed_tests:
-            log.out( log.red + str( len(failed_tests) ) + log.reset, 'of', n_tests, 'test(s)',
+            log.out( log.red + str( n_failed_tests ) + log.reset, 'of', n_tests, 'test(s)',
                      log.red + 'failed!' + log.reset + log.clear_eos )
             log.d( 'Failed tests:\n    ' + '\n    '.join( [test.name for test in failed_tests] ))
             sys.exit( 1 )

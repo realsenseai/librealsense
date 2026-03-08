@@ -1,8 +1,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
-# we want this test to run first so that all tests run with updated FW versions, so we give it priority 0
-#test:priority 0
+#We want this test to run right after camera detection phase, so that all tests will run with updated FW versions, so we give it high priority
+#test:priority 1
 #test:timeout 500
 #test:donotrun:gha
 #test:device each(D400*)
@@ -159,12 +159,13 @@ product_name = device.get_info( rs.camera_info.name )
 log.d( 'product line:', product_line )
 ###############################################################################
 #
-
-current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
-log.d( 'current FW version:', current_fw_version )
+if device.supports(rs.camera_info.firmware_version):
+    current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
+    log.d( 'current FW version:', current_fw_version )
 
 # Determine which firmware to use based on product
 bundled_fw_version = rsutils.version("")
+same_version = False
 custom_fw_path = None
 custom_fw_version = None
 if product_line == "D400" and args.custom_fw_d400:
@@ -191,8 +192,20 @@ if device.is_in_recovery_mode():
         if 'jetson' in test.context:
             # Reload d4xx mipi driver on Jetson
             log.d("Reloading d4xx driver on Jetson...")
-            subprocess.run(['sudo', 'modprobe', '-r', 'd4xx'], check=True) # force remove
-            subprocess.run(['sudo', 'modprobe', 'd4xx'], check=True) # load
+            try:
+                # Try to reload the driver, but don't fail if sudo requires a password
+                result = subprocess.run(['sudo', '-n', 'modprobe', '-r', 'd4xx'], 
+                                      capture_output=True, text=True)
+                if result.returncode != 0:
+                    log.e("Failed to remove d4xx module (may require passwordless sudo):", result.stderr)
+                else:
+                    load_result = subprocess.run(['sudo', '-n', 'modprobe', 'd4xx'], 
+                                              capture_output=True, text=True, check=False)
+                    if load_result.returncode != 0:
+                        log.e("Failed to load d4xx module (may require passwordless sudo):",
+                              f"returncode={load_result.returncode}, stderr={load_result.stderr}")
+            except Exception as driver_error:
+                log.w("Could not reload d4xx driver (passwordless sudo may not be configured):", driver_error)
     except Exception as e:
         test.unexpected_exception()
         log.f( "Unexpected error while trying to recover device:", e )
@@ -215,6 +228,7 @@ else:
 
 if (current_fw_version == bundled_fw_version and not custom_fw_path) or \
    (current_fw_version == custom_fw_version):
+    same_version = True
     if recovered or 'nightly' not in test.context:
         log.d('versions are same; skipping FW update')
         test.finish()
@@ -247,8 +261,13 @@ log.d( 'running:', cmd )
 sys.stdout.flush()
 subprocess.run( cmd )   # may throw
 
-# make sure update worked
-time.sleep(3) # MIPI devices do not re-enumerate so we need to give them some time to restart
+# if we updated to the different version, FW might need time to flash a new ISP FW,
+# otherwise 3 seconds should be enough to allow devices to reboot and enumerate again
+sleep_time = 60 if not same_version else 3
+log.d("Sleeping for", sleep_time, "seconds to allow device to reboot and enumerate after FW update...")
+time.sleep(sleep_time) 
+
+# make sure update worked and check FW version and update counter
 device, ctx = test.find_first_device_or_exit()
 current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
 

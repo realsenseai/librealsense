@@ -1,6 +1,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
 
+# Not frequently changing, no need to test for each commit
+# test:donotrun:!nightly
 # test:device D400*
 # test:device each(D555)
 

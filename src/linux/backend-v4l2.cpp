@@ -83,9 +83,9 @@ constexpr uint32_t RS_CAMERA_CID_AE_SETPOINT_SET            = (RS_CAMERA_CID_BAS
 constexpr uint32_t RS_CAMERA_CID_ERB                        = (RS_CAMERA_CID_BASE+13);
 constexpr uint32_t RS_CAMERA_CID_EWB                        = (RS_CAMERA_CID_BASE+14);
 constexpr uint32_t RS_CAMERA_CID_HWMC_LEGACY                = (RS_CAMERA_CID_BASE+15);
+constexpr uint32_t RS_CAMERA_CID_SYNC_MODE                  = (RS_CAMERA_CID_BASE+16);
 
 //const uint32_t RS_CAMERA_GENERIC_XU                     = (RS_CAMERA_CID_BASE+15); // RS_CAMERA_CID_HWMC duplicate??
-constexpr uint32_t RS_CAMERA_CID_LASER_POWER_MODE           = (RS_CAMERA_CID_BASE+16); // RS_CAMERA_CID_LASER_POWER duplicate ???
 constexpr uint32_t RS_CAMERA_CID_MANUAL_EXPOSURE            = (RS_CAMERA_CID_BASE+17);
 constexpr uint32_t RS_CAMERA_CID_LASER_POWER_LEVEL          = (RS_CAMERA_CID_BASE+18); // RS_CAMERA_CID_MANUAL_LASER_POWER ??
 constexpr uint32_t RS_CAMERA_CID_EXPOSURE_MODE              = (RS_CAMERA_CID_BASE+19);
@@ -2933,6 +2933,8 @@ namespace librealsense
         const uint8_t RS_ENABLE_AUTO_EXPOSURE            = 0xB;
         const uint8_t RS_LED_PWR                         = 0xE;
         const uint8_t RS_EMITTER_FREQUENCY               = 0x10; // Match to DS5_EMITTER_FREQUENCY
+        const uint8_t RS_DEPTH_AUTO_EXPOSURE_MODE        = 0x11;
+        const uint8_t RS_EXTERNAL_SYNC                   = 0x12;
 
 
         bool v4l_mipi_device::get_pu(rs2_option opt, int32_t& value) const
@@ -3136,6 +3138,7 @@ namespace librealsense
                     case RS_ENABLE_AUTO_EXPOSURE: return V4L2_CID_EXPOSURE_AUTO; //RS_CAMERA_CID_EXPOSURE_MODE;
                     case RS_HARDWARE_PRESET : return RS_CAMERA_CID_PRESET;
                     case RS_EMITTER_FREQUENCY : return RS_CAMERA_CID_EMITTER_FREQUENCY;
+                    case RS_EXTERNAL_SYNC : return RS_CAMERA_CID_SYNC_MODE;
                     // D457 Missing functionality
                     //case RS_ERROR_REPORTING: TBD;
                     //case RS_EXT_TRIGGER: TBD;

@@ -2,7 +2,7 @@
 #include "../live-common.h"
 #include <iostream>
 
-//#test:device D400* !D457
+//#test:device D400*
 //#test:tag D400
 
 TEST_CASE( "sensor get_option memory leak", "[live]" )

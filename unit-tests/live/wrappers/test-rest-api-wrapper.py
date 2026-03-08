@@ -8,9 +8,9 @@ from rspy.stopwatch import Stopwatch
 #############################################################################################
 #
 test.start( "Run test-rest-api-wrapper test" )
-import subprocess
+import subprocess, sys
 run_time_stopwatch = Stopwatch()
-p = subprocess.run( ["pytest", "./wrappers/rest-api/tests/test_api_service.py"],
+p = subprocess.run( [sys.executable, "-m", "pytest", "./wrappers/rest-api/tests/test_api_service.py"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,

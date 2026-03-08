@@ -2,9 +2,10 @@
 # Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
 
-#test:device D400* !D457
-#test:device D585S
-# Running nightly as this tests specific bug fix in a code that is seldom touched, no need to run for each push.
+#test:device D400*
+#test:device D500*
+# Running weekly as this tests specific bug fix in a code that is seldom touched, no need to run for each push.
+# test:donotrun:!weekly
 
 # Objective:
 #
