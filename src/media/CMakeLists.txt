@@ -25,6 +25,7 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros_common.h"
         # ROS2 message types for CDR serialization
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/builtin_interfaces/msg/Time.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/builtin_interfaces/msg/Time.cpp"
