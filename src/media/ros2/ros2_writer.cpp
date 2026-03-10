@@ -103,6 +103,21 @@ namespace librealsense
             {
                 write_extension_snapshot(get_device_index(), sensors_snapshot.get_sensor_index(), get_static_file_info_timestamp(), sensor_extension_snapshot.first, sensor_extension_snapshot.second);
             }
+
+            // Bag-to-db3 conversion only: the ROS1 reader provides stream profiles via
+            // get_stream_profiles() rather than as VIDEO_PROFILE/MOTION_PROFILE extensions
+            sensor_identifier sensor_id{ get_device_index(), sensors_snapshot.get_sensor_index() };
+            for (auto&& profile : sensors_snapshot.get_stream_profiles())
+            {
+                auto vid = std::dynamic_pointer_cast<video_stream_profile_interface>(profile);
+                auto mot = std::dynamic_pointer_cast<motion_stream_profile_interface>(profile);
+                if (vid)
+                    write_streaming_info(get_static_file_info_timestamp(), sensor_id, vid);
+                else if (mot)
+                    write_streaming_info(get_static_file_info_timestamp(), sensor_id, mot);
+                else
+                    write_stream_info(get_static_file_info_timestamp(), sensor_id, profile);
+            }
         }
     }
 
@@ -261,16 +276,12 @@ namespace librealsense
         write_string(metadata_topic, timestamp, metadata_payload);
     }
 
-    void ros2_writer::write_extrinsics(const stream_identifier& stream_id, frame_interface* frame)
+    void ros2_writer::write_extrinsics(const stream_identifier& stream_id, uint32_t reference_id, const rs2_extrinsics& ext)
     {
         if (m_extrinsics_msgs.find(stream_id) != m_extrinsics_msgs.end())
         {
             return; //already wrote it
         }
-        auto& dev = frame->get_sensor()->get_device();
-        uint32_t reference_id = 0;
-        rs2_extrinsics ext;
-        std::tie(reference_id, ext) = dev.get_extrinsics(*frame->get_stream());
         
         // Serialize extrinsics as string: rotation (9 floats) and translation (3 floats)
         std::string payload = "rotation=";
@@ -316,7 +327,15 @@ namespace librealsense
 
         try
         {
-            write_extrinsics(stream_id, frame);
+            auto sensor = frame->get_sensor();
+            if (sensor)
+            {
+                auto& dev = sensor->get_device();
+                uint32_t reference_id = 0;
+                rs2_extrinsics ext;
+                std::tie(reference_id, ext) = dev.get_extrinsics(*frame->get_stream());
+                write_extrinsics(stream_id, reference_id, ext);
+            }
         }
         catch (std::exception const& e)
         {
@@ -472,7 +491,10 @@ namespace librealsense
             break;
         }
         default:
-            throw invalid_value_exception( rsutils::string::from() << "Failed to Write Extension Snapshot: Unsupported extension \"" << librealsense::get_string(type) << "\"");
+            // Sensor-type extensions (DEPTH_SENSOR, COLOR_SENSOR, etc.) are not serialized —
+            // they are reconstructed by the reader from sensor info. Skip them silently.
+            LOG_DEBUG("Skipping extension snapshot \"" << librealsense::get_string(type) << "\" (reconstructed by reader)");
+            break;
         }
 
     }

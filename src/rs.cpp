@@ -15,6 +15,7 @@
 #include "media/record/record_device.h"
 #include <media/ros2/ros2_writer.h>
 #include <media/ros2/ros2_reader.h>
+#include <media/bag_to_db3_converter.h>
 #include "core/advanced_mode.h"
 #include "core/pose-frame.h"
 #include "core/motion-frame.h"
@@ -2231,6 +2232,15 @@ void rs2_playback_device_stop(const rs2_device* device, rs2_error** error) BEGIN
     return playback->stop();
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, device)
+
+void rs2_convert_bag_to_db3(const char* input_bag_path, const char* output_db3_path, const rs2_context* ctx, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(input_bag_path);
+    VALIDATE_NOT_NULL(output_db3_path);
+    VALIDATE_NOT_NULL(ctx);
+    librealsense::convert_bag_to_db3(input_bag_path, output_db3_path, ctx->ctx);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, input_bag_path, output_db3_path, ctx)
 
 rs2_device* rs2_create_record_device(const rs2_device* device, const char* file, rs2_error** error) BEGIN_API_CALL
 {
