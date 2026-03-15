@@ -6,7 +6,6 @@
 # test:device each(D500*)
 # Running weekly as this tests a specific bug fix in code that is seldom touched
 # test:donotrun:!weekly
-#test:donotrun  # disabled due to rosbag upgrade
 
 import os
 import pyrealsense2 as rs2
