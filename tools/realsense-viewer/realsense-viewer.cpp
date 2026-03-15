@@ -44,6 +44,10 @@ void add_playback_device( context & ctx,
                           viewer_model & viewer_model,
                           const std::string & file )
 {
+    // Legacy .bag files trigger a conversion dialog offering to convert to .db3
+    if (viewer_model.bag_converter.show_dialog_if_needed(file))
+        return;
+
     bool was_loaded = false;
     bool failed = false;
     try
@@ -507,7 +511,7 @@ int main(int argc, const char** argv) try
 
             if (ImGui::Selectable("Load Recorded Sequence", false, ImGuiSelectableFlags_SpanAllColumns))
             {
-                if (auto ret = file_dialog_open(open_file, "ROS2-bag\0*.db3\0", NULL, NULL))
+                if (auto ret = file_dialog_open(open_file, "RealSense recordings\0*.db3;*.bag\0", NULL, NULL))
                 {
                     add_playback_device(ctx, device_models, error_message, viewer_model, ret);
                 }
@@ -627,6 +631,11 @@ int main(int argc, const char** argv) try
         ImGui::End();
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
+
+        // Draw the .bag-to-.db3 conversion dialog (if active) and poll for completion
+        auto converted_file = viewer_model.bag_converter.draw_and_poll(ctx, error_message, viewer_model, window);
+        if (!converted_file.empty())
+            add_playback_device(ctx, device_models, error_message, viewer_model, converted_file);
 
         // Fetch and process frames from queue
         viewer_model.handle_ready_frames(viewer_rect, window, static_cast<int>(device_models->size()), error_message);

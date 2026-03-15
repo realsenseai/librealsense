@@ -13,6 +13,7 @@
 #include "skybox.h"
 #include "measurement.h"
 #include "updates-model.h"
+#include "bag-conversion-helper.h"
 #include <librealsense2/hpp/rs_export.hpp>
 
 namespace rs2
@@ -213,6 +214,7 @@ namespace rs2
 
         std::shared_ptr<updates_model> updates;
 
+        bag_conversion_helper bag_converter;
         std::unordered_set<int> _hidden_options;
         bool _support_ir_reflectivity;
     private:
