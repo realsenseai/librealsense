@@ -6,6 +6,7 @@ Detailed how-to guides for common tasks are maintained as skill files under `.gi
 
 | Skill file | Read before |
 |---|---|
+| `.github/skills/add_api.md` | Adding API to librealsense SDK |
 | `.github/skills/build.md` | Building the project (CMake configure, compile, flags) |
 | `.github/skills/testing.md` | Running, filtering, and debugging unit tests |
 | `.github/skills/pytest-infra.md` | Migrating tests to pytest, modifying pytest/hub infrastructure, verifying Jenkins CI results |
