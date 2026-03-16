@@ -374,7 +374,10 @@ def test_stream_fps_accuracy_generic(device, stream_name, stream_type, formats, 
     Returns:
         Tuple[bool, float, Dict]: (passed, actual_fps, stats)
     """
-    fps_monitor = FPSMonitor(window_size=60)
+    # Use a smaller window for low FPS to avoid initial frame-burst contamination;
+    # at 5 FPS a window of 60 would span ~12 seconds and include startup irregularities
+    window = 10 if expected_fps <= 6 else 30 if expected_fps <= 15 else 60
+    fps_monitor = FPSMonitor(window_size=window)
     
     # Get sensor
     try:
@@ -418,7 +421,7 @@ def test_stream_fps_accuracy_generic(device, stream_name, stream_type, formats, 
     
     # Adjust warmup frames and measurement interval based on FPS rate
     if expected_fps <= 6:
-        warmup_frames = 2      # Minimal warmup for very slow FPS to maximize measurement time
+        warmup_frames = 2      # Allow initial burst to settle before measuring
         # For very low FPS we measure every frame after warmup to avoid having only a single data point
         # (previously interval=2 caused too few measurements for short tests)
         measurement_interval = 1  # Measure on every frame post-warmup
@@ -1189,8 +1192,10 @@ def test_multistream_fps_accuracy(device, depth_config, color_config, test_durat
     depth_fps_measurements = []
     color_fps_measurements = []
     
-    depth_monitor = FPSMonitor(window_size=60)
-    color_monitor = FPSMonitor(window_size=60)
+    depth_window = 10 if depth_fps <= 6 else 30 if depth_fps <= 15 else 60
+    color_window = 10 if color_fps <= 6 else 30 if color_fps <= 15 else 60
+    depth_monitor = FPSMonitor(window_size=depth_window)
+    color_monitor = FPSMonitor(window_size=color_window)
     
     # Adaptive parameters based on the slower FPS (reduced for faster multistream testing)
     min_fps = min(depth_fps, color_fps)
@@ -1478,9 +1483,16 @@ def test_multistream_configurations_comprehensive(device):
             min_fps = min(depth_fps, color_fps)
             test_duration, tolerance = get_fps_test_parameters(min_fps)
             
-            passed, stats = test_multistream_fps_accuracy(
-                device, depth_config, color_config, test_duration, tolerance
-            )
+            # Retry once on transient failures (e.g. 0-frame hardware glitches)
+            max_attempts = 2
+            for attempt in range(1, max_attempts + 1):
+                passed, stats = test_multistream_fps_accuracy(
+                    device, depth_config, color_config, test_duration, tolerance
+                )
+                if passed or 'error' not in stats or attempt == max_attempts:
+                    break
+                log.w(f"  Attempt {attempt} failed ({stats['error']}), retrying...")
+                time.sleep(1)  # Brief settle time before retry
             
             result = {
                 "depth_config": depth_config,

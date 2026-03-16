@@ -329,7 +329,8 @@ try:
     sync_results = analyze_timestamp_synchronization(depth_frames, color_frames)
     
     if not sync_results['success']:
-        test.fail(f"Synchronization analysis failed: {sync_results['error']}")
+        log.e(f"Synchronization analysis failed: {sync_results['error']}")
+        test.fail()
     
     # Log synchronization statistics
     log.i(f"Synchronization analysis results:")
@@ -391,8 +392,8 @@ try:
                f"Color frame continuity: {color_drops} drops <= 5% of {len(color_frames)} frames")
 
 except Exception as e:
-    test.fail(f"Intra-camera synchronization test failed: {e}")
-    log.e(f"Exception: {e}")
+    log.e(f"Intra-camera synchronization test failed: {e}")
+    test.fail()
 
 finally:
     # Restore original option values
