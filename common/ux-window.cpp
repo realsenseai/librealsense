@@ -523,7 +523,7 @@ namespace rs2
 
             if (!_missing_device)
             {
-                std::string rs_dev_detected = std::string(rsutils::string::from() << textual_icons::usb
+                _dev_stat_message = std::string(rsutils::string::from() << textual_icons::usb
                     << " RealSense device detected.");
                 _query_devices = false;
             }

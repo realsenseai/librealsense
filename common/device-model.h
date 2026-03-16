@@ -414,6 +414,8 @@ namespace rs2
             ux_window& window, viewer_model& viewer, std::string& error_message, std::string& label,
             std::vector<std::function<void()>>& draw_later, const bool& update_read_only_options);
 
+        bool should_bundle_fw_be_recommended(const std::string& pid, const std::string& fw, const std::string& recommended_fw_ver) const;
+
         std::thread check_for_device_updates_thread;
         std::mutex dev_mutex;
         std::atomic<bool> stopping;

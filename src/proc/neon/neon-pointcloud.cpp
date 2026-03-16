@@ -38,15 +38,49 @@ namespace librealsense
         const auto x_f = vmulq_f32(x, f);
         const auto y_f = vmulq_f32(y, f);
 
+        // Modified Brown-Conrady: tangential distortion applied to radially distorted points (x_f, y_f)
         // dx = x_f + 2 * c[2] * x_f * y_f + c[3] * (r2 + 2 * x_f * x_f)
-        //    = x_f * (1 + 2 * c[2] * y_f + c[3] * 2 * x_f) + c[3] * r2
         //    = x_f * (1 + 2 * (c[2] * y_f + c[3] * x_f)) + c[3] * r2
         *distorted_x = vfmaq_f32(vmulq_f32(x_f, vfmaq_f32(one, two, vfmaq_f32(vmulq_f32(c[2], y_f), c[3], x_f))), c[3], r2);
 
         // dy = y_f + 2 * c[3] * x_f * y_f + c[2] * (r2 + 2 * y_f * y_f)
-        //    = y_f * (1 + 2 * c[3] * x_f + c[2] * 2 * y_f) + c[2] * r2
         //    = y_f * (1 + 2 * (c[3] * x_f + c[2] * y_f)) + c[2] * r2
         *distorted_y = vfmaq_f32(vmulq_f32(y_f, vfmaq_f32(one, two, vfmaq_f32(vmulq_f32(c[3], x_f), c[2], y_f))), c[2], r2);
+    }
+
+    // Inverse Brown-Conrady uses the same projection formula as Modified Brown-Conrady
+    // (the difference is in deprojection, not projection)
+    template <>
+    inline void distorte_x_y<RS2_DISTORTION_INVERSE_BROWN_CONRADY>(
+        const float32x4_t &x, const float32x4_t &y,
+        float32x4_t *distorted_x, float32x4_t *distorted_y, const float32x4_t(&c)[5])
+    {
+        distorte_x_y<RS2_DISTORTION_MODIFIED_BROWN_CONRADY>(x, y, distorted_x, distorted_y, c);
+    }
+
+    // Brown-Conrady: tangential distortion applied to original (non-radially-distorted) points
+    template <>
+    inline void distorte_x_y<RS2_DISTORTION_BROWN_CONRADY>(
+        const float32x4_t &x, const float32x4_t &y,
+        float32x4_t *distorted_x, float32x4_t *distorted_y, const float32x4_t(&c)[5])
+    {
+        const auto one = vdupq_n_f32(1);
+        const auto two = vdupq_n_f32(2);
+
+        const auto r2 = vfmaq_f32(vmulq_f32(x, x), y, y);
+        const auto f = vfmaq_f32(one, r2, vfmaq_f32(c[0], r2, vfmaq_f32(c[1], r2, c[4])));
+
+        const auto x_f = vmulq_f32(x, f);
+        const auto y_f = vmulq_f32(y, f);
+
+        // Brown-Conrady: tangential distortion uses original x, y (not x_f, y_f)
+        // dx = x_f + 2 * c[2] * x * y + c[3] * (r2 + 2 * x * x)
+        //    = x_f + 2 * c[2] * x * y + c[3] * r2 + 2 * c[3] * x * x
+        *distorted_x = vaddq_f32(x_f, vfmaq_f32(vfmaq_f32(vmulq_f32(c[3], r2), two, vmulq_f32(c[2], vmulq_f32(x, y))), two, vmulq_f32(c[3], vmulq_f32(x, x))));
+
+        // dy = y_f + 2 * c[3] * x * y + c[2] * (r2 + 2 * y * y)
+        //    = y_f + 2 * c[3] * x * y + c[2] * r2 + 2 * c[2] * y * y
+        *distorted_y = vaddq_f32(y_f, vfmaq_f32(vfmaq_f32(vmulq_f32(c[2], r2), two, vmulq_f32(c[3], vmulq_f32(x, y))), two, vmulq_f32(c[2], vmulq_f32(y, y))));
     }
 
     pointcloud_neon::pointcloud_neon() : pointcloud("Pointcloud (NEON)") {}
@@ -180,14 +214,14 @@ namespace librealsense
             p_x = vfmaq_f32(ppx, p_x, fx);
             p_y = vfmaq_f32(ppy, p_y, fy);
 
-            // zero the x and y if z is zero
+            // zero the x and y if original depth z is zero
             {
-                const uint32x4_t gt_zero = vcgtq_f32(p_z, zero);
+                const uint32x4_t gt_zero = vcgtq_f32(xyz.val[2], zero);
                 p_x = vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(p_x), gt_zero));
                 p_y = vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(p_y), gt_zero));
             }
 
-            // texture_map
+            // pixels_ptr: store absolute pixel coordinates
             {
                 float32x4x2_t xy;
                 xy.val[0] = p_x;
@@ -196,7 +230,7 @@ namespace librealsense
                 res1 += 8;
             }
 
-            // pixels_ptr
+            // texture_map: store normalized texture coordinates
             {
                 float32x4x2_t xy;
                 xy.val[0] = vdivq_f32(p_x, w);
@@ -218,6 +252,28 @@ namespace librealsense
         if (other_intrinsics.model == RS2_DISTORTION_MODIFIED_BROWN_CONRADY)
         {
             get_texture_map_neon<RS2_DISTORTION_MODIFIED_BROWN_CONRADY>(
+                (float2 *)output.get_texture_coordinates(),
+                points,
+                width,
+                height,
+                other_intrinsics,
+                extr,
+                pixels_ptr);
+        }
+        else if (other_intrinsics.model == RS2_DISTORTION_INVERSE_BROWN_CONRADY)
+        {
+            get_texture_map_neon<RS2_DISTORTION_INVERSE_BROWN_CONRADY>(
+                (float2 *)output.get_texture_coordinates(),
+                points,
+                width,
+                height,
+                other_intrinsics,
+                extr,
+                pixels_ptr);
+        }
+        else if (other_intrinsics.model == RS2_DISTORTION_BROWN_CONRADY)
+        {
+            get_texture_map_neon<RS2_DISTORTION_BROWN_CONRADY>(
                 (float2 *)output.get_texture_coordinates(),
                 points,
                 width,

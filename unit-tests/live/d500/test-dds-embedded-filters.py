@@ -1,8 +1,10 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
-#test:donotrun:!dds
-#test:device D555
+# Not frequently changing, no need to test for each commit
+# test:donotrun:!nightly
+# test:donotrun:!dds
+# test:device D555
 
 import pyrealsense2 as rs
 from rspy import test, log

@@ -8,12 +8,14 @@ import json
 _cached_domain = None
 
 def get_config_path():
+    file_name = "realsense-config.json"
     if os.name == "nt":  # windows
         base_dir = os.environ.get("APPDATA")
     else:  # linux / macos / other unix-like
+        file_name = "." + file_name # Hidden on unix like
         base_dir = os.environ.get("HOME")
 
-    config_path = os.path.join(base_dir, "realsense-config.json")
+    config_path = os.path.join(base_dir, file_name)
     return config_path
 
 

@@ -15,6 +15,7 @@
 #include <librealsense2/rs.hpp>
 
 #include <rsutils/string/from.h>
+#include <rsutils/easylogging/easyloggingpp.h>
 
 #ifdef RS2_USE_CUDA
 #include "proc/cuda/cuda-pointcloud.h"
@@ -399,14 +400,18 @@ namespace librealsense
         #ifdef RS2_USE_CUDA
         if (rsutils::rs2_is_gpu_available())
         {
+            LOG_INFO("Using CUDA-optimized pointcloud implementation");
             return std::make_shared<librealsense::pointcloud_cuda>();
         }
         #endif
         #ifdef __SSSE3__
+            LOG_INFO("Using SSE-optimized pointcloud implementation");
             return std::make_shared<librealsense::pointcloud_sse>();
-        #elif defined(__ARM_NEON)  && ! defined ANDROID
+        #elif defined(__ARM_NEON) && !defined(ANDROID)
+            LOG_INFO("Using NEON-optimized pointcloud implementation");
             return std::make_shared<librealsense::pointcloud_neon>();
         #else
+            LOG_INFO("Using generic (non-SIMD) pointcloud implementation");
             return std::make_shared<librealsense::pointcloud>();
         #endif
     }

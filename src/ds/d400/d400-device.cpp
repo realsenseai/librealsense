@@ -472,7 +472,7 @@ namespace librealsense
         if( 0x2 == gvd_buf[d400_gvd_offsets::depth_sensor_type] )
             val |= ds_caps::CAP_GLOBAL_SHUTTER;   // e.g. AWGC
         // Option INTER_CAM_SYNC_MODE is not enabled in D405
-        if (_pid != ds::RS405_PID)
+        if (is_d401_usb_device( gvd_buf[d400_gvd_offsets::hw_type_offset] ) || _pid != ds::RS405_PID)
             val |= ds_caps::CAP_INTERCAM_HW_SYNC;
         if (gvd_buf[d400_gvd_offsets::ip65_sealed_offset] == 0x1)
             val |= ds_caps::CAP_IP65;
@@ -627,7 +627,7 @@ namespace librealsense
             _recommended_fw_version = firmware_version(D4XX_RECOMMENDED_FIRMWARE_VERSION);
             if (_fw_version >= firmware_version("5.10.4.0"))
                 _device_capabilities = parse_device_capabilities( gvd_buff );
-        
+
             set_imu_type();
 
             //D457 Development
@@ -900,12 +900,17 @@ namespace librealsense
                 {
                     depth_sensor.register_option(RS2_OPTION_EMITTER_ON_OFF, alternating_emitter_opt);
                 }
-
             }
 
             if ((_device_capabilities & ds_caps::CAP_INTERCAM_HW_SYNC) == ds_caps::CAP_INTERCAM_HW_SYNC)
             {
-                if (_fw_version >= firmware_version("5.12.12.100") && (_device_capabilities & ds_caps::CAP_GLOBAL_SHUTTER) == ds_caps::CAP_GLOBAL_SHUTTER)
+                if(_fw_version >= firmware_version("5.17.2.5"))
+                {
+                    auto external_sync_xu_control = std::make_shared<uvc_xu_option<uint8_t>>( raw_depth_sensor, depth_xu,
+                                                                                       DS5_EXTERNAL_SYNC, "External sync");
+                    depth_sensor.register_option( RS2_OPTION_INTER_CAM_SYNC_MODE, external_sync_xu_control );
+                }
+                else if (_fw_version >= firmware_version("5.12.12.100") && (_device_capabilities & ds_caps::CAP_GLOBAL_SHUTTER) == ds_caps::CAP_GLOBAL_SHUTTER)
                 {
                     depth_sensor.register_option(RS2_OPTION_INTER_CAM_SYNC_MODE,
                         std::make_shared<external_sync_mode>(*_hw_monitor, raw_depth_sensor, 3));
@@ -1299,7 +1304,7 @@ namespace librealsense
             throw std::runtime_error("Not enough bytes returned from the firmware!");
         }
         uint32_t dt = *(uint32_t*)res.data();
-        double ts = dt * TIMESTAMP_USEC_TO_MSEC;
+        double ts = dt * MICROSEC_TO_MILLISEC;
         return ts;
     }
 

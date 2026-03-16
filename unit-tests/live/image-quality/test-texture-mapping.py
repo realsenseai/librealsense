@@ -1,74 +1,76 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
-# test:device D400*
-# test:donotrun
+# test:device each(D400*)
+# test:timeout 1500
+
+# Texture Mapping Test
+# Verifies that depth-to-color alignment (texture mapping) works correctly.
+# Streams aligned depth+color, then checks two points on a target in the lab:
+#   - Center (cube): expected to be black and closer to camera
+#   - Left edge (background): expected to be white and further from camera
+# Validates both color accuracy (per-pixel) and depth difference between the two points.
+
 import pyrealsense2 as rs
 from rspy import log, test
 import numpy as np
 import cv2
-from iq_helper import find_roi_location, get_roi_from_frame, is_color_close, WIDTH, HEIGHT
+from iq_helper import find_roi_location, get_roi_from_frame, is_color_close, get_avg_depth_from_region, SAMPLE_REGION_SIZE, WIDTH, HEIGHT
 
-
-NUM_FRAMES = 100 # Number of frames to check
-COLOR_TOLERANCE = 60 # Acceptable per-channel deviation in RGB values
-DEPTH_TOLERANCE = 0.05  # Acceptable deviation from expected depth in meters
-FRAMES_PASS_THRESHOLD =0.8 # Percentage of frames that needs to pass
+NUM_FRAMES = 100  # Number of frames to check
+COLOR_TOLERANCE = 60  # Acceptable per-channel deviation in RGB values
+DEPTH_TOLERANCE = 90  # Acceptable deviation from expected depth in mm
+FRAMES_PASS_THRESHOLD = 0.7  # Percentage of frames that needs to pass
 DEBUG_MODE = False
 
-# expected colors (insertion order -> mapped row-major to 3x3 grid)
-expected_colors = {
-    "red":   (132, 60, 60),
-    "green": (40, 84, 72),
-    "blue":  (20, 67, 103),
-    "black": (35, 35, 35),
-    "white": (150, 150, 150),
-    "gray": (90, 90, 90),
-    "purple": (56, 72, 98),
-    "orange": (136, 86, 70),
-    "yellow": (166, 142, 80),
-}
-EXPECTED_DEPTH = 0.53  # meters - all of the target is at this distance for this test
-R = 20  # radius area around the center to sample depth from (in pixels)
-# list of color names in insertion order -> used left->right, top->bottom
-color_names = list(expected_colors.keys())
+EXPECTED_DEPTH_DIFF = 110  # Expected difference in mm between background and cube
 
-# since this is a 3x3 grid, we have separators at 0, 1/3, 2/3, 1 of width and height
-# to calculate the centers, we take the middle of each cell - between the separators
-# instead of taking exact center, we offset a bit to the general center to avoid sampling out of the area
-xs = [1.5 * WIDTH / 6.0, WIDTH / 2.0, 4.5 * WIDTH / 6.0]
-ys = [1.5 * HEIGHT / 6.0, HEIGHT / 2.0, 4.5 * HEIGHT / 6.0]
-centers = [(x, y) for y in ys for x in xs]
+# Expected colors for the two sampling points
+EXPECTED_CUBE_COLOR = (35, 35, 35)  # blackish - center cube
+EXPECTED_BG_COLOR = (150, 150, 150)  # whitish - background
+
+# Sample points - center of cube and left edge for background
+cube_x, cube_y = WIDTH // 2, HEIGHT // 2
+bg_x, bg_y = int(WIDTH * 0.1), HEIGHT // 2
 
 
-def draw_debug(a4_page_bgr):
+def draw_debug(a4_page_bgr, depth_cube, depth_bg, measured_diff):
     """
-    Simple debug view:
-      - left: camera frame
-      - right: focused view on the A4 page with grid and color names
+    Simple debug view showing the two sampling points with depth values
     """
-    vertical_lines = [WIDTH / 3.0, 2.0 * WIDTH / 3.0]
-    horizontal_lines = [HEIGHT / 3.0, 2.0 * HEIGHT / 3.0]
     H, W = a4_page_bgr.shape[:2]
 
-    # draw grid on a4 page image
-    for x in vertical_lines:
-        cv2.line(a4_page_bgr, (int(x), 0), (int(x), H - 1), (255, 255, 255), 2)
-    for y in horizontal_lines:
-        cv2.line(a4_page_bgr, (0, int(y)), (W - 1, int(y)), (255, 255, 255), 2)
+    # Draw points for cube and background
+    cv2.circle(a4_page_bgr, (cube_x, cube_y), 6, (0, 0, 255), -1)  # Red for cube
+    cv2.circle(a4_page_bgr, (bg_x, bg_y), 6, (0, 255, 0), -1)  # Green for background
 
-    # label centers with color names
-    for i, (cx, cy) in enumerate(centers):
-        cx_i, cy_i = int(round(cx)), int(round(cy))
-        lbl = color_names[i] if i < len(color_names) else str(i)
-        # we sample from an area - mark it
-        [cv2.circle(a4_page_bgr, (cx_i + dx, cy_i + dy), 1, (255, 255, 255), -1)
-         for dy in range(-R, R) for dx in range(-R, R)]
-        # white marker with black text for readability
-        cv2.putText(a4_page_bgr, lbl, (cx_i + 12, cy_i + 6),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,0), 2)
+    # Draw sampled region rectangles
+    half = SAMPLE_REGION_SIZE // 2
+    cv2.rectangle(a4_page_bgr,
+                  (cube_x - half, cube_y - half),
+                  (cube_x + half, cube_y + half),
+                  (0, 0, 255), 2)
+    cv2.rectangle(a4_page_bgr,
+                  (bg_x - half, bg_y - half),
+                  (bg_x + half, bg_y + half),
+                  (0, 255, 0), 2)
 
-    # resize and display side by side
+    # Add labels for each point with their measured distance
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.5
+    thickness = 1
+    cube_label = f"cube: {depth_cube:.2f}mm"
+    bg_label = f"bg: {depth_bg:.2f}mm"
+    diff_label = f"diff: {measured_diff:.2f}mm (exp: {EXPECTED_DEPTH_DIFF:.2f}mm)"
+
+    cv2.putText(a4_page_bgr, cube_label, (cube_x + 10, cube_y - 10),
+                font, font_scale, (0, 0, 255), thickness, cv2.LINE_AA)
+    cv2.putText(a4_page_bgr, bg_label, (bg_x + 10, bg_y - 10),
+                font, font_scale, (0, 255, 0), thickness, cv2.LINE_AA)
+    cv2.putText(a4_page_bgr, diff_label, (10, 30),
+                font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+
+    # resize and display
     height = 600
     a4_page_width = int(a4_page_bgr.shape[1] * (height / a4_page_bgr.shape[0]))
     right = cv2.resize(a4_page_bgr, (a4_page_width, height))
@@ -77,26 +79,40 @@ def draw_debug(a4_page_bgr):
 
 dev, ctx = test.find_first_device_or_exit()
 
+
 def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
+    pipeline = None
+    pipeline_profile = None
     try:
         pipeline = rs.pipeline(ctx)
         cfg = rs.config()
         cfg.enable_stream(rs.stream.depth, depth_resolution[0], depth_resolution[1], rs.format.z16, depth_fps)
         cfg.enable_stream(rs.stream.color, color_resolution[0], color_resolution[1], rs.format.bgr8, color_fps)
         if not cfg.can_resolve(pipeline):
-            log.f(f"Basic config not supported! Depth: {depth_resolution[0]}x{depth_resolution[1]}@{depth_fps}fps, "
-                    f"Color: {color_resolution[0]}x{color_resolution[1]}@{color_fps}fps")
+            log.i(f"Config not supported! Depth: {depth_resolution[0]}x{depth_resolution[1]}@{depth_fps}fps, "
+                  f"Color: {color_resolution[0]}x{color_resolution[1]}@{color_fps}fps")
             return
+
+        depth_sensor = dev.first_depth_sensor()
+        depth_sensor.set_option(rs.option.exposure, 10000) # on auto exposure we see more failures on sampling
+
         pipeline_profile = pipeline.start(cfg)
-        depth_sensor = pipeline_profile.get_device().first_depth_sensor()
-        depth_scale = depth_sensor.get_depth_scale()
-        colorizer = rs.colorizer()
+
+        depth_stream = pipeline_profile.get_stream(rs.stream.depth)
+        color_stream = pipeline_profile.get_stream(rs.stream.color)
+        depth_to_color_extrinsics = depth_stream.get_extrinsics_to(color_stream)
+        if not np.any(np.array(depth_to_color_extrinsics.rotation)) and not np.any(np.array(depth_to_color_extrinsics.translation)):
+            log.f("Extrinsics between depth and color streams are all zeros, aligned stream will show blank frames, failing test")
+
         for i in range(60):  # skip initial frames
             pipeline.wait_for_frames()
 
         align = rs.align(rs.stream.color)
-        color_passes = {name: 0 for name in color_names}
-        depth_passes = {name: 0 for name in color_names}
+
+        # Track passes for color and depth difference
+        cube_color_passes = 0
+        bg_color_passes = 0
+        depth_diff_passes = 0
 
         # find region of interest (page) and get the transformation matrix
         find_roi_location(pipeline, (4, 5, 6, 7), DEBUG_MODE)  # markers in the lab are 4,5,6,7
@@ -104,97 +120,116 @@ def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
         for i in range(NUM_FRAMES):
             frames = pipeline.wait_for_frames()
             aligned_frames = align.process(frames)
+
             depth_frame = aligned_frames.get_depth_frame()
             color_frame = aligned_frames.get_color_frame()
 
             if not depth_frame or not color_frame:
+                # if color is missing, skip
+                log.d(f"Frame {i}: Missing depth or color frame, skipping")
                 continue
 
             color_frame_roi = get_roi_from_frame(color_frame)
             depth_frame_roi = get_roi_from_frame(depth_frame)
 
-            # check colors
-            for idx, (x, y) in enumerate(centers):
-                color = color_names[idx] if idx < len(color_names) else str(idx)
-                expected_rgb = expected_colors[color]
-                x = int(round(x))
-                y = int(round(y))
+            # Check cube color (center - should be black)
+            cube_b, cube_g, cube_r = (int(v) for v in color_frame_roi[cube_y, cube_x])
+            cube_pixel = (cube_r, cube_g, cube_b)
+            if is_color_close(cube_pixel, EXPECTED_CUBE_COLOR, COLOR_TOLERANCE):
+                cube_color_passes += 1
+            else:
+                log.d(f"Frame {i} - Cube color at ({cube_x},{cube_y}) sampled: {cube_pixel} too far from expected {EXPECTED_CUBE_COLOR}")
 
-                # check color OK
-                b, g, r = (int(v) for v in color_frame_roi[y, x])  # stream is BGR, convert to RGB
-                pixel = (r, g, b)
-                if is_color_close(pixel, expected_rgb, COLOR_TOLERANCE):
-                    color_passes[color] += 1
-                else:
-                    log.d(f"Frame {i} - {color} at ({x},{y}) sampled: {pixel} too far from expected {expected_rgb}")
+            # Check background color (left side - should be white)
+            bg_b, bg_g, bg_r = (int(v) for v in color_frame_roi[bg_y, bg_x])
+            bg_pixel = (bg_r, bg_g, bg_b)
+            if is_color_close(bg_pixel, EXPECTED_BG_COLOR, COLOR_TOLERANCE):
+                bg_color_passes += 1
+            else:
+                log.d(f"Frame {i} - Background color at ({bg_x},{bg_y}) sampled: {bg_pixel} too far from expected {EXPECTED_BG_COLOR}")
 
-                # because we align depth to color, we get some noise at some areas - get average of valid values nearby
-                sample_area = depth_frame_roi[y - R:y + R, x - R:x + R]
-                invalid_values = sample_area[sample_area < 300]  # most cameras have min depth ~300mm
-                valid_values = sample_area[sample_area >= 300]
-                # check if there are a lot of invalid values - if it happens in many frames, the test will fail
-                if invalid_values.size > sample_area.size * 0.4:
-                    log.d(f"Frame {i} - {color} at ({x},{y}): too many invalid depth values, skipping "
-                          f"({invalid_values.size} invalid vs {sample_area.size} total)")
-                    continue
-                raw_depth = valid_values.mean()
-                depth_value = raw_depth * depth_scale  # Convert to meters
+            # Sample depths using region averaging
+            raw_cube = get_avg_depth_from_region(depth_frame_roi, cube_x, cube_y)
+            raw_bg = get_avg_depth_from_region(depth_frame_roi, bg_x, bg_y)
 
-                if abs(depth_value - EXPECTED_DEPTH) <= DEPTH_TOLERANCE:
-                    depth_passes[color] += 1
-                else:
-                    log.d(f"Frame {i} - {color} at ({x},{y}): {depth_value:.3f}m ≠ {EXPECTED_DEPTH:.3f}m")
+            if not raw_bg or not raw_cube:
+                continue
 
-                if DEBUG_MODE:
-                    # To see the depth on top of the color, blend the images
-                    depth_image = get_roi_from_frame(colorizer.colorize(depth_frame))
-                    color_image = color_frame_roi
+            depth_cube = raw_cube  # in mm
+            depth_bg = raw_bg  # in mm
+            measured_diff = depth_bg - depth_cube  # background should be further than cube
 
-                    alpha = 0.8  # transparency factor
-                    overlay = cv2.addWeighted(depth_image, 1 - alpha, color_image, alpha, 0)
+            if abs(measured_diff - EXPECTED_DEPTH_DIFF) <= DEPTH_TOLERANCE:
+                depth_diff_passes += 1
+            else:
+                log.d(f"Frame {i} - Depth diff: {measured_diff:.2f}mm too far from "
+                      f"{EXPECTED_DEPTH_DIFF:.2f}mm (cube: {depth_cube:.2f}mm, bg: {depth_bg:.2f}mm)")
 
-                    # crop the image according to the markers found
-                    dbg = draw_debug(overlay)
-                    cv2.imshow('Overlay', dbg)
-                    cv2.waitKey(1)
+            if DEBUG_MODE:
+                # To see the depth on top of the color, blend the images
+                colorizer = rs.colorizer()
+                depth_image = get_roi_from_frame(colorizer.colorize(depth_frame))
+                color_image = color_frame_roi
 
-        # Check per-color pass threshold
+                alpha = 0.3  # transparency factor
+                overlay = cv2.addWeighted(depth_image, 1 - alpha, color_image, alpha, 0)
+
+                dbg = draw_debug(overlay, depth_cube, depth_bg, measured_diff)
+                cv2.imshow('Overlay', dbg)
+                cv2.waitKey(1)
+
+        # if DEBUG_MODE:
+        #     cv2.waitKey(0)
+
         min_passes = int(NUM_FRAMES * FRAMES_PASS_THRESHOLD)
 
         log.i("\n--- Color Results ---")
-        for name, count in color_passes.items():
-            log.i(f"{name.title()} passed in {count}/{NUM_FRAMES} frames")
-            test.check(count >= min_passes, f"{name.title()} color failed in too many frames")
+        log.i(f"Cube color passed in {cube_color_passes}/{NUM_FRAMES} frames")
+        test.check(cube_color_passes >= min_passes, "Cube color failed in too many frames")
+
+        log.i(f"Background color passed in {bg_color_passes}/{NUM_FRAMES} frames")
+        test.check(bg_color_passes >= min_passes, "Background color failed in too many frames")
 
         log.i("\n--- Depth Results ---")
-        for name, count in depth_passes.items():
-            log.i(f"{name.title()} depth passed in {count}/{NUM_FRAMES} frames")
-            test.check(count >= min_passes, f"{name.title()} depth failed in too many frames")
+        log.i(f"Depth difference passed in {depth_diff_passes}/{NUM_FRAMES} frames")
+        test.check(depth_diff_passes >= min_passes, "Depth difference failed in too many frames")
 
     except Exception as e:
         test.unexpected_exception()
     finally:
         cv2.destroyAllWindows()
-        pipeline.stop()
-        test.finish()
+        if pipeline_profile:
+            pipeline.stop()
 
 log.d("context:", test.context)
-if "nightly" not in test.context:
-    depth_configs = [((1280, 720), 30)]
-else:
-    depth_configs = [
-        ((640,480), 30),
-        ((1280,720), 30),
+
+configurations = [((1280, 720), 30)]
+# on nightly we check additional arbitrary configurations
+if "nightly" in test.context or "weekly" in test.context:
+    configurations += [
+        ((640, 480), 15),
+        ((640, 480), 30),
+        ((640, 480), 60),
+        ((848, 480), 15),
+        ((848, 480), 30),
+        ((848, 480), 60),
+        ((1280, 720), 5),
+        ((1280, 720), 10),
+        ((1280, 720), 15),
     ]
 
-color_configs = depth_configs
 
-for depth_cfg in depth_configs:
-    for color_cfg in color_configs:
+for (depth_resolution, depth_fps) in configurations:
+    for (color_resolution, color_fps) in configurations:
+        if "weekly" not in test.context:
+            # in nightly we test only matching resolutions and fps
+            if depth_resolution != color_resolution or depth_fps != color_fps:
+                continue
+
         test.start("Texture Mapping Test",
-                   f"Color: {color_cfg[0][0]}x{color_cfg[0][1]}@{color_cfg[1]}fps | "
-                   f"Depth: {depth_cfg[0][0]}x{depth_cfg[0][1]}@{depth_cfg[1]}fps")
-        run_test(*depth_cfg, *color_cfg)
+                    f"Depth: {depth_resolution[0]}x{depth_resolution[1]} @ {depth_fps}fps | "
+                    f"Color: {color_resolution[0]}x{color_resolution[1]} @ {color_fps}fps")
+        run_test(depth_resolution, depth_fps, color_resolution, color_fps)
         test.finish()
 
 

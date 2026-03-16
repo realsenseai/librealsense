@@ -48,15 +48,14 @@ For a detailed explanations and API documentation see our [Documentation](../doc
 7. [Sample of how to use the IMU of D435i as well as doing PCL rotations based on this](https://github.com/GruffyPuffy/imutest)
 8. [realsense-ir-to-vaapi-h264](https://github.com/bmegli/realsense-ir-to-vaapi-h264) - hardware encode infrared stream to H.264 with Intel VAAPI
 9. [realsense-depth-to-vaapi-hevc10](https://github.com/bmegli/realsense-depth-to-vaapi-hevc10) - hardware encode depth stream to 10 bit HEVC with Intel VAAPI
-10. [EtherSense](https://github.com/krejov100/EtherSense) - Ethernet client and server for RealSense using python's Asyncore
-11. [Unofficial OpenVino example + D400](https://github.com/gbr1/ros_openvino) - example of using OpenVino with RealSense and ROS for object detection
-12. [keijiro/Rsvfx](https://github.com/keijiro/Rsvfx) - An example that shows how to connect RealSense depth camera to Unity VFX Graph
-13. [kougaku/RealSenseOSC](https://github.com/kougaku/RealSenseOSC) - Client-Server project with Processing example for T265
-14. [Vimeo Depth Viewer](https://github.com/vimeo/vimeo-depth-viewer) - A RealSense depth viewer using [nanogui](https://github.com/wjakob/nanogui)
-15. [PINTO0309/MobileNet-SSD-RealSense](https://github.com/PINTO0309/MobileNet-SSD-RealSense) - RaspberryPi3 or Ubuntu + Multi Neural Compute Stick(NCS/NCS2) + RealSense D435 + MobileNet-SSD(MobileNetSSD) + Background Multi-transparent(Simple multi-class segmentation) + FaceDetection + MultiGraph + MultiProcessing + MultiClustering
-16. [realsenseOnCyber](https://github.com/mickeyouyou/realsenseOnCyber) Realsense module Based on Apollo Cyber RT
-17. [Raspberry Pi Handheld 3D Scanner](https://eleccelerator.com/pi-handheld-3d-scanner/) by [Frank Zhao](https://github.com/frank26080115)
-18. [Erwhi Hedgehog](https://gbr1.github.io/erwhi_hedgehog.html) by [Giovanni Bruno](https://github.com/gbr1) - Open-Source Hardware and Software design featuring RealSense, UP-Squared and Intel Movidius technologies
-19. [Archery Tower Defence Game](https://github.com/saadisaadi1/Handshot-Tower-Defence) by [Saadi Saadi](https://github.com/saadisaadi1) and [Ali Haj](mailto:alihaj00@outlook.com) - This game uses RealSense camera to control in-game movements. The game was developed as a one semester students project for the Technion Institute of Technology
-20. [Real-Time Drowning Detection](https://github.com/talaSaba/intelRealsenseProject) by [Tala Saba](https://github.com/talaSaba) and [Raneen Assy](https://github.com/raneen28) - This project is designed to detect a potential drowning incident in real-time using a Intel RealSense camera. The game was developed as a one semester students project for the Technion Institute of Technology
+10. [Unofficial OpenVino example + D400](https://github.com/gbr1/ros_openvino) - example of using OpenVino with RealSense and ROS for object detection
+11. [keijiro/Rsvfx](https://github.com/keijiro/Rsvfx) - An example that shows how to connect RealSense depth camera to Unity VFX Graph
+12. [kougaku/RealSenseOSC](https://github.com/kougaku/RealSenseOSC) - Client-Server project with Processing example for T265
+13. [Vimeo Depth Viewer](https://github.com/vimeo/vimeo-depth-viewer) - A RealSense depth viewer using [nanogui](https://github.com/wjakob/nanogui)
+14. [PINTO0309/MobileNet-SSD-RealSense](https://github.com/PINTO0309/MobileNet-SSD-RealSense) - RaspberryPi3 or Ubuntu + Multi Neural Compute Stick(NCS/NCS2) + RealSense D435 + MobileNet-SSD(MobileNetSSD) + Background Multi-transparent(Simple multi-class segmentation) + FaceDetection + MultiGraph + MultiProcessing + MultiClustering
+15. [realsenseOnCyber](https://github.com/mickeyouyou/realsenseOnCyber) Realsense module Based on Apollo Cyber RT
+16. [Raspberry Pi Handheld 3D Scanner](https://eleccelerator.com/pi-handheld-3d-scanner/) by [Frank Zhao](https://github.com/frank26080115)
+17. [Erwhi Hedgehog](https://gbr1.github.io/erwhi_hedgehog.html) by [Giovanni Bruno](https://github.com/gbr1) - Open-Source Hardware and Software design featuring RealSense, UP-Squared and Intel Movidius technologies
+18. [Archery Tower Defence Game](https://github.com/saadisaadi1/Handshot-Tower-Defence) by [Saadi Saadi](https://github.com/saadisaadi1) and [Ali Haj](mailto:alihaj00@outlook.com) - This game uses RealSense camera to control in-game movements. The game was developed as a one semester students project for the Technion Institute of Technology
+19. [Real-Time Drowning Detection](https://github.com/talaSaba/intelRealsenseProject) by [Tala Saba](https://github.com/talaSaba) and [Raneen Assy](https://github.com/raneen28) - This project is designed to detect a potential drowning incident in real-time using a Intel RealSense camera. The game was developed as a one semester students project for the Technion Institute of Technology
 

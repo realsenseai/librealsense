@@ -1,24 +1,32 @@
-# YKUSH hub
-yepkit-pykush==0.3.5
+# YKUSH hub (not used on Jetson/aarch64)
+yepkit-pykush==0.3.5; platform_machine != "aarch64"
 
-# Acroname hub
-brainstem==2.11.1
+# Acroname hub (not used on Jetson/aarch64)
+brainstem==2.11.1; platform_machine != "aarch64"
 
-# Unifi hub
-paramiko==2.9.3
+# Unifi hub (not used on Jetson/aarch64)
+paramiko==3.5.1; platform_machine != "aarch64"
 
-# REST API testing
-fastapi==0.120.1
-uvicorn==0.34.0
-pydantic==2.10.6
-aiortc==1.11.0
+# Common testing requirements
 opencv-python==4.11.0.86
 numpy==2.0.2 # max version currently working on Jetson
-python-socketio==5.13.0
+
+# Pytest framework (cross-platform)
 pytest==8.3.5
-pytest-asyncio==0.26.0
-typeguard==4.4.4
-jinja2==3.1.6
-pyyaml==6.0.2
-lark==1.2.2
-httpx==0.28.1
+pytest-timeout==2.2.0
+pytest-retry==1.6.0
+pytest-repeat==0.9.3
+
+# REST API testing requirements (Only for Linux x86)
+fastapi==0.120.1;        sys_platform == "linux" and platform_machine == "x86_64"
+uvicorn==0.34.0;         sys_platform == "linux" and platform_machine == "x86_64"
+pydantic==2.10.6;        sys_platform == "linux" and platform_machine == "x86_64"
+aiortc==1.11.0;          sys_platform == "linux" and platform_machine == "x86_64"
+python-socketio==5.13.0; sys_platform == "linux" and platform_machine == "x86_64"
+pytest==8.3.5;           sys_platform == "linux" and platform_machine == "x86_64"
+pytest-asyncio==0.26.0;  sys_platform == "linux" and platform_machine == "x86_64"
+typeguard==4.4.4;        sys_platform == "linux" and platform_machine == "x86_64"
+jinja2==3.1.6;           sys_platform == "linux" and platform_machine == "x86_64"
+pyyaml==6.0.2;           sys_platform == "linux" and platform_machine == "x86_64"
+lark==1.2.2;             sys_platform == "linux" and platform_machine == "x86_64"
+httpx==0.28.1;           sys_platform == "linux" and platform_machine == "x86_64"

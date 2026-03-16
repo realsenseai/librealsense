@@ -317,6 +317,17 @@ int main(int argc, const char** argv) try
 
     update_viewer_configuration(viewer_model);
 
+    // Check if UDEV is not enabled on Linux and show warning
+#if defined(__linux__) && !defined(USING_UDEV)
+    {
+        auto n = std::make_shared<udev_warning_model>();
+        if (!n->is_delayed())
+        {
+            viewer_model.not_model->add_notification(n);
+        }
+    }
+#endif
+
     std::vector<device> connected_devs;
     std::mutex m;
 

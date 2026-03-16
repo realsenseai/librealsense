@@ -133,7 +133,7 @@ protected:
     void add_processing_block_settings( const std::string & filter_name,
                                         std::shared_ptr< librealsense::processing_block_interface > & ppb ) const;
 
-    void update_timestamp_if_needed( librealsense::frame_additional_data & data );
+    void update_timestamp_if_needed( librealsense::frame_additional_data & data, streaming_impl & );
     bool _handle_global_timestamp_locally = false;
 
     friend class dds_device_proxy;  // Currently calls handle_new_metadata

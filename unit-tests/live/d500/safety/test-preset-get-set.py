@@ -3,7 +3,8 @@
 
 #test:device D585S
 #test:priority 10
-# test:donotrun:!nightly
+# Feature not frequently changing, moving to weekly checks
+# test:donotrun:!weekly
 
 # Add retries as occasionally HKR FW fails during this initialization
 #test:retries 3
