@@ -8,15 +8,22 @@
 #include <string>
 #include <thread>
 #include <atomic>
+#include <memory>
 
 namespace rs2
 {
     class ux_window;
     class viewer_model;
 
-    class bag_conversion_helper
+    class bag_conversion_helper : public std::enable_shared_from_this<bag_conversion_helper>
     {
     public:
+        ~bag_conversion_helper()
+        {
+            if (_thread.joinable())
+                _thread.detach();
+        }
+
         // If the file is a .bag, shows the conversion dialog and returns true
         bool show_dialog_if_needed(const std::string& file);
 

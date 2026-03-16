@@ -214,7 +214,7 @@ namespace rs2
 
         std::shared_ptr<updates_model> updates;
 
-        bag_conversion_helper bag_converter;
+        std::shared_ptr<bag_conversion_helper> bag_converter = std::make_shared<bag_conversion_helper>();
         std::unordered_set<int> _hidden_options;
         bool _support_ir_reflectivity;
     private:

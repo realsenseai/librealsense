@@ -45,7 +45,7 @@ void add_playback_device( context & ctx,
                           const std::string & file )
 {
     // Legacy .bag files trigger a conversion dialog offering to convert to .db3
-    if (viewer_model.bag_converter.show_dialog_if_needed(file))
+    if (viewer_model.bag_converter->show_dialog_if_needed(file))
         return;
 
     bool was_loaded = false;
@@ -633,7 +633,7 @@ int main(int argc, const char** argv) try
         ImGui::PopStyleVar();
 
         // Draw the .bag-to-.db3 conversion dialog (if active) and poll for completion
-        auto converted_file = viewer_model.bag_converter.draw_and_poll(ctx, error_message, viewer_model, window);
+        auto converted_file = viewer_model.bag_converter->draw_and_poll(ctx, error_message, viewer_model, window);
         if (!converted_file.empty())
             add_playback_device(ctx, device_models, error_message, viewer_model, converted_file);
 

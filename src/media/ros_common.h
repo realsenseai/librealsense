@@ -6,6 +6,7 @@
 #pragma once
 #include <string>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <typeinfo>
 #include "librealsense2/rs.h"
@@ -135,7 +136,7 @@ namespace librealsense
 
     /**
     * Incremental number of the RealSense file format version
-    * Since we maintain backward compatability, changes to topics/messages are reflected by the version
+    * Since we maintain backward compatibility, changes to topics/messages are reflected by the version
     */
     constexpr uint32_t get_file_version()
     {

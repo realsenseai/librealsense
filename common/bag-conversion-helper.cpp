@@ -15,6 +15,8 @@ namespace rs2
     {
         if (!ends_with(file, ".bag") && !ends_with(file, ".BAG"))
             return false;
+        if (_thread.joinable())
+            return false;
         if (_skip_next)
         {
             _skip_next = false;
@@ -74,19 +76,23 @@ namespace rs2
         ImGui::SameLine();
         if (ImGui::Button("Convert", ImVec2(80, 30)))
         {
-            _thread = std::thread([&ctx, this]()
+            auto weak = weak_from_this();
+            auto input = _pending_file;
+            _thread = std::thread([ctx, input, weak]() mutable
             {
                 try
                 {
                     // Output is the stem — converter appends .db3
-                    auto output = _pending_file.substr(0, _pending_file.size() - 4);
-                    ctx.convert_bag_to_db3(_pending_file, output);
+                    auto output = input.substr(0, input.size() - 4);
+                    ctx.convert_bag_to_db3(input, output);
                 }
                 catch (const std::exception& ex)
                 {
-                    _error = ex.what();
+                    if (auto self = weak.lock())
+                        self->_error = ex.what();
                 }
-                _done = true;
+                if (auto self = weak.lock())
+                    self->_done = true;
             });
         }
         ImGui::SameLine();
