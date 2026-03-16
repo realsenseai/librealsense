@@ -1,9 +1,13 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
+# Test multiple set_pu commands checking that the set control event polling works as expected.
+# We expect no exception thrown -  See [RSDSO-17185]
+# Moving bug check to weekly run frequency
+
 # test:device each(D400*)
 # test:device each(D500*)
-# test:donotrun:!nightly
+# test:donotrun:!weekly
 # test:timeout 600
 
 import pyrealsense2 as rs
@@ -11,9 +15,6 @@ from rspy import test, log
 import time
 import datetime
 from rspy import tests_wrapper as tw
-
-# Test multiple set_pu commands checking that the set control event polling works as expected.
-# We expect no exception thrown -  See [DSO-17185]
 
 test_iterations = 200
 gain_values = [16,74,132,190,248]

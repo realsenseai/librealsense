@@ -871,6 +871,16 @@ namespace librealsense
                 _reader_attrs = create_reader_attrs();
             _streams.resize(_streamIndex);
 
+            // Release any stale COM pointers from a previously failed set_d0() or set_d3()
+            safe_release(_camera_control);
+            safe_release(_video_proc);
+            safe_release(_reader);
+            if (_source)
+            {
+                _source->Shutdown();
+                safe_release(_source);
+            }
+
             //enable source
             CHECK_HR(MFCreateDeviceSource(_device_attrs, &_source));
             LOG_HR(_source->QueryInterface(__uuidof(IAMCameraControl), reinterpret_cast<void **>(&_camera_control)));
@@ -892,8 +902,11 @@ namespace librealsense
             safe_release(_camera_control);
             safe_release(_video_proc);
             safe_release(_reader);
-            _source->Shutdown(); //Failure to call Shutdown can result in memory leak
-            safe_release(_source);
+            if (_source)
+            {
+                _source->Shutdown();
+                safe_release(_source);
+            }
             for (auto& elem : _streams)
                 elem.callback = nullptr;
             _power_state = D3;

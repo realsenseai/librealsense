@@ -2,7 +2,7 @@
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 # test:device each(D400*)
-# test:donotrun:!nightly
+# test:donotrun:!weekly
 
 import pyrealsense2 as rs
 from rspy import log, repo, test

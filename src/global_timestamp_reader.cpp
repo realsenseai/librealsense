@@ -139,7 +139,7 @@ namespace librealsense
     // so that the global timestamp can be correctly computed
     bool CLinearCoefficients::update_samples_base(double x)
     {
-        static const double max_device_time(pow(2, 32) * TIMESTAMP_USEC_TO_MSEC);
+        static const double max_device_time(pow(2, 32) * MICROSEC_TO_MILLISEC);
         double base_x;
         if (_last_values.empty())
             return false;

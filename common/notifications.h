@@ -282,6 +282,15 @@ namespace rs2
         int get_max_lifetime_ms() const override { return 10000; }
     };
 
+    struct udev_warning_model : public notification_model
+    {
+        udev_warning_model();
+
+        void draw_content(ux_window& win, int x, int y, float t, std::string& error_message) override;
+        int calc_height() override { return 130; }
+        int get_max_lifetime_ms() const override { return 20000; }
+    };
+
     class export_manager : public process_manager
     {
     public:

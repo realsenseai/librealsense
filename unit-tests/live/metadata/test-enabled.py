@@ -3,7 +3,8 @@
 
 #test:device each(D400*)
 #test:device each(D500*)
-#test:priority 1
+#Setting priority to run after test-fw-update
+#test:priority 2
 #test:flag windows
 
 import pyrealsense2 as rs

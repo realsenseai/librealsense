@@ -1,10 +1,12 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
 
+# This test checks for existence of motion intrinsic data in accel and gyro profiles.
+# This validates a bug fix for code that seldom changes
+# test:donotrun:!weekly
 # test:device:jetson D457
 # test:device:!jetson D455
 # test:device:!jetson each(D500*)
-# This test check existence motion intrinsic data in accel and gyro profiles.
 
 import pyrealsense2 as rs
 from rspy import test, log

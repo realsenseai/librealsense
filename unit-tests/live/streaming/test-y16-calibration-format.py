@@ -1,8 +1,9 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
 
-# disable D457 until this issue is resolved on driver side RSDSO-20168
-# test:device D400* !D457
+# test:device D400*
+# Y16 is not streamed with metadata over GMSL causing all frames to drop
+# test:type !GMSL
 # test:device each(D555)
 # This test checks streaming y16 profile
 
