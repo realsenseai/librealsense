@@ -95,21 +95,30 @@ namespace librealsense
 
             usb_status claim_interface(uint8_t interface)
             {
-               
+                // Try to detach any existing kernel driver (e.g. usbhid, another libusb handle)
+                // before claiming. On Tegra, HID interface may be held by another libusb consumer.
+                if( libusb_kernel_driver_active( _handle, interface ) == 1 )
+                {
+                    auto det = libusb_detach_kernel_driver( _handle, interface );
+                    if( det != LIBUSB_SUCCESS && det != LIBUSB_ERROR_NOT_FOUND )
+                        LOG_WARNING( "detach_kernel_driver interface " << (int)interface << " ret=" << det );
+                }
+
                 auto sts = libusb_claim_interface(_handle, interface);
 
                 if (sts != LIBUSB_SUCCESS)
                 {
                     // If we try to claim the USB device and get 'USB_STATUS_BUSY' error we will
-                    // retry 2 times more with some short delay between each try
+                    // retry with detach + re-claim
                     if( sts == LIBUSB_ERROR_BUSY )
                     {
-                        auto retry_counter = 2;
+                        auto retry_counter = 3;
                         do
                         {
                             LOG_WARNING( "failed to claim usb interface, interface "
-                                         << (int)interface << ", is busy - retrying..." );
-                            std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+                                         << (int)interface << ", is busy - detach + retrying..." );
+                            libusb_detach_kernel_driver( _handle, interface ); // force detach
+                            std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 
                             sts = libusb_claim_interface( _handle, interface );
                             if( sts == LIBUSB_SUCCESS )

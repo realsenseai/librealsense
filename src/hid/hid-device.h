@@ -64,6 +64,7 @@ namespace librealsense
             hidapi_device* _hidapi_device = nullptr;
 #else
             rs_usb_messenger _messenger;
+            std::mutex _messenger_mutex;
             std::vector<rs_usb_request> _requests;
             std::shared_ptr<platform::usb_request_callback> _request_callback;
 #endif

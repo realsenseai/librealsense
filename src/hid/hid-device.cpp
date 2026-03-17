@@ -123,13 +123,19 @@ namespace librealsense
                 _queue.clear();
 
                 for (auto&& r : _requests)
-                    _messenger->cancel_request(r);
+                {
+                    std::lock_guard<std::mutex> lock(_messenger_mutex);
+                    if(_messenger) _messenger->cancel_request(r);
+                }
 
                 _requests.clear();
 #endif
                 _handle_interrupts_thread->stop();
 #ifndef __APPLE__
-                _messenger.reset();
+                {
+                    std::lock_guard<std::mutex> lock(_messenger_mutex);
+                    _messenger.reset();
+                }
 #endif
                _running = false;
             }, [this](){ return !_running; });
@@ -146,6 +152,11 @@ namespace librealsense
 #ifndef __APPLE__
                 auto in = get_hid_interface()->get_number();
                 _messenger = _usb_device->open(in);
+                LOG_INFO("[RSUSB HID] messenger opened: " << (_messenger ? "YES" : "NULL") << " interface=" << (int)in);
+                if (!_messenger) {
+                    LOG_ERROR("[RSUSB HID] messenger open() returned null — aborting start_capture");
+                    return;
+                }
 #endif
                 _handle_interrupts_thread = std::make_shared<active_object<>>([this](dispatcher::cancellable_timer cancellable_timer)
                 {
@@ -155,7 +166,7 @@ namespace librealsense
                 _handle_interrupts_thread->start();
 
 #ifndef __APPLE__
-                _request_callback = std::make_shared<usb_request_callback>([&](platform::rs_usb_request r)
+                _request_callback = std::make_shared<usb_request_callback>([this](platform::rs_usb_request r)
                     {
                         _action_dispatcher.invoke([this, r](dispatcher::cancellable_timer c)
                         {
@@ -196,6 +207,8 @@ namespace librealsense
                                 }
                                 _queue.enqueue(std::move(report));
                             }
+                            std::lock_guard<std::mutex> lock(_messenger_mutex);
+                            if(!_messenger) return;
                             auto sts = _messenger->submit_request(r);
                             if (sts != platform::RS2_USB_STATUS_SUCCESS)
                                 LOG_ERROR("failed to submit UVC request");
@@ -267,7 +280,8 @@ namespace librealsense
             data.fo.frame_size = sizeof(REALSENSE_HID_REPORT);
             data.fo.metadata_size = sizeof(report.timeStamp);
 
-            _callback(data);
+            if(_callback)
+                _callback(data);
 #else
             if(_queue.dequeue(&report, 10))
             {
@@ -290,7 +304,8 @@ namespace librealsense
                     data.fo.frame_size = sizeof(REALSENSE_HID_REPORT);
                     data.fo.metadata_size = sizeof(report.timeStamp);
 
-                    _callback(data);
+                    if(_callback)
+                        _callback(data);
                 }
             }
 #endif
