@@ -5,3 +5,4 @@ Tegra/
 *.so
 *.so.*
 __pycache__/
+.github/
