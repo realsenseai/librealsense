@@ -111,7 +111,7 @@ namespace librealsense
         std::shared_ptr< serialized_frame > create_frame(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg);
 
         std::shared_ptr< processing_block_interface >
-            create_processing_block(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg,
+            create_processing_block(const std::string & name,
                                  bool & depth_to_disparity,
                                  std::shared_ptr< options_interface > options );
 

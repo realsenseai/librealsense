@@ -491,9 +491,9 @@ namespace librealsense
         return frame_holder{ frame };
     }
 
-    std::shared_ptr<processing_block_interface> ros2_reader::create_processing_block(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg, bool& depth_to_disparity, std::shared_ptr<options_interface> options)
+    std::shared_ptr<processing_block_interface> ros2_reader::create_processing_block(const std::string& name_in, bool& depth_to_disparity, std::shared_ptr<options_interface> options)
     {
-        std::string name = deserialize_message<cdr_string>(msg).value;
+        std::string name = name_in;
         if (name == "Disparity Filter")
         {
             // What was recorded was the extension type (without its settings!), but we need to create different
@@ -904,22 +904,22 @@ namespace librealsense
 
     std::shared_ptr<recommended_proccesing_blocks_snapshot> ros2_reader::read_proccesing_blocks(device_serializer::sensor_identifier sensor_id, std::shared_ptr<options_interface> options)
     {
-        //Taking all messages from the beginning of the bag until the time point requested
         std::string proccesing_block_topic = ros2_topic::post_processing_blocks_topic(sensor_id);
         auto msg = peek_next_cached();
         processing_blocks blocks;
         auto depth_to_disparity = true;
-        while (msg && msg->topic_name == proccesing_block_topic)
+        if (msg && msg->topic_name == proccesing_block_topic)
         {
             msg = read_next_cached();
-            auto block = create_processing_block(msg, depth_to_disparity, options);
-            if (block)
-                blocks.push_back(block);
-            msg = peek_next_cached();
-
+            auto payload = deserialize_message<cdr_string>(msg).value;
+            for (auto& name : split_string(payload, ';'))
+            {
+                auto block = create_processing_block(name, depth_to_disparity, options);
+                if (block)
+                    blocks.push_back(block);
+            }
         }
-        auto res = std::make_shared<recommended_proccesing_blocks_snapshot>(blocks);
-        return res;
+        return std::make_shared<recommended_proccesing_blocks_snapshot>(blocks);
     }
 
     device_snapshot ros2_reader::read_device_description(const nanoseconds& time, bool reset)
@@ -1083,18 +1083,14 @@ namespace librealsense
 
     std::shared_ptr<info_container> ros2_reader::read_info_snapshot(const std::string& topic)
     {
-        // Read all messages on the topic and populate infos
         auto infos = std::make_shared<info_container>();
-
         auto msg = peek_next_cached();
-        while (msg && msg->topic_name == topic)
+        if (msg && msg->topic_name == topic)
         {
             msg = read_next_cached();
             auto kv = parse_msg_payload(msg);
             register_camera_infos(infos, kv);
-            msg = peek_next_cached();
         }
-
         return infos;
     }
 
