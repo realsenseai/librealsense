@@ -13,8 +13,11 @@
 #include "core/extension.h"
 #include "media/playback/playback-device-info.h"
 #include "media/record/record_device.h"
+#include <media/ros/ros_writer.h>
+#ifdef BUILD_ROSBAG2
 #include <media/ros2/ros2_writer.h>
 #include <media/ros2/ros2_reader.h>
+#endif
 #include <media/bag_to_db3_converter.h>
 #include <media/reader_factory.h>
 #include "core/advanced_mode.h"
@@ -2267,9 +2270,14 @@ rs2_device* rs2_create_record_device_ex(const rs2_device* device, const char* fi
     VALIDATE_NOT_NULL(device);
     VALIDATE_NOT_NULL(file);
 
-    return new rs2_device({
-        std::make_shared<record_device>(device->device, std::make_shared<ros2_writer>(file, compression_enabled != 0))
-        });
+    auto writer = std::make_shared<
+#ifdef BUILD_ROSBAG2
+        ros2_writer
+#else
+        ros_writer
+#endif
+    >(file, compression_enabled != 0);
+    return new rs2_device({ std::make_shared<record_device>(device->device, writer) });
 }
 HANDLE_EXCEPTIONS_AND_RETURN(nullptr, device, file)
 

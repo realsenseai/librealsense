@@ -2,11 +2,15 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 #include "bag_to_db3_converter.h"
+#include "core/serialization.h"
+#include <rsutils/easylogging/easyloggingpp.h>
+
+#ifdef BUILD_ROSBAG2
+
 #include "reader_factory.h"
 #include "ros_common.h"
 #include "ros2/ros2_writer.h"
 #include <rsutils/string/from.h>
-
 
 namespace librealsense
 {
@@ -85,3 +89,16 @@ namespace librealsense
         LOG_INFO("Conversion complete: " << frame_count << " frames written to " << writer->get_file_name());
     }
 }
+
+#else // !BUILD_ROSBAG2
+
+namespace librealsense
+{
+    void convert_bag_to_db3(const std::string&, const std::string&, std::shared_ptr<context>, std::function<void(float)>)
+    {
+        LOG_WARNING("bag-to-db3 conversion not available (BUILD_ROSBAG2 is off)");
+        throw std::runtime_error("bag-to-db3 conversion requires BUILD_ROSBAG2");
+    }
+}
+
+#endif

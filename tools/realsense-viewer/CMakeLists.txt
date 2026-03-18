@@ -206,6 +206,10 @@ else()
         )
 endif()
 
+if(BUILD_ROSBAG2)
+    target_compile_definitions(realsense-viewer PRIVATE BUILD_ROSBAG2)
+endif()
+
 if(OPENVINO2019)
     target_compile_definitions(realsense-viewer PRIVATE OPENVINO2019)
 endif()

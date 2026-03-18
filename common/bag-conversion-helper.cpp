@@ -12,6 +12,9 @@ namespace rs2
     {
         if (!ends_with(file, ".bag") && !ends_with(file, ".BAG"))
             return false;
+#ifndef BUILD_ROSBAG2
+        return false;  // No conversion available — load .bag directly
+#endif
         if (is_converting())
             return true;  // block loading while conversion is in progress
         if (_skip_next) // Will happen in case of conversion failure, or 'Play as-is' selected

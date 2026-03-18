@@ -9,5 +9,4 @@ file(GLOB SOURCE_FILES_RCPPUTILS
     "${CMAKE_CURRENT_LIST_DIR}/src/*.cpp"
 )
 
-message(STATUS "rosbag2: Added rcpputils sources and headers")
 set(ROSBAG2_COMPILE_FLAGS "${ROSBAG2_COMPILE_FLAGS};RCPPUTILS_BUILDING_LIBRARY")

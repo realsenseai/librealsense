@@ -7,7 +7,11 @@
 #include <map>
 #include "types.h"
 #include "ds/d400/d400-options.h"
+#include "media/ros_common.h"
+#include "environment.h"
+#ifdef BUILD_ROSBAG2
 #include "media/ros2/ros2_reader.h"
+#endif
 
 #include <rsutils/string/from.h>
 
