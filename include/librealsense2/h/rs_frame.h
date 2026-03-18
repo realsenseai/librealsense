@@ -513,6 +513,24 @@ void rs2_pose_frame_get_pose_data(const rs2_frame* frame, rs2_pose* pose, rs2_er
 */
 void rs2_extract_target_dimensions(const rs2_frame* frame, rs2_calib_target_type calib_type, float * target_dims, unsigned int target_dims_size, rs2_error** error);
 
+/**
+* When called on Object Detection frame type, this method returns the number of detections in the frame
+* \param[in] frame       Object Detection frame
+* \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return                Number of detections
+*/
+unsigned int rs2_get_frame_object_detection_count(const rs2_frame* frame, rs2_error** error);
+
+/**
+* When called on Object Detection frame type, this method returns a specific detection by index
+* \param[in] frame       Object Detection frame
+* \param[in] index       Index of detection to retrieve
+* \param[out] detection  Pointer to struct to fill with detection data
+* \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_get_frame_object_detection(const rs2_frame* frame, unsigned int index, rs2_object_detection* detection, rs2_error** error);
+
+
 #ifdef __cplusplus
 }
 #endif

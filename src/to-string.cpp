@@ -62,6 +62,7 @@ const char * get_string( rs2_stream value )
     CASE( SAFETY )
     CASE( OCCUPANCY )
     CASE( LABELED_POINT_CLOUD )
+    CASE( OBJECT_DETECTION )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;
@@ -87,6 +88,7 @@ char const * get_abbr_string( rs2_stream value)
     case RS2_STREAM_SAFETY: return "S";
     case RS2_STREAM_OCCUPANCY: return "O";
     case RS2_STREAM_LABELED_POINT_CLOUD: return "LPC";
+    case RS2_STREAM_OBJECT_DETECTION: return "OD";
     default:
         assert( !is_valid( value ) );
         return "?";
@@ -413,6 +415,8 @@ const char * get_string( rs2_extension value )
     CASE( SUPPORTED_EMBEDDED_FILTERS )
     CASE( DECIMATION_EMBEDDED_FILTER )
     CASE( TEMPORAL_EMBEDDED_FILTER )
+    CASE( INFERENCE_FRAME )
+    CASE( OBJECT_DETECTION_FRAME )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;

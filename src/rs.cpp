@@ -65,6 +65,8 @@
 #include "composite-frame.h"
 #include "points.h"
 #include "labeled-points.h"
+#include "object-detection-frame.h"
+#include "inference-frame.h"
 #include "eth-config-device.h"
 #include "embedded-filter-interface.h"
 
@@ -2022,6 +2024,7 @@ int rs2_is_frame_extendable_to(const rs2_frame* f, rs2_extension extension_type,
     case RS2_EXTENSION_MOTION_FRAME             : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::motion_frame)    != nullptr;
     case RS2_EXTENSION_POSE_FRAME               : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::pose_frame)      != nullptr;
     case RS2_EXTENSION_LABELED_POINTS         : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::labeled_points) != nullptr;
+    case RS2_EXTENSION_INFERENCE_FRAME        : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::inference_frame) != nullptr;
 
     default:
         return false;
@@ -4966,3 +4969,32 @@ void rs2_restore_default_eth_config( const rs2_device * device, rs2_error ** err
     return eth_config->restore_defaults();
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, device )
+
+unsigned int rs2_get_frame_object_detection_count(const rs2_frame* frame, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(frame);
+    auto od_frame = VALIDATE_INTERFACE((frame_interface*)frame, librealsense::object_detection_frame);
+    return static_cast<unsigned int>(od_frame->get_detection_count());
+}
+HANDLE_EXCEPTIONS_AND_RETURN(0, frame)
+
+void rs2_get_frame_object_detection(const rs2_frame* frame, unsigned int index, rs2_object_detection* detection, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(frame);
+    VALIDATE_NOT_NULL(detection);
+    auto od_frame = VALIDATE_INTERFACE((frame_interface*)frame, librealsense::object_detection_frame);
+    
+    if(index >= od_frame->get_detection_count() )
+        throw invalid_value_exception( "index " + std::to_string(index) + " is out of range (" +
+                                        std::to_string(od_frame->get_detection_count()) + ")" );
+
+    const auto & entry = od_frame->get_detection( index );
+    detection->class_id       = entry.detection_type;
+    detection->score          = entry.confidence;
+    detection->top_left_x     = entry.top_left_x;
+    detection->top_left_y     = entry.top_left_y;
+    detection->bottom_right_x = entry.bottom_right_x;
+    detection->bottom_right_y = entry.bottom_right_y;
+    detection->depth          = entry.distance;
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, frame, index, output_arg(detection))
