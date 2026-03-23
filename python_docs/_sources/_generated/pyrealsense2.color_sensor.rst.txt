@@ -24,10 +24,14 @@ pyrealsense2.color_sensor
       ~color_sensor.as_motion_sensor
       ~color_sensor.as_pose_sensor
       ~color_sensor.as_roi_sensor
+      ~color_sensor.as_safety_sensor
       ~color_sensor.as_wheel_odometer
       ~color_sensor.close
       ~color_sensor.from_frame
       ~color_sensor.get_active_streams
+      ~color_sensor.get_embedded_decimation_filter
+      ~color_sensor.get_embedded_filter
+      ~color_sensor.get_embedded_temporal_filter
       ~color_sensor.get_info
       ~color_sensor.get_option
       ~color_sensor.get_option_description
@@ -46,9 +50,11 @@ pyrealsense2.color_sensor
       ~color_sensor.is_option_read_only
       ~color_sensor.is_pose_sensor
       ~color_sensor.is_roi_sensor
+      ~color_sensor.is_safety_sensor
       ~color_sensor.is_wheel_odometer
       ~color_sensor.on_options_changed
       ~color_sensor.open
+      ~color_sensor.query_embedded_filters
       ~color_sensor.set_notifications_callback
       ~color_sensor.set_option
       ~color_sensor.set_option_value

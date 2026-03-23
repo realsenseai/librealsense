@@ -34,6 +34,7 @@ pyrealsense2.updatable
       ~updatable.first_motion_sensor
       ~updatable.first_pose_sensor
       ~updatable.first_roi_sensor
+      ~updatable.first_safety_sensor
       ~updatable.get_info
       ~updatable.hardware_reset
       ~updatable.is_auto_calibrated_device
@@ -42,6 +43,7 @@ pyrealsense2.updatable
       ~updatable.is_debug_protocol
       ~updatable.is_device_calibration
       ~updatable.is_firmware_logger
+      ~updatable.is_in_recovery_mode
       ~updatable.is_metadata_enabled
       ~updatable.is_playback
       ~updatable.is_recorder

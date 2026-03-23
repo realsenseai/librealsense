@@ -5,13 +5,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.stream &#8212; pyrealsense2 2.56.5 documentation</title>
+    <title>pyrealsense2.stream &#8212; pyrealsense2 2.57.7 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=8b0ddf77"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/documentation_options.js?v=69589b5d"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" /> 
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.56.5 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.stream</a></li> 
       </ul>
     </div>  
@@ -39,7 +39,7 @@
 <h1>pyrealsense2.stream<a class="headerlink" href="#pyrealsense2-stream" title="Link to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="pyrealsense2.stream">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyrealsense2.</span></span><span class="sig-name descname"><span class="pre">stream</span></span><a class="headerlink" href="#pyrealsense2.stream" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">pyrealsense2.</span></span><span class="sig-name descname"><span class="pre">stream</span></span><a class="headerlink" href="#pyrealsense2.stream" title="Link to this definition">¶</a></dt>
 <dd><p>Streams are different types of data provided by RealSense devices.</p>
 <p>Members:</p>
 <blockquote>
@@ -54,6 +54,9 @@
 <p>pose</p>
 <p>confidence</p>
 <p>motion</p>
+<p>safety</p>
+<p>occupancy</p>
+<p>labeled_point_cloud</p>
 </div></blockquote>
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.stream.__init__">
@@ -98,83 +101,107 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.infrared" title="pyrealsense2.stream.infrared"><code class="xref py py-obj docutils literal notranslate"><span class="pre">infrared</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.stream.motion" title="pyrealsense2.stream.motion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">motion</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.stream.labeled_point_cloud" title="pyrealsense2.stream.labeled_point_cloud"><code class="xref py py-obj docutils literal notranslate"><span class="pre">labeled_point_cloud</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.name" title="pyrealsense2.stream.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.motion" title="pyrealsense2.stream.motion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">motion</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code>(-&gt; str)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.occupancy" title="pyrealsense2.stream.occupancy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">occupancy</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.stream.pose" title="pyrealsense2.stream.pose"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.value" title="pyrealsense2.stream.value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">value</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.safety" title="pyrealsense2.stream.safety"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.stream.value" title="pyrealsense2.stream.value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">value</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 </tbody>
 </table>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.accel">
-<span class="sig-name descname"><span class="pre">accel</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.accel:</span> <span class="pre">6&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.accel" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">accel</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.accel:</span> <span class="pre">6&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.accel" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.any">
-<span class="sig-name descname"><span class="pre">any</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.any:</span> <span class="pre">0&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.any" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">any</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.any:</span> <span class="pre">0&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.any" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.color">
-<span class="sig-name descname"><span class="pre">color</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.color:</span> <span class="pre">2&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.color" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">color</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.color:</span> <span class="pre">2&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.color" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.confidence">
-<span class="sig-name descname"><span class="pre">confidence</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.confidence:</span> <span class="pre">9&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.confidence" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">confidence</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.confidence:</span> <span class="pre">9&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.confidence" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.depth">
-<span class="sig-name descname"><span class="pre">depth</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.depth:</span> <span class="pre">1&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.depth" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">depth</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.depth:</span> <span class="pre">1&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.depth" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.fisheye">
-<span class="sig-name descname"><span class="pre">fisheye</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.fisheye:</span> <span class="pre">4&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.fisheye" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">fisheye</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.fisheye:</span> <span class="pre">4&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.fisheye" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.gpio">
-<span class="sig-name descname"><span class="pre">gpio</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.gpio:</span> <span class="pre">7&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.gpio" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">gpio</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.gpio:</span> <span class="pre">7&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.gpio" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.gyro">
-<span class="sig-name descname"><span class="pre">gyro</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.gyro:</span> <span class="pre">5&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.gyro" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">gyro</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.gyro:</span> <span class="pre">5&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.gyro" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.infrared">
-<span class="sig-name descname"><span class="pre">infrared</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.infrared:</span> <span class="pre">3&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.infrared" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">infrared</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.infrared:</span> <span class="pre">3&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.infrared" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.stream.labeled_point_cloud">
+<span class="sig-name descname"><span class="pre">labeled_point_cloud</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.labeled_point_cloud:</span> <span class="pre">13&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.labeled_point_cloud" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.motion">
-<span class="sig-name descname"><span class="pre">motion</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.motion:</span> <span class="pre">10&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.motion" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">motion</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.motion:</span> <span class="pre">10&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.motion" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="pyrealsense2.stream.name">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#pyrealsense2.stream.name" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">stream.name</span> <span class="pre">-&gt;</span> <span class="pre">str</span></span></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.stream.occupancy">
+<span class="sig-name descname"><span class="pre">occupancy</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.occupancy:</span> <span class="pre">12&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.occupancy" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.pose">
-<span class="sig-name descname"><span class="pre">pose</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.pose:</span> <span class="pre">8&gt;</span></em><a class="headerlink" href="#pyrealsense2.stream.pose" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">pose</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.pose:</span> <span class="pre">8&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.pose" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.stream.safety">
+<span class="sig-name descname"><span class="pre">safety</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.safety:</span> <span class="pre">11&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.safety" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="pyrealsense2.stream.value">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#pyrealsense2.stream.value" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#pyrealsense2.stream.value" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
@@ -203,9 +230,11 @@
 <li><a class="reference internal" href="#pyrealsense2.stream.gpio"><code class="docutils literal notranslate"><span class="pre">stream.gpio</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.stream.gyro"><code class="docutils literal notranslate"><span class="pre">stream.gyro</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.stream.infrared"><code class="docutils literal notranslate"><span class="pre">stream.infrared</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.stream.labeled_point_cloud"><code class="docutils literal notranslate"><span class="pre">stream.labeled_point_cloud</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.stream.motion"><code class="docutils literal notranslate"><span class="pre">stream.motion</span></code></a></li>
-<li><a class="reference internal" href="#pyrealsense2.stream.name"><code class="docutils literal notranslate"><span class="pre">stream.name</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.stream.occupancy"><code class="docutils literal notranslate"><span class="pre">stream.occupancy</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.stream.pose"><code class="docutils literal notranslate"><span class="pre">stream.pose</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.stream.safety"><code class="docutils literal notranslate"><span class="pre">stream.safety</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.stream.value"><code class="docutils literal notranslate"><span class="pre">stream.value</span></code></a></li>
 </ul>
 </li>
@@ -244,13 +273,13 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.56.5 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.stream</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2024, Intel Realsense Team.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.0.4.
     </div>
   </body>
 </html>

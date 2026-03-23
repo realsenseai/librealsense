@@ -24,10 +24,14 @@ pyrealsense2.wheel_odometer
       ~wheel_odometer.as_motion_sensor
       ~wheel_odometer.as_pose_sensor
       ~wheel_odometer.as_roi_sensor
+      ~wheel_odometer.as_safety_sensor
       ~wheel_odometer.as_wheel_odometer
       ~wheel_odometer.close
       ~wheel_odometer.from_frame
       ~wheel_odometer.get_active_streams
+      ~wheel_odometer.get_embedded_decimation_filter
+      ~wheel_odometer.get_embedded_filter
+      ~wheel_odometer.get_embedded_temporal_filter
       ~wheel_odometer.get_info
       ~wheel_odometer.get_option
       ~wheel_odometer.get_option_description
@@ -46,10 +50,12 @@ pyrealsense2.wheel_odometer
       ~wheel_odometer.is_option_read_only
       ~wheel_odometer.is_pose_sensor
       ~wheel_odometer.is_roi_sensor
+      ~wheel_odometer.is_safety_sensor
       ~wheel_odometer.is_wheel_odometer
       ~wheel_odometer.load_wheel_odometery_config
       ~wheel_odometer.on_options_changed
       ~wheel_odometer.open
+      ~wheel_odometer.query_embedded_filters
       ~wheel_odometer.send_wheel_odometry
       ~wheel_odometer.set_notifications_callback
       ~wheel_odometer.set_option

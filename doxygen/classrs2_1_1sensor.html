@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.14"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Intel® RealSense™ Cross Platform API: rs2::sensor Class Reference</title>
+<title>RealSense Cross Platform API: rs2::sensor Class Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -18,9 +18,9 @@
  <tbody>
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
-   <div id="projectname">Intel® RealSense™ Cross Platform API
+   <div id="projectname">RealSense Cross Platform API
    </div>
-   <div id="projectbrief">Intel Realsense Cross-platform API</div>
+   <div id="projectbrief">RealSense Cross-platform API</div>
   </td>
  </tr>
  </tbody>
@@ -62,14 +62,16 @@ Inheritance diagram for rs2::sensor:</div>
 <area href="classrs2_1_1options.html" alt="rs2::options" shape="rect" coords="0,0,187,24"/>
 <area href="classrs2_1_1color__sensor.html" alt="rs2::color_sensor" shape="rect" coords="197,112,384,136"/>
 <area href="classrs2_1_1debug__stream__sensor.html" alt="rs2::debug_stream_sensor" shape="rect" coords="197,168,384,192"/>
-<area href="classrs2_1_1depth__sensor.html" alt="rs2::depth_sensor" shape="rect" coords="197,224,384,248"/>
-<area href="classrs2_1_1fisheye__sensor.html" alt="rs2::fisheye_sensor" shape="rect" coords="197,280,384,304"/>
-<area href="classrs2_1_1max__usable__range__sensor.html" alt="rs2::max_usable_range_sensor" shape="rect" coords="197,336,384,360"/>
-<area href="classrs2_1_1motion__sensor.html" alt="rs2::motion_sensor" shape="rect" coords="197,392,384,416"/>
-<area href="classrs2_1_1pose__sensor.html" alt="rs2::pose_sensor" shape="rect" coords="197,448,384,472"/>
-<area href="classrs2_1_1roi__sensor.html" alt="rs2::roi_sensor" shape="rect" coords="197,504,384,528"/>
-<area href="classrs2_1_1software__sensor.html" alt="rs2::software_sensor" shape="rect" coords="197,560,384,584"/>
-<area href="classrs2_1_1wheel__odometer.html" alt="rs2::wheel_odometer" shape="rect" coords="197,616,384,640"/>
+<area href="classrs2_1_1depth__mapping__sensor.html" alt="rs2::depth_mapping_sensor" shape="rect" coords="197,224,384,248"/>
+<area href="classrs2_1_1depth__sensor.html" alt="rs2::depth_sensor" shape="rect" coords="197,280,384,304"/>
+<area href="classrs2_1_1fisheye__sensor.html" alt="rs2::fisheye_sensor" shape="rect" coords="197,336,384,360"/>
+<area href="classrs2_1_1max__usable__range__sensor.html" alt="rs2::max_usable_range_sensor" shape="rect" coords="197,392,384,416"/>
+<area href="classrs2_1_1motion__sensor.html" alt="rs2::motion_sensor" shape="rect" coords="197,448,384,472"/>
+<area href="classrs2_1_1pose__sensor.html" alt="rs2::pose_sensor" shape="rect" coords="197,504,384,528"/>
+<area href="classrs2_1_1roi__sensor.html" alt="rs2::roi_sensor" shape="rect" coords="197,560,384,584"/>
+<area href="classrs2_1_1safety__sensor.html" alt="rs2::safety_sensor" shape="rect" coords="197,616,384,640"/>
+<area href="classrs2_1_1software__sensor.html" alt="rs2::software_sensor" shape="rect" coords="197,672,384,696"/>
+<area href="classrs2_1_1wheel__odometer.html" alt="rs2::wheel_odometer" shape="rect" coords="197,728,384,752"/>
 </map>
  </div></div>
 <table class="memberdecls">
@@ -99,6 +101,11 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:af1e86bb01ac72684a24e720f46f7ec92"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a14c29d74e74116cbb7ed3cbd8c24de0c"><td class="memItemLeft" align="right" valign="top">std::vector&lt; <a class="el" href="classrs2_1_1filter.html">filter</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1sensor.html#a14c29d74e74116cbb7ed3cbd8c24de0c">get_recommended_filters</a> () const</td></tr>
 <tr class="separator:a14c29d74e74116cbb7ed3cbd8c24de0c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae36461eb1945ee680c5c92dd7497b094"><td class="memItemLeft" align="right" valign="top">std::vector&lt; <a class="el" href="classrs2_1_1embedded__filter.html">embedded_filter</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1sensor.html#ae36461eb1945ee680c5c92dd7497b094">query_embedded_filters</a> () const</td></tr>
+<tr class="separator:ae36461eb1945ee680c5c92dd7497b094"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2b6df51ba322fe79230542948a717dd6"><td class="memTemplParams" colspan="2">template&lt;class T &gt; </td></tr>
+<tr class="memitem:a2b6df51ba322fe79230542948a717dd6"><td class="memTemplItemLeft" align="right" valign="top">T&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classrs2_1_1sensor.html#a2b6df51ba322fe79230542948a717dd6">get_embedded_filter</a> () const</td></tr>
+<tr class="separator:a2b6df51ba322fe79230542948a717dd6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a07800f9af78e59435c3075e69a1c0fdf"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classrs2_1_1sensor.html">sensor</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1sensor.html#a07800f9af78e59435c3075e69a1c0fdf">operator=</a> (const std::shared_ptr&lt; <a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> &gt; other)</td></tr>
 <tr class="separator:a07800f9af78e59435c3075e69a1c0fdf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7ea70b0c8e46f03dabae9e84447ba531"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classrs2_1_1sensor.html">sensor</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1sensor.html#a7ea70b0c8e46f03dabae9e84447ba531">operator=</a> (const <a class="el" href="classrs2_1_1sensor.html">sensor</a> &amp;other)</td></tr>
@@ -333,6 +340,33 @@ template&lt;class T &gt; </div>
 </table>
 </div><div class="memdoc">
 <p>Retrieves the list of stream profiles currently streaming on the sensor. </p><dl class="section return"><dt>Returns</dt><dd>list of stream profiles that given sensor is streaming </dd></dl>
+
+</div>
+</div>
+<a id="a2b6df51ba322fe79230542948a717dd6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2b6df51ba322fe79230542948a717dd6">&#9670;&nbsp;</a></span>get_embedded_filter()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;class T &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">T rs2::sensor::get_embedded_filter </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
 
 </div>
 </div>
@@ -603,6 +637,31 @@ template&lt;class T &gt; </div>
           <td class="paramtype">const <a class="el" href="classrs2_1_1sensor.html">sensor</a> &amp;&#160;</td>
           <td class="paramname"><em>other</em></td><td>)</td>
           <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ae36461eb1945ee680c5c92dd7497b094"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae36461eb1945ee680c5c92dd7497b094">&#9670;&nbsp;</a></span>query_embedded_filters()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::vector&lt;<a class="el" href="classrs2_1_1embedded__filter.html">embedded_filter</a>&gt; rs2::sensor::query_embedded_filters </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
         </tr>
       </table>
   </td>

@@ -6,10 +6,10 @@ Default Window=main
 Default topic=index.html
 Index file=index.hhk
 Language=0x409 English (United States)
-Title=Intel® RealSense™ Cross Platform API
+Title=RealSense Cross Platform API
 
 [WINDOWS]
-main="Intel® RealSense™ Cross Platform API","index.hhc","index.hhk","index.html","index.html",,,,,0x23520,,0x10387e,,,,,,,,0
+main="RealSense Cross Platform API","index.hhc","index.hhk","index.html","index.html",,,,,0x23520,,0x10387e,,,,,,,,0
 
 [FILES]
 rs__processing__gl_8h_source.html
@@ -18,16 +18,19 @@ rs__advanced__mode__command_8h_source.html
 rs__config_8h_source.html
 rs__context_8h_source.html
 rs__device_8h_source.html
+rs__eth__config_8h_source.html
 rs__frame_8h_source.html
 rs__internal_8h_source.html
 rs__option_8h_source.html
 rs__pipeline_8h_source.html
 rs__processing_8h_source.html
 rs__record__playback_8h_source.html
+rs__safety__sensor_8h_source.html
 rs__sensor_8h_source.html
 rs__types_8h_source.html
 rs__context_8hpp_source.html
 rs__device_8hpp_source.html
+rs__eth__config_8hpp_source.html
 rs__export_8hpp_source.html
 rs__frame_8hpp_source.html
 rs__internal_8hpp_source.html
@@ -35,6 +38,7 @@ rs__options_8hpp_source.html
 rs__pipeline_8hpp_source.html
 rs__processing_8hpp_source.html
 rs__record__playback_8hpp_source.html
+rs__safety__sensor_8hpp_source.html
 rs__sensor_8hpp_source.html
 rs__serializable__device_8hpp_source.html
 rs__types_8hpp_source.html
@@ -49,16 +53,19 @@ rs__advanced__mode__command_8h.html
 rs__config_8h.html
 rs__context_8h.html
 rs__device_8h.html
+rs__eth__config_8h.html
 rs__frame_8h.html
 rs__internal_8h.html
 rs__option_8h.html
 rs__pipeline_8h.html
 rs__processing_8h.html
 rs__record__playback_8h.html
+rs__safety__sensor_8h.html
 rs__sensor_8h.html
 rs__types_8h.html
 rs__context_8hpp.html
 rs__device_8hpp.html
+rs__eth__config_8hpp.html
 rs__export_8hpp.html
 rs__frame_8hpp.html
 rs__internal_8hpp.html
@@ -66,6 +73,7 @@ rs__options_8hpp.html
 rs__pipeline_8hpp.html
 rs__processing_8hpp.html
 rs__record__playback_8hpp.html
+rs__safety__sensor_8hpp.html
 rs__sensor_8hpp.html
 rs__serializable__device_8hpp.html
 rs__types_8hpp.html
@@ -196,6 +204,8 @@ classrs2_1_1depth__frame.html
 classrs2_1_1depth__frame-members.html
 classrs2_1_1depth__huffman__decoder.html
 classrs2_1_1depth__huffman__decoder-members.html
+classrs2_1_1depth__mapping__sensor.html
+classrs2_1_1depth__mapping__sensor-members.html
 classrs2_1_1depth__sensor.html
 classrs2_1_1depth__sensor-members.html
 classrs2_1_1depth__stereo__sensor.html
@@ -216,8 +226,16 @@ classrs2_1_1disparity__frame.html
 classrs2_1_1disparity__frame-members.html
 classrs2_1_1disparity__transform.html
 classrs2_1_1disparity__transform-members.html
+classrs2_1_1embedded__decimation__filter.html
+classrs2_1_1embedded__decimation__filter-members.html
+classrs2_1_1embedded__filter.html
+classrs2_1_1embedded__filter-members.html
+classrs2_1_1embedded__temporal__filter.html
+classrs2_1_1embedded__temporal__filter-members.html
 classrs2_1_1error.html
 classrs2_1_1error-members.html
+classrs2_1_1eth__config__device.html
+classrs2_1_1eth__config__device-members.html
 classrs2_1_1event__information.html
 classrs2_1_1event__information-members.html
 classrs2_1_1filter.html
@@ -250,10 +268,14 @@ classrs2_1_1hdr__merge.html
 classrs2_1_1hdr__merge-members.html
 classrs2_1_1hole__filling__filter.html
 classrs2_1_1hole__filling__filter-members.html
+classrs2_1_1labeled__points.html
+classrs2_1_1labeled__points-members.html
 classrs2_1_1log__callback.html
 classrs2_1_1log__callback-members.html
 classrs2_1_1log__message.html
 classrs2_1_1log__message-members.html
+classrs2_1_1m420__decoder.html
+classrs2_1_1m420__decoder-members.html
 classrs2_1_1max__usable__range__sensor.html
 classrs2_1_1max__usable__range__sensor-members.html
 classrs2_1_1motion__frame.html
@@ -306,6 +328,8 @@ classrs2_1_1roi__sensor.html
 classrs2_1_1roi__sensor-members.html
 classrs2_1_1rotation__filter.html
 classrs2_1_1rotation__filter-members.html
+classrs2_1_1safety__sensor.html
+classrs2_1_1safety__sensor-members.html
 classrs2_1_1save__single__frameset.html
 classrs2_1_1save__single__frameset-members.html
 classrs2_1_1save__to__ply.html
@@ -369,6 +393,8 @@ classrs2_1_1gl_1_1colorizer.html
 classrs2_1_1gl_1_1colorizer-members.html
 classrs2_1_1gl_1_1gpu__frame.html
 classrs2_1_1gl_1_1gpu__frame-members.html
+classrs2_1_1gl_1_1m420__decoder.html
+classrs2_1_1gl_1_1m420__decoder-members.html
 classrs2_1_1gl_1_1pointcloud.html
 classrs2_1_1gl_1_1pointcloud-members.html
 classrs2_1_1gl_1_1pointcloud__renderer.html
@@ -526,6 +552,7 @@ classrs2_1_1debug__stream__sensor.png
 classrs2_1_1decimation__filter.png
 classrs2_1_1depth__frame.png
 classrs2_1_1depth__huffman__decoder.png
+classrs2_1_1depth__mapping__sensor.png
 classrs2_1_1depth__sensor.png
 classrs2_1_1depth__stereo__sensor.png
 classrs2_1_1device.png
@@ -533,7 +560,11 @@ classrs2_1_1device__calibration.png
 classrs2_1_1devices__changed__callback.png
 classrs2_1_1disparity__frame.png
 classrs2_1_1disparity__transform.png
+classrs2_1_1embedded__decimation__filter.png
+classrs2_1_1embedded__filter.png
+classrs2_1_1embedded__temporal__filter.png
 classrs2_1_1error.png
+classrs2_1_1eth__config__device.png
 classrs2_1_1filter.png
 classrs2_1_1filter__interface.png
 classrs2_1_1firmware__logger.png
@@ -544,7 +575,9 @@ classrs2_1_1frame__processor__callback.png
 classrs2_1_1frameset.png
 classrs2_1_1hdr__merge.png
 classrs2_1_1hole__filling__filter.png
+classrs2_1_1labeled__points.png
 classrs2_1_1log__callback.png
+classrs2_1_1m420__decoder.png
 classrs2_1_1max__usable__range__sensor.png
 classrs2_1_1motion__frame.png
 classrs2_1_1motion__sensor.png
@@ -563,6 +596,7 @@ classrs2_1_1rates__printer.png
 classrs2_1_1recorder.png
 classrs2_1_1roi__sensor.png
 classrs2_1_1rotation__filter.png
+classrs2_1_1safety__sensor.png
 classrs2_1_1save__single__frameset.png
 classrs2_1_1save__to__ply.png
 classrs2_1_1sensor.png
@@ -589,6 +623,7 @@ classrs2_1_1gl_1_1align.png
 classrs2_1_1gl_1_1camera__renderer.png
 classrs2_1_1gl_1_1colorizer.png
 classrs2_1_1gl_1_1gpu__frame.png
+classrs2_1_1gl_1_1m420__decoder.png
 classrs2_1_1gl_1_1pointcloud.png
 classrs2_1_1gl_1_1pointcloud__renderer.png
 classrs2_1_1gl_1_1uploader.png

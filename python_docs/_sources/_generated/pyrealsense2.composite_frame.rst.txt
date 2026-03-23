@@ -19,6 +19,7 @@ pyrealsense2.composite_frame
       ~composite_frame.as_depth_frame
       ~composite_frame.as_frame
       ~composite_frame.as_frameset
+      ~composite_frame.as_labeled_points
       ~composite_frame.as_motion_frame
       ~composite_frame.as_points
       ~composite_frame.as_pose_frame
@@ -35,12 +36,14 @@ pyrealsense2.composite_frame
       ~composite_frame.get_frame_number
       ~composite_frame.get_frame_timestamp_domain
       ~composite_frame.get_infrared_frame
+      ~composite_frame.get_labeled_point_cloud_frame
       ~composite_frame.get_pose_frame
       ~composite_frame.get_profile
       ~composite_frame.get_timestamp
       ~composite_frame.is_depth_frame
       ~composite_frame.is_frame
       ~composite_frame.is_frameset
+      ~composite_frame.is_labeled_points
       ~composite_frame.is_motion_frame
       ~composite_frame.is_points
       ~composite_frame.is_pose_frame

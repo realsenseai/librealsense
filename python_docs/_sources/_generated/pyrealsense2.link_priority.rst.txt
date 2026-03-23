@@ -1,0 +1,37 @@
+pyrealsense2.link_priority
+==========================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: link_priority
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~link_priority.__init__
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~link_priority.dynamic_eth_first
+      ~link_priority.dynamic_usb_first
+      ~link_priority.eth_first
+      ~link_priority.eth_only
+      ~link_priority.name
+      ~link_priority.usb_first
+      ~link_priority.usb_only
+      ~link_priority.value
+   
+   

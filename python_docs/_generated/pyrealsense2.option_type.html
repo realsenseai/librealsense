@@ -5,13 +5,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.option_type &#8212; pyrealsense2 2.56.5 documentation</title>
+    <title>pyrealsense2.option_type &#8212; pyrealsense2 2.57.7 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=8b0ddf77"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/documentation_options.js?v=69589b5d"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" /> 
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.56.5 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.option_type</a></li> 
       </ul>
     </div>  
@@ -39,7 +39,7 @@
 <h1>pyrealsense2.option_type<a class="headerlink" href="#pyrealsense2-option-type" title="Link to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="pyrealsense2.option_type">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyrealsense2.</span></span><span class="sig-name descname"><span class="pre">option_type</span></span><a class="headerlink" href="#pyrealsense2.option_type" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">pyrealsense2.</span></span><span class="sig-name descname"><span class="pre">option_type</span></span><a class="headerlink" href="#pyrealsense2.option_type" title="Link to this definition">¶</a></dt>
 <dd><p>The different types option values can take on</p>
 <p>Members:</p>
 <blockquote>
@@ -47,6 +47,7 @@
 <p>float</p>
 <p>string</p>
 <p>boolean</p>
+<p>rect</p>
 </div></blockquote>
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.option_type.__init__">
@@ -73,45 +74,53 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option_type.integer" title="pyrealsense2.option_type.integer"><code class="xref py py-obj docutils literal notranslate"><span class="pre">integer</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option_type.name" title="pyrealsense2.option_type.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code></a></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code>(-&gt; str)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option_type.string" title="pyrealsense2.option_type.string"><code class="xref py py-obj docutils literal notranslate"><span class="pre">string</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option_type.rect" title="pyrealsense2.option_type.rect"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rect</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option_type.value" title="pyrealsense2.option_type.value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">value</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option_type.string" title="pyrealsense2.option_type.string"><code class="xref py py-obj docutils literal notranslate"><span class="pre">string</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option_type.value" title="pyrealsense2.option_type.value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">value</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 </tbody>
 </table>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option_type.boolean">
-<span class="sig-name descname"><span class="pre">boolean</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option_type.boolean:</span> <span class="pre">3&gt;</span></em><a class="headerlink" href="#pyrealsense2.option_type.boolean" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">boolean</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option_type.boolean:</span> <span class="pre">3&gt;</span></span><a class="headerlink" href="#pyrealsense2.option_type.boolean" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option_type.float">
-<span class="sig-name descname"><span class="pre">float</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option_type.float:</span> <span class="pre">1&gt;</span></em><a class="headerlink" href="#pyrealsense2.option_type.float" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option_type.float:</span> <span class="pre">1&gt;</span></span><a class="headerlink" href="#pyrealsense2.option_type.float" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option_type.integer">
-<span class="sig-name descname"><span class="pre">integer</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option_type.integer:</span> <span class="pre">0&gt;</span></em><a class="headerlink" href="#pyrealsense2.option_type.integer" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">integer</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option_type.integer:</span> <span class="pre">0&gt;</span></span><a class="headerlink" href="#pyrealsense2.option_type.integer" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="pyrealsense2.option_type.name">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#pyrealsense2.option_type.name" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">option_type.name</span> <span class="pre">-&gt;</span> <span class="pre">str</span></span></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option_type.rect">
+<span class="sig-name descname"><span class="pre">rect</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option_type.rect:</span> <span class="pre">4&gt;</span></span><a class="headerlink" href="#pyrealsense2.option_type.rect" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option_type.string">
-<span class="sig-name descname"><span class="pre">string</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option_type.string:</span> <span class="pre">2&gt;</span></em><a class="headerlink" href="#pyrealsense2.option_type.string" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">string</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option_type.string:</span> <span class="pre">2&gt;</span></span><a class="headerlink" href="#pyrealsense2.option_type.string" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="pyrealsense2.option_type.value">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#pyrealsense2.option_type.value" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#pyrealsense2.option_type.value" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
@@ -134,7 +143,7 @@
 <li><a class="reference internal" href="#pyrealsense2.option_type.boolean"><code class="docutils literal notranslate"><span class="pre">option_type.boolean</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option_type.float"><code class="docutils literal notranslate"><span class="pre">option_type.float</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option_type.integer"><code class="docutils literal notranslate"><span class="pre">option_type.integer</span></code></a></li>
-<li><a class="reference internal" href="#pyrealsense2.option_type.name"><code class="docutils literal notranslate"><span class="pre">option_type.name</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option_type.rect"><code class="docutils literal notranslate"><span class="pre">option_type.rect</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option_type.string"><code class="docutils literal notranslate"><span class="pre">option_type.string</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option_type.value"><code class="docutils literal notranslate"><span class="pre">option_type.value</span></code></a></li>
 </ul>
@@ -174,13 +183,13 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.56.5 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.option_type</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2024, Intel Realsense Team.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.0.4.
     </div>
   </body>
 </html>

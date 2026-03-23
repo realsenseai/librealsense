@@ -1,0 +1,40 @@
+pyrealsense2.embedded_temporal_filter
+=====================================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: embedded_temporal_filter
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~embedded_temporal_filter.__init__
+      ~embedded_temporal_filter.as_embedded_decimation_filter
+      ~embedded_temporal_filter.as_embedded_temporal_filter
+      ~embedded_temporal_filter.get_option
+      ~embedded_temporal_filter.get_option_description
+      ~embedded_temporal_filter.get_option_range
+      ~embedded_temporal_filter.get_option_value
+      ~embedded_temporal_filter.get_option_value_description
+      ~embedded_temporal_filter.get_supported_options
+      ~embedded_temporal_filter.get_type
+      ~embedded_temporal_filter.is_embedded_decimation_filter
+      ~embedded_temporal_filter.is_embedded_temporal_filter
+      ~embedded_temporal_filter.is_option_read_only
+      ~embedded_temporal_filter.on_options_changed
+      ~embedded_temporal_filter.set_option
+      ~embedded_temporal_filter.set_option_value
+      ~embedded_temporal_filter.supports
+   
+   
+   
+   
+   
+   

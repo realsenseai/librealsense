@@ -33,6 +33,7 @@ pyrealsense2.playback
       ~playback.first_motion_sensor
       ~playback.first_pose_sensor
       ~playback.first_roi_sensor
+      ~playback.first_safety_sensor
       ~playback.get_duration
       ~playback.get_info
       ~playback.get_position
@@ -43,6 +44,7 @@ pyrealsense2.playback
       ~playback.is_debug_protocol
       ~playback.is_device_calibration
       ~playback.is_firmware_logger
+      ~playback.is_in_recovery_mode
       ~playback.is_metadata_enabled
       ~playback.is_playback
       ~playback.is_real_time

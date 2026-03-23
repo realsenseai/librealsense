@@ -1,0 +1,28 @@
+pyrealsense2.ip_address
+=======================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: ip_address
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~ip_address.__init__
+      ~ip_address.clear
+      ~ip_address.empty
+      ~ip_address.get_components
+      ~ip_address.is_valid
+   
+   
+   
+   
+   
+   

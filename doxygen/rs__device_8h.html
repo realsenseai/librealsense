@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.14"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Intel® RealSense™ Cross Platform API: C:/jenkins_sys_rsbuild/workspace/LRS_doxygen_pipeline/source/include/librealsense2/h/rs_device.h File Reference</title>
+<title>RealSense Cross Platform API: C:/jenkins_sys_rsbuild/workspace/LRS_doxygen_pipeline/source/include/librealsense2/h/rs_device.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -18,9 +18,9 @@
  <tbody>
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
-   <div id="projectname">Intel® RealSense™ Cross Platform API
+   <div id="projectname">RealSense Cross Platform API
    </div>
-   <div id="projectbrief">Intel Realsense Cross-platform API</div>
+   <div id="projectbrief">RealSense Cross-platform API</div>
   </td>
  </tr>
  </tbody>
@@ -129,6 +129,8 @@ Functions</h2></td></tr>
 <tr class="separator:a9c41a30038f08cd9b43cb629cc6bcad2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abdec8d323cfcdb97f84c30bc31402712"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__device_8h.html#abdec8d323cfcdb97f84c30bc31402712">rs2_hardware_reset</a> (const <a class="el" href="rs__types_8h.html#a6b12b0e578c567223a99b0c0f2b67a25">rs2_device</a> *device, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:abdec8d323cfcdb97f84c30bc31402712"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a424ec733c2129116837dc417efb1562c"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__device_8h.html#a424ec733c2129116837dc417efb1562c">rs2_is_in_recovery_mode</a> (const <a class="el" href="rs__types_8h.html#a6b12b0e578c567223a99b0c0f2b67a25">rs2_device</a> *device, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a424ec733c2129116837dc417efb1562c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a48e86a23fa1f7a2bec3c0044bcaa1790"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="rs__types_8h.html#ab811c9b19a9d7c4608062eb12a6e3f2e">rs2_raw_data_buffer</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__device_8h.html#a48e86a23fa1f7a2bec3c0044bcaa1790">rs2_build_debug_protocol_command</a> (<a class="el" href="rs__types_8h.html#a6b12b0e578c567223a99b0c0f2b67a25">rs2_device</a> *device, unsigned opcode, unsigned param1, unsigned param2, unsigned param3, unsigned param4, void *data, unsigned size_of_data, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:a48e86a23fa1f7a2bec3c0044bcaa1790"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3651441774870a2b8549427d53b17a52"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="rs__types_8h.html#ab811c9b19a9d7c4608062eb12a6e3f2e">rs2_raw_data_buffer</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__device_8h.html#a3651441774870a2b8549427d53b17a52">rs2_send_and_receive_raw_data</a> (<a class="el" href="rs__types_8h.html#a6b12b0e578c567223a99b0c0f2b67a25">rs2_device</a> *device, void *raw_data_to_send, unsigned size_of_raw_data_to_send, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
@@ -1293,6 +1295,41 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Non-zero value iff the device can be extended to the given extension </dd></dl>
+
+</div>
+</div>
+<a id="a424ec733c2129116837dc417efb1562c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a424ec733c2129116837dc417efb1562c">&#9670;&nbsp;</a></span>rs2_is_in_recovery_mode()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int rs2_is_in_recovery_mode </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#a6b12b0e578c567223a99b0c0f2b67a25">rs2_device</a> *&#160;</td>
+          <td class="paramname"><em>device</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Check if a camera is in recovery mode </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">device</td><td>The RealSense device to check </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>If non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>

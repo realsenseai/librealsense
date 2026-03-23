@@ -24,11 +24,15 @@ pyrealsense2.pose_sensor
       ~pose_sensor.as_motion_sensor
       ~pose_sensor.as_pose_sensor
       ~pose_sensor.as_roi_sensor
+      ~pose_sensor.as_safety_sensor
       ~pose_sensor.as_wheel_odometer
       ~pose_sensor.close
       ~pose_sensor.export_localization_map
       ~pose_sensor.from_frame
       ~pose_sensor.get_active_streams
+      ~pose_sensor.get_embedded_decimation_filter
+      ~pose_sensor.get_embedded_filter
+      ~pose_sensor.get_embedded_temporal_filter
       ~pose_sensor.get_info
       ~pose_sensor.get_option
       ~pose_sensor.get_option_description
@@ -49,9 +53,11 @@ pyrealsense2.pose_sensor
       ~pose_sensor.is_option_read_only
       ~pose_sensor.is_pose_sensor
       ~pose_sensor.is_roi_sensor
+      ~pose_sensor.is_safety_sensor
       ~pose_sensor.is_wheel_odometer
       ~pose_sensor.on_options_changed
       ~pose_sensor.open
+      ~pose_sensor.query_embedded_filters
       ~pose_sensor.remove_static_node
       ~pose_sensor.set_notifications_callback
       ~pose_sensor.set_option

@@ -24,10 +24,14 @@ pyrealsense2.max_usable_range_sensor
       ~max_usable_range_sensor.as_motion_sensor
       ~max_usable_range_sensor.as_pose_sensor
       ~max_usable_range_sensor.as_roi_sensor
+      ~max_usable_range_sensor.as_safety_sensor
       ~max_usable_range_sensor.as_wheel_odometer
       ~max_usable_range_sensor.close
       ~max_usable_range_sensor.from_frame
       ~max_usable_range_sensor.get_active_streams
+      ~max_usable_range_sensor.get_embedded_decimation_filter
+      ~max_usable_range_sensor.get_embedded_filter
+      ~max_usable_range_sensor.get_embedded_temporal_filter
       ~max_usable_range_sensor.get_info
       ~max_usable_range_sensor.get_max_usable_depth_range
       ~max_usable_range_sensor.get_option
@@ -47,9 +51,11 @@ pyrealsense2.max_usable_range_sensor
       ~max_usable_range_sensor.is_option_read_only
       ~max_usable_range_sensor.is_pose_sensor
       ~max_usable_range_sensor.is_roi_sensor
+      ~max_usable_range_sensor.is_safety_sensor
       ~max_usable_range_sensor.is_wheel_odometer
       ~max_usable_range_sensor.on_options_changed
       ~max_usable_range_sensor.open
+      ~max_usable_range_sensor.query_embedded_filters
       ~max_usable_range_sensor.set_notifications_callback
       ~max_usable_range_sensor.set_option
       ~max_usable_range_sensor.set_option_value

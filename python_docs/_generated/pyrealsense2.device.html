@@ -5,13 +5,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.device &#8212; pyrealsense2 2.56.5 documentation</title>
+    <title>pyrealsense2.device &#8212; pyrealsense2 2.57.7 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=8b0ddf77"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/documentation_options.js?v=69589b5d"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" /> 
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.56.5 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.device</a></li> 
       </ul>
     </div>  
@@ -39,7 +39,7 @@
 <h1>pyrealsense2.device<a class="headerlink" href="#pyrealsense2-device" title="Link to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="pyrealsense2.device">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyrealsense2.</span></span><span class="sig-name descname"><span class="pre">device</span></span><a class="headerlink" href="#pyrealsense2.device" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">pyrealsense2.</span></span><span class="sig-name descname"><span class="pre">device</span></span><a class="headerlink" href="#pyrealsense2.device" title="Link to this definition">¶</a></dt>
 <dd><dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.device.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pyrealsense2.device.__init__" title="Link to this definition">¶</a></dt>
@@ -96,28 +96,34 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.first_roi_sensor" title="pyrealsense2.device.first_roi_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_roi_sensor</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.get_info" title="pyrealsense2.device.get_info"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_info</span></code></a>(self, info)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.first_safety_sensor" title="pyrealsense2.device.first_safety_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_safety_sensor</span></code></a>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.get_info" title="pyrealsense2.device.get_info"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_info</span></code></a>(self, info)</p></td>
 <td><p>Retrieve camera specific information, like versions of various internal components</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.hardware_reset" title="pyrealsense2.device.hardware_reset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hardware_reset</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.hardware_reset" title="pyrealsense2.device.hardware_reset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hardware_reset</span></code></a>(self)</p></td>
 <td><p>Send hardware reset request to the device</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_auto_calibrated_device" title="pyrealsense2.device.is_auto_calibrated_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_auto_calibrated_device</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_auto_calibrated_device" title="pyrealsense2.device.is_auto_calibrated_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_auto_calibrated_device</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_calibration_change_device" title="pyrealsense2.device.is_calibration_change_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_calibration_change_device</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_calibration_change_device" title="pyrealsense2.device.is_calibration_change_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_calibration_change_device</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_connected" title="pyrealsense2.device.is_connected"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_connected</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_connected" title="pyrealsense2.device.is_connected"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_connected</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_debug_protocol" title="pyrealsense2.device.is_debug_protocol"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_debug_protocol</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_debug_protocol" title="pyrealsense2.device.is_debug_protocol"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_debug_protocol</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_device_calibration" title="pyrealsense2.device.is_device_calibration"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_device_calibration</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_device_calibration" title="pyrealsense2.device.is_device_calibration"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_device_calibration</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_firmware_logger" title="pyrealsense2.device.is_firmware_logger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_firmware_logger</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_firmware_logger" title="pyrealsense2.device.is_firmware_logger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_firmware_logger</span></code></a>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.device.is_in_recovery_mode" title="pyrealsense2.device.is_in_recovery_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_in_recovery_mode</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.device.is_metadata_enabled" title="pyrealsense2.device.is_metadata_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_metadata_enabled</span></code></a>(self)</p></td>
@@ -227,6 +233,11 @@
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="pyrealsense2.device.first_safety_sensor">
+<span class="sig-name descname"><span class="pre">first_safety_sensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="pyrealsense2.safety_sensor.html#pyrealsense2.safety_sensor" title="pyrealsense2.safety_sensor"><span class="pre">pyrealsense2.safety_sensor</span></a></span></span><a class="headerlink" href="#pyrealsense2.device.first_safety_sensor" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.device.get_info">
 <span class="sig-name descname"><span class="pre">get_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="pyrealsense2.camera_info.html#pyrealsense2.camera_info" title="pyrealsense2.camera_info"><span class="pre">pyrealsense2.camera_info</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#pyrealsense2.device.get_info" title="Link to this definition">¶</a></dt>
 <dd><p>Retrieve camera specific information, like versions of various internal components</p>
@@ -269,6 +280,11 @@
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="pyrealsense2.device.is_in_recovery_mode">
+<span class="sig-name descname"><span class="pre">is_in_recovery_mode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#pyrealsense2.device.is_in_recovery_mode" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.device.is_metadata_enabled">
 <span class="sig-name descname"><span class="pre">is_metadata_enabled</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.device" title="pyrealsense2.device"><span class="pre">pyrealsense2.device</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#pyrealsense2.device.is_metadata_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -301,7 +317,7 @@
 
 <dl class="py property">
 <dt class="sig sig-object py" id="pyrealsense2.device.sensors">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">sensors</span></span><a class="headerlink" href="#pyrealsense2.device.sensors" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">sensors</span></span><a class="headerlink" href="#pyrealsense2.device.sensors" title="Link to this definition">¶</a></dt>
 <dd><p>List of adjacent devices, sharing the same physical parent composite device. Identical to calling query_sensors.</p>
 </dd></dl>
 
@@ -343,6 +359,7 @@
 <li><a class="reference internal" href="#pyrealsense2.device.first_motion_sensor"><code class="docutils literal notranslate"><span class="pre">device.first_motion_sensor()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.first_pose_sensor"><code class="docutils literal notranslate"><span class="pre">device.first_pose_sensor()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.first_roi_sensor"><code class="docutils literal notranslate"><span class="pre">device.first_roi_sensor()</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.device.first_safety_sensor"><code class="docutils literal notranslate"><span class="pre">device.first_safety_sensor()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.get_info"><code class="docutils literal notranslate"><span class="pre">device.get_info()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.hardware_reset"><code class="docutils literal notranslate"><span class="pre">device.hardware_reset()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_auto_calibrated_device"><code class="docutils literal notranslate"><span class="pre">device.is_auto_calibrated_device()</span></code></a></li>
@@ -351,6 +368,7 @@
 <li><a class="reference internal" href="#pyrealsense2.device.is_debug_protocol"><code class="docutils literal notranslate"><span class="pre">device.is_debug_protocol()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_device_calibration"><code class="docutils literal notranslate"><span class="pre">device.is_device_calibration()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_firmware_logger"><code class="docutils literal notranslate"><span class="pre">device.is_firmware_logger()</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.device.is_in_recovery_mode"><code class="docutils literal notranslate"><span class="pre">device.is_in_recovery_mode()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_metadata_enabled"><code class="docutils literal notranslate"><span class="pre">device.is_metadata_enabled()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_playback"><code class="docutils literal notranslate"><span class="pre">device.is_playback()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.device.is_recorder"><code class="docutils literal notranslate"><span class="pre">device.is_recorder()</span></code></a></li>
@@ -396,13 +414,13 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.56.5 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.device</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2024, Intel Realsense Team.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.0.4.
     </div>
   </body>
 </html>

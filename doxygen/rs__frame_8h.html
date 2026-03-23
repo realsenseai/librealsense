@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.14"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Intel® RealSense™ Cross Platform API: C:/jenkins_sys_rsbuild/workspace/LRS_doxygen_pipeline/source/include/librealsense2/h/rs_frame.h File Reference</title>
+<title>RealSense Cross Platform API: C:/jenkins_sys_rsbuild/workspace/LRS_doxygen_pipeline/source/include/librealsense2/h/rs_frame.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -18,9 +18,9 @@
  <tbody>
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
-   <div id="projectname">Intel® RealSense™ Cross Platform API
+   <div id="projectname">RealSense Cross Platform API
    </div>
-   <div id="projectbrief">Intel Realsense Cross-platform API</div>
+   <div id="projectbrief">RealSense Cross-platform API</div>
   </td>
  </tr>
  </tbody>
@@ -133,6 +133,116 @@ Enumerations</h2></td></tr>
 &#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a0551a2809d046aa766ee249655e2707d">RS2_FRAME_METADATA_SUB_PRESET_INFO</a>, 
 <a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a72d493fa488edae4d971d752a6abec6e">RS2_FRAME_METADATA_CALIB_INFO</a>, 
 <a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ad5c8ec248b61b630286721eb0f949c91">RS2_FRAME_METADATA_CRC</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9af2be00152c10ff119ce38ab181df702a">RS2_FRAME_METADATA_SAFETY_DEPTH_FRAME_COUNTER</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a7a2d9c8ad51ae1dac4d30ba5e3766453">RS2_FRAME_METADATA_SAFETY_LEVEL1</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a589f8187bdaef479efa3cf7d54574480">RS2_FRAME_METADATA_SAFETY_LEVEL1_ORIGIN</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9adad3cc289aea00277a5bc03af96ab291">RS2_FRAME_METADATA_SAFETY_LEVEL2</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ac0106b296707a381dd070a3e999088ee">RS2_FRAME_METADATA_SAFETY_LEVEL2_ORIGIN</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9aeeb5717a1404650680f651268fce9d36">RS2_FRAME_METADATA_SAFETY_LEVEL1_VERDICT</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a5df11ee5f2bded60e04a59980cd2414a">RS2_FRAME_METADATA_SAFETY_LEVEL2_VERDICT</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ad5734e51c090eab9e4e888406da1f3a0">RS2_FRAME_METADATA_SAFETY_OPERATIONAL_MODE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ab269f0b14d7e1fde45c095ea203f77fc">RS2_FRAME_METADATA_SAFETY_VISION_VERDICT</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a536716c32be1f25b448dce3d70782b4d">RS2_FRAME_METADATA_SAFETY_HARA_EVENTS</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a49d1c4336445c1d3a0aecc75efc8bfb4">RS2_FRAME_METADATA_SAFETY_PRESET_INTEGRITY</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a3e533c5a73fd7cd054096a8d478455e7">RS2_FRAME_METADATA_SAFETY_PRESET_ID_SELECTED</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a7f6ce2470611fd8f78aefea446f51cac">RS2_FRAME_METADATA_SAFETY_PRESET_ID_USED</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a641f0def29f10c33824bfbbb716f0098">RS2_FRAME_METADATA_SAFETY_SIP_DEGRADATION_USED</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a13673873c47c9ef54895cb3478ac0640">RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_ACTIVATE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a48312fe2ce4ca00f0e09a52cb9061899">RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_STATE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ab85c9b372d4428a48c442b36e735dc80">RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_VALUE1</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a3dd5631707cee40731bff566cd4a9f4e">RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_VALUE2</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a6dfa8bf63d4322298785cbc8bcd3c4d3">RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_THRESHOLD1</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a20180180822cc37f6f88545cdc565533">RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_THRESHOLD2</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a5af749651840281a0df7ee3467cddc98">RS2_FRAME_METADATA_SAFETY_ZERO_MONITORING_ENABLED</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a994f76aba6f078281d3906024a258ff4">RS2_FRAME_METADATA_SAFETY_HARA_HISTORY_MODE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ae71bdda0aeeecab78bfd72fbb59eceed">RS2_FRAME_METADATA_SAFETY_SOC_FUSA_EVENTS</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9aa579211ab15eceec97b25f59ae32c8b4">RS2_FRAME_METADATA_SAFETY_SOC_FUSA_ACTION</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9af65cd548f7d2963a217ee3d0987f7b9c">RS2_FRAME_METADATA_SAFETY_SOC_L0_COUNTER</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9aea6ff8271ea3a6b94687b04d2c852295">RS2_FRAME_METADATA_SAFETY_SOC_L0_RATE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a5ec2482b2b77c493341194d3669904c1">RS2_FRAME_METADATA_SAFETY_SOC_L1_COUNTER</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a40bd3d69267c695dc73d5cf22e782230">RS2_FRAME_METADATA_SAFETY_SOC_L1_RATE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9adaa10c2239d110d723ca54a7ad38c65c">RS2_FRAME_METADATA_SAFETY_SOC_GMT_STATUS</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ae43a30533c9d6e6ca7d3c845366969d2">RS2_FRAME_METADATA_SAFETY_SOC_HKR_CRITICAL_ERROR_GPIO</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a403e2983c737a08c89986fd4aa39eed3">RS2_FRAME_METADATA_SAFETY_SOC_MONITOR_L2_ERROR_TYPE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a3ea0fdb41a07a2b2818ab95b27771c2b">RS2_FRAME_METADATA_SAFETY_SOC_MONITOR_L3_ERROR_TYPE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a4c3c006648f05720ac8fc1890361cf43">RS2_FRAME_METADATA_SAFETY_SOC_SAFETY_AND_SECURITY</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ade5e3e9bc7b27d58506b04200894563a">RS2_FRAME_METADATA_SAFETY_DEPTH_FRAME_TIMESTAMP</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ae7fc35237a9376625de56de1eec7198f">RS2_FRAME_METADATA_SAFETY_SMCU_PROCESSING_TIMESTAMP</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a15fd09a14ec69e6591a96571cdba5c19">RS2_FRAME_METADATA_SAFETY_PIPELINE_PROPAGATION_DELAY</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a0cebe9b986ff6b967cf4cfd5d49c6ce2">RS2_FRAME_METADATA_SAFETY_SMCU_DEBUG_STATUS_BITMASK</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a92c6714651a07f1ec720b02736764d03">RS2_FRAME_METADATA_SAFETY_SMCU_DEBUG_INFO_INTERNAL_STATE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9afc3dd9b44bd491c11427980644e45dc0">RS2_FRAME_METADATA_SAFETY_SMCU_DEBUG_INFO_BIST_STATUS</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a2fab96e0af4fa595d73b63974cbb9979">RS2_FRAME_METADATA_SAFETY_NON_FUSA_GPIO_OUT</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ad59854a840c4316f82465c1a44d5782e">RS2_FRAME_METADATA_SAFETY_SMCU_HW_MONITOR_STATUS</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a8dc3495df368a2a226184229d62f4787">RS2_FRAME_METADATA_SAFETY_SMCU_SW_MONITOR_STATUS</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a2664c88f547ea098ed15acdbc98af03d">RS2_FRAME_METADATA_SAFETY_NON_FUSA_GPIO_IN</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a3c98c5b8adea3fe67c807f67a85ea2b0">RS2_FRAME_METADATA_SAFETY_MB_FUSA_EVENT</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ac8fa31e9296c0a427f5b23298830cc1e">RS2_FRAME_METADATA_SAFETY_MB_FUSA_ACTION</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a3b1b5a9a902deffea09577ec5830ee20">RS2_FRAME_METADATA_SAFETY_MB_STATUS</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a963a1c91769fc321493bc1c7f021ec01">RS2_FRAME_METADATA_SAFETY_SMCU_LIVELINESS</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9aed678601ae540c813d0f3a7cc36b45af">RS2_FRAME_METADATA_SAFETY_SMCU_STATE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9af540625a0754068d258de8e2fee2120b">RS2_FRAME_METADATA_SAFETY_PRESET_ID</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a6810e6cce3ef81b516c5a942e0452fbb">RS2_FRAME_METADATA_SENSOR_ANGLE_ROLL</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ab13a55ddc6171f92c17fb21e57187c2e">RS2_FRAME_METADATA_SENSOR_ANGLE_PITCH</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ac53b9f60f6541e40340dfb9fd2a735a5">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_MEDIAN_HEIGHT</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9af8f1a834ff70dff61362e6bbe6f25cc4">RS2_FRAME_METADATA_FLOOR_DETECTION</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ae617801aca005d130c5841359b1ffea5">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_FILL_RATE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a4c6a41b83a01f666e3e79603d26616dc">RS2_FRAME_METADATA_DEPTH_FILL_RATE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a2560d0a3fc2ff9a546e426d526bd4ed7">RS2_FRAME_METADATA_DEPTH_STDEV</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ad6481d1b2c93b0b160ed2bdb27c264f8">RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ad6a7a0d2ca9840ecf954c7676b6b1573">RS2_FRAME_METADATA_OCCUPANCY_GRID_COLUMNS</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a919053c5bb2df4c46c22190bdd6fd31c">RS2_FRAME_METADATA_OCCUPANCY_CELL_SIZE</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9af6b094ac240271e3137b0921ee4e1fe9">RS2_FRAME_METADATA_NUMBER_OF_3D_VERTICES</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a510b09b6e7c69f31e2f3cb469387bdcd">RS2_FRAME_METADATA_SAFETY_PRESET_ERROR_TYPE</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ac98c46a0096a68ff4f1e1c1953cf73e8">RS2_FRAME_METADATA_SAFETY_PRESET_ERROR_PARAM_1</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9adc9591b0e5b96ce93bc4d57eaa9433a2">RS2_FRAME_METADATA_SAFETY_PRESET_ERROR_PARAM_2</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a61d1e8f7807ef3bc3bdb6f4061000ce6">RS2_FRAME_METADATA_DANGER_ZONE_POINT_0_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9aa15690b14037c387d6bdc72d55645bf5">RS2_FRAME_METADATA_DANGER_ZONE_POINT_0_Y_CORD</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9adbc189e6659a9681ad22b8925244b93a">RS2_FRAME_METADATA_DANGER_ZONE_POINT_1_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a6e9e817fe46bde641189d267cdfc4d95">RS2_FRAME_METADATA_DANGER_ZONE_POINT_1_Y_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a5195482a7e1ce5d39a717a4b00e71da9">RS2_FRAME_METADATA_DANGER_ZONE_POINT_2_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9af82b5fca93bba897c901c071b9c8a653">RS2_FRAME_METADATA_DANGER_ZONE_POINT_2_Y_CORD</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a41d64e068fa4a79de1b7e428e2baa394">RS2_FRAME_METADATA_DANGER_ZONE_POINT_3_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a71ea27c0a848796c7484099272dda61f">RS2_FRAME_METADATA_DANGER_ZONE_POINT_3_Y_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ab2ebc4cf38cb00dbd3a76d26f3a308ac">RS2_FRAME_METADATA_WARNING_ZONE_POINT_0_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a1cf3379e5e046745df867a7a6d69894c">RS2_FRAME_METADATA_WARNING_ZONE_POINT_0_Y_CORD</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9aae4764ccffe43be38d7c6c1b0c3da2a6">RS2_FRAME_METADATA_WARNING_ZONE_POINT_1_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9adad1c602701dce5818cf8ab8d11618b3">RS2_FRAME_METADATA_WARNING_ZONE_POINT_1_Y_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a24a78ca23924997fd35c2aed50ba07a3">RS2_FRAME_METADATA_WARNING_ZONE_POINT_2_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ae5b39d64620ece68e8ded348977297a5">RS2_FRAME_METADATA_WARNING_ZONE_POINT_2_Y_CORD</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ad411f424685beb5e5a2105dcfed467bd">RS2_FRAME_METADATA_WARNING_ZONE_POINT_3_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ab1523b25432f1781f11c4eef1a41b73c">RS2_FRAME_METADATA_WARNING_ZONE_POINT_3_Y_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a51696ede496fc845353d05245904b587">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_0_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9af2105e03b37c9c0039069c7edcaaf71a">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_0_Y_CORD</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9ab00aad169e13ff352996435a3138e9d2">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_1_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a5b79770d17268e5e133e873f635c9109">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_1_Y_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a0f83528773f6cc0430b7525effafd37f">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_2_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a7a03d5cd3eda11e2fbbdabd9eae18041">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_2_Y_CORD</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a001deb691d1ed3d4eb66966cedaacb33">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_X_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a143eba52057623ab24ffc8826ca65683">RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_Y_CORD</a>, 
+<a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9aef4982b0c326d95ad4cb9a83dad779ba">RS2_FRAME_METADATA_EMBEDDED_FILTERS</a>, 
 <a class="el" href="rs__frame_8h.html#a91f19a01f5bf2abadc30959a8d3109c9a39aff1c9248160bd2a660633e5e5d517">RS2_FRAME_METADATA_COUNT</a>
 <br />
  }</td></tr>
@@ -196,6 +306,18 @@ Functions</h2></td></tr>
 <tr class="separator:a095b89895e9bd979bf77dd928ea707f2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1a87bb32e1cf696ea02864982e3bc758"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#a1a87bb32e1cf696ea02864982e3bc758">rs2_get_frame_points_count</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:a1a87bb32e1cf696ea02864982e3bc758"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac0620a21c05d543089aea54ade2fe741"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structrs2__vertex.html">rs2_vertex</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#ac0620a21c05d543089aea54ade2fe741">rs2_get_frame_labeled_vertices</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:ac0620a21c05d543089aea54ade2fe741"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5172e93f1018cacc19d34b034f96deb2"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#a5172e93f1018cacc19d34b034f96deb2">rs2_get_frame_labeled_points_count</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a5172e93f1018cacc19d34b034f96deb2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a41b37d688a49791700e1f92f09f03363"><td class="memItemLeft" align="right" valign="top">void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#a41b37d688a49791700e1f92f09f03363">rs2_get_frame_labels</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a41b37d688a49791700e1f92f09f03363"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a273db2b4c1f71e46d8107de8ef00a33b"><td class="memItemLeft" align="right" valign="top">unsigned int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#a273db2b4c1f71e46d8107de8ef00a33b">rs2_get_frame_labeled_points_width</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a273db2b4c1f71e46d8107de8ef00a33b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2562494de8aa6e306d3660a478eabee3"><td class="memItemLeft" align="right" valign="top">unsigned int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#a2562494de8aa6e306d3660a478eabee3">rs2_get_frame_labeled_points_height</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a2562494de8aa6e306d3660a478eabee3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3b2359ea3beea8b02137c5d38c2a4162"><td class="memItemLeft" align="right" valign="top">unsigned int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#a3b2359ea3beea8b02137c5d38c2a4162">rs2_get_frame_labeled_points_bits_per_pixel</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a3b2359ea3beea8b02137c5d38c2a4162"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a934adc8566831a683872452fdf9c1b3e"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="rs__types_8h.html#a338107a48471d20ecacac3e4c9e024e2">rs2_stream_profile</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#a934adc8566831a683872452fdf9c1b3e">rs2_get_frame_stream_profile</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:a934adc8566831a683872452fdf9c1b3e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a292c68aaf0b02b221b777e19f56782c8"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#a292c68aaf0b02b221b777e19f56782c8">rs2_get_stream_profile_name</a> (const <a class="el" href="rs__types_8h.html#a338107a48471d20ecacac3e4c9e024e2">rs2_stream_profile</a> *profile, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
@@ -365,7 +487,7 @@ Functions</h2></td></tr>
 </td></tr>
 <tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ac726c1023135dddbfe7a30cb46f7932b"></a>RS2_FRAME_METADATA_GAMMA&#160;</td><td class="fielddoc"><p>Color image gamma. </p>
 </td></tr>
-<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9aa060832d54f362d9abc7c52963277340"></a>RS2_FRAME_METADATA_MANUAL_WHITE_BALANCE&#160;</td><td class="fielddoc"><p>Color image white balance. </p>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9aa060832d54f362d9abc7c52963277340"></a>RS2_FRAME_METADATA_MANUAL_WHITE_BALANCE&#160;</td><td class="fielddoc"><p>Color image white balance. Manual WB value on D400, current WB value on D585S </p>
 </td></tr>
 <tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a60319e3bd3602e8c1bc7590e7ec2342e"></a>RS2_FRAME_METADATA_POWER_LINE_FREQUENCY&#160;</td><td class="fielddoc"><p>Power Line Frequency for anti-flickering Off/50Hz/60Hz/Auto. </p>
 </td></tr>
@@ -398,6 +520,179 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a72d493fa488edae4d971d752a6abec6e"></a>RS2_FRAME_METADATA_CALIB_INFO&#160;</td><td class="fielddoc"><p>FW-controlled frame counter to be using in Calibration scenarios </p>
 </td></tr>
 <tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ad5c8ec248b61b630286721eb0f949c91"></a>RS2_FRAME_METADATA_CRC&#160;</td><td class="fielddoc"><p>CRC checksum of the Metadata </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9af2be00152c10ff119ce38ab181df702a"></a>RS2_FRAME_METADATA_SAFETY_DEPTH_FRAME_COUNTER&#160;</td><td class="fielddoc"><p>Counter of the depth frame upon which the stream was calculated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a7a2d9c8ad51ae1dac4d30ba5e3766453"></a>RS2_FRAME_METADATA_SAFETY_LEVEL1&#160;</td><td class="fielddoc"><p>Designates the Yellow zone status: 0x1 - High, 0x0 - Low </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a589f8187bdaef479efa3cf7d54574480"></a>RS2_FRAME_METADATA_SAFETY_LEVEL1_ORIGIN&#160;</td><td class="fielddoc"><p>When l1 is low - equals to frame_counter in safety_header - For l1=0x1 : hold the Frame id on last transition to "High" state </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9adad3cc289aea00277a5bc03af96ab291"></a>RS2_FRAME_METADATA_SAFETY_LEVEL2&#160;</td><td class="fielddoc"><p>Designates the "Red" zone status: 0x1 - High, 0x0 - Low </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ac0106b296707a381dd070a3e999088ee"></a>RS2_FRAME_METADATA_SAFETY_LEVEL2_ORIGIN&#160;</td><td class="fielddoc"><p>When l2 is low - equals to frame_counter in safety_header - For l2=0x1 : hold the Frame id on last transition to "High" state </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9aeeb5717a1404650680f651268fce9d36"></a>RS2_FRAME_METADATA_SAFETY_LEVEL1_VERDICT&#160;</td><td class="fielddoc"><p>Current verdict for l1 Safety Signal - May differ from l1_signal due to additional logics applied </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a5df11ee5f2bded60e04a59980cd2414a"></a>RS2_FRAME_METADATA_SAFETY_LEVEL2_VERDICT&#160;</td><td class="fielddoc"><p>Current verdict for l2 Safety Signal - May differ from l2_signal due to additional logics applied </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ad5734e51c090eab9e4e888406da1f3a0"></a>RS2_FRAME_METADATA_SAFETY_OPERATIONAL_MODE&#160;</td><td class="fielddoc"><p>Reflects the SC operational mode (XU control) </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ab269f0b14d7e1fde45c095ea203f77fc"></a>RS2_FRAME_METADATA_SAFETY_VISION_VERDICT&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a536716c32be1f25b448dce3d70782b4d"></a>RS2_FRAME_METADATA_SAFETY_HARA_EVENTS&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a49d1c4336445c1d3a0aecc75efc8bfb4"></a>RS2_FRAME_METADATA_SAFETY_PRESET_INTEGRITY&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a3e533c5a73fd7cd054096a8d478455e7"></a>RS2_FRAME_METADATA_SAFETY_PRESET_ID_SELECTED&#160;</td><td class="fielddoc"><p>Safety Preset index set via Adaptive Field selection GPIO </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a7f6ce2470611fd8f78aefea446f51cac"></a>RS2_FRAME_METADATA_SAFETY_PRESET_ID_USED&#160;</td><td class="fielddoc"><p>Safety Preset index used in the latest Vision Safety algo processing </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a641f0def29f10c33824bfbbb716f0098"></a>RS2_FRAME_METADATA_SAFETY_SIP_DEGRADATION_USED&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a13673873c47c9ef54895cb3478ac0640"></a>RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_ACTIVATE&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a48312fe2ce4ca00f0e09a52cb9061899"></a>RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_STATE&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ab85c9b372d4428a48c442b36e735dc80"></a>RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_VALUE1&#160;</td><td class="fielddoc"><p>First value from byte array of up to 8 Generic Safety Algo continuous metrics indications </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a3dd5631707cee40731bff566cd4a9f4e"></a>RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_VALUE2&#160;</td><td class="fielddoc"><p>Second value from byte array of up to 8 Generic Safety Algo continuous metrics indications </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a6dfa8bf63d4322298785cbc8bcd3c4d3"></a>RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_THRESHOLD1&#160;</td><td class="fielddoc"><p>First value from byte array of up to 8 Generic Safety Algo continuous metrics thresholds </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a20180180822cc37f6f88545cdc565533"></a>RS2_FRAME_METADATA_SAFETY_SIP_GENERIC_METRICS_THRESHOLD2&#160;</td><td class="fielddoc"><p>Second value from byte array of up to 8 Generic Safety Algo continuous metrics thresholds </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a5af749651840281a0df7ee3467cddc98"></a>RS2_FRAME_METADATA_SAFETY_ZERO_MONITORING_ENABLED&#160;</td><td class="fielddoc"><p>Enum - 0:Regular (default) all safety in nominal mode - 1: "Zero Safety" mode </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a994f76aba6f078281d3906024a258ff4"></a>RS2_FRAME_METADATA_SAFETY_HARA_HISTORY_MODE&#160;</td><td class="fielddoc"><p>Enum - 0:Regular - 1: No history - 2: Local history </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ae71bdda0aeeecab78bfd72fbb59eceed"></a>RS2_FRAME_METADATA_SAFETY_SOC_FUSA_EVENTS&#160;</td><td class="fielddoc"><p>Bitmask, enumerated - SOC critical notification: L2/L3 that requires handling/troubleshooting in S.MCU 32-bit value, as supplied by STL mechanism </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9aa579211ab15eceec97b25f59ae32c8b4"></a>RS2_FRAME_METADATA_SAFETY_SOC_FUSA_ACTION&#160;</td><td class="fielddoc"><p>Bitmask, enumerated - Action taken. 0x1 &lt;&lt; 0 - HKR Reset, 0x1 &lt;&lt; 1 - HKR ShutDown </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9af65cd548f7d2963a217ee3d0987f7b9c"></a>RS2_FRAME_METADATA_SAFETY_SOC_L0_COUNTER&#160;</td><td class="fielddoc"><p>Total number of L0 notifications captured </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9aea6ff8271ea3a6b94687b04d2c852295"></a>RS2_FRAME_METADATA_SAFETY_SOC_L0_RATE&#160;</td><td class="fielddoc"><p>L_0 notifications per FDTI </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a5ec2482b2b77c493341194d3669904c1"></a>RS2_FRAME_METADATA_SAFETY_SOC_L1_COUNTER&#160;</td><td class="fielddoc"><p>Total number of L1 notifications captured </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a40bd3d69267c695dc73d5cf22e782230"></a>RS2_FRAME_METADATA_SAFETY_SOC_L1_RATE&#160;</td><td class="fielddoc"><p>L_1 notifications per FDTI </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9adaa10c2239d110d723ca54a7ad38c65c"></a>RS2_FRAME_METADATA_SAFETY_SOC_GMT_STATUS&#160;</td><td class="fielddoc"><p>Result, enumerated: 0 - GMT Clock Ok, 1- GMT Clock is outside Safe threshold, 2 - GMT Clock is not available </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ae43a30533c9d6e6ca7d3c845366969d2"></a>RS2_FRAME_METADATA_SAFETY_SOC_HKR_CRITICAL_ERROR_GPIO&#160;</td><td class="fielddoc"><p>Critical-erro GPIO Status: 0 - off, 1 - on </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a403e2983c737a08c89986fd4aa39eed3"></a>RS2_FRAME_METADATA_SAFETY_SOC_MONITOR_L2_ERROR_TYPE&#160;</td><td class="fielddoc"><p>Soc Monitor Escalation of L2 error to Arbiter </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a3ea0fdb41a07a2b2818ab95b27771c2b"></a>RS2_FRAME_METADATA_SAFETY_SOC_MONITOR_L3_ERROR_TYPE&#160;</td><td class="fielddoc"><p>Soc Monitor Escalation of L3 error to Arbiter </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a4c3c006648f05720ac8fc1890361cf43"></a>RS2_FRAME_METADATA_SAFETY_SOC_SAFETY_AND_SECURITY&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ade5e3e9bc7b27d58506b04200894563a"></a>RS2_FRAME_METADATA_SAFETY_DEPTH_FRAME_TIMESTAMP&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ae7fc35237a9376625de56de1eec7198f"></a>RS2_FRAME_METADATA_SAFETY_SMCU_PROCESSING_TIMESTAMP&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a15fd09a14ec69e6591a96571cdba5c19"></a>RS2_FRAME_METADATA_SAFETY_PIPELINE_PROPAGATION_DELAY&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a0cebe9b986ff6b967cf4cfd5d49c6ce2"></a>RS2_FRAME_METADATA_SAFETY_SMCU_DEBUG_STATUS_BITMASK&#160;</td><td class="fielddoc"><p>Bitmask: The values are state-specific and non-FuSa related. Shall be presented as HEX string </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a92c6714651a07f1ec720b02736764d03"></a>RS2_FRAME_METADATA_SAFETY_SMCU_DEBUG_INFO_INTERNAL_STATE&#160;</td><td class="fielddoc"><p>Enumerated: according to S.MCU FSM </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9afc3dd9b44bd491c11427980644e45dc0"></a>RS2_FRAME_METADATA_SAFETY_SMCU_DEBUG_INFO_BIST_STATUS&#160;</td><td class="fielddoc"><p>Bitmask. To be presented as HEX value </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a2fab96e0af4fa595d73b63974cbb9979"></a>RS2_FRAME_METADATA_SAFETY_NON_FUSA_GPIO_OUT&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ad59854a840c4316f82465c1a44d5782e"></a>RS2_FRAME_METADATA_SAFETY_SMCU_HW_MONITOR_STATUS&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a8dc3495df368a2a226184229d62f4787"></a>RS2_FRAME_METADATA_SAFETY_SMCU_SW_MONITOR_STATUS&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a2664c88f547ea098ed15acdbc98af03d"></a>RS2_FRAME_METADATA_SAFETY_NON_FUSA_GPIO_IN&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a3c98c5b8adea3fe67c807f67a85ea2b0"></a>RS2_FRAME_METADATA_SAFETY_MB_FUSA_EVENT&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ac8fa31e9296c0a427f5b23298830cc1e"></a>RS2_FRAME_METADATA_SAFETY_MB_FUSA_ACTION&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a3b1b5a9a902deffea09577ec5830ee20"></a>RS2_FRAME_METADATA_SAFETY_MB_STATUS&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a963a1c91769fc321493bc1c7f021ec01"></a>RS2_FRAME_METADATA_SAFETY_SMCU_LIVELINESS&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9aed678601ae540c813d0f3a7cc36b45af"></a>RS2_FRAME_METADATA_SAFETY_SMCU_STATE&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9af540625a0754068d258de8e2fee2120b"></a>RS2_FRAME_METADATA_SAFETY_PRESET_ID&#160;</td><td class="fielddoc"><p>Designates the Safety Zone index in [0..63] range used in algo pipe </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a6810e6cce3ef81b516c5a942e0452fbb"></a>RS2_FRAME_METADATA_SENSOR_ANGLE_ROLL&#160;</td><td class="fielddoc"><p>In millidegrees. Relative to X (forward) axis. Positive value is CCW </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ab13a55ddc6171f92c17fb21e57187c2e"></a>RS2_FRAME_METADATA_SENSOR_ANGLE_PITCH&#160;</td><td class="fielddoc"><p>In millidegrees. Relative to Y (left) axis. Positive value is CCW </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ac53b9f60f6541e40340dfb9fd2a735a5"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_MEDIAN_HEIGHT&#160;</td><td class="fielddoc"><p>In millimeters. Relative to the "leveled pointcloud" CS </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9af8f1a834ff70dff61362e6bbe6f25cc4"></a>RS2_FRAME_METADATA_FLOOR_DETECTION&#160;</td><td class="fielddoc"><p>Percentage </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ae617801aca005d130c5841359b1ffea5"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_FILL_RATE&#160;</td><td class="fielddoc"><p>Percentage </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a4c6a41b83a01f666e3e79603d26616dc"></a>RS2_FRAME_METADATA_DEPTH_FILL_RATE&#160;</td><td class="fielddoc"><p>Unsigned value in range of [0..100]. Use [x = 0xFF] if not applicable </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a2560d0a3fc2ff9a546e426d526bd4ed7"></a>RS2_FRAME_METADATA_DEPTH_STDEV&#160;</td><td class="fielddoc"><p>Spatial accuracy in millimetric units </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ad6481d1b2c93b0b160ed2bdb27c264f8"></a>RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS&#160;</td><td class="fielddoc"><p>Number of rows in the grid. Max value is 250 (corresponding to 5M width with 2cm tile) </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ad6a7a0d2ca9840ecf954c7676b6b1573"></a>RS2_FRAME_METADATA_OCCUPANCY_GRID_COLUMNS&#160;</td><td class="fielddoc"><p>Number of columns in the grid. Max value is 320 (corresponding to ~6.5M depth with 2cm tile) </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a919053c5bb2df4c46c22190bdd6fd31c"></a>RS2_FRAME_METADATA_OCCUPANCY_CELL_SIZE&#160;</td><td class="fielddoc"><p>Edge size of each tile, measured in cm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9af6b094ac240271e3137b0921ee4e1fe9"></a>RS2_FRAME_METADATA_NUMBER_OF_3D_VERTICES&#160;</td><td class="fielddoc"><p>The max number of points is 640x360 </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a510b09b6e7c69f31e2f3cb469387bdcd"></a>RS2_FRAME_METADATA_SAFETY_PRESET_ERROR_TYPE&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ac98c46a0096a68ff4f1e1c1953cf73e8"></a>RS2_FRAME_METADATA_SAFETY_PRESET_ERROR_PARAM_1&#160;</td><td class="fielddoc"><p>Preset Error Param. Enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9adc9591b0e5b96ce93bc4d57eaa9433a2"></a>RS2_FRAME_METADATA_SAFETY_PRESET_ERROR_PARAM_2&#160;</td><td class="fielddoc"><p>Preset Error Param. Enumerated </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a61d1e8f7807ef3bc3bdb6f4061000ce6"></a>RS2_FRAME_METADATA_DANGER_ZONE_POINT_0_X_CORD&#160;</td><td class="fielddoc"><p>Danger Zone point #0, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9aa15690b14037c387d6bdc72d55645bf5"></a>RS2_FRAME_METADATA_DANGER_ZONE_POINT_0_Y_CORD&#160;</td><td class="fielddoc"><p>Danger Zone point #0, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9adbc189e6659a9681ad22b8925244b93a"></a>RS2_FRAME_METADATA_DANGER_ZONE_POINT_1_X_CORD&#160;</td><td class="fielddoc"><p>Danger Zone point #1, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a6e9e817fe46bde641189d267cdfc4d95"></a>RS2_FRAME_METADATA_DANGER_ZONE_POINT_1_Y_CORD&#160;</td><td class="fielddoc"><p>Danger Zone point #1, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a5195482a7e1ce5d39a717a4b00e71da9"></a>RS2_FRAME_METADATA_DANGER_ZONE_POINT_2_X_CORD&#160;</td><td class="fielddoc"><p>Danger Zone point #2, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9af82b5fca93bba897c901c071b9c8a653"></a>RS2_FRAME_METADATA_DANGER_ZONE_POINT_2_Y_CORD&#160;</td><td class="fielddoc"><p>Danger Zone point #2, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a41d64e068fa4a79de1b7e428e2baa394"></a>RS2_FRAME_METADATA_DANGER_ZONE_POINT_3_X_CORD&#160;</td><td class="fielddoc"><p>Danger Zone point #3, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a71ea27c0a848796c7484099272dda61f"></a>RS2_FRAME_METADATA_DANGER_ZONE_POINT_3_Y_CORD&#160;</td><td class="fielddoc"><p>Danger Zone point #3, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ab2ebc4cf38cb00dbd3a76d26f3a308ac"></a>RS2_FRAME_METADATA_WARNING_ZONE_POINT_0_X_CORD&#160;</td><td class="fielddoc"><p>Warning Zone point #0, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a1cf3379e5e046745df867a7a6d69894c"></a>RS2_FRAME_METADATA_WARNING_ZONE_POINT_0_Y_CORD&#160;</td><td class="fielddoc"><p>Warning Zone point #0, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9aae4764ccffe43be38d7c6c1b0c3da2a6"></a>RS2_FRAME_METADATA_WARNING_ZONE_POINT_1_X_CORD&#160;</td><td class="fielddoc"><p>Warning Zone point #1, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9adad1c602701dce5818cf8ab8d11618b3"></a>RS2_FRAME_METADATA_WARNING_ZONE_POINT_1_Y_CORD&#160;</td><td class="fielddoc"><p>Warning Zone point #1, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a24a78ca23924997fd35c2aed50ba07a3"></a>RS2_FRAME_METADATA_WARNING_ZONE_POINT_2_X_CORD&#160;</td><td class="fielddoc"><p>Warning Zone point #2, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ae5b39d64620ece68e8ded348977297a5"></a>RS2_FRAME_METADATA_WARNING_ZONE_POINT_2_Y_CORD&#160;</td><td class="fielddoc"><p>Warning Zone point #2, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ad411f424685beb5e5a2105dcfed467bd"></a>RS2_FRAME_METADATA_WARNING_ZONE_POINT_3_X_CORD&#160;</td><td class="fielddoc"><p>Warning Zone point #3, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ab1523b25432f1781f11c4eef1a41b73c"></a>RS2_FRAME_METADATA_WARNING_ZONE_POINT_3_Y_CORD&#160;</td><td class="fielddoc"><p>Warning Zone point #3, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a51696ede496fc845353d05245904b587"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_0_X_CORD&#160;</td><td class="fielddoc"><p>Diagnostic Zone point #0, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9af2105e03b37c9c0039069c7edcaaf71a"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_0_Y_CORD&#160;</td><td class="fielddoc"><p>Diagnostic Zone point #0, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9ab00aad169e13ff352996435a3138e9d2"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_1_X_CORD&#160;</td><td class="fielddoc"><p>Diagnostic Zone point #1, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a5b79770d17268e5e133e873f635c9109"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_1_Y_CORD&#160;</td><td class="fielddoc"><p>Diagnostic Zone point #1, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a0f83528773f6cc0430b7525effafd37f"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_2_X_CORD&#160;</td><td class="fielddoc"><p>Diagnostic Zone point #2, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a7a03d5cd3eda11e2fbbdabd9eae18041"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_2_Y_CORD&#160;</td><td class="fielddoc"><p>Diagnostic Zone point #2, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a001deb691d1ed3d4eb66966cedaacb33"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_X_CORD&#160;</td><td class="fielddoc"><p>Diagnostic Zone point #3, X coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a143eba52057623ab24ffc8826ca65683"></a>RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_Y_CORD&#160;</td><td class="fielddoc"><p>Diagnostic Zone point #3, Y coord in mm </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9aef4982b0c326d95ad4cb9a83dad779ba"></a>RS2_FRAME_METADATA_EMBEDDED_FILTERS&#160;</td><td class="fielddoc"><p>Bitmask, enumerated </p>
 </td></tr>
 <tr><td class="fieldname"><a id="a91f19a01f5bf2abadc30959a8d3109c9a39aff1c9248160bd2a660633e5e5d517"></a>RS2_FRAME_METADATA_COUNT&#160;</td><td class="fielddoc"></td></tr>
 </table>
@@ -1117,6 +1412,222 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>frame height in pixels </dd></dl>
+
+</div>
+</div>
+<a id="a3b2359ea3beea8b02137c5d38c2a4162"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3b2359ea3beea8b02137c5d38c2a4162">&#9670;&nbsp;</a></span>rs2_get_frame_labeled_points_bits_per_pixel()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">unsigned int rs2_get_frame_labeled_points_bits_per_pixel </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *&#160;</td>
+          <td class="paramname"><em>frame</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>retrieve bits per pixels in the labeled point cloud frame </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">frame</td><td>handle returned from a callback </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>bits per pixel </dd></dl>
+
+</div>
+</div>
+<a id="a5172e93f1018cacc19d34b034f96deb2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5172e93f1018cacc19d34b034f96deb2">&#9670;&nbsp;</a></span>rs2_get_frame_labeled_points_count()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int rs2_get_frame_labeled_points_count </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *&#160;</td>
+          <td class="paramname"><em>frame</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>When called on Labeled Points frame type, this method returns the number of vertices in the frame </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">frame</td><td>Labeled Points frame </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>If non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Number of vertices </dd></dl>
+
+</div>
+</div>
+<a id="a2562494de8aa6e306d3660a478eabee3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2562494de8aa6e306d3660a478eabee3">&#9670;&nbsp;</a></span>rs2_get_frame_labeled_points_height()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">unsigned int rs2_get_frame_labeled_points_height </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *&#160;</td>
+          <td class="paramname"><em>frame</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>retrieve labeled point cloud height in pixels </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">frame</td><td>handle returned from a callback </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>frame height in pixels </dd></dl>
+
+</div>
+</div>
+<a id="a273db2b4c1f71e46d8107de8ef00a33b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a273db2b4c1f71e46d8107de8ef00a33b">&#9670;&nbsp;</a></span>rs2_get_frame_labeled_points_width()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">unsigned int rs2_get_frame_labeled_points_width </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *&#160;</td>
+          <td class="paramname"><em>frame</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>retrieve labeled point cloud width in pixels </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">frame</td><td>handle returned from a callback </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>frame width in pixels </dd></dl>
+
+</div>
+</div>
+<a id="ac0620a21c05d543089aea54ade2fe741"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac0620a21c05d543089aea54ade2fe741">&#9670;&nbsp;</a></span>rs2_get_frame_labeled_vertices()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structrs2__vertex.html">rs2_vertex</a>* rs2_get_frame_labeled_vertices </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *&#160;</td>
+          <td class="paramname"><em>frame</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>When called on Labeled Points frame type, this method returns a pointer to an array of 3D vertices of the model The coordinate system is: X right, Y up, Z away from the camera. Units: Meters </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">frame</td><td>Labeled Points frame </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>If non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Pointer to an array of vertices, lifetime is managed by the frame </dd></dl>
+
+</div>
+</div>
+<a id="a41b37d688a49791700e1f92f09f03363"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a41b37d688a49791700e1f92f09f03363">&#9670;&nbsp;</a></span>rs2_get_frame_labels()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void* rs2_get_frame_labels </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *&#160;</td>
+          <td class="paramname"><em>frame</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>When called on Labeled Points frame type, this method returns a pointer to an array of labels </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">frame</td><td>Vertices frame </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>If non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Pointer to an array of attributes, lifetime is managed by the frame </dd></dl>
 
 </div>
 </div>

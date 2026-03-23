@@ -1,0 +1,35 @@
+pyrealsense2.d500_intercam_sync_mode
+====================================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: d500_intercam_sync_mode
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~d500_intercam_sync_mode.__init__
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~d500_intercam_sync_mode.external_master
+      ~d500_intercam_sync_mode.name
+      ~d500_intercam_sync_mode.none
+      ~d500_intercam_sync_mode.pwm_master
+      ~d500_intercam_sync_mode.rgb_master
+      ~d500_intercam_sync_mode.value
+   
+   

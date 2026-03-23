@@ -35,11 +35,33 @@ pyrealsense2.frame_metadata_value
       ~frame_metadata_value.calib_info
       ~frame_metadata_value.contrast
       ~frame_metadata_value.crc
+      ~frame_metadata_value.danger_zone_point_0_x_cord
+      ~frame_metadata_value.danger_zone_point_0_y_cord
+      ~frame_metadata_value.danger_zone_point_1_x_cord
+      ~frame_metadata_value.danger_zone_point_1_y_cord
+      ~frame_metadata_value.danger_zone_point_2_x_cord
+      ~frame_metadata_value.danger_zone_point_2_y_cord
+      ~frame_metadata_value.danger_zone_point_3_x_cord
+      ~frame_metadata_value.danger_zone_point_3_y_cord
+      ~frame_metadata_value.depth_fill_rate
+      ~frame_metadata_value.depth_stdev
+      ~frame_metadata_value.diagnostic_zone_fill_rate
+      ~frame_metadata_value.diagnostic_zone_median_height
+      ~frame_metadata_value.diagnostic_zone_point_0_x_cord
+      ~frame_metadata_value.diagnostic_zone_point_0_y_cord
+      ~frame_metadata_value.diagnostic_zone_point_1_x_cord
+      ~frame_metadata_value.diagnostic_zone_point_1_y_cord
+      ~frame_metadata_value.diagnostic_zone_point_2_x_cord
+      ~frame_metadata_value.diagnostic_zone_point_2_y_cord
+      ~frame_metadata_value.diagnostic_zone_point_3_x_cord
+      ~frame_metadata_value.diagnostic_zone_point_3_y_cord
+      ~frame_metadata_value.embedded_filters
       ~frame_metadata_value.exposure_priority
       ~frame_metadata_value.exposure_roi_bottom
       ~frame_metadata_value.exposure_roi_left
       ~frame_metadata_value.exposure_roi_right
       ~frame_metadata_value.exposure_roi_top
+      ~frame_metadata_value.floor_detection
       ~frame_metadata_value.frame_counter
       ~frame_metadata_value.frame_emitter_mode
       ~frame_metadata_value.frame_laser_power
@@ -55,10 +77,68 @@ pyrealsense2.frame_metadata_value
       ~frame_metadata_value.low_light_compensation
       ~frame_metadata_value.manual_white_balance
       ~frame_metadata_value.name
+      ~frame_metadata_value.number_of_3d_vertices
+      ~frame_metadata_value.occupancy_cell_size
+      ~frame_metadata_value.occupancy_grid_columns
+      ~frame_metadata_value.occupancy_grid_rows
       ~frame_metadata_value.power_line_frequency
       ~frame_metadata_value.preset
       ~frame_metadata_value.raw_frame_size
+      ~frame_metadata_value.safety_depth_frame_counter
+      ~frame_metadata_value.safety_depth_frame_timestamp
+      ~frame_metadata_value.safety_hara_events
+      ~frame_metadata_value.safety_hara_history_mode
+      ~frame_metadata_value.safety_level1
+      ~frame_metadata_value.safety_level1_origin
+      ~frame_metadata_value.safety_level1_verdict
+      ~frame_metadata_value.safety_level2
+      ~frame_metadata_value.safety_level2_origin
+      ~frame_metadata_value.safety_level2_verdict
+      ~frame_metadata_value.safety_mb_fusa_action
+      ~frame_metadata_value.safety_mb_fusa_event
+      ~frame_metadata_value.safety_mb_status
+      ~frame_metadata_value.safety_non_fusa_gpio_in
+      ~frame_metadata_value.safety_non_fusa_gpio_out
+      ~frame_metadata_value.safety_operational_mode
+      ~frame_metadata_value.safety_pipeline_propagation_delay
+      ~frame_metadata_value.safety_preset_error_param_1
+      ~frame_metadata_value.safety_preset_error_param_2
+      ~frame_metadata_value.safety_preset_error_type
+      ~frame_metadata_value.safety_preset_id
+      ~frame_metadata_value.safety_preset_id_selected
+      ~frame_metadata_value.safety_preset_id_used
+      ~frame_metadata_value.safety_preset_integrity
+      ~frame_metadata_value.safety_sip_degradation_used
+      ~frame_metadata_value.safety_sip_generic_metrics_activate
+      ~frame_metadata_value.safety_sip_generic_metrics_state
+      ~frame_metadata_value.safety_sip_generic_metrics_threshold1
+      ~frame_metadata_value.safety_sip_generic_metrics_threshold2
+      ~frame_metadata_value.safety_sip_generic_metrics_value1
+      ~frame_metadata_value.safety_sip_generic_metrics_value2
+      ~frame_metadata_value.safety_smcu_debug_info_bist_status
+      ~frame_metadata_value.safety_smcu_debug_info_internal_state
+      ~frame_metadata_value.safety_smcu_debug_status_bitmask
+      ~frame_metadata_value.safety_smcu_hw_monitor_status
+      ~frame_metadata_value.safety_smcu_liveliness
+      ~frame_metadata_value.safety_smcu_processing_timestamp
+      ~frame_metadata_value.safety_smcu_state
+      ~frame_metadata_value.safety_smcu_sw_monitor_status
+      ~frame_metadata_value.safety_soc_fusa_action
+      ~frame_metadata_value.safety_soc_fusa_events
+      ~frame_metadata_value.safety_soc_gmt_status
+      ~frame_metadata_value.safety_soc_hkr_critical_error_gpio
+      ~frame_metadata_value.safety_soc_l0_counter
+      ~frame_metadata_value.safety_soc_l0_rate
+      ~frame_metadata_value.safety_soc_l1_counter
+      ~frame_metadata_value.safety_soc_l1_rate
+      ~frame_metadata_value.safety_soc_monitor_l2_error_type
+      ~frame_metadata_value.safety_soc_monitor_l3_error_type
+      ~frame_metadata_value.safety_soc_safety_and_security
+      ~frame_metadata_value.safety_vision_verdict
+      ~frame_metadata_value.safety_zero_monitoring_enabled
       ~frame_metadata_value.saturation
+      ~frame_metadata_value.sensor_angle_pitch
+      ~frame_metadata_value.sensor_angle_roll
       ~frame_metadata_value.sensor_timestamp
       ~frame_metadata_value.sequence_id
       ~frame_metadata_value.sequence_name
@@ -69,6 +149,14 @@ pyrealsense2.frame_metadata_value
       ~frame_metadata_value.time_of_arrival
       ~frame_metadata_value.trigger
       ~frame_metadata_value.value
+      ~frame_metadata_value.warning_zone_point_0_x_cord
+      ~frame_metadata_value.warning_zone_point_0_y_cord
+      ~frame_metadata_value.warning_zone_point_1_x_cord
+      ~frame_metadata_value.warning_zone_point_1_y_cord
+      ~frame_metadata_value.warning_zone_point_2_x_cord
+      ~frame_metadata_value.warning_zone_point_2_y_cord
+      ~frame_metadata_value.warning_zone_point_3_x_cord
+      ~frame_metadata_value.warning_zone_point_3_y_cord
       ~frame_metadata_value.white_balance
    
    

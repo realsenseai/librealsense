@@ -24,10 +24,14 @@ pyrealsense2.roi_sensor
       ~roi_sensor.as_motion_sensor
       ~roi_sensor.as_pose_sensor
       ~roi_sensor.as_roi_sensor
+      ~roi_sensor.as_safety_sensor
       ~roi_sensor.as_wheel_odometer
       ~roi_sensor.close
       ~roi_sensor.from_frame
       ~roi_sensor.get_active_streams
+      ~roi_sensor.get_embedded_decimation_filter
+      ~roi_sensor.get_embedded_filter
+      ~roi_sensor.get_embedded_temporal_filter
       ~roi_sensor.get_info
       ~roi_sensor.get_option
       ~roi_sensor.get_option_description
@@ -47,9 +51,11 @@ pyrealsense2.roi_sensor
       ~roi_sensor.is_option_read_only
       ~roi_sensor.is_pose_sensor
       ~roi_sensor.is_roi_sensor
+      ~roi_sensor.is_safety_sensor
       ~roi_sensor.is_wheel_odometer
       ~roi_sensor.on_options_changed
       ~roi_sensor.open
+      ~roi_sensor.query_embedded_filters
       ~roi_sensor.set_notifications_callback
       ~roi_sensor.set_option
       ~roi_sensor.set_option_value

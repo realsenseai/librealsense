@@ -34,6 +34,7 @@ pyrealsense2.software_device
       ~software_device.first_motion_sensor
       ~software_device.first_pose_sensor
       ~software_device.first_roi_sensor
+      ~software_device.first_safety_sensor
       ~software_device.get_info
       ~software_device.hardware_reset
       ~software_device.is_auto_calibrated_device
@@ -42,6 +43,7 @@ pyrealsense2.software_device
       ~software_device.is_debug_protocol
       ~software_device.is_device_calibration
       ~software_device.is_firmware_logger
+      ~software_device.is_in_recovery_mode
       ~software_device.is_metadata_enabled
       ~software_device.is_playback
       ~software_device.is_recorder

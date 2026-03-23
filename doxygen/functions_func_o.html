@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.14"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Intel® RealSense™ Cross Platform API: Class Members - Functions</title>
+<title>RealSense Cross Platform API: Class Members - Functions</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -18,9 +18,9 @@
  <tbody>
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
-   <div id="projectname">Intel® RealSense™ Cross Platform API
+   <div id="projectname">RealSense Cross Platform API
    </div>
-   <div id="projectbrief">Intel Realsense Cross-platform API</div>
+   <div id="projectbrief">RealSense Cross-platform API</div>
   </td>
  </tr>
  </tbody>
@@ -100,9 +100,13 @@ $(function() {
 : <a class="el" href="classrs2_1_1color__sensor.html#a6871d93e2b21123db5c5212e7845c91e">rs2::color_sensor</a>
 , <a class="el" href="classrs2_1_1context.html#aa71f749430f7ca687962354a8c5d65ad">rs2::context</a>
 , <a class="el" href="classrs2_1_1debug__stream__sensor.html#a5d6d12a37600e4270eb4a5aacacebd68">rs2::debug_stream_sensor</a>
+, <a class="el" href="classrs2_1_1depth__mapping__sensor.html#a4cc0bda0d5c755793a22b1e8b605de4f">rs2::depth_mapping_sensor</a>
 , <a class="el" href="classrs2_1_1depth__sensor.html#af9deab3ee38bfbb7089a022c9020bbe8">rs2::depth_sensor</a>
 , <a class="el" href="classrs2_1_1depth__stereo__sensor.html#a0273f76e087d6daa380ca395a98e0d41">rs2::depth_stereo_sensor</a>
 , <a class="el" href="classrs2_1_1device.html#ab1204ef56264c3897acdc9d8ba691ef1">rs2::device</a>
+, <a class="el" href="classrs2_1_1embedded__decimation__filter.html#a7b3eee6321a7fe247ca8506740bc865d">rs2::embedded_decimation_filter</a>
+, <a class="el" href="classrs2_1_1embedded__filter.html#a2ed4a59cd260a789176cdd3916e73da3">rs2::embedded_filter</a>
+, <a class="el" href="classrs2_1_1embedded__temporal__filter.html#a3b4814f77688746fc69313cc952283dd">rs2::embedded_temporal_filter</a>
 , <a class="el" href="classrs2_1_1filter.html#afae74db0eadf6026f033e89fab78dc98">rs2::filter</a>
 , <a class="el" href="classrs2_1_1fisheye__sensor.html#a411104130fe12f5bc57c007a893f401d">rs2::fisheye_sensor</a>
 , <a class="el" href="classrs2_1_1frame.html#a00366ad9a456e6e65b56a7f63c6e633b">rs2::frame</a>
@@ -111,6 +115,7 @@ $(function() {
 , <a class="el" href="classrs2_1_1pipeline__profile.html#a66140ff896065a2b0eab1b5dd4f0d463">rs2::pipeline_profile</a>
 , <a class="el" href="classrs2_1_1pose__sensor.html#a9f5b6808826bb59c5d31d24650b3037e">rs2::pose_sensor</a>
 , <a class="el" href="classrs2_1_1roi__sensor.html#a640e02c4e1cfb61169b8406b170e5091">rs2::roi_sensor</a>
+, <a class="el" href="classrs2_1_1safety__sensor.html#af5616a3f7812db1caa56c2e342041023">rs2::safety_sensor</a>
 , <a class="el" href="classrs2_1_1sensor.html#acd4b485ea01dc1d42cb5000d2e8ec530">rs2::sensor</a>
 , <a class="el" href="classrs2_1_1stream__profile.html#ab8a9b2ae1fc8a7be81d55b7ff99a9617">rs2::stream_profile</a>
 , <a class="el" href="classrs2_1_1wheel__odometer.html#a352bb0065553828950c8cfbae83f3f3d">rs2::wheel_odometer</a>
@@ -190,9 +195,9 @@ $(function() {
 : <a class="el" href="classrs2_1_1device.html#acd3dd84c4a678efd0337233683433523">rs2::device</a>
 , <a class="el" href="classrs2_1_1device__list.html#a8498c6e52f04f0d389ba6169752b32b8">rs2::device_list</a>
 , <a class="el" href="classrs2_1_1frame.html#aaa05b9b3c9b4871b8d2552ff672ec241">rs2::frame</a>
-, <a class="el" href="classrs2_1_1option__value.html#a57eeb3091d1b3e0612f503de3d86d152">rs2::option_value</a>
-, <a class="el" href="classrs2_1_1options.html#ac8d54af6b112b8065bdc71a247d00f3a">rs2::options</a>
-, <a class="el" href="classrs2_1_1sensor.html#a07800f9af78e59435c3075e69a1c0fdf">rs2::sensor</a>
+, <a class="el" href="classrs2_1_1option__value.html#a8d280f32f9f3a5eba3b1bd611a3c0fd0">rs2::option_value</a>
+, <a class="el" href="classrs2_1_1options.html#a2d211991c6b29ad19e6750acc27920c1">rs2::options</a>
+, <a class="el" href="classrs2_1_1sensor.html#a7ea70b0c8e46f03dabae9e84447ba531">rs2::sensor</a>
 </li>
 <li>operator==()
 : <a class="el" href="classrs2_1_1device__list_1_1device__list__iterator.html#a7733f3e26b7f945b42d7766e6aca1b3b">rs2::device_list::device_list_iterator</a>
@@ -213,13 +218,13 @@ $(function() {
 : <a class="el" href="classrs2_1_1option__value.html#a986924d650f8bf01a1505a486ab8686a">rs2::option_value</a>
 </li>
 <li>options()
-: <a class="el" href="classrs2_1_1options.html#a619cbe834a38174f86352dbb2be27121">rs2::options</a>
+: <a class="el" href="classrs2_1_1options.html#aa09d12fa6d36bac36c5bd1fb77fc9944">rs2::options</a>
 </li>
 <li>options_changed_callback()
 : <a class="el" href="classrs2_1_1options__changed__callback.html#a59b600b61d5b2bf4d10f329368790eaa">rs2::options_changed_callback</a>
 </li>
 <li>options_list()
-: <a class="el" href="classrs2_1_1options__list.html#aa851201750cc0e3eeccb080e5a279dae">rs2::options_list</a>
+: <a class="el" href="classrs2_1_1options__list.html#ab369bf2bcbbaf065075f062c86642ab5">rs2::options_list</a>
 </li>
 </ul>
 </div><!-- contents -->

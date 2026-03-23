@@ -19,6 +19,7 @@ pyrealsense2.depth_frame
       ~depth_frame.as_depth_frame
       ~depth_frame.as_frame
       ~depth_frame.as_frameset
+      ~depth_frame.as_labeled_points
       ~depth_frame.as_motion_frame
       ~depth_frame.as_points
       ~depth_frame.as_pose_frame
@@ -41,6 +42,7 @@ pyrealsense2.depth_frame
       ~depth_frame.is_depth_frame
       ~depth_frame.is_frame
       ~depth_frame.is_frameset
+      ~depth_frame.is_labeled_points
       ~depth_frame.is_motion_frame
       ~depth_frame.is_points
       ~depth_frame.is_pose_frame

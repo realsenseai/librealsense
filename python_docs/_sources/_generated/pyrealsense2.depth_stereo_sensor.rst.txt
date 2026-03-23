@@ -24,11 +24,15 @@ pyrealsense2.depth_stereo_sensor
       ~depth_stereo_sensor.as_motion_sensor
       ~depth_stereo_sensor.as_pose_sensor
       ~depth_stereo_sensor.as_roi_sensor
+      ~depth_stereo_sensor.as_safety_sensor
       ~depth_stereo_sensor.as_wheel_odometer
       ~depth_stereo_sensor.close
       ~depth_stereo_sensor.from_frame
       ~depth_stereo_sensor.get_active_streams
       ~depth_stereo_sensor.get_depth_scale
+      ~depth_stereo_sensor.get_embedded_decimation_filter
+      ~depth_stereo_sensor.get_embedded_filter
+      ~depth_stereo_sensor.get_embedded_temporal_filter
       ~depth_stereo_sensor.get_info
       ~depth_stereo_sensor.get_option
       ~depth_stereo_sensor.get_option_description
@@ -48,9 +52,11 @@ pyrealsense2.depth_stereo_sensor
       ~depth_stereo_sensor.is_option_read_only
       ~depth_stereo_sensor.is_pose_sensor
       ~depth_stereo_sensor.is_roi_sensor
+      ~depth_stereo_sensor.is_safety_sensor
       ~depth_stereo_sensor.is_wheel_odometer
       ~depth_stereo_sensor.on_options_changed
       ~depth_stereo_sensor.open
+      ~depth_stereo_sensor.query_embedded_filters
       ~depth_stereo_sensor.set_notifications_callback
       ~depth_stereo_sensor.set_option
       ~depth_stereo_sensor.set_option_value

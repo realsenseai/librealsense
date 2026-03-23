@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.14"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Intel® RealSense™ Cross Platform API: C:/jenkins_sys_rsbuild/workspace/LRS_doxygen_pipeline/source/include/librealsense2/h/rs_sensor.h File Reference</title>
+<title>RealSense Cross Platform API: C:/jenkins_sys_rsbuild/workspace/LRS_doxygen_pipeline/source/include/librealsense2/h/rs_sensor.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -18,9 +18,9 @@
  <tbody>
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
-   <div id="projectname">Intel® RealSense™ Cross Platform API
+   <div id="projectname">RealSense Cross Platform API
    </div>
-   <div id="projectbrief">Intel Realsense Cross-platform API</div>
+   <div id="projectbrief">RealSense Cross-platform API</div>
   </td>
  </tr>
  </tbody>
@@ -109,7 +109,9 @@ Enumerations</h2></td></tr>
 <a class="el" href="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa1918ad6309a8ec79b213c90121ba67b9">RS2_CAMERA_INFO_DFU_DEVICE_PATH</a>, 
 <a class="el" href="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa1b027097e95305f36f89b9e6b625e303">RS2_CAMERA_INFO_CONNECTION_TYPE</a>, 
 <br />
-&#160;&#160;<a class="el" href="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa8f5df734ba9377454f9575c706201907">RS2_CAMERA_INFO_COUNT</a>
+&#160;&#160;<a class="el" href="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa74d7e68543fc4ac65d10e3a3ab1097b8">RS2_CAMERA_INFO_SMCU_FW_VERSION</a>, 
+<a class="el" href="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa1e8b788e42ad8bc21a50bb39da5d2d70">RS2_CAMERA_INFO_IMU_TYPE</a>, 
+<a class="el" href="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa8f5df734ba9377454f9575c706201907">RS2_CAMERA_INFO_COUNT</a>
 <br />
  }</td></tr>
 <tr class="memdesc:aa607d93c1bac40af3ec1c9b0345f59af"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read-only strings that can be queried from the device. Not all information attributes are available on all camera types. This information is mainly available for camera debug and troubleshooting and should not be used in applications.  <a href="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59af">More...</a><br /></td></tr>
@@ -128,6 +130,10 @@ Enumerations</h2></td></tr>
 &#160;&#160;<a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93aca8232029db741f594390d2c091f17a5">RS2_STREAM_POSE</a>, 
 <a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a1d81b17757d6da3aa94cacd48db9ff05">RS2_STREAM_CONFIDENCE</a>, 
 <a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a9e201e9b86d863cd356989ceef41839c">RS2_STREAM_MOTION</a>, 
+<a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a874668bdf7344149acb7a919ae66156e">RS2_STREAM_SAFETY</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a053761b37e48dbd15de9c6800e7bac38">RS2_STREAM_OCCUPANCY</a>, 
+<a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a901a66592d2fb6b1caf5fc7af0e5c0fd">RS2_STREAM_LABELED_POINT_CLOUD</a>, 
 <a class="el" href="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93aa3017f2e78d17ce364cc13b84ee56d4d">RS2_STREAM_COUNT</a>
 <br />
  }</td></tr>
@@ -250,6 +256,10 @@ Functions</h2></td></tr>
 <tr class="separator:af8b3ed4999ccd08076e4592e6914482c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab84f2f7cb4ad0cba28eda89b1f5c9508"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#aae53b03d252f43953002821e7563ee4f">rs2_stream_profile_list</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__sensor_8h.html#ab84f2f7cb4ad0cba28eda89b1f5c9508">rs2_get_debug_stream_profiles</a> (<a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *sensor, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:ab84f2f7cb4ad0cba28eda89b1f5c9508"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a51838f2a9831dde10479090935d46f01"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#a16842ea7a2954682a83595d9a3bb0d99">rs2_embedded_filter_list</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__sensor_8h.html#a51838f2a9831dde10479090935d46f01">rs2_query_embedded_filters</a> (const <a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *sensor, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a51838f2a9831dde10479090935d46f01"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0c670f9216e4e0d17e7ab151ed43220f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__sensor_8h.html#a0c670f9216e4e0d17e7ab151ed43220f">rs2_delete_embedded_filter_list</a> (<a class="el" href="rs__types_8h.html#a16842ea7a2954682a83595d9a3bb0d99">rs2_embedded_filter_list</a> *embedded_filter_list)</td></tr>
+<tr class="separator:a0c670f9216e4e0d17e7ab151ed43220f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af276e645c71569cd1a029dc3599aa9f5"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#aae53b03d252f43953002821e7563ee4f">rs2_stream_profile_list</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__sensor_8h.html#af276e645c71569cd1a029dc3599aa9f5">rs2_get_active_streams</a> (<a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *sensor, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:af276e645c71569cd1a029dc3599aa9f5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a290b1dc96c6617ba301dca00c4cc0df9"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="rs__types_8h.html#a338107a48471d20ecacac3e4c9e024e2">rs2_stream_profile</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__sensor_8h.html#a290b1dc96c6617ba301dca00c4cc0df9">rs2_get_stream_profile</a> (const <a class="el" href="rs__types_8h.html#aae53b03d252f43953002821e7563ee4f">rs2_stream_profile_list</a> *list, int index, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
@@ -451,6 +461,10 @@ Functions</h2></td></tr>
 </td></tr>
 <tr><td class="fieldname"><a id="aa607d93c1bac40af3ec1c9b0345f59afa1b027097e95305f36f89b9e6b625e303"></a>RS2_CAMERA_INFO_CONNECTION_TYPE&#160;</td><td class="fielddoc"><p>Connection type, for example USB, GMSL, DDS </p>
 </td></tr>
+<tr><td class="fieldname"><a id="aa607d93c1bac40af3ec1c9b0345f59afa74d7e68543fc4ac65d10e3a3ab1097b8"></a>RS2_CAMERA_INFO_SMCU_FW_VERSION&#160;</td><td class="fielddoc"><p>Safety MCU FW Version </p>
+</td></tr>
+<tr><td class="fieldname"><a id="aa607d93c1bac40af3ec1c9b0345f59afa1e8b788e42ad8bc21a50bb39da5d2d70"></a>RS2_CAMERA_INFO_IMU_TYPE&#160;</td><td class="fielddoc"><p>IMU Type </p>
+</td></tr>
 <tr><td class="fieldname"><a id="aa607d93c1bac40af3ec1c9b0345f59afa8f5df734ba9377454f9575c706201907"></a>RS2_CAMERA_INFO_COUNT&#160;</td><td class="fielddoc"><p>Number of enumeration values. Not a valid input: intended to be used in for-loops. </p>
 </td></tr>
 </table>
@@ -579,6 +593,12 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a01b4027af33139de861408872dd11b93a1d81b17757d6da3aa94cacd48db9ff05"></a>RS2_STREAM_CONFIDENCE&#160;</td><td class="fielddoc"><p>4 bit per-pixel depth confidence level </p>
 </td></tr>
 <tr><td class="fieldname"><a id="a01b4027af33139de861408872dd11b93a9e201e9b86d863cd356989ceef41839c"></a>RS2_STREAM_MOTION&#160;</td><td class="fielddoc"><p>Native stream of combined motion data (incl. accel &amp; gyro) </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a01b4027af33139de861408872dd11b93a874668bdf7344149acb7a919ae66156e"></a>RS2_STREAM_SAFETY&#160;</td><td class="fielddoc"><p>safety info </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a01b4027af33139de861408872dd11b93a053761b37e48dbd15de9c6800e7bac38"></a>RS2_STREAM_OCCUPANCY&#160;</td><td class="fielddoc"><p>occupancy info </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a01b4027af33139de861408872dd11b93a901a66592d2fb6b1caf5fc7af0e5c0fd"></a>RS2_STREAM_LABELED_POINT_CLOUD&#160;</td><td class="fielddoc"><p>labeled point cloud stream </p>
 </td></tr>
 <tr><td class="fieldname"><a id="a01b4027af33139de861408872dd11b93aa3017f2e78d17ce364cc13b84ee56d4d"></a>RS2_STREAM_COUNT&#160;</td><td class="fielddoc"></td></tr>
 </table>
@@ -849,6 +869,30 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>the requested sensor, should be released by rs2_delete_sensor </dd></dl>
+
+</div>
+</div>
+<a id="a0c670f9216e4e0d17e7ab151ed43220f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0c670f9216e4e0d17e7ab151ed43220f">&#9670;&nbsp;</a></span>rs2_delete_embedded_filter_list()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void rs2_delete_embedded_filter_list </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#a16842ea7a2954682a83595d9a3bb0d99">rs2_embedded_filter_list</a> *&#160;</td>
+          <td class="paramname"><em>embedded_filter_list</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>delete embedded filter list allocated by rs2_query_embedded_filters </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">embedded_filter_list</td><td>embedded filter list to delete </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -2457,6 +2501,42 @@ Functions</h2></td></tr>
   </table>
   </dd>
 </dl>
+
+</div>
+</div>
+<a id="a51838f2a9831dde10479090935d46f01"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a51838f2a9831dde10479090935d46f01">&#9670;&nbsp;</a></span>rs2_query_embedded_filters()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="rs__types_8h.html#a16842ea7a2954682a83595d9a3bb0d99">rs2_embedded_filter_list</a>* rs2_query_embedded_filters </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *&#160;</td>
+          <td class="paramname"><em>sensor</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>create a static snapshot of all embedded filters within a specific sensor. </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">sensor</td><td>specific RealSense sensor </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>the list of embedded filters, should be released by rs2_delete_embeddded_filter_list </dd></dl>
 
 </div>
 </div>

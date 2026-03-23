@@ -29,10 +29,14 @@ pyrealsense2.software_sensor
       ~software_sensor.as_motion_sensor
       ~software_sensor.as_pose_sensor
       ~software_sensor.as_roi_sensor
+      ~software_sensor.as_safety_sensor
       ~software_sensor.as_wheel_odometer
       ~software_sensor.close
       ~software_sensor.from_frame
       ~software_sensor.get_active_streams
+      ~software_sensor.get_embedded_decimation_filter
+      ~software_sensor.get_embedded_filter
+      ~software_sensor.get_embedded_temporal_filter
       ~software_sensor.get_info
       ~software_sensor.get_option
       ~software_sensor.get_option_description
@@ -51,6 +55,7 @@ pyrealsense2.software_sensor
       ~software_sensor.is_option_read_only
       ~software_sensor.is_pose_sensor
       ~software_sensor.is_roi_sensor
+      ~software_sensor.is_safety_sensor
       ~software_sensor.is_wheel_odometer
       ~software_sensor.on_motion_frame
       ~software_sensor.on_notification
@@ -58,6 +63,7 @@ pyrealsense2.software_sensor
       ~software_sensor.on_pose_frame
       ~software_sensor.on_video_frame
       ~software_sensor.open
+      ~software_sensor.query_embedded_filters
       ~software_sensor.set_metadata
       ~software_sensor.set_notifications_callback
       ~software_sensor.set_option

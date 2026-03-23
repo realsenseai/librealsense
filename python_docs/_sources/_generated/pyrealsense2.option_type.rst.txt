@@ -29,6 +29,7 @@ pyrealsense2.option_type
       ~option_type.float
       ~option_type.integer
       ~option_type.name
+      ~option_type.rect
       ~option_type.string
       ~option_type.value
    

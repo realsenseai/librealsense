@@ -46,6 +46,7 @@ pyrealsense2.option
       ~option.depth_offset
       ~option.depth_units
       ~option.digital_gain
+      ~option.embedded_filter_enabled
       ~option.emitter_always_on
       ~option.emitter_enabled
       ~option.emitter_frequency
@@ -85,6 +86,7 @@ pyrealsense2.option
       ~option.laser_power
       ~option.ldd_temperature
       ~option.led_power
+      ~option.left_ir_temperature
       ~option.lld_temperature
       ~option.ma_temperature
       ~option.max_distance
@@ -105,7 +107,11 @@ pyrealsense2.option
       ~option.receiver_sensitivity
       ~option.region_of_interest
       ~option.reset_camera_accuracy_health
+      ~option.rgb_tnr_enabled
       ~option.rotation
+      ~option.safety_mcu_temperature
+      ~option.safety_mode
+      ~option.safety_preset_active_index
       ~option.saturation
       ~option.sensor_mode
       ~option.sequence_id

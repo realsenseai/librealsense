@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.14"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Intel® RealSense™ Cross Platform API: rs2::frameset Class Reference</title>
+<title>RealSense Cross Platform API: rs2::frameset Class Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -18,9 +18,9 @@
  <tbody>
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
-   <div id="projectname">Intel® RealSense™ Cross Platform API
+   <div id="projectname">RealSense Cross Platform API
    </div>
-   <div id="projectbrief">Intel Realsense Cross-platform API</div>
+   <div id="projectbrief">RealSense Cross-platform API</div>
   </td>
  </tr>
  </tbody>
@@ -80,8 +80,10 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:ae78478b6b585a36d42b4316f8e12f64e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad47bc7437fc5ca4f23d6e5006665024c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classrs2_1_1depth__frame.html">depth_frame</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1frameset.html#ad47bc7437fc5ca4f23d6e5006665024c">get_depth_frame</a> () const</td></tr>
 <tr class="separator:ad47bc7437fc5ca4f23d6e5006665024c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a982d5e274eed193ba0a34151cbe5c00c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classrs2_1_1video__frame.html">video_frame</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1frameset.html#a982d5e274eed193ba0a34151cbe5c00c">get_color_frame</a> () const</td></tr>
-<tr class="separator:a982d5e274eed193ba0a34151cbe5c00c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af84a7eeda7f1679e9bbc84d056af4f75"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classrs2_1_1video__frame.html">video_frame</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1frameset.html#af84a7eeda7f1679e9bbc84d056af4f75">get_color_frame</a> (const size_t index=0) const</td></tr>
+<tr class="separator:af84a7eeda7f1679e9bbc84d056af4f75"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a160673561898c2102acd6abda286bc74"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classrs2_1_1labeled__points.html">labeled_points</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1frameset.html#a160673561898c2102acd6abda286bc74">get_labeled_point_cloud_frame</a> () const</td></tr>
+<tr class="separator:a160673561898c2102acd6abda286bc74"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a50202d911e7a29b74419ba144525f9b3"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classrs2_1_1video__frame.html">video_frame</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1frameset.html#a50202d911e7a29b74419ba144525f9b3">get_infrared_frame</a> (const size_t index=0) const</td></tr>
 <tr class="separator:a50202d911e7a29b74419ba144525f9b3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4a774543bae3b4b03eee98d4df8157d7"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classrs2_1_1video__frame.html">video_frame</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1frameset.html#a4a774543bae3b4b03eee98d4df8157d7">get_fisheye_frame</a> (const size_t index=0) const</td></tr>
@@ -389,8 +391,8 @@ template&lt;class T &gt; </div>
 
 </div>
 </div>
-<a id="a982d5e274eed193ba0a34151cbe5c00c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a982d5e274eed193ba0a34151cbe5c00c">&#9670;&nbsp;</a></span>get_color_frame()</h2>
+<a id="af84a7eeda7f1679e9bbc84d056af4f75"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af84a7eeda7f1679e9bbc84d056af4f75">&#9670;&nbsp;</a></span>get_color_frame()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -401,7 +403,8 @@ template&lt;class T &gt; </div>
         <tr>
           <td class="memname"><a class="el" href="classrs2_1_1video__frame.html">video_frame</a> rs2::frameset::get_color_frame </td>
           <td>(</td>
-          <td class="paramname"></td><td>)</td>
+          <td class="paramtype">const size_t&#160;</td>
+          <td class="paramname"><em>index</em> = <code>0</code></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
@@ -504,6 +507,31 @@ template&lt;class T &gt; </div>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd><a class="el" href="classrs2_1_1video__frame.html">video_frame</a> - first found infrared frame. </dd></dl>
+
+</div>
+</div>
+<a id="a160673561898c2102acd6abda286bc74"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a160673561898c2102acd6abda286bc74">&#9670;&nbsp;</a></span>get_labeled_point_cloud_frame()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="classrs2_1_1labeled__points.html">labeled_points</a> rs2::frameset::get_labeled_point_cloud_frame </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
 
 </div>
 </div>

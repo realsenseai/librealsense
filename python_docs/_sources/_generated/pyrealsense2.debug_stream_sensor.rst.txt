@@ -24,11 +24,15 @@ pyrealsense2.debug_stream_sensor
       ~debug_stream_sensor.as_motion_sensor
       ~debug_stream_sensor.as_pose_sensor
       ~debug_stream_sensor.as_roi_sensor
+      ~debug_stream_sensor.as_safety_sensor
       ~debug_stream_sensor.as_wheel_odometer
       ~debug_stream_sensor.close
       ~debug_stream_sensor.from_frame
       ~debug_stream_sensor.get_active_streams
       ~debug_stream_sensor.get_debug_stream_profiles
+      ~debug_stream_sensor.get_embedded_decimation_filter
+      ~debug_stream_sensor.get_embedded_filter
+      ~debug_stream_sensor.get_embedded_temporal_filter
       ~debug_stream_sensor.get_info
       ~debug_stream_sensor.get_option
       ~debug_stream_sensor.get_option_description
@@ -47,9 +51,11 @@ pyrealsense2.debug_stream_sensor
       ~debug_stream_sensor.is_option_read_only
       ~debug_stream_sensor.is_pose_sensor
       ~debug_stream_sensor.is_roi_sensor
+      ~debug_stream_sensor.is_safety_sensor
       ~debug_stream_sensor.is_wheel_odometer
       ~debug_stream_sensor.on_options_changed
       ~debug_stream_sensor.open
+      ~debug_stream_sensor.query_embedded_filters
       ~debug_stream_sensor.set_notifications_callback
       ~debug_stream_sensor.set_option
       ~debug_stream_sensor.set_option_value

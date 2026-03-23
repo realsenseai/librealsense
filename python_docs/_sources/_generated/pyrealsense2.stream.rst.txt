@@ -34,9 +34,12 @@ pyrealsense2.stream
       ~stream.gpio
       ~stream.gyro
       ~stream.infrared
+      ~stream.labeled_point_cloud
       ~stream.motion
       ~stream.name
+      ~stream.occupancy
       ~stream.pose
+      ~stream.safety
       ~stream.value
    
    

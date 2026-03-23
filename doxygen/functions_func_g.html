@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.14"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Intel® RealSense™ Cross Platform API: Class Members - Functions</title>
+<title>RealSense Cross Platform API: Class Members - Functions</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -18,9 +18,9 @@
  <tbody>
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
-   <div id="projectname">Intel® RealSense™ Cross Platform API
+   <div id="projectname">RealSense Cross Platform API
    </div>
-   <div id="projectbrief">Intel Realsense Cross-platform API</div>
+   <div id="projectbrief">RealSense Cross-platform API</div>
   </td>
  </tr>
  </tbody>
@@ -45,6 +45,7 @@ $(function() {
 <li>get()
 : <a class="el" href="classrs2_1_1config.html#a2e6fc0e54fd640da0754344101464d9a">rs2::config</a>
 , <a class="el" href="classrs2_1_1device.html#a5fd32985d8245a4f1ce343c72eebc5e5">rs2::device</a>
+, <a class="el" href="classrs2_1_1embedded__filter.html#a3037e2535be7d6337a6055840d670d03">rs2::embedded_filter</a>
 , <a class="el" href="classrs2_1_1filter.html#ad32442a0ab77035da703db0926ea7f7f">rs2::filter</a>
 , <a class="el" href="classrs2_1_1frame.html#a89674ffbf7c21ffbec047c95aab2850c">rs2::frame</a>
 , <a class="el" href="classrs2_1_1frame__queue.html#a76fafa21041eb31fe6c6f7153be148c0">rs2::frame_queue</a>
@@ -65,11 +66,15 @@ $(function() {
 <li>get_amp_factor()
 : <a class="el" href="classrs400_1_1advanced__mode.html#afac69bc205bfc15f0706fa93c5068b46">rs400::advanced_mode</a>
 </li>
+<li>get_application_config()
+: <a class="el" href="classrs2_1_1safety__sensor.html#a57079d424af0737aea52923678c5a754">rs2::safety_sensor</a>
+</li>
 <li>get_baseline()
 : <a class="el" href="classrs2_1_1disparity__frame.html#ab18c4e65a0a5269e1cd878edc5c44126">rs2::disparity_frame</a>
 </li>
 <li>get_bits_per_pixel()
-: <a class="el" href="classrs2_1_1video__frame.html#a0cf94aaeb0a85e581ecab2aeb665af34">rs2::video_frame</a>
+: <a class="el" href="classrs2_1_1labeled__points.html#a269387aa91c61fd6ca14615377005e07">rs2::labeled_points</a>
+, <a class="el" href="classrs2_1_1video__frame.html#a0cf94aaeb0a85e581ecab2aeb665af34">rs2::video_frame</a>
 </li>
 <li>get_bytes_per_pixel()
 : <a class="el" href="classrs2_1_1video__frame.html#ab9f22f5e5cb33cf010f735cc881e576e">rs2::video_frame</a>
@@ -93,7 +98,7 @@ $(function() {
 : <a class="el" href="classrs400_1_1advanced__mode.html#a88805cf08ffcb4107575a5ffcb1185bb">rs400::advanced_mode</a>
 </li>
 <li>get_color_frame()
-: <a class="el" href="classrs2_1_1frameset.html#a982d5e274eed193ba0a34151cbe5c00c">rs2::frameset</a>
+: <a class="el" href="classrs2_1_1frameset.html#af84a7eeda7f1679e9bbc84d056af4f75">rs2::frameset</a>
 </li>
 <li>get_combined_motion_data()
 : <a class="el" href="classrs2_1_1motion__frame.html#a547e4e61cf60e1f2e8e8b378ca301eab">rs2::motion_frame</a>
@@ -103,6 +108,9 @@ $(function() {
 </li>
 <li>get_data_size()
 : <a class="el" href="classrs2_1_1frame.html#ab3665db740b156cc9ef447796d349d31">rs2::frame</a>
+</li>
+<li>get_dds_domain()
+: <a class="el" href="classrs2_1_1eth__config__device.html#ad88dcc6dd7095007c320c9b1e64cc2fc">rs2::eth_config_device</a>
 </li>
 <li>get_debug_stream_profiles()
 : <a class="el" href="classrs2_1_1debug__stream__sensor.html#ad76f081be87db337d5dbeb8a5b959ae1">rs2::debug_stream_sensor</a>
@@ -126,11 +134,17 @@ $(function() {
 <li>get_device()
 : <a class="el" href="classrs2_1_1pipeline__profile.html#afee24c7bef16dc554ee80333446e0f49">rs2::pipeline_profile</a>
 </li>
+<li>get_dhcp_config()
+: <a class="el" href="classrs2_1_1eth__config__device.html#adae688c44fdca26afec84ca515f16cfb">rs2::eth_config_device</a>
+</li>
 <li>get_distance()
 : <a class="el" href="classrs2_1_1depth__frame.html#a5090d69d04ade6dd67175cae9b6bee9c">rs2::depth_frame</a>
 </li>
 <li>get_duration()
 : <a class="el" href="classrs2_1_1playback.html#a18ca66fea6425319d1a0ff2d50d8e11e">rs2::playback</a>
+</li>
+<li>get_embedded_filter()
+: <a class="el" href="classrs2_1_1sensor.html#a2b6df51ba322fe79230542948a717dd6">rs2::sensor</a>
 </li>
 <li>get_extrinsics_to()
 : <a class="el" href="classrs2_1_1stream__profile.html#a0085b1f54ac6078c638ceb53ff89cc95">rs2::stream_profile</a>
@@ -159,11 +173,15 @@ $(function() {
 <li>get_frame_timestamp_domain()
 : <a class="el" href="classrs2_1_1frame.html#a21c0e6615083c0a8d667a05adf6db03e">rs2::frame</a>
 </li>
+<li>get_gateway()
+: <a class="el" href="classrs2_1_1eth__config__device.html#aae946437acd81d46e6e076ed86c37a55">rs2::eth_config_device</a>
+</li>
 <li>get_hdad()
 : <a class="el" href="classrs400_1_1advanced__mode.html#aeb2374e4fb8d231775a0cbe777d052f8">rs400::advanced_mode</a>
 </li>
 <li>get_height()
-: <a class="el" href="classrs2_1_1video__frame.html#a0d7fb26e6e597b9fdcb017318e5132e2">rs2::video_frame</a>
+: <a class="el" href="classrs2_1_1labeled__points.html#a6e621e80b595a4f0429f552c43f2abaf">rs2::labeled_points</a>
+, <a class="el" href="classrs2_1_1video__frame.html#a0d7fb26e6e597b9fdcb017318e5132e2">rs2::video_frame</a>
 </li>
 <li>get_info()
 : <a class="el" href="classrs2_1_1device.html#a15e4c3da5e37e42a3e8721e018eb418d">rs2::device</a>
@@ -175,6 +193,24 @@ $(function() {
 </li>
 <li>get_intrinsics()
 : <a class="el" href="classrs2_1_1video__stream__profile.html#af0e9ee46637520ae736e8b34d05becd7">rs2::video_stream_profile</a>
+</li>
+<li>get_ip_address()
+: <a class="el" href="classrs2_1_1eth__config__device.html#a935ed1864a6ca3e91325484f8a2848d6">rs2::eth_config_device</a>
+</li>
+<li>get_labeled_point_cloud_frame()
+: <a class="el" href="classrs2_1_1frameset.html#a160673561898c2102acd6abda286bc74">rs2::frameset</a>
+</li>
+<li>get_labels()
+: <a class="el" href="classrs2_1_1labeled__points.html#aeb4216e562ed6968bc93065eb25c1d04">rs2::labeled_points</a>
+</li>
+<li>get_link_priority()
+: <a class="el" href="classrs2_1_1eth__config__device.html#aeab9403c301f5f47c5efac6507916491">rs2::eth_config_device</a>
+</li>
+<li>get_link_speed()
+: <a class="el" href="classrs2_1_1eth__config__device.html#a06ffa4a96007fc5140b72aaeeeb30621">rs2::eth_config_device</a>
+</li>
+<li>get_link_timeout()
+: <a class="el" href="classrs2_1_1eth__config__device.html#a72ab08c9d8252bb8163595aa88b968ea">rs2::eth_config_device</a>
 </li>
 <li>get_list()
 : <a class="el" href="classrs2_1_1device__list.html#a0889c4c85899c12583351e9244d2b2fb">rs2::device_list</a>
@@ -191,6 +227,12 @@ $(function() {
 </li>
 <li>get_motion_intrinsics()
 : <a class="el" href="classrs2_1_1motion__stream__profile.html#af89c59269de7d0cbb0c9933241a137f7">rs2::motion_stream_profile</a>
+</li>
+<li>get_mtu()
+: <a class="el" href="classrs2_1_1eth__config__device.html#a2b1a4f1e6da748300c5343617e30f9f7">rs2::eth_config_device</a>
+</li>
+<li>get_netmask()
+: <a class="el" href="classrs2_1_1eth__config__device.html#a4f2c6cfbbb370f6968fc547b0b4b75d8">rs2::eth_config_device</a>
 </li>
 <li>get_new_devices()
 : <a class="el" href="classrs2_1_1event__information.html#ad2c23859ea425ccceff4423d963a1927">rs2::event_information</a>
@@ -249,6 +291,12 @@ $(function() {
 <li>get_rsm()
 : <a class="el" href="classrs400_1_1advanced__mode.html#af6988c362fb059669ffe1921295edba9">rs400::advanced_mode</a>
 </li>
+<li>get_safety_interface_config()
+: <a class="el" href="classrs2_1_1safety__sensor.html#a85a8433cd51b878dbff00957371a23a0">rs2::safety_sensor</a>
+</li>
+<li>get_safety_preset()
+: <a class="el" href="classrs2_1_1safety__sensor.html#ade3d5ddb0b53cc79c7f5cedff24dcb57">rs2::safety_sensor</a>
+</li>
 <li>get_sensor()
 : <a class="el" href="classrs2_1_1frame.html#a5144336180ad1e3f310b77ce2a8452de">rs2::frame</a>
 </li>
@@ -306,18 +354,27 @@ $(function() {
 , <a class="el" href="classrs2_1_1frame.html#a25f71d45193f2f4d77960320276b83f1">rs2::frame</a>
 , <a class="el" href="classrs2_1_1notification.html#a62ff1a0833243d7ede3e106f03c735f4">rs2::notification</a>
 </li>
+<li>get_transmission_delay()
+: <a class="el" href="classrs2_1_1eth__config__device.html#a29454ac5061691ee0448fbc3815c5d57">rs2::eth_config_device</a>
+</li>
 <li>get_type()
 : <a class="el" href="classrs2_1_1device.html#a55718434dd6e060df7007983ce083c29">rs2::device</a>
+, <a class="el" href="classrs2_1_1embedded__filter.html#a2a97e47dfb6f5b4862dc33f6a2764eb9">rs2::embedded_filter</a>
 , <a class="el" href="classrs2_1_1error.html#a1ed211366ca44a09f8885e5d51310d1d">rs2::error</a>
+</li>
+<li>get_udp_ttl()
+: <a class="el" href="classrs2_1_1eth__config__device.html#ab05720b9cff28f5f647e24fb3bf77a5a">rs2::eth_config_device</a>
 </li>
 <li>get_units()
 : <a class="el" href="classrs2_1_1depth__frame.html#a23ef301d9526ab3420ec6d4237f44e03">rs2::depth_frame</a>
 </li>
 <li>get_vertices()
-: <a class="el" href="classrs2_1_1points.html#a5a466b484ae3dd4e96d921e21a0eae92">rs2::points</a>
+: <a class="el" href="classrs2_1_1labeled__points.html#affb52e00aba5935c6068b3065c00e6a1">rs2::labeled_points</a>
+, <a class="el" href="classrs2_1_1points.html#a5a466b484ae3dd4e96d921e21a0eae92">rs2::points</a>
 </li>
 <li>get_width()
-: <a class="el" href="classrs2_1_1video__frame.html#a643ce667e778f0ee64d79479d768b1f7">rs2::video_frame</a>
+: <a class="el" href="classrs2_1_1labeled__points.html#a545b2ff8a1fc6216fcbce01851b73338">rs2::labeled_points</a>
+, <a class="el" href="classrs2_1_1video__frame.html#a643ce667e778f0ee64d79479d768b1f7">rs2::video_frame</a>
 </li>
 <li>gpu_frame()
 : <a class="el" href="classrs2_1_1gl_1_1gpu__frame.html#a99a423950fcbbf88c715b9104d423f64">rs2::gl::gpu_frame</a>

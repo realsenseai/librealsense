@@ -1,0 +1,33 @@
+pyrealsense2.embedded_filter_type
+=================================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: embedded_filter_type
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~embedded_filter_type.__init__
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~embedded_filter_type.decimation
+      ~embedded_filter_type.name
+      ~embedded_filter_type.temporal
+      ~embedded_filter_type.value
+   
+   

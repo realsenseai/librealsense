@@ -33,6 +33,7 @@ pyrealsense2.firmware_logger
       ~firmware_logger.first_motion_sensor
       ~firmware_logger.first_pose_sensor
       ~firmware_logger.first_roi_sensor
+      ~firmware_logger.first_safety_sensor
       ~firmware_logger.get_firmware_log
       ~firmware_logger.get_flash_log
       ~firmware_logger.get_info
@@ -45,6 +46,7 @@ pyrealsense2.firmware_logger
       ~firmware_logger.is_debug_protocol
       ~firmware_logger.is_device_calibration
       ~firmware_logger.is_firmware_logger
+      ~firmware_logger.is_in_recovery_mode
       ~firmware_logger.is_metadata_enabled
       ~firmware_logger.is_playback
       ~firmware_logger.is_recorder

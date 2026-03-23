@@ -34,14 +34,17 @@ pyrealsense2.extension
       ~extension.composite_frame
       ~extension.debug
       ~extension.debug_stream_sensor
+      ~extension.decimation_embedded_filter
       ~extension.decimation_filter
       ~extension.depth_frame
       ~extension.depth_huffman_decoder
+      ~extension.depth_mapping_sensor
       ~extension.depth_sensor
       ~extension.depth_stereo_sensor
       ~extension.device_calibration
       ~extension.disparity_filter
       ~extension.disparity_frame
+      ~extension.eth_config
       ~extension.fisheye_sensor
       ~extension.fw_logger
       ~extension.global_timer
@@ -49,6 +52,7 @@ pyrealsense2.extension
       ~extension.hole_filling_filter
       ~extension.info
       ~extension.l500_depth_sensor
+      ~extension.labeled_points
       ~extension.max_usable_range_sensor
       ~extension.motion
       ~extension.motion_frame
@@ -66,11 +70,14 @@ pyrealsense2.extension
       ~extension.record
       ~extension.roi
       ~extension.rotation_filter
+      ~extension.safety_sensor
       ~extension.sequence_id_filter
       ~extension.serializable
       ~extension.software_device
       ~extension.software_sensor
       ~extension.spatial_filter
+      ~extension.supported_embedded_filters
+      ~extension.temporal_embedded_filter
       ~extension.temporal_filter
       ~extension.threshold_filter
       ~extension.tm2

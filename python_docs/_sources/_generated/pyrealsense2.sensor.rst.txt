@@ -24,10 +24,14 @@ pyrealsense2.sensor
       ~sensor.as_motion_sensor
       ~sensor.as_pose_sensor
       ~sensor.as_roi_sensor
+      ~sensor.as_safety_sensor
       ~sensor.as_wheel_odometer
       ~sensor.close
       ~sensor.from_frame
       ~sensor.get_active_streams
+      ~sensor.get_embedded_decimation_filter
+      ~sensor.get_embedded_filter
+      ~sensor.get_embedded_temporal_filter
       ~sensor.get_info
       ~sensor.get_option
       ~sensor.get_option_description
@@ -46,9 +50,11 @@ pyrealsense2.sensor
       ~sensor.is_option_read_only
       ~sensor.is_pose_sensor
       ~sensor.is_roi_sensor
+      ~sensor.is_safety_sensor
       ~sensor.is_wheel_odometer
       ~sensor.on_options_changed
       ~sensor.open
+      ~sensor.query_embedded_filters
       ~sensor.set_notifications_callback
       ~sensor.set_option
       ~sensor.set_option_value

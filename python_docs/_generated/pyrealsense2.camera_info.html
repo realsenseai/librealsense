@@ -5,13 +5,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.camera_info &#8212; pyrealsense2 2.56.5 documentation</title>
+    <title>pyrealsense2.camera_info &#8212; pyrealsense2 2.57.7 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=8b0ddf77"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/documentation_options.js?v=69589b5d"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" /> 
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.56.5 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.camera_info</a></li> 
       </ul>
     </div>  
@@ -39,7 +39,7 @@
 <h1>pyrealsense2.camera_info<a class="headerlink" href="#pyrealsense2-camera-info" title="Link to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyrealsense2.</span></span><span class="sig-name descname"><span class="pre">camera_info</span></span><a class="headerlink" href="#pyrealsense2.camera_info" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">pyrealsense2.</span></span><span class="sig-name descname"><span class="pre">camera_info</span></span><a class="headerlink" href="#pyrealsense2.camera_info" title="Link to this definition">¶</a></dt>
 <dd><p>This information is mainly available for camera debug and troubleshooting and should not be used in applications.</p>
 <p>Members:</p>
 <blockquote>
@@ -59,6 +59,8 @@
 <p>ip_address</p>
 <p>dfu_device_path</p>
 <p>connection_type</p>
+<p>smcu_fw_version</p>
+<p>imu_type</p>
 </div></blockquote>
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.__init__">
@@ -100,25 +102,31 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.firmware_version" title="pyrealsense2.camera_info.firmware_version"><code class="xref py py-obj docutils literal notranslate"><span class="pre">firmware_version</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.ip_address" title="pyrealsense2.camera_info.ip_address"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ip_address</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.imu_type" title="pyrealsense2.camera_info.imu_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">imu_type</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.name" title="pyrealsense2.camera_info.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.ip_address" title="pyrealsense2.camera_info.ip_address"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ip_address</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.physical_port" title="pyrealsense2.camera_info.physical_port"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physical_port</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.name" title="pyrealsense2.camera_info.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.product_id" title="pyrealsense2.camera_info.product_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">product_id</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.physical_port" title="pyrealsense2.camera_info.physical_port"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physical_port</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.product_line" title="pyrealsense2.camera_info.product_line"><code class="xref py py-obj docutils literal notranslate"><span class="pre">product_line</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.product_id" title="pyrealsense2.camera_info.product_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">product_id</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.recommended_firmware_version" title="pyrealsense2.camera_info.recommended_firmware_version"><code class="xref py py-obj docutils literal notranslate"><span class="pre">recommended_firmware_version</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.product_line" title="pyrealsense2.camera_info.product_line"><code class="xref py py-obj docutils literal notranslate"><span class="pre">product_line</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.serial_number" title="pyrealsense2.camera_info.serial_number"><code class="xref py py-obj docutils literal notranslate"><span class="pre">serial_number</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.recommended_firmware_version" title="pyrealsense2.camera_info.recommended_firmware_version"><code class="xref py py-obj docutils literal notranslate"><span class="pre">recommended_firmware_version</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.serial_number" title="pyrealsense2.camera_info.serial_number"><code class="xref py py-obj docutils literal notranslate"><span class="pre">serial_number</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.smcu_fw_version" title="pyrealsense2.camera_info.smcu_fw_version"><code class="xref py py-obj docutils literal notranslate"><span class="pre">smcu_fw_version</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.camera_info.usb_type_descriptor" title="pyrealsense2.camera_info.usb_type_descriptor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">usb_type_descriptor</span></code></a></p></td>
@@ -131,87 +139,97 @@
 </table>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.advanced_mode">
-<span class="sig-name descname"><span class="pre">advanced_mode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.advanced_mode:</span> <span class="pre">6&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.advanced_mode" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">advanced_mode</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.advanced_mode:</span> <span class="pre">6&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.advanced_mode" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.asic_serial_number">
-<span class="sig-name descname"><span class="pre">asic_serial_number</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.asic_serial_number:</span> <span class="pre">11&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.asic_serial_number" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">asic_serial_number</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.asic_serial_number:</span> <span class="pre">11&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.asic_serial_number" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.camera_locked">
-<span class="sig-name descname"><span class="pre">camera_locked</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.camera_locked:</span> <span class="pre">8&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.camera_locked" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">camera_locked</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.camera_locked:</span> <span class="pre">8&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.camera_locked" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.connection_type">
-<span class="sig-name descname"><span class="pre">connection_type</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.connection_type:</span> <span class="pre">15&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.connection_type" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">connection_type</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.connection_type:</span> <span class="pre">15&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.connection_type" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.debug_op_code">
-<span class="sig-name descname"><span class="pre">debug_op_code</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.debug_op_code:</span> <span class="pre">5&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.debug_op_code" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">debug_op_code</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.debug_op_code:</span> <span class="pre">5&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.debug_op_code" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.dfu_device_path">
-<span class="sig-name descname"><span class="pre">dfu_device_path</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.dfu_device_path:</span> <span class="pre">14&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.dfu_device_path" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">dfu_device_path</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.dfu_device_path:</span> <span class="pre">14&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.dfu_device_path" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.firmware_update_id">
-<span class="sig-name descname"><span class="pre">firmware_update_id</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.firmware_update_id:</span> <span class="pre">12&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.firmware_update_id" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">firmware_update_id</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.firmware_update_id:</span> <span class="pre">12&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.firmware_update_id" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.firmware_version">
-<span class="sig-name descname"><span class="pre">firmware_version</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.firmware_version:</span> <span class="pre">2&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.firmware_version" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">firmware_version</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.firmware_version:</span> <span class="pre">2&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.firmware_version" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.camera_info.imu_type">
+<span class="sig-name descname"><span class="pre">imu_type</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.imu_type:</span> <span class="pre">17&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.imu_type" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.ip_address">
-<span class="sig-name descname"><span class="pre">ip_address</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.ip_address:</span> <span class="pre">13&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.ip_address" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">ip_address</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.ip_address:</span> <span class="pre">13&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.ip_address" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.name">
-<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.name:</span> <span class="pre">0&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.name" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">name</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.name:</span> <span class="pre">0&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.name" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.physical_port">
-<span class="sig-name descname"><span class="pre">physical_port</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.physical_port:</span> <span class="pre">4&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.physical_port" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">physical_port</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.physical_port:</span> <span class="pre">4&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.physical_port" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.product_id">
-<span class="sig-name descname"><span class="pre">product_id</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.product_id:</span> <span class="pre">7&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.product_id" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">product_id</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.product_id:</span> <span class="pre">7&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.product_id" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.product_line">
-<span class="sig-name descname"><span class="pre">product_line</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.product_line:</span> <span class="pre">10&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.product_line" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">product_line</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.product_line:</span> <span class="pre">10&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.product_line" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.recommended_firmware_version">
-<span class="sig-name descname"><span class="pre">recommended_firmware_version</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.recommended_firmware_version:</span> <span class="pre">3&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.recommended_firmware_version" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">recommended_firmware_version</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.recommended_firmware_version:</span> <span class="pre">3&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.recommended_firmware_version" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.serial_number">
-<span class="sig-name descname"><span class="pre">serial_number</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.serial_number:</span> <span class="pre">1&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.serial_number" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">serial_number</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.serial_number:</span> <span class="pre">1&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.serial_number" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.camera_info.smcu_fw_version">
+<span class="sig-name descname"><span class="pre">smcu_fw_version</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.smcu_fw_version:</span> <span class="pre">16&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.smcu_fw_version" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.usb_type_descriptor">
-<span class="sig-name descname"><span class="pre">usb_type_descriptor</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.usb_type_descriptor:</span> <span class="pre">9&gt;</span></em><a class="headerlink" href="#pyrealsense2.camera_info.usb_type_descriptor" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">usb_type_descriptor</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;camera_info.usb_type_descriptor:</span> <span class="pre">9&gt;</span></span><a class="headerlink" href="#pyrealsense2.camera_info.usb_type_descriptor" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="pyrealsense2.camera_info.value">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#pyrealsense2.camera_info.value" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#pyrealsense2.camera_info.value" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
@@ -239,6 +257,7 @@
 <li><a class="reference internal" href="#pyrealsense2.camera_info.dfu_device_path"><code class="docutils literal notranslate"><span class="pre">camera_info.dfu_device_path</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.camera_info.firmware_update_id"><code class="docutils literal notranslate"><span class="pre">camera_info.firmware_update_id</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.camera_info.firmware_version"><code class="docutils literal notranslate"><span class="pre">camera_info.firmware_version</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.camera_info.imu_type"><code class="docutils literal notranslate"><span class="pre">camera_info.imu_type</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.camera_info.ip_address"><code class="docutils literal notranslate"><span class="pre">camera_info.ip_address</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.camera_info.name"><code class="docutils literal notranslate"><span class="pre">camera_info.name</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.camera_info.physical_port"><code class="docutils literal notranslate"><span class="pre">camera_info.physical_port</span></code></a></li>
@@ -246,6 +265,7 @@
 <li><a class="reference internal" href="#pyrealsense2.camera_info.product_line"><code class="docutils literal notranslate"><span class="pre">camera_info.product_line</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.camera_info.recommended_firmware_version"><code class="docutils literal notranslate"><span class="pre">camera_info.recommended_firmware_version</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.camera_info.serial_number"><code class="docutils literal notranslate"><span class="pre">camera_info.serial_number</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.camera_info.smcu_fw_version"><code class="docutils literal notranslate"><span class="pre">camera_info.smcu_fw_version</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.camera_info.usb_type_descriptor"><code class="docutils literal notranslate"><span class="pre">camera_info.usb_type_descriptor</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.camera_info.value"><code class="docutils literal notranslate"><span class="pre">camera_info.value</span></code></a></li>
 </ul>
@@ -285,13 +305,13 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.56.5 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.camera_info</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2024, Intel Realsense Team.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.0.4.
     </div>
   </body>
 </html>

@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.14"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Intel® RealSense™ Cross Platform API: rs2::device Class Reference</title>
+<title>RealSense Cross Platform API: rs2::device Class Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -18,9 +18,9 @@
  <tbody>
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
-   <div id="projectname">Intel® RealSense™ Cross Platform API
+   <div id="projectname">RealSense Cross Platform API
    </div>
-   <div id="projectbrief">Intel Realsense Cross-platform API</div>
+   <div id="projectbrief">RealSense Cross-platform API</div>
   </td>
  </tr>
  </tbody>
@@ -63,13 +63,14 @@ Inheritance diagram for rs2::device:</div>
 <area href="classrs2_1_1calibrated__device.html" alt="rs2::calibrated_device" shape="rect" coords="199,56,388,80"/>
 <area href="classrs2_1_1calibration__change__device.html" alt="rs2::calibration_change_device" shape="rect" coords="199,112,388,136"/>
 <area href="classrs2_1_1debug__protocol.html" alt="rs2::debug_protocol" shape="rect" coords="199,168,388,192"/>
-<area href="classrs2_1_1firmware__logger.html" alt="rs2::firmware_logger" shape="rect" coords="199,224,388,248"/>
-<area href="classrs2_1_1playback.html" alt="rs2::playback" shape="rect" coords="199,280,388,304"/>
-<area href="classrs2_1_1recorder.html" alt="rs2::recorder" shape="rect" coords="199,336,388,360"/>
-<area href="classrs2_1_1serializable__device.html" alt="rs2::serializable_device" shape="rect" coords="199,392,388,416"/>
-<area href="classrs2_1_1software__device.html" alt="rs2::software_device" shape="rect" coords="199,448,388,472"/>
-<area href="classrs2_1_1updatable.html" alt="rs2::updatable" shape="rect" coords="199,504,388,528"/>
-<area href="classrs2_1_1update__device.html" alt="rs2::update_device" shape="rect" coords="199,560,388,584"/>
+<area href="classrs2_1_1eth__config__device.html" title="Ethernet configuration extension for devices that support ethernet configuration. ..." alt="rs2::eth_config_device" shape="rect" coords="199,224,388,248"/>
+<area href="classrs2_1_1firmware__logger.html" alt="rs2::firmware_logger" shape="rect" coords="199,280,388,304"/>
+<area href="classrs2_1_1playback.html" alt="rs2::playback" shape="rect" coords="199,336,388,360"/>
+<area href="classrs2_1_1recorder.html" alt="rs2::recorder" shape="rect" coords="199,392,388,416"/>
+<area href="classrs2_1_1serializable__device.html" alt="rs2::serializable_device" shape="rect" coords="199,448,388,472"/>
+<area href="classrs2_1_1software__device.html" alt="rs2::software_device" shape="rect" coords="199,504,388,528"/>
+<area href="classrs2_1_1updatable.html" alt="rs2::updatable" shape="rect" coords="199,560,388,584"/>
+<area href="classrs2_1_1update__device.html" alt="rs2::update_device" shape="rect" coords="199,616,388,640"/>
 </map>
  </div></div>
 <table class="memberdecls">
@@ -90,6 +91,8 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:a15e4c3da5e37e42a3e8721e018eb418d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a16354267951fae7816da7ee8ce58141f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1device.html#a16354267951fae7816da7ee8ce58141f">hardware_reset</a> ()</td></tr>
 <tr class="separator:a16354267951fae7816da7ee8ce58141f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aab90ad91fe37278faa5e2a1835c4c9d8"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1device.html#aab90ad91fe37278faa5e2a1835c4c9d8">is_in_recovery_mode</a> ()</td></tr>
+<tr class="separator:aab90ad91fe37278faa5e2a1835c4c9d8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acd3dd84c4a678efd0337233683433523"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classrs2_1_1device.html">device</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1device.html#acd3dd84c4a678efd0337233683433523">operator=</a> (const std::shared_ptr&lt; <a class="el" href="rs__types_8h.html#a6b12b0e578c567223a99b0c0f2b67a25">rs2_device</a> &gt; dev)</td></tr>
 <tr class="separator:acd3dd84c4a678efd0337233683433523"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a64271f278e0ea4aa3c6aa8515a5b4352"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classrs2_1_1device.html">device</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1device.html#a64271f278e0ea4aa3c6aa8515a5b4352">operator=</a> (const <a class="el" href="classrs2_1_1device.html">device</a> &amp;dev)</td></tr>
@@ -450,6 +453,32 @@ template&lt;class T &gt; </div>
   </tr>
 </table>
 </div><div class="memdoc">
+
+</div>
+</div>
+<a id="aab90ad91fe37278faa5e2a1835c4c9d8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aab90ad91fe37278faa5e2a1835c4c9d8">&#9670;&nbsp;</a></span>is_in_recovery_mode()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool rs2::device::is_in_recovery_mode </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Find if a camera is in recovery mode </p>
 
 </div>
 </div>

@@ -33,6 +33,7 @@ pyrealsense2.camera_info
       ~camera_info.dfu_device_path
       ~camera_info.firmware_update_id
       ~camera_info.firmware_version
+      ~camera_info.imu_type
       ~camera_info.ip_address
       ~camera_info.name
       ~camera_info.physical_port
@@ -40,6 +41,7 @@ pyrealsense2.camera_info
       ~camera_info.product_line
       ~camera_info.recommended_firmware_version
       ~camera_info.serial_number
+      ~camera_info.smcu_fw_version
       ~camera_info.usb_type_descriptor
       ~camera_info.value
    

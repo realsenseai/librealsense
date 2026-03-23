@@ -1,0 +1,67 @@
+pyrealsense2.labeled_points
+===========================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: labeled_points
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~labeled_points.__init__
+      ~labeled_points.as_depth_frame
+      ~labeled_points.as_frame
+      ~labeled_points.as_frameset
+      ~labeled_points.as_labeled_points
+      ~labeled_points.as_motion_frame
+      ~labeled_points.as_points
+      ~labeled_points.as_pose_frame
+      ~labeled_points.as_video_frame
+      ~labeled_points.get_bpp
+      ~labeled_points.get_data
+      ~labeled_points.get_data_size
+      ~labeled_points.get_frame_metadata
+      ~labeled_points.get_frame_number
+      ~labeled_points.get_frame_timestamp_domain
+      ~labeled_points.get_height
+      ~labeled_points.get_labels
+      ~labeled_points.get_profile
+      ~labeled_points.get_timestamp
+      ~labeled_points.get_vertices
+      ~labeled_points.get_width
+      ~labeled_points.is_depth_frame
+      ~labeled_points.is_frame
+      ~labeled_points.is_frameset
+      ~labeled_points.is_labeled_points
+      ~labeled_points.is_motion_frame
+      ~labeled_points.is_points
+      ~labeled_points.is_pose_frame
+      ~labeled_points.is_video_frame
+      ~labeled_points.keep
+      ~labeled_points.supports_frame_metadata
+      ~labeled_points.swap
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~labeled_points.data
+      ~labeled_points.frame_number
+      ~labeled_points.frame_timestamp_domain
+      ~labeled_points.height
+      ~labeled_points.profile
+      ~labeled_points.timestamp
+      ~labeled_points.width
+   
+   

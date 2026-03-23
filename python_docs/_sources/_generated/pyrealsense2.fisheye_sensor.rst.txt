@@ -24,10 +24,14 @@ pyrealsense2.fisheye_sensor
       ~fisheye_sensor.as_motion_sensor
       ~fisheye_sensor.as_pose_sensor
       ~fisheye_sensor.as_roi_sensor
+      ~fisheye_sensor.as_safety_sensor
       ~fisheye_sensor.as_wheel_odometer
       ~fisheye_sensor.close
       ~fisheye_sensor.from_frame
       ~fisheye_sensor.get_active_streams
+      ~fisheye_sensor.get_embedded_decimation_filter
+      ~fisheye_sensor.get_embedded_filter
+      ~fisheye_sensor.get_embedded_temporal_filter
       ~fisheye_sensor.get_info
       ~fisheye_sensor.get_option
       ~fisheye_sensor.get_option_description
@@ -46,9 +50,11 @@ pyrealsense2.fisheye_sensor
       ~fisheye_sensor.is_option_read_only
       ~fisheye_sensor.is_pose_sensor
       ~fisheye_sensor.is_roi_sensor
+      ~fisheye_sensor.is_safety_sensor
       ~fisheye_sensor.is_wheel_odometer
       ~fisheye_sensor.on_options_changed
       ~fisheye_sensor.open
+      ~fisheye_sensor.query_embedded_filters
       ~fisheye_sensor.set_notifications_callback
       ~fisheye_sensor.set_option
       ~fisheye_sensor.set_option_value

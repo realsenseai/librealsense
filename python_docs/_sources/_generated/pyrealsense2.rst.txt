@@ -21,6 +21,7 @@
       rs2_project_color_pixel_to_depth_pixel
       rs2_project_point_to_pixel
       rs2_transform_point_to_point
+      supports_eth_config
    
    
    
@@ -49,6 +50,7 @@
       STSloPenaltyControl
       align
       auto_calibrated_device
+      calib_location
       calib_target_type
       calibration_change_device
       calibration_status
@@ -60,6 +62,7 @@
       composite_frame
       config
       context
+      d500_intercam_sync_mode
       debug_protocol
       debug_stream_sensor
       decimation_filter
@@ -68,10 +71,16 @@
       depth_stereo_sensor
       device
       device_calibration
+      device_hub
       device_list
       disparity_frame
       disparity_transform
       distortion
+      embedded_decimation_filter
+      embedded_filter
+      embedded_filter_type
+      embedded_temporal_filter
+      eth_config_device
       event_information
       extension
       extrinsics
@@ -89,7 +98,10 @@
       hdr_merge
       hole_filling_filter
       intrinsics
+      ip_address
       l500_visual_preset
+      labeled_points
+      link_priority
       log_message
       log_severity
       matchers
@@ -128,6 +140,8 @@
       rotation_filter
       rs400_advanced_mode
       rs400_visual_preset
+      safety_mode
+      safety_sensor
       save_single_frameset
       save_to_ply
       sensor

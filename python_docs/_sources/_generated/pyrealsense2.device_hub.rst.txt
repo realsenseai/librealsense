@@ -1,0 +1,26 @@
+pyrealsense2.device_hub
+=======================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: device_hub
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~device_hub.__init__
+      ~device_hub.is_connected
+      ~device_hub.wait_for_device
+   
+   
+   
+   
+   
+   

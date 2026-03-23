@@ -31,6 +31,7 @@ pyrealsense2.recorder
       ~recorder.first_motion_sensor
       ~recorder.first_pose_sensor
       ~recorder.first_roi_sensor
+      ~recorder.first_safety_sensor
       ~recorder.get_info
       ~recorder.hardware_reset
       ~recorder.is_auto_calibrated_device
@@ -39,6 +40,7 @@ pyrealsense2.recorder
       ~recorder.is_debug_protocol
       ~recorder.is_device_calibration
       ~recorder.is_firmware_logger
+      ~recorder.is_in_recovery_mode
       ~recorder.is_metadata_enabled
       ~recorder.is_playback
       ~recorder.is_recorder

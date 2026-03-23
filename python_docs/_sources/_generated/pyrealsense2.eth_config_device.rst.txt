@@ -1,0 +1,85 @@
+pyrealsense2.eth_config_device
+==============================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: eth_config_device
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~eth_config_device.__init__
+      ~eth_config_device.as_auto_calibrated_device
+      ~eth_config_device.as_calibration_change_device
+      ~eth_config_device.as_debug_protocol
+      ~eth_config_device.as_device_calibration
+      ~eth_config_device.as_firmware_logger
+      ~eth_config_device.as_playback
+      ~eth_config_device.as_recorder
+      ~eth_config_device.as_updatable
+      ~eth_config_device.as_update_device
+      ~eth_config_device.first_color_sensor
+      ~eth_config_device.first_depth_sensor
+      ~eth_config_device.first_fisheye_sensor
+      ~eth_config_device.first_motion_sensor
+      ~eth_config_device.first_pose_sensor
+      ~eth_config_device.first_roi_sensor
+      ~eth_config_device.first_safety_sensor
+      ~eth_config_device.get_dds_domain
+      ~eth_config_device.get_dhcp_config
+      ~eth_config_device.get_gateway
+      ~eth_config_device.get_info
+      ~eth_config_device.get_ip_address
+      ~eth_config_device.get_link_priority
+      ~eth_config_device.get_link_speed
+      ~eth_config_device.get_link_timeout
+      ~eth_config_device.get_mtu
+      ~eth_config_device.get_netmask
+      ~eth_config_device.get_transmission_delay
+      ~eth_config_device.get_udp_ttl
+      ~eth_config_device.hardware_reset
+      ~eth_config_device.is_auto_calibrated_device
+      ~eth_config_device.is_calibration_change_device
+      ~eth_config_device.is_connected
+      ~eth_config_device.is_debug_protocol
+      ~eth_config_device.is_device_calibration
+      ~eth_config_device.is_firmware_logger
+      ~eth_config_device.is_in_recovery_mode
+      ~eth_config_device.is_metadata_enabled
+      ~eth_config_device.is_playback
+      ~eth_config_device.is_recorder
+      ~eth_config_device.is_updatable
+      ~eth_config_device.is_update_device
+      ~eth_config_device.query_sensors
+      ~eth_config_device.restore_defaults
+      ~eth_config_device.set_dds_domain
+      ~eth_config_device.set_dhcp_config
+      ~eth_config_device.set_gateway
+      ~eth_config_device.set_ip_address
+      ~eth_config_device.set_link_priority
+      ~eth_config_device.set_link_timeout
+      ~eth_config_device.set_mtu
+      ~eth_config_device.set_netmask
+      ~eth_config_device.set_transmission_delay
+      ~eth_config_device.set_udp_ttl
+      ~eth_config_device.supports
+      ~eth_config_device.supports_eth_config
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~eth_config_device.sensors
+   
+   

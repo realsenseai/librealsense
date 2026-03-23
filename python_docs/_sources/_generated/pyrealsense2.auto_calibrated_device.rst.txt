@@ -32,6 +32,7 @@ pyrealsense2.auto_calibrated_device
       ~auto_calibrated_device.first_motion_sensor
       ~auto_calibrated_device.first_pose_sensor
       ~auto_calibrated_device.first_roi_sensor
+      ~auto_calibrated_device.first_safety_sensor
       ~auto_calibrated_device.get_calibration_config
       ~auto_calibrated_device.get_calibration_table
       ~auto_calibrated_device.get_info
@@ -42,6 +43,7 @@ pyrealsense2.auto_calibrated_device
       ~auto_calibrated_device.is_debug_protocol
       ~auto_calibrated_device.is_device_calibration
       ~auto_calibrated_device.is_firmware_logger
+      ~auto_calibrated_device.is_in_recovery_mode
       ~auto_calibrated_device.is_metadata_enabled
       ~auto_calibrated_device.is_playback
       ~auto_calibrated_device.is_recorder

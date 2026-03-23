@@ -1,0 +1,82 @@
+pyrealsense2.safety_sensor
+==========================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: safety_sensor
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~safety_sensor.__init__
+      ~safety_sensor.as_color_sensor
+      ~safety_sensor.as_debug_stream_sensor
+      ~safety_sensor.as_depth_sensor
+      ~safety_sensor.as_fisheye_sensor
+      ~safety_sensor.as_max_usable_range_sensor
+      ~safety_sensor.as_motion_sensor
+      ~safety_sensor.as_pose_sensor
+      ~safety_sensor.as_roi_sensor
+      ~safety_sensor.as_safety_sensor
+      ~safety_sensor.as_wheel_odometer
+      ~safety_sensor.close
+      ~safety_sensor.from_frame
+      ~safety_sensor.get_active_streams
+      ~safety_sensor.get_application_config
+      ~safety_sensor.get_embedded_decimation_filter
+      ~safety_sensor.get_embedded_filter
+      ~safety_sensor.get_embedded_temporal_filter
+      ~safety_sensor.get_info
+      ~safety_sensor.get_option
+      ~safety_sensor.get_option_description
+      ~safety_sensor.get_option_range
+      ~safety_sensor.get_option_value
+      ~safety_sensor.get_option_value_description
+      ~safety_sensor.get_recommended_filters
+      ~safety_sensor.get_safety_interface_config
+      ~safety_sensor.get_safety_preset
+      ~safety_sensor.get_stream_profiles
+      ~safety_sensor.get_supported_options
+      ~safety_sensor.is_color_sensor
+      ~safety_sensor.is_debug_stream_sensor
+      ~safety_sensor.is_depth_sensor
+      ~safety_sensor.is_fisheye_sensor
+      ~safety_sensor.is_max_usable_range_sensor
+      ~safety_sensor.is_motion_sensor
+      ~safety_sensor.is_option_read_only
+      ~safety_sensor.is_pose_sensor
+      ~safety_sensor.is_roi_sensor
+      ~safety_sensor.is_safety_sensor
+      ~safety_sensor.is_wheel_odometer
+      ~safety_sensor.on_options_changed
+      ~safety_sensor.open
+      ~safety_sensor.query_embedded_filters
+      ~safety_sensor.set_application_config
+      ~safety_sensor.set_notifications_callback
+      ~safety_sensor.set_option
+      ~safety_sensor.set_option_value
+      ~safety_sensor.set_safety_interface_config
+      ~safety_sensor.set_safety_preset
+      ~safety_sensor.start
+      ~safety_sensor.stop
+      ~safety_sensor.supports
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~safety_sensor.name
+      ~safety_sensor.profiles
+   
+   

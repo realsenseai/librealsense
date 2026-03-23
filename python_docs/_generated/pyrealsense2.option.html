@@ -5,13 +5,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.option &#8212; pyrealsense2 2.56.5 documentation</title>
+    <title>pyrealsense2.option &#8212; pyrealsense2 2.57.7 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=8b0ddf77"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/documentation_options.js?v=69589b5d"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" /> 
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.56.5 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.option</a></li> 
       </ul>
     </div>  
@@ -39,7 +39,7 @@
 <h1>pyrealsense2.option<a class="headerlink" href="#pyrealsense2-option" title="Link to this heading">¶</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="pyrealsense2.option">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyrealsense2.</span></span><span class="sig-name descname"><span class="pre">option</span></span><a class="headerlink" href="#pyrealsense2.option" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">pyrealsense2.</span></span><span class="sig-name descname"><span class="pre">option</span></span><a class="headerlink" href="#pyrealsense2.option" title="Link to this definition">¶</a></dt>
 <dd><p>Defines general configuration controls. These can generally be mapped to camera UVC controls, and can be set / queried at any time unless stated otherwise.</p>
 <p>Members:</p>
 <blockquote>
@@ -143,6 +143,12 @@
 <p>gyro_sensitivity</p>
 <p>region_of_interest</p>
 <p>rotation</p>
+<p>safety_preset_active_index</p>
+<p>safety_mode</p>
+<p>rgb_tnr_enabled</p>
+<p>safety_mcu_temperature</p>
+<p>left_ir_temperature</p>
+<p>embedded_filter_enabled</p>
 <p>unknown</p>
 <p>ambient_light</p>
 <p>lld_temperature</p>
@@ -226,121 +232,127 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.digital_gain" title="pyrealsense2.option.digital_gain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">digital_gain</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.emitter_always_on" title="pyrealsense2.option.emitter_always_on"><code class="xref py py-obj docutils literal notranslate"><span class="pre">emitter_always_on</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.embedded_filter_enabled" title="pyrealsense2.option.embedded_filter_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">embedded_filter_enabled</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.emitter_enabled" title="pyrealsense2.option.emitter_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">emitter_enabled</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.emitter_always_on" title="pyrealsense2.option.emitter_always_on"><code class="xref py py-obj docutils literal notranslate"><span class="pre">emitter_always_on</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.emitter_frequency" title="pyrealsense2.option.emitter_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">emitter_frequency</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.emitter_enabled" title="pyrealsense2.option.emitter_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">emitter_enabled</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.emitter_on_off" title="pyrealsense2.option.emitter_on_off"><code class="xref py py-obj docutils literal notranslate"><span class="pre">emitter_on_off</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.emitter_frequency" title="pyrealsense2.option.emitter_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">emitter_frequency</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_auto_exposure" title="pyrealsense2.option.enable_auto_exposure"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_auto_exposure</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.emitter_on_off" title="pyrealsense2.option.emitter_on_off"><code class="xref py py-obj docutils literal notranslate"><span class="pre">emitter_on_off</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_auto_white_balance" title="pyrealsense2.option.enable_auto_white_balance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_auto_white_balance</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_auto_exposure" title="pyrealsense2.option.enable_auto_exposure"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_auto_exposure</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_dynamic_calibration" title="pyrealsense2.option.enable_dynamic_calibration"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_dynamic_calibration</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_auto_white_balance" title="pyrealsense2.option.enable_auto_white_balance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_auto_white_balance</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_ir_reflectivity" title="pyrealsense2.option.enable_ir_reflectivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_ir_reflectivity</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_dynamic_calibration" title="pyrealsense2.option.enable_dynamic_calibration"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_dynamic_calibration</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_map_preservation" title="pyrealsense2.option.enable_map_preservation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_map_preservation</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_ir_reflectivity" title="pyrealsense2.option.enable_ir_reflectivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_ir_reflectivity</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_mapping" title="pyrealsense2.option.enable_mapping"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_mapping</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_map_preservation" title="pyrealsense2.option.enable_map_preservation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_map_preservation</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_max_usable_range" title="pyrealsense2.option.enable_max_usable_range"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_max_usable_range</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_mapping" title="pyrealsense2.option.enable_mapping"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_mapping</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_motion_correction" title="pyrealsense2.option.enable_motion_correction"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_motion_correction</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_max_usable_range" title="pyrealsense2.option.enable_max_usable_range"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_max_usable_range</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_pose_jumping" title="pyrealsense2.option.enable_pose_jumping"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_pose_jumping</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_motion_correction" title="pyrealsense2.option.enable_motion_correction"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_motion_correction</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_relocalization" title="pyrealsense2.option.enable_relocalization"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_relocalization</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_pose_jumping" title="pyrealsense2.option.enable_pose_jumping"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_pose_jumping</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.error_polling_enabled" title="pyrealsense2.option.error_polling_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">error_polling_enabled</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.enable_relocalization" title="pyrealsense2.option.enable_relocalization"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_relocalization</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.exposure" title="pyrealsense2.option.exposure"><code class="xref py py-obj docutils literal notranslate"><span class="pre">exposure</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.error_polling_enabled" title="pyrealsense2.option.error_polling_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">error_polling_enabled</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.filter_magnitude" title="pyrealsense2.option.filter_magnitude"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_magnitude</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.exposure" title="pyrealsense2.option.exposure"><code class="xref py py-obj docutils literal notranslate"><span class="pre">exposure</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.filter_option" title="pyrealsense2.option.filter_option"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_option</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.filter_magnitude" title="pyrealsense2.option.filter_magnitude"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_magnitude</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.filter_smooth_alpha" title="pyrealsense2.option.filter_smooth_alpha"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_smooth_alpha</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.filter_option" title="pyrealsense2.option.filter_option"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_option</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.filter_smooth_delta" title="pyrealsense2.option.filter_smooth_delta"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_smooth_delta</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.filter_smooth_alpha" title="pyrealsense2.option.filter_smooth_alpha"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_smooth_alpha</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.fisheye_auto_exposure_mode" title="pyrealsense2.option.fisheye_auto_exposure_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fisheye_auto_exposure_mode</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.filter_smooth_delta" title="pyrealsense2.option.filter_smooth_delta"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_smooth_delta</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.frames_queue_size" title="pyrealsense2.option.frames_queue_size"><code class="xref py py-obj docutils literal notranslate"><span class="pre">frames_queue_size</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.fisheye_auto_exposure_mode" title="pyrealsense2.option.fisheye_auto_exposure_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fisheye_auto_exposure_mode</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.freefall_detection_enabled" title="pyrealsense2.option.freefall_detection_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">freefall_detection_enabled</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.frames_queue_size" title="pyrealsense2.option.frames_queue_size"><code class="xref py py-obj docutils literal notranslate"><span class="pre">frames_queue_size</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.gain" title="pyrealsense2.option.gain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gain</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.freefall_detection_enabled" title="pyrealsense2.option.freefall_detection_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">freefall_detection_enabled</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.gamma" title="pyrealsense2.option.gamma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gamma</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.gain" title="pyrealsense2.option.gain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gain</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.global_time_enabled" title="pyrealsense2.option.global_time_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">global_time_enabled</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.gamma" title="pyrealsense2.option.gamma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gamma</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.gyro_sensitivity" title="pyrealsense2.option.gyro_sensitivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gyro_sensitivity</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.global_time_enabled" title="pyrealsense2.option.global_time_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">global_time_enabled</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.hardware_preset" title="pyrealsense2.option.hardware_preset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hardware_preset</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.gyro_sensitivity" title="pyrealsense2.option.gyro_sensitivity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gyro_sensitivity</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.hdr_enabled" title="pyrealsense2.option.hdr_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hdr_enabled</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.hardware_preset" title="pyrealsense2.option.hardware_preset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hardware_preset</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.histogram_equalization_enabled" title="pyrealsense2.option.histogram_equalization_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">histogram_equalization_enabled</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.hdr_enabled" title="pyrealsense2.option.hdr_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hdr_enabled</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.holes_fill" title="pyrealsense2.option.holes_fill"><code class="xref py py-obj docutils literal notranslate"><span class="pre">holes_fill</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.histogram_equalization_enabled" title="pyrealsense2.option.histogram_equalization_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">histogram_equalization_enabled</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.host_performance" title="pyrealsense2.option.host_performance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">host_performance</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.holes_fill" title="pyrealsense2.option.holes_fill"><code class="xref py py-obj docutils literal notranslate"><span class="pre">holes_fill</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.hue" title="pyrealsense2.option.hue"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hue</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.host_performance" title="pyrealsense2.option.host_performance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">host_performance</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.humidity_temperature" title="pyrealsense2.option.humidity_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">humidity_temperature</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.hue" title="pyrealsense2.option.hue"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hue</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.inter_cam_sync_mode" title="pyrealsense2.option.inter_cam_sync_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inter_cam_sync_mode</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.humidity_temperature" title="pyrealsense2.option.humidity_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">humidity_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.invalidation_bypass" title="pyrealsense2.option.invalidation_bypass"><code class="xref py py-obj docutils literal notranslate"><span class="pre">invalidation_bypass</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.inter_cam_sync_mode" title="pyrealsense2.option.inter_cam_sync_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inter_cam_sync_mode</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.laser_power" title="pyrealsense2.option.laser_power"><code class="xref py py-obj docutils literal notranslate"><span class="pre">laser_power</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.invalidation_bypass" title="pyrealsense2.option.invalidation_bypass"><code class="xref py py-obj docutils literal notranslate"><span class="pre">invalidation_bypass</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.ldd_temperature" title="pyrealsense2.option.ldd_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ldd_temperature</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.laser_power" title="pyrealsense2.option.laser_power"><code class="xref py py-obj docutils literal notranslate"><span class="pre">laser_power</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.led_power" title="pyrealsense2.option.led_power"><code class="xref py py-obj docutils literal notranslate"><span class="pre">led_power</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.ldd_temperature" title="pyrealsense2.option.ldd_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ldd_temperature</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.led_power" title="pyrealsense2.option.led_power"><code class="xref py py-obj docutils literal notranslate"><span class="pre">led_power</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.left_ir_temperature" title="pyrealsense2.option.left_ir_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">left_ir_temperature</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.lld_temperature" title="pyrealsense2.option.lld_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">lld_temperature</span></code></a></p></td>
@@ -364,7 +376,7 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.motion_range" title="pyrealsense2.option.motion_range"><code class="xref py py-obj docutils literal notranslate"><span class="pre">motion_range</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.name" title="pyrealsense2.option.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code></a></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code>(-&gt; str)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.noise_estimation" title="pyrealsense2.option.noise_estimation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">noise_estimation</span></code></a></p></td>
@@ -403,7 +415,19 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.reset_camera_accuracy_health" title="pyrealsense2.option.reset_camera_accuracy_health"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reset_camera_accuracy_health</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.rotation" title="pyrealsense2.option.rotation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rotation</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.rgb_tnr_enabled" title="pyrealsense2.option.rgb_tnr_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rgb_tnr_enabled</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.rotation" title="pyrealsense2.option.rotation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rotation</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.safety_mcu_temperature" title="pyrealsense2.option.safety_mcu_temperature"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_mcu_temperature</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.safety_mode" title="pyrealsense2.option.safety_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_mode</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.option.safety_preset_active_index" title="pyrealsense2.option.safety_preset_active_index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_preset_active_index</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.option.saturation" title="pyrealsense2.option.saturation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">saturation</span></code></a></p></td>
@@ -482,527 +506,557 @@
 </table>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.accuracy">
-<span class="sig-name descname"><span class="pre">accuracy</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">14</span> <span class="pre">'Accuracy'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.accuracy" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">accuracy</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">14</span> <span class="pre">'Accuracy'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.accuracy" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.alternate_ir">
-<span class="sig-name descname"><span class="pre">alternate_ir</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">82</span> <span class="pre">'Alternate</span> <span class="pre">IR'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.alternate_ir" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">alternate_ir</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">82</span> <span class="pre">'Alternate</span> <span class="pre">IR'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.alternate_ir" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.ambient_light">
-<span class="sig-name descname"><span class="pre">ambient_light</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">69</span> <span class="pre">'Digital</span> <span class="pre">Gain'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.ambient_light" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">ambient_light</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">69</span> <span class="pre">'Digital</span> <span class="pre">Gain'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.ambient_light" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.apd_temperature">
-<span class="sig-name descname"><span class="pre">apd_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">54</span> <span class="pre">'Apd</span> <span class="pre">Temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.apd_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">apd_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">54</span> <span class="pre">'Apd</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.apd_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.asic_temperature">
-<span class="sig-name descname"><span class="pre">asic_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">23</span> <span class="pre">'Asic</span> <span class="pre">Temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.asic_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">asic_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">23</span> <span class="pre">'Asic</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.asic_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.auto_exposure_converge_step">
-<span class="sig-name descname"><span class="pre">auto_exposure_converge_step</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">41</span> <span class="pre">'Auto</span> <span class="pre">Exposure</span> <span class="pre">Converge</span> <span class="pre">Step'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.auto_exposure_converge_step" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">auto_exposure_converge_step</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">41</span> <span class="pre">'Auto</span> <span class="pre">Exposure</span> <span class="pre">Converge</span> <span class="pre">Step'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.auto_exposure_converge_step" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.auto_exposure_limit">
-<span class="sig-name descname"><span class="pre">auto_exposure_limit</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">85</span> <span class="pre">'Auto</span> <span class="pre">Exposure</span> <span class="pre">Limit'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.auto_exposure_limit" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">auto_exposure_limit</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">85</span> <span class="pre">'Auto</span> <span class="pre">Exposure</span> <span class="pre">Limit'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.auto_exposure_limit" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.auto_exposure_limit_toggle">
-<span class="sig-name descname"><span class="pre">auto_exposure_limit_toggle</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">91</span> <span class="pre">'Auto</span> <span class="pre">Exposure</span> <span class="pre">Limit</span> <span class="pre">Toggle'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.auto_exposure_limit_toggle" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">auto_exposure_limit_toggle</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">91</span> <span class="pre">'Auto</span> <span class="pre">Exposure</span> <span class="pre">Limit</span> <span class="pre">Toggle'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.auto_exposure_limit_toggle" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.auto_exposure_mode">
-<span class="sig-name descname"><span class="pre">auto_exposure_mode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">94</span> <span class="pre">'Auto</span> <span class="pre">Exposure</span> <span class="pre">Mode'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.auto_exposure_mode" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">auto_exposure_mode</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">94</span> <span class="pre">'Auto</span> <span class="pre">Exposure</span> <span class="pre">Mode'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.auto_exposure_mode" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.auto_exposure_priority">
-<span class="sig-name descname"><span class="pre">auto_exposure_priority</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">30</span> <span class="pre">'Auto</span> <span class="pre">Exposure</span> <span class="pre">Priority'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.auto_exposure_priority" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">auto_exposure_priority</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">30</span> <span class="pre">'Auto</span> <span class="pre">Exposure</span> <span class="pre">Priority'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.auto_exposure_priority" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.auto_gain_limit">
-<span class="sig-name descname"><span class="pre">auto_gain_limit</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">86</span> <span class="pre">'Auto</span> <span class="pre">Gain</span> <span class="pre">Limit'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.auto_gain_limit" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">auto_gain_limit</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">86</span> <span class="pre">'Auto</span> <span class="pre">Gain</span> <span class="pre">Limit'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.auto_gain_limit" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.auto_gain_limit_toggle">
-<span class="sig-name descname"><span class="pre">auto_gain_limit_toggle</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">92</span> <span class="pre">'Auto</span> <span class="pre">Gain</span> <span class="pre">Limit</span> <span class="pre">Toggle'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.auto_gain_limit_toggle" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">auto_gain_limit_toggle</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">92</span> <span class="pre">'Auto</span> <span class="pre">Gain</span> <span class="pre">Limit</span> <span class="pre">Toggle'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.auto_gain_limit_toggle" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.auto_rx_sensitivity">
-<span class="sig-name descname"><span class="pre">auto_rx_sensitivity</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">87</span> <span class="pre">'Auto</span> <span class="pre">Rx</span> <span class="pre">Sensitivity'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.auto_rx_sensitivity" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">auto_rx_sensitivity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">87</span> <span class="pre">'Auto</span> <span class="pre">Rx</span> <span class="pre">Sensitivity'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.auto_rx_sensitivity" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.backlight_compensation">
-<span class="sig-name descname"><span class="pre">backlight_compensation</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">0</span> <span class="pre">'Backlight</span> <span class="pre">Compensation'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.backlight_compensation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">backlight_compensation</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">0</span> <span class="pre">'Backlight</span> <span class="pre">Compensation'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.backlight_compensation" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.brightness">
-<span class="sig-name descname"><span class="pre">brightness</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">1</span> <span class="pre">'Brightness'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.brightness" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">brightness</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">1</span> <span class="pre">'Brightness'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.brightness" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.color_scheme">
-<span class="sig-name descname"><span class="pre">color_scheme</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">31</span> <span class="pre">'Color</span> <span class="pre">Scheme'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.color_scheme" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">color_scheme</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">31</span> <span class="pre">'Color</span> <span class="pre">Scheme'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.color_scheme" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.confidence_threshold">
-<span class="sig-name descname"><span class="pre">confidence_threshold</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">17</span> <span class="pre">'Confidence</span> <span class="pre">Threshold'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.confidence_threshold" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">confidence_threshold</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">17</span> <span class="pre">'Confidence</span> <span class="pre">Threshold'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.confidence_threshold" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.contrast">
-<span class="sig-name descname"><span class="pre">contrast</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">2</span> <span class="pre">'Contrast'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.contrast" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">contrast</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">2</span> <span class="pre">'Contrast'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.contrast" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.depth_offset">
-<span class="sig-name descname"><span class="pre">depth_offset</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">59</span> <span class="pre">'Depth</span> <span class="pre">Offset'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.depth_offset" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">depth_offset</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">59</span> <span class="pre">'Depth</span> <span class="pre">Offset'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.depth_offset" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.depth_units">
-<span class="sig-name descname"><span class="pre">depth_units</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">28</span> <span class="pre">'Depth</span> <span class="pre">Units'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.depth_units" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">depth_units</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">28</span> <span class="pre">'Depth</span> <span class="pre">Units'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.depth_units" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.digital_gain">
-<span class="sig-name descname"><span class="pre">digital_gain</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">69</span> <span class="pre">'Digital</span> <span class="pre">Gain'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.digital_gain" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">digital_gain</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">69</span> <span class="pre">'Digital</span> <span class="pre">Gain'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.digital_gain" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.embedded_filter_enabled">
+<span class="sig-name descname"><span class="pre">embedded_filter_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">105</span> <span class="pre">'Embedded</span> <span class="pre">Filter</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.embedded_filter_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.emitter_always_on">
-<span class="sig-name descname"><span class="pre">emitter_always_on</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">71</span> <span class="pre">'Emitter</span> <span class="pre">Always</span> <span class="pre">On'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.emitter_always_on" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">emitter_always_on</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">71</span> <span class="pre">'Emitter</span> <span class="pre">Always</span> <span class="pre">On'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.emitter_always_on" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.emitter_enabled">
-<span class="sig-name descname"><span class="pre">emitter_enabled</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">18</span> <span class="pre">'Emitter</span> <span class="pre">Enabled'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.emitter_enabled" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">emitter_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">18</span> <span class="pre">'Emitter</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.emitter_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.emitter_frequency">
-<span class="sig-name descname"><span class="pre">emitter_frequency</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">93</span> <span class="pre">'Emitter</span> <span class="pre">Frequency'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.emitter_frequency" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">emitter_frequency</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">93</span> <span class="pre">'Emitter</span> <span class="pre">Frequency'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.emitter_frequency" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.emitter_on_off">
-<span class="sig-name descname"><span class="pre">emitter_on_off</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">46</span> <span class="pre">'Emitter</span> <span class="pre">On</span> <span class="pre">Off'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.emitter_on_off" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">emitter_on_off</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">46</span> <span class="pre">'Emitter</span> <span class="pre">On</span> <span class="pre">Off'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.emitter_on_off" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.enable_auto_exposure">
-<span class="sig-name descname"><span class="pre">enable_auto_exposure</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">10</span> <span class="pre">'Enable</span> <span class="pre">Auto</span> <span class="pre">Exposure'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.enable_auto_exposure" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">enable_auto_exposure</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">10</span> <span class="pre">'Enable</span> <span class="pre">Auto</span> <span class="pre">Exposure'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.enable_auto_exposure" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.enable_auto_white_balance">
-<span class="sig-name descname"><span class="pre">enable_auto_white_balance</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">11</span> <span class="pre">'Enable</span> <span class="pre">Auto</span> <span class="pre">White</span> <span class="pre">Balance'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.enable_auto_white_balance" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">enable_auto_white_balance</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">11</span> <span class="pre">'Enable</span> <span class="pre">Auto</span> <span class="pre">White</span> <span class="pre">Balance'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.enable_auto_white_balance" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.enable_dynamic_calibration">
-<span class="sig-name descname"><span class="pre">enable_dynamic_calibration</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">58</span> <span class="pre">'Enable</span> <span class="pre">Dynamic</span> <span class="pre">Calibration'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.enable_dynamic_calibration" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">enable_dynamic_calibration</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">58</span> <span class="pre">'Enable</span> <span class="pre">Dynamic</span> <span class="pre">Calibration'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.enable_dynamic_calibration" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.enable_ir_reflectivity">
-<span class="sig-name descname"><span class="pre">enable_ir_reflectivity</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">84</span> <span class="pre">'Enable</span> <span class="pre">IR</span> <span class="pre">Reflectivity'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.enable_ir_reflectivity" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">enable_ir_reflectivity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">84</span> <span class="pre">'Enable</span> <span class="pre">IR</span> <span class="pre">Reflectivity'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.enable_ir_reflectivity" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.enable_map_preservation">
-<span class="sig-name descname"><span class="pre">enable_map_preservation</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">62</span> <span class="pre">'Enable</span> <span class="pre">Map</span> <span class="pre">Preservation'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.enable_map_preservation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">enable_map_preservation</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">62</span> <span class="pre">'Enable</span> <span class="pre">Map</span> <span class="pre">Preservation'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.enable_map_preservation" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.enable_mapping">
-<span class="sig-name descname"><span class="pre">enable_mapping</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">55</span> <span class="pre">'Enable</span> <span class="pre">Mapping'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.enable_mapping" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">enable_mapping</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">55</span> <span class="pre">'Enable</span> <span class="pre">Mapping'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.enable_mapping" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.enable_max_usable_range">
-<span class="sig-name descname"><span class="pre">enable_max_usable_range</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">81</span> <span class="pre">'Enable</span> <span class="pre">Max</span> <span class="pre">Usable</span> <span class="pre">Range'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.enable_max_usable_range" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">enable_max_usable_range</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">81</span> <span class="pre">'Enable</span> <span class="pre">Max</span> <span class="pre">Usable</span> <span class="pre">Range'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.enable_max_usable_range" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.enable_motion_correction">
-<span class="sig-name descname"><span class="pre">enable_motion_correction</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">29</span> <span class="pre">'Enable</span> <span class="pre">Motion</span> <span class="pre">Correction'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.enable_motion_correction" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">enable_motion_correction</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">29</span> <span class="pre">'Enable</span> <span class="pre">Motion</span> <span class="pre">Correction'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.enable_motion_correction" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.enable_pose_jumping">
-<span class="sig-name descname"><span class="pre">enable_pose_jumping</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">57</span> <span class="pre">'Enable</span> <span class="pre">Pose</span> <span class="pre">Jumping'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.enable_pose_jumping" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">enable_pose_jumping</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">57</span> <span class="pre">'Enable</span> <span class="pre">Pose</span> <span class="pre">Jumping'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.enable_pose_jumping" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.enable_relocalization">
-<span class="sig-name descname"><span class="pre">enable_relocalization</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">56</span> <span class="pre">'Enable</span> <span class="pre">Relocalization'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.enable_relocalization" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">enable_relocalization</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">56</span> <span class="pre">'Enable</span> <span class="pre">Relocalization'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.enable_relocalization" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.error_polling_enabled">
-<span class="sig-name descname"><span class="pre">error_polling_enabled</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">24</span> <span class="pre">'Error</span> <span class="pre">Polling</span> <span class="pre">Enabled'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.error_polling_enabled" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">error_polling_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">24</span> <span class="pre">'Error</span> <span class="pre">Polling</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.error_polling_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.exposure">
-<span class="sig-name descname"><span class="pre">exposure</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">3</span> <span class="pre">'Exposure'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.exposure" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">exposure</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">3</span> <span class="pre">'Exposure'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.exposure" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.filter_magnitude">
-<span class="sig-name descname"><span class="pre">filter_magnitude</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">36</span> <span class="pre">'Filter</span> <span class="pre">Magnitude'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.filter_magnitude" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">filter_magnitude</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">36</span> <span class="pre">'Filter</span> <span class="pre">Magnitude'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.filter_magnitude" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.filter_option">
-<span class="sig-name descname"><span class="pre">filter_option</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">16</span> <span class="pre">'Filter</span> <span class="pre">Option'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.filter_option" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">filter_option</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">16</span> <span class="pre">'Filter</span> <span class="pre">Option'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.filter_option" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.filter_smooth_alpha">
-<span class="sig-name descname"><span class="pre">filter_smooth_alpha</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">37</span> <span class="pre">'Filter</span> <span class="pre">Smooth</span> <span class="pre">Alpha'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.filter_smooth_alpha" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">filter_smooth_alpha</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">37</span> <span class="pre">'Filter</span> <span class="pre">Smooth</span> <span class="pre">Alpha'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.filter_smooth_alpha" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.filter_smooth_delta">
-<span class="sig-name descname"><span class="pre">filter_smooth_delta</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">38</span> <span class="pre">'Filter</span> <span class="pre">Smooth</span> <span class="pre">Delta'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.filter_smooth_delta" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">filter_smooth_delta</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">38</span> <span class="pre">'Filter</span> <span class="pre">Smooth</span> <span class="pre">Delta'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.filter_smooth_delta" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.fisheye_auto_exposure_mode">
-<span class="sig-name descname"><span class="pre">fisheye_auto_exposure_mode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">21</span> <span class="pre">'Fisheye</span> <span class="pre">Auto</span> <span class="pre">Exposure</span> <span class="pre">Mode'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.fisheye_auto_exposure_mode" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">fisheye_auto_exposure_mode</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">21</span> <span class="pre">'Fisheye</span> <span class="pre">Auto</span> <span class="pre">Exposure</span> <span class="pre">Mode'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.fisheye_auto_exposure_mode" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.frames_queue_size">
-<span class="sig-name descname"><span class="pre">frames_queue_size</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">19</span> <span class="pre">'Frames</span> <span class="pre">Queue</span> <span class="pre">Size'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.frames_queue_size" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">frames_queue_size</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">19</span> <span class="pre">'Frames</span> <span class="pre">Queue</span> <span class="pre">Size'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.frames_queue_size" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.freefall_detection_enabled">
-<span class="sig-name descname"><span class="pre">freefall_detection_enabled</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">63</span> <span class="pre">'Freefall</span> <span class="pre">Detection</span> <span class="pre">Enabled'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.freefall_detection_enabled" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">freefall_detection_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">63</span> <span class="pre">'Freefall</span> <span class="pre">Detection</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.freefall_detection_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.gain">
-<span class="sig-name descname"><span class="pre">gain</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">4</span> <span class="pre">'Gain'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.gain" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">gain</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">4</span> <span class="pre">'Gain'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.gain" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.gamma">
-<span class="sig-name descname"><span class="pre">gamma</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">5</span> <span class="pre">'Gamma'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.gamma" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">gamma</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">5</span> <span class="pre">'Gamma'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.gamma" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.global_time_enabled">
-<span class="sig-name descname"><span class="pre">global_time_enabled</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">53</span> <span class="pre">'Global</span> <span class="pre">Time</span> <span class="pre">Enabled'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.global_time_enabled" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">global_time_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">53</span> <span class="pre">'Global</span> <span class="pre">Time</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.global_time_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.gyro_sensitivity">
-<span class="sig-name descname"><span class="pre">gyro_sensitivity</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">97</span> <span class="pre">'Gyro</span> <span class="pre">Sensitivity'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.gyro_sensitivity" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">gyro_sensitivity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">97</span> <span class="pre">'Gyro</span> <span class="pre">Sensitivity'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.gyro_sensitivity" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.hardware_preset">
-<span class="sig-name descname"><span class="pre">hardware_preset</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">52</span> <span class="pre">'Hardware</span> <span class="pre">Preset'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.hardware_preset" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">hardware_preset</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">52</span> <span class="pre">'Hardware</span> <span class="pre">Preset'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.hardware_preset" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.hdr_enabled">
-<span class="sig-name descname"><span class="pre">hdr_enabled</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">76</span> <span class="pre">'Hdr</span> <span class="pre">Enabled'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.hdr_enabled" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">hdr_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">76</span> <span class="pre">'Hdr</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.hdr_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.histogram_equalization_enabled">
-<span class="sig-name descname"><span class="pre">histogram_equalization_enabled</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">32</span> <span class="pre">'Histogram</span> <span class="pre">Equalization</span> <span class="pre">Enabled'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.histogram_equalization_enabled" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">histogram_equalization_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">32</span> <span class="pre">'Histogram</span> <span class="pre">Equalization</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.histogram_equalization_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.holes_fill">
-<span class="sig-name descname"><span class="pre">holes_fill</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">39</span> <span class="pre">'Holes</span> <span class="pre">Fill'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.holes_fill" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">holes_fill</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">39</span> <span class="pre">'Holes</span> <span class="pre">Fill'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.holes_fill" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.host_performance">
-<span class="sig-name descname"><span class="pre">host_performance</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">75</span> <span class="pre">'Host</span> <span class="pre">Performance'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.host_performance" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">host_performance</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">75</span> <span class="pre">'Host</span> <span class="pre">Performance'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.host_performance" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.hue">
-<span class="sig-name descname"><span class="pre">hue</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">6</span> <span class="pre">'Hue'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.hue" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">hue</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">6</span> <span class="pre">'Hue'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.hue" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.humidity_temperature">
-<span class="sig-name descname"><span class="pre">humidity_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">80</span> <span class="pre">'Humidity</span> <span class="pre">Temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.humidity_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">humidity_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">80</span> <span class="pre">'Humidity</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.humidity_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.inter_cam_sync_mode">
-<span class="sig-name descname"><span class="pre">inter_cam_sync_mode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">42</span> <span class="pre">'Inter</span> <span class="pre">Cam</span> <span class="pre">Sync</span> <span class="pre">Mode'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.inter_cam_sync_mode" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">inter_cam_sync_mode</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">42</span> <span class="pre">'Inter</span> <span class="pre">Cam</span> <span class="pre">Sync</span> <span class="pre">Mode'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.inter_cam_sync_mode" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.invalidation_bypass">
-<span class="sig-name descname"><span class="pre">invalidation_bypass</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">68</span> <span class="pre">'Invalidation</span> <span class="pre">Bypass'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.invalidation_bypass" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">invalidation_bypass</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">68</span> <span class="pre">'Invalidation</span> <span class="pre">Bypass'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.invalidation_bypass" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.laser_power">
-<span class="sig-name descname"><span class="pre">laser_power</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">13</span> <span class="pre">'Laser</span> <span class="pre">Power'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.laser_power" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">laser_power</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">13</span> <span class="pre">'Laser</span> <span class="pre">Power'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.laser_power" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.ldd_temperature">
-<span class="sig-name descname"><span class="pre">ldd_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">49</span> <span class="pre">'LDD</span> <span class="pre">temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.ldd_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">ldd_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">49</span> <span class="pre">'LDD</span> <span class="pre">temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.ldd_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.led_power">
-<span class="sig-name descname"><span class="pre">led_power</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">60</span> <span class="pre">'Led</span> <span class="pre">Power'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.led_power" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">led_power</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">60</span> <span class="pre">'Led</span> <span class="pre">Power'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.led_power" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.left_ir_temperature">
+<span class="sig-name descname"><span class="pre">left_ir_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">104</span> <span class="pre">'Left</span> <span class="pre">Ir</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.left_ir_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.lld_temperature">
-<span class="sig-name descname"><span class="pre">lld_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">49</span> <span class="pre">'LDD</span> <span class="pre">temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.lld_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">lld_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">49</span> <span class="pre">'LDD</span> <span class="pre">temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.lld_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.ma_temperature">
-<span class="sig-name descname"><span class="pre">ma_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">51</span> <span class="pre">'Ma</span> <span class="pre">Temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.ma_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">ma_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">51</span> <span class="pre">'Ma</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.ma_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.max_distance">
-<span class="sig-name descname"><span class="pre">max_distance</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">34</span> <span class="pre">'Max</span> <span class="pre">Distance'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.max_distance" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">max_distance</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">34</span> <span class="pre">'Max</span> <span class="pre">Distance'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.max_distance" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.mc_temperature">
-<span class="sig-name descname"><span class="pre">mc_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">50</span> <span class="pre">'Mc</span> <span class="pre">Temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.mc_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">mc_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">50</span> <span class="pre">'Mc</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.mc_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.min_distance">
-<span class="sig-name descname"><span class="pre">min_distance</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">33</span> <span class="pre">'Min</span> <span class="pre">Distance'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.min_distance" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">min_distance</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">33</span> <span class="pre">'Min</span> <span class="pre">Distance'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.min_distance" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.motion_module_temperature">
-<span class="sig-name descname"><span class="pre">motion_module_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">27</span> <span class="pre">'Motion</span> <span class="pre">Module</span> <span class="pre">Temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.motion_module_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">motion_module_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">27</span> <span class="pre">'Motion</span> <span class="pre">Module</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.motion_module_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.motion_range">
-<span class="sig-name descname"><span class="pre">motion_range</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">15</span> <span class="pre">'Motion</span> <span class="pre">Range'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.motion_range" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">motion_range</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">15</span> <span class="pre">'Motion</span> <span class="pre">Range'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.motion_range" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="pyrealsense2.option.name">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#pyrealsense2.option.name" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">option.name</span> <span class="pre">-&gt;</span> <span class="pre">str</span></span></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.noise_estimation">
-<span class="sig-name descname"><span class="pre">noise_estimation</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">83</span> <span class="pre">'Noise</span> <span class="pre">Estimation'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.noise_estimation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">noise_estimation</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">83</span> <span class="pre">'Noise</span> <span class="pre">Estimation'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.noise_estimation" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.noise_filtering">
-<span class="sig-name descname"><span class="pre">noise_filtering</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">67</span> <span class="pre">'Noise</span> <span class="pre">Filtering'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.noise_filtering" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">noise_filtering</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">67</span> <span class="pre">'Noise</span> <span class="pre">Filtering'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.noise_filtering" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.ohm_temperature">
-<span class="sig-name descname"><span class="pre">ohm_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">95</span> <span class="pre">'Ohm</span> <span class="pre">Temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.ohm_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">ohm_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">95</span> <span class="pre">'Ohm</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.ohm_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.output_trigger_enabled">
-<span class="sig-name descname"><span class="pre">output_trigger_enabled</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">26</span> <span class="pre">'Output</span> <span class="pre">Trigger</span> <span class="pre">Enabled'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.output_trigger_enabled" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">output_trigger_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">26</span> <span class="pre">'Output</span> <span class="pre">Trigger</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.output_trigger_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.post_processing_sharpening">
-<span class="sig-name descname"><span class="pre">post_processing_sharpening</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">65</span> <span class="pre">'Post</span> <span class="pre">Processing</span> <span class="pre">Sharpening'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.post_processing_sharpening" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">post_processing_sharpening</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">65</span> <span class="pre">'Post</span> <span class="pre">Processing</span> <span class="pre">Sharpening'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.post_processing_sharpening" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.power_line_frequency">
-<span class="sig-name descname"><span class="pre">power_line_frequency</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">22</span> <span class="pre">'Power</span> <span class="pre">Line</span> <span class="pre">Frequency'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.power_line_frequency" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">power_line_frequency</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">22</span> <span class="pre">'Power</span> <span class="pre">Line</span> <span class="pre">Frequency'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.power_line_frequency" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.pre_processing_sharpening">
-<span class="sig-name descname"><span class="pre">pre_processing_sharpening</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">66</span> <span class="pre">'Pre</span> <span class="pre">Processing</span> <span class="pre">Sharpening'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.pre_processing_sharpening" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">pre_processing_sharpening</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">66</span> <span class="pre">'Pre</span> <span class="pre">Processing</span> <span class="pre">Sharpening'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.pre_processing_sharpening" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.projector_temperature">
-<span class="sig-name descname"><span class="pre">projector_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">25</span> <span class="pre">'Projector</span> <span class="pre">Temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.projector_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">projector_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">25</span> <span class="pre">'Projector</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.projector_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.receiver_gain">
-<span class="sig-name descname"><span class="pre">receiver_gain</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">64</span> <span class="pre">'Receiver</span> <span class="pre">Gain'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.receiver_gain" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">receiver_gain</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">64</span> <span class="pre">'Receiver</span> <span class="pre">Gain'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.receiver_gain" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.receiver_sensitivity">
-<span class="sig-name descname"><span class="pre">receiver_sensitivity</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">90</span> <span class="pre">'Receiver</span> <span class="pre">Sensitivity'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.receiver_sensitivity" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">receiver_sensitivity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">90</span> <span class="pre">'Receiver</span> <span class="pre">Sensitivity'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.receiver_sensitivity" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.region_of_interest">
-<span class="sig-name descname"><span class="pre">region_of_interest</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">98</span> <span class="pre">'Region</span> <span class="pre">of</span> <span class="pre">Interest'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.region_of_interest" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">region_of_interest</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">98</span> <span class="pre">'Region</span> <span class="pre">of</span> <span class="pre">Interest'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.region_of_interest" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.reset_camera_accuracy_health">
-<span class="sig-name descname"><span class="pre">reset_camera_accuracy_health</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">74</span> <span class="pre">'Reset</span> <span class="pre">Camera</span> <span class="pre">Accuracy</span> <span class="pre">Health'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.reset_camera_accuracy_health" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">reset_camera_accuracy_health</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">74</span> <span class="pre">'Reset</span> <span class="pre">Camera</span> <span class="pre">Accuracy</span> <span class="pre">Health'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.reset_camera_accuracy_health" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.rgb_tnr_enabled">
+<span class="sig-name descname"><span class="pre">rgb_tnr_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">102</span> <span class="pre">'Rgb</span> <span class="pre">Tnr</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.rgb_tnr_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.rotation">
-<span class="sig-name descname"><span class="pre">rotation</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">99</span> <span class="pre">'Rotation'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.rotation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">rotation</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">99</span> <span class="pre">'Rotation'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.rotation" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.safety_mcu_temperature">
+<span class="sig-name descname"><span class="pre">safety_mcu_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">103</span> <span class="pre">'Safety</span> <span class="pre">Mcu</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.safety_mcu_temperature" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.safety_mode">
+<span class="sig-name descname"><span class="pre">safety_mode</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">101</span> <span class="pre">'Safety</span> <span class="pre">Mode'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.safety_mode" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.option.safety_preset_active_index">
+<span class="sig-name descname"><span class="pre">safety_preset_active_index</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">100</span> <span class="pre">'Safety</span> <span class="pre">Preset</span> <span class="pre">Active</span> <span class="pre">Index'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.safety_preset_active_index" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.saturation">
-<span class="sig-name descname"><span class="pre">saturation</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">7</span> <span class="pre">'Saturation'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.saturation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">saturation</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">7</span> <span class="pre">'Saturation'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.saturation" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.sensor_mode">
-<span class="sig-name descname"><span class="pre">sensor_mode</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">70</span> <span class="pre">'Sensor</span> <span class="pre">Mode'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.sensor_mode" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">sensor_mode</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">70</span> <span class="pre">'Sensor</span> <span class="pre">Mode'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.sensor_mode" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.sequence_id">
-<span class="sig-name descname"><span class="pre">sequence_id</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">79</span> <span class="pre">'Sequence</span> <span class="pre">Id'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.sequence_id" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">sequence_id</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">79</span> <span class="pre">'Sequence</span> <span class="pre">Id'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.sequence_id" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.sequence_name">
-<span class="sig-name descname"><span class="pre">sequence_name</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">77</span> <span class="pre">'Sequence</span> <span class="pre">Name'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.sequence_name" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">sequence_name</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">77</span> <span class="pre">'Sequence</span> <span class="pre">Name'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.sequence_name" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.sequence_size">
-<span class="sig-name descname"><span class="pre">sequence_size</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">78</span> <span class="pre">'Sequence</span> <span class="pre">Size'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.sequence_size" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">sequence_size</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">78</span> <span class="pre">'Sequence</span> <span class="pre">Size'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.sequence_size" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.sharpness">
-<span class="sig-name descname"><span class="pre">sharpness</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">8</span> <span class="pre">'Sharpness'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.sharpness" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">sharpness</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">8</span> <span class="pre">'Sharpness'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.sharpness" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.soc_pvt_temperature">
-<span class="sig-name descname"><span class="pre">soc_pvt_temperature</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">96</span> <span class="pre">'Soc</span> <span class="pre">Pvt</span> <span class="pre">Temperature'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.soc_pvt_temperature" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">soc_pvt_temperature</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">96</span> <span class="pre">'Soc</span> <span class="pre">Pvt</span> <span class="pre">Temperature'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.soc_pvt_temperature" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.stereo_baseline">
-<span class="sig-name descname"><span class="pre">stereo_baseline</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">40</span> <span class="pre">'Stereo</span> <span class="pre">Baseline'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.stereo_baseline" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">stereo_baseline</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">40</span> <span class="pre">'Stereo</span> <span class="pre">Baseline'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.stereo_baseline" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.stream_filter">
-<span class="sig-name descname"><span class="pre">stream_filter</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">43</span> <span class="pre">'Stream</span> <span class="pre">Filter'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.stream_filter" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">stream_filter</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">43</span> <span class="pre">'Stream</span> <span class="pre">Filter'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.stream_filter" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.stream_format_filter">
-<span class="sig-name descname"><span class="pre">stream_format_filter</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">44</span> <span class="pre">'Stream</span> <span class="pre">Format</span> <span class="pre">Filter'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.stream_format_filter" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">stream_format_filter</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">44</span> <span class="pre">'Stream</span> <span class="pre">Format</span> <span class="pre">Filter'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.stream_format_filter" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.stream_index_filter">
-<span class="sig-name descname"><span class="pre">stream_index_filter</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">45</span> <span class="pre">'Stream</span> <span class="pre">Index</span> <span class="pre">Filter'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.stream_index_filter" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">stream_index_filter</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">45</span> <span class="pre">'Stream</span> <span class="pre">Index</span> <span class="pre">Filter'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.stream_index_filter" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.texture_source">
-<span class="sig-name descname"><span class="pre">texture_source</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">35</span> <span class="pre">'Texture</span> <span class="pre">Source'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.texture_source" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">texture_source</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">35</span> <span class="pre">'Texture</span> <span class="pre">Source'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.texture_source" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.thermal_compensation">
-<span class="sig-name descname"><span class="pre">thermal_compensation</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">72</span> <span class="pre">'Thermal</span> <span class="pre">Compensation'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.thermal_compensation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">thermal_compensation</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">72</span> <span class="pre">'Thermal</span> <span class="pre">Compensation'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.thermal_compensation" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.total_frame_drops">
-<span class="sig-name descname"><span class="pre">total_frame_drops</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">20</span> <span class="pre">'Total</span> <span class="pre">Frame</span> <span class="pre">Drops'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.total_frame_drops" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">total_frame_drops</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">20</span> <span class="pre">'Total</span> <span class="pre">Frame</span> <span class="pre">Drops'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.total_frame_drops" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.transmitter_frequency">
-<span class="sig-name descname"><span class="pre">transmitter_frequency</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">88</span> <span class="pre">'Transmitter</span> <span class="pre">Frequency'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.transmitter_frequency" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">transmitter_frequency</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">88</span> <span class="pre">'Transmitter</span> <span class="pre">Frequency'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.transmitter_frequency" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.trigger_camera_accuracy_health">
-<span class="sig-name descname"><span class="pre">trigger_camera_accuracy_health</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">73</span> <span class="pre">'Trigger</span> <span class="pre">Camera</span> <span class="pre">Accuracy</span> <span class="pre">Health'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.trigger_camera_accuracy_health" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">trigger_camera_accuracy_health</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">73</span> <span class="pre">'Trigger</span> <span class="pre">Camera</span> <span class="pre">Accuracy</span> <span class="pre">Health'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.trigger_camera_accuracy_health" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.unknown">
-<span class="sig-name descname"><span class="pre">unknown</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">100</span> <span class="pre">'UNKNOWN'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.unknown" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">unknown</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">106</span> <span class="pre">'UNKNOWN'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.unknown" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="pyrealsense2.option.value">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#pyrealsense2.option.value" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#pyrealsense2.option.value" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.vertical_binning">
-<span class="sig-name descname"><span class="pre">vertical_binning</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">89</span> <span class="pre">'Vertical</span> <span class="pre">Binning'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.vertical_binning" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">vertical_binning</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">89</span> <span class="pre">'Vertical</span> <span class="pre">Binning'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.vertical_binning" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.visual_preset">
-<span class="sig-name descname"><span class="pre">visual_preset</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">12</span> <span class="pre">'Visual</span> <span class="pre">Preset'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.visual_preset" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">visual_preset</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">12</span> <span class="pre">'Visual</span> <span class="pre">Preset'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.visual_preset" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.white_balance">
-<span class="sig-name descname"><span class="pre">white_balance</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">9</span> <span class="pre">'White</span> <span class="pre">Balance'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.white_balance" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">white_balance</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">9</span> <span class="pre">'White</span> <span class="pre">Balance'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.white_balance" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.zero_order_enabled">
-<span class="sig-name descname"><span class="pre">zero_order_enabled</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">61</span> <span class="pre">'Zero</span> <span class="pre">Order</span> <span class="pre">Enabled'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.zero_order_enabled" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">zero_order_enabled</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">61</span> <span class="pre">'Zero</span> <span class="pre">Order</span> <span class="pre">Enabled'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.zero_order_enabled" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.zero_order_point_x">
-<span class="sig-name descname"><span class="pre">zero_order_point_x</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">47</span> <span class="pre">'Zero</span> <span class="pre">Order</span> <span class="pre">Point</span> <span class="pre">X'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.zero_order_point_x" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">zero_order_point_x</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">47</span> <span class="pre">'Zero</span> <span class="pre">Order</span> <span class="pre">Point</span> <span class="pre">X'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.zero_order_point_x" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.option.zero_order_point_y">
-<span class="sig-name descname"><span class="pre">zero_order_point_y</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">48</span> <span class="pre">'Zero</span> <span class="pre">Order</span> <span class="pre">Point</span> <span class="pre">Y'&gt;</span></em><a class="headerlink" href="#pyrealsense2.option.zero_order_point_y" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">zero_order_point_y</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;option</span> <span class="pre">48</span> <span class="pre">'Zero</span> <span class="pre">Order</span> <span class="pre">Point</span> <span class="pre">Y'&gt;</span></span><a class="headerlink" href="#pyrealsense2.option.zero_order_point_y" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
@@ -1043,6 +1097,7 @@
 <li><a class="reference internal" href="#pyrealsense2.option.depth_offset"><code class="docutils literal notranslate"><span class="pre">option.depth_offset</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.depth_units"><code class="docutils literal notranslate"><span class="pre">option.depth_units</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.digital_gain"><code class="docutils literal notranslate"><span class="pre">option.digital_gain</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.embedded_filter_enabled"><code class="docutils literal notranslate"><span class="pre">option.embedded_filter_enabled</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.emitter_always_on"><code class="docutils literal notranslate"><span class="pre">option.emitter_always_on</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.emitter_enabled"><code class="docutils literal notranslate"><span class="pre">option.emitter_enabled</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.emitter_frequency"><code class="docutils literal notranslate"><span class="pre">option.emitter_frequency</span></code></a></li>
@@ -1082,6 +1137,7 @@
 <li><a class="reference internal" href="#pyrealsense2.option.laser_power"><code class="docutils literal notranslate"><span class="pre">option.laser_power</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.ldd_temperature"><code class="docutils literal notranslate"><span class="pre">option.ldd_temperature</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.led_power"><code class="docutils literal notranslate"><span class="pre">option.led_power</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.left_ir_temperature"><code class="docutils literal notranslate"><span class="pre">option.left_ir_temperature</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.lld_temperature"><code class="docutils literal notranslate"><span class="pre">option.lld_temperature</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.ma_temperature"><code class="docutils literal notranslate"><span class="pre">option.ma_temperature</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.max_distance"><code class="docutils literal notranslate"><span class="pre">option.max_distance</span></code></a></li>
@@ -1089,7 +1145,6 @@
 <li><a class="reference internal" href="#pyrealsense2.option.min_distance"><code class="docutils literal notranslate"><span class="pre">option.min_distance</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.motion_module_temperature"><code class="docutils literal notranslate"><span class="pre">option.motion_module_temperature</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.motion_range"><code class="docutils literal notranslate"><span class="pre">option.motion_range</span></code></a></li>
-<li><a class="reference internal" href="#pyrealsense2.option.name"><code class="docutils literal notranslate"><span class="pre">option.name</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.noise_estimation"><code class="docutils literal notranslate"><span class="pre">option.noise_estimation</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.noise_filtering"><code class="docutils literal notranslate"><span class="pre">option.noise_filtering</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.ohm_temperature"><code class="docutils literal notranslate"><span class="pre">option.ohm_temperature</span></code></a></li>
@@ -1102,7 +1157,11 @@
 <li><a class="reference internal" href="#pyrealsense2.option.receiver_sensitivity"><code class="docutils literal notranslate"><span class="pre">option.receiver_sensitivity</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.region_of_interest"><code class="docutils literal notranslate"><span class="pre">option.region_of_interest</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.reset_camera_accuracy_health"><code class="docutils literal notranslate"><span class="pre">option.reset_camera_accuracy_health</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.rgb_tnr_enabled"><code class="docutils literal notranslate"><span class="pre">option.rgb_tnr_enabled</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.rotation"><code class="docutils literal notranslate"><span class="pre">option.rotation</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.safety_mcu_temperature"><code class="docutils literal notranslate"><span class="pre">option.safety_mcu_temperature</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.safety_mode"><code class="docutils literal notranslate"><span class="pre">option.safety_mode</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.option.safety_preset_active_index"><code class="docutils literal notranslate"><span class="pre">option.safety_preset_active_index</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.saturation"><code class="docutils literal notranslate"><span class="pre">option.saturation</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.sensor_mode"><code class="docutils literal notranslate"><span class="pre">option.sensor_mode</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.option.sequence_id"><code class="docutils literal notranslate"><span class="pre">option.sequence_id</span></code></a></li>
@@ -1164,13 +1223,13 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.56.5 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.option</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2024, Intel Realsense Team.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.0.4.
     </div>
   </body>
 </html>

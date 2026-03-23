@@ -141,7 +141,8 @@ var menudata={children:[
 {text:"g",url:"globals_type.html#index_g"},
 {text:"l",url:"globals_type.html#index_l"},
 {text:"r",url:"globals_type.html#index_r"}]},
-{text:"Enumerations",url:"globals_enum.html"},
+{text:"Enumerations",url:"globals_enum.html",children:[
+{text:"r",url:"globals_enum.html#index_r"}]},
 {text:"Enumerator",url:"globals_eval.html",children:[
 {text:"r",url:"globals_eval.html#index_r"}]},
 {text:"Macros",url:"globals_defs.html"}]}]}]}
