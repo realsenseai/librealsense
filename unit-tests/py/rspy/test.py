@@ -131,8 +131,25 @@ def find_first_device_or_exit():
     """
     :return: the first device that was found, if no device is found the test is skipped. That way we can still run
         the unit-tests when no device is connected and not fail the tests that check a connected device
+    If RS2_TARGET_SERIAL_NUMBER is set, only a device with that serial number will be returned.
     """
     import pyrealsense2 as rs
+    import time as _time
+    target_sn = os.environ.get( 'RS2_TARGET_SERIAL_NUMBER' )
+    if target_sn:
+        # When targeting a specific device (e.g. parallel test runs), retry a few times
+        # in case the device is still initializing after a reset
+        for attempt in range( 5 ):
+            c = rs.context()
+            for dev in c.devices:
+                if dev.supports( rs.camera_info.serial_number ) \
+                        and dev.get_info( rs.camera_info.serial_number ) == target_sn:
+                    log.d( 'found', dev )
+                    log.d( 'in', rs )
+                    return dev, c
+            log.d( f'Target device {target_sn} not found (attempt {attempt+1}), retrying...' )
+            _time.sleep( 1 )
+        log.f( f'Target device {target_sn} not found' )
     c = rs.context()
     if not c.devices.size():  # if no device is connected we skip the test
         log.f("No device found")
@@ -148,10 +165,18 @@ def find_devices_by_product_line_or_exit( product_line ):
     :return: A list of devices of specific product line that was found, if no device is found the test is skipped.
         That way we can still run the unit-tests when no device is connected
         and not fail the tests that check a connected device
+    If RS2_TARGET_SERIAL_NUMBER is set, validates the target device is present.
     """
     import pyrealsense2 as rs
     c = rs.context()
+    target_sn = os.environ.get( 'RS2_TARGET_SERIAL_NUMBER' )
     devices_list = c.query_devices(product_line)
+    if target_sn:
+        found = any( dev.supports( rs.camera_info.serial_number )
+                     and dev.get_info( rs.camera_info.serial_number ) == target_sn
+                     for dev in devices_list )
+        if not found:
+            log.f( f'Target device {target_sn} not found in {product_line} product line' )
     if devices_list.size() == 0:
         log.f( "No device of the", product_line, "product line was found" )
     log.d( 'found', devices_list.size(), product_line, 'devices:', [dev for dev in devices_list] )

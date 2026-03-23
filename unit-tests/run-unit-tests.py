@@ -3,7 +3,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
-import sys, os, subprocess, re, platform, getopt, time
+import sys, os, subprocess, re, platform, getopt, time, threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Add our py/ module directory so we can find our own libraries
 current_dir = os.path.dirname( os.path.abspath( __file__ ) )
@@ -293,6 +294,9 @@ def serial_numbers_to_string( sns ):
     return ' '.join( [f'{devices.get(sn).name}_{sn}' for sn in sns] )
 
 
+_counters_lock = threading.Lock()
+
+
 
 def configuration_str( configuration, repetition=0, retry=0, sns=None, prefix='', suffix='' ):
     """ Return a string repr (with a prefix and/or suffix) of the configuration or '' if it's None """
@@ -465,14 +469,15 @@ def devices_by_test_config( test, exceptions ):
             continue
 
 
-def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_retry = 0, sns=None ):
+def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_retry = 0, sns=None, env=None, log_path=None, append=None ):
     global rslog
     #
     if not log.is_debug_on():
         conf_str = configuration_str( configuration, repetition, retry=curr_retry, prefix='  ', sns=sns )
         log.i( f'Running {test.name}{conf_str}' )
     #
-    log_path = test.get_log()
+    if log_path is None:
+        log_path = test.get_log()
     #
     opts = []
     if rslog:
@@ -484,7 +489,7 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
         opts.append('--custom-fw-d555')
         opts.append(custom_fw_d555_path)
     try:
-        test.run_test( configuration = configuration, log_path = log_path, opts = opts )
+        test.run_test( configuration = configuration, log_path = log_path, opts = opts, env = env, append = append )
     except FileNotFoundError as e:
         log.e( log.red + test.name + log.reset + ':', str( e ) + configuration_str( configuration, repetition, prefix=' ' ) )
     except subprocess.TimeoutExpired:
@@ -495,16 +500,17 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
             if not check_log_for_fails( log_path, test.name, configuration, repetition, sns=sns ):
                 # check_log_for_fails logs a more verbose message, but if it fails to do so log a general message here.
                 log.e( log.red + test.name + log.reset + ':',
-                       configuration_str( configuration, repetition, suffix=' ' ) + 'exited with non-zero value (' +
+                       configuration_str( configuration, repetition, suffix=' ', sns=sns ) + 'exited with non-zero value (' +
                            str( cpe.returncode ) + ')' )
     else:
         return True
     return False
 
 
-def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
+def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None, env=None, log_path=None, append=None ):
     global n_tests, n_failed_tests, retries
-    n_tests += 1
+    with _counters_lock:
+        n_tests += 1
     retry_count = max(test.config.retries, retries)
     for retry in range( retry_count + 1 ):
         if retry:
@@ -514,13 +520,61 @@ def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
                 log.debug_indent()
             if no_reset or not serial_numbers:
                 time.sleep(1)  # small pause between tries
-            else:
+            elif not env:
+                # Only call enable_only if we're not in parallel mode (no env override)
                 devices.enable_only( serial_numbers, recycle=True )
-        if test_wrapper_( test, configuration, repetition, retry, retry_count, serial_numbers ):
+        if test_wrapper_( test, configuration, repetition, retry, retry_count, serial_numbers, env=env, log_path=log_path, append=append ):
             return True
 
-    n_failed_tests += 1
+    with _counters_lock:
+        n_failed_tests += 1
     return False
+
+
+def _make_test_env( serial_numbers ):
+    """
+    Build an environment dict for a subprocess that targets specific device(s).
+    The runner tracks devices by firmware_update_id internally, but subprocess tests
+    look up devices by camera_info.serial_number, so we translate here.
+    """
+    import pyrealsense2 as rs
+    env = os.environ.copy()
+    if len( serial_numbers ) == 1:
+        sn = next( iter( serial_numbers ) )
+        dev_handle = devices.get( sn ).handle
+        if dev_handle.supports( rs.camera_info.serial_number ):
+            env['RS2_TARGET_SERIAL_NUMBER'] = dev_handle.get_info( rs.camera_info.serial_number )
+        else:
+            env['RS2_TARGET_SERIAL_NUMBER'] = sn
+    return env
+
+
+def _get_device_log_path( test, serial_numbers ):
+    """
+    Return a log path that includes the serial number(s) so parallel runs don't collide.
+    """
+    base_log = test.get_log()
+    if not base_log:
+        return None
+    sn_suffix = '_'.join( sorted( serial_numbers ) )
+    root, ext = os.path.splitext( base_log )
+    return f'{root}_{sn_suffix}{ext}'
+
+
+def _run_one_device_test( test, configuration, serial_numbers ):
+    """
+    Run a single test targeting a specific device set. Used by the parallel executor.
+    Returns True on success.
+    """
+    env = _make_test_env( serial_numbers )
+    log_path = _get_device_log_path( test, serial_numbers )
+    test_ok = True
+    ran = False
+    for repetition in range( repeat ):
+        log.d( 'configuration:', configuration_str( configuration, repetition, sns=serial_numbers ) )
+        test_ok = test_wrapper( test, configuration, repetition, serial_numbers, env=env, log_path=log_path, append=ran ) and test_ok
+        ran = True
+    return test_ok
 
 
 def close_hubs():
@@ -678,6 +732,10 @@ try:
                 continue
             #
             test_ok = True
+            #
+            # Collect all valid (configuration, serial_numbers) pairs for this test
+            #
+            device_runs = []
             for configuration, serial_numbers in devices_by_test_config( test, exceptions ):
                 # Currently, with all of our tests, serial_numbers holds a single serial number
                 # We will see multiple devices on serial_numbers only if the test specifies multiple devices in a
@@ -699,20 +757,63 @@ try:
                     log.d( f'connection type does not fit {test.config.types}; skipping' )
                     continue
 
-                for repetition in range(repeat):
-                    try:
-                        log.d( 'configuration:', configuration_str( configuration, repetition, sns=serial_numbers ) )
-                        log.debug_indent()
-                        should_reset = not no_reset
-                        devices.enable_only( serial_numbers, recycle=should_reset )
-                    except (RuntimeError, TimeoutError, OSError) as e:
-                        log.w( log.red + test.name + log.reset + ': ' + str( e ) )
-                        test_ok = False
-                    else:
-                        register_signal_handlers()
-                        test_ok = test_wrapper( test, configuration, repetition, serial_numbers ) and test_ok
-                    finally:
-                        log.debug_unindent()
+                device_runs.append( (configuration, serial_numbers) )
+
+            #
+            # If we have multiple device runs with disjoint serial-number sets, run them in parallel
+            #
+            all_sns = set()
+            can_parallelize = len( device_runs ) > 1
+            if can_parallelize:
+                for _, sns in device_runs:
+                    if all_sns & sns:  # overlap means we can't safely parallelize
+                        can_parallelize = False
+                        break
+                    all_sns.update( sns )
+
+            if can_parallelize:
+                log.d( f'running {len(device_runs)} device configurations in parallel' )
+                try:
+                    # Don't recycle/reset for parallel runs: each subprocess targets its own device
+                    # via RS2_TARGET_SERIAL_NUMBER, and hw_reset disrupts all devices simultaneously
+                    devices.enable_only( all_sns, recycle=False )
+                except (RuntimeError, TimeoutError, OSError) as e:
+                    log.w( log.red + test.name + log.reset + ': ' + str( e ) )
+                    test_ok = False
+                else:
+                    register_signal_handlers()
+                    with ThreadPoolExecutor( max_workers=len( device_runs ) ) as executor:
+                        futures = {}
+                        for configuration, serial_numbers in device_runs:
+                            f = executor.submit( _run_one_device_test, test, configuration, serial_numbers )
+                            futures[f] = (configuration, serial_numbers)
+                        for f in as_completed( futures ):
+                            try:
+                                if not f.result():
+                                    test_ok = False
+                            except Exception as e:
+                                configuration, serial_numbers = futures[f]
+                                log.e( log.red + test.name + log.reset + ': '
+                                       + configuration_str( configuration, sns=serial_numbers )
+                                       + ' unexpected error: ' + str( e ) )
+                                test_ok = False
+            else:
+                for configuration, serial_numbers in device_runs:
+                    for repetition in range(repeat):
+                        try:
+                            log.d( 'configuration:', configuration_str( configuration, repetition, sns=serial_numbers ) )
+                            log.debug_indent()
+                            should_reset = not no_reset
+                            devices.enable_only( serial_numbers, recycle=should_reset )
+                        except (RuntimeError, TimeoutError, OSError) as e:
+                            log.w( log.red + test.name + log.reset + ': ' + str( e ) )
+                            test_ok = False
+                        else:
+                            register_signal_handlers()
+                            test_ok = test_wrapper( test, configuration, repetition, serial_numbers ) and test_ok
+                        finally:
+                            log.debug_unindent()
+
             if not test_ok:
                 failed_tests.append( test )
             #
