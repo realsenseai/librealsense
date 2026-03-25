@@ -11,6 +11,7 @@
 #include "proc/hdr-merge.h"
 #include "proc/sequence-id-filter.h"
 #include "ros2_writer.h"
+#include "media/reader_factory.h"
 #include "core/motion-frame.h"
 #include <src/core/sensor-interface.h>
 #include <src/core/device-interface.h>
@@ -18,29 +19,39 @@
 #include <src/points.h>
 #include <src/labeled-points.h>
 
-#include <fstream>   // for std::ifstream
+#include <fstream>
 
 namespace librealsense
 {
     using namespace device_serializer;
 
+    static std::string strip_db3_extension(const std::string& file)
+    {
+        if (!is_db3_file(file))
+            throw std::runtime_error("Output file must have .db3 extension: '" + file + "'");
+        return file.substr(0, file.size() - 4);
+    }
+
     ros2_writer::ros2_writer(const std::string& file, bool compress_while_record) : m_file_path(file)
     {
         LOG_INFO("Compression while record is set to " << (compress_while_record ? "ON" : "OFF"));
         _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
-        // check if file exists, if so, delete it to record - rosbag2 sqlite plugin doesn't overwrite existing files
-        std::ifstream f(file + ".db3");
+
+        // rosbag2 sqlite plugin appends .db3 internally, so pass the stem
+        auto base_path = strip_db3_extension(file);
+
+        // Remove existing file — sqlite plugin doesn't overwrite
+        std::ifstream f(file);
         if (f.good())
         {
             f.close();
-            if (std::remove((file + ".db3").c_str()) != 0)
+            if (std::remove(file.c_str()) != 0)
             {
-                throw std::runtime_error(rsutils::string::from() << "Failed to remove existing rosbag2 storage file '" << file << "'");
+                throw std::runtime_error(rsutils::string::from() << "Failed to remove existing file '" << file << "'");
             }
         }
 
-        _storage->open(file, rosbag2_storage::storage_interfaces::IOFlag::READ_WRITE);
-        m_file_path += ".db3"; // rosbag2 sqlite plugin appends .db3 internally, so this is for consistency
+        _storage->open(base_path, rosbag2_storage::storage_interfaces::IOFlag::READ_WRITE);
         if (!_storage)
             throw std::runtime_error(rsutils::string::from() << "Failed to open rosbag2 storage for uri '" << file
                 << "' using storage id 'sqlite3'");

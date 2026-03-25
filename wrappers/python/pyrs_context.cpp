@@ -38,7 +38,8 @@ void init_context(py::module &m) {
              "filename"_a)
         .def("unload_device", &rs2::context::unload_device, "filename"_a) // No docstring in C++
         .def("unload_tracking_module", &rs2::context::unload_tracking_module) // No docstring in C++
-        .def("convert_bag_to_db3", &rs2::context::convert_bag_to_db3,
+        .def("convert_bag_to_db3",
+             (void (rs2::context::*)(const std::string&, const std::string&)) &rs2::context::convert_bag_to_db3,
              "Convert a legacy ROS1 .bag recording to a ROS2 .db3 file.",
              "input"_a, "output"_a);
 

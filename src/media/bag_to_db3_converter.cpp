@@ -1,50 +1,35 @@
 // License: Apache 2.0. See LICENSE file in root directory.
-// Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 #include "bag_to_db3_converter.h"
 #include "reader_factory.h"
+#include "ros_common.h"
 #include "ros2/ros2_writer.h"
+#include <rsutils/string/from.h>
 
 
 namespace librealsense
 {
     using namespace device_serializer;
 
-    void convert_bag_to_db3(const std::string& input_bag, const std::string& output_db3, std::shared_ptr<context> ctx)
+    static std::vector<stream_identifier> collect_stream_identifiers(const device_snapshot& device_desc)
     {
-        LOG_INFO("Converting " << input_bag << " to " << output_db3 << ".db3");
-
-        auto reader = create_reader_for_file(input_bag, ctx);
-        std::shared_ptr<writer> writer = std::make_shared<ros2_writer>(output_db3, false);
-
-        // 1. Write device description (info, options, stream profiles, processing blocks)
-        auto device_desc = reader->query_device_description(nanoseconds(0));
-        writer->write_device_description(device_desc);
-
-        // 2. Write extrinsics and collect stream identifiers
         std::vector<stream_identifier> all_streams;
         for (auto&& sensor_snap : device_desc.get_sensors_snapshots())
         {
             for (auto&& profile : sensor_snap.get_stream_profiles())
             {
-                all_streams.push_back({ 0, sensor_snap.get_sensor_index(),
+                all_streams.push_back({ get_device_index(), sensor_snap.get_sensor_index(),
                     profile->get_stream_type(), static_cast<uint32_t>(profile->get_stream_index()) });
             }
         }
+        return all_streams;
+    }
 
-        for (auto&& extrinsic_entry : device_desc.get_extrinsics_map())
-        {
-            auto& stream_id = extrinsic_entry.first;
-            auto& reference_id = extrinsic_entry.second.first;
-            auto& ext = extrinsic_entry.second.second;
-            writer->write_extrinsics(stream_id, reference_id, ext);
-        }
-
-        // 3. Enable all streams so the reader delivers frames
-        reader->enable_stream(all_streams);
-
-        // 4. Read all data and write frames/notifications
+    static uint64_t write_frames(std::shared_ptr<reader> reader, std::shared_ptr<writer> writer, nanoseconds total_duration, std::function<void(float)> progress_callback)
+    {
         uint64_t frame_count = 0;
+        auto duration_ns = total_duration.count();
         while (true)
         {
             auto data = reader->read_next_data();
@@ -54,6 +39,11 @@ namespace librealsense
 
             if (auto frame = data->as<serialized_frame>())
             {
+                if (progress_callback && duration_ns > 0)
+                {
+                    auto ts = frame->get_timestamp().count();
+                    progress_callback(std::min(1.0f, static_cast<float>(ts) / duration_ns));
+                }
                 writer->write_frame(frame->stream_id, frame->get_timestamp(), std::move(frame->frame));
                 ++frame_count;
             }
@@ -61,8 +51,37 @@ namespace librealsense
             {
                 writer->write_notification(notif->sensor_id, notif->get_timestamp(), notif->notif);
             }
-            // serialized_option: individual option changes are already captured in device_description
         }
+        if (progress_callback)
+            progress_callback(1.0f);
+        return frame_count;
+    }
+
+    void convert_bag_to_db3(const std::string& input_bag, const std::string& output_db3, std::shared_ptr<context> ctx, std::function<void(float)> progress_callback)
+    {
+        if (!is_bag_file(input_bag))
+            throw invalid_value_exception(rsutils::string::from() << "Input file '" << input_bag << "' is not a .bag file");
+
+        LOG_INFO("Converting " << input_bag << " to " << output_db3);
+
+        auto reader = create_reader_for_file(input_bag, ctx);
+        std::shared_ptr<writer> writer = std::make_shared<ros2_writer>(output_db3, false);
+
+        auto device_desc = reader->query_device_description(nanoseconds(0));
+        writer->write_device_description(device_desc);
+
+        auto all_streams = collect_stream_identifiers(device_desc);
+        reader->enable_stream(all_streams);
+
+        for (auto&& extrinsic_entry : device_desc.get_extrinsics_map())
+        {
+            auto& stream_id = extrinsic_entry.first;
+            auto& reference_id = extrinsic_entry.second.first;
+            auto& ext = extrinsic_entry.second.second;
+            writer->write_extrinsics(stream_id, reference_id, ext);
+        }
+        auto duration = reader->query_duration();
+        auto frame_count = write_frames(reader, writer, duration, progress_callback);
 
         LOG_INFO("Conversion complete: " << frame_count << " frames written to " << writer->get_file_name());
     }

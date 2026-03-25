@@ -219,7 +219,17 @@ namespace rs2
         void convert_bag_to_db3(const std::string& input, const std::string& output)
         {
             rs2_error* e = nullptr;
-            rs2_convert_bag_to_db3(input.c_str(), output.c_str(), _context.get(), &e);
+            rs2_convert_bag_to_db3(input.c_str(), output.c_str(), _context.get(), nullptr, nullptr, &e);
+            rs2::error::handle(e);
+        }
+
+        template<class T>
+        void convert_bag_to_db3(const std::string& input, const std::string& output, T callback)
+        {
+            rs2_error* e = nullptr;
+            rs2_convert_bag_to_db3(input.c_str(), output.c_str(), _context.get(),
+                [](const float progress, void* user) { (*static_cast<T*>(user))(progress); },
+                &callback, &e);
             rs2::error::handle(e);
         }
 

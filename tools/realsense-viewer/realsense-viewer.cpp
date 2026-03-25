@@ -632,10 +632,23 @@ int main(int argc, const char** argv) try
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
 
-        // Draw the .bag-to-.db3 conversion dialog (if active) and poll for completion
-        auto converted_file = viewer_model.bag_converter->draw_and_poll(ctx, error_message, viewer_model, window);
+        // Poll conversion completion (separate from drawing)
+        auto converted_file = viewer_model.bag_converter->poll_completion(error_message, viewer_model);
         if (!converted_file.empty())
             add_playback_device(ctx, device_models, error_message, viewer_model, converted_file);
+
+        // .bag-to-.db3 conversion UI
+        if (viewer_model.bag_converter->should_show_dialog())
+        {
+            if (viewer_model.bag_converter->is_converting())
+                viewer_model.bag_converter->draw_progress(window);
+            else
+            {
+                auto dialog_file = viewer_model.bag_converter->draw_prompt(ctx, window);
+                if (!dialog_file.empty())
+                    add_playback_device(ctx, device_models, error_message, viewer_model, dialog_file);
+            }
+        }
 
         // Fetch and process frames from queue
         viewer_model.handle_ready_frames(viewer_rect, window, static_cast<int>(device_models->size()), error_message);

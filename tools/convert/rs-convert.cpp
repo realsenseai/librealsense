@@ -41,7 +41,7 @@ int main(int argc, char** argv) try
     cli::value <string> frameNumberEnd('t', "last-framenumber", "frame", "", "ignore frames whose frame number is greater than this value");
     cli::value <string> startTime('s', "start-time", "seconds", "", "ignore frames whose timestamp is less than this value (the first frame is at time 0)");
     cli::value <string> endTime('e', "end-time", "seconds", "", "ignore frames whose timestamp is greater than this value (the first frame is at time 0)" );
-    cli::value<string> outputFilenameDb3('D', "output-db3", "db3-path", "", "convert legacy .bag to .db3 format (output path without .db3 extension)");
+    cli::value<string> outputFilenameDb3('D', "output-db3", "db3-path", "", "convert legacy .bag to .db3 format");
 
     auto settings = cli( "librealsense rs-convert tool" )
                         .default_log_level( RS2_LOG_SEVERITY_WARN )
@@ -123,7 +123,7 @@ int main(int argc, char** argv) try
         converters.push_back( make_shared< rs2::tools::converter::converter_text >() );
     }
 
-    if (converters.empty() && !outputFilenamePly.isSet() && !outputFilenameDb3.isSet())
+    if (converters.empty() && !outputFilenamePly.isSet())
     {
         throw runtime_error("output not defined");
     }
