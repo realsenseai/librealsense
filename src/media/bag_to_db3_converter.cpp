@@ -26,10 +26,10 @@ namespace librealsense
         return all_streams;
     }
 
-    static uint64_t write_frames(std::shared_ptr<reader> reader, std::shared_ptr<writer> writer, nanoseconds total_duration, std::function<void(float)> progress_callback)
+    static uint64_t write_frames(std::shared_ptr<reader> reader, std::shared_ptr<writer> writer, std::function<void(float)> progress_callback)
     {
         uint64_t frame_count = 0;
-        auto duration_ns = total_duration.count();
+        auto duration_ns = reader->query_duration().count();
         while (true)
         {
             auto data = reader->read_next_data();
@@ -80,8 +80,7 @@ namespace librealsense
             auto& ext = extrinsic_entry.second.second;
             writer->write_extrinsics(stream_id, reference_id, ext);
         }
-        auto duration = reader->query_duration();
-        auto frame_count = write_frames(reader, writer, duration, progress_callback);
+        auto frame_count = write_frames(reader, writer, progress_callback);
 
         LOG_INFO("Conversion complete: " << frame_count << " frames written to " << writer->get_file_name());
     }

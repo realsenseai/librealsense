@@ -27,14 +27,14 @@ test.check( rs_convert )
 if rs_convert:
     bag_file = os.path.join( repo.build, 'unit-tests', 'recordings', 'recording_deadlock.bag' )
     temp_dir = tempfile.mkdtemp( prefix='bag_to_db3_' )
-    db3_base = os.path.join( temp_dir, 'converted' )
-    p = subprocess.run( [rs_convert, '-i', bag_file, '-D', db3_base],
+    db3_file = os.path.join( temp_dir, 'converted.db3' )
+    p = subprocess.run( [rs_convert, '-i', bag_file, '-D', db3_file],
                         capture_output=True, text=True, timeout=60 )
     test.check( p.returncode == 0 )
-    log.d( 'converted to', db3_base + '.db3' )
+    log.d( 'converted to', db3_file )
 
     bag_pipe = start_pipeline( bag_file )
-    db3_pipe = start_pipeline( db3_base + '.db3' )
+    db3_pipe = start_pipeline( db3_file )
 
     frame_count = 0
     while True:

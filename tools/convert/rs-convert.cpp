@@ -66,9 +66,9 @@ int main(int argc, char** argv) try
     if (outputFilenameDb3.isSet())
     {
         rs2::context ctx(settings.dump());
-        cout << "Converting " << inputFilename.getValue() << " to " << outputFilenameDb3.getValue() << ".db3 ..." << endl;
+        cout << "Converting " << inputFilename.getValue() << " to " << outputFilenameDb3.getValue() << " ..." << endl;
         ctx.convert_bag_to_db3(inputFilename.getValue(), outputFilenameDb3.getValue());
-        cout << "Conversion complete: " << outputFilenameDb3.getValue() << ".db3" << endl;
+        cout << "Conversion complete: " << outputFilenameDb3.getValue() << endl;
         return EXIT_SUCCESS;
     }
 
