@@ -13,6 +13,8 @@ namespace librealsense
 {
     using namespace device_serializer;
 
+    class info_interface;
+    class options_interface;
     class recommended_proccesing_blocks_interface;
 
     class ros2_writer: public writer
@@ -28,12 +30,12 @@ namespace librealsense
     private:
         void write_file_version();
         void write_frame_metadata(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
-        void write_extrinsics(const stream_identifier& stream_id, frame_interface* frame);
         void write_string( std::string const & topic, const device_serializer::nanoseconds & ts, std::string const & payload );
         void ensure_topic( const std::string & name, const std::string & type );
         std::shared_ptr<rcutils_uint8_array_t> create_buffer(size_t size) const;
 
         void write_notification(const sensor_identifier& sensor_id, const nanoseconds& timestamp, const notification& n) override;
+        void write_extrinsics(const stream_identifier& stream_id, uint32_t reference_id, const rs2_extrinsics& ext) override;
         void write_additional_frame_messages(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
         void write_stream_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<stream_profile_interface> profile);
         void write_streaming_info(nanoseconds timestamp, const sensor_identifier& sensor_id, std::shared_ptr<video_stream_profile_interface> profile);

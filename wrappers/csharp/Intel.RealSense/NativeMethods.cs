@@ -562,6 +562,9 @@ namespace Intel.RealSense
 
         [DllImport(dllName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void rs2_context_add_software_device(ContextHandle ctx, IntPtr device, [MarshalAs(UnmanagedType.CustomMarshaler, MarshalTypeRef = typeof(ErrorMarshaler))] out object error);
+
+        [DllImport(dllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void rs2_convert_bag_to_db3([MarshalAs(UnmanagedType.LPStr)] string input_bag_path, [MarshalAs(UnmanagedType.LPStr)] string output_db3_path, ContextHandle ctx, IntPtr callback, IntPtr client_data, [MarshalAs(UnmanagedType.CustomMarshaler, MarshalTypeRef = typeof(ErrorMarshaler))] out object error);
         #endregion
         #region rs
         [DllImport(dllName, CallingConvention = CallingConvention.Cdecl)]

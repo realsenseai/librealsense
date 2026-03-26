@@ -15,6 +15,8 @@
 #include "media/record/record_device.h"
 #include <media/ros2/ros2_writer.h>
 #include <media/ros2/ros2_reader.h>
+#include <media/bag_to_db3_converter.h>
+#include <media/reader_factory.h>
 #include "core/advanced_mode.h"
 #include "core/pose-frame.h"
 #include "core/motion-frame.h"
@@ -2088,6 +2090,9 @@ rs2_device* rs2_context_add_device(rs2_context* ctx, const char* file, rs2_error
     VALIDATE_NOT_NULL(ctx);
     VALIDATE_NOT_NULL(file);
 
+    if (librealsense::is_bag_file(file))
+        LOG_WARNING("ROS1 .bag format is deprecated. Use rs-convert --output-db3 to convert to .db3 format.");
+
     auto dev_info = std::make_shared< playback_device_info >( ctx->ctx, file );
     ctx->ctx->add_device( dev_info );
     return new rs2_device{ dev_info->create_device() };
@@ -2231,6 +2236,21 @@ void rs2_playback_device_stop(const rs2_device* device, rs2_error** error) BEGIN
     return playback->stop();
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, device)
+
+void rs2_convert_bag_to_db3(const char* input_bag_path, const char* output_db3_path, const rs2_context* ctx,
+                            rs2_update_progress_callback_ptr callback, void* client_data, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(input_bag_path);
+    VALIDATE_NOT_NULL(output_db3_path);
+    VALIDATE_NOT_NULL(ctx);
+    if (!librealsense::is_db3_file(output_db3_path))
+        throw librealsense::invalid_value_exception("Output path must end with .db3 extension");
+    std::function<void(float)> progress_callback;
+    if (callback)
+        progress_callback = [callback, client_data](float progress) { callback(progress, client_data); };
+    librealsense::convert_bag_to_db3(input_bag_path, output_db3_path, ctx->ctx, progress_callback);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, input_bag_path, output_db3_path, ctx)
 
 rs2_device* rs2_create_record_device(const rs2_device* device, const char* file, rs2_error** error) BEGIN_API_CALL
 {

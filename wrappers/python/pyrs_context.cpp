@@ -37,7 +37,11 @@ void init_context(py::module &m) {
              "On successful load, the device will be appended to the context and a devices_changed event triggered.",
              "filename"_a)
         .def("unload_device", &rs2::context::unload_device, "filename"_a) // No docstring in C++
-        .def("unload_tracking_module", &rs2::context::unload_tracking_module); // No docstring in C++
+        .def("unload_tracking_module", &rs2::context::unload_tracking_module) // No docstring in C++
+        .def("convert_bag_to_db3",
+             (void (rs2::context::*)(const std::string&, const std::string&)) &rs2::context::convert_bag_to_db3,
+             "Convert a legacy ROS1 .bag recording to a ROS2 .db3 file.",
+             "input"_a, "output"_a);
 
     // rs2::device_hub
     py::class_<rs2::device_hub>(m, "device_hub",

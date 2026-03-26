@@ -11,6 +11,7 @@
 #include "proc/hdr-merge.h"
 #include "proc/sequence-id-filter.h"
 #include "ros2_writer.h"
+#include "media/reader_factory.h"
 #include "core/motion-frame.h"
 #include <src/core/sensor-interface.h>
 #include <src/core/device-interface.h>
@@ -18,29 +19,39 @@
 #include <src/points.h>
 #include <src/labeled-points.h>
 
-#include <fstream>   // for std::ifstream
+#include <fstream>
 
 namespace librealsense
 {
     using namespace device_serializer;
 
+    static std::string strip_db3_extension(const std::string& file)
+    {
+        if (!is_db3_file(file))
+            throw std::runtime_error("Output file must have .db3 extension: '" + file + "'");
+        return file.substr(0, file.size() - 4);
+    }
+
     ros2_writer::ros2_writer(const std::string& file, bool compress_while_record) : m_file_path(file)
     {
         LOG_INFO("Compression while record is set to " << (compress_while_record ? "ON" : "OFF"));
         _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
-        // check if file exists, if so, delete it to record - rosbag2 sqlite plugin doesn't overwrite existing files
-        std::ifstream f(file + ".db3");
+
+        // rosbag2 sqlite plugin appends .db3 internally, so pass the stem
+        auto base_path = strip_db3_extension(file);
+
+        // Remove existing file — sqlite plugin doesn't overwrite
+        std::ifstream f(file);
         if (f.good())
         {
             f.close();
-            if (std::remove((file + ".db3").c_str()) != 0)
+            if (std::remove(file.c_str()) != 0)
             {
-                throw std::runtime_error(rsutils::string::from() << "Failed to remove existing rosbag2 storage file '" << file << "'");
+                throw std::runtime_error(rsutils::string::from() << "Failed to remove existing file '" << file << "'");
             }
         }
 
-        _storage->open(file, rosbag2_storage::storage_interfaces::IOFlag::READ_WRITE);
-        m_file_path += ".db3"; // rosbag2 sqlite plugin appends .db3 internally, so this is for consistency
+        _storage->open(base_path, rosbag2_storage::storage_interfaces::IOFlag::READ_WRITE);
         if (!_storage)
             throw std::runtime_error(rsutils::string::from() << "Failed to open rosbag2 storage for uri '" << file
                 << "' using storage id 'sqlite3'");
@@ -102,6 +113,21 @@ namespace librealsense
             for (auto&& sensor_extension_snapshot : sensors_snapshot.get_sensor_extensions_snapshots().get_snapshots())
             {
                 write_extension_snapshot(get_device_index(), sensors_snapshot.get_sensor_index(), get_static_file_info_timestamp(), sensor_extension_snapshot.first, sensor_extension_snapshot.second);
+            }
+
+            // Bag-to-db3 conversion only: the ROS1 reader provides stream profiles via
+            // get_stream_profiles() rather than as VIDEO_PROFILE/MOTION_PROFILE extensions
+            sensor_identifier sensor_id{ get_device_index(), sensors_snapshot.get_sensor_index() };
+            for (auto&& profile : sensors_snapshot.get_stream_profiles())
+            {
+                auto vid = std::dynamic_pointer_cast<video_stream_profile_interface>(profile);
+                auto mot = std::dynamic_pointer_cast<motion_stream_profile_interface>(profile);
+                if (vid)
+                    write_streaming_info(get_static_file_info_timestamp(), sensor_id, vid);
+                else if (mot)
+                    write_streaming_info(get_static_file_info_timestamp(), sensor_id, mot);
+                else
+                    write_stream_info(get_static_file_info_timestamp(), sensor_id, profile);
             }
         }
     }
@@ -261,16 +287,12 @@ namespace librealsense
         write_string(metadata_topic, timestamp, metadata_payload);
     }
 
-    void ros2_writer::write_extrinsics(const stream_identifier& stream_id, frame_interface* frame)
+    void ros2_writer::write_extrinsics(const stream_identifier& stream_id, uint32_t reference_id, const rs2_extrinsics& ext)
     {
         if (m_extrinsics_msgs.find(stream_id) != m_extrinsics_msgs.end())
         {
             return; //already wrote it
         }
-        auto& dev = frame->get_sensor()->get_device();
-        uint32_t reference_id = 0;
-        rs2_extrinsics ext;
-        std::tie(reference_id, ext) = dev.get_extrinsics(*frame->get_stream());
         
         // Serialize extrinsics as string: rotation (9 floats) and translation (3 floats)
         std::string payload = "rotation=";
@@ -316,7 +338,15 @@ namespace librealsense
 
         try
         {
-            write_extrinsics(stream_id, frame);
+            auto sensor = frame->get_sensor();
+            if (sensor)
+            {
+                auto& dev = sensor->get_device();
+                uint32_t reference_id = 0;
+                rs2_extrinsics ext;
+                std::tie(reference_id, ext) = dev.get_extrinsics(*frame->get_stream());
+                write_extrinsics(stream_id, reference_id, ext);
+            }
         }
         catch (std::exception const& e)
         {
@@ -472,7 +502,10 @@ namespace librealsense
             break;
         }
         default:
-            throw invalid_value_exception( rsutils::string::from() << "Failed to Write Extension Snapshot: Unsupported extension \"" << librealsense::get_string(type) << "\"");
+            // Sensor-type extensions (DEPTH_SENSOR, COLOR_SENSOR, etc.) are not serialized —
+            // they are reconstructed by the reader from sensor info. Skip them silently.
+            LOG_DEBUG("Skipping extension snapshot \"" << librealsense::get_string(type) << "\" (reconstructed by reader)");
+            break;
         }
 
     }

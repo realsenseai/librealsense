@@ -13,7 +13,7 @@ sw.init()
 
 import tempfile, os
 temp_dir = tempfile.TemporaryDirectory( prefix = 'recordings_' )
-filename = os.path.join( temp_dir.name, 'rec' )
+filename = os.path.join( temp_dir.name, 'rec.db3' )
 recorder = rs.recorder( filename, sw.device )
 
 sw.start()
@@ -114,7 +114,7 @@ test.finish()
 #
 test.start( "Play it back, with syncer -- lose last frame" )
 
-sw.playback( filename + ".db3" )
+sw.playback( filename )
 sw.start()
 
 sw.expect( depth_frame = 0 )                          # syncer doesn't know about color yet
@@ -143,7 +143,7 @@ test.finish()
 #
 test.start( "Play it back, without syncer -- and now expect the lost frame" )
 
-sw.playback( filename + ".db3", use_syncer = False )
+sw.playback( filename, use_syncer = False )
 sw.start()
 
 sw.expect( depth_frame = 0 )  # none of these is synced (no syncer)
