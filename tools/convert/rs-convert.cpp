@@ -289,6 +289,13 @@ int main(int argc, char** argv) try
         }
     }
 
+
+    for_each(converters.begin(), converters.end(),
+        [](shared_ptr<rs2::tools::converter::converter_base>& converter) {
+            converter->flush();
+        });
+
+
     if( !switchTextOutput.isSet() )
         cout << endl;
 
