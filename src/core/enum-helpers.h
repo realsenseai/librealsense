@@ -85,6 +85,7 @@ RS2_ENUM_HELPERS( rs2_point_cloud_label, POINT_CLOUD_LABEL )
 RS2_ENUM_HELPERS( rs2_calib_location, CALIB_LOCATION )
 RS2_ENUM_HELPERS( rs2_embedded_filter_type, EMBEDDED_FILTER_TYPE )
 RS2_ENUM_HELPERS( rs2_gyro_sensitivity, GYRO_SENSITIVITY )
+RS2_ENUM_HELPERS( rs2_thread_category, THREAD_CATEGORY )
 
 
 }  // namespace librealsense

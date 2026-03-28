@@ -110,6 +110,14 @@ struct rs2_options_changed_callback
 };
 typedef std::shared_ptr< rs2_options_changed_callback > rs2_options_changed_callback_sptr;
 
+struct rs2_thread_start_callback
+{
+    virtual void                            on_thread_start( rs2_thread_category category, const char * name ) noexcept = 0;
+    virtual void                            release() = 0;
+    virtual                                 ~rs2_thread_start_callback() {}
+};
+typedef std::shared_ptr< rs2_thread_start_callback > rs2_thread_start_callback_sptr;
+
 namespace rs2
 {
     class error : public std::runtime_error

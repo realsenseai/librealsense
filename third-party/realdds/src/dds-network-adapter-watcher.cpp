@@ -4,6 +4,7 @@
 #include <realdds/dds-network-adapter-watcher.h>
 #include <rsutils/shared-ptr-singleton.h>
 #include <rsutils/signal.h>
+#include <rsutils/concurrency/thread-utils.h>
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <rsutils/time/stopwatch.h>
 
@@ -44,7 +45,8 @@ public:
                 _time_since_update.reset();
                 if( ! _th.joinable() )
                 {
-                    _th = std::thread(
+                    _th = rsutils::concurrency::create_thread(
+                        rsutils::concurrency::thread_category_network, "dds-ip-wait",
                         [this, weak = std::weak_ptr< rsutils::os::network_adapter_watcher >( _adapter_watcher )]
                         {
                             LOG_DEBUG( "waiting for IP changes" );

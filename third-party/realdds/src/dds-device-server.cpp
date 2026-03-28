@@ -39,7 +39,7 @@ dds_device_server::dds_device_server( std::shared_ptr< dds_participant > const &
     : _publisher( std::make_shared< dds_publisher >( participant ) )
     , _subscriber( std::make_shared< dds_subscriber >( participant ) )
     , _topic_root( topic_root )
-    , _control_dispatcher( QUEUE_MAX_SIZE )
+    , _control_dispatcher( QUEUE_MAX_SIZE, rsutils::concurrency::thread_category_network, "dds-ctrl-d" )
 {
     LOG_DEBUG( "[" << debug_name() << "] device server created" );
     _control_dispatcher.start();

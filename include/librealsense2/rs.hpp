@@ -160,6 +160,50 @@ namespace rs2
         rs2_log(severity, message, &e);
         error::handle(e);
     }
+
+    /*
+        Wrapper around any callback function that is given to set_thread_start_callback.
+    */
+    class thread_start_callback : public rs2_thread_start_callback
+    {
+    public:
+        typedef std::function< void( rs2_thread_category, const char * ) > callback_fn;
+
+    private:
+        callback_fn _on_thread_start;
+
+    public:
+        explicit thread_start_callback( callback_fn && on_thread_start )
+            : _on_thread_start( std::move( on_thread_start ) )
+        {
+        }
+
+        void on_thread_start( rs2_thread_category category, const char * name ) noexcept override
+        {
+            _on_thread_start( category, name );
+        }
+
+        void release() override { delete this; }
+    };
+
+    /*
+        Register a callback to be invoked at the start of every library-created thread.
+        The callback runs inside the new thread, so the user can call platform APIs to
+        adjust thread priority.
+
+        Example:
+            rs2::set_thread_start_callback(
+                []( rs2_thread_category category, const char * name )
+                {
+                    // Adjust thread priority based on category...
+                });
+    */
+    inline void set_thread_start_callback( thread_start_callback::callback_fn callback )
+    {
+        rs2_error * e = nullptr;
+        rs2_set_thread_start_callback_cpp( new thread_start_callback( std::move( callback ) ), &e );
+        error::handle( e );
+    }
 }
 
 inline std::ostream & operator << (std::ostream & o, rs2_stream stream) { return o << rs2_stream_to_string(stream); }
@@ -180,5 +224,6 @@ inline std::ostream & operator << (std::ostream & o, rs2_sensor_mode mode) { ret
 inline std::ostream & operator << (std::ostream & o, rs2_calibration_type mode) { return o << rs2_calibration_type_to_string(mode); }
 inline std::ostream & operator << (std::ostream & o, rs2_calibration_status mode) { return o << rs2_calibration_status_to_string(mode); }
 inline std::ostream & operator << (std::ostream & o, rs2_eth_link_priority priority) { return o << rs2_eth_link_priority_to_string(priority); }
+inline std::ostream & operator << (std::ostream & o, rs2_thread_category category) { return o << rs2_thread_category_to_string(category); }
 
 #endif // LIBREALSENSE_RS2_HPP

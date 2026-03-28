@@ -9,6 +9,8 @@
 #include <chrono>
 #include <fstream>
 
+#include <rsutils/concurrency/thread-utils.h>
+
 #include "../../../tools/fw-logger/fw-logs-parser.h"
 #include "../../../include/librealsense2/hpp/rs_context.hpp"
 
@@ -120,7 +122,9 @@ void android_fw_logger::read_log_loop()
 android_fw_logger::android_fw_logger(std::string xml_path, int sample_rate) : _xml_path(xml_path), _sample_rate(sample_rate)
 {
     log("StartReadingFwLogs");
-    _thread = std::thread(&android_fw_logger::read_log_loop, this);
+    _thread = rsutils::concurrency::create_thread(
+        rsutils::concurrency::thread_category_utility, "fw-logger",
+        [this]() { read_log_loop(); });
 }
 
 android_fw_logger::~android_fw_logger()

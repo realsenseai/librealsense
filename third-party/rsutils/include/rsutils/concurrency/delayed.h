@@ -3,6 +3,7 @@
 #pragma once
 
 #include <rsutils/concurrency/event.h>
+#include <rsutils/concurrency/thread-utils.h>
 #include <rsutils/time/timer.h>
 #include <functional>
 #include <thread>
@@ -67,7 +68,8 @@ public:
         {
             if( _th.joinable() )
                 _th.join();
-            _th = std::thread(
+            _th = rsutils::concurrency::create_thread(
+                rsutils::concurrency::thread_category_utility, "delayed",
                 [this]
                 {
                     while( ! _done.wait( _timer.time_left() ) )  // i.e., timeout occurred

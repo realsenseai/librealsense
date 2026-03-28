@@ -21,7 +21,7 @@ int fibo( int num )
 
 TEST_CASE( "dispatcher main flow" )
 {
-    dispatcher d(3);
+    dispatcher d(3, rsutils::concurrency::thread_category_utility, "test-disp");
     std::atomic_bool run = { false };
     auto func = [&](dispatcher::cancellable_timer c) 
     {
@@ -44,7 +44,7 @@ TEST_CASE( "dispatcher main flow" )
 
 TEST_CASE( "invoke and wait" )
 {
-    dispatcher d(2);
+    dispatcher d(2, rsutils::concurrency::thread_category_utility, "test-disp");
 
     std::atomic_bool run = { false };
     auto func = [&](dispatcher::cancellable_timer c)
@@ -67,7 +67,7 @@ TEST_CASE("verify stop() not consuming high CPU usage")
 
     for (int i = 0 ; i < 32; ++i)
     {
-        dispatchers.push_back(std::make_shared<dispatcher>(10));
+        dispatchers.push_back(std::make_shared<dispatcher>(10, rsutils::concurrency::thread_category_utility, "test-disp"));
     }
 
     for (auto &&dispatcher : dispatchers)
@@ -99,7 +99,7 @@ TEST_CASE("stop() notify flush to finish")
 {
     // On this test we check that if during a flush() another thread call stop(),
     // than the flush CV will be triggered to exit and not wait a full timeout
-    dispatcher dispatcher( 10 );
+    dispatcher dispatcher( 10, rsutils::concurrency::thread_category_utility, "test-disp" );
     dispatcher.start();
 
     stopwatch sw;

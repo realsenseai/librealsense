@@ -10,6 +10,7 @@
 #include <realdds/topics/flexible-msg.h>
 #include <realdds/topics/device-info-msg.h>
 
+#include <rsutils/concurrency/thread-utils.h>
 #include <rsutils/json.h>
 using rsutils::json;
 
@@ -86,9 +87,10 @@ dds_device_watcher::dds_device_watcher( std::shared_ptr< dds_participant > const
                                 ->on_discovery_restored( device_info );
                             if( _on_device_added )
                             {
-                                std::thread( [device = device.alive, on_device_added = _on_device_added]()
-                                             { on_device_added( device ); } )
-                                    .detach();
+                                rsutils::concurrency::create_thread(
+                                    rsutils::concurrency::thread_category_device_monitoring, "dds-dev-add",
+                                    [device = device.alive, on_device_added = _on_device_added]()
+                                             { on_device_added( device ); } ).detach();
                             }
                             continue;
                         }
@@ -115,11 +117,11 @@ dds_device_watcher::dds_device_watcher( std::shared_ptr< dds_participant > const
                 // NOTE: device removals are handled via the writer-removed notification; see on_subscription_matched() below
                 if( _on_device_added )
                 {
-                    std::thread(
+                    rsutils::concurrency::create_thread(
+                        rsutils::concurrency::thread_category_device_monitoring, "dds-dev-new",
                         [new_device, on_device_added = _on_device_added]() {  //
                             on_device_added( new_device );
-                        } )
-                        .detach();
+                        } ).detach();
                 }
             }
         } );
@@ -204,7 +206,8 @@ void dds_device_watcher::device_discovery_lost( device_liveliness & device, std:
         static_cast< dds_discovery_sink * >( disconnected_device.get() )->on_discovery_lost();
 
         // rest must happen outside the mutex
-        std::thread(
+        rsutils::concurrency::create_thread(
+            rsutils::concurrency::thread_category_device_monitoring, "dds-dev-rm",
             [disconnected_device, on_device_removed = _on_device_removed]
             {
                 if( on_device_removed )
@@ -214,8 +217,7 @@ void dds_device_watcher::device_discovery_lost( device_liveliness & device, std:
                 // will cause some sort of invalid state in DDS. The thread will get killed and we won't get
                 // any notification of the remote participant getting removed... and the process will even
                 // hang on exit.
-            } )
-            .detach();
+            } ).detach();
     }
 }
 

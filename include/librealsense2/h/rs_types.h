@@ -271,6 +271,21 @@ typedef enum rs2_embedded_filter_type
 } rs2_embedded_filter_type;
 const char* rs2_embedded_filter_type_to_string(rs2_embedded_filter_type embedded_filter);
 
+/** \brief Category of a library-created thread, for use with the thread-start callback. */
+typedef enum rs2_thread_category
+{
+    RS2_THREAD_CATEGORY_USB_IO,              /**< USB I/O threads: libusb events, UVC stream/device dispatch, WinUSB endpoints */
+    RS2_THREAD_CATEGORY_VIDEO_CAPTURE,       /**< Video capture threads: V4L2 capture loop */
+    RS2_THREAD_CATEGORY_SENSOR_IO,           /**< Sensor I/O threads: HID data reads, interrupt processing, timestamp sync */
+    RS2_THREAD_CATEGORY_FRAME_PROCESSING,    /**< Frame processing threads: UVC frame publishing */
+    RS2_THREAD_CATEGORY_DEVICE_MONITORING,   /**< Device monitoring threads: udev/polling/DDS device watchers, error polling, thermal monitoring */
+    RS2_THREAD_CATEGORY_DISPATCH,            /**< Dispatch threads: pipeline dispatch, notification dispatch */
+    RS2_THREAD_CATEGORY_NETWORK,             /**< Network threads: DDS communication, network adapter monitoring */
+    RS2_THREAD_CATEGORY_UTILITY,             /**< Utility threads: delayed initialization, firmware logging, power management */
+    RS2_THREAD_CATEGORY_COUNT                /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
+} rs2_thread_category;
+const char * rs2_thread_category_to_string(rs2_thread_category category);
+
 typedef struct rs2_device_info rs2_device_info;
 typedef struct rs2_device rs2_device;
 typedef struct rs2_error rs2_error;
@@ -311,6 +326,7 @@ typedef struct rs2_firmware_log_message rs2_firmware_log_message;
 typedef struct rs2_firmware_log_parsed_message rs2_firmware_log_parsed_message;
 typedef struct rs2_firmware_log_parser rs2_firmware_log_parser;
 typedef struct rs2_terminal_parser rs2_terminal_parser;
+typedef struct rs2_thread_start_callback rs2_thread_start_callback;
 typedef void (*rs2_log_callback_ptr)(rs2_log_severity, rs2_log_message const *, void * arg);
 typedef void (*rs2_notification_callback_ptr)(rs2_notification*, void*);
 typedef void (*rs2_software_device_destruction_callback_ptr)(void*);
@@ -319,6 +335,7 @@ typedef void (*rs2_frame_callback_ptr)(rs2_frame*, void*);
 typedef void (*rs2_frame_processor_callback_ptr)(rs2_frame*, rs2_source*, void*);
 typedef void (*rs2_update_progress_callback_ptr)(const float, void*);
 typedef void (*rs2_options_changed_callback_ptr)(const rs2_options_list *);
+typedef void (*rs2_thread_start_callback_ptr)(rs2_thread_category category, const char * name, void * arg);
 
 typedef double      rs2_time_t;     /**< Timestamp format. units are milliseconds */
 typedef long long   rs2_metadata_type; /**< Metadata attribute type is defined as 64 bit signed integer*/

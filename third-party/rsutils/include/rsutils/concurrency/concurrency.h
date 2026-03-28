@@ -9,6 +9,8 @@
 #include <atomic>
 #include <functional>
 #include <cassert>
+#include <string>
+#include <rsutils/concurrency/thread-utils.h>
 
 const int QUEUE_MAX_SIZE = 10;
 // Simplest implementation of a blocking concurrent queue for thread messaging
@@ -314,12 +316,20 @@ public:
     // and we're non-blocking. The on_drop_callback allows caputring of these instances, if we
     // want...
     //
+    // The thread_category and thread_name parameters are used for OS-level thread naming and
+    // the user-registerable thread-start callback. The thread name will be prefixed with "rs:".
+    //
     dispatcher( unsigned int queue_capacity,
+                rsutils::concurrency::thread_category thread_category,
+                std::string const & thread_name,
                 std::function< void( action ) > on_drop_callback = nullptr );
 
     ~dispatcher();
 
     bool empty() const { return _queue.empty(); }
+
+    std::string const & get_thread_name() const { return _thread_name; }
+    rsutils::concurrency::thread_category get_thread_category() const { return _thread_category; }
 
     // Main invocation of an action: this will be called from any thread, and basically just queues
     // up the actions for our dispatching thread to handle them.
@@ -400,14 +410,17 @@ private:
     std::mutex _blocking_invoke_mutex;
 
     std::atomic<bool> _is_alive;
+
+    rsutils::concurrency::thread_category _thread_category;
+    std::string _thread_name;
 };
 
 template<class T = std::function<void(dispatcher::cancellable_timer)>>
 class active_object
 {
 public:
-    active_object(T operation)
-        : _operation(std::move(operation)), _dispatcher(1), _stopped(true)
+    active_object(T operation, rsutils::concurrency::thread_category thread_category, std::string const & thread_name)
+        : _operation(std::move(operation)), _dispatcher(1, thread_category, thread_name), _stopped(true)
     {
     }
 
@@ -457,7 +470,8 @@ private:
 class watchdog
 {
 public:
-    watchdog(std::function<void()> operation, uint64_t timeout_ms) :
+    watchdog(std::function<void()> operation, uint64_t timeout_ms,
+             rsutils::concurrency::thread_category thread_category, std::string const & thread_name) :
             _timeout_ms(timeout_ms), _operation(std::move(operation))
     {
         _watcher = std::make_shared<active_object<>>([this](dispatcher::cancellable_timer cancellable_timer)
@@ -469,7 +483,7 @@ public:
                 std::lock_guard<std::mutex> lk(_m);
                 _kicked = false;
             }
-        });
+        }, thread_category, thread_name);
     }
 
     ~watchdog()

@@ -55,6 +55,7 @@ auto_exposure_mechanism::auto_exposure_mechanism(option& gain_option, option& ex
       _skip_frames(auto_exposure_state.skip_frames)
 {
     _exposure_thread = std::make_shared<std::thread>(
+        rsutils::concurrency::create_thread( rsutils::concurrency::thread_category_frame_processing, "auto-expos",
                 [this]()
     {
         while (_keep_alive)
@@ -127,7 +128,7 @@ auto_exposure_mechanism::auto_exposure_mechanism(option& gain_option, option& ex
                 LOG_ERROR("Unknown error during Auto-Exposure loop!");
             }
         }
-    });
+    }));
 }
 
 auto_exposure_mechanism::~auto_exposure_mechanism()

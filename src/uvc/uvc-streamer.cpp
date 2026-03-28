@@ -16,7 +16,7 @@ namespace librealsense
     namespace platform
     {
         uvc_streamer::uvc_streamer(uvc_streamer_context context) :
-            _context(context), _action_dispatcher(10)
+            _context(context), _action_dispatcher(10, rsutils::concurrency::thread_category_usb_io, "uvc-strm-d")
         {
             auto inf = context.usb_device->get_interface(context.control->bInterfaceNumber);
             if (inf == nullptr)
@@ -93,7 +93,7 @@ namespace librealsense
                     if(_publish_frames && running())
                         _context.user_cb(_context.profile, fp->fo, []() mutable {});
                 }
-            });
+            }, rsutils::concurrency::thread_category_frame_processing, "uvc-pub-fr");
 
             _watchdog = std::make_shared<watchdog>([this]()
              {
@@ -106,7 +106,7 @@ namespace librealsense
                        _context.messenger->reset_endpoint(_read_endpoint, ENDPOINT_RESET_MILLISECONDS_TIMEOUT);
                        _frame_arrived = false;
                    });
-             }, _watchdog_timeout);
+             }, _watchdog_timeout, rsutils::concurrency::thread_category_usb_io, "uvc-wdog");
 
             _watchdog->start();
 

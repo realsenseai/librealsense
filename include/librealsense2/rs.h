@@ -97,6 +97,25 @@ void rs2_log_to_callback_cpp( rs2_log_severity min_severity, rs2_log_callback * 
 
 void rs2_log_to_callback( rs2_log_severity min_severity, rs2_log_callback_ptr callback, void * arg, rs2_error** error );
 
+/**
+* Register a callback that is invoked at the start of every library-created thread.
+* The callback runs inside the new thread before any work begins, so the user can call
+* platform-specific APIs (e.g., pthread_setpriority, SetThreadPriority) to adjust the thread priority.
+* Only one callback can be registered at a time; registering a new one replaces the previous.
+* \param[in] callback         Callback function pointer
+* \param[in] arg              User data passed to the callback
+* \param[out] error           if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_set_thread_start_callback( rs2_thread_start_callback_ptr callback, void * arg, rs2_error ** error );
+
+/**
+* Register a callback that is invoked at the start of every library-created thread (C++ interface).
+* The callback runs inside the new thread before any work begins.
+* \param[in] callback         Callback object implementing rs2_thread_start_callback interface
+* \param[out] error           if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_set_thread_start_callback_cpp( rs2_thread_start_callback * callback, rs2_error ** error );
+
 void rs2_reset_logger( rs2_error ** error);
 
 /**

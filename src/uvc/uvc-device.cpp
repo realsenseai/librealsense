@@ -82,7 +82,7 @@ namespace librealsense
         rs_uvc_device::rs_uvc_device(const rs_usb_device& usb_device, const uvc_device_info &info, uint8_t usb_request_count) :
                 _usb_device(usb_device),
                 _info(info),
-                _action_dispatcher(10),
+                _action_dispatcher(10, rsutils::concurrency::thread_category_usb_io, "uvc-dev-d"),
                 _usb_request_count(usb_request_count)
         {
             _parser = std::make_shared<uvc_parser>(usb_device, info);

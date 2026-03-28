@@ -255,7 +255,9 @@ namespace librealsense
 
             _callback = sensor_callback;
             _is_capturing = true;
-            _hid_thread = std::unique_ptr<std::thread>(new std::thread([this, read_device_path_str](){
+            _hid_thread = std::unique_ptr<std::thread>(new std::thread(rsutils::concurrency::create_thread(
+                rsutils::concurrency::thread_category_sensor_io, "hid-custom",
+                [this, read_device_path_str](){
                 const uint32_t channel_size = 24; // TODO: why 24?
                 std::vector<uint8_t> raw_data(channel_size * hid_buf_len);
 
@@ -326,7 +328,7 @@ namespace librealsense
                         LOG_WARNING("hid_custom_sensor: Frames didn't arrived within 5 seconds");
                     }
                 } while(this->_is_capturing);
-            }));
+            })));
         }
 
         void hid_custom_sensor::stop_capture()
@@ -463,7 +465,7 @@ namespace librealsense
               _sampling_frequency_name(""),
               _callback(nullptr),
               _is_capturing(false),
-              _pm_dispatcher(16)    // queue for async power management commands
+              _pm_dispatcher(16, rsutils::concurrency::thread_category_sensor_io, "hid-pm-d")    // queue for async power management commands
         {
             init(frequency, sensitivity);
         }
@@ -536,7 +538,9 @@ namespace librealsense
 
             _callback = sensor_callback;
             _is_capturing = true;
-            _hid_thread = std::unique_ptr<std::thread>(new std::thread([this](){
+            _hid_thread = std::unique_ptr<std::thread>(new std::thread(rsutils::concurrency::create_thread(
+                rsutils::concurrency::thread_category_sensor_io, "hid-iio-cap",
+                [this](){
                 const uint32_t channel_size = get_channel_size();
                 size_t raw_data_size = channel_size*hid_buf_len;
 
@@ -642,7 +646,7 @@ namespace librealsense
                         std::this_thread::sleep_for(std::chrono::milliseconds(2));
                     }
                 } while(this->_is_capturing);
-            }));
+            })));
         }
 
         void iio_hid_sensor::stop_capture()
@@ -818,7 +822,9 @@ namespace librealsense
             // The patch will rectify this behaviour
             std::string current_trigger = _sensor_name + "-dev" + _iio_device_path.back();
             std::string path = _iio_device_path + "/trigger/current_trigger";
-            _pm_thread = std::unique_ptr<std::thread>(new std::thread([path,current_trigger](){
+            _pm_thread = std::unique_ptr<std::thread>(new std::thread(rsutils::concurrency::create_thread(
+                rsutils::concurrency::thread_category_utility, "hid-pm-init",
+                [path,current_trigger](){
                 bool retry =true;
                 while (retry) {
                     try {
@@ -830,7 +836,7 @@ namespace librealsense
                     catch(...){} // Device disconnect
                     retry = false;
                 }
-            }));
+            })));
             _pm_thread->detach();
 
             // read all available input of the iio_device

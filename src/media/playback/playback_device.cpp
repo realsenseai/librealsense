@@ -35,7 +35,8 @@ std::shared_ptr< device_interface > playback_device_info::create_device()
 
 playback_device::playback_device( std::shared_ptr< const device_info > const & dev_info,
                                   std::shared_ptr< device_serializer::reader > const & serializer )
-    : m_read_thread( []() { return std::make_shared< dispatcher >( std::numeric_limits< unsigned int >::max() ); } )
+    : m_read_thread( []() { return std::make_shared< dispatcher >( std::numeric_limits< unsigned int >::max(),
+          rsutils::concurrency::thread_category_utility, "playback-rd" ); } )
     , m_device_info( dev_info )
     , m_is_started( false )
     , m_is_paused( false )

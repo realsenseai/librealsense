@@ -2,45 +2,51 @@
 // Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
 #include <rsutils/concurrency/concurrency.h>
+#include <rsutils/concurrency/thread-utils.h>
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <rsutils/time/waiting-on.h>
 
-dispatcher::dispatcher( unsigned int cap, std::function< void( action ) > on_drop_callback )
+dispatcher::dispatcher( unsigned int cap, rsutils::concurrency::thread_category thread_category,
+                        std::string const & thread_name,
+                        std::function< void( action ) > on_drop_callback )
     : _queue( cap, on_drop_callback )
     , _was_stopped( true )
     , _is_alive( true )
+    , _thread_category( thread_category )
+    , _thread_name( thread_name )
 {
     // We keep a running thread that takes stuff off our queue and dispatches them
-    _thread = std::thread([&]()
-    {
-        int timeout_ms = 5000;
-        while( _is_alive )
+    _thread = rsutils::concurrency::create_thread( _thread_category, _thread_name,
+        [this]()
         {
-            if( _wait_for_start( timeout_ms ) )
+            int timeout_ms = 5000;
+            while( _is_alive )
             {
-                std::function< void(cancellable_timer) > item;
-                if (_queue.dequeue(&item, timeout_ms))
+                if( _wait_for_start( timeout_ms ) )
                 {
-                    cancellable_timer time(this);
+                    std::function< void(cancellable_timer) > item;
+                    if (_queue.dequeue(&item, timeout_ms))
+                    {
+                        cancellable_timer time(this);
 
-                    try
-                    {
-                        // While we're dispatching the item, we cannot stop!
-                        std::lock_guard< std::mutex > lock(_dispatch_mutex);
-                        item(time);
-                    }
-                    catch (const std::exception& e)
-                    {
-                        LOG_ERROR("Dispatcher [" << this << "] exception caught: " << e.what());
-                    }
-                    catch (...)
-                    {
-                        LOG_ERROR("Dispatcher [" << this << "] unknown exception caught!");
+                        try
+                        {
+                            // While we're dispatching the item, we cannot stop!
+                            std::lock_guard< std::mutex > lock(_dispatch_mutex);
+                            item(time);
+                        }
+                        catch (const std::exception& e)
+                        {
+                            LOG_ERROR("Dispatcher [" << _thread_name << "] exception caught: " << e.what());
+                        }
+                        catch (...)
+                        {
+                            LOG_ERROR("Dispatcher [" << _thread_name << "] unknown exception caught!");
+                        }
                     }
                 }
             }
-        }
-    });
+        } );
 }
 
 

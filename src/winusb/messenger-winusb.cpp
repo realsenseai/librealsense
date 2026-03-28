@@ -176,7 +176,8 @@ namespace librealsense
             std::lock_guard<std::mutex> lk(_mutex);
             if (_dispatchers.find(endpoint) == _dispatchers.end())
             {
-                _dispatchers[endpoint] = std::make_shared<dispatcher>(10);
+                std::string name = std::string("winusb-ep") + std::to_string(endpoint);
+                _dispatchers[endpoint] = std::make_shared<dispatcher>(10, rsutils::concurrency::thread_category_usb_io, name);
                 _dispatchers[endpoint]->start();
             }
             return _dispatchers.at(endpoint);

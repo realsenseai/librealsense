@@ -11,6 +11,7 @@
 #include <src/metadata-parser.h>
 
 #include <rsutils/type/fourcc.h>
+#include <rsutils/concurrency/thread-utils.h>
 using rsutils::type::fourcc;
 
 
@@ -149,7 +150,9 @@ platform_camera::platform_camera( std::shared_ptr< const device_info > const & d
                                  make_uvc_header_parser( &platform::uvc_header::timestamp ) );
 
     // Create a thread to call initialize after a delay
-    _init_thread = std::thread([this]() {
+    _init_thread = rsutils::concurrency::create_thread(
+        rsutils::concurrency::thread_category_utility, "platcam-init",
+        [this]() {
         std::this_thread::sleep_for(std::chrono::seconds(2)); // Delay for 2 seconds
         this->initialize();
     });

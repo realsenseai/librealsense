@@ -137,7 +137,7 @@ udev_device_watcher::udev_device_watcher( const platform::backend * backend )
             }
             _changed = false;
         }
-    } )
+    }, rsutils::concurrency::thread_category_device_monitoring, "udev-dev-w" )
 {
     _udev_ctx = udev_new();
     if( ! _udev_ctx )

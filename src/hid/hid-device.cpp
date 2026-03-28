@@ -57,7 +57,7 @@ namespace librealsense
 
         rs_hid_device::rs_hid_device(rs_usb_device usb_device)
             : _usb_device(usb_device),
-              _action_dispatcher(10)
+              _action_dispatcher(10, rsutils::concurrency::thread_category_usb_io, "hid-dev-d")
         {
             _id_to_sensor[REPORT_ID_GYROMETER_3D] = gyro;
             _id_to_sensor[REPORT_ID_ACCELEROMETER_3D] = accel;
@@ -150,7 +150,7 @@ namespace librealsense
                 _handle_interrupts_thread = std::make_shared<active_object<>>([this](dispatcher::cancellable_timer cancellable_timer)
                 {
                     handle_interrupt();
-                });
+                }, rsutils::concurrency::thread_category_sensor_io, "hid-intr");
 
                 _handle_interrupts_thread->start();
 

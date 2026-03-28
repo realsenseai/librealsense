@@ -174,6 +174,20 @@ enum class ERealSenseDepthColormap : uint8
     Pattern,
 };
 
+// typedef enum rs2_thread_category
+UENUM(Blueprintable)
+enum class ERealSenseThreadCategory : uint8
+{
+    USB_IO                                     , /**< USB I/O threads */
+    VIDEO_CAPTURE                              , /**< Video capture threads */
+    SENSOR_IO                                  , /**< Sensor I/O threads */
+    FRAME_PROCESSING                           , /**< Frame processing threads */
+    DEVICE_MONITORING                          , /**< Device monitoring threads */
+    DISPATCH                                   , /**< Dispatch threads */
+    NETWORK                                    , /**< Network threads */
+    UTILITY                                    , /**< Utility threads */
+};
+
 USTRUCT(BlueprintType)
 struct FRealSenseStreamProfile
 {

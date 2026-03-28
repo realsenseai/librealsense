@@ -17,6 +17,7 @@
 
 #include <rsutils/shared-ptr-singleton.h>
 #include <rsutils/string/slice.h>
+#include <rsutils/concurrency/thread-utils.h>
 #include <rsutils/json.h>
 
 using rsutils::string::slice;
@@ -58,7 +59,8 @@ public:
             } );
         _writer->run();
 
-        _th = std::thread(
+        _th = rsutils::concurrency::create_thread(
+            rsutils::concurrency::thread_category_network, "dds-bcast",
             [this]()
             {
                 LOG_DEBUG( _writer->topic()->get_participant()->name() << ": broadcaster thread running" );
@@ -161,7 +163,8 @@ void dds_device_broadcaster::broadcast() const
         // If a broadcast callback is asked for, we wait for acks and call it on the first broadcast (and never again)
         if( _on_ack )
         {
-            std::thread(
+            rsutils::concurrency::create_thread(
+                rsutils::concurrency::thread_category_network, "dds-bcast-ak",
                 [on_ack = std::move( _on_ack ),
                  weak_broadcaster = std::weak_ptr< const dds_device_broadcaster >( shared_from_this() )]
                 {
@@ -176,8 +179,7 @@ void dds_device_broadcaster::broadcast() const
                         }
                         catch( ... ) {}
                     }
-                } )
-                .detach();
+                } ).detach();
         }
     }
     catch( std::exception const & e )

@@ -19,7 +19,8 @@ class polling_device_watcher : public librealsense::platform::device_watcher
 public:
     polling_device_watcher( const platform::backend * backend_ref )
         : _backend( backend_ref )
-        , _active_object( [this]( dispatcher::cancellable_timer cancellable_timer ) { polling( cancellable_timer ); } )
+        , _active_object( [this]( dispatcher::cancellable_timer cancellable_timer ) { polling( cancellable_timer ); },
+                          rsutils::concurrency::thread_category_device_monitoring, "poll-dev-w" )
         , _devices_data()
     {
         _devices_data = { _backend->query_uvc_devices(), _backend->query_usb_devices(), _backend->query_hid_devices() };
