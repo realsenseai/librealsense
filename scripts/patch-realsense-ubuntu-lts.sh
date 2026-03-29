@@ -260,6 +260,23 @@ fi
 
 echo -e "\e[32mPatched kernels modules were created successfully\n\e[0m"
 
+
+## -- This code signs the modules so that users don't have to disable secure-boot.
+cd ../../../
+
+echo "Signing Modules"
+for file in `find ./ -name '*.ko'`
+do
+        echo $file 
+        sudo kmodsign sha512 /var/lib/shim-signed/mok/MOK.priv /var/lib/shim-signed/mok/MOK.der $file
+done
+
+echo "Unsigned modules:"
+find ./ -name '*.ko' -exec grep -FL '~Module signature appended~' {} \+
+
+## -- End of new code
+
+
 # Load the newly-built modules
 # As a precausion start with unloading the core uvcvideo:
 try_unload_module uvcvideo
