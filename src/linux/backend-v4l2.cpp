@@ -1629,11 +1629,13 @@ namespace librealsense
 
         void v4l_uvc_device::start_callbacks()
         {
+            LOG_DEBUG_V4L("_is_started_flag true for: name=" << _name << ", device_path=" << _device_path );
             _is_started = true;
         }
 
         void v4l_uvc_device::stop_callbacks()
         {
+            LOG_DEBUG_V4L("_is_started_flag false for: name=" << _name << ", device_path=" << _device_path );
             _is_started = false;
         }
 
