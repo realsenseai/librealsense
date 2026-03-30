@@ -21,9 +21,9 @@ For example:
 will collect the data for 60 seconds.
 The data will be saved to `./test1.db3`.
 
-To inspect the recorded file, use [Foxglove](https://foxglove.dev/) (see [Recording Inspector](../rosbag-inspector) for details).
+To inspect the recorded file, use any third-party application that supports `.db3` files, such as [Foxglove](https://foxglove.dev/) (see [Recording Inspector](../rosbag-inspector) for details).
 
 # Recording file
-The recorded `.db3` file can be replayed within librealsense using the playback API or the RealSense Viewer, and inspected using [Foxglove](https://foxglove.dev/) or standard ROS2 tools (`ros2 bag info`, `ros2 bag play`).
+The recorded `.db3` file can be replayed within librealsense using the playback API or the RealSense Viewer, and inspected using any third-party application that supports `.db3` files (e.g. [Foxglove](https://foxglove.dev/)) or standard ROS2 tools (`ros2 bag info`, `ros2 bag play`).
 
 The `.db3` format is a SQLite database following the ROS2 rosbag2 storage format, using CDR serialization.

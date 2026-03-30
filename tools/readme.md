@@ -11,5 +11,5 @@
 4. [Firmware-Logger](./fw-logger) - Console application for collecting internal camera logs.
 5. [Data-Collect](./data-collect) - Console application capable of generating CSV report of frame statistics
 6. [Terminal](./terminal) - Troubleshooting tool that sends commands to the camera firmware
-7. [Recording Inspector](./rosbag-inspector) - For inspecting `.db3` recordings use [Foxglove](https://foxglove.dev/); for legacy `.bag` files use `rs-rosbag-inspector`
+7. [Recording Inspector](./rosbag-inspector) - For inspecting `.db3` recordings use any third-party application that supports `.db3` files (e.g. [Foxglove](https://foxglove.dev/)); for legacy `.bag` files use `rs-rosbag-inspector`
 8. [dds-sniffer](./dds/dds-sniffer) - Console application providing information about active DDS domain entities

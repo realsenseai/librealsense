@@ -2,7 +2,7 @@
 
 ## Inspecting `.db3` Recordings
 
-The SDK now records to `.db3` (ROS2 rosbag2 format). To inspect these recordings, use [Foxglove](https://foxglove.dev/), a free desktop application that can open `.db3` files directly.
+The SDK now records to `.db3` (ROS2 rosbag2 format). To inspect these recordings, use any third-party application that supports `.db3` files, such as [Foxglove](https://foxglove.dev/).
 
 Foxglove is also [recommended by the official ROS 2 documentation](https://docs.ros.org/en/rolling/Related-Projects/Visualizing-ROS-2-Data-With-Foxglove.html) for visualizing ROS 2 data.
 
