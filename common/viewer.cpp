@@ -1479,7 +1479,7 @@ namespace rs2
 
         auto flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
             | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar
-            | ImGuiWindowFlags_NoSavedSettings
+            | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus
             | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 5, 5 });

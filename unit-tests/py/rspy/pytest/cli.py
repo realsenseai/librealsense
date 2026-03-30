@@ -27,4 +27,19 @@ def consume_legacy_flags():
 
     Call this before pytest parses sys.argv.
     """
+    # TODO: remove -r/--regex bridge once old infra (run-unit-tests.py) is fully retired;
+    #       users can switch to pytest's native -k flag directly
     _consume_flag_with_arg(['-r', '--regex'], '-k')  # -r/--regex -> pytest's -k (keyword filter)
+
+
+def apply_pending_flags(config):
+    """Apply -k filter that consume_legacy_flags() added to sys.argv.
+
+    pytest consumes -r as a built-in flag before conftest.py loads, so the -k
+    added to sys.argv by consume_legacy_flags() is never parsed. This function
+    applies it directly to pytest's config. Call from pytest_configure().
+    """
+    if '-k' in sys.argv and not config.option.keyword:
+        idx = sys.argv.index('-k')
+        if idx + 1 < len(sys.argv):
+            config.option.keyword = sys.argv[idx + 1]

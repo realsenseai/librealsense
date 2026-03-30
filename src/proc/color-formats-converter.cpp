@@ -229,7 +229,7 @@ namespace librealsense
             }
         }
 
-#elif defined(__ARM_NEON)  && ! defined ANDROID
+#elif defined(__ARM_NEON) && defined(BUILD_WITH_NEON) && !defined(ANDROID)
 
         if (FORMAT == RS2_FORMAT_Y8) unpack_yuy2_neon_y8(d, s, n);
         if (FORMAT == RS2_FORMAT_Y16) unpack_yuy2_neon_y16(d, s, n);

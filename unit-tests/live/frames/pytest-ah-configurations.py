@@ -1,22 +1,29 @@
 # License: Apache 2.0. See LICENSE file in root directory.
-# Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# test:device D585S
-# test:donotrun:!nightly
+"""
+Test FPS accuracy on D585S with various sensor permutations
+(Depth+Color, Depth+Color+Safety, etc.).
+"""
 
-from rspy import test, log, tests_wrapper
+import pytest
 import pyrealsense2 as rs
+from rspy import tests_wrapper as tw
 import fps_helper
-
+import logging
+log = logging.getLogger(__name__)
 
 VGA_RESOLUTION = (640, 360)
 HD_RESOLUTION = (1280, 720)
 
+pytestmark = [
+    pytest.mark.device_each("D585S"),
+    pytest.mark.context("nightly"),
+]
+
 
 def get_sensors_and_profiles(device):
-    """
-    Returns an array of pairs of a (sensor, profile) for each of its profiles
-    """
+    """Returns an array of pairs of a (sensor, profile) for each of its profiles."""
     sensor_profiles_arr = []
     for sensor in device.query_sensors():
         profile = None
@@ -28,7 +35,7 @@ def get_sensors_and_profiles(device):
             if sensor.supports(rs.option.enable_auto_exposure):
                 sensor.set_option(rs.option.enable_auto_exposure, 1)
             if sensor.supports(rs.option.auto_exposure_priority):
-                sensor.set_option(rs.option.auto_exposure_priority, 0)  # AE priority should be 0 for constant FPS
+                sensor.set_option(rs.option.auto_exposure_priority, 0)
             profile = fps_helper.get_profile(sensor, rs.stream.color, HD_RESOLUTION, 30)
         elif sensor.is_motion_sensor():
             sensor_profiles_arr.append((sensor, fps_helper.get_profile(sensor, rs.stream.accel)))
@@ -44,17 +51,21 @@ def get_sensors_and_profiles(device):
     return sensor_profiles_arr
 
 
-dev, _ = test.find_first_device_or_exit()
-tests_wrapper.start_wrapper(dev)
+PERMUTATIONS = [
+    ["Depth", "Color"],
+    ["Depth", "Color", "Safety"],
+    ["Depth", "Color", "Safety", "Occupancy"],
+    ["Depth", "Color", "Safety", "Labeled Point Cloud"],
+    ["Depth", "Color", "Accel", "Gyro"],
+]
 
-sensor_profiles_array = get_sensors_and_profiles(dev)
 
-permutations_to_run = [["Depth", "Color"],
-                       ["Depth", "Color", "Safety"],
-                       ["Depth", "Color", "Safety", "Occupancy"],
-                       ["Depth", "Color", "Safety", "Labeled Point Cloud"],
-                       ["Depth", "Color", "Accel", "Gyro"]]
-fps_helper.perform_fps_test(sensor_profiles_array, permutations_to_run)
-tests_wrapper.stop_wrapper(dev)
+def test_ah_configurations(test_device):
+    dev, ctx = test_device
 
-test.print_results_and_exit()
+    tw.start_wrapper(dev)
+    try:
+        sensor_profiles_array = get_sensors_and_profiles(dev)
+        fps_helper.perform_fps_test(sensor_profiles_array, PERMUTATIONS)
+    finally:
+        tw.stop_wrapper(dev)

@@ -123,17 +123,26 @@ def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground
     return health[0]
 
 
-def measure_average_depth(config, pipe, width=640, height=480, fps=30, frames=10, timeout_s=12, enable_emitter=True):
+def measure_average_depth(config, pipe, width=640, height=480, fps=30, frames=10, timeout_s=12, enable_emitter=True, center_fraction=1.0, depth_range_mm=None):
     """Measure the average depth distance (in meters) across a series of frames.
 
     Valid depth pixels are > 0 (raw units). Invalid (<=0) are ignored.
 
     Args:
-        ctx (rs.context|None): Optional existing context; created if None.
-        width, height, fps (int): Stream configuration for depth.
+        config (rs.config): Configuration associated with the depth stream used by ``pipe``.
+        pipe (rs.pipeline): Pipeline providing depth frames; expected to be configured/started elsewhere.
+        width, height, fps (int): Optional depth stream parameters, expected to match the active stream.
+        These parameters are not used by this function to configure the stream.
         frames (int): Maximum number of frames to sample.
         timeout_s (float): Overall timeout for the sampling loop.
         enable_emitter (bool): Attempt to enable emitter for more reliable data.
+        center_fraction (float): Fraction of the frame (centered) to sample, in range (0, 1].
+                                 Use values like 0.3 to measure only the central region where
+                                 a calibration target is expected to be placed.
+        depth_range_mm (tuple|None): Optional (min_mm, max_mm) range. When provided, only pixels
+                                     whose depth (in mm) falls within this range are included.
+                                     Use this to isolate a target at a known distance from
+                                     background clutter.
 
     Returns:
         float | None: Mean depth in meters over all valid pixels from collected frames,
@@ -171,7 +180,19 @@ def measure_average_depth(config, pipe, width=640, height=480, fps=30, frames=10
             data = np.asanyarray(depth.get_data())  # uint16
             if data.size == 0:
                 continue
+            # Optionally restrict to the central region of the frame
+            if center_fraction < 1.0:
+                h, w = data.shape
+                y0 = int(h * (1.0 - center_fraction) / 2)
+                y1 = h - y0
+                x0 = int(w * (1.0 - center_fraction) / 2)
+                x1 = w - x0
+                data = data[y0:y1, x0:x1]
             valid_mask = data > 0  # ignore zero / invalid
+            if depth_range_mm is not None:
+                min_raw = int(depth_range_mm[0] / (depth_scale * 1000.0))
+                max_raw = int(depth_range_mm[1] / (depth_scale * 1000.0))
+                valid_mask = valid_mask & (data >= min_raw) & (data <= max_raw)
             count = valid_mask.sum()
             if count == 0:
                 # No valid points in this frame; keep trying

@@ -2,6 +2,7 @@
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 from rspy import log, test
+import os
 import numpy as np
 import cv2
 import time
@@ -123,3 +124,41 @@ def get_avg_depth_from_region(image, x, y, size=SAMPLE_REGION_SIZE, min_value=60
 
 def is_color_close(actual, expected, tolerance):
     return all(abs(int(a) - int(e)) <= tolerance for a, e in zip(actual, expected))
+
+
+_snapshot_saved = False
+
+def save_failure_snapshot( test_file, pipeline, annotated_image=None ):
+    """
+    Save a single failure snapshot per test run (first call wins).
+    If *annotated_image* is provided it is saved directly; otherwise a raw
+    frame is grabbed from the still-running *pipeline* as a fallback
+    (useful for page-detection failures).
+
+    :param test_file:        pass ``__file__`` from the calling test
+    :param pipeline:         an active ``rs.pipeline`` (for the raw-frame fallback)
+    :param annotated_image:  optional pre-built debug image (numpy array)
+    """
+    global _snapshot_saved
+    if _snapshot_saved:
+        return
+
+    image = annotated_image
+    if image is None:
+        frames = pipeline.wait_for_frames()
+        f = frames.get_color_frame() or frames.get_infrared_frame()
+        if f:
+            image = np.asanyarray( f.get_data() )
+
+    if image is None:
+        return
+
+    name = os.path.basename( test_file ).replace( '.py', '' )
+    try:
+        dev_name = pipeline.get_active_profile().get_device().get_info( rs.camera_info.name ).split()[-1]
+        filename = f"{name}_{dev_name}.png"
+    except:
+        filename = f"{name}.png"
+    cv2.imwrite( filename, image )
+    log.i( f"Saved failure snapshot: {filename}" )
+    _snapshot_saved = True

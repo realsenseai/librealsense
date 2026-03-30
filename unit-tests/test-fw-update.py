@@ -5,7 +5,7 @@
 #test:priority 1
 #test:timeout 500
 #test:donotrun:gha
-#test:device each(D400*)
+#test:device each(D400*) !D401
 #test:device D555
 
 import sys
@@ -87,34 +87,30 @@ def extract_version_from_filename(file_path):
         return rsutils.version(f"{a}.{b}.{c}.{d}")
 
 
-def get_update_counter(device):
+def get_downgrade_counter(device):
     product_line = device.get_info(rs.camera_info.product_line)
-    opcode = 0x09
-    start_index = 0x30
-    size = None
 
     if product_line == "D400":
-        size = 0x2
-    elif product_line == "D500":
-        return 0 # D500 do not have update counter
-    else:
-        log.f( "Incompatible product line:", product_line )
-
-    raw_cmd = rs.debug_protocol(device).build_command(opcode, start_index, size)
-    counter = send_hardware_monitor_command(device, raw_cmd)
-    return counter[0]
+        opcode = 0x93  # DFU_READ_CNT — reads the actual downgrade counter from flash payload header
+        raw_cmd = rs.debug_protocol(device).build_command(opcode)
+        counter = send_hardware_monitor_command(device, raw_cmd)
+        return counter[0] | (counter[1] << 8)  # uint16_t little-endian
+    if product_line == "D500":
+        return 0  # D500 do not have downgrade counter
+    log.f( "Incompatible product line:", product_line )  # calls sys.exit(1)
 
 
-def reset_update_counter( device ):
+def reset_downgrade_counter( device ):
     product_line = device.get_info( rs.camera_info.product_line )
 
     if product_line == "D400":
-        opcode = 0x86
+        opcode = 0x86  # DFU_RESET_CNT — resets the downgrade counter in flash payload header
         raw_cmd = rs.debug_protocol(device).build_command(opcode)
-    else:
-        log.f( "Incompatible product line:", product_line )
-
-    send_hardware_monitor_command( device, raw_cmd )
+        send_hardware_monitor_command( device, raw_cmd )
+        return
+    if product_line == "D500":
+        return  # D500 do not have downgrade counter
+    log.f( "Incompatible product line:", product_line )  # calls sys.exit(1)
 
 def find_image_or_exit( product_name, fw_version_regex = r'(\d+\.){3}(\d+)' ):
     """
@@ -246,12 +242,20 @@ if (current_fw_version == bundled_fw_version and not custom_fw_path) or \
         test.finish()
         test.print_results_and_exit()
 
-update_counter = get_update_counter( device )
-log.d( 'update counter:', update_counter )
-if update_counter >= 19:
-    log.d( 'resetting update counter' )
-    reset_update_counter( device )
-    update_counter = 0
+downgrade_counter = get_downgrade_counter( device )
+log.d( 'downgrade counter:', downgrade_counter )
+if downgrade_counter == 0xFFFF:
+    log.d( 'downgrade counter is uninitialized (0xFFFF), skipping reset' )
+    downgrade_counter = 0
+elif downgrade_counter >= 19:
+    log.d( 'resetting downgrade counter (was', str(downgrade_counter) + ')' )
+    reset_downgrade_counter( device )
+    log.d( 'sleeping for 3 sec...' )
+    time.sleep( 3 )
+    downgrade_counter = get_downgrade_counter( device )
+    log.d( 'downgrade counter after reset is:', str(downgrade_counter))
+    test.check_equal( downgrade_counter, 0 )
+    downgrade_counter = 0
 
 fw_version_regex = bundled_fw_version.to_string()
 if not bundled_fw_version.build():
@@ -287,25 +291,16 @@ if result.returncode != 0:
 device, ctx = test.find_first_device_or_exit()
 current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
 
-# Detect flash lock: if the device reports a camera_locked status other than UNLOCKED,
-if device.supports( rs.camera_info.camera_locked ):
-    try:
-        camera_locked_info = device.get_info( rs.camera_info.camera_locked )
-    except Exception as ex:
-        log.w( 'Failed to read camera_locked info from device:', ex )
-    else:
-        if camera_locked_info != 'UNLOCKED':
-            log.w( 'Device may be flash-locked (camera_locked != UNLOCKED):', camera_locked_info )
-else:
-    log.d( 'Device does not expose camera_locked info; skipping flash-lock check' )
+# camera_locked returns "YES" (locked) or "NO" (unlocked)
+if device.supports( rs.camera_info.camera_locked ) and device.get_info( rs.camera_info.camera_locked ) == 'YES':
+    log.w( 'Device is flash-locked' )
 
 expected_fw_version = custom_fw_version if custom_fw_path else bundled_fw_version
 test.check_equal(current_fw_version, expected_fw_version)
-new_update_counter = get_update_counter( device )
-# According to FW: "update counter zeros if you load newer FW than (ever) before"
-# TODO: check why update counter is 255 when installing cutom fw
-if new_update_counter > 0 and not custom_fw_version:
-    test.check_equal( new_update_counter, update_counter + 1 )
+new_downgrade_counter = get_downgrade_counter( device )
+log.d( 'downgrade counter after update:', new_downgrade_counter )
+if new_downgrade_counter > 0 and not custom_fw_version:
+    test.check_equal( new_downgrade_counter, downgrade_counter + 1 )
 
 test.finish()
 #

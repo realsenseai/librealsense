@@ -9,7 +9,7 @@
 namespace librealsense
 {
 #ifndef ANDROID
-#if defined(__ARM_NEON)
+#if defined(__ARM_NEON) && defined(BUILD_WITH_NEON)
     class align_neon_helper
     {
     public:

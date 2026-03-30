@@ -8,6 +8,8 @@ Detailed how-to guides for common tasks are maintained as skill files under `.gi
 |---|---|
 | `.github/skills/build.md` | Building the project (CMake configure, compile, flags) |
 | `.github/skills/testing.md` | Running, filtering, and debugging unit tests |
+| `.github/skills/pytest-infra.md` | Migrating tests to pytest, modifying pytest/hub infrastructure, verifying Jenkins CI results |
+| `.github/skills/git-workflow.md` | Branch/PR conventions, commit message style, push remotes |
 
 If a skill file exists for the task at hand, follow its instructions precisely. New skills may be added to this folder over time — check its contents before assuming none applies.
 

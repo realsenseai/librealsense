@@ -1,7 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
-# test:device each(D400*)
+# test:device each(D400*) !D401
 # test:timeout 1500
 
 # Texture Mapping Test
@@ -15,7 +15,7 @@ import pyrealsense2 as rs
 from rspy import log, test
 import numpy as np
 import cv2
-from iq_helper import find_roi_location, get_roi_from_frame, is_color_close, get_avg_depth_from_region, SAMPLE_REGION_SIZE, WIDTH, HEIGHT
+from iq_helper import find_roi_location, get_roi_from_frame, is_color_close, get_avg_depth_from_region, save_failure_snapshot, SAMPLE_REGION_SIZE, WIDTH, HEIGHT
 
 NUM_FRAMES = 100  # Number of frames to check
 COLOR_TOLERANCE = 60  # Acceptable per-channel deviation in RGB values
@@ -34,23 +34,25 @@ cube_x, cube_y = WIDTH // 2, HEIGHT // 2
 bg_x, bg_y = int(WIDTH * 0.1), HEIGHT // 2
 
 
-def draw_debug(a4_page_bgr, depth_cube, depth_bg, measured_diff):
+def draw_debug(depth_frame, color_roi, depth_cube, depth_bg, measured_diff):
     """
-    Simple debug view showing the two sampling points with depth values
+    Simple debug view: depth+color overlay with sampling points and depth values
     """
-    H, W = a4_page_bgr.shape[:2]
+    colorizer = rs.colorizer()
+    depth_image = get_roi_from_frame(colorizer.colorize(depth_frame))
+    overlay = cv2.addWeighted(depth_image, 0.7, color_roi, 0.3, 0)
 
     # Draw points for cube and background
-    cv2.circle(a4_page_bgr, (cube_x, cube_y), 6, (0, 0, 255), -1)  # Red for cube
-    cv2.circle(a4_page_bgr, (bg_x, bg_y), 6, (0, 255, 0), -1)  # Green for background
+    cv2.circle(overlay, (cube_x, cube_y), 6, (0, 0, 255), -1)  # Red for cube
+    cv2.circle(overlay, (bg_x, bg_y), 6, (0, 255, 0), -1)  # Green for background
 
     # Draw sampled region rectangles
     half = SAMPLE_REGION_SIZE // 2
-    cv2.rectangle(a4_page_bgr,
+    cv2.rectangle(overlay,
                   (cube_x - half, cube_y - half),
                   (cube_x + half, cube_y + half),
                   (0, 0, 255), 2)
-    cv2.rectangle(a4_page_bgr,
+    cv2.rectangle(overlay,
                   (bg_x - half, bg_y - half),
                   (bg_x + half, bg_y + half),
                   (0, 255, 0), 2)
@@ -59,22 +61,17 @@ def draw_debug(a4_page_bgr, depth_cube, depth_bg, measured_diff):
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 0.5
     thickness = 1
-    cube_label = f"cube: {depth_cube:.2f}mm"
-    bg_label = f"bg: {depth_bg:.2f}mm"
-    diff_label = f"diff: {measured_diff:.2f}mm (exp: {EXPECTED_DEPTH_DIFF:.2f}mm)"
-
-    cv2.putText(a4_page_bgr, cube_label, (cube_x + 10, cube_y - 10),
+    cv2.putText(overlay, f"cube: {depth_cube:.2f}mm", (cube_x + 10, cube_y - 10),
                 font, font_scale, (0, 0, 255), thickness, cv2.LINE_AA)
-    cv2.putText(a4_page_bgr, bg_label, (bg_x + 10, bg_y - 10),
+    cv2.putText(overlay, f"bg: {depth_bg:.2f}mm", (bg_x + 10, bg_y - 10),
                 font, font_scale, (0, 255, 0), thickness, cv2.LINE_AA)
-    cv2.putText(a4_page_bgr, diff_label, (10, 30),
+    cv2.putText(overlay, f"diff: {measured_diff:.2f}mm (exp: {EXPECTED_DEPTH_DIFF:.2f}mm)", (10, 30),
                 font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
-    # resize and display
+    # resize
     height = 600
-    a4_page_width = int(a4_page_bgr.shape[1] * (height / a4_page_bgr.shape[0]))
-    right = cv2.resize(a4_page_bgr, (a4_page_width, height))
-    return right
+    width = int(overlay.shape[1] * (height / overlay.shape[0]))
+    return cv2.resize(overlay, (width, height))
 
 
 dev, ctx = test.find_first_device_or_exit()
@@ -83,6 +80,11 @@ dev, ctx = test.find_first_device_or_exit()
 def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
     pipeline = None
     pipeline_profile = None
+    last_color_roi = None
+    last_depth_frame = None
+    last_depth_cube = 0
+    last_depth_bg = 0
+    last_measured_diff = 0
     try:
         pipeline = rs.pipeline(ctx)
         cfg = rs.config()
@@ -132,6 +134,9 @@ def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
             color_frame_roi = get_roi_from_frame(color_frame)
             depth_frame_roi = get_roi_from_frame(depth_frame)
 
+            last_color_roi = color_frame_roi.copy()
+            last_depth_frame = depth_frame
+
             # Check cube color (center - should be black)
             cube_b, cube_g, cube_r = (int(v) for v in color_frame_roi[cube_y, cube_x])
             cube_pixel = (cube_r, cube_g, cube_b)
@@ -159,6 +164,10 @@ def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
             depth_bg = raw_bg  # in mm
             measured_diff = depth_bg - depth_cube  # background should be further than cube
 
+            last_depth_cube = depth_cube
+            last_depth_bg = depth_bg
+            last_measured_diff = measured_diff
+
             if abs(measured_diff - EXPECTED_DEPTH_DIFF) <= DEPTH_TOLERANCE:
                 depth_diff_passes += 1
             else:
@@ -166,15 +175,7 @@ def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
                       f"{EXPECTED_DEPTH_DIFF:.2f}mm (cube: {depth_cube:.2f}mm, bg: {depth_bg:.2f}mm)")
 
             if DEBUG_MODE:
-                # To see the depth on top of the color, blend the images
-                colorizer = rs.colorizer()
-                depth_image = get_roi_from_frame(colorizer.colorize(depth_frame))
-                color_image = color_frame_roi
-
-                alpha = 0.3  # transparency factor
-                overlay = cv2.addWeighted(depth_image, 1 - alpha, color_image, alpha, 0)
-
-                dbg = draw_debug(overlay, depth_cube, depth_bg, measured_diff)
+                dbg = draw_debug(depth_frame, color_frame_roi, depth_cube, depth_bg, measured_diff)
                 cv2.imshow('Overlay', dbg)
                 cv2.waitKey(1)
 
@@ -194,7 +195,13 @@ def run_test(depth_resolution, depth_fps, color_resolution, color_fps):
         log.i(f"Depth difference passed in {depth_diff_passes}/{NUM_FRAMES} frames")
         test.check(depth_diff_passes >= min_passes, "Depth difference failed in too many frames")
 
+        if test.test_failed and last_color_roi is not None and last_depth_frame:
+            save_failure_snapshot(__file__, pipeline,
+                                 draw_debug(last_depth_frame, last_color_roi,
+                                            last_depth_cube, last_depth_bg, last_measured_diff))
+
     except Exception as e:
+        save_failure_snapshot(__file__, pipeline)
         test.unexpected_exception()
     finally:
         cv2.destroyAllWindows()

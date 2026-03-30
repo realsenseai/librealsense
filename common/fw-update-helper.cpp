@@ -175,8 +175,6 @@ namespace rs2
             if (next < steps.size() && _progress >= steps[next].first)
             {
                 log(steps[next].second);
-                if (steps[next].first >= 100.f)
-                    _done = true;
                 ++next;
             }
         });
@@ -193,6 +191,16 @@ namespace rs2
 
         // Restart the device to reconstruct with the new version information
         _dev.hardware_reset();
+
+        // Give MIPI device time to complete hardware reset before marking done
+        // This prevents automation from powering off before device restart completes
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+
+        // Ensure progress is fully complete before marking as done
+        _progress = 100.f;
+
+        // Mark as done after sending hardware reset command
+        _done = true;
     }
 
     void firmware_update_manager::backup_firmware(updatable& upd, int& next_progress, const std::string& serial)

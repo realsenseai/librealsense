@@ -4,7 +4,7 @@
 #include "image-neon.h"
 
 #ifndef ANDROID
-    #ifdef __ARM_NEON
+    #if defined(__ARM_NEON) && defined(BUILD_WITH_NEON)
     #include <arm_neon.h>
 
     namespace librealsense

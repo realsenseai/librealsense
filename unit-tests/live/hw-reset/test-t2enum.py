@@ -16,7 +16,7 @@ import time
 dev = None
 device_removed = False
 device_added = False
-MAX_ENUM_TIME_D400 = 5 # [sec]
+MAX_ENUM_TIME_D400 = 7 # [sec]
 MAX_ENUM_TIME_D500 = 15 # [sec]
 
 def device_changed( info ):

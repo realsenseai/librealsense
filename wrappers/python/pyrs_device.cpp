@@ -53,16 +53,18 @@ void init_device(py::module &m) {
             else
                 ss << " (FW update id: " << self.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
             if (self.supports(RS2_CAMERA_INFO_FIRMWARE_VERSION))
-                ss << "  FW: " << self.get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION);
+                ss << " FW: " << self.get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION);
             if (self.supports(RS2_CAMERA_INFO_SMCU_FW_VERSION))
-                ss << "  SMCU: " << self.get_info(RS2_CAMERA_INFO_SMCU_FW_VERSION);
+                ss << " SMCU: " << self.get_info(RS2_CAMERA_INFO_SMCU_FW_VERSION);
+            if (self.supports(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION))
+                ss << " MIPI DRIVER: " << self.get_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION);
             if( self.supports( RS2_CAMERA_INFO_CAMERA_LOCKED )
                 && strcmp( "YES", self.get_info( RS2_CAMERA_INFO_CAMERA_LOCKED ) ) )
-                ss << "  UNLOCKED";
+                ss << " UNLOCKED";
             if (self.supports(RS2_CAMERA_INFO_CONNECTION_TYPE))
             {
                 auto connection_type = self.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE);
-                ss << "  on ";
+                ss << " on ";
                 ss << connection_type;
                 if (strcmp(connection_type, "USB") == 0)
                     if (self.supports(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR))

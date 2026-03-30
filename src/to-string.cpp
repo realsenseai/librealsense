@@ -717,6 +717,7 @@ const char * get_string( rs2_camera_info value )
     CASE( CONNECTION_TYPE )
     CASE( SMCU_FW_VERSION )
     CASE( IMU_TYPE )
+    CASE( MIPI_DRIVER_VERSION )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;

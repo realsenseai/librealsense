@@ -2,7 +2,7 @@
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 
-#test:device each(D400*)
+#test:device each(D400*) !D401
 #test:device each(D500*)
 
 

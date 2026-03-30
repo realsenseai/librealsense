@@ -1,9 +1,11 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
 
-from rspy import test, log
+import logging
 import time
 import pyrealsense2 as rs
+
+log = logging.getLogger(__name__)
 
 # global variable used to count on all the sensors simultaneously
 count_frames = False
@@ -62,7 +64,7 @@ def check_fps_dict(measured_fps, expected_fps):
         res = check_fps_pair(measured_fps[profile_name], expected_fps[profile_name])
         if not res:
             all_fps_ok = False
-        log.d(f"Expected {expected_fps[profile_name]} fps, received {measured_fps[profile_name]} fps in profile"
+        log.debug(f"Expected {expected_fps[profile_name]} fps, received {measured_fps[profile_name]:.1f} fps in profile"
               f" {profile_name}"
               f" {'(Pass)' if res else '(Fail)'}")
     return all_fps_ok
@@ -73,28 +75,26 @@ def generate_callbacks(sensor_profiles_dict, profile_name_fps_dict, profile_prev
     Creates callable functions for each sensor to be triggered when a new frame arrives
     Used to count frames received for measuring fps
     """
-    log.d(f"Setting up callbacks for profiles: {list(profile_name_fps_dict.keys())}")
-    
+    log.debug(f"Setting up callbacks for profiles: {list(profile_name_fps_dict.keys())}")
+
     def on_frame_received(frame):
         global count_frames
         profile_name = frame.profile.stream_name()
-        
+
         # Check if this profile is expected
         if profile_name not in profile_name_fps_dict:
-            log.w(f"Received unexpected frame from profile: {profile_name}")
+            log.warning(f"Received unexpected frame from profile: {profile_name}")
             return
-            
+
         counted_frame_number = profile_name_fps_dict[frame.profile.stream_name()] + 1  # frame number counted in test
         frame_number = frame.get_frame_number()  # the actual frame number from the metadata
         frame_ts = frame.get_timestamp()
         if profile_prev_frame_dict[frame.profile.stream_name()] != -1:
             if frame_number > profile_prev_frame_dict[frame.profile.stream_name()] + 1:
-                log.w( f'Frame drop detected. Current frame number {frame_number} previous was {profile_prev_frame_dict[frame.profile.stream_name()]}' )
+                log.warning( f'Frame drop detected. Current frame number {frame_number} previous was {profile_prev_frame_dict[frame.profile.stream_name()]}' )
         profile_prev_frame_dict[frame.profile.stream_name()] = frame_number
-        # log.d(f"frame {profile_name} #{counted_frame_number} accepted with frame number {frame_number} and ts {frame_ts}")
         if count_frames:
             profile_name_fps_dict[profile_name] += 1
-        # log.d(f"frame {profile_name} #{counted_frame_number} callback finished")
 
     sensor_function_dict = {sensor_key: on_frame_received for sensor_key in sensor_profiles_dict}
     return sensor_function_dict
@@ -131,11 +131,11 @@ def measure_fps(sensor_profiles_dict):
             resolution = ((" " + str(vp.width()) + "x" + str(vp.height())) if vp else "")
             fps = "@" + str(p.fps())
             profiles_str.append( p.stream_name() + resolution + fps )
-        log.d(f"Opening sensor {sensor.name} with profiles: {profiles_str}")
+        log.debug(f"Opening sensor {sensor.name} with profiles: {profiles_str}")
         sensor.open(profiles)
-        log.d(f"Starting sensor {sensor.name}")
+        log.debug(f"Starting sensor {sensor.name}")
         sensor.start(funcs_dict[sensor])
-        log.d(f"Sensor {sensor.name} started successfully")
+        log.debug(f"Sensor {sensor.name} started successfully")
 
     # the core of the test - frames are counted during sleep when count_frames is on
     time.sleep(TIME_FOR_STEADY_STATE)
@@ -178,17 +178,21 @@ def perform_fps_test(sensor_profiles_arr, streams_combinations):
     :param streams_combinations: an array of combinations to run
                                  each combination is an array with stream names to test
     """
-    log.d(get_time_est_string(streams_combinations))
+    log.debug(get_time_est_string(streams_combinations))
+    failures = []
     for streams_to_test in streams_combinations:
         partial_dict = get_dict_for_streams(sensor_profiles_arr, streams_to_test)
-        with test.closure("Testing", get_tested_profiles_string(partial_dict)):
-            log.i(partial_dict)
-            expected_fps_dict = get_expected_fps_dict(partial_dict)
-            log.d(get_test_details_str(partial_dict))
-            fps_dict = measure_fps(partial_dict)
-            log.i("Expected: ", expected_fps_dict)
-            log.i("Got: ", fps_dict)
-            test.check(check_fps_dict(fps_dict, expected_fps_dict))
+        tested = get_tested_profiles_string(partial_dict)
+        log.info(f"Testing {tested}")
+        log.info(f"{partial_dict}")
+        expected_fps_dict = get_expected_fps_dict(partial_dict)
+        log.debug(get_test_details_str(partial_dict))
+        fps_dict = measure_fps(partial_dict)
+        log.info(f"Expected: {expected_fps_dict}")
+        log.info(f"Got: {fps_dict}")
+        if not check_fps_dict(fps_dict, expected_fps_dict):
+            failures.append(f"{tested}: expected={expected_fps_dict}, got={fps_dict}")
+    assert not failures, "FPS check failed for:\n" + "\n".join(failures)
 
 
 def get_profile(sensor, stream, resolution=None, fps=None):
@@ -201,4 +205,4 @@ def get_profile(sensor, stream, resolution=None, fps=None):
 def get_profiles(sensor, stream, resolution=None, fps=None):
     return iter(profile for profile in sensor.profiles if profile.stream_type() == stream
                 and (resolution is None or get_resolution(profile) == resolution)
-                and (fps is None or profile.fps()))
+                and (fps is None or profile.fps() == fps))

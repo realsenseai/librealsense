@@ -37,7 +37,7 @@ namespace librealsense
         #if defined(__SSSE3__)
             LOG_INFO("Using SSE-optimized align implementation");
             return std::make_shared<librealsense::align_sse>(align_to);
-        #elif defined(__ARM_NEON) && ! defined(ANDROID)
+        #elif defined(__ARM_NEON) && defined(BUILD_WITH_NEON) && !defined(ANDROID)
             LOG_INFO("Using NEON-optimized align implementation");
             return std::make_shared<librealsense::align_neon>(align_to);
         #else

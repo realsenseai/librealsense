@@ -160,10 +160,10 @@ def is_debug_on():
 if find_flag( '--debug' ):
     sys.argv.remove( '--debug' )
     debug_on()
-def debug_indent( n = 1, indentation = '    ' ):
+def debug_indent( n = 1, indentation = '  ' ):
     global _debug_indent
     _debug_indent += n * indentation
-def debug_unindent( n = 1, indentation = '    ' ):
+def debug_unindent( n = 1, indentation = '  ' ):
     global _debug_indent
     _debug_indent = _debug_indent[:-n * len(indentation)]
 

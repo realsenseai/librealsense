@@ -35,7 +35,7 @@ from rspy.pytest.logging_setup import (
     setup_test_logging, bridge_rspy_log, ensure_newline, configure_logging,
     start_test_log, stop_test_log, print_terminal_summary,
 )
-from rspy.pytest.cli import consume_legacy_flags
+from rspy.pytest.cli import consume_legacy_flags, apply_pending_flags
 from rspy.pytest.device_helpers import find_matching_devices, resolve_device_each_serials
 from rspy.pytest.collection import filter_and_sort_items
 
@@ -133,6 +133,8 @@ def pytest_configure(config):
     """Early setup: register markers, configure defaults, and query connected devices."""
     global context_list
 
+    apply_pending_flags(config)
+
     # Parse and store context
     context_str = config.getoption("--context", default="")
     if context_str:
@@ -157,11 +159,11 @@ def pytest_configure(config):
         config.option.timeout_method = "thread"
 
     # Suppress verbose failure tracebacks — per-test log files have full details.
-    # Keep short "FAILED" one-liners (-rf) so Jenkins Groovy can parse them for log file links.
+    # Keep short one-liners (-rfE) so Jenkins Groovy can parse them for log file links.
     # pytest-retry's verbose report is also suppressed (details are in per-test log files).
     if config.getoption("--tb") == "auto":
         config.option.tbstyle = "no"
-    config.option.reportchars = "f"
+    config.option.reportchars = "fE"
     try:
         from pytest_retry.retry_plugin import retry_manager
         retry_manager.build_retry_report = lambda *args, **kwargs: None
@@ -188,10 +190,7 @@ def pytest_configure(config):
         "markers", "live: tests requiring live devices"
     )
     config.addinivalue_line(
-        "markers", "nightly: tests that only run in nightly context"
-    )
-    config.addinivalue_line(
-        "markers", "dds: tests requiring DDS support"
+        "markers", "context(name): test only runs when name is in --context (e.g., nightly, weekly, dds)"
     )
     config.addinivalue_line(
         "markers", "priority(value): test execution priority (lower runs first, default 500)"
@@ -245,10 +244,17 @@ def pytest_runtest_protocol(item, nextitem):
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Log test duration after each test call phase."""
+    """Log test duration and any failures/errors."""
     outcome = yield
     report = outcome.get_result()
 
+    if report.skipped:
+        ensure_newline()
+        reason = report.longrepr[-1]
+        log.info(reason)
+    if report.failed and call.excinfo:
+        ensure_newline()
+        log.error(f"{call.when} {report.outcome}: {call.excinfo.typename}: {call.excinfo.value}")
     if call.when == "call":
         ensure_newline()
         log.debug(f"Test execution took {report.duration:.3f}s")
@@ -334,12 +340,18 @@ def module_device_setup(request):
             yield None
             return
 
-        serial_numbers = find_matching_devices(device_markers, each=False,
+        serial_numbers, had_candidates = find_matching_devices(device_markers, each=False,
                                                   cli_includes=request.config.getoption("--device", default=[]),
                                                   cli_excludes=request.config.getoption("--exclude-device", default=[]))
 
         if not serial_numbers:
-            pytest.skip("No devices found matching requirements")
+            has_required = any(m.name == 'device' for m in device_markers)
+            if had_candidates:
+                pytest.skip("All matching devices were excluded")
+            elif has_required:
+                pytest.fail("No devices found matching requirements")
+            else:
+                pytest.skip("No devices found matching requirements")
 
         serial_number = serial_numbers[0]
         log.debug(f"Test will use first matching device: {serial_number}")
@@ -394,10 +406,10 @@ def test_context(request, module_device_setup):
 
 @pytest.fixture
 def test_device(test_context):
-    """Return (device, context) for the first visible device, or skip if none found."""
+    """Return (device, context) for the first visible device, or fail if none found."""
     devices_list = list(test_context.devices)
     if not devices_list:
-        pytest.skip("No device available for test")
+        pytest.fail("No device available for test")
 
     dev = devices_list[0]
     log.debug(f"Test using device: {dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else 'Unknown'}")

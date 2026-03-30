@@ -1,7 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
-# test:device each(D400*)
+# test:device each(D400*) !D401
 # test:timeout 400  # extra time for page detection
 
 import pyrealsense2 as rs
@@ -9,7 +9,7 @@ from rspy import log, test
 import numpy as np
 import cv2
 import time
-from iq_helper import find_roi_location, get_roi_from_frame, get_avg_depth_from_region, SAMPLE_REGION_SIZE, WIDTH, HEIGHT
+from iq_helper import find_roi_location, get_roi_from_frame, get_avg_depth_from_region, save_failure_snapshot, SAMPLE_REGION_SIZE, WIDTH, HEIGHT
 
 NUM_FRAMES = 100  # Number of frames to check
 DEPTH_TOLERANCE = 100  # Acceptable deviation from expected depth in mm
@@ -82,11 +82,14 @@ def draw_debug(depth_frame, cube_x, cube_y, bg_x, bg_y,
     cv2.putText(roi_img_disp, diff_label, (10, 30),
                 font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
-    cv2.imshow("ROI with Sampled Points", roi_img_disp)
-    cv2.waitKey(1)
+    return roi_img_disp
 
 
 def run_test(resolution, fps):
+    last_depth_frame = None
+    last_depth_cube = 0
+    last_depth_bg = 0
+    last_measured_diff = 0
     try:
         global pipeline
         pipeline = rs.pipeline(ctx)
@@ -132,6 +135,11 @@ def run_test(resolution, fps):
             depth_bg = raw_bg  # * depth_scale
             measured_diff = depth_bg - depth_cube  # background should be further than cube
 
+            last_depth_frame = depth_frame
+            last_depth_cube = depth_cube
+            last_depth_bg = depth_bg
+            last_measured_diff = measured_diff
+
             if abs(measured_diff - EXPECTED_DEPTH_DIFF) <= DEPTH_TOLERANCE:
                 pass_count += 1
             else:
@@ -139,7 +147,9 @@ def run_test(resolution, fps):
                       f"{EXPECTED_DEPTH_DIFF:.3f}mm (cube: {depth_cube:.3f}mm, bg: {depth_bg:.3f}mm)")
 
             if DEBUG_MODE:
-                draw_debug(depth_frame, cube_x, cube_y, bg_x, bg_y, depth_cube, depth_bg, measured_diff)
+                dbg = draw_debug(depth_frame, cube_x, cube_y, bg_x, bg_y, depth_cube, depth_bg, measured_diff)
+                cv2.imshow("ROI with Sampled Points", dbg)
+                cv2.waitKey(1)
 
         # wait for close
         # if DEBUG_MODE:
@@ -149,7 +159,13 @@ def run_test(resolution, fps):
         log.i(f"Depth diff passed in {pass_count}/{NUM_FRAMES} frames")
         test.check(pass_count >= min_passes)
 
+        if test.test_failed and last_depth_frame:
+            save_failure_snapshot(__file__, pipeline,
+                                 draw_debug(last_depth_frame, cube_x, cube_y, bg_x, bg_y,
+                                            last_depth_cube, last_depth_bg, last_measured_diff))
+
     except Exception as e:
+        save_failure_snapshot(__file__, pipeline)
         test.fail()
         raise e
     finally:

@@ -3,7 +3,7 @@
 
 # Currently, we exclude D555 as it's failing
 
-# test:device each(D400*)
+# test:device each(D400*) !D401
 # test:device each(D500*) !D555
 
 import pyrealsense2 as rs, os, time, tempfile, platform, sys

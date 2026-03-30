@@ -6,7 +6,8 @@
 #include "uvc-device-info.h"
 #include "hid-device-info.h"
 #include <src/librealsense-exception.h>
-
+#include <rsutils/version.h>
+#include <fstream>
 
 namespace librealsense {
 namespace platform {
@@ -141,6 +142,39 @@ std::vector< uvc_device_info > filter_by_mi( const std::vector< uvc_device_info 
     }
     return results;
 }
+
+#ifdef __linux__
+
+rsutils::version get_jetson_driver_version()
+{
+    // Cache the result to avoid reading the file multiple times
+    static bool queried = false;
+    static rsutils::version cached_version;
+    
+    if (queried)
+        return cached_version.is_valid() ? cached_version : rsutils::version();
+    
+    // Read driver version from sysfs
+    std::ifstream version_file("/sys/module/d4xx/version");
+    if (version_file.is_open())
+    {
+        std::string version_str;
+        std::getline(version_file, version_str);
+        version_file.close();
+        
+        if (!version_str.empty())
+            cached_version = rsutils::version(version_str);
+    }
+    
+    queried = true;
+    return cached_version.is_valid() ? cached_version : rsutils::version();
+}
+#else
+rsutils::version get_jetson_driver_version()
+{
+    return rsutils::version();
+}
+#endif
 
 
 }  // namespace platform

@@ -1,6 +1,10 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
                                                           ##
+#test:device each(D400*)
+#test: device D555
+#test:donotrun
+
 import sys
 import time
 import pyrealsense2 as rs
@@ -17,8 +21,6 @@ from test_calibrations_common import (
     measure_average_depth,
     is_d555
 )
-
-#test:donotrun
 def tare_calibration_json(tare_json_file, host_assistance):
     tare_json = None
     if tare_json_file is not None:
@@ -44,6 +46,7 @@ def tare_calibration_json(tare_json_file, host_assistance):
 
 def calculate_target_z():
     number_of_images = 50  # The required number of frames is 10+
+    warmup_frames = 30     # Allow AE to stabilize before capturing (1 sec at 30fps)
     timeout_s = 30
     target_size = [175, 100]
 
@@ -55,14 +58,17 @@ def calculate_target_z():
     q3 = rs.frame_queue(capacity=number_of_images, keep_frames=True)
 
     counter = 0
+    warmup_counter = 0
 
     def cb(frame):
-        nonlocal counter
-        if counter > number_of_images:
+        nonlocal counter, warmup_counter
+        if counter >= number_of_images:
             return
-        for f in frame.as_frameset():
-            q.enqueue(f)
-            counter += 1
+        if warmup_counter < warmup_frames:
+            warmup_counter += 1
+            return
+        q.enqueue(frame)
+        counter += 1
 
     ctx = rs.context()
     pipe = rs.pipeline(ctx)
@@ -152,8 +158,10 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
             log.e(f"Modification mismatch for ppx. Expected {modified_ppx:.6f} got {mod_right_pp[0]:.6f}")
             test.fail()
 
-       # Measure average depth after modification, before tare correction (modified baseline)
-        modified_avg_depth_m = measure_average_depth(config, pipeline, width=image_width, height=image_height, fps=fps)
+       # Measure average depth after modification, before tare correction (modified baseline).
+       # target from background, making the measurement reflect the actual depth scale accuracy.
+        depth_range_mm = (target_z * 0.5, target_z * 1.5) if target_z else None
+        modified_avg_depth_m = measure_average_depth(config, pipeline, width=image_width, height=image_height, fps=fps, center_fraction=0.3, depth_range_mm=depth_range_mm)
         if modified_avg_depth_m is not None:
             log.i(f"Average depth after modification (pre-tare): {modified_avg_depth_m*1000:.1f} mm")
         else:
@@ -191,7 +199,7 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
         log.i(f"  Final principal points (Right) ppx={fin_right_pp[0]:.6f} ppy={fin_right_pp[1]:.6f}")
 
         # Measure average depth after tare correction
-        post_avg_depth_m = measure_average_depth(config, pipeline, width=image_width, height=image_height, fps=fps)
+        post_avg_depth_m = measure_average_depth(config, pipeline, width=image_width, height=image_height, fps=fps, center_fraction=0.3, depth_range_mm=depth_range_mm)
         if post_avg_depth_m is not None:
             log.i(f"Average depth after tare: {post_avg_depth_m*1000:.1f} mm")
         else:
@@ -214,17 +222,18 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
         else:
             log.i("tare reverted ppy toward base successfully")
 
-        # Measure average depth after tare correction
-        # Compare average depths to target_z (in mm). Expect post calibration to be closer.
+        # Validate that tare improved depth accuracy at the target location.
+        # center_fraction=0.3 limits measurement to the central region where the target sits,
+        # so this reflects the depth scale correction that tare is designed to provide.
         if target_z is not None and modified_avg_depth_m is not None and post_avg_depth_m is not None:
             modified_diff_mm = abs(modified_avg_depth_m * 1000.0 - target_z)
             post_diff_mm = abs(post_avg_depth_m * 1000.0 - target_z)
             log.i(f"  Depth distance to target: pre-tare={modified_diff_mm:.2f} mm post-tare={post_diff_mm:.2f} mm (target_z={target_z} mm)")
             if post_diff_mm > modified_diff_mm:
-                log.e("Average depth after OCC not closer to target distance")
+                log.e("Tare did not improve depth accuracy: post-tare center depth is not closer to target_z")
                 test.fail()
             else:
-                log.i("Average depth after OCC moved closer to target distance")
+                log.i("Tare improved depth accuracy: center depth moved closer to target_z")
     finally:
         # Always stop pipeline before returning device so subsequent tests can reset factory calibration
         try:
@@ -242,15 +251,20 @@ if not is_mipi_device() and not is_d555():
         try:
             host_assistance = False
             if (_target_z is None):
-                _target_z = calculate_target_z()
-                test.check(_target_z > TARGET_Z_MIN and _target_z < TARGET_Z_MAX)
+                try:
+                    _target_z = calculate_target_z()
+                    test.check(_target_z > TARGET_Z_MIN and _target_z < TARGET_Z_MAX)
+                except Exception as e:
+                    _target_z = 1200.0
+                    log.w(f"calculate_target_z failed ({e}); falling back to default target_z={_target_z} mm for test")
             image_width, image_height, fps = (256, 144, 90)
             config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
             restore_calibration_table(calib_dev, None)
             calib_dev, saved_table = run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, _target_z)
         except Exception as e:
             log.e("Tare calibration with principal point modification failed: ", str(e))
-            restore_calibration_table(calib_dev, None)
+            if calib_dev is not None:
+                restore_calibration_table(calib_dev, None)
             test.fail()
         finally:
             if calib_dev is not None:

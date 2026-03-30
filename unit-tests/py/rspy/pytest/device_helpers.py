@@ -11,9 +11,15 @@ from rspy import devices
 log = logging.getLogger('librealsense')
 
 
-def find_matching_devices(device_markers, each=True, cli_includes=None, cli_excludes=None) -> List[str]:
-    """Resolve device markers + CLI filters into a list of matching serial numbers."""
+def find_matching_devices(device_markers, each=True, cli_includes=None, cli_excludes=None):
+    """Resolve device markers + CLI filters into a list of matching serial numbers.
+
+    Returns (matching_sns, had_candidates):
+        matching_sns: list of serial numbers that passed all filters
+        had_candidates: True if devices matched the pattern before exclusions were applied
+    """
     matching_sns = []
+    had_candidates = False
 
     if cli_includes is None:
         cli_includes = []
@@ -48,6 +54,7 @@ def find_matching_devices(device_markers, each=True, cli_includes=None, cli_excl
         log.debug(f"Looking for devices matching pattern: {pattern}")
 
         for sn in devices.by_spec(pattern, []):
+            had_candidates = True
             if sn in excluded_sns:
                 log.debug(f"  Device {devices.get(sn).name} ({sn}) excluded")
                 continue
@@ -59,9 +66,9 @@ def find_matching_devices(device_markers, each=True, cli_includes=None, cli_excl
                 log.debug(f"  Found matching device: {devices.get(sn).name} ({sn})")
 
             if not each:
-                return matching_sns
+                return matching_sns, had_candidates
 
-    return matching_sns
+    return matching_sns, had_candidates
 
 
 def resolve_device_each_serials(metafunc):

@@ -88,6 +88,7 @@ macro(os_set_flags)
 endmacro()
 
 macro(os_target_config)
+    message(STATUS "Building with SSE optimizations")
     add_definitions(-D__SSSE3__ -D_CRT_SECURE_NO_WARNINGS)
 
     if(FORCE_RSUSB_BACKEND)

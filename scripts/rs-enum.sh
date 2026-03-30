@@ -86,6 +86,10 @@ declare -A camera_names=( [depth]=depth [rgb]=color [ir]=ir [imu]=imu )
 
 camera_vid=("depth" "depth-md" "color" "color-md" "ir" "ir-md" "imu")
 
+depth_dev_counter=0
+color_dev_counter=0
+ir_dev_counter=0
+imu_dev_counter=0
 
 # Helper function: detect RS devices
 # Searches v4l2-ctl output for RealSense DS5 mux devices on Tegra platforms
@@ -127,6 +131,71 @@ get_video_devices_for_rs() {
   '
 }
 
+# Helper function: identifies if a video device is depth/color/ir/imu using v4l-ctl
+# The decision tree is:
+# - If Bytes per line == 64 -> imu
+# - Otherwise:
+# -- If pixel format == Z16 -> depth
+# -- If pixel format == GREY -> ir
+# -- Else -> color (This allows for RGB main format to change in the future with no impact)
+identify_dev_type() {
+  local DEVICE="$1"
+  OUTPUT=$(${v4l2_util} -d "$DEVICE" -V 2>/dev/null)
+
+  if [ $? -ne 0 ]; then
+    echo "Error: Failed to query device $DEVICE"
+    exit 1
+  fi
+
+  # Extract Bytes per Line
+  BYTES_PER_LINE=$(echo "$OUTPUT" | grep -oP 'Bytes per Line\s*:\s*\K[0-9]+')
+  # Check if IMU (Bytes per Line = 64)
+  if [ "$BYTES_PER_LINE" = "64" ]; then
+    echo "imu"
+    exit 0
+  fi
+
+  # Extract Pixel Format
+  PIXEL_FORMAT=$(echo "$OUTPUT" | grep -oP "Pixel Format\s*:\s*'\K[^']+")
+
+  # Check Pixel Format
+  if [[ "$PIXEL_FORMAT" == *"Z16"* ]]; then
+    echo "depth"
+  elif [[ "$PIXEL_FORMAT" == *"GREY"* ]]; then
+    echo "ir"
+  else
+    echo "color"
+  fi
+}
+
+# Helper function: get the number of devices of specific type identified
+get_dev_num() {
+  local DEVICE="$1"
+  if [[ "$DEVICE" == "depth" ]]; then
+    echo $depth_dev_counter
+  elif [[ "$DEVICE" == "color" ]]; then
+    echo $color_dev_counter
+  elif [[ "$DEVICE" == "ir" ]]; then
+    echo $ir_dev_counter
+  elif [[ "$DEVICE" == "imu" ]]; then
+    echo $imu_dev_counter
+  fi
+}
+
+# Helper function: increment the number of devices of specific type identified
+increment_dev_num() {
+  local DEVICE="$1"
+  if [[ "$DEVICE" == "depth" ]]; then
+    depth_dev_counter=$((depth_dev_counter+1))
+  elif [[ "$DEVICE" == "color" ]]; then
+    color_dev_counter=$((color_dev_counter+1))
+  elif [[ "$DEVICE" == "ir" ]]; then
+    ir_dev_counter=$((ir_dev_counter+1))
+  elif [[ "$DEVICE" == "imu" ]]; then
+    imu_dev_counter=$((imu_dev_counter+1))
+  fi
+}
+
 # Helper function: create video device link
 # Creates a symbolic link from /dev/videoN to a standardized RS device name
 # Handles both info display and actual link creation based on global flags
@@ -153,38 +222,44 @@ create_video_link() {
 # Processes all video devices for one RealSense camera, determining device types
 # Maps devices to sensors based on driver names (tegra-video=streaming, tegra-embedded=metadata)
 # Expected device order: depth, depth-md, color, color-md, ir, ir-md, imu
-# Input example: "/dev/video0 /dev/video1 /dev/video2" "0"
+# Input example: "/dev/video0 /dev/video1 /dev/video2"
 process_rs_video_devices() {
   local vid_devices="$1"
-  local cam_id="$2"
   
   # Convert video devices to array
   local vid_dev_arr=(${vid_devices})
   echo "DEBUG: Video device array: ${vid_dev_arr[*]}"
   
   # Process each video device in the expected order
-  local sens_id=0
   local bus="mipi"
-  
+  local sensor_name=""
+  local sensor_idx=0
+
   for vid in "${vid_dev_arr[@]}"; do
     [[ ! -c "${vid}" ]] && echo "DEBUG: Video device ${vid} not found, skipping" && continue
     
     # Check if this is a valid tegra video device
     local dev_name=$(${v4l2_util} -d ${vid} -D 2>/dev/null | grep 'Driver name' | head -n1 | awk -F' : ' '{print $2}')
     echo "DEBUG: Video device ${vid} driver name: ${dev_name}"
-    
     # Handle streaming devices
-    if [ "${dev_name}" = "tegra-video" ] && [[ ${sens_id} -lt ${#camera_vid[@]} ]]; then
-      local dev_ln="/dev/video-rs-${camera_vid[${sens_id}]}-${cam_id}"
-      local sensor_name=$(echo "${camera_vid[${sens_id}]}" | awk -F'-' '{print $1}')
-      create_video_link "$vid" "$dev_ln" "$bus" "$cam_id" "$sensor_name" "Streaming"
-      sens_id=$((sens_id+1))
+    if [ "${dev_name}" = "tegra-video" ]; then
+      sensor_name=$(identify_dev_type $vid)
+      if [[ -z "$sensor_name" ]]; then
+        echo "DEBUG: Could not identify sensor type for ${vid}, skipping"
+        continue
+      fi
+      sensor_idx=$(get_dev_num $sensor_name)
+      local dev_ln="/dev/video-rs-${sensor_name}-${sensor_idx}"
+      create_video_link "$vid" "$dev_ln" "$bus" "$sensor_idx" "$sensor_name" "Streaming"
+      increment_dev_num $sensor_name
     # Handle metadata devices  
-    elif [ "${dev_name}" = "tegra-embedded" ] && [[ ${sens_id} -lt ${#camera_vid[@]} ]]; then
-      local dev_md_ln="/dev/video-rs-${camera_vid[${sens_id}]}-${cam_id}"
-      local sensor_name=$(echo "${camera_vid[${sens_id}]}" | awk -F'-' '{print $1}')
-      create_video_link "$vid" "$dev_md_ln" "$bus" "$cam_id" "$sensor_name" "Metadata"
-      sens_id=$((sens_id+1))
+    elif [ "${dev_name}" = "tegra-embedded" ]; then
+      if [[ -z "$sensor_name" ]]; then
+        echo "DEBUG: Could not identify sensor type for ${vid}, skipping"
+        continue
+      fi
+      local dev_md_ln="/dev/video-rs-${sensor_name}-md-${sensor_idx}"
+      create_video_link "$vid" "$dev_md_ln" "$bus" "$sensor_idx" "$sensor_name" "Metadata"
     else
       echo "DEBUG: Unrecognized driver ${dev_name} for ${vid}, skipping"
     fi
@@ -228,10 +303,8 @@ create_dfu_link() {
 # Orchestrates complete processing of one RealSense DS5 mux device
 # Extracts I2C address, finds video devices, creates links, and handles DFU
 # Input example: "vi-output, DS5 mux 30-001a (platform:tegra-capture-vi:0):" "0"
-# Returns: 0 on success, 1 on failure (used to increment camera counter)
 process_single_rs_device() {
   local rs_line="$1"
-  local cam_id="$2"
   
   echo "DEBUG: Processing RS line: ${rs_line}"
   
@@ -241,7 +314,7 @@ process_single_rs_device() {
   
   if [[ -z "${i2c_addr}" ]]; then
     echo "DEBUG: Could not extract I2C address from ${rs_line}, skipping"
-    return 1
+    return
   fi
   
   # Get the video devices for this RS mux
@@ -251,16 +324,11 @@ process_single_rs_device() {
   
   if [[ -z "${vid_devices}" ]]; then
     echo "DEBUG: No video devices found for ${i2c_addr}, skipping"
-    return 1
+    return
   fi
   
   # Process video devices
-  process_rs_video_devices "$vid_devices" "$cam_id"
-  
-  # Create DFU device link
-  create_dfu_link "$cam_id"
-  
-  return 0
+  process_rs_video_devices "$vid_devices"
 }
 
 # Check for Tegra devices by looking for RS mux in v4l2-ctl output
@@ -271,19 +339,21 @@ if [ -n "${rs_devices}" ]; then
   echo "DEBUG: Tegra RS devices detected"
   [[ $quiet -eq 0 ]] && printf "Bus\tCamera\tSensor\tNode Type\tVideo Node\tRS Link\n"
   
-  cam_id=0
   # Parse each RS mux device
   while IFS= read -r rs_line; do
     if [[ -z "${rs_line}" ]]; then
       continue
     fi
     
-    if process_single_rs_device "$rs_line" "$cam_id"; then
-      cam_id=$((cam_id+1))
-    fi
+    process_single_rs_device "$rs_line"
   done <<< "${rs_devices}"
-  
-  echo "DEBUG: Processed ${cam_id} Tegra cameras"
+
+  # Create DFU device links for all detected cameras
+  for ((i=0; i<${depth_dev_counter}; i++)); do
+    create_dfu_link "$i"
+  done
+
+  echo "DEBUG: Processed ${depth_dev_counter} Tegra cameras"
   exit 0 # exit for Tegra
 fi # done for Jetson
 
