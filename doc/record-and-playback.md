@@ -177,7 +177,7 @@ The same RealSense topics and message types are used as in the legacy format —
 
 #### Dependencies
 
-The SDK embeds the following third-party components under `third-party/realsense-file/rosbag2/` to provide `.db3` support. No external ROS2 installation is required.
+The SDK embeds the following third-party components under `third-party/realsense-file/rosbag2/` to provide `.db3` support. No external ROS2 installation is required. Note that `fastcdr` is fetched from GitHub at CMake configure time (requires internet access for first build).
 
 **Core storage:**
 - `rosbag2_storage` — Core rosbag2 storage interface and SQLite3-based `.db3` implementation
