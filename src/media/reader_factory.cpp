@@ -6,7 +6,6 @@
 #ifdef BUILD_ROSBAG2
 #include "ros2/ros2_reader.h"
 #endif
-#include <iostream>
 
 namespace librealsense
 {

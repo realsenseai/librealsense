@@ -3,6 +3,7 @@
 
 #include "bag_to_db3_converter.h"
 #include "core/serialization.h"
+#include <stdexcept>
 #include <rsutils/easylogging/easyloggingpp.h>
 
 #ifdef BUILD_ROSBAG2
