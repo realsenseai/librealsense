@@ -104,12 +104,12 @@ After choosing a file destination, a red dot will appear next to the device's na
 Starting a stream will save its frames to the file, and once all streams are stopped, recording will complete automatically.
 
 To replay a file, click "Add Source", choose "Load Recorded Sequence" and select the file you want to play.
-Once you select the file, the Viewer will automatically add it the the list of source, and a popup should appear stating that the file was loaded:
+Once you select the file, the Viewer will automatically add it to the list of sources, and a popup should appear stating that the file was loaded:
 
 ![Loading Recorded Sequence](./img/playback_screenshot.png)
 >Notice that devices that were loaded from file have a "movie" icon next to their name.  
 
-After loading the file, you can start streaming its streams, view its controls (with the values at time of record), pause the playback, choose speed, and use the seek bar to navigate trough frames.
+After loading the file, you can start streaming its streams, view its controls (with the values at time of record), pause the playback, choose speed, and use the seek bar to navigate through frames.
 
 
 Under the Hood
@@ -120,11 +120,11 @@ Under the Hood
 A **Device** is a container of Sensors with some correlation between them (e.g - all sensors are on a single board, sensors are mounted on a robot and share calibration information, etc.). A **Sensor** is a data streaming object, that provides one or more Streams.
 **Stream** is a sequence of data items of a single data type, which are ordered according to their time of creation or arrival. The Sensor provides the Streams frames to the user.
 
-We call the device's sensors and stream, the **topology** of the device.
+We call the device's sensors and streams, the **topology** of the device.
 
 Devices and Sensors can have **Extensions** that provide additional functionalities. A **Snapshot** of an Extension is a snapshot of the data that is available by the extension at some point of time, it is a sort of "read-only" version of the extension. For example, say we have a `DigitalClockExtension`, that can set and show the time. If we take a snapshot of that extension at noon, then whenever we ask the snapshot to show the time it will show "12:00", and trying to set its time will fail.
 
-Finally, we will refer to a an actual implementation of devices and sensors as "live" or "real" devices and sensors.
+Finally, we will refer to an actual implementation of devices and sensors as "live" or "real" devices and sensors.
 
 #### Rosbag
 
