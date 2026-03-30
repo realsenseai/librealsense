@@ -61,8 +61,10 @@ endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         $<$<BOOL:${USE_EXTERNAL_LZ4}>:lz4::lz4>
-        $<$<BOOL:${BUILD_ROSBAG2}>:sqlite3_lib>
 )
+if(BUILD_ROSBAG2)
+    target_link_libraries(${PROJECT_NAME} PRIVATE sqlite3_lib)
+endif()
 
 #set_target_properties(${PROJECT_NAME} PROPERTIES VERSION "${LIBVERSION}" SOVERSION "${LIBSOVERSION}")
 
