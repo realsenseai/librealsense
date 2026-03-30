@@ -6,7 +6,7 @@
 #include "playback-device-info.h"
 #include "core/motion.h"
 #include "stream.h"
-#include "media/reader_factory.h"
+#include "media/ros_factory.h"
 #include "media/ros2/ros2_file_format.h"
 #include "environment.h"
 #include "sync.h"

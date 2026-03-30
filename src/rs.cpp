@@ -13,13 +13,8 @@
 #include "core/extension.h"
 #include "media/playback/playback-device-info.h"
 #include "media/record/record_device.h"
-#include <media/ros/ros_writer.h>
-#ifdef BUILD_ROSBAG2
-#include <media/ros2/ros2_writer.h>
-#include <media/ros2/ros2_reader.h>
-#endif
 #include <media/bag_to_db3_converter.h>
-#include <media/reader_factory.h>
+#include <media/ros_factory.h>
 #include "core/advanced_mode.h"
 #include "core/pose-frame.h"
 #include "core/motion-frame.h"
@@ -2093,8 +2088,12 @@ rs2_device* rs2_context_add_device(rs2_context* ctx, const char* file, rs2_error
     VALIDATE_NOT_NULL(ctx);
     VALIDATE_NOT_NULL(file);
 
-    if (librealsense::is_bag_file(file))
-        LOG_WARNING("ROS1 .bag format is deprecated. Use rs-convert --output-db3 to convert to .db3 format.");
+    if (!librealsense::is_db3_file(file))
+#ifdef BUILD_ROSBAG2
+        LOG_WARNING("ROS1 .bag format is deprecated. Use rs-convert -D to convert to .db3 format.");
+#else
+        LOG_WARNING("ROS1 .bag format is deprecated. Build with BUILD_ROSBAG2 to enable .db3 support.");
+#endif
 
     auto dev_info = std::make_shared< playback_device_info >( ctx->ctx, file );
     ctx->ctx->add_device( dev_info );
@@ -2270,13 +2269,7 @@ rs2_device* rs2_create_record_device_ex(const rs2_device* device, const char* fi
     VALIDATE_NOT_NULL(device);
     VALIDATE_NOT_NULL(file);
 
-    auto writer = std::make_shared<
-#ifdef BUILD_ROSBAG2
-        ros2_writer
-#else
-        ros_writer
-#endif
-    >(file, compression_enabled != 0);
+    auto writer = create_writer_for_file(file, compression_enabled != 0);
     return new rs2_device({ std::make_shared<record_device>(device->device, writer) });
 }
 HANDLE_EXCEPTIONS_AND_RETURN(nullptr, device, file)
