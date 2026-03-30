@@ -33,4 +33,5 @@
   * [D400 cameras with Raspberry Pi](./RaspberryPi3.md) - Example of low-end system without USB3 interface
   * [D400 cameras on **rooted** Android devices](./android.md) - Instructions of how to build the RealSense SDK for Android OS.
   * [D435i depth camera with IMU](./d435i.md) - An introduction to the D435i depth camera and it's IMU
-* [Record and Playback](./record-and-playback.md) - SDK Record and Playback functionality using ROS-bag file format
+* [Record and Playback](./record-and-playback.md) - SDK Record and Playback functionality using `.db3` (ROS2 rosbag2) file format
+* [Record and Playback (Legacy ROS1)](./record-and-playback-legacy-ros1.md) - Legacy documentation for the ROS1 `.bag` file format

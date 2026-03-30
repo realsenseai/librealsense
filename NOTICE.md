@@ -17,6 +17,7 @@
 | rapidxml | https://github.com/Fe-Bell/RapidXML | MIT License  | Copyright (c) 2006, 2007 Marcin Kalicinski |
 | easyloggingpp | https://github.com/abumq/easyloggingpp | MIT License | Copyright (c) 2012-present @abumq (Majid Q.) |
 | tclap | http://tclap.sourceforge.net/ | MIT License | Copyright (c) 2003 Michael E. Smoot, Copyright (c) 2004 Daniel Aarno, Copyright (c) 2017 Google Inc.  |
+| yaml-cpp (rosbag2) | https://github.com/jbeder/yaml-cpp | MIT License | Copyright (c) Jesse Beder |
 
 ###### MIT License 
 The MIT License (MIT)
@@ -48,6 +49,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 | ------- | ------- | ------- | ------- |
 | GLFW | https://github.com/glfw/glfw | Zlib license  | Copyright (c) 2002-2006 Marcus Geelnard , Copyright (c) 2006-2019 Camilla Löwy |
 | tiny file dialogs | http://tinyfiledialogs.sourceforge.net | zlib/libpng License  | Copyright (c) 2014 - 2016 Guillaume Vareille http://ysengrin.com  |
+| tinyxml2 (rosbag2) | https://github.com/leethomason/tinyxml2 | zlib License | Copyright (c) Lee Thomason |
 
 ###### Zlib license
 Copyright (c) 2002-2006 Marcus Geelnard
@@ -72,6 +74,10 @@ This notice may not be removed or altered from any source distribution.
 | ------- | ------- | ------- | ------- |
 | HIDAPI library | https://github.com/signal11/hidapi|  BSD-3-Clause license  |  Copyright (c) 2010, Alan Ott, Signal 11 Software |
 | ross_comm | https://github.com/ros/ros_comm | BSD-3-Clause  | Copyright (c) 2008, Willow Garage, Inc.  |
+| class_loader (rosbag2) | https://github.com/ros/class_loader | BSD-3-Clause | Copyright (c) Willow Garage, Inc. |
+| pluginlib (rosbag2) | https://github.com/ros/pluginlib | BSD-3-Clause | Copyright (c) Willow Garage, Inc. |
+| console_bridge (rosbag2) | https://github.com/ros/console_bridge | BSD-3-Clause | Copyright (c) 2008, Willow Garage, Inc. |
+| zstd (rosbag2) | https://github.com/facebook/zstd | BSD-3-Clause | Copyright (c) Meta Platforms, Inc. and affiliates |
 
 ######  BSD-3-Clause license
 Copyright (c) 2010, Alan Ott, Signal 11 Software
@@ -622,6 +628,13 @@ That's all there is to it!
 | Fast-DDS | https://github.com/eProsima/Fast-DDS | Apache-2.0 license   | Copyright 2019, Proyectos y Sistemas de Mantenimiento SL (eProsima). |
 | OpenCV | https://github.com/opencv/opencv | Apache-2.0 license   | Copyright (C) 2000-2008, Intel Corporation, all rights reserved. Copyright (C) 2009-2010, Willow Garage Inc., all rights reserved. |
 | libusbhost | https://android.googlesource.com/platform/system/core/+/master/libusbhost/include/usbhost/usbhost.h | Apache-2.0 license   | Copyright (C) 2010 The Android Open Source Project |
+| rosbag2_storage (rosbag2) | https://github.com/ros2/rosbag2 | Apache-2.0 license | Copyright (c) Amazon.com, Inc.; Bosch Software Innovations GmbH |
+| rosbag2_compression (rosbag2) | https://github.com/ros2/rosbag2 | Apache-2.0 license | Copyright (c) Amazon.com, Inc. |
+| rosbag2_storage_default_plugins (rosbag2) | https://github.com/ros2/rosbag2 | Apache-2.0 license | Copyright (c) Open Source Robotics Foundation, Inc. |
+| ament_index_cpp (rosbag2) | https://github.com/ament/ament_index | Apache-2.0 license | Copyright (c) Open Source Robotics Foundation, Inc. |
+| rcutils (rosbag2) | https://github.com/ros2/rcutils | Apache-2.0 license | Copyright (c) Open Source Robotics Foundation, Inc. |
+| rcpputils (rosbag2) | https://github.com/ros2/rcpputils | Apache-2.0 license | Copyright (c) Open Source Robotics Foundation, Inc. |
+| Fast-CDR (rosbag2) | https://github.com/eProsima/Fast-CDR | Apache-2.0 license | Copyright (c) eProsima |
 
 
 ###### Apache-2.0 license
@@ -836,6 +849,7 @@ That's all there is to it!
 | ------- | ------- | ------- | ------- |
 | LZ4 library | https://github.com/lz4/lz4 |  BSD-2-Clause license  |  Copyright (C) 2011-2023, Yann Collet. |
 
+
 ######  BSD-2-Clause license
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
 
@@ -870,6 +884,7 @@ That's all there is to it!
 | ------- | ------- | ------- | ------- |
 | arcball_camera | https://github.com/nlguillemot/arcball_camera | Public Domain License  | N/A  |
 | STB | https://github.com/nothings/stb | Public Domain License  | N/A  |
+| sqlite3 (rosbag2) | https://sqlite.org | Public Domain | N/A |
 
 ###### Public Domain License  
 This is free and unencumbered software released into the public domain.
@@ -1007,3 +1022,4 @@ This license becomes null and void if any of the above conditions are not met.
 DISCLAIMER
 THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM OTHER DEALINGS IN THE FONT SOFTWARE.
 ------------------------------------------------------------------------------------------------
+

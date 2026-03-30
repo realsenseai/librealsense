@@ -3,9 +3,9 @@
 ## Overview
 
 This example demonstrates usage of the recorder and playback devices. We'll show how to use `rs2::recorder` with `rs2::pipeline` to
-record frames from the camera to a .bag file ('a.bag' in the example), with an option to pause and resume the recording. 
+record frames from the camera to a .db3 file ('a.db3' in the example), with an option to pause and resume the recording. 
 
-After the file is ready, we'll demonstrate how to play, pause, seek and stop a .bag file using `rs2::playback`.
+After the file is ready, we'll demonstrate how to play, pause, seek and stop a .db3 file using `rs2::playback`.
 
 Throughout the example, frames from the active device (default, recorder or playback) will be rendered.
 
@@ -144,12 +144,12 @@ In the first case, we stop the pipeline and initiate the shared pointer with a n
 pipe->stop(); // Stop the pipeline with the default configuration
 pipe = std::make_shared<rs2::pipeline>();
 ```
-Then we initiate a new configuration, allowing recording to the file 'a.bag' using the function `enable_record_to_file`, and start the
+Then we initiate a new configuration, allowing recording to the file 'a.db3' using the function `enable_record_to_file`, and start the
 pipeline with the new configuration. Also, we update the `device` variable to hold the current device.
 
 ```cpp
 rs2::config cfg; // Declare a new configuration
-cfg.enable_record_to_file("a.bag");
+cfg.enable_record_to_file("a.db3");
 pipe->start(cfg); //File will be opened at this point
 device = pipe->get_active_profile().get_device();
 ```
@@ -171,7 +171,7 @@ device->as<rs2::recorder>().pause();
 ```
 
 To stop recording, we need to stop the pipeline and release any resources that the pipeline holds,
-including the 'a.bag' file. Therefore, we initiate the shared pointer with a new pipeline.
+including the 'a.db3' file. Therefore, we initiate the shared pointer with a new pipeline.
 
 ```cpp
 pipe->stop(); // Stop the pipeline that holds the file and the recorder
@@ -197,7 +197,7 @@ if (!device.as<rs2::playback>()) {
     pipe->stop(); // Stop streaming with default configuration
     pipe = std::make_shared<rs2::pipeline>();
     rs2::config cfg;
-    cfg.enable_device_from_file("a.bag");
+    cfg.enable_device_from_file("a.db3");
     pipe->start(cfg); //File will be opened in read mode at this point
     device = pipe->get_active_profile().get_device();  
 }
