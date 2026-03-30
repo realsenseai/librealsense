@@ -3,7 +3,10 @@
 
 #include "reader_factory.h"
 #include "ros/ros_reader.h"
+#ifdef BUILD_ROSBAG2
 #include "ros2/ros2_reader.h"
+#endif
+#include <iostream>
 
 namespace librealsense
 {
@@ -28,6 +31,10 @@ namespace librealsense
         if (is_bag_file(filename))
             return std::make_shared<ros_reader>(filename, ctx);
 
+#ifdef BUILD_ROSBAG2
         return std::make_shared<ros2_reader>(filename, ctx);
+#else
+        throw invalid_value_exception("Cannot open .db3 files without BUILD_ROSBAG2");
+#endif
     }
 }

@@ -20,7 +20,6 @@ import platform
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
-    pytest.mark.live
 ]
 
 
@@ -74,7 +73,7 @@ def test_pipeline_first_color_frame_delay(pipeline_device):
     max_delay = 1
     os_name = platform.system()
 
-    if any(model in product_name for model in ['D421', 'D405', 'D430']):
+    if any(model in product_name for model in ['D421', 'D405', 'D430', 'D401']):
         pytest.skip(f"Device {product_name} has no color sensor")
 
     # Allow HKR some time to close the depth pipe completely (runs after depth test)

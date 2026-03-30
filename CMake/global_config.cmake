@@ -55,6 +55,10 @@ macro(global_set_flags)
         add_definitions(-DRS2_USE_CUDA)
     endif()
 
+    if (BUILD_WITH_NEON)
+        add_definitions(-DBUILD_WITH_NEON)
+    endif()
+
     if (BUILD_SHARED_LIBS)
         add_definitions(-DBUILD_SHARED_LIBS)
     endif()

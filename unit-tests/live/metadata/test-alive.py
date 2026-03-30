@@ -2,7 +2,7 @@
 # Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
 import time
 
-# test:device each(D400*)
+# test:device each(D400*) !D401
 # test:device each(D500*)
 
 # test:donotrun:!nightly

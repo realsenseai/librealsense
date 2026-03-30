@@ -12,6 +12,9 @@ namespace rs2
     {
         if (!ends_with(file, ".bag") && !ends_with(file, ".BAG"))
             return false;
+#ifndef BUILD_ROSBAG2
+        return false;  // No conversion available — load .bag directly
+#endif
         if (is_converting())
             return true;  // block loading while conversion is in progress
         if (_skip_next) // Will happen in case of conversion failure, or 'Play as-is' selected
@@ -121,7 +124,7 @@ namespace rs2
             _progress_bar = progress_bar();
             _progress_bar.threshold_progress = 0.f;
             _progress_bar.last_progress_time = std::chrono::system_clock::now();
-            auto weak = weak_from_this();
+            std::weak_ptr<bag_conversion_helper> weak = shared_from_this();
             _thread = std::thread([ctx, input, weak]() mutable
             {
                 try

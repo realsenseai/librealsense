@@ -512,15 +512,21 @@ namespace librealsense
 
     void ros2_writer::write_vendor_info(const std::string& topic, nanoseconds timestamp, std::shared_ptr< info_interface > info_snapshot)
     {
+        // Pack all info key=value pairs into a single semicolon-delimited message
+        // so third-party tools (e.g. Foxglove) can display all info in one entry
+        std::ostringstream oss;
+        bool first = true;
         for (uint32_t i = 0; i < static_cast<uint32_t>(RS2_CAMERA_INFO_COUNT); i++)
         {
             auto camera_info = static_cast<rs2_camera_info>(i);
             if (info_snapshot->supports_info(camera_info))
             {
-                std::string kv = rsutils::string::from() << rs2_camera_info_to_string(camera_info) << "=" << info_snapshot->get_info(camera_info);
-                write_string(topic, timestamp, kv);
+                if (!first) oss << ";";
+                oss << rs2_camera_info_to_string(camera_info) << "=" << info_snapshot->get_info(camera_info);
+                first = false;
             }
         }
+        write_string(topic, timestamp, oss.str());
     }
 
     void ros2_writer::write_sensor_option(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, rs2_option type, const librealsense::option& option)
@@ -589,6 +595,9 @@ namespace librealsense
 
     void ros2_writer::write_sensor_processing_blocks(device_serializer::sensor_identifier sensor_id, const nanoseconds& timestamp, std::shared_ptr<recommended_proccesing_blocks_interface> proccesing_blocks)
     {
+        // Pack all processing block names into a single semicolon-delimited message
+        std::ostringstream oss;
+        bool first = true;
         for (auto block : proccesing_blocks->get_recommended_processing_blocks())
         {
             std::string name = get_processing_block_extension_name(block);
@@ -597,13 +606,19 @@ namespace librealsense
                 LOG_WARNING("Failed to get recommended processing block name for sensor " << sensor_id.sensor_index);
                 continue;
             }
+            if (!first) oss << ";";
+            oss << name;
+            first = false;
+        }
+        if (!first)
+        {
             try
             {
-                write_string(ros2_topic::post_processing_blocks_topic(sensor_id), timestamp, name);
+                write_string(ros2_topic::post_processing_blocks_topic(sensor_id), timestamp, oss.str());
             }
             catch (std::exception& e)
             {
-                LOG_WARNING("Failed to write processing block '" << name << "' for sensor " << sensor_id.sensor_index
+                LOG_WARNING("Failed to write processing blocks for sensor " << sensor_id.sensor_index
                     << ": " << e.what());
             }
         }

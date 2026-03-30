@@ -724,7 +724,8 @@ try:
     log.progress()
     #
     if not n_tests:
-        log.f( 'No unit-tests found!' )
+        log.i( 'No unit-tests found; exiting' )
+        sys.exit(0)
     #
     if list_only:
         if list_tags and list_tests:

@@ -3,7 +3,7 @@
 
 # Currently, we exclude D555 as it's failing
 
-# test:device each(D400*)
+# test:device each(D400*) !D401
 # test:device each(D500*) !D555
 
 import pyrealsense2 as rs, os, time, tempfile, platform, sys
@@ -62,8 +62,7 @@ def color_frame_call_back( frame ):
     global allowed_drops
     global got_frames_rgb
     got_frames_rgb = True
-    # currently not checking frame drops as it fails in some cases
-    # test.check_frame_drops( frame, previous_color_frame_number, allowed_drops, is_d400 )
+    test.check_frame_drops( frame, previous_color_frame_number, allowed_drops, is_d400 )
     previous_color_frame_number = frame.get_frame_number()
 
 def depth_frame_call_back( frame ):
@@ -73,8 +72,7 @@ def depth_frame_call_back( frame ):
     global got_frames_depth
 
     got_frames_depth = True
-    # currently not checking frame drops as it fails in some cases
-    # test.check_frame_drops( frame, previous_depth_frame_number, allowed_drops, is_d400 )
+    test.check_frame_drops( frame, previous_depth_frame_number, allowed_drops, is_d400 )
     previous_depth_frame_number = frame.get_frame_number()
 
 def restart_profiles():

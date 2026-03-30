@@ -35,6 +35,7 @@ def tare_calibration_json(tare_json_file, host_assistance):
 
 def calculate_target_z():
     number_of_images = 50  # The required number of frames is 10+
+    warmup_frames = 30     # Allow AE to stabilize before capturing (1 sec at 30fps)
     timeout_s = 30
     target_size = [175, 100]
 
@@ -42,18 +43,22 @@ def calculate_target_z():
     cfg.enable_stream(rs.stream.infrared, 1, 1280, 720, rs.format.y8, 30)
 
     q = rs.frame_queue(capacity=number_of_images, keep_frames=True)
+    # Frame queues q2, q3 should be left empty. Provision for future enhancements.
     q2 = rs.frame_queue(capacity=number_of_images, keep_frames=True)
     q3 = rs.frame_queue(capacity=number_of_images, keep_frames=True)
 
     counter = 0
+    warmup_counter = 0
 
     def cb(frame):
-        nonlocal counter
-        if counter > number_of_images:
+        nonlocal counter, warmup_counter
+        if counter >= number_of_images:
             return
-        for f in frame.as_frameset():
-            q.enqueue(f)
-            counter += 1
+        if warmup_counter < warmup_frames:
+            warmup_counter += 1
+            return
+        q.enqueue(frame)
+        counter += 1
 
     ctx = rs.context()
     pipe = rs.pipeline(ctx)
@@ -119,5 +124,6 @@ if not is_mipi_device():
             test.check(abs(health_factor) < HEALTH_FACTOR_THRESHOLD)
         except Exception as e:
             log.e("Tare calibration test failed: ", str(e))
+            test.fail()
 
 test.print_results_and_exit()

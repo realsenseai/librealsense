@@ -407,7 +407,7 @@ namespace librealsense
         #ifdef __SSSE3__
             LOG_INFO("Using SSE-optimized pointcloud implementation");
             return std::make_shared<librealsense::pointcloud_sse>();
-        #elif defined(__ARM_NEON) && !defined(ANDROID)
+        #elif defined(__ARM_NEON) && defined(BUILD_WITH_NEON) && !defined(ANDROID)
             LOG_INFO("Using NEON-optimized pointcloud implementation");
             return std::make_shared<librealsense::pointcloud_neon>();
         #else

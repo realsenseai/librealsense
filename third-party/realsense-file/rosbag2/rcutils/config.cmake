@@ -31,7 +31,5 @@ list(FILTER SOURCE_FILES_RCUTILS EXCLUDE REGEX ".*time_unix\\.c$")
 # Add the correct platform-specific time implementation
 list(APPEND SOURCE_FILES_RCUTILS "${CMAKE_CURRENT_LIST_DIR}/src/${time_impl_c}")
 
-message(STATUS "ROSBAG2_COMPILE_FLAGS before adding rcutils: ${ROSBAG2_COMPILE_FLAGS}")
 set(ROSBAG2_COMPILE_FLAGS "${ROSBAG2_COMPILE_FLAGS};RCUTILS_BUILDING_DLL")
-message(STATUS "ROSBAG2_COMPILE_FLAGS after adding rcutils: ${ROSBAG2_COMPILE_FLAGS}")
 

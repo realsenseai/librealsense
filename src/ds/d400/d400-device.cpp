@@ -610,6 +610,17 @@ namespace librealsense
 
         using namespace platform;
 
+        rsutils::version mipi_driver_version;
+        // Register MIPI driver version for Jetson platform (GMSL devices only)
+        if (_is_mipi_device)
+        {
+            auto uvc_dev = raw_depth_sensor->get_uvc_device();
+            if (uvc_dev && uvc_dev->is_platform_jetson())
+            {
+                mipi_driver_version = platform::get_jetson_driver_version();
+            }
+        }
+
         // minimal firmware version in which hdr feature is supported
         firmware_version hdr_firmware_version("5.12.8.100");
 
@@ -904,7 +915,8 @@ namespace librealsense
 
             if ((_device_capabilities & ds_caps::CAP_INTERCAM_HW_SYNC) == ds_caps::CAP_INTERCAM_HW_SYNC)
             {
-                if(_fw_version >= firmware_version("5.17.2.5"))
+                if(_fw_version >= firmware_version("5.17.2.5") &&
+                    (!_is_mipi_device || mipi_driver_version >= rsutils::version("1.0.2.6")))
                 {
                     auto external_sync_xu_control = std::make_shared<uvc_xu_option<uint8_t>>( raw_depth_sensor, depth_xu,
                                                                                        DS5_EXTERNAL_SYNC, "External sync");
@@ -975,7 +987,6 @@ namespace librealsense
             // used for mipi device
             register_metadata_mipi(depth_sensor, hdr_firmware_version);
         }
-        //mipi
 
         register_info(RS2_CAMERA_INFO_NAME, device_name);
         register_info(RS2_CAMERA_INFO_SERIAL_NUMBER, optic_serial);
@@ -989,7 +1000,8 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_PRODUCT_LINE, "D400");
         register_info(RS2_CAMERA_INFO_RECOMMENDED_FIRMWARE_VERSION, _recommended_fw_version);
         register_info(RS2_CAMERA_INFO_CAMERA_LOCKED, _is_locked ? "YES" : "NO");
-        register_info(RS2_CAMERA_INFO_DFU_DEVICE_PATH, group.uvc_devices.front().dfu_device_path);
+        if (_is_mipi_device)
+            register_info(RS2_CAMERA_INFO_DFU_DEVICE_PATH, group.uvc_devices.front().dfu_device_path);
         register_info(RS2_CAMERA_INFO_IMU_TYPE, _imu_type);
 
         if (usb_modality)
@@ -998,7 +1010,21 @@ namespace librealsense
             register_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR, usb_type_str);
         }
         else
+        {
             register_info(RS2_CAMERA_INFO_CONNECTION_TYPE, "GMSL");
+            if (mipi_driver_version.is_valid())
+            {
+                register_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION, mipi_driver_version.to_string());
+
+                // Log driver version only once across all devices
+                static bool logged = false;
+                if (!logged)
+                {
+                    LOG_INFO("MIPI driver version detected: " << mipi_driver_version.to_string());
+                    logged = true;
+                }
+            }
+        }
 
         std::string curr_version= _fw_version;
 

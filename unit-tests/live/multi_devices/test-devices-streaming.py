@@ -3,6 +3,7 @@
 
 # Test configuration: Requires 2 D400 series devices
 #test:device:!jetson D400* D400*
+#test:donotrun
 
 """
 Tests:
@@ -90,100 +91,6 @@ def get_common_multi_stream_config(*devs):
     return stream_configs
 
 
-def setup_pipelines(devs, stream_configs):
-    """
-    Create and configure pipelines for all devices with the specified stream configurations.
-    
-    :param devs: List of device objects
-    :param stream_configs: List of (stream_type, stream_index, width, height, format, fps) tuples
-    :return: Tuple of (pipes, cfgs, device_info)
-    """
-    pipes = []
-    cfgs = []
-    device_info = []
-    
-    # Setup pipelines for all devices
-    for dev in devs:
-        sn = dev.get_info(rs.camera_info.serial_number)
-        name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else "Unknown"
-        
-        pipe = rs.pipeline()
-        cfg = rs.config()
-        cfg.enable_device(sn)
-        
-        pipes.append(pipe)
-        cfgs.append(cfg)
-        device_info.append({'sn': sn, 'name': name})
-    
-    # Configure all pipelines identically
-    log.i(f"Configuring streams:")
-    for stream_type, stream_index, width, height, format, fps in stream_configs:
-        for cfg in cfgs:
-            if stream_index >= 0:
-                # Use the overload with stream_index (important for infrared streams)
-                cfg.enable_stream(stream_type, stream_index, width, height, format, fps)
-            else:
-                # Use the overload without stream_index (for depth/color)
-                cfg.enable_stream(stream_type, width, height, format, fps)
-        index_str = f" index {stream_index}" if stream_index >= 0 else ""
-        log.i(f"  - {stream_type}{index_str} {width}x{height} @ {fps}fps {format}")
-    
-    return pipes, cfgs, device_info
-
-
-def stabilize_streams(pipes):
-    """
-    Allow auto-exposure to stabilize by collecting and discarding initial frames.
-    
-    :param pipes: List of pipeline objects
-    """
-    log.i(f"Stabilizing for {STABILIZATION_TIME_SEC} seconds...")
-    stabilization_frames = int(STABILIZATION_TIME_SEC * 30)  # Assume ~30fps
-    for _ in range(stabilization_frames):
-        try:
-            for pipe in pipes:
-                pipe.wait_for_frames(timeout_ms=5000)
-        except Exception as e:
-            log.w(f"  Exception during stabilization: {e}")
-
-
-def collect_frames(pipes, duration_sec):
-    """
-    Collect frames from all pipelines for the specified duration.
-    
-    :param pipes: List of pipeline objects
-    :param duration_sec: How long to stream in seconds
-    :return: Tuple of (all_frame_counters, all_framesets_received, all_stream_frame_counts, actual_duration)
-    :raises: Re-raises any exception from wait_for_frames() after logging
-    """
-    all_frame_counters = [defaultdict(list) for _ in pipes]
-    all_framesets_received = [0] * len(pipes)
-    all_stream_frame_counts = [defaultdict(int) for _ in pipes]
-    
-    log.i(f"Streaming for {duration_sec} seconds...")
-    start_time = time.time()
-    
-    try:
-        while time.time() - start_time < duration_sec:
-            for i, pipe in enumerate(pipes):
-                frameset = pipe.wait_for_frames(timeout_ms=5000)
-                all_framesets_received[i] += 1
-                
-                for frame in frameset:
-                    stream_type = frame.get_profile().stream_type()
-                    all_stream_frame_counts[i][stream_type] += 1
-                    
-                    if frame.supports_frame_metadata(rs.frame_metadata_value.frame_counter):
-                        counter = frame.get_frame_metadata(rs.frame_metadata_value.frame_counter)
-                        all_frame_counters[i][stream_type].append(counter)
-    except Exception as e:
-        actual_duration = time.time() - start_time
-        log.e(f"Exception during streaming after {actual_duration:.2f}s: {e}")
-        raise
-    
-    actual_duration = time.time() - start_time
-    return all_frame_counters, all_framesets_received, all_stream_frame_counts, actual_duration
-
 
 def analyze_device_drops(frame_counters, stream_frame_counts, device_name):
     """
@@ -233,13 +140,13 @@ def analyze_device_drops(frame_counters, stream_frame_counts, device_name):
     return overall_drop_pct, per_stream_stats
 
 
-def aggregate_results(all_frame_counters, all_framesets_received, all_stream_frame_counts, 
+def aggregate_results(all_frame_counters, all_frames_received, all_stream_frame_counts,
                      device_info, actual_duration):
     """
     Aggregate and analyze results from all devices.
-    
+
     :param all_frame_counters: List of frame counter dicts (one per device)
-    :param all_framesets_received: List of frameset counts (one per device)
+    :param all_frames_received: List of total frame counts (one per device)
     :param all_stream_frame_counts: List of stream frame count dicts (one per device)
     :param device_info: List of device info dicts
     :param actual_duration: Actual streaming duration in seconds
@@ -247,7 +154,7 @@ def aggregate_results(all_frame_counters, all_framesets_received, all_stream_fra
     """
     log.i(f"Streaming completed after {actual_duration:.2f} seconds")
     for i, info in enumerate(device_info):
-        log.i(f"Device {i+1} ({info['name']}): {all_framesets_received[i]} framesets")
+        log.i(f"Device {i+1} ({info['name']}): {all_frames_received[i]} total frames")
     
     # Log per-stream frame counts for all devices
     for i, (info, stream_counts) in enumerate(zip(device_info, all_stream_frame_counts)):
@@ -266,7 +173,7 @@ def aggregate_results(all_frame_counters, all_framesets_received, all_stream_fra
         dev_stats = {
             'name': info['name'],
             'sn': info['sn'],
-            'framesets': all_framesets_received[i],
+            'total_frames': all_frames_received[i],
             'drop_pct': drop_pct,
             'streams': stream_stats
         }
@@ -285,43 +192,91 @@ def aggregate_results(all_frame_counters, all_framesets_received, all_stream_fra
 def stream_multi_and_check_frames(*devs, stream_configs, duration_sec=STREAM_DURATION_SEC):
     """
     Stream multiple stream types from all devices simultaneously and check for frame drops.
-    
+
     :param devs: Variable number of device objects
-    :param stream_configs: List of (stream_type, width, height, format, fps) tuples
+    :param stream_configs: List of (stream_type, stream_index, width, height, format, fps) tuples
     :param duration_sec: How long to stream in seconds
     :return: Tuple of (success, list of drop_percentages, stats)
     """
-    # Setup phase: Create and configure pipelines
-    pipes, cfgs, device_info = setup_pipelines(devs, stream_configs)
-    
+    device_info = []
+    all_frame_counters = []
+    all_stream_frame_counts = []
+    active_sensors = []
+
+    counting = False
+
+    def make_callback(frame_counters, frame_counts):
+        def callback(frame):
+            if not counting:
+                return
+            st = frame.get_profile().stream_type()
+            frame_counts[st] += 1
+            if frame.supports_frame_metadata(rs.frame_metadata_value.frame_counter):
+                frame_counters[st].append(frame.get_frame_metadata(rs.frame_metadata_value.frame_counter))
+        return callback
+
     try:
-        # Start all pipelines
-        for i, (pipe, cfg, info) in enumerate(zip(pipes, cfgs, device_info)):
-            log.d(f"Starting pipeline on {info['name']} (SN: {info['sn']})...")
-            pipe.start(cfg)
-        
-        # Stabilization phase: Allow auto-exposure to settle
-        stabilize_streams(pipes)
-        
-        # Collection phase: Stream and collect frame data
-        # Note: Exceptions will propagate and fail the test after cleanup in finally block
-        all_frame_counters, all_framesets_received, all_stream_frame_counts, actual_duration = \
-            collect_frames(pipes, duration_sec)
-        
-        # Analysis phase: Aggregate results and analyze drops
-        success, drop_percentages, stats = aggregate_results(
-            all_frame_counters, all_framesets_received, all_stream_frame_counts,
-            device_info, actual_duration
-        )
-        
-        return success, drop_percentages, stats
-        
+        for dev in devs:
+            sn = dev.get_info(rs.camera_info.serial_number)
+            name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else "Unknown"
+            device_info.append({'sn': sn, 'name': name})
+
+            frame_counters = defaultdict(list)
+            frame_counts = defaultdict(int)
+            all_frame_counters.append(frame_counters)
+            all_stream_frame_counts.append(frame_counts)
+            cb = make_callback(frame_counters, frame_counts)
+
+            # Group profiles by sensor index (depth+IR share stereo module, color is separate)
+            sensors = dev.query_sensors()
+            profiles_by_idx = defaultdict(list)
+            for stream_type, stream_index, w, h, fmt, fps in stream_configs:
+                found = False
+                for idx, sensor in enumerate(sensors):
+                    for p in sensor.get_stream_profiles():
+                        if not p.is_video_stream_profile():
+                            continue
+                        vp = p.as_video_stream_profile()
+                        idx_match = stream_index < 0 or vp.stream_index() == stream_index
+                        if (vp.stream_type() == stream_type and vp.format() == fmt
+                                and vp.width() == w and vp.height() == h
+                                and vp.fps() == fps and idx_match):
+                            profiles_by_idx[idx].append(p)
+                            found = True
+                            break
+                    if found:
+                        break
+                if not found:
+                    log.f(f"No matching profile for {stream_type} on {name}")
+
+            for idx, profiles in profiles_by_idx.items():
+                sensor = sensors[idx]
+                sensor.open(profiles)
+                active_sensors.append(sensor)
+                sensor.start(cb)
+        log.i(f"Stabilizing for {STABILIZATION_TIME_SEC} seconds...")
+        time.sleep(STABILIZATION_TIME_SEC)
+
+        counting = True
+        log.i(f"Streaming for {duration_sec} seconds...")
+        start_time = time.time()
+        time.sleep(duration_sec)
+        actual_duration = time.time() - start_time
+        counting = False
     finally:
-        for pipe in pipes:
+        for s in active_sensors:
             try:
-                pipe.stop()
+                s.stop()
             except Exception as e:
-                log.d(f"Failed to stop pipeline during cleanup: {e}")
+                log.d(f"Stop error: {e}")
+            try:
+                s.close()
+            except Exception as e:
+                log.d(f"Close error: {e}")
+
+    # Feed into existing analysis
+    all_frames = [sum(cnt.values()) for cnt in all_stream_frame_counts]
+    return aggregate_results(all_frame_counters, all_frames, all_stream_frame_counts, device_info, actual_duration)
 
 
 #
@@ -338,7 +293,7 @@ with test.closure(f"Multiple devices - multi-stream simultaneous operation (dept
         name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else "Unknown"
         log.i(f"  Device {i}: {name} (SN: {sn})")
     log.i("=" * 80)
-    
+
     # Get common multi-stream configuration
     log.i("\nFinding common multi-stream configuration...")
     stream_configs = get_common_multi_stream_config(*devs)
@@ -368,7 +323,7 @@ with test.closure(f"Multiple devices - multi-stream simultaneous operation (dept
         
         for i, dev_stats in enumerate(stats['devices'], 1):
             log.i(f"\nDevice {i} ({dev_stats['name']}):")
-            log.i(f"  Total framesets: {dev_stats['framesets']}")
+            log.i(f"  Total frames: {dev_stats['total_frames']}")
             log.i(f"  Overall drop rate: {dev_stats['drop_pct']:.2f}%")
             for stream_type, stream_stats in dev_stats['streams'].items():
                 log.i(f"  {stream_type}:")

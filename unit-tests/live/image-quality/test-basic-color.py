@@ -1,13 +1,13 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
-# test:device each(D400*)
+# test:device each(D400*) !D401
 
 import pyrealsense2 as rs
 from rspy import log, test
 import numpy as np
 import cv2
-from iq_helper import find_roi_location, get_roi_from_frame, is_color_close, WIDTH, HEIGHT
+from iq_helper import find_roi_location, get_roi_from_frame, is_color_close, save_failure_snapshot, WIDTH, HEIGHT
 
 NUM_FRAMES = 100 # Number of frames to check
 COLOR_TOLERANCE = 60 # Acceptable per-channel deviation in RGB values
@@ -82,6 +82,8 @@ def run_test(resolution, fps):
     pipeline_profile = pipeline.start(cfg)
     for i in range(60):  # skip initial frames
         pipeline.wait_for_frames()
+    last_frame_bgr = None
+    last_roi = None
     try:
         # find region of interest (page) and get the transformation matrix
         find_roi_location(pipeline, (0, 1, 2, 3), DEBUG_MODE) # markers in the lab are 0,1,2,3
@@ -93,6 +95,9 @@ def run_test(resolution, fps):
             img_bgr = np.asanyarray(color_frame.get_data())
 
             color_frame_roi = get_roi_from_frame(color_frame)
+
+            last_frame_bgr = img_bgr.copy()
+            last_roi = color_frame_roi.copy()
 
             # sample each grid center and compare to expected color by row-major insertion order
             for idx, (x, y) in enumerate(centers):
@@ -122,7 +127,11 @@ def run_test(resolution, fps):
             log.i(f"{name.title()} passed in {count}/{NUM_FRAMES} frames")
             test.check(count >= min_passes)
 
+        if test.test_failed and last_frame_bgr is not None:
+            save_failure_snapshot(__file__, pipeline, draw_debug(last_frame_bgr, last_roi))
+
     except Exception as e:
+        save_failure_snapshot(__file__, pipeline)
         test.fail()
         raise e
     finally:

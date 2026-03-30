@@ -6,10 +6,8 @@ project( rs-depth-quality )
 
 if(WIN32)
     add_executable( ${PROJECT_NAME} WIN32 "" )
-    target_link_libraries( ${PROJECT_NAME} OpenGL::GL)
 else()
     add_executable( ${PROJECT_NAME} "" )
-    target_link_libraries( ${PROJECT_NAME} OpenGL::GL dl) # Check the platform and conditionally link OpenGL and libdl (for linux)
 endif()
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -17,7 +15,7 @@ find_package(Threads REQUIRED)
 
 include_directories(${CMAKE_BINARY_DIR})
 
-using_easyloggingpp( ${PROJECT_NAME} SHARED )
+include(../tools_common.cmake)
 
 include(../../common/CMakeLists.txt)
 
@@ -53,12 +51,9 @@ if(BUILD_GRAPHICAL_EXAMPLES)
         target_sources( ${PROJECT_NAME}
             PRIVATE
                 ${RS_QUALITY_TOOL_CPP}
-                ${CMAKE_CURRENT_SOURCE_DIR}/res/resource.h
-                ${CMAKE_CURRENT_SOURCE_DIR}/res/realsense-viewer.rc
                 ../../common/windows-app-bootstrap.cpp
             )
 
-        set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 11)
         source_group("Resources" FILES
                 ${CMAKE_CURRENT_SOURCE_DIR}/res/resource.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/res/realsense-viewer.rc)
@@ -90,7 +85,6 @@ if(BUILD_GRAPHICAL_EXAMPLES)
         PREPEND(DELAYED " /DELAYLOAD:" ${DELAYED})
         #infoValue(DELAYED)
         string(REPLACE ";" " " LD_FLAGS_STR "${DELAYED}")
-        set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "${LD_FLAGS_STR}")
 
     else()
         target_sources( ${PROJECT_NAME}
@@ -107,31 +101,8 @@ if(BUILD_GRAPHICAL_EXAMPLES)
 
     source_group("SW-Update" FILES ${SW_UPDATE_FILES})
 
-    if (CHECK_FOR_UPDATES)
-        message( STATUS "Check for updates capability added to realsense-depth-quality" )
-        add_dependencies(${PROJECT_NAME} libcurl)
-        target_link_libraries(${PROJECT_NAME} curl)
-    endif()
-
-    target_link_libraries(${PROJECT_NAME} ${DEPENDENCIES}
-                                           ${GTK3_LIBRARIES}
-                                           Threads::Threads
-                                           realsense2-gl
-                                           tclap )
-
-    if (IMPORT_DEPTH_CAM_FW)
-        add_definitions(-DINTERNAL_FW)
-        target_link_libraries(${PROJECT_NAME} fw)
-    endif()
-
-
-
-
-    set_target_properties (${PROJECT_NAME} PROPERTIES
-        FOLDER Tools
-    )
-
-target_include_directories(${PROJECT_NAME} PRIVATE ../../src)
+    set(RS_VIEWER_LIBS ${GTK3_LIBRARIES} Threads::Threads realsense2-gl)
+    tools_target_config(${PROJECT_NAME})
 
     install(
         TARGETS

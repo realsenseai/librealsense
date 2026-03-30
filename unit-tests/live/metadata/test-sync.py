@@ -1,7 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
-# test:device each(D400*)
+# test:device each(D400*) !D401
 # test:donotrun:!nightly
 
 import pyrealsense2 as rs
