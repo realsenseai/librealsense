@@ -117,14 +117,6 @@ Inspecting `.db3` Recordings
 
 To inspect the contents of a `.db3` recording (topics, messages, metadata), use any third-party application that supports `.db3` files, such as [Foxglove](https://foxglove.dev/). Foxglove is also [recommended by the official ROS 2 documentation](https://docs.ros.org/en/rolling/Related-Projects/Visualizing-ROS-2-Data-With-Foxglove.html) for visualizing ROS 2 data.
 
-#### How to inspect a `.db3` file with Foxglove
-
-1. Download and install [Foxglove](https://foxglove.dev/download) (free for up to 3 users)
-2. Open the application and select **"Open local file"**
-3. Drag and drop your `.db3` file, or browse to it
-4. Use the **Topics** panel on the left to browse all recorded topics and their messages
-
-> :bulb: **Tip:** Foxglove is best used for inspecting metadata, topic structure, and info messages. Video playback of image streams may be slow — for frame-level playback, use the RealSense Viewer or the SDK's playback API instead.
 
 For inspecting legacy `.bag` files, see the [ROS Bag Inspector](../tools/rosbag-inspector) tool.
 
