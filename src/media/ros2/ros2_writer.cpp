@@ -11,8 +11,9 @@
 #include "proc/hdr-merge.h"
 #include "proc/sequence-id-filter.h"
 #include "ros2_writer.h"
-#include "media/reader_factory.h"
+#include "media/ros_factory.h"
 #include "core/motion-frame.h"
+#include <sstream>
 #include <src/core/sensor-interface.h>
 #include <src/core/device-interface.h>
 #include <src/core/depth-frame.h>

@@ -3,11 +3,12 @@
 
 #include "bag_to_db3_converter.h"
 #include "core/serialization.h"
+#include <stdexcept>
 #include <rsutils/easylogging/easyloggingpp.h>
 
 #ifdef BUILD_ROSBAG2
 
-#include "reader_factory.h"
+#include "ros_factory.h"
 #include "ros_common.h"
 #include "ros2/ros2_writer.h"
 #include <rsutils/string/from.h>
@@ -63,8 +64,8 @@ namespace librealsense
 
     void convert_bag_to_db3(const std::string& input_bag, const std::string& output_db3, std::shared_ptr<context> ctx, std::function<void(float)> progress_callback)
     {
-        if (!is_bag_file(input_bag))
-            throw invalid_value_exception(rsutils::string::from() << "Input file '" << input_bag << "' is not a .bag file");
+        if (is_db3_file(input_bag))
+            throw invalid_value_exception(rsutils::string::from() << "Input file '" << input_bag << "' is already a .db3 file");
 
         LOG_INFO("Converting " << input_bag << " to " << output_db3);
 
