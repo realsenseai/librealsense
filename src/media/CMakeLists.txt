@@ -1,9 +1,6 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2019 RealSense, Inc. All Rights Reserved.
 
-# Include path for ROS2 message types
-target_include_directories(${LRS_TARGET} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types")
-
 target_sources(${LRS_TARGET}
     PRIVATE
         "${CMAKE_CURRENT_LIST_DIR}/playback/playback-device-info.h"
@@ -29,6 +26,8 @@ target_sources(${LRS_TARGET}
 
 if(BUILD_ROSBAG2)
     target_compile_definitions(${LRS_TARGET} PRIVATE BUILD_ROSBAG2)
+    # Include path for ROS2 message types (only needed when building rosbag2 support)
+    target_include_directories(${LRS_TARGET} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types")
     target_sources(${LRS_TARGET}
         PRIVATE
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_file_format.h"

@@ -612,4 +612,63 @@ jobs:
        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_BUILD_CONFIG}} -DCMAKE_TOOLCHAIN_FILE=../android-ndk-r20b/build/cmake/android.toolchain.cmake -DFORCE_RSUSB_BACKEND=true
        cmake --build . -- -j4
        ls
-  
+
+
+  #--------------------------------------------------------------------------------
+  U22_SH_No_Rosbag2:  # Ubuntu 22.04, Shared, without rosbag2 (ROS2) support
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+
+    - name: Prebuild
+      shell: bash
+      run: |
+        sudo apt-get update;
+        sudo apt-get install -qq build-essential xorg-dev libgl1-mesa-dev libglu1-mesa-dev libglew-dev libglm-dev;
+        sudo apt-get install -qq libusb-1.0-0-dev;
+        sudo apt-get install -qq libgtk-3-dev;
+        sudo apt-get install libglfw3-dev libglfw3;
+
+    - name: Check_API
+      shell: bash
+      run: |
+        cd scripts
+        ./api_check.sh
+        cd ..
+        mkdir build
+
+    - name: Build
+      shell: bash
+      run: |
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_ROSBAG2=OFF
+        cmake --build . -- -j4
+
+  #--------------------------------------------------------------------------------
+  Win_SH_No_Rosbag2:  # Windows, Shared, without rosbag2 (ROS2) support
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+
+    - name: Enable Long Paths
+      shell: powershell
+      run: |
+       New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+
+    - name: Check_API
+      shell: bash
+      run: |
+        cd scripts
+        ./api_check.sh
+        cd ..
+
+    - name: Build
+      shell: bash
+      run: |
+        mkdir build
+        cd build
+        cmake .. -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_ROSBAG2=OFF
+        cmake --build . --config ${{env.LRS_RUN_CONFIG}} -- -m
+

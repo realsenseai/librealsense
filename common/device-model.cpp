@@ -1309,17 +1309,26 @@ namespace rs2
                 std::string path = "";
                 std::string default_path = config_file::instance().get(configurations::record::default_path);
                 if (!ends_with(default_path, "/") && !ends_with(default_path, "\\")) default_path += "/";
-                std::string default_filename = rs2::get_timestamped_file_name();
+#ifdef BUILD_ROSBAG2
+                const char* rec_ext = ".db3";
+                const char* rec_filter = "ROS2-bag\0*.db3\0";
+#else
+                const char* rec_ext = ".bag";
+                const char* rec_filter = "ROS-bag\0*.bag\0";
+#endif
+                std::string default_filename = rs2::get_timestamped_file_name() + rec_ext;
                 if (recording_setting == 0 && default_path.size() > 1 )
                 {
                     path = default_path + default_filename;
                 }
                 else
                 {
-                    if (const char* ret = file_dialog_open(file_dialog_mode::save_file, "ROS2-bag\0*.db3\0",
+                    if (const char* ret = file_dialog_open(file_dialog_mode::save_file, rec_filter,
                         default_path.c_str(), default_filename.c_str()))
                     {
                         path = ret;
+                        if (!ends_with(rsutils::string::to_lower(path), rec_ext))
+                            path += rec_ext;
                     }
                 }
 

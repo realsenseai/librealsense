@@ -10,7 +10,7 @@ namespace rs2
 {
     bool bag_conversion_helper::show_dialog_if_needed(const std::string& file)
     {
-        if (!ends_with(file, ".bag") && !ends_with(file, ".BAG"))
+        if (ends_with(rsutils::string::to_lower(file), ".db3"))
             return false;
 #ifndef BUILD_ROSBAG2
         return false;  // No conversion available — load .bag directly
@@ -125,6 +125,7 @@ namespace rs2
             _progress_bar.threshold_progress = 0.f;
             _progress_bar.last_progress_time = std::chrono::system_clock::now();
             std::weak_ptr<bag_conversion_helper> weak = shared_from_this();
+            _stop_requested = false;
             _thread = std::thread([ctx, input, weak]() mutable
             {
                 try
@@ -132,16 +133,22 @@ namespace rs2
                     auto output = input.substr(0, input.size() - 4) + ".db3";
                     ctx.convert_bag_to_db3(input, output, [weak](float p) {
                         if (auto self = weak.lock())
+                        {
+                            if (self->_stop_requested)
+                                throw std::runtime_error("conversion cancelled");
                             self->_progress = p;
+                        }
                     });
                 }
                 catch (const std::exception& ex)
                 {
                     if (auto self = weak.lock())
-                        self->_error = ex.what();
+                        if (!self->_stop_requested)
+                            self->_error = ex.what();
                 }
                 if (auto self = weak.lock())
-                    self->_done = true;
+                    if (!self->_stop_requested)
+                        self->_done = true;
             });
         }
         ImGui::SameLine();
