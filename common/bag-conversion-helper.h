@@ -21,8 +21,9 @@ namespace rs2
     public:
         ~bag_conversion_helper()
         {
+            _stop_requested = true;
             if (_thread.joinable())
-                _thread.detach();
+                _thread.join();
         }
 
         // If the file is a .bag, activates the conversion dialog and returns true
@@ -48,6 +49,7 @@ namespace rs2
         bool _show_dialog = false;
         std::string _pending_file;
         std::thread _thread;
+        std::atomic<bool> _stop_requested{false};
         std::atomic<bool> _done{false};
         std::atomic<float> _progress{0.0f};
         progress_bar _progress_bar;

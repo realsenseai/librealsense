@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.10)
 project(realsense-file)
 
 set(ROSBAG2_COMPILE_FLAGS)
+if(BUILD_ROSBAG2)
+    include(CMake/external_sqlite3.cmake)
+    include(CMake/external_yaml_cpp.cmake)
+endif()
 include(${CMAKE_CURRENT_LIST_DIR}/config.cmake)
 
 FILE(GLOB_RECURSE AllSources
@@ -46,7 +50,7 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC
 )
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0) # GCC 13 and above require cstdint to be included for stdint types
-    target_compile_options(realsense-file PRIVATE
+    target_compile_options(${PROJECT_NAME} PRIVATE
       $<$<COMPILE_LANGUAGE:CXX>:-std=c++14>
       $<$<COMPILE_LANGUAGE:CXX>:-include cstdint>
       $<$<COMPILE_LANGUAGE:C>:-include stdint.h>

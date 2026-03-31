@@ -1,4 +1,7 @@
-if (NOT TARGET yaml_cpp)
+# Fetch yaml-cpp headers for rosbag2 metadata parsing
+
+if(NOT TARGET yaml_cpp)
+    include(ExternalProject)
     ExternalProject_Add(yaml_cpp
         GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
         GIT_TAG yaml-cpp-0.7.0

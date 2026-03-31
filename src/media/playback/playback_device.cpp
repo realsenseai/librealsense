@@ -7,7 +7,7 @@
 #include "core/motion.h"
 #include "stream.h"
 #include "media/ros_factory.h"
-#include "media/ros2/ros2_file_format.h"
+#include "media/ros_common.h"
 #include "environment.h"
 #include "sync.h"
 #include <src/depth-sensor.h>
