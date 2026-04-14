@@ -44,6 +44,7 @@ static rs2_stream to_rs2_stream_type( std::string const & type_string )
         { "ir", RS2_STREAM_INFRARED },
         { "motion", RS2_STREAM_MOTION },
         { "confidence", RS2_STREAM_CONFIDENCE },
+        { "object_detection", RS2_STREAM_OBJECT_DETECTION },
     };
     auto it = type_to_rs2.find( type_string );
     if( it == type_to_rs2.end() )

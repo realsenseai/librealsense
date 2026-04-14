@@ -14,7 +14,9 @@
 #include <realdds/topics/device-info-msg.h>
 #include <realdds/topics/image-msg.h>
 #include <realdds/topics/imu-msg.h>
+#include <realdds/topics/string-msg.h>
 #include <realdds/topics/dds-topic-names.h>
+#include <src/object-detection-frame.h>
 
 #include <src/core/options-registry.h>
 #include <src/core/frame-callback.h>
@@ -242,8 +244,8 @@ dds_sensor_proxy::find_profile( sid_index sidx, realdds::dds_video_stream_profil
 }
 
 
-std::shared_ptr< realdds::dds_motion_stream_profile >
-dds_sensor_proxy::find_profile( sid_index sidx, realdds::dds_motion_stream_profile const & profile ) const
+std::shared_ptr< realdds::dds_stream_profile >
+dds_sensor_proxy::find_profile( sid_index sidx, realdds::dds_stream_profile const & profile ) const
 {
     auto it = _streams.find( sidx );
     if( it == _streams.end() )
@@ -255,14 +257,13 @@ dds_sensor_proxy::find_profile( sid_index sidx, realdds::dds_motion_stream_profi
         auto & stream = it->second;
         for( auto & sp : stream->profiles() )
         {
-            auto msp = std::static_pointer_cast< realdds::dds_motion_stream_profile >( sp );
-            if( profile.frequency() == msp->frequency() )
+            if( profile.frequency() == sp->frequency() )
             {
-                return msp;
+                return sp;
             }
         }
     }
-    return std::shared_ptr< realdds::dds_motion_stream_profile >();
+    return std::shared_ptr< realdds::dds_stream_profile >();
 }
 
 
@@ -290,6 +291,14 @@ realdds::dds_stream_profiles dds_sensor_proxy::find_dds_profiles( const libreals
             auto motion_profile = find_profile( sidx, realdds::dds_motion_stream_profile( source_profiles[i]->get_framerate() ) );
             if( motion_profile )
                 realdds_profiles.push_back( motion_profile );
+            else
+                LOG_ERROR( "no profile found in stream for rs2 profile " << sp );
+        }
+        else if( sp->get_stream_type() == RS2_STREAM_OBJECT_DETECTION )
+        {
+            auto inference_profile = find_profile( sidx, realdds::dds_inference_stream_profile( source_profiles[i]->get_framerate() ) );
+            if( inference_profile )
+                realdds_profiles.push_back( inference_profile );
             else
                 LOG_ERROR( "no profile found in stream for rs2 profile " << sp );
         }
@@ -378,26 +387,10 @@ void dds_sensor_proxy::handle_video_data( std::vector< uint8_t > && buffer,
     auto stride = static_cast< int >(height > 0 ? data.raw_size / height : data.raw_size );
     auto expected_bpp = get_image_bpp(vid_profile->get_format()) / 8;
     auto expected_size = height * width * expected_bpp;
-    
-    if( profile->get_stream_type() != RS2_STREAM_OBJECT_DETECTION )
-    {
-        if( data.raw_size != expected_size )
-            throw invalid_value_exception( rsutils::string::from()
-                                           << "Received frame with unexpected size " << data.raw_size << ", expected "
-                                           << expected_size );
-    }
+    if( data.raw_size != expected_size )
+        throw invalid_value_exception( rsutils::string::from() << "Received frame with unexpected size " << data.raw_size << ", expected " << expected_size );
 
-
-    frame_interface * new_frame_interface;
-    if( profile->get_stream_type() == RS2_STREAM_OBJECT_DETECTION )
-    {
-        new_frame_interface = allocate_new_frame( RS2_EXTENSION_OBJECT_DETECTION_FRAME, vid_profile, std::move( data ) );
-    }
-    else
-    {
-        new_frame_interface = allocate_new_video_frame( vid_profile, stride, expected_bpp, std::move( data ) );
-    }
-
+    auto new_frame_interface = allocate_new_video_frame( vid_profile, stride, expected_bpp, std::move( data ) );    
     if( ! new_frame_interface )
         return;
 
@@ -477,6 +470,114 @@ void dds_sensor_proxy::handle_new_metadata( std::string const & stream_name,
             throw std::runtime_error( "missing metadata header/timestamp" );
     }
     // else we're not streaming -- must be another client that's subscribed
+}
+
+
+void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg,
+                                              realdds::dds_sample && sample,
+                                              const std::shared_ptr< stream_profile_interface > & profile,
+                                              streaming_impl & streaming )
+{
+    json j;
+    try
+    {
+        j = json::parse( msg.data() );
+    }
+    catch( json::exception const & e )
+    {
+        LOG_ERROR( "Failed to parse inference JSON: " << e.what() );
+        return;
+    }
+
+    frame_additional_data data;                   // with NO metadata by default!
+    data.system_time = time_service::get_time();  // time of arrival in system clock
+    data.backend_timestamp                        // time when the underlying backend (DDS) received it
+        = static_cast< rs2_time_t >( realdds::time_to_double( sample.reception_timestamp ) * SECONDS_TO_MILLISEC );
+    if( auto ts_j = j.nested( "timestamp_us" ) )  // timestamp as provided by the inference engine, convert to millisec
+        data.timestamp = ts_j.get< double >() * MICROSEC_TO_MILLISEC;
+    data.timestamp_domain;                        // leave default (hardware domain)
+    // If frame_id supplied, we try to use it. If not supplied, we use an increasing counter.
+    if( j.nested( "frame_id" ).get_ex( data.frame_number ) )
+    {
+        data.last_frame_number = streaming.last_frame_number.exchange( data.frame_number );
+        if( data.frame_number != data.last_frame_number + 1 && data.last_frame_number )
+            LOG_DEBUG( get_string( profile->get_stream_type() ) << " frame drop? Expecting " << data.last_frame_number + 1 << ", got " << data.frame_number );
+    }
+    else
+    {
+        data.last_frame_number = streaming.last_frame_number.fetch_add( 1 );
+        data.frame_number = data.last_frame_number + 1;
+    }
+    data.raw_size = static_cast< uint32_t >( msg.data().size() );
+
+    update_timestamp_if_needed( data, streaming );
+
+    frame_interface * new_frame_interface;
+    auto n_detections = j.nested( "number_of_detections" ).default_value< uint16_t >( 0 );
+    if (n_detections > 0)
+    {
+        new_frame_interface = allocate_new_frame( RS2_EXTENSION_OBJECT_DETECTION_FRAME, profile.get(), std::move( data ) );
+    }
+    else
+    {
+        LOG_DEBUG( "Inference frame with zero detections received, allocating empty frame" );
+        new_frame_interface = allocate_new_frame( RS2_EXTENSION_INFERENCE_FRAME, profile.get(), std::move( data ) );
+    }
+    if( ! new_frame_interface )
+    {
+        LOG_ERROR( "Failed to allocate new frame" );
+        return;
+    }
+
+    // Compute total buffer size: payload base (without detection entries) + detection entries
+    size_t const base_size = sizeof( object_detection_frame::object_detection_payload )
+                           - sizeof( object_detection_frame::object_detection_entry );
+    size_t const detections_size = n_detections * sizeof( object_detection_frame::object_detection_entry );
+    size_t const total_size = base_size + detections_size;
+
+    auto new_frame = static_cast< frame * >( new_frame_interface );
+    new_frame->data.resize( total_size );
+    auto * payload = reinterpret_cast< object_detection_frame::object_detection_payload * >( new_frame->data.data() );
+
+    // Fill payload fields
+    payload->timestamp = new_frame->additional_data.timestamp * MILLISEC_TO_SECONDS;
+    payload->frame_id = new_frame->additional_data.frame_number;
+    payload->number_of_detections = n_detections;
+    payload->source = static_cast< uint8_t >( object_detection_frame::source::RGB ); // Currently only RGB is supported.
+    j.nested( "source_frame_id" ).get_ex( payload->source_frame_id );
+
+    // Fill detection entries
+    auto detections_j = j.nested( "detections" );
+    if( ! detections_j.is_array() || detections_j.size() != n_detections )
+    {
+        LOG_ERROR( "Invalid detections array received" );
+        return;
+    }
+
+    for( uint16_t idx = 0; idx < n_detections; ++idx )
+    {
+        auto & entry = payload->detections[idx];
+        auto const & det = detections_j[idx];
+
+        entry.detection_id = 0;  // For future use - currently not supported by detection engines
+        det.nested( "class_id" ).get_ex( entry.detection_type );
+        det.nested( "confidence" ).get_ex( entry.confidence );
+        det.nested( "x1" ).get_ex( entry.top_left_x );
+        det.nested( "y1" ).get_ex( entry.top_left_y );
+        det.nested( "x2" ).get_ex( entry.bottom_right_x );
+        det.nested( "y2" ).get_ex( entry.bottom_right_y );
+        det.nested( "distance" ).get_ex( entry.distance );
+    }
+    
+    // Fill header
+    payload->header.magic_number = object_detection_frame::MAGIC_NUMBER;
+    payload->header.version = j.nested( "version" ).get< uint16_t >();
+    payload->header.data_type = static_cast< uint8_t >( inference_frame::type::OBJECT_DETECTION );
+    payload->header.flags = 0;
+    payload->header.size  = static_cast< uint32_t >( total_size - sizeof( object_detection_frame::object_detection_frame_header ) );
+    payload->header.spare = 0;
+    uint8_t * payload_data = reinterpret_cast< uint8_t * >( payload ) + sizeof( object_detection_frame::object_detection_frame_header );
+    payload->header.crc32 = rsutils::number::calc_crc32( payload_data, payload->header.size );
 }
 
 
@@ -602,6 +703,15 @@ void dds_sensor_proxy::start( rs2_frame_callback_sptr callback )
                         handle_motion_data( std::move( imu ), std::move( sample ), profile, streaming );
                 } );
         }
+        else if( auto dds_inference_stream = std::dynamic_pointer_cast< realdds::dds_inference_stream >( dds_stream ) )
+        {
+            dds_inference_stream->on_data_available(
+                [profile, this, &streaming]( realdds::topics::string_msg && msg, realdds::dds_sample && sample )
+                {
+                    if( _is_streaming )
+                        handle_inference_data( std::move( msg ), std::move( sample ), profile, streaming );
+                } );
+        }
         else
             throw std::runtime_error( "Unsupported stream type" );
 
@@ -644,6 +754,10 @@ void dds_sensor_proxy::stop()
         else if( auto dds_motion_stream = std::dynamic_pointer_cast< realdds::dds_motion_stream >( dds_stream ) )
         {
             dds_motion_stream->on_data_available( nullptr );
+        }
+        else if( auto dds_inference_stream = std::dynamic_pointer_cast< realdds::dds_inference_stream >( dds_stream ) )
+        {
+            dds_inference_stream->on_data_available( nullptr );
         }
         else
             throw std::runtime_error( "Unsupported stream type" );

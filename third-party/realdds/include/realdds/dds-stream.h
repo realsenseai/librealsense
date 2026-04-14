@@ -16,6 +16,7 @@ namespace realdds {
 
 namespace topics {
 class imu_msg;
+class string_msg;
 class flexible_msg;
 }  // namespace topics
 
@@ -164,6 +165,36 @@ protected:
     on_data_available_callback _on_data_available = nullptr;
 };
 
+class dds_inference_stream : public dds_stream
+{
+    typedef dds_stream super;
+
+public:
+    dds_inference_stream( std::string const & stream_name, std::string const & sensor_name );
+
+    char const * type_string() const override { return "inference"; }
+
+    void open( std::string const & topic_name, std::shared_ptr< dds_subscriber > const & ) override;
+
+    typedef std::function< void( topics::string_msg &&, dds_sample && ) > on_data_available_callback;
+    void on_data_available( on_data_available_callback cb ) { _on_data_available = cb; }
+
+protected:
+    void handle_data() override;
+    bool can_start_streaming() const override { return _on_data_available != nullptr; }
+
+    on_data_available_callback _on_data_available = nullptr;
+};
+
+class dds_object_detection_stream : public dds_inference_stream
+{
+    typedef dds_inference_stream super;
+
+public:
+    dds_object_detection_stream( std::string const & stream_name, std::string const & sensor_name );
+
+    char const * type_string() const override { return "object_detection"; }
+};
 
 typedef std::vector< std::shared_ptr< dds_stream > > dds_streams;
 
