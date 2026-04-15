@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(realsense-file)
+set( REALSENSE_FILE_TARGET realsense-file )
 
 set(ROSBAG2_COMPILE_FLAGS)
 if(BUILD_ROSBAG2)
@@ -29,28 +29,28 @@ endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-add_library(${PROJECT_NAME} STATIC
+add_library(${REALSENSE_FILE_TARGET} STATIC
     ${AllSources}
     ${HEADER_FILES_ROSBAG}
     ${SOURCE_FILES_ROSBAG}
     ${SOURCE_FILES_COMPRESSION}
 )
 
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
+target_compile_features(${REALSENSE_FILE_TARGET} PUBLIC cxx_std_14)
 
-target_include_directories(${PROJECT_NAME} PRIVATE
+target_include_directories(${REALSENSE_FILE_TARGET} PRIVATE
         ${ROSBAG_HEADER_DIRS}
         $<$<NOT:$<BOOL:${USE_EXTERNAL_LZ4}>>:${LZ4_INCLUDE_PATH}>
 )
 
-disable_third_party_warnings(${PROJECT_NAME})
+disable_third_party_warnings(${REALSENSE_FILE_TARGET})
 
-target_compile_definitions(${PROJECT_NAME} PUBLIC
+target_compile_definitions(${REALSENSE_FILE_TARGET} PUBLIC
         ${ROSBAG2_COMPILE_FLAGS}
 )
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0) # GCC 13 and above require cstdint to be included for stdint types
-    target_compile_options(${PROJECT_NAME} PRIVATE
+    target_compile_options(${REALSENSE_FILE_TARGET} PRIVATE
       $<$<COMPILE_LANGUAGE:CXX>:-std=c++14>
       $<$<COMPILE_LANGUAGE:CXX>:-include cstdint>
       $<$<COMPILE_LANGUAGE:C>:-include stdint.h>
@@ -59,24 +59,24 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 if(BUILD_ROSBAG2)
-    add_dependencies(${PROJECT_NAME} sqlite3_lib)
-    add_dependencies(${PROJECT_NAME} yaml_cpp)
+    add_dependencies(${REALSENSE_FILE_TARGET} sqlite3_lib)
+    add_dependencies(${REALSENSE_FILE_TARGET} yaml_cpp)
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
+target_link_libraries(${REALSENSE_FILE_TARGET} PRIVATE
         $<$<BOOL:${USE_EXTERNAL_LZ4}>:lz4::lz4>
 )
 if(BUILD_ROSBAG2)
-    target_link_libraries(${PROJECT_NAME} PRIVATE sqlite3_lib)
+    target_link_libraries(${REALSENSE_FILE_TARGET} PRIVATE sqlite3_lib)
 endif()
 
-#set_target_properties(${PROJECT_NAME} PROPERTIES VERSION "${LIBVERSION}" SOVERSION "${LIBSOVERSION}")
+#set_target_properties(${REALSENSE_FILE_TARGET} PROPERTIES VERSION "${LIBVERSION}" SOVERSION "${LIBSOVERSION}")
 
-set_target_properties (${PROJECT_NAME} PROPERTIES FOLDER Library)
+set_target_properties (${REALSENSE_FILE_TARGET} PROPERTIES FOLDER Library)
 
 set(CMAKECONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/../cmake/realsense2")
 
-set(_install_targets ${PROJECT_NAME})
+set(_install_targets ${REALSENSE_FILE_TARGET})
 if(BUILD_ROSBAG2)
     list(APPEND _install_targets sqlite3_lib)
 endif()
