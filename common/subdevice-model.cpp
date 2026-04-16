@@ -795,6 +795,18 @@ namespace rs2
                     if (ImGui::Checkbox(label.c_str(), &stream_enabled[f.first]))
                     {
                         prev_stream_enabled = tmp;
+                        // If LPC stream was just enabled, reset to 2880x1040
+                        if (stream_enabled[f.first] && !tmp[f.first])
+                        {
+                            for (auto&& profile : profiles)
+                            {
+                                if (profile.unique_id() == f.first && profile.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
+                                {
+                                    ui.selected_stream_to_res[RS2_STREAM_LABELED_POINT_CLOUD] = std::make_pair(2880, 1040);
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1213,6 +1225,35 @@ namespace rs2
         {
             if (num_streams == 0)
                 return results;
+            
+            // If LPC was just enabled, force resolution to 2880x1040
+            for (auto& s : stream_enabled)
+            {
+                if (s.second) // stream is enabled
+                {
+                    auto prev_it = prev_stream_enabled.find(s.first);
+                    bool was_disabled = (prev_it == prev_stream_enabled.end() || !prev_it->second);
+                    
+                    if (was_disabled) // stream was just enabled
+                    {
+                        for (auto&& p : profiles)
+                        {
+                            if (p.unique_id() == s.first && p.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
+                            {
+                                ui.selected_stream_to_res[RS2_STREAM_LABELED_POINT_CLOUD] = std::make_pair(2880, 1040);
+                                // Rebuild selected_resolutions with the updated value
+                                selected_resolutions.clear();
+                                for (auto it = resolutions_per_stream.begin(); it != resolutions_per_stream.end(); ++it)
+                                {
+                                    selected_resolutions.push_back(ui.selected_stream_to_res[it->first]);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
             get_sorted_profiles(sorted_profiles);
             std::vector<stream_profile> matching_profiles;
             std::map<rs2_format, std::map<int, stream_profile>> profiles_by_format;
@@ -1265,6 +1306,53 @@ namespace rs2
         }
         if (results.empty())
             results.push_back(def_p);
+        
+        // Force LPC to 2880x1040 if it's in the results but at wrong resolution
+        for (size_t i = 0; i < results.size(); i++)
+        {
+            if (results[i].stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
+            {
+                if (auto vid_prof = results[i].as<video_stream_profile>())
+                {
+                    if (vid_prof.width() != 2880 || vid_prof.height() != 1040)
+                    {
+                        auto current_fps = results[i].fps();
+                        auto current_format = results[i].format();
+                        stream_profile replacement;
+                        
+                        // Try to find 2880x1040 with matching FPS and format
+                        for (auto&& p : profiles)
+                        {
+                            if (p.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
+                            {
+                                if (auto lpc_vid = p.as<video_stream_profile>())
+                                {
+                                    if (lpc_vid.width() == 2880 && lpc_vid.height() == 1040)
+                                    {
+                                        if (p.fps() == current_fps && p.format() == current_format)
+                                        {
+                                            replacement = p;
+                                            break; // Perfect match
+                                        }
+                                        else if (!replacement.get())
+                                        {
+                                            replacement = p; // Save as fallback
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (replacement.get())
+                        {
+                            results[i] = replacement;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        
         update_ui(results);
         return results;
     }
