@@ -11,6 +11,9 @@
 
 namespace rs2
 {
+    static constexpr int LPC_DEFAULT_WIDTH  = 2880;
+    static constexpr int LPC_DEFAULT_HEIGHT = 1040;
+
     std::vector<const char*> get_string_pointers(const std::vector<std::string>& vec)
     {
         std::vector<const char*> res;
@@ -795,14 +798,14 @@ namespace rs2
                     if (ImGui::Checkbox(label.c_str(), &stream_enabled[f.first]))
                     {
                         prev_stream_enabled = tmp;
-                        // If LPC stream was just enabled, reset to 2880x1040
+                        // If LPC stream was just enabled, reset to default resolution
                         if (stream_enabled[f.first] && !tmp[f.first])
                         {
                             for (auto&& profile : profiles)
                             {
                                 if (profile.unique_id() == f.first && profile.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
                                 {
-                                    ui.selected_stream_to_res[RS2_STREAM_LABELED_POINT_CLOUD] = std::make_pair(2880, 1040);
+                                    ui.selected_stream_to_res[RS2_STREAM_LABELED_POINT_CLOUD] = std::make_pair(LPC_DEFAULT_WIDTH, LPC_DEFAULT_HEIGHT);
                                     break;
                                 }
                             }
@@ -1226,31 +1229,30 @@ namespace rs2
             if (num_streams == 0)
                 return results;
             
-            // If LPC was just enabled, force resolution to 2880x1040
+            // If LPC was just enabled, force resolution to default
             for (auto& s : stream_enabled)
             {
                 if (s.second) // stream is enabled
                 {
                     auto prev_it = prev_stream_enabled.find(s.first);
                     bool was_disabled = (prev_it == prev_stream_enabled.end() || !prev_it->second);
-                    
+
                     if (was_disabled) // stream was just enabled
                     {
                         for (auto&& p : profiles)
                         {
                             if (p.unique_id() == s.first && p.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
                             {
-                                ui.selected_stream_to_res[RS2_STREAM_LABELED_POINT_CLOUD] = std::make_pair(2880, 1040);
+                                ui.selected_stream_to_res[RS2_STREAM_LABELED_POINT_CLOUD] = std::make_pair(LPC_DEFAULT_WIDTH, LPC_DEFAULT_HEIGHT);
                                 // Rebuild selected_resolutions with the updated value
                                 selected_resolutions.clear();
                                 for (auto it = resolutions_per_stream.begin(); it != resolutions_per_stream.end(); ++it)
                                 {
-                                    auto selected_res_it = ui.selected_stream_to_res.find(it->first);
-                                    if (selected_res_it != ui.selected_stream_to_res.end())
-                                    {
-                                        selected_resolutions.push_back(selected_res_it->second);
-                                    }
+                                    auto res_it = ui.selected_stream_to_res.find(it->first);
+                                    if (res_it != ui.selected_stream_to_res.end())
+                                        selected_resolutions.push_back(res_it->second);
                                 }
+                                prev_stream_enabled[s.first] = s.second;
                                 break;
                             }
                         }
@@ -1311,27 +1313,29 @@ namespace rs2
         if (results.empty())
             results.push_back(def_p);
         
-        // Force LPC to 2880x1040 if it's in the results but at wrong resolution
+        // Force LPC to default resolution if it's in the results at a different resolution
         for (size_t i = 0; i < results.size(); i++)
         {
             if (results[i].stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
             {
                 if (auto vid_prof = results[i].as<video_stream_profile>())
                 {
-                    if (vid_prof.width() != 2880 || vid_prof.height() != 1040)
+                    if (vid_prof.width() != LPC_DEFAULT_WIDTH || vid_prof.height() != LPC_DEFAULT_HEIGHT)
                     {
-                        auto current_fps = results[i].fps();
+                        auto current_uid    = results[i].unique_id();
+                        auto current_fps    = results[i].fps();
                         auto current_format = results[i].format();
                         stream_profile replacement;
-                        
-                        // Try to find 2880x1040 with matching FPS and format
+
+                        // Try to find default resolution with matching UID, FPS and format
                         for (auto&& p : profiles)
                         {
-                            if (p.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
+                            if (p.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD &&
+                                p.unique_id() == current_uid)
                             {
                                 if (auto lpc_vid = p.as<video_stream_profile>())
                                 {
-                                    if (lpc_vid.width() == 2880 && lpc_vid.height() == 1040)
+                                    if (lpc_vid.width() == LPC_DEFAULT_WIDTH && lpc_vid.height() == LPC_DEFAULT_HEIGHT)
                                     {
                                         if (p.fps() == current_fps && p.format() == current_format)
                                         {
@@ -1346,7 +1350,7 @@ namespace rs2
                                 }
                             }
                         }
-                        
+
                         if (replacement.get())
                         {
                             results[i] = replacement;
