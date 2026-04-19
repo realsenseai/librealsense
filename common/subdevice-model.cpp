@@ -1245,7 +1245,11 @@ namespace rs2
                                 selected_resolutions.clear();
                                 for (auto it = resolutions_per_stream.begin(); it != resolutions_per_stream.end(); ++it)
                                 {
-                                    selected_resolutions.push_back(ui.selected_stream_to_res[it->first]);
+                                    auto selected_res_it = ui.selected_stream_to_res.find(it->first);
+                                    if (selected_res_it != ui.selected_stream_to_res.end())
+                                    {
+                                        selected_resolutions.push_back(selected_res_it->second);
+                                    }
                                 }
                                 break;
                             }
