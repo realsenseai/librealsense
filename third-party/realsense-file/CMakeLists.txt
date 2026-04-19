@@ -29,7 +29,7 @@ endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-add_library(${PROJECT_NAME} STATIC
+add_library(${PROJECT_NAME}
     ${AllSources}
     ${HEADER_FILES_ROSBAG}
     ${SOURCE_FILES_ROSBAG}
@@ -70,7 +70,7 @@ if(BUILD_ROSBAG2)
     target_link_libraries(${PROJECT_NAME} PRIVATE sqlite3_lib)
 endif()
 
-#set_target_properties(${PROJECT_NAME} PROPERTIES VERSION "${LIBVERSION}" SOVERSION "${LIBSOVERSION}")
+set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${REALSENSE_VERSION_STRING} SOVERSION "${REALSENSE_VERSION_MAJOR}.${REALSENSE_VERSION_MINOR}")
 
 set_target_properties (${PROJECT_NAME} PROPERTIES FOLDER Library)
 
