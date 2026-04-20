@@ -168,10 +168,10 @@ public:
     {
     }
 
-    dds_inference_stream_profile( rsutils::json const & j, int & index )
-        : super( j, index )
-    {
-    }
+    dds_inference_stream_profile( rsutils::json const & j, int & index );
+    //    : super( j, index )
+    //{
+    //}
 };
 
 

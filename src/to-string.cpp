@@ -417,6 +417,9 @@ const char * get_string( rs2_extension value )
     CASE( TEMPORAL_EMBEDDED_FILTER )
     CASE( INFERENCE_FRAME )
     CASE( OBJECT_DETECTION_FRAME )
+    CASE( INFERENCE_SENSOR )
+    CASE( OBJECT_DETECTION_SENSOR )
+    CASE( INFERENCE_PROFILE )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;

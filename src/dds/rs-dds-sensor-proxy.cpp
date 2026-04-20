@@ -40,6 +40,7 @@
 #include <src/ds/ds-private.h>
 
 #include "rs-dds-depth-sensor-proxy.h"
+#include "rs-dds-inference-sensor-proxy.h"
 
 #include <cmath>
 
@@ -95,6 +96,13 @@ void dds_sensor_proxy::add_dds_stream( sid_index sidx, std::shared_ptr< realdds:
     s = stream;
 }
 
+format_conversion dds_sensor_proxy::get_format_conversion() const
+{
+    if( Is< const dds_inference_sensor_proxy >( this ) )
+        return format_conversion::raw; // Do not convert inference data, it is not an image.
+
+    return _owner->get_format_conversion();
+}
 
 stream_profiles dds_sensor_proxy::init_stream_profiles()
 {
@@ -313,9 +321,13 @@ realdds::dds_stream_profiles dds_sensor_proxy::find_dds_profiles( const libreals
 
 void dds_sensor_proxy::open( const stream_profiles & profiles )
 {
-    _formats_converter.prepare_to_convert( profiles );
     _active_converted_profiles = profiles;
-    const auto & source_profiles = _formats_converter.get_active_source_profiles();
+    auto source_profiles = profiles; // Start with user requested profiles
+    if( get_format_conversion() != format_conversion::raw )
+    {
+        _formats_converter.prepare_to_convert( profiles );
+        source_profiles = _formats_converter.get_active_source_profiles(); // Override with profiles that should be opened on the device
+    }
     // TODO - register processing block options?
 
     for( size_t i = 0; i < source_profiles.size(); ++i )
@@ -578,6 +590,11 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
     payload->header.spare = 0;
     uint8_t * payload_data = reinterpret_cast< uint8_t * >( payload ) + sizeof( object_detection_frame::object_detection_frame_header );
     payload->header.crc32 = rsutils::number::calc_crc32( payload_data, payload->header.size );
+
+    // No metadata for inference streams, therefore no syncer
+    invoke_new_frame( new_frame,
+                      nullptr,    // pixels are already inside new_frame->data
+                      nullptr );  // so no deleter is necessary
 }
 
 

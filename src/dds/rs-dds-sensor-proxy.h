@@ -95,6 +95,7 @@ public:
     void set_frames_callback( rs2_frame_callback_sptr callback ) override;
     rs2_frame_callback_sptr get_frames_callback() const override;
 
+
     // sensor_interface
 public:
     rsutils::subscription register_options_changed_callback( options_watcher::callback && ) override;
@@ -106,6 +107,7 @@ public:
 
 protected:
     void register_converters();
+    format_conversion get_format_conversion() const;
     stream_profiles init_stream_profiles() override;
     void log_bandwidth( const std::shared_ptr< librealsense::video_stream_profile > & vsp ) const;
 

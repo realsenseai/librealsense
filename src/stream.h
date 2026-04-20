@@ -6,6 +6,7 @@
 #include "core/stream-profile-interface.h"
 #include "core/video.h"
 #include "core/motion.h"
+#include "core/inference.h"
 #include "core/stream-profile.h"
 #include "core/tagged-profile.h"
 #include "librealsense-exception.h"
@@ -217,6 +218,24 @@ namespace librealsense
             return res;
         }
 
+    };
+
+    class inference_stream_profile : public inference_stream_profile_interface, public stream_profile_base, public extension_snapshot
+    {
+    public:
+        explicit inference_stream_profile()
+        {
+        }
+
+        void update( std::shared_ptr< extension_snapshot > ext ) override { /*Nothing to do here*/ }
+
+        std::shared_ptr< stream_profile_interface > clone() const override
+        {
+            auto res = std::make_shared< inference_stream_profile >();
+            res->set_unique_id( environment::get_instance().generate_stream_id() );
+            res->set_framerate( get_framerate() );
+            return res;
+        }
     };
 
     inline stream_profile to_profile(const stream_profile_interface* sp)

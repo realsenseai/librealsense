@@ -215,5 +215,11 @@ rsutils::json dds_video_stream_profile::to_json() const
     return profile;
 }
 
+dds_inference_stream_profile::dds_inference_stream_profile( rsutils::json const & j, int & index )
+    : super( j[index].get< int16_t >() )
+  //: super( j, index ) //TODO - temporary until HKR will send profile with only frequency as other parameters are not relevant
+{
+    index = 4;  // skip the rest of the parameters for now - this is just to verify that we reached the end of the json array
+}
 
 }  // namespace realdds

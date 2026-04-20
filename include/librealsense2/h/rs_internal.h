@@ -72,6 +72,16 @@ typedef struct rs2_pose_stream
     rs2_format fmt;
 } rs2_pose_stream;
 
+/** \brief All the parameters required to define an inference stream. */
+typedef struct rs2_inference_stream
+{
+    rs2_stream type;
+    int index;
+    int uid;
+    int fps;
+    rs2_format fmt;
+} rs2_inference_stream;
+
 /** \brief All the parameters required to define a video frame. */
 typedef struct rs2_software_video_frame
 {
