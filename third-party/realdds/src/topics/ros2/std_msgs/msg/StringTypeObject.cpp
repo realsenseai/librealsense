@@ -13,7 +13,7 @@
 namespace { char dummy; }
 #endif
 
-#include "String.h"
+#include <realdds/topics/ros2/std_msgs/msg/String.h>
 #include "StringTypeObject.h"
 #include <mutex>
 #include <utility>
