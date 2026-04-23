@@ -98,8 +98,8 @@ void dds_sensor_proxy::add_dds_stream( sid_index sidx, std::shared_ptr< realdds:
 
 format_conversion dds_sensor_proxy::get_format_conversion() const
 {
-    if( Is< const dds_inference_sensor_proxy >( this ) )
-        return format_conversion::raw; // Do not convert inference data, it is not an image.
+    //if( Is< const dds_inference_sensor_proxy >( this ) )
+    //    return format_conversion::raw; // Do not convert inference data, it is not an image.
 
     return _owner->get_format_conversion();
 }
@@ -214,6 +214,11 @@ void dds_sensor_proxy::register_converters()
 
     // Confidence
     _formats_converter.register_converter( processing_block_factory::create_id_pbf( RS2_FORMAT_RAW8, RS2_STREAM_CONFIDENCE ) );
+
+    // Inference
+    _formats_converter.register_converter( { { { RS2_FORMAT_Y8, RS2_STREAM_OBJECT_DETECTION } },
+                                             { { RS2_FORMAT_Y8, RS2_STREAM_OBJECT_DETECTION } },
+                                            []() { return std::make_shared< identity_processing_block >(); } } );
 }
 
 
@@ -532,7 +537,6 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
     }
     else
     {
-        LOG_DEBUG( "Inference frame with zero detections received, allocating empty frame" );
         new_frame_interface = allocate_new_frame( RS2_EXTENSION_INFERENCE_FRAME, profile.get(), std::move( data ) );
     }
     if( ! new_frame_interface )

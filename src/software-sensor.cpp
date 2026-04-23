@@ -147,6 +147,7 @@ std::shared_ptr< stream_profile_interface > software_sensor::add_inference_strea
     if( ! profile )
         throw librealsense::invalid_value_exception( "null pointer passed for argument \"profile\"." );
 
+    profile->set_format( inference_stream.fmt );
     profile->set_framerate( inference_stream.fps );
     profile->set_stream_index( inference_stream.index );
     profile->set_stream_type( inference_stream.type );

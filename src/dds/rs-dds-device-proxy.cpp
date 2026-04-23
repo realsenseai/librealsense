@@ -145,6 +145,10 @@ static rs2_inference_stream to_rs2_inference_stream( rs2_stream const stream_typ
     prof.index = sidx.index;
     prof.uid = sidx.sid;
     prof.fps = profile->frequency();
+    // We use Y8 for inference streams, but this is not actually an image format and should be handled as raw data.
+    // We set this similar to LPC and safety stream to avoid need for special Linux kernel patches, and because
+    // format is required to be able to use the existing format_converter framework.
+    prof.fmt = RS2_FORMAT_Y8;
     return prof;
 }
 

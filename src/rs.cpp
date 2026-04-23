@@ -2030,6 +2030,7 @@ int rs2_is_frame_extendable_to(const rs2_frame* f, rs2_extension extension_type,
     case RS2_EXTENSION_POSE_FRAME               : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::pose_frame)      != nullptr;
     case RS2_EXTENSION_LABELED_POINTS         : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::labeled_points) != nullptr;
     case RS2_EXTENSION_INFERENCE_FRAME        : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::inference_frame) != nullptr;
+    case RS2_EXTENSION_OBJECT_DETECTION_FRAME : return VALIDATE_INTERFACE_NO_THROW((frame_interface*)f, librealsense::object_detection_frame) != nullptr;
 
     default:
         return false;

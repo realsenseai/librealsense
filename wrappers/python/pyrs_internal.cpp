@@ -45,7 +45,8 @@ void init_internal(py::module &m) {
         .def_readwrite("type",  &rs2_inference_stream::type)
         .def_readwrite("index", &rs2_inference_stream::index)
         .def_readwrite("uid",   &rs2_inference_stream::uid)
-        .def_readwrite("fps",   &rs2_inference_stream::fps);
+        .def_readwrite("fps",   &rs2_inference_stream::fps)
+        .def_readwrite("fmt",   &rs2_inference_stream::fmt);
 
     py::class_< rs2_software_video_frame >( m,
                                             "software_video_frame",

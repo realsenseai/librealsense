@@ -79,6 +79,7 @@ typedef struct rs2_inference_stream
     int index;
     int uid;
     int fps;
+    rs2_format fmt;
 } rs2_inference_stream;
 
 /** \brief All the parameters required to define a video frame. */

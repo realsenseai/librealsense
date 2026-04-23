@@ -46,6 +46,14 @@ std::shared_ptr< matcher > matcher_factory::create_DLR_C_matcher( std::vector< s
         return create_timestamp_matcher( profiles );
     }
 
+    auto infer = get_inference_profiles( profiles );
+    if( ! infer.empty() )
+    {
+        return create_timestamp_composite_matcher( { create_DLR_matcher( profiles ),
+                                                     create_color_composite_matcher( color ),
+                                                     create_timestamp_matcher( infer ) } );
+    }
+
     return create_timestamp_composite_matcher( { create_DLR_matcher( profiles ), create_color_composite_matcher( color ) } );
 }
 
@@ -177,6 +185,18 @@ matcher_factory::get_color_profiles( std::vector< stream_interface * > const & p
     std::vector< stream_interface * > ret;
     for( auto & profile : color_profiles )
         ret.push_back( profile.second );
+
+    return ret;
+}
+
+
+std::vector< stream_interface * >
+matcher_factory::get_inference_profiles( std::vector< stream_interface * > const & profiles )
+{
+    std::vector< stream_interface * > ret;
+    for( auto & profile : profiles )
+        if( profile->get_stream_type() == RS2_STREAM_OBJECT_DETECTION)
+            ret.push_back( profile );
 
     return ret;
 }
