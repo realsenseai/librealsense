@@ -189,7 +189,6 @@ valid_sp_json_str = """
             "angular_velocity": 0.0,
             "payload_weight": 0.0,
             "surface_inclination": 15.0,
-            "surface_height": 0.05,
             "diagnostic_zone_fill_rate_threshold": 90,
             "floor_fill_threshold": 0,
             "depth_fill_threshold": 20,

@@ -371,7 +371,6 @@ namespace librealsense
             m_angular_velocity = j.at("angular_velocity").get<float>();
             m_payload_weight = j.at("payload_weight").get<float>();
             m_surface_inclination = j.at("surface_inclination").get<float>();
-            m_surface_height = j.at("surface_height").get<float>();
             m_diagnostic_zone_fill_rate_threshold = j.at("diagnostic_zone_fill_rate_threshold").get<uint8_t>();
             m_floor_fill_threshold = j.at("floor_fill_threshold").get<uint8_t>();
             m_depth_fill_threshold = j.at("depth_fill_threshold").get<uint8_t>();
@@ -400,7 +399,6 @@ namespace librealsense
             j["angular_velocity"] = m_angular_velocity;
             j["payload_weight"] = m_payload_weight;
             j["surface_inclination"] = m_surface_inclination;
-            j["surface_height"] = m_surface_height;
             j["diagnostic_zone_fill_rate_threshold"] = m_diagnostic_zone_fill_rate_threshold;
             j["floor_fill_threshold"] = m_floor_fill_threshold;
             j["depth_fill_threshold"] = m_depth_fill_threshold;
@@ -414,12 +412,12 @@ namespace librealsense
     private:
         void validate_json(const json &j) const
         {
-            if (!j.is_object() || j.size() != 15)
+            if (!j.is_object() || j.size() != 14)
             {
                 throw librealsense::invalid_value_exception(
                     "Invalid environment format: environment must include 'safety_trigger_duration', "
                     "'zero_safety_monitoring', 'hara_history_continuation', 'reserved1', 'angular_velocity', 'payload_weight', 'surface_inclination', "
-                    "'surface_height', 'diagnostic_zone_fill_rate_threshold', 'floor_fill_threshold', 'depth_fill_threshold', 'diagnostic_zone_height_median_threshold', "
+                    "'diagnostic_zone_fill_rate_threshold', 'floor_fill_threshold', 'depth_fill_threshold', 'diagnostic_zone_height_median_threshold', "
                     "'vision_hara_persistency', 'crypto_signature' and 'reserved2'");
             }
             if (!j.at("safety_trigger_duration").is_number_float())
@@ -456,10 +454,6 @@ namespace librealsense
             if (!j.at("surface_inclination").is_number_float())
             {
                 throw librealsense::invalid_value_exception("Invalid environment type: surface_inclination must be float number");
-            }
-            if (!j.at("surface_height").is_number_float())
-            {
-                throw librealsense::invalid_value_exception("Invalid environment type: surface_height must be float number");
             }
             if (!j.at("diagnostic_zone_fill_rate_threshold").is_number_unsigned())
             {
@@ -522,7 +516,7 @@ namespace librealsense
 
         // Environmetal properties
         float m_surface_inclination;                       // Expected floor min/max inclination angle, degrees
-        float m_surface_height;                            // Min height above surface to be used for obstacle avoidance (meter)
+        uint8_t m_reserved_surface_height[4] = {0};        // surface_height transferred to safety_interface_config (0xC0DC)
         uint8_t m_diagnostic_zone_fill_rate_threshold;     // Min pixel fill rate required in the diagnostic area for Safety Algo processing [0...100%]
         uint8_t m_floor_fill_threshold;                    // Depth fill rate threshold for the floor area [0...100%]
         uint8_t m_depth_fill_threshold;                    // Depth Fill rate threshold for the full image [0...100%]
