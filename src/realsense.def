@@ -360,6 +360,8 @@ EXPORTS
     rs2_software_sensor_add_motion_stream_ex
     rs2_software_sensor_add_pose_stream
     rs2_software_sensor_add_pose_stream_ex
+    rs2_software_sensor_add_inference_stream
+    rs2_software_sensor_add_inference_stream_ex
     rs2_software_sensor_add_read_only_option
     rs2_software_sensor_update_read_only_option
     rs2_software_sensor_add_option

@@ -341,6 +341,21 @@ namespace rs2
         }
     };
 
+    class inference_stream_profile : public stream_profile
+    {
+    public:
+        explicit inference_stream_profile(const stream_profile& sp)
+            : stream_profile(sp)
+        {
+            rs2_error* e = nullptr;
+            if (!sp || (rs2_stream_profile_is(sp.get(), RS2_EXTENSION_INFERENCE_PROFILE, &e) == 0 && !e))
+            {
+                _profile = nullptr;
+            }
+            error::handle(e);
+        }
+    };
+
     /**
     Interface for frame filtering functionality
     */

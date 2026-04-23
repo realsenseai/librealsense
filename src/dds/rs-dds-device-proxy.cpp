@@ -145,7 +145,6 @@ static rs2_inference_stream to_rs2_inference_stream( rs2_stream const stream_typ
     prof.index = sidx.index;
     prof.uid = sidx.sid;
     prof.fps = profile->frequency();
-    prof.fmt = RS2_FORMAT_ANY;
     return prof;
 }
 

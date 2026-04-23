@@ -94,6 +94,8 @@ void init_sensor(py::module &m) {
         .def(BIND_DOWNCAST(sensor, wheel_odometer))
         .def(BIND_DOWNCAST(sensor, max_usable_range_sensor))
         .def(BIND_DOWNCAST(sensor, debug_stream_sensor))
+        .def(BIND_DOWNCAST(sensor, inference_sensor))
+        .def(BIND_DOWNCAST(sensor, object_detection_sensor))
         .def_property_readonly( "name",
                                 []( const rs2::sensor & self ) {
                                     std::string name;
@@ -132,6 +134,12 @@ void init_sensor(py::module &m) {
 
     py::class_<rs2::fisheye_sensor, rs2::sensor> fisheye_sensor(m, "fisheye_sensor"); // No docstring in C++
     fisheye_sensor.def(py::init<rs2::sensor>(), "sensor"_a);
+
+    py::class_<rs2::inference_sensor, rs2::sensor> inference_sensor(m, "inference_sensor"); // No docstring in C++
+    inference_sensor.def(py::init<rs2::sensor>(), "sensor"_a);
+
+    py::class_<rs2::object_detection_sensor, rs2::inference_sensor> object_detection_sensor(m, "object_detection_sensor"); // No docstring in C++
+    object_detection_sensor.def(py::init<rs2::sensor>(), "sensor"_a);
 
     py::class_<rs2::safety_sensor, rs2::sensor> safety_sensor(m, "safety_sensor"); // No docstring in C++
     safety_sensor.def(py::init<rs2::sensor>(), "sensor"_a)

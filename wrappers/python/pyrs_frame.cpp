@@ -74,6 +74,7 @@ void init_frame(py::module &m) {
         .def(BIND_DOWNCAST(stream_profile, video_stream_profile))
         .def(BIND_DOWNCAST(stream_profile, motion_stream_profile))
         .def(BIND_DOWNCAST(stream_profile, pose_stream_profile))
+        .def(BIND_DOWNCAST(stream_profile, inference_stream_profile))
         .def("stream_name", &rs2::stream_profile::stream_name, "The stream's human-readable name.")
         .def("is_default", &rs2::stream_profile::is_default, "Checks if the stream profile is marked/assigned as default, "
              "meaning that the profile will be selected when the user requests stream configuration using wildcards.")
@@ -123,6 +124,9 @@ void init_frame(py::module &m) {
 
     py::class_<rs2::pose_stream_profile, rs2::stream_profile> pose_stream_profile(m, "pose_stream_profile", "Stream profile instance with an explicit pose extension type.");
     pose_stream_profile.def(py::init<const rs2::stream_profile&>(), "sp"_a);
+
+    py::class_<rs2::inference_stream_profile, rs2::stream_profile> inference_stream_profile(m, "inference_stream_profile", "Stream profile for inference streams.");
+    inference_stream_profile.def(py::init<const rs2::stream_profile&>(), "sp"_a);
 
     py::class_<rs2::filter_interface> filter_interface(m, "filter_interface", "Interface for frame filtering functionality");
     filter_interface.def("process", &rs2::filter_interface::process, "frame"_a); // No docstring in C++
