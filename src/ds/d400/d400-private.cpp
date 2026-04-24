@@ -275,7 +275,7 @@ namespace librealsense
                 ((1 + intrin(2, 1)) * height) / 2.f,
                 intrin(0, 0) * width / 2.f,
                 intrin(1, 1) * height / 2.f,
-                RS2_DISTORTION_INVERSE_BROWN_CONRADY  // The coefficients shall be use for undistort
+                RS2_DISTORTION_BROWN_CONRADY
             };
             std::memcpy(calc_intrinsic.coeffs, table->distortion, sizeof(table->distortion));
             //LOG_DEBUG(endl << array2str((float_4&)(calc_intrinsic.fx, calc_intrinsic.fy, calc_intrinsic.ppx, calc_intrinsic.ppy)) << endl);
@@ -369,7 +369,7 @@ namespace librealsense
                 k( 2, 1 ),
                 k( 0, 0 ),
                 k( 1, 1 ),
-                RS2_DISTORTION_INVERSE_BROWN_CONRADY  // The coefficients shall be use for undistort
+                RS2_DISTORTION_BROWN_CONRADY
             };
             std::memcpy( rs2_intr.coeffs, table->distortion, sizeof( table->distortion ) );
 
