@@ -360,7 +360,7 @@ dds_device_proxy::dds_device_proxy( std::shared_ptr< const device_info > const &
         for( auto & profile : sensor_proxy->get_stream_profiles() )
         {
             auto source_profile = profile;
-            if( sensor_proxy->get_format_conversion() != format_conversion::raw )
+            if( get_format_conversion() != format_conversion::raw )
             {
                 auto & source_profiles = sensor_proxy->_formats_converter.get_source_profiles_from_target( profile );
                 if( source_profiles.size() != 1 )

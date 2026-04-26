@@ -107,7 +107,6 @@ public:
 
 protected:
     void register_converters();
-    format_conversion get_format_conversion() const;
     stream_profiles init_stream_profiles() override;
     void log_bandwidth( const std::shared_ptr< librealsense::video_stream_profile > & vsp ) const;
 

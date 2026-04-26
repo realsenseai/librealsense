@@ -794,7 +794,9 @@ namespace rs2
         {
             rs2_error* e = nullptr;
             if (rs2_is_sensor_extendable_to(_sensor.get(), RS2_EXTENSION_INFERENCE_SENSOR, &e) == 0 && !e)
+            {
                 _sensor.reset();
+            }
             error::handle(e);
         }
         operator bool() const { return _sensor.get() != nullptr; }
@@ -809,7 +811,9 @@ namespace rs2
             {
                 rs2_error* e = nullptr;
                 if (rs2_is_sensor_extendable_to(_sensor.get(), RS2_EXTENSION_OBJECT_DETECTION_SENSOR, &e) == 0 && !e)
+                {
                     _sensor.reset();
+                }
                 error::handle(e);
             }
         }

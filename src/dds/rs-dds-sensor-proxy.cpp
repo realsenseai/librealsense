@@ -96,13 +96,6 @@ void dds_sensor_proxy::add_dds_stream( sid_index sidx, std::shared_ptr< realdds:
     s = stream;
 }
 
-format_conversion dds_sensor_proxy::get_format_conversion() const
-{
-    //if( Is< const dds_inference_sensor_proxy >( this ) )
-    //    return format_conversion::raw; // Do not convert inference data, it is not an image.
-
-    return _owner->get_format_conversion();
-}
 
 stream_profiles dds_sensor_proxy::init_stream_profiles()
 {
@@ -525,31 +518,43 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
         data.last_frame_number = streaming.last_frame_number.fetch_add( 1 );
         data.frame_number = data.last_frame_number + 1;
     }
-    data.raw_size = static_cast< uint32_t >( msg.data().size() );
 
     update_timestamp_if_needed( data, streaming );
 
     frame_interface * new_frame_interface;
     auto n_detections = j.nested( "number_of_detections" ).default_value< uint16_t >( 0 );
+    auto detections_j = j.nested( "detections" );
+    if( ! detections_j.is_array() || detections_j.size() != n_detections )
+    {
+        LOG_ERROR( "Invalid detections array received" );
+        return;
+    }
+    
+    // Compute total buffer size: payload base (without detection entries) + detection entries
+    size_t const base_size = sizeof( object_detection_frame::object_detection_payload )
+                           - sizeof( object_detection_frame::object_detection_entry );
+    size_t const detections_size = n_detections * sizeof( object_detection_frame::object_detection_entry );
+    size_t const total_size = base_size + detections_size;
+
+    data.raw_size = static_cast< uint32_t >( total_size );
+
     if (n_detections > 0)
     {
         new_frame_interface = allocate_new_frame( RS2_EXTENSION_OBJECT_DETECTION_FRAME, profile.get(), std::move( data ) );
     }
     else
     {
-        new_frame_interface = allocate_new_frame( RS2_EXTENSION_INFERENCE_FRAME, profile.get(), std::move( data ) );
+        // Currently only object detection frames are supported in inference streams, but in future, when we have more
+        // types of inference frames, we will want to allocate the correct type. For now, we allocate the same
+        // object detection frame type.
+        new_frame_interface = allocate_new_frame( RS2_EXTENSION_OBJECT_DETECTION_FRAME, profile.get(), std::move( data ) );
+        //new_frame_interface = allocate_new_frame( RS2_EXTENSION_INFERENCE_FRAME, profile.get(), std::move( data ) );
     }
     if( ! new_frame_interface )
     {
         LOG_ERROR( "Failed to allocate new frame" );
         return;
     }
-
-    // Compute total buffer size: payload base (without detection entries) + detection entries
-    size_t const base_size = sizeof( object_detection_frame::object_detection_payload )
-                           - sizeof( object_detection_frame::object_detection_entry );
-    size_t const detections_size = n_detections * sizeof( object_detection_frame::object_detection_entry );
-    size_t const total_size = base_size + detections_size;
 
     auto new_frame = static_cast< frame * >( new_frame_interface );
     new_frame->data.resize( total_size );
@@ -563,15 +568,6 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
     j.nested( "source_frame_id" ).get_ex( payload->source_frame_id );
 
     // Fill detection entries
-    auto detections_j = j.nested( "detections" );
-    if( ! detections_j.is_array() || detections_j.size() != n_detections )
-    {
-        LOG_ERROR( "Invalid detections array received" );
-        return;
-    }
-
-    //if( n_detections )
-    //    LOG_INFO( "Got " << n_detections << " detections" );
     for( uint16_t idx = 0; idx < n_detections; ++idx )
     {
         auto & entry = payload->detections[idx];
@@ -585,12 +581,11 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
         det.nested( "x2" ).get_ex( entry.bottom_right_x );
         det.nested( "y2" ).get_ex( entry.bottom_right_y );
         det.nested( "distance" ).get_ex( entry.distance );
-        //LOG_INFO( "detection " << idx << ": (" << entry.top_left_x << ", " << entry.top_left_y << ") - (" << entry.bottom_right_x << ", " << entry.bottom_right_y << "), confidence: " << entry.confidence );
     }
     
     // Fill header
     payload->header.magic_number = object_detection_frame::MAGIC_NUMBER;
-    payload->header.version = j.nested( "version" ).get< uint16_t >();
+    j.nested( "version" ).get_ex( payload->header.version );
     payload->header.data_type = static_cast< uint8_t >( inference_frame::type::OBJECT_DETECTION );
     payload->header.flags = 0;
     payload->header.size  = static_cast< uint32_t >( total_size - sizeof( object_detection_frame::object_detection_frame_header ) );

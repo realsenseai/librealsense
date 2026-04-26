@@ -3500,6 +3500,70 @@ namespace rs2
         else return nullptr;
     }
 
+    void viewer_model::get_frame_objects_container( rs2::frame & frame,
+                                                          std::shared_ptr< atomic_objects_in_frame > & objects )
+    {
+        auto uid = frame.get_profile().unique_id();
+        auto it = streams.find( uid );
+        if( it == streams.end() )
+        {
+            auto orig = streams_origin.find( uid );
+            if( orig != streams_origin.end() )
+                it = streams.find( orig->second );
+        }
+        if( it != streams.end() && it->second.dev )
+            objects = it->second.dev->detected_objects;
+    }
+
+    rs2::rect viewer_model::project_color_bbox_to_depth( const rs2::rect &     color_bbox,
+                                                         const uint16_t *      depth_data,
+                                                         float                 depth_scale,
+                                                         const rs2_intrinsics & depth_intrin,
+                                                         const rs2_intrinsics & color_intrin,
+                                                         const rs2_extrinsics & color_to_depth,
+                                                         const rs2_extrinsics & depth_to_color,
+                                                         const rs2::rect &     depth_frame_rect )
+    {
+        // Project both corners of the color bbox into depth-frame coordinates
+        float src_tl[2] = { color_bbox.x, color_bbox.y };
+        float src_br[2] = { color_bbox.x + color_bbox.w, color_bbox.y + color_bbox.h };
+        float dst_tl[2], dst_br[2];
+        rs2_project_color_pixel_to_depth_pixel( dst_tl, depth_data, depth_scale, 0.1f, 10.f,
+                                                &depth_intrin, &color_intrin, &color_to_depth, &depth_to_color, src_tl );
+        rs2_project_color_pixel_to_depth_pixel( dst_br, depth_data, depth_scale, 0.1f, 10.f,
+                                                &depth_intrin, &color_intrin, &color_to_depth, &depth_to_color, src_br );
+        return rs2::rect{ dst_tl[0], dst_tl[1], dst_br[0] - dst_tl[0], dst_br[1] - dst_tl[1] }.intersection( depth_frame_rect );
+    }
+
+    float viewer_model::sample_mean_depth( const rs2::depth_frame & df, const rs2::rect & depth_bbox )
+    {
+        uint16_t const * const depth_data   = reinterpret_cast< uint16_t const * >( df.get_data() );
+        float const            depth_scale  = df.get_units();
+        int const              depth_width  = df.get_width();
+        int const              depth_height = df.get_height();
+        int const cx = int( depth_bbox.x + depth_bbox.w * 0.5f );
+        int const cy = int( depth_bbox.y + depth_bbox.h * 0.5f );
+        static const int offsets[][2] = { { -2, -2 }, {  0, -2 }, {  2, -2 },
+                                          { -2,  0 }, {  0,  0 }, {  2,  0 },
+                                          { -2,  2 }, {  0,  2 }, {  2,  2 } };
+        float total = 0.f;
+        int hits = 0;
+        for( auto const & off : offsets )
+        {
+            int const x = cx + off[0];
+            int const y = cy + off[1];
+            if( x < 0 || x >= depth_width || y < 0 || y >= depth_height )
+                continue;
+            uint16_t const d = depth_data[y * depth_width + x];
+            if( d != 0 )
+            {
+                total += d * depth_scale;
+                ++hits;
+            }
+        }
+        return hits > 0 ? total / hits : 0.f;
+    }
+
     void viewer_model::process_object_detection_frames( std::map< int, rs2::frame > & last_frames )
     {
         // Scan last_frames for an object detection frame, a color frame, and a depth frame.
@@ -3524,17 +3588,7 @@ namespace rs2
             else if( stype == RS2_STREAM_COLOR && ! cf )
             {
                 cf = frame.as< rs2::video_frame >();
-                // Find the detected_objects container via this stream's subdevice_model
-                auto uid = frame.get_profile().unique_id();
-                auto it = streams.find( uid );
-                if( it == streams.end() )
-                {
-                    auto orig = streams_origin.find( uid );
-                    if( orig != streams_origin.end() )
-                        it = streams.find( orig->second );
-                }
-                if( it != streams.end() && it->second.dev )
-                    objects = it->second.dev->detected_objects;
+                get_frame_objects_container( frame, objects );
             }
             else if( stype == RS2_STREAM_DEPTH && ! df )
             {
@@ -3567,10 +3621,8 @@ namespace rs2
             rs2::rect color_frame_rect{ 0.f, 0.f, float( color_intrin.width ), float( color_intrin.height ) };
             rs2::rect depth_frame_rect{ 0.f, 0.f, float( depth_intrin.width ), float( depth_intrin.height ) };
 
-            uint16_t const * const depth_data = reinterpret_cast< uint16_t const * >( df.get_data() );
-            float const depth_scale = df.get_units();
-            int const depth_width = df.get_width();
-            int const depth_height = df.get_height();
+            uint16_t const * const depth_data  = reinterpret_cast< uint16_t const * >( df.get_data() );
+            float const            depth_scale = df.get_units();
 
             objects_in_frame new_objects;
             unsigned int const count = odf.get_detection_count();
@@ -3586,40 +3638,13 @@ namespace rs2
                                       float( det.bottom_right_y - det.top_left_y ) };
                 rs2::rect normalized_color_bbox = color_bbox.normalize( color_frame_rect );
 
-                // Project both corners of the color bbox into depth-frame coordinates
-                float src_tl[2] = { color_bbox.x, color_bbox.y };
-                float src_br[2] = { color_bbox.x + color_bbox.w, color_bbox.y + color_bbox.h };
-                float dst_tl[2], dst_br[2];
-                rs2_project_color_pixel_to_depth_pixel( dst_tl, depth_data, depth_scale, 0.1f, 10.f, &depth_intrin, &color_intrin,
-                                                        &color_to_depth, &depth_to_color, src_tl );
-                rs2_project_color_pixel_to_depth_pixel( dst_br, depth_data, depth_scale, 0.1f, 10.f, &depth_intrin, &color_intrin,
-                                                        &color_to_depth, &depth_to_color, src_br );
-
-                rs2::rect depth_bbox = rs2::rect{ dst_tl[0], dst_tl[1], dst_br[0] - dst_tl[0], dst_br[1] - dst_tl[1] }.intersection( depth_frame_rect );
+                rs2::rect depth_bbox = project_color_bbox_to_depth( color_bbox, depth_data, depth_scale,
+                                                                    depth_intrin, color_intrin,
+                                                                    color_to_depth, depth_to_color, depth_frame_rect );
                 rs2::rect normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
 
-                // Sample the centre pixel and its neighbours, average the non-zero depth values.
-                int const cx = int( depth_bbox.x + depth_bbox.w * 0.5f );
-                int const cy = int( depth_bbox.y + depth_bbox.h * 0.5f );
-                static const int offsets[][2] = { { -2, -2 }, { 0, -2 }, { 2, -2 },
-                                                  { -2,  0 }, { 0,  0 }, { 2,  0 },
-                                                  { -2,  2 }, { 0,  2 }, { 2,  2 } };
-                float total = 0.f;
-                int hits = 0;
-                for( auto const & off : offsets )
-                {
-                    int const x = cx + off[0];
-                    int const y = cy + off[1];
-                    if( x < 0 || x >= depth_width || y < 0 || y >= depth_height )
-                        continue;
-                    uint16_t const d = depth_data[y * depth_width + x];
-                    if( d != 0 )
-                    {
-                        total += d * depth_scale;
-                        ++hits;
-                    }
-                }
-                float const mean_depth = hits > 0 ? total / hits : 0.f;
+                // Currently detection depth is not calculated in device, later we will use detection depth data.
+                float const mean_depth = sample_mean_depth( df, depth_bbox );
 
                 std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
                 new_objects.emplace_back( size_t( i ), name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
