@@ -1441,6 +1441,10 @@ namespace rs2
             for(auto&& f : last_frames)
                 not_model->output.update_dashboards(f.second);
 
+            // Process any object detection frames and update detected_objects overlays
+            if( !paused )
+                process_object_detection_frames( last_frames );
+
             for( auto && frame : last_frames )
             {
                 auto f = frame.second;
@@ -1947,11 +1951,16 @@ namespace rs2
                     rect bbox = normalized_bbox.unnormalize( stream_rect );
                     bbox.grow( 10, 5 );  // Allow more text, and easier identification of the face
 
-                    float const max_depth = 2.f;
-                    float const min_depth = 0.8f;
-                    float const depth_range = max_depth - min_depth;
-                    float usable_depth = std::min( object.mean_depth, max_depth );
-                    float a = 0.75f * (max_depth - usable_depth) / depth_range + 0.25f;
+                    float a = 0.75f;
+                    if( object.type == object_type::face )
+                    {  // For faces, the bounding box is drawn with an opacity according to the face's distance - the
+                       // farther it is, the more transparent it is, so that closer faces are more visible and easier to identify
+                        float const max_depth = 2.f;
+                        float const min_depth = 0.8f;
+                        float const depth_range = max_depth - min_depth;
+                        float usable_depth = std::min( object.mean_depth, max_depth );
+                        a = 0.75f * (max_depth - usable_depth) / depth_range + 0.25f;
+                    }
 
                     // Don't draw text in boxes that are too small...
                     auto h = bbox.h;
@@ -1960,6 +1969,7 @@ namespace rs2
 
                     if( fabs(object.mean_depth) > 0.f )
                     {
+                        ImGui::PushFont( font2 );
                         std::string str = rsutils::string::from() << std::setprecision( 2 ) << object.mean_depth << " m";
                         auto size = ImGui::CalcTextSize( str.c_str() );
                         if( size.y < h  &&  size.x < bbox.w )
@@ -1972,6 +1982,7 @@ namespace rs2
                             ImGui::Text("%s",  str.c_str() );
                             h -= size.y;
                         }
+                        ImGui::PopFont();
                     }
                     if( ! object.name.empty() )
                     {
@@ -1993,7 +2004,7 @@ namespace rs2
                     // The rectangle itself is always drawn, in the same color as the text
                     auto frame_color = get_color( object );
                     glColor3f( a * frame_color.Value.x, a * frame_color.Value.y, a * frame_color.Value.z );
-                    draw_rect( bbox );
+                    draw_rect( bbox, 2 );
                 }
             }
 
@@ -3488,6 +3499,145 @@ namespace rs2
             return streams[stream_origin_iter->second].upload_frame(std::move(f));
         else return nullptr;
     }
+
+    void viewer_model::process_object_detection_frames( std::map< int, rs2::frame > & last_frames )
+    {
+        // Scan last_frames for an object detection frame, a color frame, and a depth frame.
+        // These types have no default constructor; initialise from an empty rs2::frame.
+        rs2::object_detection_frame odf{ rs2::frame{} };
+        rs2::video_frame cf{ rs2::frame{} };
+        rs2::depth_frame df{ rs2::frame{} };
+        std::shared_ptr< atomic_objects_in_frame > objects;
+
+        for( auto & kv : last_frames )
+        {
+            rs2::frame & frame = kv.second;
+            if( ! frame )
+                continue;
+
+            auto stype = frame.get_profile().stream_type();
+
+            if( stype == RS2_STREAM_OBJECT_DETECTION && ! odf )
+            {
+                odf = frame.as< rs2::object_detection_frame >();
+            }
+            else if( stype == RS2_STREAM_COLOR && ! cf )
+            {
+                cf = frame.as< rs2::video_frame >();
+                // Find the detected_objects container via this stream's subdevice_model
+                auto uid = frame.get_profile().unique_id();
+                auto it = streams.find( uid );
+                if( it == streams.end() )
+                {
+                    auto orig = streams_origin.find( uid );
+                    if( orig != streams_origin.end() )
+                        it = streams.find( orig->second );
+                }
+                if( it != streams.end() && it->second.dev )
+                    objects = it->second.dev->detected_objects;
+            }
+            else if( stype == RS2_STREAM_DEPTH && ! df )
+            {
+                df = frame.as< rs2::depth_frame >();
+            }
+        }
+
+        // Without a color sensor we have nowhere to draw
+        if( ! objects )
+            return;
+
+        // Require both color and depth; clear detections if either is absent
+        if( ! odf || ! cf || ! df || odf.get_detection_count() == 0 )
+        {
+            std::lock_guard< std::mutex > lock( objects->mutex );
+            objects->clear();
+            return;
+        }
+
+        try
+        {
+            auto color_vsp = cf.get_profile().as< rs2::video_stream_profile >();
+            auto depth_vsp = df.get_profile().as< rs2::video_stream_profile >();
+
+            rs2_intrinsics color_intrin = color_vsp.get_intrinsics();
+            rs2_intrinsics depth_intrin = depth_vsp.get_intrinsics();
+            rs2_extrinsics color_to_depth = color_vsp.get_extrinsics_to( depth_vsp );
+            rs2_extrinsics depth_to_color = depth_vsp.get_extrinsics_to( color_vsp );
+
+            rs2::rect color_frame_rect{ 0.f, 0.f, float( color_intrin.width ), float( color_intrin.height ) };
+            rs2::rect depth_frame_rect{ 0.f, 0.f, float( depth_intrin.width ), float( depth_intrin.height ) };
+
+            uint16_t const * const depth_data = reinterpret_cast< uint16_t const * >( df.get_data() );
+            float const depth_scale = df.get_units();
+            int const depth_width = df.get_width();
+            int const depth_height = df.get_height();
+
+            objects_in_frame new_objects;
+            unsigned int const count = odf.get_detection_count();
+
+            for( unsigned int i = 0; i < count; ++i )
+            {
+                rs2_object_detection det = odf.get_detection( i );
+
+                // Pixel-coordinate bounding box in the color frame
+                rs2::rect color_bbox{ float( det.top_left_x ),
+                                      float( det.top_left_y ),
+                                      float( det.bottom_right_x - det.top_left_x ),
+                                      float( det.bottom_right_y - det.top_left_y ) };
+                rs2::rect normalized_color_bbox = color_bbox.normalize( color_frame_rect );
+
+                // Project both corners of the color bbox into depth-frame coordinates
+                float src_tl[2] = { color_bbox.x, color_bbox.y };
+                float src_br[2] = { color_bbox.x + color_bbox.w, color_bbox.y + color_bbox.h };
+                float dst_tl[2], dst_br[2];
+                rs2_project_color_pixel_to_depth_pixel( dst_tl, depth_data, depth_scale, 0.1f, 10.f, &depth_intrin, &color_intrin,
+                                                        &color_to_depth, &depth_to_color, src_tl );
+                rs2_project_color_pixel_to_depth_pixel( dst_br, depth_data, depth_scale, 0.1f, 10.f, &depth_intrin, &color_intrin,
+                                                        &color_to_depth, &depth_to_color, src_br );
+
+                rs2::rect depth_bbox = rs2::rect{ dst_tl[0], dst_tl[1], dst_br[0] - dst_tl[0], dst_br[1] - dst_tl[1] }.intersection( depth_frame_rect );
+                rs2::rect normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
+
+                // Sample the centre pixel and its neighbours, average the non-zero depth values.
+                int const cx = int( depth_bbox.x + depth_bbox.w * 0.5f );
+                int const cy = int( depth_bbox.y + depth_bbox.h * 0.5f );
+                static const int offsets[][2] = { { -2, -2 }, { 0, -2 }, { 2, -2 },
+                                                  { -2,  0 }, { 0,  0 }, { 2,  0 },
+                                                  { -2,  2 }, { 0,  2 }, { 2,  2 } };
+                float total = 0.f;
+                int hits = 0;
+                for( auto const & off : offsets )
+                {
+                    int const x = cx + off[0];
+                    int const y = cy + off[1];
+                    if( x < 0 || x >= depth_width || y < 0 || y >= depth_height )
+                        continue;
+                    uint16_t const d = depth_data[y * depth_width + x];
+                    if( d != 0 )
+                    {
+                        total += d * depth_scale;
+                        ++hits;
+                    }
+                }
+                float const mean_depth = hits > 0 ? total / hits : 0.f;
+
+                std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
+                new_objects.emplace_back( size_t( i ), name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
+                                          static_cast< object_type >( det.class_id ) );
+            }
+
+            std::lock_guard< std::mutex > lock( objects->mutex );
+            if( objects->sensor_is_on )
+                objects->swap( new_objects );
+            else
+                objects->clear();
+        }
+        catch( std::exception const & e )
+        {
+            LOG_WARNING( "Object detection processing: " << e.what() );
+        }
+    }
+
 
     void viewer_model::draw_viewport(const rect& viewer_rect,
         ux_window& window, int devices, std::string& error_message,

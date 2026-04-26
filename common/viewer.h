@@ -219,6 +219,10 @@ namespace rs2
         bool _support_ir_reflectivity;
     private:
 
+        // Process any object detection frames in last_frames alongside their color and depth
+        // counterparts, updating detected_objects with UV-mapped, depth-sampled results.
+        void process_object_detection_frames( std::map< int, rs2::frame > & last_frames );
+
         void check_permissions();
         void hide_common_options();
         std::vector<popup> _active_popups;

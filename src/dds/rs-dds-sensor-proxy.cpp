@@ -570,12 +570,14 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
         return;
     }
 
+    //if( n_detections )
+    //    LOG_INFO( "Got " << n_detections << " detections" );
     for( uint16_t idx = 0; idx < n_detections; ++idx )
     {
         auto & entry = payload->detections[idx];
         auto const & det = detections_j[idx];
 
-        entry.detection_id = 0;  // For future use - currently not supported by detection engines
+        entry.detection_id = idx;  // For future use - currently not supported by detection engines
         det.nested( "class_id" ).get_ex( entry.detection_type );
         det.nested( "confidence" ).get_ex( entry.confidence );
         det.nested( "x1" ).get_ex( entry.top_left_x );
@@ -583,6 +585,7 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
         det.nested( "x2" ).get_ex( entry.bottom_right_x );
         det.nested( "y2" ).get_ex( entry.bottom_right_y );
         det.nested( "distance" ).get_ex( entry.distance );
+        //LOG_INFO( "detection " << idx << ": (" << entry.top_left_x << ", " << entry.top_left_y << ") - (" << entry.bottom_right_x << ", " << entry.bottom_right_y << "), confidence: " << entry.confidence );
     }
     
     // Fill header
