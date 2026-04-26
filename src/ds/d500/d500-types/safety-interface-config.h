@@ -517,6 +517,8 @@ namespace librealsense
         std::array<uint8_t, 32> m_crypto_signature; // SHA2 or similar
         std::array<uint8_t, 324> m_reserved2 = {0};
     };
+    static_assert(sizeof(safety_interface_config) == 464,
+                  "safety_interface_config must remain 464 bytes to match the v0.95 flash table layout");
 
     /***
      *  safety_interface_config_with_header class

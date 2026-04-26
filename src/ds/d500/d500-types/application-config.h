@@ -389,6 +389,10 @@ namespace librealsense
      *                 0 - 1280x720 (Default)
      *                 1 - 640x360
      *         peripherals_sensors_disable_mask
+     *         hw_configuration_setup (uint8_t, Feat #16): HW platform selector
+     *             0 = nominal (default)
+     *             1 = Pixter MIPI injection
+     *             2 = RVP dev board
      *         reserved3[264]: zero-ed
      *             S.MCU specific inhibitor, allows to ignore errors (L1-L3) originated 
      *             by the underlying sensor in Operational state : threshold exceeded/invalid data/no data arriving.

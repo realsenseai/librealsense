@@ -456,7 +456,7 @@ namespace librealsense
         auto computed_crc32 = rsutils::number::calc_crc32(reinterpret_cast<const uint8_t*>(&sp), sizeof(safety_preset));
 
         // prepare vector of data to be sent (header + sp)
-        uint16_t version = ((uint16_t)0x03 << 8) | 0x01;  // major=0x03, minor=0x01 --> ver = major.minor
+        uint16_t version = ((uint16_t)0x03 << 8) | 0x02;  // major=0x03, minor=0x02 --> ver = major.minor
         uint32_t calib_version = 0;  // ignoring this field, as requested by sw architect
         safety_preset_header header(version, static_cast<uint16_t>(ds::d500_calibration_table_id::safety_preset_id), sizeof(safety_preset_with_header), computed_crc32);
         safety_preset_with_header sp_with_header(header, sp);
