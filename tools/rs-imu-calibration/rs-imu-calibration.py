@@ -669,6 +669,25 @@ def main():
         print("singular:", singular)
         check_X(X, w[:,:3], show_graph)
 
+        # Calculate Accelerometer Variance (using the first static bucket)
+        accel_data = np.array(measurements[0]) 
+        accel_var = np.var(accel_data, axis=0) 
+
+        print("\nLinear Acceleration Covariance (diagonal values):")
+        print("Scientific Notation:")
+        print(accel_var)
+        print("Basic Notation:")
+        print(f"[{accel_var[0]:.8f}, {accel_var[1]:.8f}, {accel_var[2]:.8f}]")
+
+        # Calculate Gyroscope Variance
+        gyro_var = np.var(gyro[:, 1:], axis=0) 
+
+        print("\nAngular Velocity Covariance (diagonal values):")
+        print("Scientific Notation:")
+        print(gyro_var)
+        print("Basic Notation:")
+        print(f"[{gyro_var[0]:.8f}, {gyro_var[1]:.8f}, {gyro_var[2]:.8f}]")
+
         calibration = {}
 
         calibration["device_type"] = "D435i"
