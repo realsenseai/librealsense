@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const SOURCE_DIR = path.join(__dirname, '..', 'dist');
-const TARGET_DIR = path.join(__dirname, '..', '..', 'rest-api', 'static');
+const TARGET_DIR = path.join(__dirname, '..', '..', '..', 'static');
 
 async function copyDir(src, dest) {
   await fs.mkdir(dest, { recursive: true });

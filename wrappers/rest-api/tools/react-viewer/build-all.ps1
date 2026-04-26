@@ -62,13 +62,13 @@ Write-Host "━━━━━━━━━━━━━━━━━━━━━━�
 Write-Host ""
 
 # Resolve project root for shared output locations
-$ProjectRoot = Resolve-Path "..\..\"
+$ProjectRoot = Resolve-Path "..\..\..\..\""
 $RestApiOutput = Join-Path $ProjectRoot "build\rest-api-dist"
 $RestApiWork = Join-Path $ProjectRoot "build\rest-api-work"
 
 # Step 1: Build FastAPI Executable
 Write-Info "Step 1/3: Building FastAPI executable with PyInstaller..."
-Push-Location "..\rest-api"
+Push-Location "..\.."
 
 if ($Clean) {
     Write-Warning "Cleaning FastAPI build artifacts..."
@@ -105,12 +105,12 @@ if (-not (Test-Path $BundleDir)) {
     Write-Error "FastAPI bundle directory not found at $BundleDir"; Pop-Location; exit 1
 }
 
-$ProjectRoot = Resolve-Path "..\..\"
+$ProjectRoot = Resolve-Path "..\..\..\..\""
 $TauriResources = Join-Path $ProjectRoot "build\tauri-resources"
 if (-not (Test-Path $TauriResources)) { New-Item -ItemType Directory -Path $TauriResources | Out-Null }
 
 # Clean old in-source copy to keep repo clean
-$LegacyResources = "..\react-viewer\src-tauri\resources\realsense_api"
+$LegacyResources = ".\src-tauri\resources\realsense_api"
 if (Test-Path $LegacyResources) { Remove-Item $LegacyResources -Recurse -Force }
 
 # Remove previous staged bundle and copy fresh (exe + _internal/ with DLLs)
@@ -123,7 +123,7 @@ Pop-Location
 
 # Step 2: Build React UI
 Write-Info "Step 2/3: Building React UI..."
-Push-Location "..\react-viewer"
+Push-Location "."
 
 if ($Clean) {
     Write-Warning "Cleaning Node modules cache..."
@@ -145,7 +145,7 @@ Write-Success "React UI built in $($Duration.TotalSeconds)s"
 Write-Info "Step 3/3: Building Tauri production bundles..."
 
 # Ensure Cargo outputs to project-level build/tauri-target
-$ProjectRoot = Resolve-Path "..\..\"
+$ProjectRoot = Resolve-Path "..\..\..\..\""
 $CargoTarget = Join-Path $ProjectRoot "build\tauri-target"
 Write-Info "Setting CARGO_TARGET_DIR to: $CargoTarget"
 if (-not (Test-Path $CargoTarget)) { New-Item -ItemType Directory -Path $CargoTarget | Out-Null }
