@@ -214,6 +214,9 @@ class RealSenseManager:
 
     def _download_firmware(self, version: str, dest: Path) -> bool:
         """Download firmware file to dest and verify SHA1 only when we know it for this version."""
+        if not re.match(r'^\d+\.\d+\.\d+\.\d+$', version):
+            logging.error("Rejected invalid firmware version string: %s", version)
+            return False
         try:
             url = f"{self._fw_base_url}/D4XX_FW_Image-{version}.bin"
             logging.info("Downloading firmware %s -> %s", url, dest)
@@ -1427,7 +1430,7 @@ class RealSenseManager:
             ).start()
             timings['thread_start'] = time.perf_counter() - t6
             timings['total'] = time.perf_counter() - t0
-            print(f"[TIMING] start_stream timings for {device_id}: {timings}")
+            logging.debug("[TIMING] start_stream timings for %s: %s", device_id, timings)
             return {
                 'device_id': device_id,
                 'is_streaming': True,
@@ -1650,8 +1653,8 @@ class RealSenseManager:
 
     def _collect_frames(self, device_id: str, align_processor=None):
         """Thread function to collect frames from the pipeline"""
-        print(f"[INFO] Frame collection thread started for device {device_id}")
-        print(f"[INFO] Active streams: {self.active_streams.get(device_id, set())}")
+        logging.debug("[INFO] Frame collection thread started for device %s", device_id)
+        logging.debug("[INFO] Active streams: %s", self.active_streams.get(device_id, set()))
         
         # Pre-compute stream mappings for performance (avoid lookup on every frame)
         stream_mappings = {}
