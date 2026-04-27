@@ -261,10 +261,12 @@ void rscuda::unpack_yuy2_cuda_helper(const uint8_t* h_src, uint8_t* h_dst, int n
 
         // How many super pixels do we have?
     int superPix = n / 2;
-    std::shared_ptr<uint8_t> d_dst;
-    std::shared_ptr<uint8_t> d_src = alloc_dev<uint8_t>(superPix * 4);
 
-    auto result = cudaMemcpy(d_src.get(), h_src, superPix * sizeof(uint8_t) * 4, cudaMemcpyHostToDevice);
+    static DeviceBuffer<uint8_t> d_dst;
+    static DeviceBuffer<uint8_t> d_src;
+    d_src.reserve(superPix,  4);
+
+    auto result = cudaMemcpy(d_src.data(), h_src, superPix * sizeof(uint8_t) * 4, cudaMemcpyHostToDevice);
     assert(result == cudaSuccess);
 
     int numBlocks = superPix / RS2_CUDA_THREADS_PER_BLOCK;
@@ -281,28 +283,28 @@ void rscuda::unpack_yuy2_cuda_helper(const uint8_t* h_src, uint8_t* h_dst, int n
         */
     case RS2_FORMAT_Y16:
         size = 2;
-        d_dst = alloc_dev<uint8_t>(n * size);
-        kernel_unpack_yuy2_y16_cuda << <numBlocks, RS2_CUDA_THREADS_PER_BLOCK >> > (d_src.get(), d_dst.get(), superPix);
+        d_dst.reserve(n * size);
+        kernel_unpack_yuy2_y16_cuda << <numBlocks, RS2_CUDA_THREADS_PER_BLOCK >> > (d_src.data(), d_dst.data(), superPix);
         break;
     case RS2_FORMAT_RGB8:
         size = 3;
-        d_dst = alloc_dev<uint8_t>(n * size);
-        kernel_unpack_yuy2_rgb8_cuda << <numBlocks, RS2_CUDA_THREADS_PER_BLOCK >> > (d_src.get(), d_dst.get(), superPix);
+        d_dst.reserve(n * size);
+        kernel_unpack_yuy2_rgb8_cuda << <numBlocks, RS2_CUDA_THREADS_PER_BLOCK >> > (d_src.data(), d_dst.data(), superPix);
         break;
     case RS2_FORMAT_BGR8:
         size = 3;
-        d_dst = alloc_dev<uint8_t>(n * size);
-        kernel_unpack_yuy2_bgr8_cuda << <numBlocks, RS2_CUDA_THREADS_PER_BLOCK >> > (d_src.get(), d_dst.get(), superPix);
+        d_dst.reserve(n * size);
+        kernel_unpack_yuy2_bgr8_cuda << <numBlocks, RS2_CUDA_THREADS_PER_BLOCK >> > (d_src.data(), d_dst.data(), superPix);
         break;
     case RS2_FORMAT_RGBA8:
         size = 4;
-        d_dst = alloc_dev<uint8_t>(n * size);
-        kernel_unpack_yuy2_rgba8_cuda << <numBlocks, RS2_CUDA_THREADS_PER_BLOCK >> > (d_src.get(), d_dst.get(), superPix);
+        d_dst.reserve(n * size);
+        kernel_unpack_yuy2_rgba8_cuda << <numBlocks, RS2_CUDA_THREADS_PER_BLOCK >> > (d_src.data(), d_dst.data(), superPix);
         break;
     case RS2_FORMAT_BGRA8:
         size = 4;
-        d_dst = alloc_dev<uint8_t>(n * size);
-        kernel_unpack_yuy2_bgra8_cuda << <numBlocks, RS2_CUDA_THREADS_PER_BLOCK >> > (d_src.get(), d_dst.get(), superPix);
+        d_dst.reserve(n * size);
+        kernel_unpack_yuy2_bgra8_cuda << <numBlocks, RS2_CUDA_THREADS_PER_BLOCK >> > (d_src.data(), d_dst.data(), superPix);
         break;
     default:
         assert(false);
@@ -312,7 +314,7 @@ void rscuda::unpack_yuy2_cuda_helper(const uint8_t* h_src, uint8_t* h_dst, int n
 
     cudaStreamSynchronize(0);
 
-    result = cudaMemcpy(h_dst, d_dst.get(), n * sizeof(uint8_t) * size, cudaMemcpyDeviceToHost);
+    result = cudaMemcpy(h_dst, d_dst.data(), n * sizeof(uint8_t) * size, cudaMemcpyDeviceToHost);
     assert(result == cudaSuccess);
 
     /*	cudaEventRecord(stop);
