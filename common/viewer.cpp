@@ -1952,6 +1952,7 @@ namespace rs2
                     bbox.grow( 10, 5 );  // Allow more text, and easier identification of the face
 
                     float a = 0.75f;
+                    auto frame_color = colors[2].first; // Green by default, good contrast.
                     if( object.type == object_type::face )
                     {  // For faces, the bounding box is drawn with an opacity according to the face's distance - the
                        // farther it is, the more transparent it is, so that closer faces are more visible and easier to identify
@@ -1960,6 +1961,7 @@ namespace rs2
                         float const depth_range = max_depth - min_depth;
                         float usable_depth = std::min( object.mean_depth, max_depth );
                         a = 0.75f * (max_depth - usable_depth) / depth_range + 0.25f;
+                        frame_color = get_color( object ); // Each face gets a unique color, so that it's easier to identify them across frames
                     }
 
                     // Don't draw text in boxes that are too small...
@@ -2002,7 +2004,6 @@ namespace rs2
                     ImGui::PopStyleColor();
 
                     // The rectangle itself is always drawn, in the same color as the text
-                    auto frame_color = get_color( object );
                     glColor3f( a * frame_color.Value.x, a * frame_color.Value.y, a * frame_color.Value.z );
                     draw_rect( bbox, 2 );
                 }
