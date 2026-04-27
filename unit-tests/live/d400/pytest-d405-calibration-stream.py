@@ -1,37 +1,25 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
-# test:device each(D405)
-import sys
-
+import pytest
 import pyrealsense2 as rs
-from rspy import test
+from pytest_check import check
+import logging
+log = logging.getLogger(__name__)
 
-ctx = rs.context()
-dev = ctx.query_devices()[0]
-pid = dev.get_info(rs.camera_info.product_id)
-print(dev.get_info(rs.camera_info.name) + " found")
-if pid != "0B5B":
-    print("This test is dedicated to run with D405 only - stepping over test")
-    sys.exit(0)
+pytestmark = [pytest.mark.device_each("D405")]
 
-#############################################################################################
-test.start("D405 explicit configuration - IR calibration, Color in HD")
-try:
+
+def test_d405_explicit_config_ir_color_hd(module_device_setup):
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.infrared, 1, 1288, 808, rs.format.y16, 15)
     config.enable_stream(rs.stream.infrared, 2, 1288, 808, rs.format.y16, 15)
     config.enable_stream(rs.stream.color, 1280, 720, rs.format.rgb8, 15)
     pipeline.start(config)
-
-    iteration = 0
-    while True:
-        iteration = iteration + 1
-        if iteration > 10:
-            break
+    for _ in range(10):
         frames = pipeline.wait_for_frames()
-        test.check(frames.size() == 3)
+        check.is_true(frames.size() == 3)
         ir_1_stream_found = False
         ir_2_stream_found = False
         color_stream_found = False
@@ -44,32 +32,20 @@ try:
                     ir_2_stream_found = True
             elif profile.stream_type() == rs.stream.color:
                 color_stream_found = True
-        test.check(ir_1_stream_found and ir_2_stream_found and color_stream_found)
-    pass
+        check.is_true(ir_1_stream_found and ir_2_stream_found and color_stream_found)
+    pipeline.stop()
 
-except Exception as e:
-    print(e)
-    pass
 
-test.finish()
-
-#############################################################################################
-test.start("D405 explicit configuration - IR calibration, Color in VGA")
-try:
+def test_d405_explicit_config_ir_color_vga(module_device_setup):
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.infrared, 1, 1288, 808, rs.format.y16, 15)
     config.enable_stream(rs.stream.infrared, 2, 1288, 808, rs.format.y16, 15)
     config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, 15)
     pipeline.start(config)
-
-    iteration = 0
-    while True:
-        iteration = iteration + 1
-        if iteration > 10:
-            break
+    for _ in range(10):
         frames = pipeline.wait_for_frames()
-        test.check(frames.size() == 3)
+        check.is_true(frames.size() == 3)
         ir_1_stream_found = False
         ir_2_stream_found = False
         color_stream_found = False
@@ -82,30 +58,19 @@ try:
                     ir_2_stream_found = True
             elif profile.stream_type() == rs.stream.color:
                 color_stream_found = True
-        test.check(ir_1_stream_found and ir_2_stream_found and color_stream_found)
-    pass
+        check.is_true(ir_1_stream_found and ir_2_stream_found and color_stream_found)
+    pipeline.stop()
 
-except Exception as e:
-    print(e)
-    pass
 
-test.finish()
-#############################################################################################
-test.start("D405 implicit configuration - IR calibration, Color")
-try:
+def test_d405_implicit_config_ir_color(module_device_setup):
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.infrared, rs.format.y16, 15)
     config.enable_stream(rs.stream.color)
     pipeline.start(config)
-
-    iteration = 0
-    while True:
-        iteration = iteration + 1
-        if iteration > 10:
-            break
+    for _ in range(10):
         frames = pipeline.wait_for_frames()
-        test.check(frames.size() == 2)
+        check.is_true(frames.size() == 2)
         ir_1_stream_found = False
         color_stream_found = False
         for f in frames:
@@ -115,14 +80,5 @@ try:
                     ir_1_stream_found = True
             elif profile.stream_type() == rs.stream.color:
                 color_stream_found = True
-        test.check(ir_1_stream_found and color_stream_found)
-    pass
-
-except Exception as e:
-    print(e)
-    pass
-
-test.finish()
-
-
-test.print_results_and_exit()
+        check.is_true(ir_1_stream_found and color_stream_found)
+    pipeline.stop()

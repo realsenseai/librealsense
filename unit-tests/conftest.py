@@ -67,6 +67,12 @@ except ImportError:
     log.warning('No pyrealsense2 library available!')
     rs = None
 
+try:
+    import pyrsutils
+except ImportError:
+    log.warning('No pyrsutils library available!')
+    pyrsutils = None
+
 
 # ============================================================================
 # Pytest Hooks

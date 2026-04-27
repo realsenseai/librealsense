@@ -208,3 +208,42 @@ def is_jetson_platform():
             return 'jetson' in model.lower()
     except:
         return False
+
+
+_fw_version_cache: dict = {}  # (serial, str(min_version), inclusive) -> True (set only on pass)
+
+
+def require_min_fw_version(dev, min_version, feature_name="", inclusive=True):
+    """Skip the test if the device FW does not meet the minimum version requirement.
+
+    Caches the result per (device serial, min_version, inclusive) so the check
+    runs at most once per module per device — subsequent calls for the same key
+    are no-ops when the check already passed.  If the FW is too old, pytest.skip()
+    is called (raising Skipped), so the cache entry is never written and every
+    test that calls this function will also be skipped.
+
+    Args:
+        dev: RealSense device (rs.device).
+        min_version: rsutils.version — the minimum acceptable FW version.
+        feature_name: Optional name of the feature requiring this FW, included in
+                      the skip message for clarity.
+        inclusive: True (default) → require fw >= min_version (skip if fw < min).
+                   False → require fw > min_version (skip if fw <= min).
+    """
+    import pytest
+    import pyrealsense2 as rs
+    import pyrsutils as rsutils
+
+    serial = dev.get_info(rs.camera_info.serial_number)
+    key = (serial, str(min_version), inclusive)
+    if key in _fw_version_cache:
+        return
+    if not dev.supports(rs.camera_info.firmware_version):
+        pytest.skip("Device does not support firmware version info")
+    fw_version = rsutils.version(dev.get_info(rs.camera_info.firmware_version))
+    should_skip = (fw_version < min_version) if inclusive else (fw_version <= min_version)
+    if should_skip:
+        op = ">=" if inclusive else ">"
+        feature_str = f" ({feature_name})" if feature_name else ""
+        pytest.skip(f"FW version {fw_version} does not meet minimum {op} {min_version}{feature_str}, skipping test...")
+    _fw_version_cache[key] = True

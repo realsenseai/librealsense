@@ -95,7 +95,24 @@ When migrating a legacy `test-*.py` to `pytest-*.py`:
 
 11. **Common code snippets**: Common short code snippets can be replaced with convenience helper functions, e.g `rspy.snippets.is_dds_dev`.
 
-12. **Don't wrap test bodies in `try`/`finally` to swallow failures**: Pytest natively reports any unhandled exception as a test failure — there is no need for the legacy `try: ... except: test.unexpected_exception()` pattern. When migrating, just **delete** the `try`/`except` wrapper and let pytest handle it.
+12. **FW version gating — use `require_min_fw_version`**: When a test requires a minimum firmware version, do **not** write inline `fw_version = ... / if fw_version < ...: pytest.skip(...)` blocks in each function. Use the shared helper from `rspy.pytest.device_helpers` instead:
+
+    ```python
+    from rspy.pytest.device_helpers import require_min_fw_version
+    import pyrsutils as rsutils
+
+    def test_something(test_device):
+        dev, _ = test_device
+        # skip if fw < 5.15.0.0 (require fw >= 5.15.0.0):
+        require_min_fw_version(dev, rsutils.version(5, 15, 0, 0), "FEATURE_NAME")
+
+        # skip if fw <= 5.14.0.0 (require fw > 5.14.0.0, i.e. strictly greater):
+        require_min_fw_version(dev, rsutils.version(5, 14, 0, 0), "FEATURE_NAME", inclusive=False)
+    ```
+
+    The helper caches the result per `(device serial, min_version, inclusive)` — the check runs at most once per device/version combination. On pass the result is cached and subsequent calls are no-ops. On fail `pytest.skip()` is raised (cache never written), so every test that calls it will also skip. It also handles devices that don't expose firmware version info.
+
+13. **Don't wrap test bodies in `try`/`finally` to swallow failures**: Pytest natively reports any unhandled exception as a test failure — there is no need for the legacy `try: ... except: test.unexpected_exception()` pattern. When migrating, just **delete** the `try`/`except` wrapper and let pytest handle it.
 
     - **Cleanup belongs in a fixture**, not in `try/finally` inside the test body. Use `@pytest.fixture` with `yield`: code before `yield` is setup, code after `yield` runs even when the test fails (see the `_sw_session` autouse fixture in `unit-tests/syncer/pytest-ts-*.py` for the pattern).
     - **If you genuinely must wrap with `try`** (e.g. to attach context to the failure message), **always re-raise or fail explicitly** — never swallow:
