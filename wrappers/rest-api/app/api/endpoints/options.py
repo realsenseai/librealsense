@@ -1,9 +1,10 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Any
 
 
 from app.models.option import OptionInfo, OptionUpdate
-from app.services.rs_manager import RealSenseManager
+from app.services.rs_manager import RealSenseManager, RealSenseError
 from app.api.dependencies import get_realsense_manager
 
 router = APIRouter()
@@ -51,5 +52,9 @@ async def update_option(
     try:
         result = rs_manager.set_sensor_option(device_id, sensor_id, option_id, option_update.value)
         return {"success": result}
+    except RealSenseError as e:
+        # Preserve the original status code from RealSenseError
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logging.exception("Unexpected error updating options")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")

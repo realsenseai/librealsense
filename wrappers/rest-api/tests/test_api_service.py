@@ -192,7 +192,7 @@ class TestRealSenseAPI:
 
     def test_get_devices(self, setup_mock_managers):
         # Test the /devices endpoint
-        response = client.get("/api/devices")
+        response = client.get("/api/v1/devices")
         assert response.status_code == 200
 
         devices = response.json()
@@ -202,7 +202,7 @@ class TestRealSenseAPI:
 
     def test_get_device_by_id(self, setup_mock_managers):
         # Test the /devices/{device_id} endpoint
-        response = client.get("/api/devices/device1")
+        response = client.get("/api/v1/devices/device1")
         assert response.status_code == 200
 
         device = response.json()
@@ -210,12 +210,12 @@ class TestRealSenseAPI:
         assert device["name"] == "Test Device 1"
 
         # Test with non-existent device
-        response = client.get("/api/devices/nonexistent")
+        response = client.get("/api/v1/devices/nonexistent")
         assert response.status_code == 404
 
     def test_get_sensors(self, setup_mock_managers):
         # Test the /devices/{device_id}/sensors endpoint
-        response = client.get("/api/devices/device1/sensors")
+        response = client.get("/api/v1/devices/device1/sensors")
         assert response.status_code == 200
 
         sensors = response.json()
@@ -225,19 +225,19 @@ class TestRealSenseAPI:
 
     def test_get_sensor_by_id(self, setup_mock_managers):
         # Test the /devices/{device_id}/sensors/{sensor_id} endpoint
-        response = client.get("/api/devices/device1/sensors/device1-sensor-0")
+        response = client.get("/api/v1/devices/device1/sensors/device1-sensor-0")
         assert response.status_code == 200
 
         sensor = response.json()
         assert sensor["sensor_id"] == "device1-sensor-0"
 
         # Test with non-existent sensor
-        response = client.get("/api/devices/device1/sensors/nonexistent")
+        response = client.get("/api/v1/devices/device1/sensors/nonexistent")
         assert response.status_code == 404
 
     def test_get_sensor_options(self, setup_mock_managers):
         # Test the /devices/{device_id}/sensors/{sensor_id}/options endpoint
-        response = client.get("/api/devices/device1/sensors/device1-sensor-0/options")
+        response = client.get("/api/v1/devices/device1/sensors/device1-sensor-0/options")
         assert response.status_code == 200
 
         options = response.json()
@@ -246,12 +246,12 @@ class TestRealSenseAPI:
     def test_get_option_by_id(self, setup_mock_managers):
         # Test the /devices/{device_id}/sensors/{sensor_id}/options/{option_id} endpoint
         # First get available options
-        response = client.get("/api/devices/device1/sensors/device1-sensor-0/options")
+        response = client.get("/api/v1/devices/device1/sensors/device1-sensor-0/options")
         options = response.json()
         option_id = options[0]["option_id"]
 
         response = client.get(
-            f"/api/devices/device1/sensors/device1-sensor-0/options/{option_id}"
+            f"/api/v1/devices/device1/sensors/device1-sensor-0/options/{option_id}"
         )
         assert response.status_code == 200
 
@@ -261,12 +261,12 @@ class TestRealSenseAPI:
     def test_set_option(self, setup_mock_managers):
         # Test the /devices/{device_id}/sensors/{sensor_id}/options/{option_id} PUT endpoint
         # First get available options
-        response = client.get("/api/devices/device1/sensors/device1-sensor-0/options")
+        response = client.get("/api/v1/devices/device1/sensors/device1-sensor-0/options")
         options = response.json()
         option_id = options[0]["option_id"]
 
         response = client.put(
-            f"/api/devices/device1/sensors/device1-sensor-0/options/{option_id}",
+            f"/api/v1/devices/device1/sensors/device1-sensor-0/options/{option_id}",
             json={"value": 0.5},
         )
         assert response.status_code == 200
@@ -285,7 +285,7 @@ class TestRealSenseAPI:
             ]
         }
 
-        response = client.post("/api/devices/device1/stream/start", json=stream_config)
+        response = client.post("/api/v1/devices/device1/stream/start", json=stream_config)
         assert response.status_code == 200
 
         result = response.json()
@@ -307,7 +307,7 @@ class TestRealSenseAPI:
                 }
             ]
         }
-        response = client.post("/api/devices/device1/stream/stop", json=stream_config)
+        response = client.post("/api/v1/devices/device1/stream/stop", json=stream_config)
 
         assert response.status_code == 200
 
@@ -317,7 +317,7 @@ class TestRealSenseAPI:
 
     def test_get_stream_status(self, setup_mock_managers):
         # Test the /devices/{device_id}/stream GET endpoint
-        response = client.get("/api/devices/device1/stream/status")
+        response = client.get("/api/v1/devices/device1/stream/status")
         assert response.status_code == 200
 
         status = response.json()
@@ -340,12 +340,12 @@ class TestRealSenseAPI:
                 }
             ]
         }
-        client.post("/api/devices/device1/stream", json=stream_config)
+        client.post("/api/v1/devices/device1/stream", json=stream_config)
 
         # Test the /webrtc/offer POST endpoint
         webrtc_config = {"device_id": "device1", "stream_types": ["depth"]}
 
-        response = client.post("/api/webrtc/offer", json=webrtc_config)
+        response = client.post("/api/v1/webrtc/offer", json=webrtc_config)
         assert response.status_code == 200
 
         result = response.json()
@@ -359,7 +359,7 @@ class TestRealSenseAPI:
     async def test_process_webrtc_answer(self, setup_mock_managers):
         # First create offer
         webrtc_config = {"device_id": "device1", "stream_types": ["depth"]}
-        response = client.post("/api/webrtc/offer", json=webrtc_config)
+        response = client.post("/api/v1/webrtc/offer", json=webrtc_config)
         session_id = response.json()["session_id"]
 
         # Test the /webrtc/sessions/{session_id}/answer POST endpoint
@@ -369,7 +369,7 @@ class TestRealSenseAPI:
             "type": "answer",
         }
 
-        response = client.post(f"/api/webrtc/answer", json=answer)
+        response = client.post(f"/api/v1/webrtc/answer", json=answer)
         assert response.status_code == 200
         assert response.json()["success"] == True
 
@@ -377,7 +377,7 @@ class TestRealSenseAPI:
     async def test_add_ice_candidate(self, setup_mock_managers):
         # First create offer
         webrtc_config = {"device_id": "device1", "stream_types": ["depth"]}
-        response = client.post("/api/webrtc/offer", json=webrtc_config)
+        response = client.post("/api/v1/webrtc/offer", json=webrtc_config)
         session_id = response.json()["session_id"]
 
         # Test the /webrtc/sessions/{session_id}/ice POST endpoint
@@ -388,7 +388,7 @@ class TestRealSenseAPI:
             "sdpMLineIndex": 0,
         }
 
-        response = client.post(f"/api/webrtc/ice-candidates", json=ice_candidate)
+        response = client.post(f"/api/v1/webrtc/ice-candidates", json=ice_candidate)
         assert response.status_code == 200
         assert response.json()["success"] == True
 
@@ -396,11 +396,11 @@ class TestRealSenseAPI:
     async def test_get_webrtc_session(self, setup_mock_managers):
         # First create offer
         webrtc_config = {"device_id": "device1", "stream_types": ["depth"]}
-        response = client.post("/api/webrtc/offer", json=webrtc_config)
+        response = client.post("/api/v1/webrtc/offer", json=webrtc_config)
         session_id = response.json()["session_id"]
 
         # Test the /webrtc/sessions/{session_id} GET endpoint
-        response = client.get(f"/api/webrtc/sessions/{session_id}")
+        response = client.get(f"/api/v1/webrtc/sessions/{session_id}")
         assert response.status_code == 200
 
         result = response.json()
@@ -412,16 +412,16 @@ class TestRealSenseAPI:
     async def test_close_webrtc_session(self, setup_mock_managers):
         # First create offer
         webrtc_config = {"device_id": "device1", "stream_types": ["depth"]}
-        response = client.post("/api/webrtc/offer", json=webrtc_config)
+        response = client.post("/api/v1/webrtc/offer", json=webrtc_config)
         session_id = response.json()["session_id"]
 
         # Test the /webrtc/sessions/{session_id} DELETE endpoint
-        response = client.delete(f"/api/webrtc/sessions/{session_id}")
+        response = client.delete(f"/api/v1/webrtc/sessions/{session_id}")
         assert response.status_code == 200
         assert response.json()["success"] == True
 
         # Verify session is closed
-        response = client.get(f"/api/webrtc/sessions/{session_id}")
+        response = client.get(f"/api/v1/webrtc/sessions/{session_id}")
         assert response.status_code == 404
 
 
@@ -581,7 +581,7 @@ class TestRealSenseAPIIntegration:
 
         real_client = TestClient(app)
 
-        response = real_client.get("/api/devices")
+        response = real_client.get("/api/v1/devices")
 
         if response.status_code == 500:
             pytest.skip("No RealSense devices connected or RealSense library issue")
@@ -612,14 +612,14 @@ class TestRealSenseAPIIntegration:
         real_client = TestClient(app)
 
         # First get devices
-        response = real_client.get("/api/devices")
+        response = real_client.get("/api/v1/devices")
 
 
         devices = response.json()
         device_id = devices[0]["device_id"]
 
         # Test sensors endpoint
-        response = real_client.get(f"/api/devices/{device_id}/sensors")
+        response = real_client.get(f"/api/v1/devices/{device_id}/sensors")
         assert response.status_code == 200
 
         sensors = response.json()
@@ -648,7 +648,7 @@ class TestRealSenseAPIIntegration:
         real_client = TestClient(app)
 
         # First get devices
-        response = real_client.get("/api/devices")
+        response = real_client.get("/api/v1/devices")
 
 
         devices = response.json()
@@ -656,12 +656,12 @@ class TestRealSenseAPIIntegration:
         device_id = devices[0]["device_id"]
 
         # Get sensors
-        response = real_client.get(f"/api/devices/{device_id}/sensors")
+        response = real_client.get(f"/api/v1/devices/{device_id}/sensors")
         sensors = response.json()
         sensor_id = sensors[0]["sensor_id"]
 
         # Test options endpoint
-        response = real_client.get(f"/api/devices/{device_id}/sensors/{sensor_id}/options")
+        response = real_client.get(f"/api/v1/devices/{device_id}/sensors/{sensor_id}/options")
         assert response.status_code == 200
 
         options = response.json()
@@ -677,7 +677,7 @@ class TestRealSenseAPIIntegration:
 
         # Test getting specific option
         option_id = option["option_id"]
-        response = real_client.get(f"/api/devices/{device_id}/sensors/{sensor_id}/options/{option_id}")
+        response = real_client.get(f"/api/v1/devices/{device_id}/sensors/{sensor_id}/options/{option_id}")
         assert response.status_code == 200
 
         retrieved_option = response.json()

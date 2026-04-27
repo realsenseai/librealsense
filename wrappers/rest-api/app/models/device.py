@@ -5,6 +5,9 @@ class DeviceBase(BaseModel):
     name: str
     serial_number: str
     firmware_version: Optional[str] = None
+    recommended_firmware_version: Optional[str] = None
+    firmware_status: Optional[str] = None  # up_to_date | outdated | missing_file | unknown
+    firmware_file_available: Optional[bool] = None
     physical_port: Optional[str] = None
 
 
@@ -21,6 +24,9 @@ class DeviceInfo(BaseModel):
     name: str
     serial_number: str
     firmware_version: Optional[str] = None
+    recommended_firmware_version: Optional[str] = None
+    firmware_status: Optional[str] = None
+    firmware_file_available: Optional[bool] = None
     physical_port: Optional[str] = None
     usb_type: Optional[str] = None
     product_id: Optional[str] = None
