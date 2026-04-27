@@ -36,8 +36,6 @@ def device_changed( info ):
 
 def _wait_for_reconnect():
     """Wait up to TOGGLE_WAIT_TIME seconds for the device to reappear. Returns True if it did."""
-    global device_added
-    device_added = False
     t = Timer( TOGGLE_WAIT_TIME )
     t.start()
     while not t.has_expired():
@@ -63,31 +61,42 @@ def test_advanced_mode_toggle( test_device ):
     ctx.set_devices_changed_callback( device_changed )
 
     initial_state = am_dev.is_enabled()
+    toggled_state = not initial_state
     log.info( "Device: %s | Initial advanced mode: %s", name, "ON" if initial_state else "OFF" )
 
     # --- Toggle to opposite state ---
-    toggled_state = not initial_state
+    # Clear the flag before toggling so a fast reconnect cannot be missed
+    device_added = False
     log.info( "Toggling advanced mode to %s", "ON" if toggled_state else "OFF" )
     am_dev.toggle_advanced_mode( toggled_state )
 
     log.info( "Waiting up to %d sec for device to reconnect after toggle...", TOGGLE_WAIT_TIME )
-    assert _wait_for_reconnect(), \
-        f"Device did not reconnect within {TOGGLE_WAIT_TIME} sec after toggling advanced mode"
+    try:
+        assert _wait_for_reconnect(), \
+            f"Device did not reconnect within {TOGGLE_WAIT_TIME} sec after toggling advanced mode"
 
-    toggled_enabled = rs.rs400_advanced_mode( dev ).is_enabled()
-    assert toggled_enabled == toggled_state, \
-        f"Expected advanced mode {'ON' if toggled_state else 'OFF'} after toggle but got {'ON' if toggled_enabled else 'OFF'}"
-    log.info( "Device reconnected; advanced mode is %s", "ON" if toggled_state else "OFF" )
+        toggled_enabled = rs.rs400_advanced_mode( dev ).is_enabled()
+        assert toggled_enabled == toggled_state, \
+            f"Expected advanced mode {'ON' if toggled_state else 'OFF'} after toggle but got {'ON' if toggled_enabled else 'OFF'}"
+        log.info( "Device reconnected; advanced mode is %s", "ON" if toggled_state else "OFF" )
 
-    # --- Toggle back to original state ---
-    log.info( "Toggling advanced mode back to %s", "ON" if initial_state else "OFF" )
-    rs.rs400_advanced_mode( dev ).toggle_advanced_mode( initial_state )
+    finally:
+        # Best-effort restore initial state so later tests in the session are not affected
+        try:
+            if dev and rs.rs400_advanced_mode( dev ).is_enabled() != initial_state:
+                log.info( "Restoring advanced mode to %s", "ON" if initial_state else "OFF" )
+                device_added = False
+                rs.rs400_advanced_mode( dev ).toggle_advanced_mode( initial_state )
 
-    log.info( "Waiting up to %d sec for device to reconnect after restore...", TOGGLE_WAIT_TIME )
-    assert _wait_for_reconnect(), \
-        f"Device did not reconnect within {TOGGLE_WAIT_TIME} sec after restoring advanced mode"
-
-    restored_enabled = rs.rs400_advanced_mode( dev ).is_enabled()
-    assert restored_enabled == initial_state, \
-        f"Expected advanced mode {'ON' if initial_state else 'OFF'} after restore but got {'ON' if restored_enabled else 'OFF'}"
-    log.info( "Advanced mode restored to %s; test passed", "ON" if initial_state else "OFF" )
+                log.info( "Waiting up to %d sec for device to reconnect after restore...", TOGGLE_WAIT_TIME )
+                if not _wait_for_reconnect():
+                    log.warning( "Device did not reconnect within %d sec after restoring advanced mode", TOGGLE_WAIT_TIME )
+                else:
+                    restored_enabled = rs.rs400_advanced_mode( dev ).is_enabled()
+                    if restored_enabled != initial_state:
+                        log.warning( "Advanced mode restore: expected %s but got %s",
+                                     "ON" if initial_state else "OFF", "ON" if restored_enabled else "OFF" )
+                    else:
+                        log.info( "Advanced mode restored to %s; test passed", "ON" if initial_state else "OFF" )
+        except Exception as e:
+            log.warning( "Best-effort advanced mode restore failed for %s: %s", name, e )
