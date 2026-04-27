@@ -66,16 +66,28 @@ def find_built_exe( source, name ):
     """
     if platform.system() != 'Linux':
         name += '.exe'
+    tried = []
     import sys
     for p in sys.path:
         exe = os.path.join( p, name )
+        tried.append( exe )
         if os.path.isfile( exe ):
             return exe
-    if platform.system() == 'Linux':
-        # The Linux build leaves all the executables in their source dir
-        global build
+    global build
+    if build:
+        # CMake puts executables under <build>/<CONFIG>/ — on Linux via
+        # CMAKE_RUNTIME_OUTPUT_DIRECTORY in CMake/unix_config.cmake, on Windows via the
+        # Visual Studio multi-config generator appending the config name automatically.
+        for cfg in ('Release', 'Debug'):
+            exe = os.path.join( build, cfg, name )
+            tried.append( exe )
+            if os.path.isfile( exe ):
+                return exe
+        # Fall back to source-mirrored layout for non-CMake build trees.
         exe = os.path.join( build, source, name )
+        tried.append( exe )
         if os.path.isfile( exe ):
             return exe
+    log.d( f'find_built_exe: {name!r} not found; tried:\n    ' + '\n    '.join( tried ) )
     return None
 
