@@ -35,6 +35,7 @@ private:
     static std::shared_ptr< matcher > create_timestamp_matcher( std::vector< stream_interface * > const & profiles );
 
     static std::vector< stream_interface * > get_color_profiles( std::vector< stream_interface * > const & profiles );
+    static std::vector< stream_interface * > get_inference_profiles( std::vector< stream_interface * > const & profiles );
     static std::shared_ptr< matcher >
         create_color_composite_matcher( std::vector< stream_interface * > const & profiles );
     static std::shared_ptr< matcher >

@@ -484,6 +484,47 @@ namespace rs2
             LOG_WARNING( "Exception caught trying to detect presets: " << e.what() );
         }
     }
+
+    bool device_model::subdevice_has_inference_stream_enabled( const subdevice_model & sub )
+    {
+        for( auto const & kv : sub.stream_enabled )
+        {
+            if( ! kv.second ) continue;
+            for( auto const & p : sub.profiles )
+                if( p.unique_id() == kv.first && p.stream_type() == RS2_STREAM_OBJECT_DETECTION )
+                    return true;
+        }
+        return false;
+    }
+
+    bool device_model::are_color_and_depth_streaming() const
+    {
+        bool has_color = false, has_depth = false;
+        for( auto const & sub : subdevices )
+        {
+            if( ! sub->streaming ) continue;
+            for( auto const & p : sub->profiles )
+            {
+                if( p.stream_type() == RS2_STREAM_COLOR ) has_color = true;
+                if( p.stream_type() == RS2_STREAM_DEPTH ) has_depth = true;
+            }
+            if( has_color && has_depth ) return true;
+        }
+        return false;
+    }
+
+    void device_model::stop_inference_if_video_stopped( viewer_model & viewer )
+    {
+        // If color or depth are no longer both streaming, stop any inference subdevice that is still running.
+        if( are_color_and_depth_streaming() )
+            return;
+        for( auto & sub : subdevices )
+        {
+            if( sub->streaming && subdevice_has_inference_stream_enabled( *sub ) )
+                sub->stop( viewer.not_model );
+        }
+    }
+
     void device_model::play_defaults(viewer_model& viewer)
     {
         if (!dev_syncer)
@@ -2585,6 +2626,11 @@ namespace rs2
                         }
                         if (can_stream)
                         {
+                            // Disable the start button for inference streams unless color and depth are already streaming.
+                            bool disable_inference = subdevice_has_inference_stream_enabled( *sub ) && ! are_color_and_depth_streaming();
+                            if( disable_inference )
+                                ImGui::BeginDisabled();
+
                             if( ImGui::Button( label.c_str(), button_size ) )
                             {
                                 if (profiles.empty()) // profiles might be already filled
@@ -2618,7 +2664,13 @@ namespace rs2
                                     viewer.begin_stream(sub, profile);
                                 }
                             }
-                            if (ImGui::IsItemHovered())
+                            if( disable_inference )
+                            {
+                                ImGui::EndDisabled();
+                                if( ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
+                                    RsImGui::CustomTooltip( "Color and Depth streams must be streaming before starting inference" );
+                            }
+                            else if (ImGui::IsItemHovered())
                             {
                                 window.link_hovered();
                                 RsImGui::CustomTooltip("Start streaming data from this sensor");
@@ -2636,6 +2688,7 @@ namespace rs2
                         if( ImGui::Button( label.c_str(), button_size ) )
                         {
                             sub->stop(viewer.not_model);
+                            stop_inference_if_video_stopped( viewer );
                             std::string friendly_name = sub->s->get_info(RS2_CAMERA_INFO_NAME);
                             if ((friendly_name.find("Tracking") != std::string::npos) ||
                                 (friendly_name.find("Motion") != std::string::npos))

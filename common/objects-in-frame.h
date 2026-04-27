@@ -9,6 +9,14 @@
 #include <mutex>
 #include <imgui.h>
 
+enum class object_type
+{
+    person = 0,
+    face = 1,
+    other = 2
+};
+
+std::string object_type_to_string( object_type type );
 
 struct object_in_frame
 {
@@ -16,13 +24,16 @@ struct object_in_frame
     std::string name;
     float mean_depth;
     size_t id;
+    object_type type = object_type::other;
 
-    object_in_frame( size_t id, std::string const & name, rs2::rect bbox_color, rs2::rect bbox_depth, float depth )
-    : normalized_color_bbox( bbox_color )
-    , normalized_depth_bbox( bbox_depth )
-    , name( name )
-    , mean_depth( depth )
-    , id( id )
+    object_in_frame( size_t _id, std::string const & _name, rs2::rect _bbox_color, rs2::rect _bbox_depth, float _depth,
+                     object_type _type = object_type::other )
+        : normalized_color_bbox( _bbox_color )
+        , normalized_depth_bbox( _bbox_depth )
+        , name( _name )
+        , mean_depth( _depth )
+        , id( _id )
+        , type( _type )
     {
     }
 };

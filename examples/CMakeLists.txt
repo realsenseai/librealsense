@@ -56,5 +56,6 @@ add_subdirectory(hdr)
 add_subdirectory(on-chip-calib)
 add_subdirectory(eth-config)
 add_subdirectory(embedded-filters)
+add_subdirectory(object-detection)
 
 unset_security_flags_for_executable()

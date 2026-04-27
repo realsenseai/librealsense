@@ -74,6 +74,7 @@ void init_frame(py::module &m) {
         .def(BIND_DOWNCAST(stream_profile, video_stream_profile))
         .def(BIND_DOWNCAST(stream_profile, motion_stream_profile))
         .def(BIND_DOWNCAST(stream_profile, pose_stream_profile))
+        .def(BIND_DOWNCAST(stream_profile, inference_stream_profile))
         .def("stream_name", &rs2::stream_profile::stream_name, "The stream's human-readable name.")
         .def("is_default", &rs2::stream_profile::is_default, "Checks if the stream profile is marked/assigned as default, "
              "meaning that the profile will be selected when the user requests stream configuration using wildcards.")
@@ -124,6 +125,9 @@ void init_frame(py::module &m) {
     py::class_<rs2::pose_stream_profile, rs2::stream_profile> pose_stream_profile(m, "pose_stream_profile", "Stream profile instance with an explicit pose extension type.");
     pose_stream_profile.def(py::init<const rs2::stream_profile&>(), "sp"_a);
 
+    py::class_<rs2::inference_stream_profile, rs2::stream_profile> inference_stream_profile(m, "inference_stream_profile", "Stream profile for inference streams.");
+    inference_stream_profile.def(py::init<const rs2::stream_profile&>(), "sp"_a);
+
     py::class_<rs2::filter_interface> filter_interface(m, "filter_interface", "Interface for frame filtering functionality");
     filter_interface.def("process", &rs2::filter_interface::process, "frame"_a); // No docstring in C++
 
@@ -156,6 +160,8 @@ void init_frame(py::module &m) {
         .def(BIND_DOWNCAST(frame, depth_frame))
         .def(BIND_DOWNCAST(frame, motion_frame))
         .def(BIND_DOWNCAST(frame, pose_frame))
+        .def(BIND_DOWNCAST(frame, inference_frame))
+        .def(BIND_DOWNCAST(frame, object_detection_frame))
         // No apply_filter?
         .def( "__repr__", []( const rs2::frame &self )
         {
@@ -238,6 +244,21 @@ void init_frame(py::module &m) {
             return oss.str();
         });
 
+    py::class_<rs2_object_detection> object_detection(m, "object_detection"); // No docstring
+    object_detection.def_readwrite("class_id", &rs2_object_detection::class_id)
+        .def_readwrite("score", &rs2_object_detection::score)
+        .def_readwrite("top_left_x", &rs2_object_detection::top_left_x)
+        .def_readwrite("top_left_y", &rs2_object_detection::top_left_y)
+        .def_readwrite("bottom_right_x", &rs2_object_detection::bottom_right_x)
+        .def_readwrite("bottom_right_y", &rs2_object_detection::bottom_right_y)
+        .def_readwrite( "depth", &rs2_object_detection::depth )
+        .def("__repr__", [](const rs2_object_detection& d) {
+                std::ostringstream oss;
+                oss << "class_id: " << d.class_id << ", score: " << d.score << ", top_left: [" << d.top_left_x << ", "
+                    << d.top_left_y << "], bottom_right: [" << d.bottom_right_x << ", " << d.bottom_right_y << "], depth: " << d.depth;
+            return oss.str();
+        });
+
     py::class_<rs2::points, rs2::frame> points(m, "points", "Extends the frame class with additional point cloud related attributes and functions.");
     points.def(py::init<>())
         .def(py::init<rs2::frame>())
@@ -311,6 +332,14 @@ void init_frame(py::module &m) {
                 .def_property_readonly( "height", &rs2::labeled_points::get_height, "labeled point cloud height in pixels. Identical to calling get_height." )
                 .def( "get_bpp", &rs2::labeled_points::get_bits_per_pixel, "Returns labeled point cloud bpp (bits per pixel)." );
 
+    py::class_<rs2::inference_frame, rs2::frame> inference_frame(m, "inference_frame", "Extends the frame class with attributes inferred from the frame content, such as object detection results.");
+    inference_frame.def(py::init<rs2::frame>());
+
+    py::class_<rs2::object_detection_frame, rs2::inference_frame> object_detection_frame(m, "object_detection_frame", "Extends inference_frame class with additional object detection related attributes and functions.");
+    object_detection_frame.def(py::init<rs2::frame>())
+        .def("get_detection_count", &rs2::object_detection_frame::get_detection_count, "Get the number of detected objects in this frame")
+        .def("get_detection", &rs2::object_detection_frame::get_detection, "index"_a, "Get a specific detection by index");
+
     // TODO: Deprecate composite_frame, replace with frameset
     py::class_<rs2::frameset, rs2::frame> frameset(m, "composite_frame", "Extends the frame class with additional frameset related attributes and functions");
     frameset.def(py::init<rs2::frame>())
@@ -332,6 +361,7 @@ void init_frame(py::module &m) {
         .def("get_fisheye_frame", &rs2::frameset::get_fisheye_frame, "Retrieve the fisheye monochrome video frame", "index"_a = 0)
         .def("get_pose_frame", &rs2::frameset::get_pose_frame, "Retrieve the pose frame", "index"_a = 0)
         .def("get_labeled_point_cloud_frame", &rs2::frameset::get_labeled_point_cloud_frame, "Retrieve the labeled point cloud frame, if no frame is found, return an empty frame instance.")
+        .def("get_object_detection_frame", &rs2::frameset::get_object_detection_frame, "Retrieve the object detection frame, if no frame is found, return an empty frame instance.", "index"_a = 0)
         .def("__iter__", [](rs2::frameset& self) {
             return py::make_iterator(self.begin(), self.end());
         }, py::keep_alive<0, 1>())

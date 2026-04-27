@@ -217,7 +217,19 @@ namespace rs2
         std::shared_ptr<bag_conversion_helper> bag_converter = std::make_shared<bag_conversion_helper>();
         std::unordered_set<int> _hidden_options;
         bool _support_ir_reflectivity;
+
     private:
+        void get_frame_objects_container( rs2::frame & frame, std::shared_ptr< atomic_objects_in_frame > & objects );
+        rs2::rect project_color_bbox_to_depth( const rs2::rect &    color_bbox,
+                                               const uint16_t *     depth_data,
+                                               float                depth_scale,
+                                               const rs2_intrinsics & depth_intrin,
+                                               const rs2_intrinsics & color_intrin,
+                                               const rs2_extrinsics & color_to_depth,
+                                               const rs2_extrinsics & depth_to_color,
+                                               const rs2::rect &    depth_frame_rect );
+        static float sample_mean_depth( const rs2::depth_frame & df, const rs2::rect & depth_bbox );
+        void process_object_detection_frames( std::map< int, rs2::frame > & last_frames );
 
         void check_permissions();
         void hide_common_options();

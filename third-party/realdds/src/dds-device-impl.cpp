@@ -869,6 +869,7 @@ void dds_device::impl::on_stream_header( json const & j, dds_sample const & samp
     TYPE2STREAM( color, video )
     TYPE2STREAM( motion, motion )
     TYPE2STREAM( confidence, video )
+    TYPE2STREAM( object_detection, inference )
     DDS_THROW( runtime_error, "stream '" << stream_name << "' is of unknown type '" << stream_type << "'" );
 
 #undef TYPE2STREAM

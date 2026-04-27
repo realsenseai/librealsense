@@ -341,6 +341,21 @@ namespace rs2
         }
     };
 
+    class inference_stream_profile : public stream_profile
+    {
+    public:
+        explicit inference_stream_profile(const stream_profile& sp)
+            : stream_profile(sp)
+        {
+            rs2_error* e = nullptr;
+            if (!sp || (rs2_stream_profile_is(sp.get(), RS2_EXTENSION_INFERENCE_PROFILE, &e) == 0 && !e))
+            {
+                _profile = nullptr;
+            }
+            error::handle(e);
+        }
+    };
+
     /**
     Interface for frame filtering functionality
     */
@@ -1063,6 +1078,81 @@ namespace rs2
         }
     };
 
+    class inference_frame : public frame
+    {
+    public:
+        /**
+         * Extends the frame class with attributes inferred from the frame content, such as object detection results.
+         */
+        inference_frame() : frame()
+        {
+        }
+
+        /**
+         * Extends the frame class with attributes inferred from the frame content, such as object detection results.
+         * \param[in] frame - existing frame instance
+         */
+        inference_frame( const frame & f ) : frame( f )
+        {
+            rs2_error * e = nullptr;
+            if( ! f || ( rs2_is_frame_extendable_to( f.get(), RS2_EXTENSION_INFERENCE_FRAME, &e ) == 0 && ! e ) )
+            {
+                reset();
+            }
+            error::handle( e );
+        }
+    };
+
+    class object_detection_frame : public inference_frame
+    {
+    public:
+        /**
+        * Extends inference_frame class with additional object detection related attributes and functions
+        */
+        object_detection_frame() : inference_frame() {}
+
+        /**
+        * Extends inference_frame class with additional object detection related attributes and functions
+        * \param[in] frame - existing frame instance
+        */
+        object_detection_frame(const frame& f)
+            : inference_frame(f)
+        {
+            rs2_error* e = nullptr;
+            if (!f || (rs2_is_frame_extendable_to(f.get(), RS2_EXTENSION_OBJECT_DETECTION_FRAME, &e) == 0 && !e))
+            {
+                reset();
+            }
+            error::handle(e);
+        }
+
+        /**
+        * Get the number of detected objects in this frame
+        * \return unsigned int - number of detections
+        */
+        unsigned int get_detection_count() const
+        {
+            rs2_error* e = nullptr;
+            auto r = rs2_get_frame_object_detection_count(get(), &e);
+            error::handle(e);
+            return r;
+        }
+
+        /**
+        * Get a specific detection by index
+        * \param[in] index - zero-based index of the detection
+        * \return rs2_object_detection - the detection at the specified index
+        */
+        rs2_object_detection get_detection(unsigned int index) const
+        {
+            rs2_object_detection detection;
+            rs2_error* e = nullptr;
+            rs2_get_frame_object_detection(get(), index, &detection, &e);
+            error::handle(e);
+            return detection;
+        }
+    };
+
     class frameset : public frame
     {
     public:
@@ -1230,6 +1320,28 @@ namespace rs2
                 });
             }
             return f.as<pose_frame>();
+        }
+
+        /**
+        * Retrieve the object detection frame
+        * \param[in] size_t index
+        * \return object_detection_frame - the detected objects data
+        */
+        object_detection_frame get_object_detection_frame(const size_t index = 0) const
+        {
+            frame f;
+            if (!index)
+            {
+                f = first_or_default(RS2_STREAM_OBJECT_DETECTION);
+            }
+            else
+            {
+                foreach_rs([&f, index](const frame& frm) {
+                    if (frm.get_profile().stream_type() == RS2_STREAM_OBJECT_DETECTION &&
+                        frm.get_profile().stream_index() == index) f = frm;
+                });
+            }
+            return f.as<object_detection_frame>();
         }
 
         /**

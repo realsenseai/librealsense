@@ -7,6 +7,7 @@
 #include <realdds/dds-topic-reader-thread.h>
 #include <realdds/dds-subscriber.h>
 #include <realdds/topics/compressed-image-msg.h>
+#include <realdds/topics/string-msg.h>
 #include <realdds/topics/image-msg.h>
 #include <realdds/topics/imu-msg.h>
 #include <realdds/topics/flexible-msg.h>
@@ -72,6 +73,24 @@ void dds_motion_stream::open( std::string const & topic_name, std::shared_ptr< d
 }
 
 
+void dds_inference_stream::open( std::string const & topic_name, std::shared_ptr< dds_subscriber > const & subscriber )
+{
+    if( is_open() )
+        DDS_THROW( runtime_error, "stream '" + name() + "' is already open" );
+    if( profiles().empty() )
+        DDS_THROW( runtime_error, "stream '" + name() + "' has no profiles" );
+
+    // Topics with same name and type can be created multiple times (multiple open() calls) without an error.
+    auto topic = topics::string_msg::create_topic( subscriber->get_participant(), topic_name.c_str() );
+
+    // To support automatic streaming (without the need to handle start/stop-streaming commands) the reader is created
+    // here and destroyed on close()
+    _reader = std::make_shared< dds_topic_reader_thread >( topic, subscriber );
+    _reader->on_data_available( [this]() { handle_data(); } );
+    _reader->run( dds_topic_reader::qos( eprosima::fastdds::dds::BEST_EFFORT_RELIABILITY_QOS ) );  // no retries
+}
+
+
 void dds_stream::close()
 {
     if( _reader )
@@ -110,6 +129,18 @@ void dds_motion_stream::handle_data()
     {
         if( is_streaming() && _on_data_available )
             _on_data_available( std::move( imu ), std::move( sample ) );
+    }
+}
+
+
+void dds_inference_stream::handle_data()
+{
+    topics::string_msg msg;
+    dds_sample sample;
+    while( _reader && topics::string_msg::take_next( *_reader, &msg, &sample ) )
+    {
+        if( is_streaming() && _on_data_available )
+            _on_data_available( std::move( msg ), std::move( sample ) );
     }
 }
 
@@ -159,6 +190,19 @@ dds_confidence_stream::dds_confidence_stream( std::string const & stream_name, s
 
 
 dds_motion_stream::dds_motion_stream( std::string const & stream_name, std::string const & sensor_name )
+    : super( stream_name, sensor_name )
+{
+}
+
+
+dds_inference_stream::dds_inference_stream( std::string const & stream_name, std::string const & sensor_name )
+    : super( stream_name, sensor_name )
+{
+}
+
+
+dds_object_detection_stream::dds_object_detection_stream( std::string const & stream_name,
+                                                          std::string const & sensor_name )
     : super( stream_name, sensor_name )
 {
 }

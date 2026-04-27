@@ -11,6 +11,8 @@
 #include <src/composite-frame.h>
 #include <src/points.h>
 #include <src/labeled-points.h>
+#include <src/inference-frame.h>
+#include <src/object-detection-frame.h>
 
 
 namespace librealsense
@@ -45,6 +47,12 @@ namespace librealsense
 
         case RS2_EXTENSION_LABELED_POINTS:
             return std::make_shared<frame_archive<labeled_points>>(in_max_frame_queue_size, parsers);
+
+        case RS2_EXTENSION_INFERENCE_FRAME:
+            return std::make_shared< frame_archive< inference_frame > >( in_max_frame_queue_size, parsers );
+
+        case RS2_EXTENSION_OBJECT_DETECTION_FRAME:
+                return std::make_shared< frame_archive< object_detection_frame > >( in_max_frame_queue_size, parsers );
 
         default:
             throw std::runtime_error("Requested frame type is not supported!");

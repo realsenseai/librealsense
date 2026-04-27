@@ -55,6 +55,7 @@ namespace librealsense {
 
     static constexpr const double SECONDS_TO_MILLISEC  = 1000.0;
     static constexpr const double MILLISEC_TO_MICROSEC = 1000.0;
+    static constexpr const double MILLISEC_TO_SECONDS  = 0.001;
     static constexpr const double MICROSEC_TO_MILLISEC = 0.001;
 
     ///////////////////////////////////

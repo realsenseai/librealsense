@@ -25,8 +25,10 @@ class dds_stream;
 class dds_option;
 class dds_video_stream_profile;
 class dds_motion_stream_profile;
+class dds_inference_stream;
 namespace topics {
 class imu_msg;
+class string_msg;
 }  // namespace topics
 }  // namespace realdds
 
@@ -93,6 +95,7 @@ public:
     void set_frames_callback( rs2_frame_callback_sptr callback ) override;
     rs2_frame_callback_sptr get_frames_callback() const override;
 
+
     // sensor_interface
 public:
     rsutils::subscription register_options_changed_callback( options_watcher::callback && ) override;
@@ -110,8 +113,8 @@ protected:
     std::shared_ptr< realdds::dds_video_stream_profile >
     find_profile( sid_index sidx, realdds::dds_video_stream_profile const & profile ) const;
 
-    std::shared_ptr< realdds::dds_motion_stream_profile >
-    find_profile( sid_index sidx, realdds::dds_motion_stream_profile const & profile ) const;
+    std::shared_ptr< realdds::dds_stream_profile >
+    find_profile( sid_index sidx, realdds::dds_stream_profile const & profile ) const;
 
     realdds::dds_stream_profiles find_dds_profiles( const librealsense::stream_profiles & source_profiles ) const;
 
@@ -126,6 +129,10 @@ protected:
                              streaming_impl & );
     void handle_new_metadata( std::string const & stream_name,
                               std::shared_ptr< const rsutils::json > const & metadata );
+    void handle_inference_data( realdds::topics::string_msg &&,
+                                realdds::dds_sample &&,
+                                const std::shared_ptr< stream_profile_interface > &,
+                                streaming_impl & );
 
     virtual void add_no_metadata( frame *, streaming_impl & );
     virtual void add_frame_metadata( frame *, rsutils::json const & metadata, streaming_impl & );
