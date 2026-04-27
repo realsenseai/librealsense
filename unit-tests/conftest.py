@@ -502,3 +502,26 @@ def test_devices(test_context, module_device_setup):
 def test_context_var():
     """Expose the --context tags (e.g. ['nightly', 'weekly']) so tests can branch on them."""
     return context_list
+
+
+@pytest.fixture
+def device_in_service_mode(test_device):
+    """Like test_device, but puts D585S into service mode for the duration of the test.
+
+    Many option-setting operations on D585S require service mode. No-op for all other
+    device families.
+    """
+    dev, ctx = test_device
+    is_d585s = dev.supports(rs.camera_info.name) and "D585S" in dev.get_info(rs.camera_info.name)
+    if is_d585s:
+        safety_sensor = dev.first_safety_sensor()
+        safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.service)
+        # Will throw on failure to get sensor or set option, this is intentional so we won't return a device and fail the calling test.
+    yield dev, ctx
+    if is_d585s:
+        try:
+            safety_sensor = dev.first_safety_sensor()
+            safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.run)
+        except Exception as e:
+            # Don't throw on cleanup failure, to not mask test failures and also after test device is usually reset.
+            log.error(f"Cleanup failed: could not set safety_mode back to run: {e}")
