@@ -62,6 +62,7 @@ app_config_json_str = '''
         "depth_roi": 0,
         "ir_for_sip": 0,
         "peripherals_sensors_disable_mask": 0,
+        "hw_configuration_setup": 0,
         "digital_signature": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 	}
 }

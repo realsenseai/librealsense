@@ -169,12 +169,14 @@ def generate_depth_sign_features():
     depth_roi = 0
     ir_for_sip = 0
     peripherals_sensors_disable_mask = to_np_array(0, 2)
-    reserved3 = to_np_array(0, 265)
+    hw_configuration_setup = np.array([0], dtype=np.uint8)
+    reserved3 = to_np_array(0, 264)
     digital_signature = to_np_array(0, 32)
 
     ds_1 = np.asarray([depth_pipeline_config, depth_roi, ir_for_sip], dtype=np.uint8)
     ds_2 = np.hstack((ds_1, peripherals_sensors_disable_mask))
-    ds_3 = np.hstack((ds_2, reserved3))
+    ds_2b = np.hstack((ds_2, hw_configuration_setup))
+    ds_3 = np.hstack((ds_2b, reserved3))
     ds_4 = np.hstack((ds_3, digital_signature))
 
     return ds_4
@@ -204,7 +206,7 @@ def set_app_config_table(app_config_table):
     flash_mem_enum = 1
     app_config_id = 0xc0de
     d500_dynamic = 0
-    version_array = np.array([1, 0])
+    version_array = np.array([1, 2])
     header = build_header(app_config_table, app_config_id, version_array)
     table_with_header = np.hstack((header, app_config_table))
     cmd = hwm_dev.build_command(opcode=set_table_opcode,

@@ -117,10 +117,10 @@ valid_sic_table_as_json_str = """
         },
         "occupancy_grid_params":
         {
-            "grid_cell_seed" : 70,
-            "close_range_quorum" : 98 ,
-            "mid_range_quorum" : 16,
-            "long_range_quorum" : 8
+            "grid_cell_size" : 70,
+            "cell_threshold_factor" : 1.0,
+            "polynomial_bias" : 0.0,
+            "surface_height" : 0.05
         },
         "smcu_arbitration_params":
         {
@@ -142,7 +142,7 @@ valid_sic_table_as_json_str = """
 def change_config(sic_table_as_json_str):
   sic_as_json_object = json.loads(sic_table_as_json_str)
   sic_as_json_object["safety_interface_config"]["smcu_arbitration_params"]["l_0_total_threshold"] = 90
-  sic_as_json_object["safety_interface_config"]["occupancy_grid_params"]["mid_range_quorum"] = 7
+  sic_as_json_object["safety_interface_config"]["occupancy_grid_params"]["cell_threshold_factor"] = 1.5
   return json.dumps(sic_as_json_object)
 
 #############################################################################################

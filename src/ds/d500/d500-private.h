@@ -116,6 +116,8 @@ namespace librealsense
             safety_interface_cfg_id = 0xc0dc,
             calib_cfg_id = 0xc0dd,
             app_config_table_id = 0xc0de,
+            frame_sequence_id = 0xc0e0,
+            projector_laser_id = 0xc0e8,
             max_id = -1
         };
 

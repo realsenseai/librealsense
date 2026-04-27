@@ -328,8 +328,8 @@ namespace librealsense
     };
 
     /***
-     * Application Config Table (according to flash0.92 specs)
-     * Version:    0x01 0x01 (major.minor)
+     * Application Config Table (according to flash0.95 specs)
+     * Version:    0x01 0x02 (major.minor)
      * Table type: 0xC0DE (ctAppConfig)
      * Table size: 464 (bytes)
      *
@@ -389,6 +389,10 @@ namespace librealsense
      *                 0 - 1280x720 (Default)
      *                 1 - 640x360
      *         peripherals_sensors_disable_mask
+     *         hw_configuration_setup (uint8_t, Feat #16): HW platform selector
+     *             0 = nominal (default)
+     *             1 = Pixter MIPI injection
+     *             2 = RVP dev board
      *         reserved3[264]: zero-ed
      *             S.MCU specific inhibitor, allows to ignore errors (L1-L3) originated 
      *             by the underlying sensor in Operational state : threshold exceeded/invalid data/no data arriving.
@@ -427,6 +431,7 @@ namespace librealsense
             m_depth_roi = j["depth_roi"];
             m_ir_for_sip = j["ir_for_sip"];
             m_peripherals_sensors_disable_mask = j["peripherals_sensors_disable_mask"];
+            m_hw_configuration_setup = j["hw_configuration_setup"].get<uint8_t>();
 
             std::vector<uint8_t> digital_signature_vec = j["digital_signature"].get<std::vector<uint8_t>>();
             std::memcpy(m_digital_signature, digital_signature_vec.data(), digital_signature_vec.size());
@@ -450,6 +455,7 @@ namespace librealsense
             app_config_json["depth_roi"] = m_depth_roi;
             app_config_json["ir_for_sip"] = m_ir_for_sip;
             app_config_json["peripherals_sensors_disable_mask"] = m_peripherals_sensors_disable_mask;
+            app_config_json["hw_configuration_setup"] = m_hw_configuration_setup;
             app_config_json["digital_signature"] = native_arr_to_std_vector(m_digital_signature);
             return j;
         }
@@ -471,7 +477,8 @@ namespace librealsense
         uint8_t m_depth_roi;
         uint8_t m_ir_for_sip;
         uint16_t m_peripherals_sensors_disable_mask;
-        uint8_t m_reserved3[265] = {0};
+        uint8_t m_hw_configuration_setup = 0;
+        uint8_t m_reserved3[264] = {0};
         uint8_t m_digital_signature[32];
 
         void validate_json(const json &j) const
@@ -486,6 +493,7 @@ namespace librealsense
                    validate_json_field<uint8_t>(j, "depth_roi") ;
                    validate_json_field<uint8_t>(j, "ir_for_sip") ;
                    validate_json_field<uint16_t>(j, "peripherals_sensors_disable_mask") ;
+                   validate_json_field<uint8_t>(j, "hw_configuration_setup") ;
                    validate_json_field<std::vector<uint8_t>>(j, "digital_signature", 32);
         }
     };
