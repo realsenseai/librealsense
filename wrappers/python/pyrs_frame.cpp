@@ -361,7 +361,7 @@ void init_frame(py::module &m) {
         .def("get_fisheye_frame", &rs2::frameset::get_fisheye_frame, "Retrieve the fisheye monochrome video frame", "index"_a = 0)
         .def("get_pose_frame", &rs2::frameset::get_pose_frame, "Retrieve the pose frame", "index"_a = 0)
         .def("get_labeled_point_cloud_frame", &rs2::frameset::get_labeled_point_cloud_frame, "Retrieve the labeled point cloud frame, if no frame is found, return an empty frame instance.")
-        .def("get_object_detection_frame", &rs2::frameset::get_object_detection_frame, "Retrieve the object detection frame, if no frame is found, return an empty frame instance.")
+        .def("get_object_detection_frame", &rs2::frameset::get_object_detection_frame, "Retrieve the object detection frame, if no frame is found, return an empty frame instance.", "index"_a = 0)
         .def("__iter__", [](rs2::frameset& self) {
             return py::make_iterator(self.begin(), self.end());
         }, py::keep_alive<0, 1>())
