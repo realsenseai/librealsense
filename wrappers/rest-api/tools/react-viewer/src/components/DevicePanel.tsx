@@ -194,6 +194,7 @@ export function DevicePanel() {
                 onStartSensorStreaming={(sensorId) => startSensorStreaming(device.device_id, sensorId)}
                 onStopSensorStreaming={(sensorId) => stopSensorStreaming(device.device_id, sensorId)}
                 onCheckFirmwareUpdates={() => checkFirmwareUpdates(device.device_id)}
+                onShowToast={addToast}
                 onUpdateFirmware={() => {
                   setFirmwareProgressDeviceId(device.device_id)
                   // Initialize progress state with progress at 0 and clear any previous errors
@@ -261,13 +262,14 @@ interface DeviceCardProps {
   onStopSensorStreaming: (sensorId: string) => void
   onCheckFirmwareUpdates: () => void
   onUpdateFirmware: () => void
+  onShowToast: (type: ToastType, message: string) => void
 }
 
-function DeviceCard({ 
-  device, 
-  deviceState, 
-  onToggle, 
-  onReset, 
+function DeviceCard({
+  device,
+  deviceState,
+  onToggle,
+  onReset,
   onUpdateStreamConfig,
   onUpdateSensorConfig,
   onSetOption,
@@ -275,11 +277,11 @@ function DeviceCard({
   onStopSensorStreaming,
   onCheckFirmwareUpdates,
   onUpdateFirmware,
+  onShowToast,
 }: DeviceCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [expandedSensor, setExpandedSensor] = useState<string | null>(null)
-  const [showDismissMenu, setShowDismissMenu] = useState(false)
-  
+
   const isActive = deviceState?.isActive || false
   const isLoading = deviceState?.isLoading || false
   const isStreaming = deviceState?.isStreaming || false
@@ -289,7 +291,7 @@ function DeviceCard({
   const sensorConfigs = deviceState?.sensorConfigs || {}
   const streamingMode = deviceState?.streamingMode || 'idle'
   const sensorStreamingStatus = deviceState?.sensorStreamingStatus || {}
-  
+
   // Group stream configs by sensor
   const streamsBySensor: Record<string, StreamConfig[]> = {}
   for (const config of streamConfigs) {
@@ -309,28 +311,9 @@ function DeviceCard({
     last_error: null,
   }
 
-  // Check if FW update has been dismissed
+  // Clear dismiss so the banner re-appears when user explicitly checks from the hamburger menu
   const dismissKey = `fw-dismiss-${device.device_id}-${firmware.recommended}`
-  const dismissData = localStorage.getItem(dismissKey)
-  const isDismissed = dismissData === 'forever'
-  const isRemindLater = dismissData ? new Date(dismissData).getTime() > Date.now() : false
-
-  const showFirmwareUpdate = firmware.status === 'outdated' && !isDismissed && !isRemindLater
-  const showMissingFirmware = firmware.status === 'missing_file'
-
-  const handleDismiss = (mode: 'later' | 'forever') => {
-    if (mode === 'forever') {
-      localStorage.setItem(dismissKey, 'forever')
-    } else {
-      // Remind in 7 days
-      const remindDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      localStorage.setItem(dismissKey, remindDate.toISOString())
-    }
-    setShowDismissMenu(false)
-  }
-
   const handleCheckFirmwareUpdates = () => {
-    // Clear any existing dismissal state so the banner appears if update is available
     localStorage.removeItem(dismissKey)
     onCheckFirmwareUpdates()
   }
@@ -382,8 +365,7 @@ function DeviceCard({
                     <button
                       onClick={() => {
                         setShowMenu(false)
-                        // TODO: Implement calibration
-                        alert('Calibration feature coming soon')
+                        onShowToast('info', 'Calibration feature coming soon')
                       }}
                       className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
                     >
@@ -395,8 +377,7 @@ function DeviceCard({
                     <button
                       onClick={() => {
                         setShowMenu(false)
-                        // TODO: Implement tare calibration
-                        alert('Tare calibration feature coming soon')
+                        onShowToast('info', 'Tare calibration feature coming soon')
                       }}
                       className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
                     >
@@ -458,80 +439,12 @@ function DeviceCard({
         </div>
 
         {/* Firmware status / update */}
-        {showFirmwareUpdate && (
-          <div className="mt-2 p-2 bg-amber-900/40 border border-amber-600 rounded text-amber-200 text-xs">
-            <div className="flex items-start gap-2">
-              <div className="flex-1">
-                <div className="font-semibold text-amber-100">Firmware update available</div>
-                <div className="text-amber-50/90">
-                  Current: {firmware.current || 'Unknown'} · Recommended: {firmware.recommended || 'Unknown'}
-                </div>
-                {!firmware.file_available && (
-                  <div className="text-amber-300 mt-1">FW update needed but bundled file not found (debug message)</div>
-                )}
-                {firmware.last_error && (
-                  <div className="text-red-200 mt-1">{firmware.last_error}</div>
-                )}
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={onUpdateFirmware}
-                  disabled={isStreaming || firmware.is_updating || !firmware.file_available}
-                  className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
-                    isStreaming || firmware.is_updating || !firmware.file_available
-                      ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                      : 'bg-amber-500 hover:bg-amber-400 text-black'
-                  }`}
-                >
-                  {firmware.is_updating ? 'Updating…' : 'Install update'}
-                </button>
-                <div className="relative">
-                  <button
-                    onClick={() => setShowDismissMenu(!showDismissMenu)}
-                    className="p-1 hover:bg-amber-800 rounded transition-colors"
-                    title="Dismiss"
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                  {showDismissMenu && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setShowDismissMenu(false)} />
-                      <div className="absolute right-0 mt-1 w-40 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-20 py-1">
-                        <button
-                          onClick={() => handleDismiss('later')}
-                          className="w-full px-3 py-2 text-left text-xs hover:bg-gray-700 transition-colors"
-                        >
-                          Remind me later
-                        </button>
-                        <button
-                          onClick={() => handleDismiss('forever')}
-                          className="w-full px-3 py-2 text-left text-xs hover:bg-gray-700 transition-colors"
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showMissingFirmware && !showFirmwareUpdate && (
-          <div className="mt-2 p-2 bg-amber-900/40 border border-amber-600 rounded text-amber-200 text-xs">
-            <div className="font-semibold text-amber-100">FW update needed but bundled file not found (debug message)</div>
-            <div>Current: {firmware.current || 'Unknown'} · Recommended: {firmware.recommended || 'Unknown'}</div>
-          </div>
-        )}
-
-        {firmware.is_updating && (
-          <div className="mt-2 text-xs text-blue-200">
-            Updating firmware... {Math.round((firmware.progress || 0) * 100)}%
-          </div>
-        )}
+        <FirmwareBanner
+          device={device}
+          firmware={firmware}
+          isStreaming={isStreaming}
+          onUpdateFirmware={onUpdateFirmware}
+        />
 
         {/* Device Details */}
         <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-500">
@@ -578,157 +491,17 @@ function DeviceCard({
             </div>
             
             {/* Stream configs grouped by sensor */}
-            <div className="space-y-3">
-              {sensors.map((sensor) => {
-                const sensorStreamConfigs = streamsBySensor[sensor.sensor_id] || []
-                if (sensorStreamConfigs.length === 0) return null
-                
-                const sensorStatus = sensorStreamingStatus[sensor.sensor_id]
-                const isSensorStreaming = sensorStatus?.is_streaming || false
-                const isSensorPending = sensorStatus?.pendingOp === 'stopping'
-                const sensorError = sensorStatus?.error
-                const hasEnabledSensorStreams = sensorStreamConfigs.some(c => c.enable)
-                const sensorConfig = sensorConfigs[sensor.sensor_id]
-                
-                // Per-sensor button: disabled if pipeline mode active, or no streams enabled
-                const canStartSensor = hasEnabledSensorStreams && streamingMode !== 'pipeline'
-                
-                // Compute intersection of resolutions/FPS across all stream profiles on this sensor
-                // All streams must use the same resolution/FPS when opened together
-                const computeCommonOptions = () => {
-                  const profiles = sensor.supported_stream_profiles
-                  if (profiles.length === 0) return { resolutions: [], fps: [] }
-                  
-                  // Start with first profile's options
-                  let commonResolutions = new Set(
-                    profiles[0].resolutions.map(([w, h]) => `${w}x${h}`)
-                  )
-                  let commonFps = new Set(profiles[0].fps)
-                  
-                  // Intersect with each subsequent profile
-                  for (let i = 1; i < profiles.length; i++) {
-                    const profileRes = new Set(
-                      profiles[i].resolutions.map(([w, h]) => `${w}x${h}`)
-                    )
-                    const profileFps = new Set(profiles[i].fps)
-                    
-                    commonResolutions = new Set(
-                      [...commonResolutions].filter(r => profileRes.has(r))
-                    )
-                    commonFps = new Set(
-                      [...commonFps].filter(f => profileFps.has(f))
-                    )
-                  }
-                  
-                  // Convert back to arrays
-                  const resolutions: [number, number][] = [...commonResolutions].map(r => {
-                    const [w, h] = r.split('x').map(Number)
-                    return [w, h] as [number, number]
-                  })
-                  const fps = [...commonFps].sort((a, b) => a - b)
-                  
-                  return { resolutions, fps }
-                }
-                
-                const { resolutions: availableResolutions, fps: availableFps } = computeCommonOptions()
-                
-                return (
-                  <div key={sensor.sensor_id} className="bg-gray-800/50 rounded-lg p-2">
-                    {/* Sensor header with per-sensor start button */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-300">{sensor.name}</span>
-                        {isSensorStreaming && (
-                          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                        )}
-                      </div>
-                      {/* Per-sensor start/stop button */}
-                      <button
-                        onClick={() => isSensorStreaming 
-                          ? onStopSensorStreaming(sensor.sensor_id) 
-                          : onStartSensorStreaming(sensor.sensor_id)
-                        }
-                        disabled={isSensorPending || (!canStartSensor && !isSensorStreaming)}
-                        data-testid={isSensorStreaming ? "stop-streaming" : "start-streaming"}
-                        title={streamingMode === 'pipeline' ? 'Stop all streams first' : isSensorPending ? 'Stopping...' : isSensorStreaming ? 'Stop' : 'Start'}
-                        className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                          isSensorPending
-                            ? 'bg-yellow-600 text-white cursor-wait'
-                            : isSensorStreaming
-                              ? 'bg-red-600 hover:bg-red-700 text-white'
-                              : canStartSensor
-                                ? 'bg-green-600/80 hover:bg-green-600 text-white'
-                                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                        }`}
-                      >
-                        <span className="sr-only">{isSensorStreaming ? 'Stop' : 'Start'}</span>
-                        {isSensorPending ? '⏳' : isSensorStreaming ? '■' : '▶'}
-                      </button>
-                    </div>
-                    
-                    {/* Inline error for this sensor */}
-                    {sensorError && (
-                      <div className="mb-2 text-xs text-red-400 bg-red-900/30 rounded px-2 py-1">
-                        {sensorError}
-                      </div>
-                    )}
-                    
-                    {/* Per-sensor Resolution/FPS controls - hidden for motion sensors (they use per-stream FPS) */}
-                    {sensorConfig && !sensorConfig.isMotionSensor && (
-                      <div className="mb-2 flex items-center gap-2 text-xs">
-                        <div className="flex items-center gap-1">
-                          <label className="text-gray-500">Res:</label>
-                          <select
-                            value={`${sensorConfig.resolution.width}x${sensorConfig.resolution.height}`}
-                            onChange={(e) => {
-                              const [width, height] = e.target.value.split('x').map(Number)
-                              onUpdateSensorConfig(sensor.sensor_id, { resolution: { width, height } })
-                            }}
-                            disabled={streamingMode === 'pipeline' || isSensorStreaming}
-                            className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
-                          >
-                            {availableResolutions.map(([w, h]) => (
-                              <option key={`${w}x${h}`} value={`${w}x${h}`}>
-                                {w}×{h}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <label className="text-gray-500">FPS:</label>
-                          <select
-                            value={sensorConfig.framerate}
-                            onChange={(e) => onUpdateSensorConfig(sensor.sensor_id, { framerate: Number(e.target.value) })}
-                            disabled={streamingMode === 'pipeline' || isSensorStreaming}
-                            className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
-                          >
-                            {availableFps.map((fps) => (
-                              <option key={fps} value={fps}>
-                                {fps}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Stream configs for this sensor (format only for video, format + FPS for motion) */}
-                    <div className="space-y-1">
-                      {sensorStreamConfigs.map((config) => (
-                        <StreamConfigItem
-                          key={`${config.sensor_id}-${config.stream_type}`}
-                          config={config}
-                          sensors={sensors}
-                          onUpdate={onUpdateStreamConfig}
-                          disabled={streamingMode === 'pipeline' || isSensorStreaming}
-                          isMotionSensor={sensorConfig?.isMotionSensor ?? false}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <SensorStreamControls
+              sensors={sensors}
+              streamsBySensor={streamsBySensor}
+              streamingMode={streamingMode}
+              sensorStreamingStatus={sensorStreamingStatus}
+              sensorConfigs={sensorConfigs}
+              onUpdateStreamConfig={onUpdateStreamConfig}
+              onUpdateSensorConfig={onUpdateSensorConfig}
+              onStartSensorStreaming={onStartSensorStreaming}
+              onStopSensorStreaming={onStopSensorStreaming}
+            />
           </div>
 
           {/* Camera Controls */}
@@ -749,6 +522,272 @@ function DeviceCard({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+interface FirmwareBannerProps {
+  device: DeviceInfo
+  firmware: FirmwareState
+  isStreaming: boolean
+  onUpdateFirmware: () => void
+}
+
+function FirmwareBanner({ device, firmware, isStreaming, onUpdateFirmware }: FirmwareBannerProps) {
+  const [showDismissMenu, setShowDismissMenu] = useState(false)
+
+  const dismissKey = `fw-dismiss-${device.device_id}-${firmware.recommended}`
+  const dismissData = localStorage.getItem(dismissKey)
+  const isDismissed = dismissData === 'forever'
+  const isRemindLater = dismissData ? new Date(dismissData).getTime() > Date.now() : false
+
+  const showFirmwareUpdate = firmware.status === 'outdated' && !isDismissed && !isRemindLater
+  const showMissingFirmware = firmware.status === 'missing_file'
+
+  const handleDismiss = (mode: 'later' | 'forever') => {
+    if (mode === 'forever') {
+      localStorage.setItem(dismissKey, 'forever')
+    } else {
+      const remindDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      localStorage.setItem(dismissKey, remindDate.toISOString())
+    }
+    setShowDismissMenu(false)
+  }
+
+  return (
+    <>
+      {showFirmwareUpdate && (
+        <div className="mt-2 p-2 bg-amber-900/40 border border-amber-600 rounded text-amber-200 text-xs">
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <div className="font-semibold text-amber-100">Firmware update available</div>
+              <div className="text-amber-50/90">
+                Current: {firmware.current || 'Unknown'} · Recommended: {firmware.recommended || 'Unknown'}
+              </div>
+              {!firmware.file_available && (
+                <div className="text-amber-300 mt-1">FW update needed but bundled file not found (debug message)</div>
+              )}
+              {firmware.last_error && (
+                <div className="text-red-200 mt-1">{firmware.last_error}</div>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onUpdateFirmware}
+                disabled={isStreaming || firmware.is_updating || !firmware.file_available}
+                className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                  isStreaming || firmware.is_updating || !firmware.file_available
+                    ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                    : 'bg-amber-500 hover:bg-amber-400 text-black'
+                }`}
+              >
+                {firmware.is_updating ? 'Updating…' : 'Install update'}
+              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowDismissMenu(!showDismissMenu)}
+                  className="p-1 hover:bg-amber-800 rounded transition-colors"
+                  title="Dismiss"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                {showDismissMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowDismissMenu(false)} />
+                    <div className="absolute right-0 mt-1 w-40 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-20 py-1">
+                      <button
+                        onClick={() => handleDismiss('later')}
+                        className="w-full px-3 py-2 text-left text-xs hover:bg-gray-700 transition-colors"
+                      >
+                        Remind me later
+                      </button>
+                      <button
+                        onClick={() => handleDismiss('forever')}
+                        className="w-full px-3 py-2 text-left text-xs hover:bg-gray-700 transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMissingFirmware && !showFirmwareUpdate && (
+        <div className="mt-2 p-2 bg-amber-900/40 border border-amber-600 rounded text-amber-200 text-xs">
+          <div className="font-semibold text-amber-100">FW update needed but bundled file not found (debug message)</div>
+          <div>Current: {firmware.current || 'Unknown'} · Recommended: {firmware.recommended || 'Unknown'}</div>
+        </div>
+      )}
+
+      {firmware.is_updating && (
+        <div className="mt-2 text-xs text-blue-200">
+          Updating firmware... {Math.round((firmware.progress || 0) * 100)}%
+        </div>
+      )}
+    </>
+  )
+}
+
+interface SensorStreamControlsProps {
+  sensors: SensorInfo[]
+  streamsBySensor: Record<string, StreamConfig[]>
+  streamingMode: string
+  sensorStreamingStatus: Record<string, { is_streaming: boolean; pendingOp?: string | null; error?: string }>
+  sensorConfigs: Record<string, SensorConfig>
+  onUpdateStreamConfig: (config: StreamConfig) => void
+  onUpdateSensorConfig: (sensorId: string, config: Partial<SensorConfig>) => void
+  onStartSensorStreaming: (sensorId: string) => void
+  onStopSensorStreaming: (sensorId: string) => void
+}
+
+function SensorStreamControls({
+  sensors,
+  streamsBySensor,
+  streamingMode,
+  sensorStreamingStatus,
+  sensorConfigs,
+  onUpdateStreamConfig,
+  onUpdateSensorConfig,
+  onStartSensorStreaming,
+  onStopSensorStreaming,
+}: SensorStreamControlsProps) {
+  return (
+    <div className="space-y-3">
+      {sensors.map((sensor) => {
+        const sensorStreamConfigs = streamsBySensor[sensor.sensor_id] || []
+        if (sensorStreamConfigs.length === 0) return null
+
+        const sensorStatus = sensorStreamingStatus[sensor.sensor_id]
+        const isSensorStreaming = sensorStatus?.is_streaming || false
+        const isSensorPending = sensorStatus?.pendingOp === 'stopping'
+        const sensorError = sensorStatus?.error
+        const hasEnabledSensorStreams = sensorStreamConfigs.some(c => c.enable)
+        const sensorConfig = sensorConfigs[sensor.sensor_id]
+
+        const canStartSensor = hasEnabledSensorStreams && streamingMode !== 'pipeline'
+
+        const computeCommonOptions = () => {
+          const profiles = sensor.supported_stream_profiles
+          if (profiles.length === 0) return { resolutions: [], fps: [] }
+
+          let commonResolutions = new Set(profiles[0].resolutions.map(([w, h]) => `${w}x${h}`))
+          let commonFps = new Set(profiles[0].fps)
+
+          for (let i = 1; i < profiles.length; i++) {
+            const profileRes = new Set(profiles[i].resolutions.map(([w, h]) => `${w}x${h}`))
+            const profileFps = new Set(profiles[i].fps)
+            commonResolutions = new Set([...commonResolutions].filter(r => profileRes.has(r)))
+            commonFps = new Set([...commonFps].filter(f => profileFps.has(f)))
+          }
+
+          const resolutions: [number, number][] = [...commonResolutions].map(r => {
+            const [w, h] = r.split('x').map(Number)
+            return [w, h] as [number, number]
+          })
+          const fps = [...commonFps].sort((a, b) => a - b)
+          return { resolutions, fps }
+        }
+
+        const { resolutions: availableResolutions, fps: availableFps } = computeCommonOptions()
+
+        return (
+          <div key={sensor.sensor_id} className="bg-gray-800/50 rounded-lg p-2">
+            {/* Sensor header with per-sensor start button */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-300">{sensor.name}</span>
+                {isSensorStreaming && (
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                )}
+              </div>
+              <button
+                onClick={() => isSensorStreaming
+                  ? onStopSensorStreaming(sensor.sensor_id)
+                  : onStartSensorStreaming(sensor.sensor_id)
+                }
+                disabled={isSensorPending || (!canStartSensor && !isSensorStreaming)}
+                data-testid={isSensorStreaming ? "stop-streaming" : "start-streaming"}
+                title={streamingMode === 'pipeline' ? 'Stop all streams first' : isSensorPending ? 'Stopping...' : isSensorStreaming ? 'Stop' : 'Start'}
+                className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                  isSensorPending
+                    ? 'bg-yellow-600 text-white cursor-wait'
+                    : isSensorStreaming
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : canStartSensor
+                        ? 'bg-green-600/80 hover:bg-green-600 text-white'
+                        : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <span className="sr-only">{isSensorStreaming ? 'Stop' : 'Start'}</span>
+                {isSensorPending ? '⏳' : isSensorStreaming ? '■' : '▶'}
+              </button>
+            </div>
+
+            {sensorError && (
+              <div className="mb-2 text-xs text-red-400 bg-red-900/30 rounded px-2 py-1">
+                {sensorError}
+              </div>
+            )}
+
+            {sensorConfig && !sensorConfig.isMotionSensor && (
+              <div className="mb-2 flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-1">
+                  <label className="text-gray-500">Res:</label>
+                  <select
+                    value={`${sensorConfig.resolution.width}x${sensorConfig.resolution.height}`}
+                    onChange={(e) => {
+                      const [width, height] = e.target.value.split('x').map(Number)
+                      onUpdateSensorConfig(sensor.sensor_id, { resolution: { width, height } })
+                    }}
+                    disabled={streamingMode === 'pipeline' || isSensorStreaming}
+                    className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+                  >
+                    {availableResolutions.map(([w, h]) => (
+                      <option key={`${w}x${h}`} value={`${w}x${h}`}>
+                        {w}×{h}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <label className="text-gray-500">FPS:</label>
+                  <select
+                    value={sensorConfig.framerate}
+                    onChange={(e) => onUpdateSensorConfig(sensor.sensor_id, { framerate: Number(e.target.value) })}
+                    disabled={streamingMode === 'pipeline' || isSensorStreaming}
+                    className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+                  >
+                    {availableFps.map((fps) => (
+                      <option key={fps} value={fps}>
+                        {fps}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              {sensorStreamConfigs.map((config) => (
+                <StreamConfigItem
+                  key={`${config.sensor_id}-${config.stream_type}`}
+                  config={config}
+                  sensors={sensors}
+                  onUpdate={onUpdateStreamConfig}
+                  disabled={streamingMode === 'pipeline' || isSensorStreaming}
+                  isMotionSensor={sensorConfig?.isMotionSensor ?? false}
+                />
+              ))}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

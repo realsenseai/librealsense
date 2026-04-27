@@ -18,6 +18,75 @@ import type {
 // Map to track pending stop operations by "deviceId:sensorId" key
 // Used to await completion before allowing a new start
 const pendingStopPromises = new Map<string, Promise<void>>()
+
+function buildStreamConfigs(sensors: SensorInfo[]): StreamConfig[] {
+  const configs: StreamConfig[] = []
+  for (const sensor of sensors) {
+    const profiles = sensor.supported_stream_profiles.filter(
+      p => p.resolutions.length > 0 && p.fps.length > 0
+    )
+    for (const profile of profiles) {
+      const streamTypeLower = profile.stream_type.toLowerCase()
+      const enableByDefault = streamTypeLower === 'depth' || streamTypeLower === 'color'
+      configs.push({
+        sensor_id: sensor.sensor_id,
+        stream_type: profile.stream_type,
+        format: profile.formats[0] || 'rgb8',
+        resolution: {
+          width: profile.resolutions[0][0],
+          height: profile.resolutions[0][1],
+        },
+        framerate: profile.fps[0],
+        enable: enableByDefault,
+      })
+    }
+  }
+  return configs
+}
+
+function buildSensorConfigs(sensors: SensorInfo[]): Record<string, SensorConfig> {
+  const sensorConfigs: Record<string, SensorConfig> = {}
+  for (const sensor of sensors) {
+    const isMotionSensor = sensor.name.toLowerCase().includes('motion')
+    const profiles = sensor.supported_stream_profiles.filter(
+      p => p.resolutions.length > 0 && p.fps.length > 0
+    )
+
+    let commonResolutions = new Set<string>()
+    let commonFps = new Set<number>()
+    let isFirst = true
+
+    for (const profile of profiles) {
+      const profileRes = new Set<string>(profile.resolutions.map(([w, h]) => `${w}x${h}`))
+      const profileFps = new Set<number>(profile.fps)
+      if (isFirst) {
+        commonResolutions = profileRes
+        commonFps = profileFps
+        isFirst = false
+      } else {
+        commonResolutions = new Set<string>([...commonResolutions].filter(r => profileRes.has(r)))
+        commonFps = new Set<number>([...commonFps].filter(f => profileFps.has(f)))
+      }
+    }
+
+    if (commonResolutions.size > 0 && commonFps.size > 0) {
+      const firstCommonRes = [...commonResolutions][0]
+      const [width, height] = firstCommonRes.split('x').map(Number)
+      const sortedFps = [...commonFps].sort((a, b) => b - a)
+      let selectedFps = sortedFps[0]
+      if (commonFps.has(30)) selectedFps = 30
+      else if (commonFps.has(15)) selectedFps = 15
+      sensorConfigs[sensor.sensor_id] = { resolution: { width, height }, framerate: selectedFps, isMotionSensor }
+    } else if (sensor.supported_stream_profiles.length > 0) {
+      const firstProfile = sensor.supported_stream_profiles[0]
+      const width = firstProfile.resolutions[0]?.[0] || 320
+      const height = firstProfile.resolutions[0]?.[1] || 120
+      const selectedFps = firstProfile.fps[0] || 200
+      sensorConfigs[sensor.sensor_id] = { resolution: { width, height }, framerate: selectedFps, isMotionSensor }
+    }
+  }
+  return sensorConfigs
+}
 import { apiClient } from '../api/client'
 import {
   checkChatAvailability,
@@ -428,106 +497,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
     try {
       const sensors = await apiClient.getSensors(deviceId)
-      
-      // Build initial stream configs from sensor profiles
-      const configs: StreamConfig[] = []
+
       const optionsMap: Record<string, OptionInfo[]> = {}
-      const sensorConfigs: Record<string, SensorConfig> = {}
-      
       for (const sensor of sensors) {
-        // Store options from sensor response
         if (sensor.options && sensor.options.length > 0) {
           optionsMap[sensor.sensor_id] = sensor.options
         }
-        
-        // Compute intersection of resolutions/FPS across all stream profiles
-        // All streams on same sensor must use same resolution/FPS when opened together
-        const profiles = sensor.supported_stream_profiles.filter(
-          p => p.resolutions.length > 0 && p.fps.length > 0
-        )
-        
-        let commonResolutions: Set<string> = new Set<string>()
-        let commonFps: Set<number> = new Set<number>()
-        let isFirst = true
-        
-        for (const profile of profiles) {
-          const profileRes = new Set<string>(
-            profile.resolutions.map(([w, h]) => `${w}x${h}`)
-          )
-          const profileFps = new Set<number>(profile.fps)
-          
-          if (isFirst) {
-            commonResolutions = profileRes
-            commonFps = profileFps
-            isFirst = false
-          } else {
-            // Intersect
-            commonResolutions = new Set<string>(
-              [...commonResolutions].filter(r => profileRes.has(r))
-            )
-            commonFps = new Set<number>(
-              [...commonFps].filter(f => profileFps.has(f))
-            )
-          }
-          
-          // Enable depth and color streams by default for better UX
-          const streamTypeLower = profile.stream_type.toLowerCase()
-          const enableByDefault = streamTypeLower === 'depth' || streamTypeLower === 'color'
-          
-          configs.push({
-            sensor_id: sensor.sensor_id,
-            stream_type: profile.stream_type,
-            format: profile.formats[0] || 'rgb8',
-            resolution: {
-              width: profile.resolutions[0][0],
-              height: profile.resolutions[0][1],
-            },
-            framerate: profile.fps[0],
-            enable: enableByDefault,
-          })
-        }
-        
-        // Set sensor-level resolution/fps from common options
-        // Check if this is a motion sensor (gyro/accel use per-stream FPS)
-        const isMotionSensor = sensor.name.toLowerCase().includes('motion')
-        
-        if (commonResolutions && commonResolutions.size > 0 && commonFps && commonFps.size > 0) {
-          const firstCommonRes = [...commonResolutions][0]
-          const [width, height] = firstCommonRes.split('x').map(Number)
-          
-          // Pick a reasonable FPS: prefer 30, else 15, else highest available
-          const sortedFps = [...commonFps].sort((a, b) => b - a) // descending
-          let selectedFps = sortedFps[0] // default to highest
-          if (commonFps.has(30)) {
-            selectedFps = 30
-          } else if (commonFps.has(15)) {
-            selectedFps = 15
-          }
-          
-          sensorConfigs[sensor.sensor_id] = {
-            resolution: { width, height },
-            framerate: selectedFps,
-            isMotionSensor,
-          }
-        } else if (sensor.supported_stream_profiles.length > 0) {
-          // Fallback for sensors without common resolutions (e.g., motion sensors)
-          // Use first profile's resolution
-          const firstProfile = sensor.supported_stream_profiles[0]
-          const width = firstProfile.resolutions[0]?.[0] || 320
-          const height = firstProfile.resolutions[0]?.[1] || 120
-          
-          // For motion sensors, don't require common FPS - each stream uses its own
-          // Just pick a reasonable default for the sensor-level config (won't be used for motion)
-          const selectedFps = firstProfile.fps[0] || 200
-          
-          sensorConfigs[sensor.sensor_id] = {
-            resolution: { width, height },
-            framerate: selectedFps,
-            isMotionSensor,
-          }
-        }
       }
-      
+
+      const configs = buildStreamConfigs(sensors)
+      const sensorConfigs = buildSensorConfigs(sensors)
+
       set((state) => ({
         deviceStates: {
           ...state.deviceStates,

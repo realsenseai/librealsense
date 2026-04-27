@@ -21,6 +21,12 @@ from app.api.dependencies import get_realsense_manager
 router = APIRouter()
 
 
+def _handle_rs_exception(e: Exception, default_status: int = 400) -> None:
+    if hasattr(e, 'status_code'):
+        raise HTTPException(status_code=e.status_code, detail=str(e.detail))
+    raise HTTPException(status_code=default_status, detail=str(e))
+
+
 # =============================================================================
 # Per-Sensor Endpoints
 # =============================================================================
@@ -52,9 +58,7 @@ async def start_sensor(
         
         return rs_manager.start_sensor(device_id, sensor_id, configs)
     except Exception as e:
-        if hasattr(e, 'status_code'):
-            raise HTTPException(status_code=e.status_code, detail=str(e.detail))
-        raise HTTPException(status_code=400, detail=str(e))
+        _handle_rs_exception(e)
 
 
 @router.post("/{sensor_id}/stop", response_model=SensorStreamStatus)
@@ -72,9 +76,7 @@ async def stop_sensor(
     try:
         return rs_manager.stop_sensor(device_id, sensor_id)
     except Exception as e:
-        if hasattr(e, 'status_code'):
-            raise HTTPException(status_code=e.status_code, detail=str(e.detail))
-        raise HTTPException(status_code=400, detail=str(e))
+        _handle_rs_exception(e)
 
 
 @router.get("/{sensor_id}/status", response_model=SensorStreamStatus)
@@ -92,9 +94,7 @@ async def get_sensor_status(
     try:
         return rs_manager.get_sensor_status(device_id, sensor_id)
     except Exception as e:
-        if hasattr(e, 'status_code'):
-            raise HTTPException(status_code=e.status_code, detail=str(e.detail))
-        raise HTTPException(status_code=404, detail=str(e))
+        _handle_rs_exception(e, default_status=404)
 
 
 # =============================================================================
@@ -119,9 +119,7 @@ async def batch_start_sensors(
     try:
         return rs_manager.batch_start_sensors(device_id, request.sensors)
     except Exception as e:
-        if hasattr(e, 'status_code'):
-            raise HTTPException(status_code=e.status_code, detail=str(e.detail))
-        raise HTTPException(status_code=400, detail=str(e))
+        _handle_rs_exception(e)
 
 
 @router.post("/batch/stop", response_model=BatchSensorStatus)
@@ -140,9 +138,7 @@ async def batch_stop_sensors(
         sensor_ids = request.sensor_ids if request else None
         return rs_manager.batch_stop_sensors(device_id, sensor_ids)
     except Exception as e:
-        if hasattr(e, 'status_code'):
-            raise HTTPException(status_code=e.status_code, detail=str(e.detail))
-        raise HTTPException(status_code=400, detail=str(e))
+        _handle_rs_exception(e)
 
 
 @router.get("/batch/status", response_model=BatchSensorStatus)
@@ -159,6 +155,4 @@ async def get_batch_status(
     try:
         return rs_manager.get_batch_status(device_id)
     except Exception as e:
-        if hasattr(e, 'status_code'):
-            raise HTTPException(status_code=e.status_code, detail=str(e.detail))
-        raise HTTPException(status_code=404, detail=str(e))
+        _handle_rs_exception(e, default_status=404)

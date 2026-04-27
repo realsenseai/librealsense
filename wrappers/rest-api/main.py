@@ -51,7 +51,7 @@ if __name__ == "__main__":
     # Disable reload when running as a bundled executable (PyInstaller)
     # Reload mode doesn't work in PyInstaller and causes issues with device access
     is_bundled = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
-    reload_enabled = not is_bundled and '--reload' not in sys.argv
+    reload_enabled = not is_bundled
     
     if is_bundled:
         # When bundled, pass the app object directly (string import doesn't work)

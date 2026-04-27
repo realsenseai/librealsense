@@ -15,7 +15,7 @@ export function resetStore() {
     isLoadingDevices: false,
     hasUserInteracted: false,
     error: null,
-    viewMode: 'grid',
+    viewMode: '2d',
     isChatOpen: false,
     isChatAvailable: false,
     isChatLoading: false,
@@ -112,9 +112,10 @@ export function createMockOption(overrides: Partial<OptionInfo> = {}): OptionInf
  */
 export function createMockStreamConfig(overrides: Partial<StreamConfig> = {}): StreamConfig {
   return {
+    sensor_id: 'test-device-1-sensor-0',
     stream_type: 'depth',
     format: 'Z16',
-    enabled: true,
+    enable: true,
     resolution: { width: 640, height: 480 },
     framerate: 30,
     ...overrides,
@@ -149,6 +150,6 @@ export function renderWithProviders(
   }
 }
 
-// Re-export everything from React Testing Library
+// Re-export everything from React Testing Library except render (avoid duplicate export)
 export * from '@testing-library/react'
-export { renderWithProviders as render }
+export { renderWithProviders }

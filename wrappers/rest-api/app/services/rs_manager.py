@@ -227,7 +227,7 @@ class RealSenseManager:
             header_version = self._load_header_version()
             sha_expected = self._load_cmake_fw_sha1() if header_version and header_version == version else None
             if sha_expected:
-                sha = hashlib.sha1()
+                sha = hashlib.sha256()
                 with open(dest, "rb") as f:
                     for chunk in iter(lambda: f.read(8192), b""):
                         sha.update(chunk)
@@ -2040,6 +2040,61 @@ class RealSenseManager:
                        f"Requested: {', '.join(profile_details)}"
             )
 
+    def _process_sensor_frame(
+        self,
+        frame: Any,
+        frame_stream_name: str,
+        device_id: str,
+        colorizer: Any,
+    ) -> Tuple[Optional[Any], dict]:
+        """Process a single sensor frame; return (processed_frame, metadata)."""
+        processed_frame = None
+        metadata: dict = {
+            "timestamp": frame.get_timestamp(),
+            "frame_number": frame.get_frame_number(),
+        }
+
+        if "depth" in frame_stream_name:
+            depth_frame = frame.as_depth_frame()
+            depth_frame = self._apply_depth_filters(device_id, depth_frame)
+            self.depth_frames[device_id] = depth_frame
+            colorized = colorizer.colorize(depth_frame)
+            processed_frame = np.asanyarray(colorized.get_data())
+            metadata["width"] = depth_frame.get_width()
+            metadata["height"] = depth_frame.get_height()
+
+        elif "color" in frame_stream_name:
+            color_frame = frame.as_video_frame()
+            color_frame = self._apply_color_filters(device_id, color_frame)
+            processed_frame = np.asanyarray(color_frame.get_data())
+            metadata["width"] = color_frame.get_width()
+            metadata["height"] = color_frame.get_height()
+
+        elif "infrared" in frame_stream_name:
+            processed_frame = np.asanyarray(frame.get_data())
+            metadata["width"] = frame.as_video_frame().get_width()
+            metadata["height"] = frame.as_video_frame().get_height()
+
+        elif "gyro" in frame_stream_name or "accel" in frame_stream_name:
+            motion_frame = frame.as_motion_frame()
+            motion_data = motion_frame.get_motion_data()
+            metadata["motion_data"] = {
+                "x": float(motion_data.x),
+                "y": float(motion_data.y),
+                "z": float(motion_data.z),
+            }
+            processed_frame = np.zeros((120, 320, 3), dtype=np.uint8)
+            cv2.putText(processed_frame, f"X: {motion_data.x:.3f}", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 100), 1)
+            cv2.putText(processed_frame, f"Y: {motion_data.y:.3f}", (10, 60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 255, 100), 1)
+            cv2.putText(processed_frame, f"Z: {motion_data.z:.3f}", (10, 90),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1)
+            metadata["width"] = 320
+            metadata["height"] = 120
+
+        return processed_frame, metadata
+
     def _collect_sensor_frames(
         self,
         device_id: str,
@@ -2088,56 +2143,10 @@ class RealSenseManager:
                     if frame_stream == rs.stream.infrared:
                         frame_stream_name = f"infrared-{frame_profile.stream_index()}"
                     
-                    # Process frame based on stream type
-                    processed_frame = None
-                    metadata = {
-                        "timestamp": frame.get_timestamp(),
-                        "frame_number": frame.get_frame_number(),
-                    }
-                    
-                    if "depth" in frame_stream_name:
-                        # Store depth frame (cast from raw) for pixel queries and get_depth_range
-                        depth_frame = frame.as_depth_frame()
-                        # Apply post-processing filters
-                        depth_frame = self._apply_depth_filters(device_id, depth_frame)
-                        self.depth_frames[device_id] = depth_frame
-                        colorized = colorizer.colorize(depth_frame)
-                        processed_frame = np.asanyarray(colorized.get_data())
-                        metadata["width"] = depth_frame.get_width()
-                        metadata["height"] = depth_frame.get_height()
-                        
-                    elif "color" in frame_stream_name:
-                        color_frame = frame.as_video_frame()
-                        # Apply post-processing filters for color
-                        color_frame = self._apply_color_filters(device_id, color_frame)
-                        processed_frame = np.asanyarray(color_frame.get_data())
-                        metadata["width"] = color_frame.get_width()
-                        metadata["height"] = color_frame.get_height()
-                        
-                    elif "infrared" in frame_stream_name:
-                        processed_frame = np.asanyarray(frame.get_data())
-                        metadata["width"] = frame.as_video_frame().get_width()
-                        metadata["height"] = frame.as_video_frame().get_height()
-                        
-                    elif "gyro" in frame_stream_name or "accel" in frame_stream_name:
-                        motion_frame = frame.as_motion_frame()
-                        motion_data = motion_frame.get_motion_data()
-                        metadata["motion_data"] = {
-                            "x": float(motion_data.x),
-                            "y": float(motion_data.y),
-                            "z": float(motion_data.z),
-                        }
-                        # Create visualization frame
-                        processed_frame = np.zeros((120, 320, 3), dtype=np.uint8)
-                        cv2.putText(processed_frame, f"X: {motion_data.x:.3f}", (10, 30), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 100), 1)
-                        cv2.putText(processed_frame, f"Y: {motion_data.y:.3f}", (10, 60), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 255, 100), 1)
-                        cv2.putText(processed_frame, f"Z: {motion_data.z:.3f}", (10, 90), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1)
-                        metadata["width"] = 320
-                        metadata["height"] = 120
-                    
+                    processed_frame, metadata = self._process_sensor_frame(
+                        frame, frame_stream_name, device_id, colorizer
+                    )
+
                     if processed_frame is None:
                         continue
                     

@@ -41,6 +41,7 @@ export function Toast({ id, type, message, onClose, duration = 4000 }: ToastProp
       <button
         onClick={() => onClose(id)}
         className="text-lg leading-none hover:opacity-70 transition-opacity"
+        aria-label="Close"
       >
         ×
       </button>

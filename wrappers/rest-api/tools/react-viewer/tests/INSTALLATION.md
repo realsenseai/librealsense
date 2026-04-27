@@ -3,7 +3,7 @@
 ## Step 1: Install Dependencies
 
 ```bash
-cd wrappers/react-viewer
+cd wrappers/rest-api/tools/react-viewer
 npm install
 ```
 

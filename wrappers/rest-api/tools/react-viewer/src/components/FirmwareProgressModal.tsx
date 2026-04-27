@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { apiClient } from '../api/client'
 import type { FirmwareState } from '../api/types'
 
@@ -24,6 +24,8 @@ export function FirmwareProgressModal({
   onSuccess,
   onError,
 }: FirmwareProgressModalProps) {
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     if (!isOpen) return
 
@@ -35,7 +37,7 @@ export function FirmwareProgressModal({
     const unsubscribeSuccess = apiClient.onFirmwareSuccess(device.device_id, (fwVersion: string | null) => {
       onSuccess(fwVersion)
       // Close modal after 2 seconds to show completion
-      setTimeout(() => {
+      closeTimerRef.current = setTimeout(() => {
         onClose()
       }, 2000)
     })
@@ -48,6 +50,9 @@ export function FirmwareProgressModal({
       unsubscribeProgress()
       unsubscribeSuccess()
       unsubscribeError()
+      if (closeTimerRef.current !== null) {
+        clearTimeout(closeTimerRef.current)
+      }
     }
   }, [isOpen, device.device_id, onProgressUpdate, onSuccess, onError, onClose])
 

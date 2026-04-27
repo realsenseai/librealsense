@@ -179,91 +179,8 @@ export function IMUViewer() {
 
               {/* Charts */}
               <div className="grid grid-cols-2 gap-4">
-                {/* Accelerometer Chart */}
-                {accelData.length > 0 && (
-                  <div className="bg-gray-800 rounded-lg p-3">
-                    <h4 className="text-sm font-semibold mb-2 text-orange-400">
-                      Accelerometer History
-                    </h4>
-                    <div className="h-40">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={accelData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                          <XAxis dataKey="index" tick={false} stroke="#666" />
-                          <YAxis stroke="#666" fontSize={10} />
-                          <Tooltip
-                            contentStyle={{ backgroundColor: '#1a1a2e', border: 'none' }}
-                            labelStyle={{ color: '#888' }}
-                          />
-                          <Legend wrapperStyle={{ fontSize: '10px' }} />
-                          <Line
-                            type="monotone"
-                            dataKey="x"
-                            stroke="#ef4444"
-                            dot={false}
-                            strokeWidth={1}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="y"
-                            stroke="#22c55e"
-                            dot={false}
-                            strokeWidth={1}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="z"
-                            stroke="#3b82f6"
-                            dot={false}
-                            strokeWidth={1}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                )}
-
-                {/* Gyroscope Chart */}
-                {gyroData.length > 0 && (
-                  <div className="bg-gray-800 rounded-lg p-3">
-                    <h4 className="text-sm font-semibold mb-2 text-red-400">Gyroscope History</h4>
-                    <div className="h-40">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={gyroData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                          <XAxis dataKey="index" tick={false} stroke="#666" />
-                          <YAxis stroke="#666" fontSize={10} />
-                          <Tooltip
-                            contentStyle={{ backgroundColor: '#1a1a2e', border: 'none' }}
-                            labelStyle={{ color: '#888' }}
-                          />
-                          <Legend wrapperStyle={{ fontSize: '10px' }} />
-                          <Line
-                            type="monotone"
-                            dataKey="x"
-                            stroke="#ef4444"
-                            dot={false}
-                            strokeWidth={1}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="y"
-                            stroke="#22c55e"
-                            dot={false}
-                            strokeWidth={1}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="z"
-                            stroke="#3b82f6"
-                            dot={false}
-                            strokeWidth={1}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                )}
+                <IMUChart data={accelData} title="Accelerometer History" titleColor="text-orange-400" />
+                <IMUChart data={gyroData} title="Gyroscope History" titleColor="text-red-400" />
               </div>
 
               {/* Actions */}
@@ -282,6 +199,38 @@ export function IMUViewer() {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+interface IMUChartProps {
+  data: { index: number; x: number; y: number; z: number }[]
+  title: string
+  titleColor: string
+}
+
+function IMUChart({ data, title, titleColor }: IMUChartProps) {
+  if (data.length === 0) return null
+  return (
+    <div className="bg-gray-800 rounded-lg p-3">
+      <h4 className={`text-sm font-semibold mb-2 ${titleColor}`}>{title}</h4>
+      <div className="h-40">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+            <XAxis dataKey="index" tick={false} stroke="#666" />
+            <YAxis stroke="#666" fontSize={10} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1a2e', border: 'none' }}
+              labelStyle={{ color: '#888' }}
+            />
+            <Legend wrapperStyle={{ fontSize: '10px' }} />
+            <Line type="monotone" dataKey="x" stroke="#ef4444" dot={false} strokeWidth={1} />
+            <Line type="monotone" dataKey="y" stroke="#22c55e" dot={false} strokeWidth={1} />
+            <Line type="monotone" dataKey="z" stroke="#3b82f6" dot={false} strokeWidth={1} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }

@@ -20,7 +20,7 @@ A modern React-based web UI for Intel RealSense cameras, leveraging the REST API
 
 1. **Install dependencies:**
    ```bash
-   cd wrappers/react-viewer
+   cd wrappers/rest-api/tools/react-viewer
    npm install
    ```
 

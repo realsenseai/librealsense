@@ -33,12 +33,7 @@ class PointCloudStatus(BaseModel):
     device_id: str
     is_active: bool
 
-class StreamStartTiming(BaseModel):
-    device_id: str
-    is_streaming: bool
-    active_streams: List[str] = []
+class StreamStartTiming(StreamStatus):
     timings: dict
-    framerate: Optional[float] = None
-    duration: Optional[float] = None  # Time in seconds
     config_reused: Optional[bool] = None
     config_signature: Optional[str] = None

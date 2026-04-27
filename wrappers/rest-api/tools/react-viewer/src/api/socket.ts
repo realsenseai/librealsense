@@ -29,13 +29,13 @@ class SocketService {
     })
 
     this.socket.on('connect', () => {
-      console.log('Socket.IO connected:', this.socket?.id)
+      if (import.meta.env.DEV) console.log('Socket.IO connected:', this.socket?.id)
       this.isConnecting = false
       useAppStore.getState().setConnected(true)
     })
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Socket.IO disconnected:', reason)
+      if (import.meta.env.DEV) console.log('Socket.IO disconnected:', reason)
       useAppStore.getState().setConnected(false)
     })
 
@@ -49,7 +49,7 @@ class SocketService {
     })
 
     this.socket.on('welcome', (data) => {
-      console.log('Socket.IO welcome:', data)
+      if (import.meta.env.DEV) console.log('Socket.IO welcome:', data)
     })
   }
 
