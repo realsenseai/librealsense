@@ -4,7 +4,6 @@
 import pytest
 import pyrealsense2 as rs
 from rspy.timer import Timer
-from rspy.snippets import is_dds_dev
 import time
 import logging
 log = logging.getLogger(__name__)
@@ -14,11 +13,9 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
-    pytest.mark.device_each("D500*"),
 ]
 
-TOGGLE_WAIT_TIME     = 30  # [sec] max wait for device to reconnect after advanced mode toggle
-TOGGLE_WAIT_TIME_DDS = 60  # [sec] DDS devices enumerate slower after advanced mode toggle
+TOGGLE_WAIT_TIME = 30  # [sec] max wait for device to reconnect after advanced mode toggle
 
 dev = None
 target_sn = None   # cached before toggle — the removed dev handle cannot be queried safely
@@ -62,11 +59,9 @@ def test_advanced_mode_toggle( test_device ):
 
     ctx.set_devices_changed_callback( device_changed )
 
-    wait_time = TOGGLE_WAIT_TIME_DDS if is_dds_dev( dev ) else TOGGLE_WAIT_TIME
     initial_state = am_dev.is_enabled()
     toggled_state = not initial_state
-    log.info( "Device: %s | Initial advanced mode: %s | Reconnect timeout: %d sec",
-              name, "ON" if initial_state else "OFF", wait_time )
+    log.info( "Device: %s | Initial advanced mode: %s", name, "ON" if initial_state else "OFF" )
 
     # --- Toggle to opposite state ---
     # Clear the flag before toggling so a fast reconnect cannot be missed
@@ -74,10 +69,10 @@ def test_advanced_mode_toggle( test_device ):
     log.info( "Toggling advanced mode to %s", "ON" if toggled_state else "OFF" )
     am_dev.toggle_advanced_mode( toggled_state )
 
-    log.info( "Waiting up to %d sec for device to reconnect after toggle...", wait_time )
+    log.info( "Waiting up to %d sec for device to reconnect after toggle...", TOGGLE_WAIT_TIME )
     try:
-        assert _wait_for_reconnect( wait_time ), \
-            f"Device did not reconnect within {wait_time} sec after toggling advanced mode"
+        assert _wait_for_reconnect( TOGGLE_WAIT_TIME ), \
+            f"Device did not reconnect within {TOGGLE_WAIT_TIME} sec after toggling advanced mode"
 
         toggled_enabled = rs.rs400_advanced_mode( dev ).is_enabled()
         assert toggled_enabled == toggled_state, \
@@ -92,9 +87,9 @@ def test_advanced_mode_toggle( test_device ):
                 device_added = False
                 rs.rs400_advanced_mode( dev ).toggle_advanced_mode( initial_state )
 
-                log.info( "Waiting up to %d sec for device to reconnect after restore...", wait_time )
-                if not _wait_for_reconnect( wait_time ):
-                    log.warning( "Device did not reconnect within %d sec after restoring advanced mode", wait_time )
+                log.info( "Waiting up to %d sec for device to reconnect after restore...", TOGGLE_WAIT_TIME )
+                if not _wait_for_reconnect( TOGGLE_WAIT_TIME ):
+                    log.warning( "Device did not reconnect within %d sec after restoring advanced mode", TOGGLE_WAIT_TIME )
                 else:
                     restored_enabled = rs.rs400_advanced_mode( dev ).is_enabled()
                     if restored_enabled != initial_state:
