@@ -101,86 +101,60 @@ class ApiClient {
     })
   }
 
-  /**
-   * Register a callback to receive firmware progress updates for a device
-   */
+  private subscribeFirmwareEvent<T>(
+    eventName: string,
+    callbackMap: Map<string, T>,
+    deviceId: string,
+    callback: T,
+    handler: (data: unknown) => void
+  ): () => void {
+    callbackMap.set(deviceId, callback)
+    if (this.socket) {
+      this.socket.on(eventName, handler)
+    }
+    return () => {
+      callbackMap.delete(deviceId)
+      if (this.socket) this.socket.off(eventName)
+    }
+  }
+
   onFirmwareProgress(deviceId: string, callback: FirmwareProgressCallback): () => void {
-    this.firmwareProgressCallbacks.set(deviceId, callback)
-
-    // Set up the socket listener if not already done
-    if (this.socket) {
-      const eventName = `firmware_progress_${deviceId}`
-      console.log(`[FW Update] Subscribing to ${eventName}`)
-      this.socket.on(eventName, (data: { device_id: string; progress: number }) => {
-        console.log(`[FW Update] Progress event received:`, data)
+    return this.subscribeFirmwareEvent(
+      `firmware_progress_${deviceId}`,
+      this.firmwareProgressCallbacks,
+      deviceId,
+      callback,
+      (data: unknown) => {
         const cb = this.firmwareProgressCallbacks.get(deviceId)
-        if (cb) {
-          cb(data.progress)
-        }
-      })
-    } else {
-      console.warn('[FW Update] Socket not available for progress subscription')
-    }
-
-    // Return unsubscribe function
-    return () => {
-      this.firmwareProgressCallbacks.delete(deviceId)
-      if (this.socket) {
-        this.socket.off(`firmware_progress_${deviceId}`)
+        if (cb) cb((data as { progress: number }).progress)
       }
-    }
+    )
   }
 
-  /**
-   * Register a callback to receive firmware error updates for a device
-   */
   onFirmwareError(deviceId: string, callback: FirmwareErrorCallback): () => void {
-    this.firmwareErrorCallbacks.set(deviceId, callback)
-
-    if (this.socket) {
-      const eventName = `firmware_update_failed_${deviceId}`
-      console.log(`[FW Update] Subscribing to ${eventName}`)
-      this.socket.on(eventName, (data: { device_id: string; error: string }) => {
-        console.log(`[FW Update] Error event received:`, data)
+    return this.subscribeFirmwareEvent(
+      `firmware_update_failed_${deviceId}`,
+      this.firmwareErrorCallbacks,
+      deviceId,
+      callback,
+      (data: unknown) => {
         const cb = this.firmwareErrorCallbacks.get(deviceId)
-        if (cb) {
-          cb(data.error)
-        }
-      })
-    }
-
-    return () => {
-      this.firmwareErrorCallbacks.delete(deviceId)
-      if (this.socket) {
-        this.socket.off(`firmware_update_failed_${deviceId}`)
+        if (cb) cb((data as { error: string }).error)
       }
-    }
+    )
   }
 
-  /**
-   * Register a callback to receive firmware success updates for a device
-   */
   onFirmwareSuccess(deviceId: string, callback: FirmwareSuccessCallback): () => void {
-    this.firmwareSuccessCallbacks.set(deviceId, callback)
-
-    if (this.socket) {
-      const eventName = `firmware_update_success_${deviceId}`
-      console.log(`[FW Update] Subscribing to ${eventName}`)
-      this.socket.on(eventName, (data: { device_id: string; firmware_version: string | null }) => {
-        console.log(`[FW Update] Success event received:`, data)
+    return this.subscribeFirmwareEvent(
+      `firmware_update_success_${deviceId}`,
+      this.firmwareSuccessCallbacks,
+      deviceId,
+      callback,
+      (data: unknown) => {
         const cb = this.firmwareSuccessCallbacks.get(deviceId)
-        if (cb) {
-          cb(data.firmware_version)
-        }
-      })
-    }
-
-    return () => {
-      this.firmwareSuccessCallbacks.delete(deviceId)
-      if (this.socket) {
-        this.socket.off(`firmware_update_success_${deviceId}`)
+        if (cb) cb((data as { firmware_version: string | null }).firmware_version)
       }
-    }
+    )
   }
 
   // ============ Devices ============

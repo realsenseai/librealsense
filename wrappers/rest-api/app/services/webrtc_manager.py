@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 import weakref
 import threading
@@ -75,9 +76,7 @@ class RealSenseVideoTrack(VideoStreamTrack):
             error_detail = getattr(e, 'detail', str(e))
             status_code = getattr(e, 'status_code', None)
             if status_code != 503:
-                import traceback
-                print(f"Error getting frame for {self.stream_type}: {error_detail}")
-                traceback.print_exc()
+                logging.exception("Error getting frame for %s: %s", self.stream_type, error_detail)
             return video_frame
 
 class WebRTCManager:

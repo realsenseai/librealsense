@@ -55,7 +55,7 @@ export class WebRTCHandler {
     }
 
     this.peerConnection.oniceconnectionstatechange = () => {
-      console.log('ICE connection state:', this.peerConnection?.iceConnectionState)
+      if (import.meta.env.DEV) console.log('ICE connection state:', this.peerConnection?.iceConnectionState)
     }
 
     // Add transceivers for receiving streams
@@ -64,7 +64,7 @@ export class WebRTCHandler {
         direction: 'recvonly',
         streams: [new MediaStream()],
       })
-      console.log(`Added transceiver for ${streamType}`)
+      if (import.meta.env.DEV) console.log(`Added transceiver for ${streamType}`)
     })
 
     try {

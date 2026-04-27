@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Any
 
@@ -55,7 +56,5 @@ async def update_option(
         # Preserve the original status code from RealSenseError
         raise HTTPException(status_code=e.status_code, detail=e.detail)
     except Exception as e:
-        # Log unexpected errors for debugging
-        import traceback
-        traceback.print_exc()
+        logging.exception("Unexpected error updating options")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
