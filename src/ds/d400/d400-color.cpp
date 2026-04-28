@@ -117,8 +117,10 @@ namespace librealsense
         else
         {
             auto color_devs_info_mi0 = filter_by_mi(group.uvc_devices, 0);
-            // one uvc device is seen over Windows and 3 uvc devices are seen over linux
-            if (color_devs_info_mi0.size() == 1 || color_devs_info_mi0.size() == 3 || (_is_mipi_device && _pid == ds::RS401_GMSL_PID))
+            // Color is part of the depth sensor when MI0 enumerates as:
+            // 1 UVC device on Windows, 3 UVC devices on Linux, or 2 UVC devices for RS401_GMSL on MIPI.
+            if (color_devs_info_mi0.size() == 1 || color_devs_info_mi0.size() == 3
+                || (_is_mipi_device && _pid == ds::RS401_GMSL_PID && color_devs_info_mi0.size() == 2))
             {
                 // means color end point is part of the depth sensor (e.g. D405, D401_GMSL)
                 color_devs_info = color_devs_info_mi0;
