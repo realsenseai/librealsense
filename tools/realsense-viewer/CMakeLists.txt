@@ -196,6 +196,43 @@ endif()
 
 set(RS_VIEWER_LIBS ${GTK3_LIBRARIES} Threads::Threads realsense2-gl)
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    option(BUILD_WITH_MINZ "Enable MinZ depth improvement (Jetson only, requires rs-enhanced-depth deb)" OFF)
+    if(BUILD_WITH_MINZ)
+        # Installed by: sudo dpkg -i rs-enhanced-depth-*.deb
+        set(MINZ_ROOT "/opt/rs-enhanced-depth" CACHE PATH
+            "Root of the rs-enhanced-depth installation (default: /opt/rs-enhanced-depth)")
+
+        find_path(MINZ_INCLUDE_DIR
+            NAMES rs_depth_range.hpp
+            PATHS "${MINZ_ROOT}/include"
+            NO_DEFAULT_PATH
+        )
+        find_library(MINZ_LIBRARY
+            NAMES rs_depth_range
+            PATHS "${MINZ_ROOT}/lib"
+            NO_DEFAULT_PATH
+        )
+
+        if(NOT MINZ_INCLUDE_DIR)
+            message(FATAL_ERROR "rs_depth_range.hpp not found under ${MINZ_ROOT}/include -- "
+                "install rs-enhanced-depth-*.deb or set MINZ_ROOT")
+        endif()
+        if(NOT MINZ_LIBRARY)
+            message(FATAL_ERROR "librs_depth_range not found under ${MINZ_ROOT}/lib -- "
+                "install rs-enhanced-depth-*.deb or set MINZ_ROOT")
+        endif()
+
+        target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_WITH_MINZ)
+        include_directories("${MINZ_INCLUDE_DIR}")
+        get_property(deps VARIABLE PROPERTY DEPENDENCIES)
+        set(DEPENDENCIES ${deps} ${MINZ_LIBRARY})
+        message(STATUS "MinZ depth improvement enabled")
+        message(STATUS "  include : ${MINZ_INCLUDE_DIR}")
+        message(STATUS "  library : ${MINZ_LIBRARY}")
+    endif()
+endif()
+
 include(../tools_common.cmake)
 tools_target_config(${PROJECT_NAME})
 

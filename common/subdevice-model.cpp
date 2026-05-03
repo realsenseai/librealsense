@@ -3,6 +3,9 @@
 
 #include "post-processing-filters-list.h"
 #include "post-processing-block-model.h"
+#ifdef BUILD_WITH_MINZ
+#include "minz-filter.h"
+#endif
 #include <imgui_internal.h>
 #include <realsense_imgui.h>
 
@@ -163,6 +166,18 @@ namespace rs2
 
             post_processing.push_back(model);
         }
+
+#ifdef BUILD_WITH_MINZ
+        if( !is_rgb_camera && s->supports( RS2_OPTION_STEREO_BASELINE ) )
+        {
+            auto block = std::make_shared< minz_filter >();
+            auto model = std::make_shared< processing_block_model >(
+                this, "Min-Z Improvement", block,
+                [block]( rs2::frame f ) { return block->process( f ); },
+                error_message, false );
+            post_processing.push_back( model );
+        }
+#endif
 
         for (auto&& f : s->query_embedded_filters())
         {
