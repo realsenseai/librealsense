@@ -20,6 +20,54 @@
 
 namespace {
 
+// RAII wrapper for HDEVNOTIFY — auto-unregisters on scope exit. The underlying
+// API requires the registration to be released before the owning HWND is
+// destroyed, so the watcher releases its handles explicitly before
+// DestroyWindow rather than relying solely on scope.
+class hdev_notify_handle
+{
+    HDEVNOTIFY _h = nullptr;
+public:
+    hdev_notify_handle() = default;
+    explicit hdev_notify_handle( HDEVNOTIFY h ) : _h( h ) {}
+    hdev_notify_handle( hdev_notify_handle const & ) = delete;
+    hdev_notify_handle & operator=( hdev_notify_handle const & ) = delete;
+    hdev_notify_handle( hdev_notify_handle && o ) noexcept : _h( o._h ) { o._h = nullptr; }
+    hdev_notify_handle & operator=( hdev_notify_handle && o ) noexcept
+    {
+        if( this != &o )
+        {
+            reset();
+            _h = o._h;
+            o._h = nullptr;
+        }
+        return *this;
+    }
+    ~hdev_notify_handle() { reset(); }
+
+    void reset() noexcept
+    {
+        if( _h )
+        {
+            UnregisterDeviceNotification( _h );
+            _h = nullptr;
+        }
+    }
+
+    explicit operator bool() const noexcept { return _h != nullptr; }
+};
+
+// Register for DEVICEINTERFACE notifications of the given class GUID.
+// Returns an empty handle on failure.
+hdev_notify_handle register_devinterface( HWND hWnd, REFGUID classGuid )
+{
+    DEV_BROADCAST_DEVICEINTERFACE filter = {};
+    filter.dbcc_size = sizeof( DEV_BROADCAST_DEVICEINTERFACE );
+    filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+    filter.dbcc_classguid = classGuid;
+    return hdev_notify_handle{ RegisterDeviceNotification( hWnd, &filter, DEVICE_NOTIFY_WINDOW_HANDLE ) };
+}
+
 void debug_dev_broadcast( DEV_BROADCAST_HDR const * p_hdr, char const * context )
 {
     switch( p_hdr->dbch_devicetype )
@@ -233,14 +281,10 @@ namespace librealsense
                 bool _stopped = true;
                 bool _changed = false;
                 HWND hWnd = nullptr;
-                // One handle per registered DEVICEINTERFACE; previously a single
-                // hdevnotify_sensor field was reused for both sensor-camera and HID
-                // registrations, which leaked the first handle.
-                HDEVNOTIFY hdevnotifyHW = nullptr;
-                HDEVNOTIFY hdevnotifyUVC = nullptr;
-                HDEVNOTIFY hdevnotifySensorCamera = nullptr;
-                HDEVNOTIFY hdevnotifyHID = nullptr;
-                HDEVNOTIFY hdevnotifyUSB = nullptr;
+                // One entry per registered DEVICEINTERFACE class. Each handle
+                // auto-unregisters on destruction, but we clear them explicitly
+                // before the HWND is destroyed (Win32 requires that order).
+                std::vector<hdev_notify_handle> registrations;
             } _data;
 
             void run()
@@ -288,11 +332,7 @@ namespace librealsense
                     }
                 }
 
-                if (_data.hdevnotifyHW)            UnregisterDeviceNotification(_data.hdevnotifyHW);
-                if (_data.hdevnotifyUVC)           UnregisterDeviceNotification(_data.hdevnotifyUVC);
-                if (_data.hdevnotifySensorCamera)  UnregisterDeviceNotification(_data.hdevnotifySensorCamera);
-                if (_data.hdevnotifyHID)           UnregisterDeviceNotification(_data.hdevnotifyHID);
-                if (_data.hdevnotifyUSB)           UnregisterDeviceNotification(_data.hdevnotifyUSB);
+                _data.registrations.clear();  // unregister all before destroying the HWND
                 DestroyWindow(_data.hWnd);
             }
 
@@ -365,70 +405,37 @@ namespace librealsense
             {
                 auto data = reinterpret_cast<extra_data*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
-                auto register_interface = [hWnd]( REFGUID classGuid ) -> HDEVNOTIFY
-                {
-                    DEV_BROADCAST_DEVICEINTERFACE filter = {};
-                    filter.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
-                    filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
-                    filter.dbcc_classguid = classGuid;
-                    return RegisterDeviceNotification( hWnd, &filter, DEVICE_NOTIFY_WINDOW_HANDLE );
-                };
-
-                auto unregister_succeeded = [data]()
-                {
-                    if (data->hdevnotifyHW)            { UnregisterDeviceNotification(data->hdevnotifyHW);            data->hdevnotifyHW = nullptr; }
-                    if (data->hdevnotifyUVC)           { UnregisterDeviceNotification(data->hdevnotifyUVC);           data->hdevnotifyUVC = nullptr; }
-                    if (data->hdevnotifySensorCamera)  { UnregisterDeviceNotification(data->hdevnotifySensorCamera);  data->hdevnotifySensorCamera = nullptr; }
-                    if (data->hdevnotifyHID)           { UnregisterDeviceNotification(data->hdevnotifyHID);           data->hdevnotifyHID = nullptr; }
-                };
-
                 // HW monitor (private RealSense interface)
                 static const GUID hwMonitorGuid = { 0x175695cd, 0x30d9, 0x4f87, { 0x8b, 0xe3, 0x5a, 0x82, 0x70, 0xf4, 0x9a, 0x31 } };
-                data->hdevnotifyHW = register_interface( hwMonitorGuid );
-                if (!data->hdevnotifyHW)
-                {
-                    LOG_WARNING("Register HW events failed");
-                    return FALSE;
-                }
-
-                // UVC video capture
-                data->hdevnotifyUVC = register_interface( KSCATEGORY_CAPTURE );
-                if (!data->hdevnotifyUVC)
-                {
-                    LOG_WARNING("Register UVC events failed");
-                    unregister_succeeded();
-                    return FALSE;
-                }
-
-                // UVC sensor-camera (Win10+ depth/IR)
-                data->hdevnotifySensorCamera = register_interface( KSCATEGORY_SENSOR_CAMERA );
-                if (!data->hdevnotifySensorCamera)
-                {
-                    LOG_WARNING("Register sensor-camera events failed");
-                    unregister_succeeded();
-                    return FALSE;
-                }
-
                 // HID sensors (IMU)
-                static const GUID GUID_DEVINTERFACE_HID = { 0x4d1e55b2, 0xf16f, 0x11cf, { 0x88, 0xcb, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30 } };
-                data->hdevnotifyHID = register_interface( GUID_DEVINTERFACE_HID );
-                if (!data->hdevnotifyHID)
-                {
-                    LOG_WARNING("Register HID events failed");
-                    unregister_succeeded();
-                    return FALSE;
-                }
-
+                static const GUID hidInterfaceGuid = { 0x4d1e55b2, 0xf16f, 0x11cf, { 0x88, 0xcb, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30 } };
                 // FW Update device (USB device class)
-                static const GUID usbClassGuid = { 0xa5dcbf10, 0x6530, 0x11d2, { 0x90, 0x1f, 0x00, 0xc0, 0x4f, 0xb9, 0x51, 0xed } };
-                data->hdevnotifyUSB = register_interface( usbClassGuid );
-                if (!data->hdevnotifyUSB)
-                {
-                    LOG_WARNING("Register USB events failed");
-                    unregister_succeeded();
-                    return FALSE;
-                }
+                static const GUID usbDeviceGuid = { 0xa5dcbf10, 0x6530, 0x11d2, { 0x90, 0x1f, 0x00, 0xc0, 0x4f, 0xb9, 0x51, 0xed } };
 
+                struct interface_to_register {
+                    char const * label;
+                    GUID const & guid;
+                };
+                interface_to_register const interfaces[] = {
+                    { "HW monitor",     hwMonitorGuid          },
+                    { "UVC capture",    KSCATEGORY_CAPTURE     },
+                    { "sensor camera",  KSCATEGORY_SENSOR_CAMERA },
+                    { "HID",            hidInterfaceGuid       },
+                    { "USB device",     usbDeviceGuid          },
+                };
+
+                data->registrations.reserve( sizeof(interfaces) / sizeof(interfaces[0]) );
+                for( auto const & ix : interfaces )
+                {
+                    auto h = register_devinterface( hWnd, ix.guid );
+                    if( ! h )
+                    {
+                        LOG_WARNING( "Register " << ix.label << " events failed" );
+                        data->registrations.clear();  // RAII unregisters everything we did register
+                        return FALSE;
+                    }
+                    data->registrations.push_back( std::move( h ) );
+                }
                 return TRUE;
             }
         };
