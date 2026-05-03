@@ -81,8 +81,8 @@ def test_decimation_embedded_filter_options(depth_sensor, fw_version):
 
     decimation_options = decimation_embedded_filter.get_supported_options()
     check.equal(len(decimation_options), 2)
-    check_option_in_list(rs.option.embedded_filter_enabled, decimation_options)
-    check_option_in_list(rs.option.filter_magnitude, decimation_options)
+    check.is_true(check_option_in_list(rs.option.embedded_filter_enabled, decimation_options))
+    check.is_true(check_option_in_list(rs.option.filter_magnitude, decimation_options))
 
 
 def test_decimation_embedded_filter_set_get_options(depth_sensor, fw_version):
@@ -150,10 +150,10 @@ def test_temporal_embedded_filter_options(depth_sensor, fw_version):
 
     temporal_options = temporal_embedded_filter.get_supported_options()
     check.equal(len(temporal_options), 4)
-    check_option_in_list(rs.option.embedded_filter_enabled, temporal_options)
-    check_option_in_list(rs.option.filter_smooth_alpha, temporal_options)
-    check_option_in_list(rs.option.filter_smooth_delta, temporal_options)
-    check_option_in_list(rs.option.holes_fill, temporal_options)
+    check.is_true(check_option_in_list(rs.option.embedded_filter_enabled, temporal_options))
+    check.is_true(check_option_in_list(rs.option.filter_smooth_alpha, temporal_options))
+    check.is_true(check_option_in_list(rs.option.filter_smooth_delta, temporal_options))
+    check.is_true(check_option_in_list(rs.option.holes_fill, temporal_options))
 
 
 def test_temporal_embedded_filter_set_get_options(depth_sensor, fw_version):

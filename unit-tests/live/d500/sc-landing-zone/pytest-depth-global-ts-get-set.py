@@ -42,7 +42,7 @@ def test_global_ts_for_depth(test_device):
         while not wait_for_frames_timer.has_expired() and state["global_frame_num"] < num_of_frames_before_check:
             time.sleep(0.5)
         if wait_for_frames_timer.has_expired():
-            pytest.fail(f"timer expired: {num_of_frames_before_check} frames did not arrived before {MAX_TIME_TO_WAIT_FOR_FRAMES}sec")
+            pytest.fail(f"timer expired: {num_of_frames_before_check} frames did not arrive before {MAX_TIME_TO_WAIT_FOR_FRAMES} sec")
 
     dev, _ = test_device
     depth_sensor = dev.first_depth_sensor()

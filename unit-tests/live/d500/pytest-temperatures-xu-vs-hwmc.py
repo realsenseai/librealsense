@@ -101,9 +101,9 @@ def test_temperatures_xu_vs_hwmc(test_device):
     pvt_temp_xu, ohm_temp_xu, projector_temp_xu = get_temperatures_from_xu()
     pvt_temp_hwm, ohm_temp_hwm, projector_temp_hwm = get_temperatures_from_hwm()
 
-    # Since PVT in XU is different sensor than PVT in HMC, we increase the tollerance to 3 deg
+    # Since PVT in XU is different sensor than PVT in HMC, we increase the tolerance to 3 deg
     tolerance = 3.0
     check.almost_equal(pvt_temp_xu, pvt_temp_hwm, abs=tolerance)
     check.almost_equal(ohm_temp_xu, ohm_temp_hwm, abs=tolerance)
     if is_projector_option_supported:
-        check.almost_equal(projector_temp_xu, projector_temp_xu, abs=tolerance)
+        check.almost_equal(projector_temp_xu, projector_temp_hwm, abs=tolerance)

@@ -24,8 +24,8 @@ def check_counter_and_timestamp_increase(frame, fps):
     else:
         current_counter = frame.get_frame_metadata(rs.frame_metadata_value.frame_counter)
         current_ts = frame.get_frame_metadata(rs.frame_metadata_value.frame_timestamp)
-        log.info("prev_counter %s", prev_counter)
-        log.info("current_counter %s", current_counter)
+        log.debug("prev_counter %s", prev_counter)
+        log.debug("current_counter %s", current_counter)
         check.is_true(current_counter > prev_counter)  # D500 has a skip frames mechanism on low fps meaning no sequential frame numbers
         check.is_true((current_ts - prev_ts) / 1000 < 2 * 1000 / fps)
         prev_counter = current_counter

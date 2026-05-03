@@ -60,7 +60,7 @@ def test_smcu_version_consistent_across_methods(test_device):
         log.debug("SMCU version using rs-fw-update: %s", smcu_version_rs_fw_update_tool)
         versions_dict["smcu_version_rs_fw_update"] = str(smcu_version_rs_fw_update_tool)
 
-    log.debug("Actual Dictonary is %s", str(versions_dict.values()))
+    log.debug("Actual Dictionary is %s", str(versions_dict.values()))
 
     # Consider SMCU Versions fetched from one of the methods as reference
     test_val = versions_dict["smcu_version_rsutils_fw_version"]
