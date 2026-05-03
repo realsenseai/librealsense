@@ -18,6 +18,7 @@
 #include <SensAPI.h>
 #include <initguid.h>
 #include <propkeydef.h>
+#include <wrl/implements.h>
 #include <rsutils/string/from.h>
 #include <rsutils/string/windows.h>
 
@@ -32,69 +33,29 @@ namespace librealsense
 {
     namespace platform
     {
-        class sensor_events : public ISensorEvents
+        class sensor_events : public Microsoft::WRL::RuntimeClass<
+            Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+            ISensorEvents>
         {
         public:
-            virtual ~sensor_events() = default;
+            ~sensor_events() override = default;
 
-            explicit sensor_events(hid_callback callback, double gyro_scale_factor = 10.0) : m_cRef(0), _callback(callback), _gyro_scale_factor(gyro_scale_factor) {}
-
-            STDMETHODIMP QueryInterface(REFIID iid, void** ppv)
-            {
-                if (ppv == NULL)
-                {
-                    return E_POINTER;
-                }
-                if (iid == __uuidof(IUnknown))
-                {
-                    *ppv = static_cast<IUnknown*>(this);
-                }
-                else if (iid == __uuidof(ISensorEvents))
-                {
-                    *ppv = static_cast<ISensorEvents*>(this);
-                }
-                else
-                {
-                    *ppv = NULL;
-                    return E_NOINTERFACE;
-                }
-                AddRef();
-                return S_OK;
-            }
-
-            STDMETHODIMP_(ULONG) AddRef()
-            {
-                return InterlockedIncrement(&m_cRef);
-            }
-
-            STDMETHODIMP_(ULONG) Release()
-            {
-                ULONG count = InterlockedDecrement(&m_cRef);
-                if (count == 0)
-                {
-                    delete this;
-                    return 0;
-                }
-                return count;
-            }
+            explicit sensor_events(hid_callback callback, double gyro_scale_factor = 10.0)
+                : _callback(callback), _gyro_scale_factor(gyro_scale_factor) {}
 
             //
             // ISensorEvents methods.
             //
 
-            STDMETHODIMP OnEvent(
-                ISensor *pSensor,
-                REFGUID eventID,
-                IPortableDeviceValues *pEventData)
+            IFACEMETHODIMP OnEvent(
+                ISensor * /*pSensor*/,
+                REFGUID /*eventID*/,
+                IPortableDeviceValues * /*pEventData*/) override
             {
-                HRESULT hr = S_OK;
-
-                // Handle custom events here.
-
-                return hr;
+                return S_OK;
             }
 
-            STDMETHODIMP OnDataUpdated(ISensor *pSensor, ISensorDataReport *report)
+            IFACEMETHODIMP OnDataUpdated(ISensor *pSensor, ISensorDataReport *report) override
             {
                 if (NULL == report ||
                     NULL == pSensor)
@@ -220,45 +181,25 @@ namespace librealsense
                 return S_OK;
             }
 
-            STDMETHODIMP OnLeave(
-                REFSENSOR_ID sensorID)
+            IFACEMETHODIMP OnLeave(REFSENSOR_ID /*sensorID*/) override
             {
-                HRESULT hr = S_OK;
-
-                // Perform any housekeeping tasks for the sensor that is leaving.
-                // For example, if you have maintained a reference to the sensor,
-                // release it now and set the pointer to NULL.
-
-                return hr;
+                return S_OK;
             }
 
-            STDMETHODIMP OnStateChanged(
-                ISensor* pSensor,
-                SensorState state)
+            IFACEMETHODIMP OnStateChanged(ISensor* pSensor, SensorState state) override
             {
-                HRESULT hr = S_OK;
-
-                if (NULL == pSensor)
-                {
+                if (nullptr == pSensor)
                     return E_INVALIDARG;
-                }
-
 
                 if (state == SENSOR_STATE_READY)
-                {
                     LOG_DEBUG("HID sensor is now ready");
-                }
                 else if (state == SENSOR_STATE_ACCESS_DENIED)
-                {
                     LOG_WARNING("No permission for the HID sensor; enable it in the control panel");
-                }
 
-
-                return hr;
+                return S_OK;
             }
 
         private:
-            long m_cRef;
             hid_callback _callback;
             double _gyro_scale_factor = 10.0;
         };
@@ -361,7 +302,7 @@ namespace librealsense
         void wmf_hid_device::start_capture(hid_callback callback)
         {
             // Hack, start default profile
-            _cb = new sensor_events(callback, _gyro_scale_factor);
+            _cb = Microsoft::WRL::Make<sensor_events>(callback, _gyro_scale_factor);
 
             for (auto& sensor : _opened_sensors)
             {

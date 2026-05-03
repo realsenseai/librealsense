@@ -9,6 +9,7 @@
 #include <mfidl.h>
 #include <mfreadwrite.h>
 #include <wrl/client.h>
+#include <wrl/implements.h>
 #include <strmif.h>
 #include <Ks.h>
 #include <ksproxy.h>
@@ -148,26 +149,24 @@ namespace librealsense
             std::wstring                            _device_id;
         };
 
-        class source_reader_callback : public IMFSourceReaderCallback
+        class source_reader_callback : public Microsoft::WRL::RuntimeClass<
+            Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+            IMFSourceReaderCallback>
         {
         public:
-            explicit source_reader_callback(std::weak_ptr<wmf_uvc_device> owner) : _owner(owner)
-            {
-            };
-            virtual ~source_reader_callback() {};
-            STDMETHODIMP QueryInterface(REFIID iid, void** ppv) override;
-            STDMETHODIMP_(ULONG) AddRef() override;
-            STDMETHODIMP_(ULONG) Release() override;
-            STDMETHODIMP OnReadSample(HRESULT /*hrStatus*/,
+            explicit source_reader_callback(std::weak_ptr<wmf_uvc_device> owner) : _owner(std::move(owner)) {}
+            ~source_reader_callback() override = default;
+
+            IFACEMETHODIMP OnReadSample(HRESULT hrStatus,
                 DWORD dwStreamIndex,
-                DWORD /*dwStreamFlags*/,
-                LONGLONG /*llTimestamp*/,
-                IMFSample *sample) override;
-            STDMETHODIMP OnEvent(DWORD /*sidx*/, IMFMediaEvent* /*event*/) override;
-            STDMETHODIMP OnFlush(DWORD) override;
+                DWORD dwStreamFlags,
+                LONGLONG llTimestamp,
+                IMFSample * sample) override;
+            IFACEMETHODIMP OnEvent(DWORD sidx, IMFMediaEvent * event) override;
+            IFACEMETHODIMP OnFlush(DWORD) override;
+
         private:
             std::weak_ptr<wmf_uvc_device> _owner;
-            long _refCount = 0;
         };
 
     }

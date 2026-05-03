@@ -125,32 +125,7 @@ namespace librealsense
                     return false;
             }
 
-        STDMETHODIMP source_reader_callback::QueryInterface(REFIID iid, void** ppv)
-        {
-#pragma warning( push )
-#pragma warning(disable : 4838)
-            static const QITAB qit[] =
-            {
-                QITABENT(source_reader_callback, IMFSourceReaderCallback),
-                { nullptr },
-            };
-            return QISearch(this, qit, iid, ppv);
-#pragma warning( pop )
-        };
-
-        STDMETHODIMP_(ULONG) source_reader_callback::AddRef() { return InterlockedIncrement(&_refCount); }
-
-        STDMETHODIMP_(ULONG) source_reader_callback::Release()  {
-            ULONG count = InterlockedDecrement(&_refCount);
-            if (count <= 0)
-            {
-                delete this;
-            }
-            return count;
-        }
-
-
-        STDMETHODIMP source_reader_callback::OnReadSample(HRESULT hrStatus,
+        IFACEMETHODIMP source_reader_callback::OnReadSample(HRESULT hrStatus,
             DWORD dwStreamIndex,
             DWORD dwStreamFlags,
             LONGLONG llTimestamp,
@@ -212,8 +187,8 @@ namespace librealsense
 
             return S_OK;
         };
-        STDMETHODIMP source_reader_callback::OnEvent(DWORD /*sidx*/, IMFMediaEvent* /*event*/) { return S_OK; }
-        STDMETHODIMP source_reader_callback::OnFlush(DWORD)
+        IFACEMETHODIMP source_reader_callback::OnEvent(DWORD /*sidx*/, IMFMediaEvent* /*event*/) { return S_OK; }
+        IFACEMETHODIMP source_reader_callback::OnFlush(DWORD)
         {
             auto owner = _owner.lock();
             if (owner)
@@ -835,8 +810,8 @@ namespace librealsense
             CHECK_HR(MFCreateAttributes(&reader_attrs, 3));
             CHECK_HR(reader_attrs->SetUINT32(MF_SOURCE_READER_DISCONNECT_MEDIASOURCE_ON_SHUTDOWN, FALSE));
             CHECK_HR(reader_attrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE));
-            CHECK_HR(reader_attrs->SetUnknown(MF_SOURCE_READER_ASYNC_CALLBACK,
-                static_cast<IUnknown*>(new source_reader_callback(shared_from_this()))));
+            auto callback = Microsoft::WRL::Make<source_reader_callback>(shared_from_this());
+            CHECK_HR(reader_attrs->SetUnknown(MF_SOURCE_READER_ASYNC_CALLBACK, callback.Get()));
             return reader_attrs;
         }
 
