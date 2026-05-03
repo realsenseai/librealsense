@@ -1,13 +1,21 @@
 # License: Apache 2.0. See LICENSE file in root directory.
-# Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Not frequently changing, no need to test for each commit
-# test:donotrun:!nightly
-# test:device D585S
 
+import pytest
 import pyrealsense2 as rs
-from rspy import test,log
-from metadata_common import *
+import logging
+import metadata_common
+from metadata_common import check_md_value, check_counter_and_timestamp_increase, reset_data
+log = logging.getLogger(__name__)
+
+pytestmark = [
+    pytest.mark.device_each("D585S"),
+    pytest.mark.context("nightly"),
+]
+
+
 safety_metadata_values = [rs.frame_metadata_value.frame_counter,
                           rs.frame_metadata_value.safety_depth_frame_counter,
                           rs.frame_metadata_value.frame_timestamp,
@@ -24,38 +32,35 @@ safety_metadata_values = [rs.frame_metadata_value.frame_counter,
                           rs.frame_metadata_value.safety_mb_fusa_action,
                           rs.frame_metadata_value.safety_mb_status]
 
+
 def check_safety_metadata(frame):
     for md_value in safety_metadata_values:
         check_md_value(frame, md_value)
 
-################# Checking safety metadata required fileds are received ##################
-test.start("Checking safety stream metadata received")
 
-cfg = rs.config()
-cfg.enable_stream(rs.stream.safety)
-pipe = rs.pipeline()
-pipe.start(cfg)
-iterations = 0
-while iterations < 20:
-    iterations += 1
-    f = pipe.wait_for_frames()
-    check_safety_metadata(f)
-pipe.stop()
-test.finish()
+def test_safety_stream_metadata_received(test_context):
+    cfg = rs.config()
+    cfg.enable_stream(rs.stream.safety)
+    pipe = rs.pipeline(test_context)
+    pipe.start(cfg)
+    iterations = 0
+    while iterations < 20:
+        iterations += 1
+        f = pipe.wait_for_frames()
+        check_safety_metadata(f)
+    pipe.stop()
 
-################# Checking safety frame counter and timestamp increasing ##################
-test.start("Checking safety stream metadata frame counter and timestamp increasing")
-cfg = rs.config()
-fps = 30
-cfg.enable_stream(rs.stream.safety, rs.format.y8, fps)
-pipe = rs.pipeline()
-pipe.start(cfg)
-iterations = 0
-while iterations < 20:
-    iterations += 1
-    f = pipe.wait_for_frames()
-    check_counter_and_timestamp_increase(f, fps)
-pipe.stop()
-test.finish()
 
-test.print_results_and_exit()
+def test_safety_counter_and_timestamp_increase(test_context):
+    cfg = rs.config()
+    fps = 30
+    cfg.enable_stream(rs.stream.safety, rs.format.y8, fps)
+    pipe = rs.pipeline(test_context)
+    pipe.start(cfg)
+    iterations = 0
+    reset_data()
+    while iterations < 20:
+        iterations += 1
+        f = pipe.wait_for_frames()
+        check_counter_and_timestamp_increase(f, fps)
+    pipe.stop()

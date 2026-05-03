@@ -1,25 +1,32 @@
 # License: Apache 2.0. See LICENSE file in root directory.
-# Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Not frequently changing, no need to test for each commit
-# test:donotrun:!nightly
-# test:device D585S
 
+import pytest
 import time
 import numpy as np
 import zlib
 import pyrealsense2 as rs
-from rspy import test, log, devices
+from pytest_check import check
 from rspy import tests_wrapper as tw
+import logging
+log = logging.getLogger(__name__)
+
+pytestmark = [
+    pytest.mark.device_each("D585S"),
+    pytest.mark.context("nightly"),
+]
 
 
-DEFAULT_PERCENTAGE_THRESHOLD = 80 #80%
+DEFAULT_PERCENTAGE_THRESHOLD = 80  # 80%
+
 
 def build_header(table_array, table_id, version_array):
     version_major = version_array[0]
     version_minor = version_array[1]
     table_size = len(table_array)
-    print ("table size", table_size)
+    print("table size", table_size)
     counter = 0
     test_cal_version = 0
     crc_computed = zlib.crc32(table_array)
@@ -78,11 +85,12 @@ def generate_dev_rules_selection_bitmap():
     bitmap |= np.uint64(1) << np.uint64(6)
 
     # bitmap: 0000000000000000000000000000000000000000000000000000000001000001
-    # log.d(f"Bitmap: {bitmap:064b}") # uncomment this line for debug print of bitmap
+    # log.debug(f"Bitmap: {bitmap:064b}") # uncomment this line for debug print of bitmap
 
     # convert 64-bit-map to 8 bytes np array
     bitmap_bytes = np.frombuffer(bitmap.tobytes(), dtype=np.uint8)
     return bitmap_bytes
+
 
 def generate_features_1_4():
 
@@ -92,7 +100,7 @@ def generate_features_1_4():
     smcu_skip_spi_error = 0
 
     arr = np.asarray([depth_pipe_safety_checks_override, triggered_calib_safety_checks_override,
-                       smcu_bypass_directly_to_maintenance_mode, smcu_skip_spi_error], dtype=np.uint8)
+                      smcu_bypass_directly_to_maintenance_mode, smcu_skip_spi_error], dtype=np.uint8)
     return arr
 
 
@@ -129,7 +137,6 @@ def generate_temp_thresholds():
     return temp_10
 
 
-
 def generate_humid_volt_thresholds():
     humidity_threshold_sht4x = DEFAULT_PERCENTAGE_THRESHOLD
     voltage_thresholds_vdd3v3 = DEFAULT_PERCENTAGE_THRESHOLD
@@ -145,9 +152,9 @@ def generate_humid_volt_thresholds():
     reserved2 = 0
 
     arr = np.asarray([humidity_threshold_sht4x, voltage_thresholds_vdd3v3, voltage_thresholds_vdd1v8,
-                     voltage_thresholds_vdd1v2, voltage_thresholds_vdd1v1, voltage_thresholds_vdd0v8,
-                     voltage_thresholds_vdd0v6, voltage_thresholds_vdd5vo_u, voltage_thresholds_vdd5vo_l,
-                     voltage_thresholds_vdd0v8_ddr, reserved1, reserved2], dtype=np.uint8)
+                      voltage_thresholds_vdd1v2, voltage_thresholds_vdd1v1, voltage_thresholds_vdd0v8,
+                      voltage_thresholds_vdd0v6, voltage_thresholds_vdd5vo_u, voltage_thresholds_vdd5vo_l,
+                      voltage_thresholds_vdd0v8_ddr, reserved1, reserved2], dtype=np.uint8)
 
     return arr
 
@@ -201,7 +208,7 @@ def generate_app_config_table():
     return app_cfg_6
 
 
-def set_app_config_table(app_config_table):
+def set_app_config_table(hwm_dev, app_config_table):
     set_table_opcode = 0xa6
     flash_mem_enum = 1
     app_config_id = 0xc0de
@@ -216,11 +223,11 @@ def set_app_config_table(app_config_table):
                                 data=table_with_header)
     ans = hwm_dev.send_and_receive_raw_data(cmd)
     opcode = ans[0]
-    test.check_equal(opcode, set_table_opcode)
+    check.equal(opcode, set_table_opcode)
     return ans
 
 
-def get_app_config_table():
+def get_app_config_table(hwm_dev):
     get_table_opcode = 0xa7
     flash_mem_enum = 1
     app_config_id = 0xc0de
@@ -231,7 +238,7 @@ def get_app_config_table():
                                 param3=d500_dynamic)
     ans = hwm_dev.send_and_receive_raw_data(cmd)
     opcode = ans[0]
-    test.check_equal(opcode, get_table_opcode)
+    check.equal(opcode, get_table_opcode)
     # slicing:
     # the 4 first bytes - opcode
     # the 16 following bytes = header
@@ -239,39 +246,31 @@ def get_app_config_table():
     return ans_data
 
 
-#############################################################################################
-# Tests
-#############################################################################################
+@pytest.fixture
+def hwm_dev(test_device):
+    """Yield hwm_dev with original app-config saved/restored around the test."""
+    dev, _ = test_device
+    hwm_dev = dev.as_debug_protocol()
+    tw.start_wrapper(dev)
+    orig_app_config_table = get_app_config_table(hwm_dev)
+    yield hwm_dev
+    set_app_config_table(hwm_dev, np.asarray(orig_app_config_table, dtype=np.uint8))
+    log.debug("app config successfully restored")
+    curr_config_table = get_app_config_table(hwm_dev)
+    check.equal(curr_config_table, orig_app_config_table)
+    tw.stop_wrapper(dev)
 
-dev, _ = test.find_first_device_or_exit()
-hwm_dev = dev.as_debug_protocol()
-tw.start_wrapper(dev)
 
-#############################################################################################
-test.start("get app config table")
-orig_app_config_table = get_app_config_table()
-log.d("app config successfully downloaded")
-test.finish()
+def test_get_app_config(hwm_dev):
+    config = get_app_config_table(hwm_dev)
+    log.debug("app config successfully downloaded")
+    assert config is not None
 
-#############################################################################################
-test.start("set app config table, and check its writing")
-generated_app_config_table_array = generate_app_config_table()
-ans = set_app_config_table(generated_app_config_table_array)
-log.d("app config successfully uploaded")
-# checking the app config table now in device is equal to the one uploaded
-curr_config_table = get_app_config_table()
-test.check_equal(curr_config_table, generated_app_config_table_array.tolist())
-test.finish()
 
-#############################################################################################
-test.start("restoring config table")
-app_config_table = set_app_config_table(np.asarray(orig_app_config_table, dtype=np.uint8))
-log.d("app config successfully uploaded")
-# checking the app config table now in device is equal to the one uploaded
-curr_config_table = get_app_config_table()
-test.check_equal(curr_config_table, orig_app_config_table)
-test.finish()
-
-#############################################################################################
-tw.stop_wrapper(dev)
-test.print_results_and_exit()
+def test_set_app_config(hwm_dev):
+    generated_app_config_table_array = generate_app_config_table()
+    set_app_config_table(hwm_dev, generated_app_config_table_array)
+    log.debug("app config successfully uploaded")
+    # checking the app config table now in device is equal to the one uploaded
+    curr_config_table = get_app_config_table(hwm_dev)
+    check.equal(curr_config_table, generated_app_config_table_array.tolist())

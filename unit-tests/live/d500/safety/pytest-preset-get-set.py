@@ -1,44 +1,31 @@
 # License: Apache 2.0. See LICENSE file in root directory.
-# Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-#test:device D585S
-#test:priority 10
 # Feature not frequently changing, moving to weekly checks
-# test:donotrun:!weekly
 
-# Add retries as occasionally HKR FW fails during this initialization
-#test:retries 3
-
-
-import pyrealsense2 as rs
+import pytest
 import random
-from rspy import test, log
 import json
 from rspy import tests_wrapper as tw
+from rspy.json_compare import check_equal_jsons
+import logging
+log = logging.getLogger(__name__)
 
-#############################################################################################
-# Helper Functions
-#############################################################################################
+# Add retries as occasionally HKR FW fails during this initialization
+pytestmark = [
+    pytest.mark.device_each("D585S"),
+    pytest.mark.priority(10),
+    pytest.mark.context("weekly"),
+    pytest.mark.flaky(retries=3),
+]
 
-#############################################################################################
-# Tests
-#############################################################################################
-
-test.start("Verify Safety Sensor Extension")
-ctx = rs.context()
-dev = ctx.query_devices()[0]
-safety_sensor = dev.first_safety_sensor()
-test.finish()
-
-tw.start_wrapper(dev)
-#############################################################################################
 
 # Safety Preset JSON String representation to be written on all indexes
 valid_sp_json_str = """
 {
     "safety_preset":
     {
-        "platform_config": 
+        "platform_config":
         {
             "transformation_link":
             {
@@ -53,7 +40,7 @@ valid_sp_json_str = """
             "robot_height": 1.0,
             "reserved": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         },
-        "safety_zones": 
+        "safety_zones":
         {
             "danger_zone":
             {
@@ -80,7 +67,7 @@ valid_sp_json_str = """
                 "reserved": [0, 0, 0, 0, 0, 0, 0]
             }
         },
-        "masking_zones": 
+        "masking_zones":
         {
             "0":
             {
@@ -180,7 +167,7 @@ valid_sp_json_str = """
             }
         },
         "reserved": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        "environment": 
+        "environment":
         {
             "safety_trigger_duration": 1.0,
             "zero_safety_monitoring": 0,
@@ -201,43 +188,43 @@ valid_sp_json_str = """
 }
 """
 
-#############################################################################################
 
-test.start("Init all safety zones")
-for x in range(64):
-    log.d("Init preset ID =", x)
-    safety_sensor.set_safety_preset(x, valid_sp_json_str)
-test.finish()
+@pytest.fixture
+def safety_sensor(test_device):
+    dev, _ = test_device
+    safety_sensor = dev.first_safety_sensor()
+    tw.start_wrapper(dev)
+    yield safety_sensor
+    tw.stop_wrapper(dev)
 
-#############################################################################################
 
-test.start("Writing safety preset to random index, then reading and comparing safety presets JSONs")
+def test_init_all_safety_zones(safety_sensor):
+    for x in range(64):
+        log.debug("Init preset ID = %s", x)
+        safety_sensor.set_safety_preset(x, valid_sp_json_str)
 
-# changing some small value to create new SP
-safety_preset_json_obj = json.loads(valid_sp_json_str)
-safety_preset_json_obj["safety_preset"]["environment"]["diagnostic_zone_fill_rate_threshold"] = 99
-new_safety_preset = json.dumps(safety_preset_json_obj)
 
-# generate random index
-index = random.randint(1, 63)
-log.out( "writing to index = ", index )
+def test_write_random_index_and_compare(safety_sensor):
+    # changing some small value to create new SP
+    safety_preset_json_obj = json.loads(valid_sp_json_str)
+    safety_preset_json_obj["safety_preset"]["environment"]["diagnostic_zone_fill_rate_threshold"] = 99
+    new_safety_preset = json.dumps(safety_preset_json_obj)
 
-# Save previous safety preset to restore it at the end
-previous_result = safety_sensor.get_safety_preset(index)
+    # generate random index
+    index = random.randint(1, 63)
+    log.info("writing to index = %s", index)
 
-# write the above sp table to the device
-safety_sensor.set_safety_preset(index, new_safety_preset)
+    # Save previous safety preset to restore it at the end
+    previous_result = safety_sensor.get_safety_preset(index)
 
-# read the table from the device
-read_result = safety_sensor.get_safety_preset(index)
+    # write the above sp table to the device
+    safety_sensor.set_safety_preset(index, new_safety_preset)
 
-# verify the tables are equal
-test.check_equal_jsons(json.loads(new_safety_preset), json.loads(read_result))
+    # read the table from the device
+    read_result = safety_sensor.get_safety_preset(index)
 
-# restore original table
-safety_sensor.set_safety_preset(index, previous_result)
-test.finish()
+    # verify the tables are equal
+    assert check_equal_jsons(json.loads(new_safety_preset), json.loads(read_result))
 
-#############################################################################################
-tw.stop_wrapper(dev)
-test.print_results_and_exit()
+    # restore original table
+    safety_sensor.set_safety_preset(index, previous_result)
