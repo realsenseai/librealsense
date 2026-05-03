@@ -21,6 +21,111 @@
 #define LOG_OCC_WARN(...)
 #endif //UCAL_PROFILE
 
+// Dumps tare host-assistance debug artifacts (input JSON per FW call,
+// baseline + final calibration table, decoded TareCalibrationResult).
+// Defined by default in this branch; #undef to strip.
+#define TARE_DEBUG_DUMP
+
+#ifdef TARE_DEBUG_DUMP
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
+namespace librealsense {
+namespace tare_debug {
+    struct session_t { bool active = false; std::string prefix; int step = 0; };
+    inline session_t & instance() { static thread_local session_t s; return s; }
+    inline void begin() {
+        auto & s = instance();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        std::stringstream pp; pp << "tare_debug_" << ms << "_";
+        s.prefix = pp.str();
+        s.step = 0;
+        s.active = true;
+    }
+    inline void end() { instance().active = false; }
+    inline void write_text(const std::string & name, const std::string & content) {
+        auto & s = instance(); if (!s.active) return;
+        std::ofstream f(s.prefix + name);
+        f << content;
+    }
+    inline void write_binary(const std::string & name, const std::vector<uint8_t> & bytes) {
+        auto & s = instance(); if (!s.active) return;
+        std::ofstream f(s.prefix + name, std::ios::binary);
+        if (!bytes.empty()) f.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());
+    }
+    inline std::string step_name(const char * suffix) {
+        std::stringstream n;
+        n << "step_" << std::setfill('0') << std::setw(2) << instance().step << "_" << suffix;
+        return n.str();
+    }
+    inline char const * state_name(int s) {
+        switch (s) {
+        case 0: return "NOT_ACTIVE";
+        case 1: return "WAIT_TO_CAMERA_START";
+        case 2: return "INITIAL_FW_CALL";
+        case 3: return "WAIT_TO_CALIB_START";
+        case 4: return "DATA_COLLECT";
+        case 5: return "WAIT_FOR_FINAL_FW_CALL";
+        case 6: return "FINAL_FW_CALL";
+        default: return "UNKNOWN";
+        }
+    }
+    // Decodes raw coefficients-table bytes (table_header + d400_coefficients_table)
+    // into a JSON string with intrinsics, rotations, baseline and per-resolution rect_params.
+    inline std::string decode_coefficients_table(std::vector<uint8_t> const & bytes) {
+        using namespace librealsense::ds;
+        std::stringstream ss;
+        // FW returns the table without the trailing reserved2 region. We only need
+        // everything up through rect_params, hence offsetof(...reserved2).
+        size_t const min_size = offsetof(d400_coefficients_table, reserved2);
+        if (bytes.size() < min_size) {
+            ss << "{\n  \"error\": \"truncated\",\n  \"size\": " << bytes.size()
+               << ",\n  \"expected_min\": " << min_size << "\n}";
+            return ss.str();
+        }
+        auto const * tbl = reinterpret_cast<d400_coefficients_table const *>(bytes.data());
+        auto dump_mat = [&](char const * name, rsutils::number::float3x3 const & m, bool trailing_comma) {
+            ss << "  \"" << name << "\": [["
+               << m.x.x << "," << m.x.y << "," << m.x.z << "],["
+               << m.y.x << "," << m.y.y << "," << m.y.z << "],["
+               << m.z.x << "," << m.z.y << "," << m.z.z << "]]"
+               << (trailing_comma ? "," : "") << "\n";
+        };
+        ss << "{\n";
+        ss << "  \"header\": {\n";
+        ss << "    \"table_type\": " << tbl->header.table_type << ",\n";
+        ss << "    \"table_size\": " << tbl->header.table_size << ",\n";
+        ss << "    \"crc32\": " << tbl->header.crc32 << "\n";
+        ss << "  },\n";
+        dump_mat("intrinsic_left_normalized", tbl->intrinsic_left, true);
+        dump_mat("intrinsic_right_normalized", tbl->intrinsic_right, true);
+        dump_mat("world2left_rot", tbl->world2left_rot, true);
+        dump_mat("world2right_rot", tbl->world2right_rot, true);
+        ss << "  \"baseline_mm\": " << tbl->baseline << ",\n";
+        ss << "  \"brown_model\": " << tbl->brown_model << ",\n";
+        char const * res_names[max_ds_rect_resolutions] = {
+            "1920x1080", "1280x720", "640x480", "848x480", "640x360", "424x240",
+            "320x240", "480x270", "1280x800", "960x540", "reserved_1", "reserved_2",
+            "640x400", "576x576", "720x720", "1152x1152"
+        };
+        // rect_params are stored as pixel-space intrinsics (fx, fy, ppx, ppy) per resolution.
+        ss << "  \"rect_params_pixels\": {\n";
+        for (int i = 0; i < max_ds_rect_resolutions; ++i) {
+            auto const & r = tbl->rect_params[i];
+            ss << "    \"" << res_names[i] << "\": {\"fx\": " << r.x
+               << ", \"fy\": " << r.y << ", \"ppx\": " << r.z
+               << ", \"ppy\": " << r.w << "}"
+               << (i + 1 < max_ds_rect_resolutions ? "," : "") << "\n";
+        }
+        ss << "  }\n";
+        ss << "}";
+        return ss.str();
+    }
+}}
+#endif // TARE_DEBUG_DUMP
+
 namespace librealsense
 {
 #pragma pack(push, 1)
@@ -686,6 +791,57 @@ namespace librealsense
             ds_calib_common::update_value_if_exists(jsn, "resize factor", _resize_factor);
         }
 
+#ifdef TARE_DEBUG_DUMP
+        {
+            bool first_call = (host_assistance != host_assistance_type::no_assistance
+                               && _interactive_state == interactive_calibration_state::RS2_OCC_STATE_NOT_ACTIVE);
+            if (first_call)
+            {
+                tare_debug::begin();
+                std::stringstream meta;
+                meta << "{\n"
+                     << "  \"ground_truth_mm\": " << ground_truth_mm << ",\n"
+                     << "  \"timeout_ms\": " << timeout_ms << ",\n"
+                     << "  \"host_assistance\": " << static_cast<int>(host_assistance) << ",\n"
+                     << "  \"caller_json\": " << (json.empty() ? std::string("null") : json) << "\n"
+                     << "}";
+                tare_debug::write_text("input.json", meta.str());
+                LOG_INFO("tare debug: session begin, prefix=" << tare_debug::instance().prefix
+                         << " ground_truth_mm=" << ground_truth_mm);
+            }
+            if (tare_debug::instance().active)
+            {
+                int step_idx = tare_debug::instance().step;
+                int state_int = static_cast<int>(_interactive_state);
+                std::stringstream ss;
+                ss << "{\n"
+                   << "  \"step\": " << step_idx << ",\n"
+                   << "  \"state_on_entry\": " << state_int << ",\n"
+                   << "  \"state_name\": \"" << tare_debug::state_name(state_int) << "\",\n"
+                   << "  \"depth\": " << depth << "\n"
+                   << "}";
+                std::string step_json_name  = tare_debug::step_name("input.json");
+                std::string step_calib_bin  = tare_debug::step_name("calib_table.bin");
+                std::string step_calib_json = tare_debug::step_name("calib_table.json");
+                tare_debug::write_text(step_json_name, ss.str());
+                // Read calibration table from FW (GETINTCAL) at this iteration.
+                try {
+                    auto calib = get_calibration_table();
+                    tare_debug::write_binary(step_calib_bin, calib);
+                    tare_debug::write_text(step_calib_json, tare_debug::decode_coefficients_table(calib));
+                    LOG_INFO("tare debug: step " << step_idx
+                             << " state=" << tare_debug::state_name(state_int)
+                             << " depth=" << depth
+                             << " -> " << step_json_name << ", " << step_calib_bin
+                             << " (" << calib.size() << "B)");
+                } catch (const std::exception & e) {
+                    LOG_WARNING("tare debug: step " << step_idx << " calib read failed: " << e.what());
+                }
+                ++tare_debug::instance().step;
+            }
+        }
+#endif
+
         if (host_assistance != host_assistance_type::no_assistance && _interactive_state == interactive_calibration_state::RS2_OCC_STATE_NOT_ACTIVE)
         {
             _json = json;
@@ -840,7 +996,49 @@ namespace librealsense
                 if (status != ds_calib_common::STATUS_SUCCESS)
                     handle_calibration_error(status);
 
+#ifdef TARE_DEBUG_DUMP
+                // Capture health values before res is overwritten (ph points into old res buffer).
+                float dbg_health_before = ph[0];
+                float dbg_health_after  = ph[1];
+                ds_calib_common::TareCalibrationResult dbg_result = result;
+                bool dbg_session_active = tare_debug::instance().active;
+#endif
+
                 res = get_calibration_results();
+
+#ifdef TARE_DEBUG_DUMP
+                if (dbg_session_active)
+                {
+                    tare_debug::write_binary("final_calib_table.bin", res);
+                    tare_debug::write_text("final_calib_table.json", tare_debug::decode_coefficients_table(res));
+                    std::stringstream ts;
+                    ts << "{\n"
+                       << "  \"status\": " << static_cast<int>(dbg_result.status) << ",\n"
+                       << "  \"tareDepth\": " << dbg_result.tareDepth << ",\n"
+                       << "  \"aveDepth\": " << dbg_result.aveDepth << ",\n"
+                       << "  \"curPx\": " << dbg_result.curPx << ",\n"
+                       << "  \"calPx\": " << dbg_result.calPx << ",\n"
+                       << "  \"accuracyLevel\": " << dbg_result.accuracyLevel << ",\n"
+                       << "  \"iterations\": " << dbg_result.iterations << ",\n"
+                       << "  \"healthCheck_before\": " << dbg_health_before << ",\n"
+                       << "  \"healthCheck_after\": " << dbg_health_after << ",\n"
+                       << "  \"ground_truth_mm\": " << ground_truth_mm << ",\n"
+                       << "  \"curRightRotation\": [";
+                    for (int i = 0; i < 9; ++i) ts << dbg_result.curRightRotation[i] << (i < 8 ? "," : "");
+                    ts << "],\n  \"calRightRotation\": [";
+                    for (int i = 0; i < 9; ++i) ts << dbg_result.calRightRotation[i] << (i < 8 ? "," : "");
+                    ts << "]\n}";
+                    tare_debug::write_text("final_tare_result.json", ts.str());
+                    LOG_INFO("tare debug: final result dumped, calib_table=" << res.size() << "B"
+                             << " status=" << static_cast<int>(dbg_result.status)
+                             << " curPx=" << dbg_result.curPx << " calPx=" << dbg_result.calPx
+                             << " health_before=" << dbg_health_before << " health_after=" << dbg_health_after);
+                    if (depth < 0) {
+                        tare_debug::end();
+                        LOG_INFO("tare debug: session end");
+                    }
+                }
+#endif
 
                 if (depth < 0)
                 {
