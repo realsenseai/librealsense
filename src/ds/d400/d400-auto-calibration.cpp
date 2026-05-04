@@ -31,9 +31,43 @@
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <cstring>
+#include <tuple>
 namespace librealsense {
 namespace tare_debug {
-    struct session_t { bool active = false; std::string prefix; int step = 0; };
+    // RAM addresses on the depth ASIC for the live right-IR intrinsics that the
+    // tare algorithm updates per iteration (read via MRD opcode):
+    //   0x1000a8  fx  (int32, Q26.6 — divide by 2^6)
+    //   0x1000ac  fy  (int32, Q26.6)
+    //   0x1000b0  ppx (int32, Q24.8 — divide by 2^8)
+    //   0x1000b4  ppy (int32, Q24.8)
+    constexpr uint32_t RIGHT_INTR_RAM_BASE = 0x1000a8;
+    constexpr uint32_t RIGHT_INTR_RAM_END  = 0x1000b8;
+    struct right_intr_ram_t {
+        float fx = std::numeric_limits<float>::quiet_NaN();
+        float fy = std::numeric_limits<float>::quiet_NaN();
+        float ppx = std::numeric_limits<float>::quiet_NaN();
+        float ppy = std::numeric_limits<float>::quiet_NaN();
+    };
+    inline right_intr_ram_t parse_right_intr_ram(std::vector<uint8_t> const & res) {
+        right_intr_ram_t out;
+        if (res.size() >= 16) {
+            int32_t v[4];
+            std::memcpy(v, res.data(), 16);
+            out.fx  = static_cast<float>(v[0]) / 64.0f;
+            out.fy  = static_cast<float>(v[1]) / 64.0f;
+            out.ppx = static_cast<float>(v[2]) / 256.0f;
+            out.ppy = static_cast<float>(v[3]) / 256.0f;
+        }
+        return out;
+    }
+    struct session_t {
+        bool active = false;
+        std::string prefix;
+        int step = 0;
+        // Per-step summary rows captured during the run; flushed on end().
+        std::vector<std::string> summary_rows;
+    };
     inline session_t & instance() { static thread_local session_t s; return s; }
     inline void begin() {
         auto & s = instance();
@@ -42,9 +76,20 @@ namespace tare_debug {
         std::stringstream pp; pp << "tare_debug_" << ms << "_";
         s.prefix = pp.str();
         s.step = 0;
+        s.summary_rows.clear();
         s.active = true;
     }
-    inline void end() { instance().active = false; }
+    inline void flush_summary() {
+        auto & s = instance(); if (!s.active) return;
+        std::ofstream f(s.prefix + "summary.json");
+        f << "{\n  \"steps\": [\n";
+        for (size_t i = 0; i < s.summary_rows.size(); ++i) {
+            f << "    " << s.summary_rows[i]
+              << (i + 1 < s.summary_rows.size() ? "," : "") << "\n";
+        }
+        f << "  ]\n}\n";
+    }
+    inline void end() { flush_summary(); instance().active = false; }
     inline void write_text(const std::string & name, const std::string & content) {
         auto & s = instance(); if (!s.active) return;
         std::ofstream f(s.prefix + name);
@@ -105,18 +150,34 @@ namespace tare_debug {
         dump_mat("world2right_rot", tbl->world2right_rot, true);
         ss << "  \"baseline_mm\": " << tbl->baseline << ",\n";
         ss << "  \"brown_model\": " << tbl->brown_model << ",\n";
-        char const * res_names[max_ds_rect_resolutions] = {
-            "1920x1080", "1280x720", "640x480", "848x480", "640x360", "424x240",
-            "320x240", "480x270", "1280x800", "960x540", "reserved_1", "reserved_2",
-            "640x400", "576x576", "720x720", "1152x1152"
+        struct res_info { char const * name; int width; int height; };
+        // Order must match the ds_rect_resolutions enum.
+        res_info const resolutions[max_ds_rect_resolutions] = {
+            { "1920x1080", 1920, 1080 }, { "1280x720", 1280, 720 },
+            { "640x480",    640,  480 }, { "848x480",   848, 480 },
+            { "640x360",    640,  360 }, { "424x240",   424, 240 },
+            { "320x240",    320,  240 }, { "480x270",   480, 270 },
+            { "1280x800",  1280,  800 }, { "960x540",   960, 540 },
+            { "reserved_1",   0,    0 }, { "reserved_2",  0,   0 },
+            { "640x400",    640,  400 }, { "576x576",   576, 576 },
+            { "720x720",    720,  720 }, { "1152x1152",1152,1152 },
         };
-        // rect_params are stored as pixel-space intrinsics (fx, fy, ppx, ppy) per resolution.
-        ss << "  \"rect_params_pixels\": {\n";
+        // Rectified depth intrinsics per resolution, shaped as rs2_intrinsics:
+        // model is always BROWN_CONRADY with zero coeffs (rectified CS origin).
+        ss << "  \"intrinsics_per_resolution\": {\n";
         for (int i = 0; i < max_ds_rect_resolutions; ++i) {
             auto const & r = tbl->rect_params[i];
-            ss << "    \"" << res_names[i] << "\": {\"fx\": " << r.x
-               << ", \"fy\": " << r.y << ", \"ppx\": " << r.z
-               << ", \"ppy\": " << r.w << "}"
+            auto const & info = resolutions[i];
+            ss << "    \"" << info.name << "\": {"
+               << "\"width\": " << info.width
+               << ", \"height\": " << info.height
+               << ", \"ppx\": " << r.z
+               << ", \"ppy\": " << r.w
+               << ", \"fx\": " << r.x
+               << ", \"fy\": " << r.y
+               << ", \"model\": \"RS2_DISTORTION_BROWN_CONRADY\""
+               << ", \"coeffs\": [0, 0, 0, 0, 0]"
+               << "}"
                << (i + 1 < max_ds_rect_resolutions ? "," : "") << "\n";
         }
         ss << "  }\n";
@@ -823,15 +884,69 @@ namespace librealsense
                 std::string step_json_name  = tare_debug::step_name("input.json");
                 std::string step_calib_bin  = tare_debug::step_name("calib_table.bin");
                 std::string step_calib_json = tare_debug::step_name("calib_table.json");
+                std::string step_ram_json   = tare_debug::step_name("ram.json");
                 tare_debug::write_text(step_json_name, ss.str());
-                // Read calibration table from FW (GETINTCAL) at this iteration.
+
+                // Live right-IR intrinsics from RAM (MRD). The GETINTCAL table only
+                // updates at FINAL_FW_CALL, but the algorithm's working values live
+                // at fixed RAM addresses and update every iteration.
+                tare_debug::right_intr_ram_t ram;
+                try {
+                    auto ram_bytes = _hw_monitor->send(
+                        command{ ds::MRD,
+                                 (int)tare_debug::RIGHT_INTR_RAM_BASE,
+                                 (int)tare_debug::RIGHT_INTR_RAM_END });
+                    ram = tare_debug::parse_right_intr_ram(ram_bytes);
+                    std::stringstream rs;
+                    rs << "{\n"
+                       << "  \"fx\": " << ram.fx << ",\n"
+                       << "  \"fy\": " << ram.fy << ",\n"
+                       << "  \"ppx\": " << ram.ppx << ",\n"
+                       << "  \"ppy\": " << ram.ppy << "\n"
+                       << "}";
+                    tare_debug::write_text(step_ram_json, rs.str());
+                } catch (const std::exception & e) {
+                    LOG_WARNING("tare debug: MRD read failed: " << e.what());
+                }
+
+                // Read calibration table from FW (GETINTCAL) at this iteration. Capture
+                // a compact summary row so the cross-step progression of the right-IR
+                // ppx/fx (which is what tare adjusts) shows up in summary.json.
                 try {
                     auto calib = get_calibration_table();
                     tare_debug::write_binary(step_calib_bin, calib);
                     tare_debug::write_text(step_calib_json, tare_debug::decode_coefficients_table(calib));
+                    float right_ppx_norm = std::numeric_limits<float>::quiet_NaN();
+                    float right_fx_norm  = std::numeric_limits<float>::quiet_NaN();
+                    float right_ppx_640  = std::numeric_limits<float>::quiet_NaN();
+                    size_t const min_size = offsetof(ds::d400_coefficients_table, reserved2);
+                    if (calib.size() >= min_size) {
+                        auto const * tbl = reinterpret_cast<ds::d400_coefficients_table const *>(calib.data());
+                        right_ppx_norm = tbl->intrinsic_right.x.z;
+                        right_fx_norm  = tbl->intrinsic_right.x.x;
+                        right_ppx_640  = tbl->rect_params[ds::res_640_480].z;
+                    }
+                    std::stringstream row;
+                    row << "{\"step\": " << step_idx
+                        << ", \"state\": \"" << tare_debug::state_name(state_int) << "\""
+                        << ", \"depth_in\": " << depth
+                        << ", \"ram_fx\": " << ram.fx
+                        << ", \"ram_fy\": " << ram.fy
+                        << ", \"ram_ppx\": " << ram.ppx
+                        << ", \"ram_ppy\": " << ram.ppy
+                        << ", \"right_ppx_norm\": " << right_ppx_norm
+                        << ", \"right_fx_norm\": " << right_fx_norm
+                        << ", \"right_ppx_640x480\": " << right_ppx_640
+                        << ", \"calib_crc32\": " << (calib.size() >= sizeof(ds::table_header)
+                                                    ? reinterpret_cast<ds::table_header const *>(calib.data())->crc32
+                                                    : 0u)
+                        << "}";
+                    tare_debug::instance().summary_rows.push_back(row.str());
+                    tare_debug::flush_summary();
                     LOG_INFO("tare debug: step " << step_idx
                              << " state=" << tare_debug::state_name(state_int)
                              << " depth=" << depth
+                             << " right_ppx_norm=" << right_ppx_norm
                              << " -> " << step_json_name << ", " << step_calib_bin
                              << " (" << calib.size() << "B)");
                 } catch (const std::exception & e) {
@@ -1029,6 +1144,59 @@ namespace librealsense
                     for (int i = 0; i < 9; ++i) ts << dbg_result.calRightRotation[i] << (i < 8 ? "," : "");
                     ts << "]\n}";
                     tare_debug::write_text("final_tare_result.json", ts.str());
+                    // Append a "final" row to summary.json so the post-tare values
+                    // sit next to the per-step DATA_COLLECT rows for easy diffing.
+                    {
+                        float right_ppx_norm = std::numeric_limits<float>::quiet_NaN();
+                        float right_fx_norm  = std::numeric_limits<float>::quiet_NaN();
+                        float right_ppx_640  = std::numeric_limits<float>::quiet_NaN();
+                        size_t const min_size = offsetof(ds::d400_coefficients_table, reserved2);
+                        if (res.size() >= min_size) {
+                            auto const * tbl = reinterpret_cast<ds::d400_coefficients_table const *>(res.data());
+                            right_ppx_norm = tbl->intrinsic_right.x.z;
+                            right_fx_norm  = tbl->intrinsic_right.x.x;
+                            right_ppx_640  = tbl->rect_params[ds::res_640_480].z;
+                        }
+                        tare_debug::right_intr_ram_t ram_final;
+                        try {
+                            auto ram_bytes = _hw_monitor->send(
+                                command{ ds::MRD,
+                                         (int)tare_debug::RIGHT_INTR_RAM_BASE,
+                                         (int)tare_debug::RIGHT_INTR_RAM_END });
+                            ram_final = tare_debug::parse_right_intr_ram(ram_bytes);
+                            std::stringstream rs;
+                            rs << "{\n"
+                               << "  \"fx\": " << ram_final.fx << ",\n"
+                               << "  \"fy\": " << ram_final.fy << ",\n"
+                               << "  \"ppx\": " << ram_final.ppx << ",\n"
+                               << "  \"ppy\": " << ram_final.ppy << "\n"
+                               << "}";
+                            tare_debug::write_text("final_ram.json", rs.str());
+                        } catch (const std::exception & e) {
+                            LOG_WARNING("tare debug: final MRD read failed: " << e.what());
+                        }
+                        std::stringstream row;
+                        row << "{\"step\": \"final\""
+                            << ", \"state\": \"FINAL_RESULT\""
+                            << ", \"depth_in\": " << depth
+                            << ", \"ram_fx\": " << ram_final.fx
+                            << ", \"ram_fy\": " << ram_final.fy
+                            << ", \"ram_ppx\": " << ram_final.ppx
+                            << ", \"ram_ppy\": " << ram_final.ppy
+                            << ", \"right_ppx_norm\": " << right_ppx_norm
+                            << ", \"right_fx_norm\": " << right_fx_norm
+                            << ", \"right_ppx_640x480\": " << right_ppx_640
+                            << ", \"calib_crc32\": " << (res.size() >= sizeof(ds::table_header)
+                                                        ? reinterpret_cast<ds::table_header const *>(res.data())->crc32
+                                                        : 0u)
+                            << ", \"curPx\": " << dbg_result.curPx
+                            << ", \"calPx\": " << dbg_result.calPx
+                            << ", \"healthCheck_before\": " << dbg_health_before
+                            << ", \"healthCheck_after\": " << dbg_health_after
+                            << "}";
+                        tare_debug::instance().summary_rows.push_back(row.str());
+                    tare_debug::flush_summary();
+                    }
                     LOG_INFO("tare debug: final result dumped, calib_table=" << res.size() << "B"
                              << " status=" << static_cast<int>(dbg_result.status)
                              << " curPx=" << dbg_result.curPx << " calPx=" << dbg_result.calPx
