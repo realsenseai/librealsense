@@ -20,6 +20,7 @@
 #include <src/core/depth-frame.h>
 #include <src/points.h>
 #include <src/labeled-points.h>
+#include <src/object-detection-frame.h>
 
 #include <fstream>
 
@@ -223,6 +224,41 @@ namespace librealsense
 
             write_message(ros2_topic::frame_data_topic(stream_id), "sensor_msgs/msg/Image", timestamp, img);
         }
+        else if (Is<object_detection_frame>(frame.frame))
+        {
+            // Re-encode the binary object_detection_payload back to the same JSON format the DDS server sends,
+            // so that playback can reconstruct the frame using the same parse path.
+            auto od = As<object_detection_frame>(frame.frame);
+            auto raw = reinterpret_cast<object_detection_frame::object_detection_payload const *>(od->get_frame_data());
+            auto n = raw->number_of_detections;
+
+            std::ostringstream json;
+            json << "{"
+                 << "\"frame_id\":" << raw->frame_id << ","
+                 << "\"number_of_detections\":" << n << ","
+                 << "\"detections\":[";
+            for (uint16_t i = 0; i < n; ++i)
+            {
+                auto const & e = raw->detections[i];
+                if (i) json << ",";
+                json << "{"
+                     << "\"class_id\":"    << static_cast<int>(e.detection_type) << ","
+                     << "\"confidence\":"  << static_cast<int>(e.confidence) << ","
+                     << "\"x1\":"          << e.top_left_x << ","
+                     << "\"y1\":"          << e.top_left_y << ","
+                     << "\"x2\":"          << e.bottom_right_x << ","
+                     << "\"y2\":"          << e.bottom_right_y << ","
+                     << "\"distance\":"    << e.distance
+                     << "}";
+            }
+            json << "],"
+                 << "\"source_frame_id\":" << raw->source_frame_id << ","
+                 << "\"version\":"         << raw->header.version << ","
+                 << "\"timestamp_us\":"    << (raw->timestamp * 1e6)
+                 << "}";
+
+            write_string(ros2_topic::frame_data_topic(stream_id), timestamp, json.str());
+        }
         else
         {
             LOG_WARNING("Unsupported frame type for stream " << stream_id.stream_type << ". Skipping frame.");
@@ -338,21 +374,25 @@ namespace librealsense
             LOG_WARNING("Failed to write frame metadata for " << stream_id.stream_type << ". Exception: " << e.what());
         }
 
-        try
+        // Inference streams don't participate in the extrinsics map
+        if (stream_id.stream_type != RS2_STREAM_OBJECT_DETECTION)
         {
-            auto sensor = frame->get_sensor();
-            if (sensor)
+            try
             {
-                auto& dev = sensor->get_device();
-                uint32_t reference_id = 0;
-                rs2_extrinsics ext;
-                std::tie(reference_id, ext) = dev.get_extrinsics(*frame->get_stream());
-                write_extrinsics(stream_id, reference_id, ext);
+                auto sensor = frame->get_sensor();
+                if (sensor)
+                {
+                    auto& dev = sensor->get_device();
+                    uint32_t reference_id = 0;
+                    rs2_extrinsics ext;
+                    std::tie(reference_id, ext) = dev.get_extrinsics(*frame->get_stream());
+                    write_extrinsics(stream_id, reference_id, ext);
+                }
             }
-        }
-        catch (std::exception const& e)
-        {
-            LOG_WARNING("Failed to write stream extrinsics for " << stream_id.stream_type << ". Exception: " << e.what());
+            catch (std::exception const& e)
+            {
+                LOG_WARNING("Failed to write stream extrinsics for " << stream_id.stream_type << ". Exception: " << e.what());
+            }
         }
     }
 
@@ -497,6 +537,12 @@ namespace librealsense
             write_streaming_info(timestamp, { device_id, sensor_id }, profile);
             break;
         }*/
+        case RS2_EXTENSION_INFERENCE_PROFILE:
+        {
+            auto profile = SnapshotAs<RS2_EXTENSION_INFERENCE_PROFILE>(snapshot);
+            write_stream_info(timestamp, { device_id, sensor_id }, profile);
+            break;
+        }
         case RS2_EXTENSION_RECOMMENDED_FILTERS:
         {
             auto filters = SnapshotAs<RS2_EXTENSION_RECOMMENDED_FILTERS>(snapshot);

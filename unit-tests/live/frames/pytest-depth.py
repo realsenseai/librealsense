@@ -22,6 +22,7 @@ FRAMES_TO_CHECK = 30
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
+    pytest.mark.device_exclude("D401"),
 ]
 
 

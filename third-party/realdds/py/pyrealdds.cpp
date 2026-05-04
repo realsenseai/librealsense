@@ -9,6 +9,7 @@
 #include <realdds/topics/compressed-image-msg.h>
 #include <realdds/topics/image-msg.h>
 #include <realdds/topics/imu-msg.h>
+#include <realdds/topics/string-msg.h>
 #include <realdds/topics/blob-msg.h>
 #include <realdds/topics/ros2/participant-entities-info-msg.h>
 #include <realdds/topics/blob/blobPubSubTypes.h>
@@ -1041,6 +1042,10 @@ PYBIND11_MODULE(NAME, m) {
     py::class_< dds_motion_stream_profile, std::shared_ptr< dds_motion_stream_profile > >( m, "motion_stream_profile", stream_profile_base )
         .def( py::init< int16_t >() );
 
+    using realdds::dds_inference_stream_profile;
+    py::class_< dds_inference_stream_profile, std::shared_ptr< dds_inference_stream_profile > >( m, "inference_stream_profile", stream_profile_base )
+        .def( py::init< int16_t >() );
+
     using realdds::dds_stream_base;
     py::class_< dds_stream_base, std::shared_ptr< dds_stream_base > > stream_base( m, "stream_base" );
     stream_base
@@ -1109,6 +1114,27 @@ PYBIND11_MODULE(NAME, m) {
         .def( "set_gyro_intrinsics", &dds_motion_stream_server::set_gyro_intrinsics )
         .def( "set_accel_intrinsics", &dds_motion_stream_server::set_accel_intrinsics )
         .def( "start_streaming", &dds_motion_stream_server::start_streaming );
+
+    using realdds::dds_inference_stream_server;
+    py::class_< dds_inference_stream_server, std::shared_ptr< dds_inference_stream_server > >
+        inference_stream_server_base( m, "inference_stream_server", stream_server_base );
+    inference_stream_server_base
+        .def( py::init< std::string const &, std::string const & >(), "stream_name"_a, "sensor_name"_a )
+        .def( "start_streaming", &dds_inference_stream_server::start_streaming )
+        .def( "publish_inference",
+              []( dds_inference_stream_server & self, std::string const & data )
+              {
+                  realdds::topics::string_msg msg;
+                  msg.set_data( data );
+                  self.publish_inference( msg );
+              },
+              py::call_guard< py::gil_scoped_release >(),
+              "data"_a );
+
+    using realdds::dds_object_detection_stream_server;
+    py::class_< dds_object_detection_stream_server, std::shared_ptr< dds_object_detection_stream_server > >(
+        m, "object_detection_stream_server", inference_stream_server_base )
+        .def( py::init< std::string const &, std::string const & >(), "stream_name"_a, "sensor_name"_a );
 
     // To have the python code be able to modify json objects in callbacks, we need to somehow refer to the original
     // json object as changes to translated dict will not automatically get picked up!
@@ -1206,6 +1232,21 @@ PYBIND11_MODULE(NAME, m) {
                       ( dds_motion_stream *, imu_msg &&, dds_sample && ),
                       ( imu_msg && i, dds_sample && sample ),
                       callback( self, std::move( i ), std::move( sample ) ); ) );
+
+    using realdds::dds_inference_stream;
+    py::class_< dds_inference_stream, std::shared_ptr< dds_inference_stream > >
+        inference_stream_client_base( m, "inference_stream", stream_client_base );
+    inference_stream_client_base
+        .def( FN_FWD( dds_inference_stream,
+                      on_data_available,
+                      ( dds_inference_stream *, std::string, dds_sample && ),
+                      ( realdds::topics::string_msg && msg, dds_sample && sample ),
+                      callback( self, std::string( msg.data() ), std::move( sample ) ); ) );
+
+    using realdds::dds_object_detection_stream;
+    py::class_< dds_object_detection_stream, std::shared_ptr< dds_object_detection_stream > >(
+        m, "object_detection_stream", inference_stream_client_base )
+        .def( py::init< std::string const &, std::string const & >(), "stream_name"_a, "sensor_name"_a );
 
 
     using subscription = rsutils::subscription;

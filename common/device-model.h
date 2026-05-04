@@ -365,6 +365,11 @@ namespace rs2
         // Needed as a member for reseting the window memory on device disconnection.
 
         bool show_advanced_mode_popup = false;
+        
+        bool subdevice_has_inference_stream_enabled( const subdevice_model & sub );
+        bool are_color_and_depth_streaming() const;
+        void stop_inference_if_video_stopped( viewer_model & viewer );
+
         void draw_info_icon(ux_window& window, ImFont* font, const ImVec2& size);
         int draw_seek_bar();
         int draw_playback_controls(ux_window& window, ImFont* font, viewer_model& view);

@@ -35,6 +35,7 @@ namespace librealsense
         static constexpr const char* ros_safety_type_str() { return "safety"; }
         static constexpr const char* ros_occupancy_type_str() { return "occupancy"; }
         static constexpr const char* ros_labeled_points_type_str() { return "labeled_points"; }
+        static constexpr const char* ros_object_detection_type_str() { return "object_detection"; }
 
         static uint32_t get_device_index(const std::string& topic)
         {
@@ -167,7 +168,9 @@ namespace librealsense
 
         static std::string notification_topic(const device_serializer::sensor_identifier& sensor_id, rs2_notification_category nc)
         {
-            return create_from({ device_prefix(sensor_id.device_index), sensor_prefix(sensor_id.sensor_index), "notification", rs2_notification_category_to_string(nc)});
+            std::string topic_name = rs2_notification_category_to_string(nc);
+            std::replace(topic_name.begin(), topic_name.end(), ' ', '_');
+            return create_from({ device_prefix(sensor_id.device_index), sensor_prefix(sensor_id.sensor_index), "notification", topic_name });
         }
 
         template<uint32_t index>
@@ -229,6 +232,8 @@ namespace librealsense
                 return ros_occupancy_type_str();
             case RS2_STREAM_LABELED_POINT_CLOUD:
                 return ros_labeled_points_type_str();
+            case RS2_STREAM_OBJECT_DETECTION:
+                return ros_object_detection_type_str();
             }
             throw io_exception( rsutils::string::from() << "Unknown stream type when resolving ros type: " << type );
         }

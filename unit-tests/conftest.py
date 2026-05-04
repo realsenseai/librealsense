@@ -132,6 +132,20 @@ def pytest_addoption(parser):
         help="Only run tests that require a live device (have at least one device/device_each marker)."
     )
     group.addoption(
+        "--not-live",
+        action="store_true",
+        default=False,
+        help="Only run tests that don't require a live device (skip tests with device/device_each markers). "
+             "Mutually exclusive with --live."
+    )
+    group.addoption(
+        "--tag",
+        action="store",
+        default="",
+        help="Run only tests with the given marker (alias for pytest's -m). "
+             "Legacy run-unit-tests.py compatibility."
+    )
+    group.addoption(
         "--repeat",
         action="store",
         default=0,
@@ -148,6 +162,7 @@ def pytest_addoption(parser):
         help="Pre-parsed flags (no need for --rs-help): "
              "--debug (enable -D- debug logs), "
              "-r/--regex <pattern> (filter tests by name, maps to -k), "
+             "--tag <name> (run only tests with marker, maps to -m), "
              "--retries N (retry failed tests N times)."
     )
 
@@ -162,6 +177,13 @@ def pytest_configure(config):
 
     check_required_plugins()
     apply_pending_flags(config)
+
+    if config.getoption("--live", default=False) and config.getoption("--not-live", default=False):
+        raise pytest.UsageError("--live and --not-live are mutually exclusive")
+
+    tag_value = config.getoption("--tag", default="")
+    if tag_value and not config.option.markexpr:
+        config.option.markexpr = tag_value
 
     # --repeat N → pytest-repeat's --count N (only if --count wasn't explicitly set)
     repeat_val = config.getoption('repeat_count', default=0)
@@ -522,3 +544,48 @@ def test_devices(test_context, module_device_setup):
 def test_context_var():
     """Expose the --context tags (e.g. ['nightly', 'weekly']) so tests can branch on them."""
     return context_list
+
+
+@pytest.fixture(scope="module")
+def _safety_mode_state():
+    """Module-scoped state holder for D585S service mode, keyed by device serial number.
+
+    Each serial gets its own entry so that multiple D585S cameras in the same module
+    (e.g. via device_each) are each entered into service mode independently.
+    Teardown runs once at module end, restoring run mode for every camera that was entered.
+    """
+    state = {}  # serial_number -> {'sensor': ..., 'entered': False}
+    yield state
+    for sn, entry in state.items():
+        if entry['entered'] and entry['sensor'] is not None:
+            try:
+                entry['sensor'].set_option(rs.option.safety_mode, rs.safety_mode.run)
+            except Exception as e:
+                # Don't throw on cleanup failure, to not mask test failures and also after test device is usually reset.
+                log.error(f"safety_mode restore failed for {sn}: {e}")
+
+
+@pytest.fixture
+def test_device_wrapped(test_device, _safety_mode_state):
+    """Like test_device, but puts D585S into service mode once per module per device.
+
+    Many option-setting operations on D585S require service mode. No-op for all other
+    device families. Service mode is entered on the first test in the module that uses
+    this fixture for a given serial, and restored once at module teardown — not toggled
+    per test case. Multiple D585S cameras are each tracked independently by serial.
+    """
+    dev, ctx = test_device
+    is_d585s = dev.supports(rs.camera_info.name) and "D585S" in dev.get_info(rs.camera_info.name)
+    if is_d585s:
+        sn = dev.get_info(rs.camera_info.serial_number)
+        if sn not in _safety_mode_state:
+            _safety_mode_state[sn] = {'sensor': None, 'entered': False}
+        entry = _safety_mode_state[sn]
+        if not entry['entered']:
+            safety_sensor = dev.first_safety_sensor()
+            if safety_sensor.get_option(rs.option.safety_mode) != rs.safety_mode.service:
+                # Will throw on failure — intentional so we fail the test rather than run without service mode.
+                safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.service)
+            entry['sensor'] = safety_sensor
+            entry['entered'] = True
+    yield dev, ctx

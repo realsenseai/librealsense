@@ -18,5 +18,6 @@ pytest-timeout==2.2.0
 pytest-retry==1.7.0
 pytest-repeat==0.9.3
 pytest-check==2.8.0
+pytest-dependency==0.6.1
 
 # REST API deps: wrappers/rest-api/requirements.txt + unit-tests/wrappers/rest-api/requirements.txt

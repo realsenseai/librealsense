@@ -9,6 +9,8 @@
 #include <src/safety-sensor.h>
 #include <src/depth-mapping-sensor.h>
 #include <src/core/frame-callback.h>
+#include <src/core/inference.h>
+#include <src/inference-sensor.h>
 
 #include <rsutils/string/from.h>
 
@@ -204,6 +206,12 @@ bool librealsense::record_sensor::extend_to(rs2_extension extension_type, void**
         return *ext;
     case RS2_EXTENSION_DEPTH_MAPPING_SENSOR:
         *ext = As< typename ExtensionToType< RS2_EXTENSION_DEPTH_MAPPING_SENSOR >::type >( &m_sensor );
+        return *ext;
+    case RS2_EXTENSION_INFERENCE_SENSOR:
+        *ext = As< typename ExtensionToType< RS2_EXTENSION_INFERENCE_SENSOR >::type >( &m_sensor );
+        return *ext;
+    case RS2_EXTENSION_OBJECT_DETECTION_SENSOR:
+        *ext = As< typename ExtensionToType< RS2_EXTENSION_OBJECT_DETECTION_SENSOR >::type >( &m_sensor );
         return *ext;
 
     //Other extensions are not expected to be extensions of a sensor
@@ -420,6 +428,8 @@ void record_sensor::wrap_streams()
                 extension_type = RS2_EXTENSION_MOTION_PROFILE;
             else if (Is<librealsense::pose_stream_profile_interface>(stream))
                 extension_type = RS2_EXTENSION_POSE_PROFILE;
+            else if (Is<librealsense::inference_stream_profile_interface>(stream))
+                extension_type = RS2_EXTENSION_INFERENCE_PROFILE;
             else
                 throw std::runtime_error("Unsupported stream");
 

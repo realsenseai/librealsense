@@ -32,6 +32,8 @@ public:
                                                                            bool is_default = false, std::string name = "" );
     virtual std::shared_ptr< stream_profile_interface > add_pose_stream( rs2_pose_stream pose_stream,
                                                                          bool is_default = false, std::string name = "" );
+    virtual std::shared_ptr< stream_profile_interface > add_inference_stream( rs2_inference_stream inference_stream,
+                                                                              bool is_default = false, std::string name = "" );
 
     bool extend_to( rs2_extension extension_type, void ** ptr ) override;
 

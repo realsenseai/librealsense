@@ -9,6 +9,7 @@
 
 #include <rsutils/string/from.h>
 #include <src/core/stream-profile-interface.h>
+#include <src/object-detection-frame.h>
 
 namespace librealsense
 {
@@ -63,7 +64,9 @@ namespace librealsense
                                   RS2_EXTENSION_DISPARITY_FRAME,
                                   RS2_EXTENSION_MOTION_FRAME,
                                   RS2_EXTENSION_POSE_FRAME,
-                                  RS2_EXTENSION_LABELED_POINTS };
+                                  RS2_EXTENSION_LABELED_POINTS,
+                                  RS2_EXTENSION_INFERENCE_FRAME,
+                                  RS2_EXTENSION_OBJECT_DETECTION_FRAME };
 
         _metadata_parsers = metadata_parsers;
     }
@@ -201,6 +204,9 @@ namespace librealsense
             return RS2_EXTENSION_MOTION_FRAME;
         case RS2_STREAM_LABELED_POINT_CLOUD:
             return RS2_EXTENSION_LABELED_POINTS;
+
+        case RS2_STREAM_OBJECT_DETECTION:
+            return RS2_EXTENSION_OBJECT_DETECTION_FRAME;
 
         case RS2_STREAM_COLOR:
         case RS2_STREAM_INFRARED:

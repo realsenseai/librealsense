@@ -125,6 +125,7 @@ namespace librealsense
         static constexpr const char* ros_safety_type_str() { return "safety"; }
         static constexpr const char* ros_occupancy_type_str() { return "occupancy"; }
         static constexpr const char* ros_labeled_points_type_str() { return "labeled_points"; }
+        static constexpr const char* ros_object_detection_type_str() { return "object_detection"; }
 
         static uint32_t get_device_index(const std::string& topic)
         {
@@ -317,6 +318,8 @@ namespace librealsense
                 return ros_occupancy_type_str();
             case RS2_STREAM_LABELED_POINT_CLOUD:
                 return ros_labeled_points_type_str();
+            case RS2_STREAM_OBJECT_DETECTION:
+                return ros_object_detection_type_str();
             }
             throw io_exception( rsutils::string::from() << "Unknown stream type when resolving ros type: " << type );
         }
@@ -397,6 +400,7 @@ namespace librealsense
                                              << "|" << ros_topic::ros_safety_type_str()
                                              << "|" << ros_topic::ros_occupancy_type_str()
                                              << "|" << ros_topic::ros_labeled_points_type_str()
+                                             << "|" << ros_topic::ros_object_detection_type_str()
                                              << "|" << ros_topic::ros_pose_type_str() << "/transform";
         }
 

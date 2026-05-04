@@ -169,6 +169,12 @@ jobs:
       run: |
         python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "windows" ${{env.WIN_BUILD_DIR}}/Release
 
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "windows"
+
     - name: Client for realsense2-all
       shell: bash
       run: |
@@ -212,7 +218,7 @@ jobs:
       run: |        
         LRS_SRC_DIR=$(pwd)   
         cd ${{env.WIN_BUILD_DIR}}
-        cmake ${LRS_SRC_DIR} -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true 
+        cmake ${LRS_SRC_DIR} -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=true -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true
 
     - name: Build
       # Build your program with the given configuration
@@ -222,11 +228,15 @@ jobs:
         cmake --build . --config ${{env.LRS_RUN_CONFIG}} -- -m
 
     - name: LibCI
-      # Note: we specifically disable BUILD_UNIT_TESTS so the executable C++ unit-tests won't run
-      # This is to save time as DDS already lengthens the build...
       shell: bash
       run: |
         python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "dds windows" ${{env.WIN_BUILD_DIR}}/Release
+
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "dds windows"
 
 #--------------------------------------------------------------------------------
   Win_SH_Py_DDS_SEC:  # Windows, Shared, Python, Tools, DDS, additional security checks
@@ -396,6 +406,12 @@ jobs:
       run: |
         python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "linux"
 
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "linux"
+
 
   #--------------------------------------------------------------------------------
   U22_ST_Py_DDS_RSUSB_CI:  # Ubuntu 2020, Static, Python, DDS, RSUSB, LibCI without executables
@@ -430,7 +446,7 @@ jobs:
       shell: bash
       run: |
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=false -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DFORCE_RSUSB_BACKEND=true
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=false -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DBUILD_UNIT_TESTS=true -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DFORCE_RSUSB_BACKEND=true
         cmake --build . -- -j4
 
     - name: Client for realsense2-all
@@ -443,12 +459,16 @@ jobs:
         ./rs-all-client
 
     - name: LibCI
-      # Note: we specifically disable BUILD_UNIT_TESTS so the executable C++ unit-tests won't run
-      # This is to save time as DDS already lengthens the build...
       shell: bash
       run: |
         python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "dds linux" --tag dds
-  
+
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "dds linux" --tag dds
+
 
   #--------------------------------------------------------------------------------
   U22_ST_Py_DDS_RSUSB_SEC:  # Ubuntu 2020, Static, Python, DDS, RSUSB, additional security checks
@@ -542,15 +562,19 @@ jobs:
       # Adding -DENABLE_SECURITY_FLAGS=true here to also check DDS. See RSDSO-RSDSO-20629.
       run: | 
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DENABLE_SECURITY_FLAGS=true
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DBUILD_UNIT_TESTS=true -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DENABLE_SECURITY_FLAGS=true
         cmake --build . -- -j4
 
     - name: LibCI
-      # Note: we specifically disable BUILD_UNIT_TESTS so the executable C++ unit-tests won't run
-      # This is to save time as DDS already lengthens the build...
       shell: bash
       run: |
         python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "dds linux" --tag dds
+
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "dds linux" --tag dds
 
   #--------------------------------------------------------------------------------
   U-Latest_ST_Py_EX_CfU:  # Ubuntu latest, Static, Python, Examples & Tools, Check for Updates

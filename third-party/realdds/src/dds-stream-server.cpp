@@ -2,6 +2,7 @@
 // Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
 
 #include <realdds/dds-stream-server.h>
+#include <realdds/dds-stream-profile.h>
 
 #include <realdds/dds-topic-writer.h>
 #include <realdds/dds-topic.h>
@@ -10,6 +11,7 @@
 #include <realdds/dds-utilities.h>
 #include <realdds/topics/image-msg.h>
 #include <realdds/topics/imu-msg.h>
+#include <realdds/topics/string-msg.h>
 #include <realdds/topics/flexible-msg.h>
 #include <realdds/dds-time.h>
 
@@ -256,5 +258,58 @@ void dds_motion_stream_server::publish_motion( topics::imu_msg && imu )
 
     imu.write_to( *_writer );
 }
+
+
+dds_inference_stream_server::dds_inference_stream_server( std::string const & stream_name,
+                                                          std::string const & sensor_name )
+    : dds_stream_server( stream_name, sensor_name )
+{
+}
+
+
+void dds_inference_stream_server::check_profile( std::shared_ptr< dds_stream_profile > const & profile ) const
+{
+    super::check_profile( profile );
+    if( ! std::dynamic_pointer_cast< dds_inference_stream_profile >( profile ) )
+        DDS_THROW( runtime_error, "profile '" + profile->to_string() + "' is not an inference profile" );
+}
+
+
+void dds_inference_stream_server::open( std::string const & topic_name,
+                                        std::shared_ptr< dds_publisher > const & publisher )
+{
+    if( is_open() )
+        DDS_THROW( runtime_error, "stream '" + name() + "' is already open" );
+    if( profiles().empty() )
+        DDS_THROW( runtime_error, "stream '" + name() + "' has no profiles" );
+
+    auto topic = topics::string_msg::create_topic( publisher->get_participant(), topic_name.c_str() );
+    _writer = std::make_shared< dds_topic_writer >( topic, publisher );
+
+    run_stream();
+}
+
+
+void dds_inference_stream_server::start_streaming()
+{
+    super::start_streaming();
+}
+
+
+void dds_inference_stream_server::publish_inference( topics::string_msg const & msg )
+{
+    if( ! is_streaming() )
+        DDS_THROW( runtime_error, "stream '" + name() + "' cannot publish before start_streaming()" );
+
+    msg.write_to( *_writer );
+}
+
+
+dds_object_detection_stream_server::dds_object_detection_stream_server( std::string const & stream_name,
+                                                                          std::string const & sensor_name )
+    : super( stream_name, sensor_name )
+{
+}
+
 
 }  // namespace realdds

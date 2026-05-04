@@ -92,6 +92,8 @@ EXPORTS
     rs2_frame_add_ref
     rs2_pose_frame_get_pose_data
     rs2_extract_target_dimensions
+    rs2_get_frame_object_detection_count
+    rs2_get_frame_object_detection
 
     rs2_get_option
     rs2_get_option_value
@@ -358,6 +360,8 @@ EXPORTS
     rs2_software_sensor_add_motion_stream_ex
     rs2_software_sensor_add_pose_stream
     rs2_software_sensor_add_pose_stream_ex
+    rs2_software_sensor_add_inference_stream
+    rs2_software_sensor_add_inference_stream_ex
     rs2_software_sensor_add_read_only_option
     rs2_software_sensor_update_read_only_option
     rs2_software_sensor_add_option

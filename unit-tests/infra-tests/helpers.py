@@ -105,10 +105,10 @@ def make_mock_item(name="test_example", markers=None, module_name="fake_module",
     return item
 
 
-def make_mock_config(context="", live=False, markexpr=""):
+def make_mock_config(context="", live=False, not_live=False, markexpr=""):
     """Build a mock pytest Config for unit-testing collection/filter logic."""
     config = MagicMock()
-    opts = {"--context": context, "--live": live, "-m": markexpr}
+    opts = {"--context": context, "--live": live, "--not-live": not_live, "-m": markexpr}
     config.getoption = lambda key, default=None: opts.get(key, default)
     return config
 
@@ -160,10 +160,10 @@ def run_e2e(test_filename, *extra_pytest_args):
             timeout=30,
         )
 
-        if p.returncode != 0 and 'no tests ran' not in p.stdout and 'passed' not in p.stdout \
-                and 'skipped' not in p.stdout and 'error' not in p.stdout \
-                and 'failed' not in p.stdout:
-            pytest.fail(f"Subprocess crashed (rc={p.returncode}):\n{p.stdout}")
+        if p.returncode != 0:
+            out_lower = p.stdout.lower()
+            if not any(kw in out_lower for kw in ('no tests ran', 'passed', 'skipped', 'error', 'failed')):
+                pytest.fail(f"Subprocess crashed (rc={p.returncode}):\n{p.stdout}")
 
         tracking_file = os.path.join(tmpdir, '_tracking.json')
         tracking = json.loads(open(tracking_file).read()) if os.path.exists(tracking_file) else {

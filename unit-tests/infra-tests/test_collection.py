@@ -95,6 +95,36 @@ class TestLiveFiltering:
         item.add_marker.assert_not_called()
 
 
+class TestNotLiveFiltering:
+    """--not-live should skip tests that HAVE device/device_each markers."""
+
+    def _device_marker(self, name):
+        m = MagicMock()
+        m.name = name
+        m.args = ("D455",)
+        return m
+
+    def test_skips_device_tests(self):
+        item = make_mock_item(markers=[self._device_marker("device")])
+        filter_and_sort_items(make_mock_config(not_live=True), [item])
+
+        item.add_marker.assert_called_once()
+        assert item.add_marker.call_args[0][0].name == "skip"
+
+    def test_skips_device_each_tests(self):
+        item = make_mock_item(markers=[self._device_marker("device_each")])
+        filter_and_sort_items(make_mock_config(not_live=True), [item])
+
+        item.add_marker.assert_called_once()
+        assert item.add_marker.call_args[0][0].name == "skip"
+
+    def test_keeps_non_device_tests(self):
+        item = make_mock_item()
+        filter_and_sort_items(make_mock_config(not_live=True), [item])
+
+        item.add_marker.assert_not_called()
+
+
 class TestPrioritySorting:
     """@pytest.mark.priority(N) should sort tests — lower values run first."""
 

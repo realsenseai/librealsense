@@ -287,10 +287,11 @@ private:
                 }
                 objects.emplace_back(
                     face->get_id(),
-                    rsutils::string::from(),
+                    object_type_to_string( object_type::face ),
                     normalized_color_bbox,
                     normalized_depth_bbox,
-                    face->get_depth()
+                    face->get_depth(),
+                    object_type::face
                 );
             }
 

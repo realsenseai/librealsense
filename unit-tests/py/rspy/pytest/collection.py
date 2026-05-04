@@ -7,7 +7,7 @@ import pytest
 
 
 def filter_and_sort_items(config, items):
-    """Auto-skip nightly/dds tests unless opted in, filter --live, and sort by priority.
+    """Auto-skip nightly/dds tests unless opted in, filter --live/--not-live, and sort by priority.
 
     Called from the pytest_collection_modifyitems hook.
     """
@@ -35,6 +35,14 @@ def filter_and_sort_items(config, items):
             has_device = any(item.iter_markers("device")) or any(item.iter_markers("device_each"))
             if not has_device:
                 item.add_marker(skip_no_device)
+
+    # Skip device tests when --not-live is specified (no hardware, e.g. GHA runners)
+    if config.getoption("--not-live", default=False):
+        skip_device = pytest.mark.skip(reason="--not-live: test requires a live device")
+        for item in items:
+            has_device = any(item.iter_markers("device")) or any(item.iter_markers("device_each"))
+            if has_device:
+                item.add_marker(skip_device)
 
     def get_priority(item):
         marker = item.get_closest_marker("priority")

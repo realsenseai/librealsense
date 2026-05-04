@@ -43,6 +43,28 @@ class TestLiveFilteringE2E:
         assert_outcomes(out, passed=1, skipped=1)
 
 
+class TestNotLiveFilteringE2E:
+    """--not-live should skip device tests (run only the no-hardware ones)."""
+
+    def test_keeps_non_device(self):
+        rc, out, *_ = run_e2e("pytest-live.py", "-k", "test_no_device", "--not-live")
+        assert_outcomes(out, passed=1)
+
+    def test_skips_device_each(self):
+        rc, out, *_ = run_e2e("pytest-live.py", "-k", "test_with_device", "--not-live")
+        assert_outcomes(out, skipped=1)
+
+    def test_mixed(self):
+        rc, out, *_ = run_e2e("pytest-live.py", "--not-live")
+        assert_outcomes(out, passed=1, skipped=1)
+
+    def test_live_and_not_live_mutually_exclusive(self):
+        """Passing both --live and --not-live should raise UsageError."""
+        rc, out, *_ = run_e2e("pytest-live.py", "--live", "--not-live")
+        assert rc != 0
+        assert "mutually exclusive" in out.lower()
+
+
 class TestPriorityOrderingE2E:
     """Tests should execute in priority order (lower first)."""
 

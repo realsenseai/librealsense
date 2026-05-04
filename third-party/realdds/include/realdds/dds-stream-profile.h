@@ -158,4 +158,21 @@ public:
 };
 
 
+class dds_inference_stream_profile : public dds_stream_profile
+{
+    typedef dds_stream_profile super;
+
+public:
+    dds_inference_stream_profile( int16_t frequency )
+        : super( frequency )
+    {
+    }
+
+    dds_inference_stream_profile( rsutils::json const & j, int & index )
+        : super( j, index )
+    {
+    }
+};
+
+
 }  // namespace realdds

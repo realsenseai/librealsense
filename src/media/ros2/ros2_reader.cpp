@@ -14,9 +14,13 @@
 #include <src/color-sensor.h>
 #include <src/safety-sensor.h>
 #include <src/depth-mapping-sensor.h>
+#include <src/inference-sensor.h>
 #include <src/points.h>
 #include <src/labeled-points.h>
 #include <src/context.h>
+#include <src/object-detection-frame.h>
+#include <rsutils/json.h>
+#include <rsutils/number/crc32.h>
 
 #include <cstring>
 
@@ -251,11 +255,65 @@ namespace librealsense
         frame_additional_data additional_data{};
         read_frame_metadata(additional_data);
 
-        bool is_imu_topic = (msg->topic_name.find("/imu/") != std::string::npos);
+        bool is_imu_topic       = (msg->topic_name.find("/" + std::string(ros2_topic::ros_imu_type_str())              + "/") != std::string::npos);
+        bool is_inference_topic = (msg->topic_name.find("/" + std::string(ros2_topic::ros_object_detection_type_str()) + "/") != std::string::npos);
 
         std::vector<uint8_t> data;
 
-        if (is_imu_topic)
+        if (is_inference_topic)
+        {
+            // Inference frames are stored as a JSON string (std_msgs/msg/String).
+            // Re-parse using the same format written by ros2_writer and construct the binary payload.
+            auto json_str = deserialize_message<cdr_string>(msg).value;
+            auto j = rsutils::json::parse( json_str );
+
+            auto n_detections = j.value( "number_of_detections", uint16_t(0) );
+
+            size_t const base_size = sizeof( object_detection_frame::object_detection_payload )
+                                   - sizeof( object_detection_frame::object_detection_entry );
+            size_t const total_size = base_size + n_detections * sizeof( object_detection_frame::object_detection_entry );
+
+            data.resize( total_size );
+            auto * payload = reinterpret_cast< object_detection_frame::object_detection_payload * >( data.data() );
+
+            payload->frame_id             = j.value( "frame_id", uint64_t(0) );
+            payload->number_of_detections = n_detections;
+            payload->source               = static_cast< uint8_t >( object_detection_frame::source::RGB );
+            payload->source_frame_id      = j.value( "source_frame_id", uint32_t(0) );
+            payload->timestamp            = j.value( "timestamp_us", 0.0 ) * 1e-6;  // us → seconds
+
+            auto dets_j = j.find( "detections" );
+            if( dets_j != j.end() && dets_j->is_array() )
+            {
+                for( uint16_t i = 0; i < n_detections && i < dets_j->size(); ++i )
+                {
+                    auto const & det = (*dets_j)[i];
+                    auto & e         = payload->detections[i];
+                    e.detection_id   = i;
+                    e.detection_type = det.value( "class_id",    uint8_t(0) );
+                    e.confidence     = det.value( "confidence",  uint8_t(0) );
+                    e.top_left_x     = det.value( "x1",          uint16_t(0) );
+                    e.top_left_y     = det.value( "y1",          uint16_t(0) );
+                    e.bottom_right_x = det.value( "x2",          uint16_t(0) );
+                    e.bottom_right_y = det.value( "y2",          uint16_t(0) );
+                    e.distance       = det.value( "distance",    0.0f );
+                }
+            }
+
+            // Fill header so object_detection_frame::validate() passes
+            payload->header.magic_number = object_detection_frame::MAGIC_NUMBER;
+            payload->header.version      = static_cast< uint16_t >( j.value( "version", 1 ) );
+            payload->header.data_type    = static_cast< uint8_t >( inference_frame::type::OBJECT_DETECTION );
+            payload->header.flags        = 0;
+            payload->header.spare        = 0;
+            payload->header.size         = static_cast< uint32_t >( total_size - sizeof( object_detection_frame::object_detection_frame_header ) );
+            uint8_t * payload_data       = reinterpret_cast< uint8_t * >( payload ) + sizeof( object_detection_frame::object_detection_frame_header );
+            payload->header.crc32        = rsutils::number::calc_crc32( payload_data, payload->header.size );
+
+            // Update additional_data fields from the JSON payload
+            additional_data.frame_number = static_cast< unsigned long long >( payload->frame_id );
+        }
+        else if (is_imu_topic)
         {
             auto imu = deserialize_message<sensor_msgs::msg::Imu>(msg);
 
@@ -331,19 +389,34 @@ namespace librealsense
 
         stream_identifier stream_id = ros2_topic::get_stream_identifier(msg->topic_name);
 
-        msg = read_next_cached();
-        if (!msg)
-            return nullptr;
-        
-        auto intrinsics_kv = parse_msg_payload(msg);
+        // Peek at the next message — if it's intrinsics data, consume and use it;
+        // otherwise this is a bare stream profile (e.g. inference) with no extra intrinsics.
+        auto next = peek_next_cached();
+        if (next && (next->topic_name.find("imu_intrinsic") != std::string::npos
+                  || next->topic_name.find("camera_info")  != std::string::npos))
+        {
+            read_next_cached(); // consume
+            auto intrinsics_kv = parse_msg_payload(next);
 
-        if (msg->topic_name.find("imu_intrinsic") != std::string::npos)
-        {
-            return create_motion_profile(stream_id, format, fps, intrinsics_kv);
+            if (next->topic_name.find("imu_intrinsic") != std::string::npos)
+            {
+                return create_motion_profile(stream_id, format, fps, intrinsics_kv);
+            }
+            else
+            {
+                return create_video_stream_profile(stream_id, format, fps, intrinsics_kv);
+            }
         }
-        else if (msg->topic_name.find("camera_info") != std::string::npos)
+
+        // Bare stream profile — e.g. inference streams
+        if (stream_id.stream_type == RS2_STREAM_OBJECT_DETECTION)
         {
-            return create_video_stream_profile(stream_id, format, fps, intrinsics_kv);
+            auto profile = std::make_shared<inference_stream_profile>();
+            profile->set_framerate(fps);
+            profile->set_format(format);
+            profile->set_stream_index(int(stream_id.stream_index));
+            profile->set_stream_type(stream_id.stream_type);
+            return profile;
         }
 
         return nullptr;
@@ -774,6 +847,22 @@ namespace librealsense
         void update(std::shared_ptr< extension_snapshot > ext) override {}
     };
 
+    class inference_sensor_snapshot
+        : public virtual inference_sensor
+        , public extension_snapshot
+    {
+    public:
+        void update(std::shared_ptr< extension_snapshot > ext) override {}
+    };
+
+    class object_detection_sensor_snapshot
+        : public virtual object_detection_sensor
+        , public inference_sensor_snapshot
+    {
+    public:
+        void update(std::shared_ptr< extension_snapshot > ext) override {}
+    };
+
     }  // namespace
 
 
@@ -821,6 +910,15 @@ namespace librealsense
         {
             sensor_extensions[RS2_EXTENSION_DEPTH_MAPPING_SENSOR] = std::make_shared<depth_mapping_sensor_snapshot>();
         }
+        else if (is_object_detection_sensor(sensor_name))
+        {
+            sensor_extensions[RS2_EXTENSION_OBJECT_DETECTION_SENSOR] = std::make_shared<object_detection_sensor_snapshot>();
+            sensor_extensions[RS2_EXTENSION_INFERENCE_SENSOR] = std::make_shared<inference_sensor_snapshot>();
+        }
+        else if (is_inference_module_sensor(sensor_name))
+        {
+            sensor_extensions[RS2_EXTENSION_INFERENCE_SENSOR] = std::make_shared<inference_sensor_snapshot>();
+        }
     }
 
 
@@ -857,6 +955,16 @@ namespace librealsense
     bool ros2_reader::is_depth_mapping_sensor(const std::string& sensor_name)
     {
         return (sensor_name.compare("Depth Mapping Camera") == 0);
+    }
+
+    bool ros2_reader::is_inference_module_sensor(const std::string& sensor_name)
+    {
+        return (sensor_name.compare("Inference Sensor") == 0);
+    }
+
+    bool ros2_reader::is_object_detection_sensor(const std::string& sensor_name)
+    {
+        return (sensor_name.compare("Object Detection Sensor") == 0);
     }
 
     // Helpers ---------------------------------------------------------------------
