@@ -6,6 +6,7 @@
 #ifdef BUILD_WITH_MINZ
 #include <rs_depth_calibration.hpp>
 #include <rs_depth_range.hpp>
+#include <rsutils/easylogging/easyloggingpp.h>
 #include <cstring>
 #include <cmath>
 #endif
@@ -61,8 +62,9 @@ bool min_z_depth_improver::init( rs2::video_frame const & ir_left,
     {
         _impl = std::make_unique< rs_depth::DepthRangeImprover >( cal );
     }
-    catch( std::exception const & )
+    catch( std::exception const & e )
     {
+        LOG_WARNING( "MinZ init failed: " << e.what() );
         _impl.reset();
         return false;
     }
@@ -115,6 +117,8 @@ rs2::frame min_z_depth_improver::run( rs2::frameset            original_fs,
     if( ! new_frame )
         return {};
 
+    // get_data() returns const void* even for newly-allocated frames;
+    // exclusive ownership from allocate_video_frame above makes the write safe.
     auto * dst = reinterpret_cast< uint16_t * >( const_cast< void * >( new_frame.get_data() ) );
     if( is_1mm )
         std::memcpy( dst, _out_buf.data(), w * h * sizeof( uint16_t ) );

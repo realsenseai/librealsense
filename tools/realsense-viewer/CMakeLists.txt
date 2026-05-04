@@ -224,7 +224,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
         endif()
 
         target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_WITH_MINZ)
-        include_directories("${MINZ_INCLUDE_DIR}")
+        target_include_directories(${PROJECT_NAME} PRIVATE "${MINZ_INCLUDE_DIR}")
+        # DEPENDENCIES is consumed by tools_target_config() in tools_common.cmake via target_link_libraries
         get_property(deps VARIABLE PROPERTY DEPENDENCIES)
         set(DEPENDENCIES ${deps} ${MINZ_LIBRARY})
         message(STATUS "MinZ depth improvement enabled")

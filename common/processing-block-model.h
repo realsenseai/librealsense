@@ -4,6 +4,7 @@
 #pragma once
 
 #include <librealsense2/rs.hpp>
+#include <functional>
 #include <string>
 
 

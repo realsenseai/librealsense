@@ -2993,6 +2993,7 @@ namespace rs2
                     draw_later.push_back([windows_width, &window, sub, pos, &viewer, this, pb]() {
                         ImGui::SetCursorPos({ windows_width - 42, pos.y - 3 });
 
+                        const bool pb_available = pb->is_available();
                         try
                         {
                             ImGui::PushFont(window.get_font());
@@ -3003,7 +3004,6 @@ namespace rs2
                             int font_size = window.get_font_size();
                             const ImVec2 button_size = { font_size * 2.f, font_size * 1.5f };
 
-                            const bool pb_available = pb->is_available();
                             if( !pb_available ) ImGui::BeginDisabled( true );
 
                             if (!sub->post_processing_enabled)
@@ -3091,6 +3091,7 @@ namespace rs2
                         }
                         catch (...)
                         {
+                            if( !pb_available ) ImGui::EndDisabled();
                             ImGui::PopStyleColor(5);
                             ImGui::PopFont();
                             throw;

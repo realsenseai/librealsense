@@ -176,10 +176,15 @@ namespace rs2
                 [block]( rs2::frame f ) { return block->process( f ); },
                 error_message, false );
 
+            // D405 (0B5B): very short baseline, not compatible with MinZ algorithm
+            // D401 (ABCC): GMSL variant, not validated for MinZ
+            static constexpr const char * PID_D405 = "0B5B";
+            static constexpr const char * PID_D401 = "ABCC";
+
             std::string pid;
             if( s->supports( RS2_CAMERA_INFO_PRODUCT_ID ) )
                 pid = s->get_info( RS2_CAMERA_INFO_PRODUCT_ID );
-            bool unsupported_model = ( pid == "0B5B" || pid == "ABCC" );  // D405, D401
+            bool unsupported_model = ( pid == PID_D405 || pid == PID_D401 );
 
             if( unsupported_model )
             {
@@ -188,14 +193,29 @@ namespace rs2
             }
             else
             {
+                // Safe to capture this: the lambda lives in model which lives in post_processing,
+                // a member of this subdevice_model — so the lambda cannot outlive its owner.
                 model->available = [this]()
                 {
-                    if( !res_values.empty() )
+                    // Resolution check — VGA (640x480) minimum
+                    if( ui.is_multiple_resolutions )
+                    {
+                        // Per-stream resolutions: check depth and IR independently
+                        auto check = [&]( rs2_stream stream ) {
+                            auto it = ui.selected_stream_to_res.find( stream );
+                            if( it == ui.selected_stream_to_res.end() ) return false;
+                            return it->second.first >= 640 && it->second.second >= 480;
+                        };
+                        if( !check( RS2_STREAM_DEPTH ) || !check( RS2_STREAM_INFRARED ) )
+                            return false;
+                    }
+                    else if( !res_values.empty() )
                     {
                         auto& res = res_values[ui.selected_res_id];
                         if( res.first < 640 || res.second < 480 )
                             return false;
                     }
+
                     bool depth = false, ir1 = false, ir2 = false;
                     for( auto& p : profiles )
                     {
@@ -207,7 +227,7 @@ namespace rs2
                     }
                     return depth && ir1 && ir2;
                 };
-                model->unavailable_tooltip = "Depth and IR Left, IR Right streams have to be enabled at VGA or higher resolution";
+                model->unavailable_tooltip = "Depth, IR Left/Right streams have to be enabled at VGA or higher resolution";
             }
 
             post_processing.push_back( model );
