@@ -50,6 +50,13 @@ namespace rs2
 
         bool visible = true;
 
+        // Optional predicate; null means always available.
+        // When it returns false the toggle is grayed out in the UI.
+        std::function<bool()> available;
+        std::string unavailable_tooltip;
+
+        bool is_available() const { return !available || available(); }
+
         // Callback when our state changes
         // NOTE: actual may not be same as is_enabled()! The latter is this particular pb,
         // while the former takes into account global "Post-Processing"...

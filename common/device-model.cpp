@@ -3003,6 +3003,9 @@ namespace rs2
                             int font_size = window.get_font_size();
                             const ImVec2 button_size = { font_size * 2.f, font_size * 1.5f };
 
+                            const bool pb_available = pb->is_available();
+                            if( !pb_available ) ImGui::BeginDisabled( true );
+
                             if (!sub->post_processing_enabled)
                             {
                                 if (!pb->is_enabled())
@@ -3073,6 +3076,14 @@ namespace rs2
                                         window.link_hovered();
                                     }
                                 }
+                            }
+
+                            if( !pb_available )
+                            {
+                                ImGui::EndDisabled();
+                                if( ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled )
+                                    && !pb->unavailable_tooltip.empty() )
+                                    RsImGui::CustomTooltip( "%s", pb->unavailable_tooltip.c_str() );
                             }
 
                             ImGui::PopStyleColor(5);
