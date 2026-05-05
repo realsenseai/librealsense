@@ -18,6 +18,10 @@ namespace rs_depth {
 // Lazily initialises from camera calibration on the first frameset that
 // contains IR left, IR right, and depth together.
 // When BUILD_WITH_MINZ is not defined apply() is a no-op pass-through.
+//
+// Threading: apply() must be called from a single thread (the viewer render loop).
+// The scratch buffers (_out_buf, _depth_mm_buf, _replace_buf) are not protected by
+// a mutex; concurrent calls would race on them.
 class min_z_depth_improver
 {
 public:

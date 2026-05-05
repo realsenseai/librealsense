@@ -208,6 +208,12 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
             PATHS "${MINZ_ROOT}/include"
             NO_DEFAULT_PATH
         )
+        # rs_depth_calibration.hpp is also required; both ship in the same package directory
+        find_file(MINZ_CALIBRATION_HEADER
+            NAMES rs_depth_calibration.hpp
+            PATHS "${MINZ_ROOT}/include"
+            NO_DEFAULT_PATH
+        )
         find_library(MINZ_LIBRARY
             NAMES rs_depth_range
             PATHS "${MINZ_ROOT}/lib"
@@ -218,6 +224,10 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
             message(FATAL_ERROR "rs_depth_range.hpp not found under ${MINZ_ROOT}/include -- "
                 "install rs-enhanced-depth-*.deb or set MINZ_ROOT")
         endif()
+        if(NOT MINZ_CALIBRATION_HEADER)
+            message(FATAL_ERROR "rs_depth_calibration.hpp not found under ${MINZ_ROOT}/include -- "
+                "install rs-enhanced-depth-*.deb or set MINZ_ROOT")
+        endif()
         if(NOT MINZ_LIBRARY)
             message(FATAL_ERROR "librs_depth_range not found under ${MINZ_ROOT}/lib -- "
                 "install rs-enhanced-depth-*.deb or set MINZ_ROOT")
@@ -226,8 +236,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
         target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_WITH_MINZ)
         target_include_directories(${PROJECT_NAME} PRIVATE "${MINZ_INCLUDE_DIR}")
         # DEPENDENCIES is consumed by tools_target_config() in tools_common.cmake via target_link_libraries
-        get_property(deps VARIABLE PROPERTY DEPENDENCIES)
-        set(DEPENDENCIES ${deps} ${MINZ_LIBRARY})
+        list(APPEND DEPENDENCIES ${MINZ_LIBRARY})
         message(STATUS "MinZ depth improvement enabled")
         message(STATUS "  include : ${MINZ_INCLUDE_DIR}")
         message(STATUS "  library : ${MINZ_LIBRARY}")
