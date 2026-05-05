@@ -148,7 +148,7 @@ void init_frame(py::module &m) {
         .def_property_readonly("frame_number", &rs2::frame::get_frame_number, "The frame number. Identical to calling get_frame_number.")
         .def("get_data_size", &rs2::frame::get_data_size, "Retrieve data size from frame handle.")
         .def("get_data", get_frame_data, "Retrieve data from the frame handle.", py::keep_alive<0, 1>())
-        .def_property_readonly("data", get_frame_data, "Data from the frame handle. Identical to calling get_data.", py::keep_alive<0, 1>())
+        .def_property_readonly("data", py::cpp_function(get_frame_data, "Data from the frame handle. Identical to calling get_data.", py::keep_alive<0, 1>()))
         .def("get_profile", &rs2::frame::get_profile, "Retrieve stream profile from frame handle.")
         .def_property_readonly("profile", &rs2::frame::get_profile, "Stream profile from frame handle. Identical to calling get_profile.")
         .def("keep", &rs2::frame::keep, "Keep the frame, otherwise if no refernce to the frame, the frame will be released.")
