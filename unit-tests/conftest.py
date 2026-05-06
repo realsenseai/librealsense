@@ -467,9 +467,9 @@ def _test_device_serial(request):
     return request.param
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def module_device_setup(request):
-    """Enable the target device via the hub. Recycles (power-cycles) once per test file, not per test case."""
+    """Enable the target device via the hub. Recycles per test function on Linux, maintains state on Windows."""
     serial_number = None
 
     # Check parametrized serial from device_each / device (injected by pytest_generate_tests)
@@ -557,11 +557,6 @@ def module_device_setup(request):
     base_nodeid = re.sub(r'-\d+-\d+\]$', ']', nodeid)
     last_base_test = re.sub(r'-\d+-\d+\]$', ']', last_test) if last_test else None
 
-    # Extract test file path from nodeid (e.g., "path/file.py::test_name" -> "path/file.py")
-    test_file = nodeid.split('::')[0] if '::' in nodeid else nodeid
-    last_test_file = last_test.split('::')[0] if last_test and '::' in last_test else last_test
-    test_file_changed = (last_test_file is not None and last_test_file != test_file)
-
     # Detect actual retry (pytest-retry plugin - same exact nodeid runs again after failure)
     is_actual_retry = (last_test == nodeid)
 
@@ -584,14 +579,16 @@ def module_device_setup(request):
     device_changed = (last_device is not None and last_device != serial_number)
     first_setup = (last_device is None)
 
+    # Detect when moving to a new test function (not just iteration)
+    test_function_changed = (last_base_test is not None and last_base_test != base_nodeid)
+
     # Recycle on:
     # - First setup (fresh start)
     # - Device change (switching devices)
     # - Actual retry (pytest-retry plugin - device needs fresh start)
-    # - First iteration when moving to a new test FILE (not just new function in same file)
-    # This matches legacy behavior: recycle once per file, then run all tests sequentially
-    # Maintains firmware stability for tests that depend on device warm-up state
-    recycle = not no_reset and (first_setup or device_changed or is_actual_retry or (test_file_changed and is_first_iteration_of_test))
+    # - First iteration of a NEW test function (ensures clean state between tests)
+    # NOT on subsequent iterations of the same test (--count flag)
+    recycle = not no_reset and (first_setup or device_changed or is_actual_retry or (test_function_changed and is_first_iteration_of_test))
 
     if not recycle and not first_setup:
         log.debug(f"Device {serial_number} already enabled, skipping hub setup")
