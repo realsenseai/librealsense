@@ -133,13 +133,14 @@ namespace rs2
 
     void on_chip_calib_manager::set_laser_emitter_state( float value )
     {
-        // Use options_model::set_option to update GUI after change
-        std::string ignored_error_message{ "" };
-        auto it = _sub->options_metadata.find( RS2_OPTION_EMITTER_ENABLED );
-        if( it != _sub->options_metadata.end() )  // Option supported
+        // Calibration needs synchronous semantics: write, then read back to verify
+        // the FW actually applied the value. option_model::set_option is now async
+        // (its value_as_float() reads a local user-request cache, so the round-trip
+        // check would always pass) — go through the sensor endpoint directly here.
+        if( _sub->options_metadata.find( RS2_OPTION_EMITTER_ENABLED ) != _sub->options_metadata.end() )
         {
-            it->second.set_option( RS2_OPTION_EMITTER_ENABLED, value, ignored_error_message );
-            if( it->second.value_as_float() != value )
+            _sub->s->set_option( RS2_OPTION_EMITTER_ENABLED, value );
+            if( _sub->s->get_option( RS2_OPTION_EMITTER_ENABLED ) != value )
                 throw std::runtime_error( rsutils::string::from()
                                           << "Failed to set laser " << ( value == off_value ? "off" : "on" ) );
         }
@@ -147,13 +148,11 @@ namespace rs2
 
     void on_chip_calib_manager::set_thermal_loop_state( float value )
     {
-        // Use options_model::set_option to update GUI after change
-        std::string ignored_error_message{ "" };
-        auto it = _sub->options_metadata.find( RS2_OPTION_THERMAL_COMPENSATION );
-        if( it != _sub->options_metadata.end() )  // Option supported
+        // See set_laser_emitter_state for why we bypass option_model here.
+        if( _sub->options_metadata.find( RS2_OPTION_THERMAL_COMPENSATION ) != _sub->options_metadata.end() )
         {
-            it->second.set_option( RS2_OPTION_THERMAL_COMPENSATION, value, ignored_error_message );
-            if( it->second.value_as_float() != value )
+            _sub->s->set_option( RS2_OPTION_THERMAL_COMPENSATION, value );
+            if( _sub->s->get_option( RS2_OPTION_THERMAL_COMPENSATION ) != value )
                 throw std::runtime_error( rsutils::string::from()
                                           << "Failed to set thermal compensation " << ( value == off_value ? "off" : "on" ) );
         }

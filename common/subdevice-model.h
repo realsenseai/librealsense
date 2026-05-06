@@ -18,6 +18,9 @@
 #include <unordered_map>
 #include <fstream>
 #include <future>
+#include <thread>
+#include <condition_variable>
+#include <functional>
 
 #include "objects-in-frame.h"
 #include "processing-block-model.h"
@@ -257,5 +260,34 @@ namespace rs2
         std::atomic_bool _destructing;
         std::mutex _stop_mutex;
         std::future<void> _stop_future;
+
+        // Process-wide singleton background worker that drains the JSON config-save
+        // block off the UI thread. Coalescing: keyed by an opaque void* (subdevice
+        // identity) — if a save for the same subdevice is already pending, the newer
+        // lambda replaces it, so a slider drag posting many _options_invalidated events
+        // still produces at most one save pass per wake-up cycle. Nested + private so
+        // it stays an implementation detail of subdevice_model.
+        class config_save_worker
+        {
+        public:
+            static config_save_worker & instance();
+
+            config_save_worker( config_save_worker const & ) = delete;
+            config_save_worker & operator=( config_save_worker const & ) = delete;
+
+            void post( void * key, std::function< void() > job );
+            void cancel( void * key );
+
+        private:
+            config_save_worker();
+            ~config_save_worker();
+            void run();
+
+            std::mutex _mtx;
+            std::condition_variable _cv;
+            std::map< void *, std::function< void() > > _pending;
+            bool _stop = false;
+            std::thread _worker;  // declared last so other members are init'd before run() starts
+        };
     };
 }

@@ -13,43 +13,23 @@
 #include "subdevice-model.h"
 #include <rsutils/accelerators/gpu.h>
 
-#include <thread>
-#include <condition_variable>
-#include <functional>
-
-namespace {
-// Background worker that drains the JSON config-save block off the UI thread.
-// Coalescing: keyed by an opaque void* (subdevice identity) — if a save for
-// the same subdevice is already pending, the newer lambda replaces it, so a
-// slider drag posting many _options_invalidated events still produces at most
-// one save pass per wake-up cycle.
-class config_save_worker
+namespace rs2
 {
-public:
-    static config_save_worker & instance()
+    // --- subdevice_model::config_save_worker ---------------------------------------------------
+    // Defined out-of-line; the class is declared as a private nested type in subdevice-model.h.
+
+    subdevice_model::config_save_worker & subdevice_model::config_save_worker::instance()
     {
         static config_save_worker w;
         return w;
     }
 
-    void post( void * key, std::function< void() > job )
+    subdevice_model::config_save_worker::config_save_worker()
+        : _worker( [this] { run(); } )
     {
-        {
-            std::lock_guard< std::mutex > lk( _mtx );
-            _pending[key] = std::move( job );
-        }
-        _cv.notify_one();
     }
 
-    void cancel( void * key )
-    {
-        std::lock_guard< std::mutex > lk( _mtx );
-        _pending.erase( key );
-    }
-
-private:
-    config_save_worker() : _worker( [this] { run(); } ) {}
-    ~config_save_worker()
+    subdevice_model::config_save_worker::~config_save_worker()
     {
         {
             std::lock_guard< std::mutex > lk( _mtx );
@@ -59,7 +39,22 @@ private:
         if( _worker.joinable() ) _worker.join();
     }
 
-    void run()
+    void subdevice_model::config_save_worker::post( void * key, std::function< void() > job )
+    {
+        {
+            std::lock_guard< std::mutex > lk( _mtx );
+            _pending[key] = std::move( job );
+        }
+        _cv.notify_one();
+    }
+
+    void subdevice_model::config_save_worker::cancel( void * key )
+    {
+        std::lock_guard< std::mutex > lk( _mtx );
+        _pending.erase( key );
+    }
+
+    void subdevice_model::config_save_worker::run()
     {
         for( ;; )
         {
@@ -80,16 +75,8 @@ private:
         }
     }
 
-    std::mutex _mtx;
-    std::condition_variable _cv;
-    std::map< void *, std::function< void() > > _pending;
-    bool _stop = false;
-    std::thread _worker;  // declared last so other members are init'd before run() starts
-};
-}
+    // -------------------------------------------------------------------------------------------
 
-namespace rs2
-{
     std::vector<const char*> get_string_pointers(const std::vector<std::string>& vec)
     {
         std::vector<const char*> res;
@@ -541,6 +528,12 @@ namespace rs2
 
     subdevice_model::~subdevice_model()
     {
+        // cancel() drops any not-yet-started save job for this subdevice. If the
+        // worker has already dequeued and is running our lambda, cancel is a no-op —
+        // but that's safe because the lambda intentionally captures only shared_ptrs
+        // to the processing blocks (by value), never `this`. So `subdevice_model`'s
+        // dtor doesn't need to wait for the worker; the in-flight save will finish on
+        // its own without dereferencing any member of *this.
         config_save_worker::instance().cancel( this );
         _destructing = true;
         try
@@ -1868,20 +1861,20 @@ namespace rs2
     }
     void subdevice_model::update(std::string& error_message, notifications_model& notifications)
     {
-        // While the user is actively setting options, skip everything below:
-        //   - the _options_invalidated branch triggers save_processing_block_to_config_file
-        //     which calls config_file::set() per option, and every set() rewrites the entire
-        //     JSON config file to disk (see common/rs-config.cpp). At slider-drag rate that
-        //     turned into a disk-I/O storm on the UI thread, freezing the render loop.
-        //   - the per-frame get_option_value() polling shares the per-device USB bus with our
-        //     async option-write worker and with options_watcher's 1 s poll cycle, so leaving
-        //     it in place reintroduces the UI freeze the async dispatch is meant to fix.
-        // Both jobs are coalesced into a single pass once the user stops interacting.
+        // Two paths below are throttled while the user is actively writing options
+        // (last_user_set_stopwatch < 500 ms):
+        //   - the _options_invalidated branch posts a JSON-config save job, which is
+        //     fine to skip during a drag (the worker coalesces anyway).
+        //   - the per-frame get_option_value() polling shares the per-device USB bus
+        //     with our async option-write worker and with options_watcher's 1 s poll
+        //     cycle, so polling here would reintroduce the UI freeze the async dispatch
+        //     is meant to fix.
+        // The gate is scoped to just these two paths so that any other logic added to
+        // update() in the future (or below this point) is not silently throttled.
         // `value` stays fresh during the gate via options_watcher -> on_options_changed.
-        if (last_user_set_stopwatch.get_elapsed_ms() < 500)
-            return;
+        const bool user_writing = last_user_set_stopwatch.get_elapsed_ms() < 500;
 
-        if (_options_invalidated)
+        if (!user_writing && _options_invalidated)
         {
             next_option = 0;
             _options_invalidated = false;
@@ -1906,7 +1899,7 @@ namespace rs2
                 } );
         }
 
-        if (next_option < supported_options.size())
+        if (!user_writing && next_option < supported_options.size())
         {
             auto next = supported_options[next_option];
             if (options_metadata.find(static_cast<rs2_option>(next)) != options_metadata.end())
