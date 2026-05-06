@@ -256,6 +256,7 @@ void option_model::update_all_fields( std::string & error_message, notifications
             return;
 
         value = endpoint->get_option_value( opt );
+        _has_optimistic = false;
         supported = value->is_valid;
         if( supported )
         {
@@ -382,6 +383,11 @@ bool option_model::draw_combobox( notifications_model & model,
 
 float option_model::value_as_float() const
 {
+    // While the optimistic cache is fresh, prefer the user's just-committed value.
+    // Cap at 2s in case the FW echo never matches (rejected/clamped value).
+    if( _has_optimistic && _optimistic_stopwatch.get_elapsed_ms() < 2000 )
+        return _optimistic_value;
+
     switch( value->type )
     {
     case RS2_OPTION_TYPE_FLOAT:
@@ -808,6 +814,12 @@ void option_model::set_option_async( rs2_option opt, float value )
     if( ! _async_setter )
         _async_setter = std::make_shared< option_async_setter >( endpoint, opt );
     _async_setter->post( value );
+
+    // Mask the stale cached `value` with the user's choice until the FW echo
+    // refreshes it, so draw_slider doesn't snap back to the old value next frame.
+    _optimistic_value = value;
+    _has_optimistic = true;
+    _optimistic_stopwatch.reset();
     // Tell the parent subdevice_model to back off its per-frame option polling for a
     // bit, otherwise the UI thread will issue a sync get_option_value() that serializes
     // on the per-device USB lock behind our worker's in-flight write (and behind any
@@ -823,4 +835,5 @@ void option_model::update_value( const rs2::option_value & updated_value, notifi
         return;
 
     value = updated_value;
+    _has_optimistic = false;
 }
