@@ -601,6 +601,15 @@ def module_device_setup(request):
         module._last_device_serial = serial_number
         module._last_test_nodeid = nodeid
         log.debug(f"Device enabled and ready")
+        
+        # On Linux, V4L2 backend needs time for device to stabilize after power cycle
+        if recycle and sys.platform.startswith('linux'):
+            import time
+            stabilization_time = 3  # seconds
+            log.debug(f"Linux platform: waiting {stabilization_time}s for device stabilization...")
+            time.sleep(stabilization_time)
+            log.debug("Device stabilization complete")
+            
     except Exception as e:
         pytest.fail(f"Failed to enable device {serial_number}: {e}")
 
