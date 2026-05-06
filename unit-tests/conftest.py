@@ -467,7 +467,7 @@ def _test_device_serial(request):
     return request.param
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def module_device_setup(request):
     """Enable the target device via the hub. Recycles (power-cycles) once per test file, not per test case."""
     serial_number = None
