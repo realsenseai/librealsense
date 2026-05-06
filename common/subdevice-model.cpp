@@ -13,6 +13,81 @@
 #include "subdevice-model.h"
 #include <rsutils/accelerators/gpu.h>
 
+#include <thread>
+#include <condition_variable>
+#include <functional>
+
+namespace {
+// Background worker that drains the JSON config-save block off the UI thread.
+// Coalescing: keyed by an opaque void* (subdevice identity) — if a save for
+// the same subdevice is already pending, the newer lambda replaces it, so a
+// slider drag posting many _options_invalidated events still produces at most
+// one save pass per wake-up cycle.
+class config_save_worker
+{
+public:
+    static config_save_worker & instance()
+    {
+        static config_save_worker w;
+        return w;
+    }
+
+    void post( void * key, std::function< void() > job )
+    {
+        {
+            std::lock_guard< std::mutex > lk( _mtx );
+            _pending[key] = std::move( job );
+        }
+        _cv.notify_one();
+    }
+
+    void cancel( void * key )
+    {
+        std::lock_guard< std::mutex > lk( _mtx );
+        _pending.erase( key );
+    }
+
+private:
+    config_save_worker() : _worker( [this] { run(); } ) {}
+    ~config_save_worker()
+    {
+        {
+            std::lock_guard< std::mutex > lk( _mtx );
+            _stop = true;
+        }
+        _cv.notify_one();
+        if( _worker.joinable() ) _worker.join();
+    }
+
+    void run()
+    {
+        for( ;; )
+        {
+            std::vector< std::function< void() > > jobs;
+            bool stopping = false;
+            {
+                std::unique_lock< std::mutex > lk( _mtx );
+                _cv.wait( lk, [this] { return _stop || ! _pending.empty(); } );
+                stopping = _stop;
+                for( auto & kv : _pending ) jobs.push_back( std::move( kv.second ) );
+                _pending.clear();
+            }
+            for( auto & job : jobs )
+            {
+                try { job(); } catch( ... ) {}
+            }
+            if( stopping ) return;
+        }
+    }
+
+    std::mutex _mtx;
+    std::condition_variable _cv;
+    std::map< void *, std::function< void() > > _pending;
+    bool _stop = false;
+    std::thread _worker;  // declared last so other members are init'd before run() starts
+};
+}
+
 namespace rs2
 {
     std::vector<const char*> get_string_pointers(const std::vector<std::string>& vec)
@@ -466,6 +541,7 @@ namespace rs2
 
     subdevice_model::~subdevice_model()
     {
+        config_save_worker::instance().cancel( this );
         _destructing = true;
         try
         {
@@ -1810,13 +1886,24 @@ namespace rs2
             next_option = 0;
             _options_invalidated = false;
 
-            save_processing_block_to_config_file("colorizer", depth_colorizer);
-            save_processing_block_to_config_file("yuy2rgb", yuy2rgb);
-            save_processing_block_to_config_file("m420_to_rgb", m420_to_rgb);
-            save_processing_block_to_config_file("nv12_to_rgb", nv12_to_rgb);
-            save_processing_block_to_config_file("y411", y411);
-
-            for (auto&& pbm : post_processing) pbm->save_to_config_file();
+            // Capture by value so the worker stays UAF-safe even if `this` dies mid-save.
+            // shared_ptrs keep the underlying processing blocks alive until the job runs.
+            auto colorizer = depth_colorizer;
+            auto yuy2      = yuy2rgb;
+            auto m420      = m420_to_rgb;
+            auto nv12      = nv12_to_rgb;
+            auto y411_ptr  = y411;
+            auto pp        = post_processing;
+            config_save_worker::instance().post( this,
+                [ colorizer, yuy2, m420, nv12, y411_ptr, pp ]
+                {
+                    save_processing_block_to_config_file( "colorizer",   colorizer );
+                    save_processing_block_to_config_file( "yuy2rgb",     yuy2 );
+                    save_processing_block_to_config_file( "m420_to_rgb", m420 );
+                    save_processing_block_to_config_file( "nv12_to_rgb", nv12 );
+                    save_processing_block_to_config_file( "y411",        y411_ptr );
+                    for( auto & pbm : pp ) pbm->save_to_config_file();
+                } );
         }
 
         if (next_option < supported_options.size())
