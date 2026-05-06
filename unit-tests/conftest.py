@@ -573,14 +573,21 @@ def module_device_setup(request):
     else:
         current_iteration = getattr(module, iteration_key, 0) + 1
         setattr(module, iteration_key, current_iteration)
-    is_first_repeat_iteration = (is_repeat and current_iteration == 1)
+    
+    # Detect when moving to a different test function
+    test_function_changed = (last_base_test is not None and last_base_test != base_nodeid)
+    is_first_iteration_of_test = (current_iteration == 1)
 
     device_changed = (last_device is not None and last_device != serial_number)
     first_setup = (last_device is None)
 
-    # Recycle on: first setup, device change, actual retry (to give fresh start), or first repeat iteration
-    # NOT on subsequent repeat iterations to maintain firmware stability
-    recycle = not no_reset and (first_setup or device_changed or is_actual_retry or is_first_repeat_iteration)
+    # Recycle on:
+    # - First setup (fresh start)
+    # - Device change (switching devices)
+    # - Actual retry (pytest-retry plugin - device needs fresh start)
+    # - First iteration of a new test function (ensures clean state between tests)
+    # NOT on subsequent iterations of the same test (maintains firmware stability)
+    recycle = not no_reset and (first_setup or device_changed or is_actual_retry or (test_function_changed and is_first_iteration_of_test))
 
     if not recycle and not first_setup:
         log.debug(f"Device {serial_number} already enabled, skipping hub setup")
