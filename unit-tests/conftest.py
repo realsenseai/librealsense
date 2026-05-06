@@ -620,9 +620,14 @@ def module_device_setup(request):
     yield serial_number
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def test_context(request, module_device_setup):
-    """Create a fresh rs.context() for the test. Depends on module_device_setup for hub state."""
+    """Create a module-scoped rs.context() shared by all tests in the same file.
+    
+    Module scope ensures device state is preserved between tests when device
+    recycling is skipped. Fresh context per test could re-enumerate and disrupt
+    device state, especially after operational mode transitions.
+    """
     if not rs:
         pytest.skip("pyrealsense2 not available")
 
