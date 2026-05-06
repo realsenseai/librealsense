@@ -28,6 +28,7 @@
 #include "updates-model.h"
 #include "calibration-model.h"
 #include <rsutils/time/periodic-timer.h>
+#include <rsutils/time/stopwatch.h>
 #include <rsutils/number/stabilized-value.h>
 #include "option-model.h"
 
@@ -182,6 +183,11 @@ namespace rs2
         std::mutex _queue_lock;
         bool _options_invalidated = false;
         int next_option = 0;
+        // Reset by option_model::set_option_async on every user-initiated option write.
+        // While this stopwatch is fresh, subdevice_model::update() skips its per-frame
+        // sync get_option_value() polling so the UI thread doesn't serialize on the
+        // per-device USB bus behind an in-flight worker write or options_watcher poll.
+        rsutils::time::stopwatch last_user_set_stopwatch;
         std::vector<rs2_option> supported_options;
         bool streaming = false;
         std::map<rs2_stream, bool> streaming_map; // used for depth and ir mixed resolutions

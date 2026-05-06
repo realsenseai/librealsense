@@ -4,10 +4,40 @@
 #pragma once
 #include <librealsense2/rs.hpp>
 #include <rsutils/time/stopwatch.h>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 namespace rs2
 {
     struct notifications_model;
     class subdevice_model;
+
+    // Background worker that applies option writes to the device asynchronously.
+    // Coalescing: only the latest posted value between two FW round-trips is applied,
+    // so spamming post() (e.g., during slider drag) never queues up stale values.
+    class option_async_setter
+    {
+    public:
+        option_async_setter( std::shared_ptr< options > endpoint, rs2_option opt );
+        ~option_async_setter();
+
+        option_async_setter( option_async_setter const & ) = delete;
+        option_async_setter & operator=( option_async_setter const & ) = delete;
+
+        void post( float value );
+
+    private:
+        void run();
+
+        std::shared_ptr< options > _endpoint;
+        rs2_option _opt;
+        std::mutex _mtx;
+        std::condition_variable _cv;
+        float _pending_value = 0.f;
+        bool _has_pending = false;
+        bool _stop = false;
+        std::thread _worker;
+    };
 
     class option_model
     {
@@ -63,7 +93,14 @@ namespace rs2
             std::string& error_message,
             notifications_model& model );
 
+        // Dispatches the option write to a background worker so the UI thread
+        // (and therefore the viewer's render loop) is not blocked on the FW round-trip.
+        void set_option_async( rs2_option opt, float value );
+
         std::string adjust_description( const std::string& str_in, const std::string& to_be_replaced, const std::string& to_replace );
+
+        // Lazily created on first async dispatch; shared so option_model stays copyable.
+        std::shared_ptr< option_async_setter > _async_setter;
     };
 
     option_model create_option_model(option_value const & opt,
