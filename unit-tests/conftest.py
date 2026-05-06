@@ -620,13 +620,14 @@ def module_device_setup(request):
     yield serial_number
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def test_context(request, module_device_setup):
-    """Create a module-scoped rs.context() shared by all tests in the same file.
+    """Create a fresh rs.context() for each test to re-enumerate devices.
     
-    Module scope ensures device state is preserved between tests when device
-    recycling is skipped. Fresh context per test could re-enumerate and disrupt
-    device state, especially after operational mode transitions.
+    Function scope ensures device is re-enumerated between tests, which is
+    necessary after operational mode transitions on Linux V4L2 backend.
+    The device hardware is not recycled (that's handled by module_device_setup),
+    but the SDK context needs fresh enumeration to pick up device state changes.
     """
     if not rs:
         pytest.skip("pyrealsense2 not available")
