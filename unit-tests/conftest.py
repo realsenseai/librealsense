@@ -605,7 +605,7 @@ def module_device_setup(request):
         # On Linux, V4L2 backend needs time for device to stabilize after power cycle
         if recycle and sys.platform.startswith('linux'):
             import time
-            stabilization_time = 3  # seconds
+            stabilization_time = 5  # seconds - longer delay for USB re-enumeration and firmware boot
             log.debug(f"Linux platform: waiting {stabilization_time}s for device stabilization...")
             time.sleep(stabilization_time)
             log.debug("Device stabilization complete")
