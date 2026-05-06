@@ -101,6 +101,15 @@ namespace rs2
 
         // Lazily created on first async dispatch; shared so option_model stays copyable.
         std::shared_ptr< option_async_setter > _async_setter;
+
+        // Optimistic local cache so the slider doesn't visually snap back to the stale
+        // `value` between dispatch (set_option_async) and the FW echo arriving via
+        // options_watcher -> update_value or the post-gate update_all_fields poll.
+        // Cleared when either authoritative path refreshes `value`, or after the timeout
+        // below (in case FW rejects/clamps and never echoes the requested value).
+        float _optimistic_value = 0.f;
+        bool _has_optimistic = false;
+        rsutils::time::stopwatch _optimistic_stopwatch;
     };
 
     option_model create_option_model(option_value const & opt,
