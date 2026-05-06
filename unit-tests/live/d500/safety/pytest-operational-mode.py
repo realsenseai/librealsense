@@ -31,29 +31,32 @@ def test_pause_resume_no_impact_on_streaming(test_context):
 
     pipe = rs.pipeline(test_context)
     profile = pipe.start(cfg)
-    f = pipe.wait_for_frames()
+    
+    try:
+        f = pipe.wait_for_frames()
 
-    pipeline_device = profile.get_device()
-    safety_sensor = pipeline_device.first_safety_sensor()
-    log.debug("Verify default is run mode")
-    check.equal(safety_sensor.get_option(rs.option.safety_mode), float(rs.safety_mode.run))  # verify default
+        pipeline_device = profile.get_device()
+        safety_sensor = pipeline_device.first_safety_sensor()
+        log.debug("Verify default is run mode")
+        check.equal(safety_sensor.get_option(rs.option.safety_mode), float(rs.safety_mode.run))  # verify default
 
-    log.debug("Command standby mode")
-    safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.standby)
-    check.equal(safety_sensor.get_option(rs.option.safety_mode), float(rs.safety_mode.standby))
-    verify_frames_received(pipe, count=10)
+        log.debug("Command standby mode")
+        safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.standby)
+        check.equal(safety_sensor.get_option(rs.option.safety_mode), float(rs.safety_mode.standby))
+        verify_frames_received(pipe, count=10)
 
-    pipe.stop()
-    time.sleep(1)  # allow some time for the streaming to actually stop
-    pipe.start(cfg)
-    verify_frames_received(pipe, count=10)
+        pipe.stop()
+        time.sleep(1)  # allow some time for the streaming to actually stop
+        pipe.start(cfg)
+        verify_frames_received(pipe, count=10)
 
-    log.debug("Command run mode")
-    safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.run)
-    check.equal(safety_sensor.get_option(rs.option.safety_mode), float(rs.safety_mode.run))
-    verify_frames_received(pipe, count=10)
-
-    pipe.stop()
+        log.debug("Command run mode")
+        safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.run)
+        check.equal(safety_sensor.get_option(rs.option.safety_mode), float(rs.safety_mode.run))
+        verify_frames_received(pipe, count=10)
+    finally:
+        pipe.stop()
+        time.sleep(1)  # allow device to fully release before next test
 
 
 ########################### SRS - 3.3.1.14.c ##############################################
@@ -91,6 +94,7 @@ def test_resume_to_maintenance_keeps_video_streaming(test_context):
         verify_frames_received(pipe, count=10)
     finally:
         pipe.stop()
+        time.sleep(1)  # allow device to fully release before next test
 
 
 ########################### SRS - 3.3.1.14.c ##############################################
@@ -134,3 +138,4 @@ def test_resume_to_maintenance_keeps_safety_streaming(test_context):
         verify_frames_received(pipe, count=10)
     finally:
         pipe.stop()
+        time.sleep(1)  # allow device to fully release before next test
