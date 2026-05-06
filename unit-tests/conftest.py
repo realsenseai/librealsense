@@ -19,6 +19,7 @@ import pytest
 import sys
 import os
 import logging
+import time
 
 # Defense against ROS 2 launch.logging: when ROS is sourced, launch_testing's
 # pytest entry-point transitively imports launch.logging, which installs a
@@ -633,6 +634,32 @@ def test_context(request, module_device_setup):
 
     if module_device_setup and len(list(ctx.devices)) == 0:
         pytest.fail("No devices visible in context after device setup")
+
+    # Linux V4L2 warm-up: flush stale buffered frames after device enumeration
+    # Without this, tests may receive frames with frozen/stale timestamps
+    if sys.platform.startswith('linux') and len(list(ctx.devices)) > 0:
+        try:
+            log.debug("Linux platform: flushing device buffers with warm-up frames...")
+            dev = list(ctx.devices)[0]
+            pipe = rs.pipeline(ctx)
+            cfg = rs.config()
+            # Use any available stream for warm-up
+            profiles = dev.query_sensors()[0].get_stream_profiles()
+            if profiles:
+                profile = profiles[0]
+                cfg.enable_stream(profile.stream_type(), profile.stream_index(), 
+                                profile.format(), profile.fps())
+                pipe.start(cfg)
+                # Pull and discard 15 frames to flush buffers
+                for _ in range(15):
+                    frames = pipe.wait_for_frames(timeout_ms=2000)
+                    if frames:
+                        log.debug(f"Warm-up frame: {frames.get_frame_number()}")
+                pipe.stop()
+                time.sleep(0.5)  # Allow device to settle after warm-up
+                log.debug("Device buffer flush complete")
+        except Exception as e:
+            log.warning(f"Warm-up flush failed (non-fatal): {e}")
 
     return ctx
 
