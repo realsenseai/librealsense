@@ -39,6 +39,61 @@ namespace rs2
 
 using namespace rs2;
 
+option_async_setter::option_async_setter( std::shared_ptr< options > endpoint, rs2_option opt )
+    : _endpoint( std::move( endpoint ) )
+    , _opt( opt )
+{
+    _worker = std::thread( [this]() { run(); } );
+}
+
+option_async_setter::~option_async_setter()
+{
+    {
+        std::lock_guard< std::mutex > lock( _mtx );
+        _stop = true;
+    }
+    _cv.notify_all();
+    if( _worker.joinable() )
+        _worker.join();
+}
+
+void option_async_setter::post( float value )
+{
+    {
+        std::lock_guard< std::mutex > lock( _mtx );
+        _pending_value = value;
+        _has_pending = true;
+    }
+    _cv.notify_one();
+}
+
+void option_async_setter::run()
+{
+    while( true )
+    {
+        float value;
+        {
+            std::unique_lock< std::mutex > lock( _mtx );
+            _cv.wait( lock, [this]() { return _has_pending || _stop; } );
+            if( _stop && ! _has_pending )
+                return;
+            value = _pending_value;
+            _has_pending = false;
+        }
+        try
+        {
+            _endpoint->set_option( _opt, value );
+        }
+        catch( ... )
+        {
+            // Errors are intentionally swallowed: this runs off the UI thread and has no
+            // safe channel to surface a message synchronously. The next periodic refresh
+            // (option_model::update_all_fields) will read the device's actual value back,
+            // so the user sees the real applied state if the FW rejected/clamped the write.
+        }
+    }
+}
+
 std::string option_model::adjust_description(const std::string& str_in, const std::string& to_be_replaced, const std::string& to_replace)
 {
     std::string adjusted_string(str_in);
@@ -666,22 +721,22 @@ bool option_model::slider_selected( rs2_option opt,
                                     std::string & error_message,
                                     notifications_model & model )
 {
-    bool res = false;
-    auto option_was_set = set_option( opt, value, error_message, std::chrono::milliseconds( 200 ) );
-    if( option_was_set )
+    // Dispatch the write to a background thread so the UI/render loop keeps drawing
+    // frames while the FW round-trip is in flight. The worker coalesces — only the
+    // latest posted value gets applied between two FW writes, so dragging the slider
+    // never queues stale values.
+    set_option_async( opt, value );
+    have_unset_value = false;
+    if( invalidate_flag )
+        *invalidate_flag = true;
+
+    // Throttle the log to ~5 Hz to keep the notifications panel readable during drag.
+    if( last_set_stopwatch.get_elapsed() >= std::chrono::milliseconds( 200 ) )
     {
-        have_unset_value = false;
-        if (invalidate_flag)
-            *invalidate_flag = true;
+        last_set_stopwatch.reset();
         model.add_log( rsutils::string::from() << "Setting " << opt << " to " << value );
-        res = true;
     }
-    else
-    {
-        have_unset_value = true;
-        unset_value = value;
-    }
-    return res;
+    return true;
 }
 bool option_model::slider_unselected( rs2_option opt,
                                       float value,
@@ -735,34 +790,30 @@ bool option_model::draw_option(bool update_read_only_options,
 
 bool option_model::set_option(rs2_option opt,
     float req_value,
-    std::string& error_message,
-    std::chrono::steady_clock::duration ignore_period)
+    std::string& /*error_message*/,
+    std::chrono::steady_clock::duration /*ignore_period*/)
 {
-    // Only set the value if `ignore_period` time past since last set_option() call for this option
-    if (last_set_stopwatch.get_elapsed() < ignore_period)
-        return false;
-
-    try
-    {
-        last_set_stopwatch.reset();
-        endpoint->set_option(opt, req_value);
-    }
-    catch (const error& e)
-    {
-        error_message = error_to_string(e);
-    }
-
-    // Only update the cached value once set_option is done! That way, if it doesn't change
-    // anything...
-    try
-    {
-        value = endpoint->get_option_value(opt);
-    }
-    catch (...)
-    {
-    }
-
+    // All UI-thread option writes go through the async worker so the render loop is never
+    // blocked on the FW round-trip (set_option is ~200 ms on UVC; readback is another ~200 ms;
+    // and they serialize on the per-device USB lock against options_watcher's 1 s poll cycle).
+    // Coalescing in option_async_setter replaces the previous ignore_period rate-limit, and
+    // the cached `value` is refreshed by options_watcher -> on_options_changed -> update_value.
+    last_set_stopwatch.reset();
+    set_option_async( opt, req_value );
     return true;
+}
+
+void option_model::set_option_async( rs2_option opt, float value )
+{
+    if( ! _async_setter )
+        _async_setter = std::make_shared< option_async_setter >( endpoint, opt );
+    _async_setter->post( value );
+    // Tell the parent subdevice_model to back off its per-frame option polling for a
+    // bit, otherwise the UI thread will issue a sync get_option_value() that serializes
+    // on the per-device USB lock behind our worker's in-flight write (and behind any
+    // concurrent options_watcher poll cycle), reintroducing the visible UI freeze.
+    if( dev )
+        dev->last_user_set_stopwatch.reset();
 }
 
 void option_model::update_value( const rs2::option_value & updated_value, notifications_model & model )

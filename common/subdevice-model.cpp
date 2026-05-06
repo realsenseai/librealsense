@@ -1792,6 +1792,19 @@ namespace rs2
     }
     void subdevice_model::update(std::string& error_message, notifications_model& notifications)
     {
+        // While the user is actively setting options, skip everything below:
+        //   - the _options_invalidated branch triggers save_processing_block_to_config_file
+        //     which calls config_file::set() per option, and every set() rewrites the entire
+        //     JSON config file to disk (see common/rs-config.cpp). At slider-drag rate that
+        //     turned into a disk-I/O storm on the UI thread, freezing the render loop.
+        //   - the per-frame get_option_value() polling shares the per-device USB bus with our
+        //     async option-write worker and with options_watcher's 1 s poll cycle, so leaving
+        //     it in place reintroduces the UI freeze the async dispatch is meant to fix.
+        // Both jobs are coalesced into a single pass once the user stops interacting.
+        // `value` stays fresh during the gate via options_watcher -> on_options_changed.
+        if (last_user_set_stopwatch.get_elapsed_ms() < 500)
+            return;
+
         if (_options_invalidated)
         {
             next_option = 0;
