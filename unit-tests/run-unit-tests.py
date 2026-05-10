@@ -528,6 +528,82 @@ def close_hubs():
             devices.wait_until_all_ports_disabled()
             devices.hub.disconnect()
 
+
+def _find_fw_image_path( product_name, fw_version_regex ):
+    """
+    Mirror of test-fw-update.find_image_or_exit but returns None on miss instead of exiting.
+    Used to locate the bundled FW image on disk so we can ask the device whether it's
+    compatible without actually attempting a flash.
+    """
+    pattern = re.compile( r'^Intel RealSense (((\S+?)(\d+))(\S*))' )
+    m = pattern.search( product_name or '' )
+    if not m:
+        return None
+    suffix = 5
+    for j in range( 1, 3 ):
+        start, end = m.span( j )
+        for i in range( 0, len( m.group( suffix ) ) ):
+            pn = product_name[start:end - i]
+            image_re = '(^|/)' + pn + i * 'X' + '_FW_Image-' + fw_version_regex + r'\.bin$'
+            for image in file.find( repo.root, image_re ):
+                return os.path.join( repo.root, image )
+        suffix -= 1
+    return None
+
+
+def _is_fw_update_compatible( device ):
+    """
+    For test-fw-update, ask the device whether the candidate FW image (custom path if
+    supplied, otherwise the bundled image matching RECOMMENDED_FIRMWARE_VERSION) meets
+    its minimum supported FW. Uses device.as_updatable().check_firmware_compatibility,
+    so the source of truth is the librealsense d400_device check itself.
+
+    Returns (compatible: bool, reason: str). On any can't-decide path, returns True so
+    we err on the side of letting the test run.
+    """
+    try:
+        import pyrealsense2 as rs
+    except ImportError as e:
+        return True, f'pyrealsense2 unavailable ({e})'
+
+    try:
+        product_line = device.get_info( rs.camera_info.product_line )
+        product_name = device.get_info( rs.camera_info.name )
+    except Exception as e:
+        return True, f'could not read device info ({e})'
+
+    image_path = None
+    if product_line == 'D400' and custom_fw_path:
+        image_path = custom_fw_path
+    elif 'D555' in (product_name or '') and custom_fw_d555_path:
+        image_path = custom_fw_d555_path
+    elif device.supports( rs.camera_info.recommended_firmware_version ):
+        recommended = device.get_info( rs.camera_info.recommended_firmware_version )
+        regex_str = recommended
+        if regex_str.count( '.' ) == 2:  # version drops the build if 0
+            regex_str += '.0'
+        image_path = _find_fw_image_path( product_name, re.escape( regex_str ) )
+        if image_path is None:
+            return True, f'could not locate bundled FW image ({recommended}) for {product_name}'
+    else:
+        return True, 'no candidate FW image available; deferring to test'
+
+    if not image_path or not os.path.isfile( image_path ):
+        return True, f'FW image not found: {image_path}'
+
+    try:
+        with open( image_path, 'rb' ) as f:
+            image_bytes = list( f.read() )
+        upd = device.as_updatable()
+        if upd is None:
+            return True, 'device is not updatable; deferring to test'
+        compatible = upd.check_firmware_compatibility( image_bytes )
+    except Exception as e:
+        return True, f'compatibility check raised ({e}); deferring to test'
+
+    verdict = 'compatible' if compatible else 'below device min FW'
+    return compatible, f'{verdict} -- {os.path.basename( image_path )}'
+
 # Run all tests
 try:
     list_only = list_tags or list_tests
@@ -686,6 +762,17 @@ try:
                 if skip_test:
                     log.d( f'connection type does not fit {test.config.types}; skipping' )
                     continue
+
+                if test.name == 'test-fw-update':
+                    incompatible = []
+                    for sn in serial_numbers:
+                        ok, reason = _is_fw_update_compatible( devices.get( sn ) )
+                        if not ok:
+                            incompatible.append( (sn, reason) )
+                    if incompatible:
+                        for sn, reason in incompatible:
+                            log.w( f'{test.name}: skipping {devices.get( sn ).name}_{sn}: {reason}' )
+                        continue
 
                 for repetition in range(repeat):
                     try:
