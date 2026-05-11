@@ -134,19 +134,23 @@ namespace librealsense
 
         std::string fw_version = ds::extract_firmware_version_string( image );
 
-        auto it = ds::d400_device_to_fw_min_version.find( _pid );
-        if( it == ds::d400_device_to_fw_min_version.end() )
-        {
-            throw librealsense::invalid_value_exception(
-                rsutils::string::from()
-                << "Min and Max firmware versions have not been defined for this device: "
-                << std::hex << _pid );
-        }
-        bool result = ( firmware_version( fw_version ) >= firmware_version( it->second ) );
+        std::string const min_fw = get_firmware_min_version();
+        bool result = ( firmware_version( fw_version ) >= firmware_version( min_fw ) );
         if( ! result )
             LOG_ERROR( "Firmware version isn't compatible " << fw_version );
 
         return result;
+    }
+
+    std::string d400_device::get_firmware_min_version() const
+    {
+        auto it = ds::d400_device_to_fw_min_version.find( _pid );
+        if( it == ds::d400_device_to_fw_min_version.end() )
+            throw librealsense::invalid_value_exception(
+                rsutils::string::from()
+                << "Minimum firmware version has not been defined for this device: "
+                << std::hex << _pid );
+        return it->second;
     }
 
     std::string d400_device::get_opcode_string(int opcode) const

@@ -181,6 +181,16 @@ namespace rs2
             return connected;
         }
 
+        // Minimum firmware version supported by this device's SKU (e.g. "5.10.0.17").
+        // Throws if the device does not implement the FW-update protocol or has no defined minimum.
+        std::string get_firmware_min_version() const
+        {
+            rs2_error * e = nullptr;
+            auto res = rs2_get_firmware_min_version( _dev.get(), &e );
+            error::handle( e );
+            return res ? std::string( res ) : std::string();
+        }
+
         template<class T>
         bool is() const
         {
