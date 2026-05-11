@@ -529,37 +529,29 @@ def close_hubs():
             devices.hub.disconnect()
 
 
-def _find_fw_image_path( product_name, fw_version_regex ):
-    """
-    Mirror of test-fw-update.find_image_or_exit but returns None on miss instead of exiting.
-    Used to locate the bundled FW image on disk so we can ask the device whether it's
-    compatible without actually attempting a flash.
-    """
-    pattern = re.compile( r'^Intel RealSense (((\S+?)(\d+))(\S*))' )
-    m = pattern.search( product_name or '' )
+def _version_to_tuple( s ):
+    parts = re.findall( r'\d+', s or '' )
+    return tuple( int( p ) for p in parts[:4] ) + (0,) * max( 0, 4 - len( parts ) )
+
+
+def _version_from_fw_filename( path ):
+    """Mirror of test-fw-update.extract_version_from_filename; returns 'a.b.c.d' or None."""
+    name = os.path.basename( path or '' )
+    m = re.search( r'(\d+)_(\d+)_(\d+)_(\d+)\.(?:bin|img)$', name, re.IGNORECASE )
+    if not m:
+        m = re.search( r'-(\d+)\.(\d+)\.(\d+)\.(\d+)\.(?:bin|img)$', name, re.IGNORECASE )
     if not m:
         return None
-    suffix = 5
-    for j in range( 1, 3 ):
-        start, end = m.span( j )
-        for i in range( 0, len( m.group( suffix ) ) ):
-            pn = product_name[start:end - i]
-            image_re = '(^|/)' + pn + i * 'X' + '_FW_Image-' + fw_version_regex + r'\.bin$'
-            for image in file.find( repo.root, image_re ):
-                return os.path.join( repo.root, image )
-        suffix -= 1
-    return None
+    return '.'.join( m.group( i ) for i in range( 1, 5 ) )
 
 
 def _is_fw_update_compatible( device ):
     """
-    For test-fw-update, ask the device whether the candidate FW image (custom path if
-    supplied, otherwise the bundled image matching RECOMMENDED_FIRMWARE_VERSION) meets
-    its minimum supported FW. Uses device.as_updatable().check_firmware_compatibility,
-    so the source of truth is the librealsense d400_device check itself.
-
-    Returns (compatible: bool, reason: str). On any can't-decide path, returns True so
-    we err on the side of letting the test run.
+    For test-fw-update, compare the candidate FW version (parsed from a custom-fw-*
+    filename if supplied, otherwise RECOMMENDED_FIRMWARE_VERSION) against the device's
+    minimum supported FW via rs2::device::get_firmware_min_version. Returns
+    (compatible, reason). On any can't-decide path returns True so we err on the side
+    of letting the test run.
     """
     try:
         import pyrealsense2 as rs
@@ -572,37 +564,31 @@ def _is_fw_update_compatible( device ):
     except Exception as e:
         return True, f'could not read device info ({e})'
 
-    image_path = None
+    candidate = None
+    source = ''
     if product_line == 'D400' and custom_fw_path:
-        image_path = custom_fw_path
+        candidate = _version_from_fw_filename( custom_fw_path )
+        source = f'--custom-fw-d400 ({os.path.basename( custom_fw_path )})'
     elif 'D555' in (product_name or '') and custom_fw_d555_path:
-        image_path = custom_fw_d555_path
+        candidate = _version_from_fw_filename( custom_fw_d555_path )
+        source = f'--custom-fw-d555 ({os.path.basename( custom_fw_d555_path )})'
     elif device.supports( rs.camera_info.recommended_firmware_version ):
-        recommended = device.get_info( rs.camera_info.recommended_firmware_version )
-        regex_str = recommended
-        if regex_str.count( '.' ) == 2:  # version drops the build if 0
-            regex_str += '.0'
-        image_path = _find_fw_image_path( product_name, re.escape( regex_str ) )
-        if image_path is None:
-            return True, f'could not locate bundled FW image ({recommended}) for {product_name}'
-    else:
-        return True, 'no candidate FW image available; deferring to test'
-
-    if not image_path or not os.path.isfile( image_path ):
-        return True, f'FW image not found: {image_path}'
+        candidate = device.get_info( rs.camera_info.recommended_firmware_version )
+        source = 'RECOMMENDED_FIRMWARE_VERSION'
+    if not candidate:
+        return True, 'no candidate FW version available; deferring to test'
 
     try:
-        with open( image_path, 'rb' ) as f:
-            image_bytes = list( f.read() )
-        upd = device.as_updatable()
-        if upd is None:
-            return True, 'device is not updatable; deferring to test'
-        compatible = upd.check_firmware_compatibility( image_bytes )
+        min_fw = device.get_firmware_min_version()
     except Exception as e:
-        return True, f'compatibility check raised ({e}); deferring to test'
+        return True, f'get_firmware_min_version raised ({e}); deferring to test'
 
-    verdict = 'compatible' if compatible else 'below device min FW'
-    return compatible, f'{verdict} -- {os.path.basename( image_path )}'
+    if not min_fw:
+        return True, f'device reports no minimum FW; deferring (candidate {candidate})'
+
+    if _version_to_tuple( candidate ) >= _version_to_tuple( min_fw ):
+        return True, f'compatible -- candidate {candidate} >= min {min_fw} (from {source})'
+    return False, f'below device min FW -- candidate {candidate} < min {min_fw} (from {source})'
 
 # Run all tests
 try:
