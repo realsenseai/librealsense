@@ -21,6 +21,16 @@ import sys
 import os
 import logging
 
+# Defense against ROS 2 launch.logging: when ROS is sourced, launch_testing's
+# pytest entry-point transitively imports launch.logging, which installs a
+# logger class whose __init__ forces propagate=False on every new logger.
+# That stops pytest's live log handler (set up below) from ever seeing test
+# logs. Reset the class and re-enable propagate on anything already created.
+logging.setLoggerClass(logging.Logger)
+for _name, _lgr in list(logging.Logger.manager.loggerDict.items()):
+    if isinstance(_lgr, logging.Logger) and not _lgr.propagate:
+        _lgr.propagate = True
+
 # unit-tests/py/ contains rspy -- the shared helper library used by all RealSense tests
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # pytest built-in: exclude infra-tests/e2e/ from collection (those are static test cases
