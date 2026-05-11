@@ -12,10 +12,20 @@ _py_dir = os.path.join(_unit_tests_dir, 'py')
 if _py_dir not in sys.path:
     sys.path.insert(0, _py_dir)
 
-# Fake pyrealsense2 — track log_to_console calls so tests can verify --rslog
+# Fake pyrealsense2 — track log_to_console calls so tests can verify --rslog.
+# Load any existing tracking file (subprocess_isolation children re-load this
+# conftest from the same tmpdir; without merging, the child would overwrite
+# the parent inner-pytest's tracking with an empty dict).
 import json as _json
 _tracking_log = os.path.join(os.path.dirname(os.path.abspath(__file__)), '_tracking.json')
-_tracking = {"rslog_calls": [], "query_kwargs": [], "enable_only_calls": []}
+_default_tracking = {"rslog_calls": [], "query_kwargs": [], "enable_only_calls": []}
+try:
+    with open(_tracking_log) as _f:
+        _tracking = _json.load(_f)
+    for _k, _v in _default_tracking.items():
+        _tracking.setdefault(_k, _v)
+except (FileNotFoundError, ValueError):
+    _tracking = dict(_default_tracking)
 def _save_tracking():
     with open(_tracking_log, 'w') as _f:
         _json.dump(_tracking, _f)

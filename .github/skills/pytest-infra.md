@@ -41,6 +41,22 @@ To add one:
 1. Pin the plugin in `unit-tests/requirements.txt`.
 2. Add a `'<module_name>': '<pip-package-name>'` entry to `REQUIRED_PYTEST_PLUGINS` in `rspy/pytest/plugins.py` (module name is the Python import name, typically with underscores; pip name uses hyphens).
 
+### Subprocess isolation (every test runs in a child pytest)
+
+Each `(file, device)` group runs in a fresh `pytest` child via the
+`rs_subprocess_isolation` plugin (`rspy/pytest/subprocess_isolation.py`); the
+parent owns the hub and recycles target ports before each child, so a native
+crash, retry, or repeat is contained to its own subprocess with a real port
+cycle in between.
+
+**When adding a new CLI flag**: decide if the test needs it at runtime in the
+child. If yes, **forward it from `_forwarded_args(config)` in
+`subprocess_isolation.py`** -- otherwise the child won't see it and behavior
+silently differs from a non-isolated run. Selection-time flags (`--live`,
+`--tag`, `-k`) and hub-control flags (`--device`, `--exclude-device`,
+`--no-reset`, `--hub-reset`, `--retries`) stay parent-only -- the parent
+already filters items, restricts hub visibility, and orchestrates retries.
+
 ### Hub port management
 
 - CI machines may have multiple hubs (e.g., Acroname + UniFi) wrapped in a `CombinedHub`

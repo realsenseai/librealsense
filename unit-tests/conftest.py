@@ -15,12 +15,13 @@ Implementation is split across rspy.pytest sub-modules; this file keeps only the
 and fixtures that pytest requires in conftest.py for auto-discovery.
 """
 
+import argparse
 import pytest
 import sys
 import os
 import logging
 
-# unit-tests/py/ contains rspy — the shared helper library used by all RealSense tests
+# unit-tests/py/ contains rspy -- the shared helper library used by all RealSense tests
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # pytest built-in: exclude infra-tests/e2e/ from collection (those are static test cases
 # run in isolated subprocesses by the infra regression tests, not by the parent pytest)
@@ -49,10 +50,11 @@ from rspy.pytest.cli import consume_legacy_flags, apply_pending_flags
 from rspy.pytest.device_helpers import find_matching_devices, find_matching_devices_multi, resolve_device_each_serials, _MISSING_SENTINEL_PREFIX, _SKIP_SENTINEL_PREFIX
 from rspy.pytest.collection import filter_and_sort_items
 from rspy.pytest.plugins import check_required_plugins
+from rspy.pytest import subprocess_isolation
 
 log = logging.getLogger('librealsense')
 
-# Bridge rspy.log → Python logging early, before any test output
+# Bridge rspy.log -> Python logging early, before any test output
 bridge_rspy_log()
 
 # Translate legacy CLI flags before pytest parses sys.argv
@@ -62,7 +64,7 @@ consume_legacy_flags()
 # ============================================================================
 # pyrealsense2 Import
 # ============================================================================
-# pyrealsense2 is built as part of the CMake build — repo.find_pyrs_dir() locates the .pyd/.so
+# pyrealsense2 is built as part of the CMake build -- repo.find_pyrs_dir() locates the .pyd/.so
 pyrs_dir = repo.find_pyrs_dir()
 if pyrs_dir and pyrs_dir not in sys.path:
     sys.path.insert(1, pyrs_dir)
@@ -165,9 +167,20 @@ def pytest_addoption(parser):
              "--tag <name> (run only tests with marker, maps to -m), "
              "--retries N (retry failed tests N times)."
     )
+    # Internal: parent -> child handshake. Set by subprocess_isolation when
+    # launching a per-(file, device) child pytest. Tells conftest to skip the
+    # parent-only setup (hub init, per-test log management) and short-circuit
+    # device-enable fixtures (parent already arranged the hub state).
+    # Suppressed from `pytest --help` -- users should never pass it manually.
+    group.addoption(
+        "--rs-child",
+        action="store_true",
+        default=False,
+        help=argparse.SUPPRESS,
+    )
 
 
-# Shared context tags (e.g. "nightly", "weekly") — tests check this to adjust behavior
+# Shared context tags (e.g. "nightly", "weekly") -- tests check this to adjust behavior
 context_list = []
 
 # Module-scoped retry: tracks which (module, repeat_step) passes had failures.
@@ -189,15 +202,26 @@ def pytest_configure(config):
     if tag_value and not config.option.markexpr:
         config.option.markexpr = tag_value
 
-    # --repeat N → pytest-repeat's --count N + module scope (only if --count wasn't explicitly set).
+    is_child = config.getoption("--rs-child", default=False)
+
+    # Subprocess-isolation plugin: only the parent runs each (file, device)
+    # group as an isolated child pytest. The child sees --rs-child and skips
+    # registration so it just runs the dispatched nodeids normally. Tests like
+    # infra-tests/helpers.run_e2e block the plugin via "-p no:" too -- we treat
+    # those runs as normal in-process (timeout default applies, etc.).
+    isolating = (not is_child) and (not config.pluginmanager.is_blocked("rs_subprocess_isolation"))
+    if isolating:
+        config.pluginmanager.register(subprocess_isolation, name="rs_subprocess_isolation")
+
+    # --repeat N -> pytest-repeat's --count N + module scope (only if --count wasn't explicitly set).
     # Using --repeat (our alias) always runs the full file N times; use --count for per-test repetition.
     repeat_val = config.getoption('repeat_count', default=0)
     if repeat_val and config.getoption('count', default=1) <= 1:
         config.option.count = repeat_val
         config.option.repeat_scope = 'module'
 
-    # --retries N → module-scoped retry.  Run all tests in a file; if any fail,
-    # recycle the device and rerun the *entire* module — up to N extra attempts.
+    # --retries N -> module-scoped retry.  Run all tests in a file; if any fail,
+    # recycle the device and rerun the *entire* module - up to N extra attempts.
     # Implemented on top of pytest-repeat (count = N+1, module scope).
     # pytest-retry's function-level retry is ALWAYS disabled when --retries is used.
     retries_val = config.getoption('retries', default=0)
@@ -215,8 +239,12 @@ def pytest_configure(config):
         context_list = context_str.split()
         log.info(f"Test context: {context_list}")
 
-    # Set up test log directory
-    setup_test_logging(config)
+    # Per-test log file management is parent-only. The child writes to its own
+    # stdout/stderr (captured by the parent's subprocess.run and forwarded into
+    # the parent's per-test .log). If the child also opened a FileHandler with
+    # mode='w', it would truncate the parent's content.
+    if not is_child:
+        setup_test_logging(config)
 
     # Enable LibRS debug logging if --rslog (once, globally)
     if rs and config.getoption("--rslog", default=False):
@@ -227,12 +255,28 @@ def pytest_configure(config):
     config.addinivalue_line("python_classes", "Test*")
     config.addinivalue_line("python_functions", "test_*")
 
-    # Default timeout: 200s, thread-based (Windows-compatible)
-    if not config.getoption("--timeout", default=None):
+    # Per-test timeout: 200s default (thread-based, Windows-compatible).
+    # User-passed --timeout, and any @pytest.mark.timeout(N) override, both
+    # flow through unchanged in the child (where the test actually runs).
+    # Capture the effective default for the parent's group-timeout math
+    # (subprocess_isolation reads _rs_default_per_test_timeout), then in the
+    # parent disable pytest-timeout unconditionally -- otherwise it would fire
+    # at the per-test budget while we are waiting on a child that legitimately
+    # runs many tests in a row.
+    user_timeout = config.getoption("--timeout", default=None)
+    config._rs_default_per_test_timeout = user_timeout or 200
+    config.option.timeout_method = "thread"
+    if isolating:
+        # Parent (subprocess-isolation active): each "test" is a subprocess.run
+        # wait that may legitimately span multiple per-test budgets. Disable
+        # pytest-timeout; we apply our own subprocess-side timeout.
+        config.option.timeout = 0
+    elif not user_timeout:
+        # Child, or any non-isolated run: pytest-timeout enforces per-test
+        # (with @pytest.mark.timeout overrides).
         config.option.timeout = 200
-        config.option.timeout_method = "thread"
 
-    # Suppress verbose failure tracebacks — per-test log files have full details.
+    # Suppress verbose failure tracebacks -- per-test log files have full details.
     # Keep short one-liners (-rfE) so Jenkins Groovy can parse them for log file links.
     # pytest-retry's verbose report is also suppressed (details are in per-test log files).
     if config.getoption("--tb") == "auto":
@@ -286,7 +330,7 @@ def pytest_configure(config):
     # #14962 investigation.
     install_live_log_format()
 
-    # Log build environment info (printed directly — pytest log handlers aren't active yet)
+    # Log build environment info (printed directly -- pytest log handlers aren't active yet)
     print(f"-I- {'=' * 80}")
     if rs:
         print(f"-I- Using pyrealsense2 from: {rs.__file__}")
@@ -294,8 +338,15 @@ def pytest_configure(config):
         print(f"-I- Build directory: {repo.build}")
     print(f"-I- {'=' * 80}")
 
-    # Create hub after logging is configured so discovery prints are visible
-    devices.init_hub()
+    # Hub ownership is parent-only: BrainStem/UniFi don't allow concurrent
+    # connections from multiple processes. Mark _hub_attempted so a later
+    # devices.query() (which calls init_hub) also skips the hub branch and
+    # just enumerates devices via rs.context().
+    if is_child:
+        devices._hub_attempted = True
+        devices.hub = None
+    else:
+        devices.init_hub()
 
     # Echo CLI device filters once (' '.join handles both repeated-flag and space-separated forms)
     exclude_list = config.getoption("--exclude-device", default=[])
@@ -364,6 +415,25 @@ def pytest_runtest_makereport(item, call):
         mod = item.module.__file__
         _module_pass_had_failure[(mod, step)] = True
 
+    # Sanitize the report's longrepr for pytest-reportlog (which the parent
+    # uses to ship reports across the subprocess boundary). pytest-reportlog
+    # calls dataclasses.asdict() -> copy.deepcopy() on the longrepr's
+    # reprtraceback; if it contains live Python traceback objects (as
+    # pytest-check's collected failures do) the deepcopy raises
+    # `TypeError: cannot pickle 'traceback' object`, the child exits with
+    # pytest INTERNALERROR (code 3), and the parent never sees the real
+    # failure message. Coerce to string in the child *only* (parent's
+    # terminal reporter still gets to render the structured longrepr in-
+    # process; coercing here only affects what crosses the subprocess
+    # boundary).
+    is_child = item.config.getoption("--rs-child", default=False)
+    if is_child and report.failed and report.longrepr is not None \
+            and not isinstance(report.longrepr, (str, tuple)):
+        try:
+            report.longrepr = str(report.longrepr)
+        except Exception as e:
+            report.longrepr = f"<longrepr unrenderable: {e}>"
+
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_runtest_setup(item):
@@ -375,7 +445,7 @@ def pytest_runtest_setup(item):
     if step > 0:
         mod = item.module.__file__
         if not _module_pass_had_failure.get((mod, step - 1), False):
-            pytest.skip("Module retry skipped — no failures in previous pass")
+            pytest.skip("Module retry skipped - no failures in previous pass")
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
@@ -388,7 +458,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 # ============================================================================
 
 def _cleanup_devices():
-    """Release hub and rs.context — required so BrainStem threads don't prevent exit."""
+    """Release hub and rs.context -- required so BrainStem threads don't prevent exit."""
     if devices.hub:
         try:
             if devices.hub.is_connected():
@@ -407,12 +477,12 @@ def _cleanup_devices():
 @pytest.fixture(scope="session", autouse=True)
 def session_setup_teardown():
     """Runs once per session: log startup info, yield, then clean up hub/devices on exit."""
-    # Setup — runs once before the first test
+    # Setup -- runs once before the first test
     register_signal_handlers(_cleanup_devices)
 
     yield  # All tests run here
 
-    # Teardown — runs once after the last test
+    # Teardown -- runs once after the last test
     ensure_newline()
     log.info("")
     log.info("=" * 80)
@@ -439,7 +509,13 @@ def _test_device_serial(request):
 
 @pytest.fixture(scope="function")
 def module_device_setup(request):
-    """Enable the target device via the hub. Recycles (power-cycles) once per test file, not per test case."""
+    """Enable the target device via the hub. Recycles (power-cycles) once per test file, not per test case.
+
+    In a subprocess_isolation child (--rs-child), the parent has already enabled
+    the right device(s); this fixture short-circuits to just resolving and
+    yielding the serial -- no hub interaction in the child.
+    """
+    is_child = request.config.getoption("--rs-child", default=False)
     serial_number = None
 
     # Check parametrized serial from device_each / device (injected by pytest_generate_tests)
@@ -447,7 +523,7 @@ def module_device_setup(request):
         serial_number = request.node.callspec.params['_test_device_serial']
         if serial_number.startswith(_SKIP_SENTINEL_PREFIX):
             # Device matched the pattern but was excluded (wrong type, device_exclude, etc.)
-            # Mirror the non-parametrized path: had_candidates=True → skip, not fail.
+            # Mirror the non-parametrized path: had_candidates=True -> skip, not fail.
             pattern = serial_number[len(_SKIP_SENTINEL_PREFIX):]
             pytest.skip(f"No suitable devices for requirements: {pattern}")
         if serial_number.startswith(_MISSING_SENTINEL_PREFIX):
@@ -482,14 +558,16 @@ def module_device_setup(request):
             if len(serial_numbers) < expected_count:
                 pytest.fail(f"Need {expected_count} devices but only {len(serial_numbers)} found")
 
-            # Enable all matched devices, recycle, and yield the list of SNs
+            # Parent owns the hub; in child mode the parent has already enabled
+            # the matched devices, so we just log and yield.
             names = [f"{devices.get(sn).name} [{sn}]" for sn in serial_numbers]
             log.info(f"Configuration: {', '.join(names)}")
-            try:
-                devices.enable_only(serial_numbers, recycle=True)
-                log.debug(f"All {len(serial_numbers)} devices enabled and ready")
-            except Exception as e:
-                pytest.fail(f"Failed to enable devices: {e}")
+            if not is_child:
+                try:
+                    devices.enable_only(serial_numbers, recycle=True)
+                    log.debug(f"All {len(serial_numbers)} devices enabled and ready")
+                except Exception as e:
+                    pytest.fail(f"Failed to enable devices: {e}")
             yield serial_numbers
             return
 
@@ -514,6 +592,11 @@ def module_device_setup(request):
     device = devices.get(serial_number)
     device_name = device.name if device else serial_number
     log.info(f"Configuration: {device_name} [{serial_number}]")
+
+    if is_child:
+        # Parent already enabled the right device. The child does no hub work.
+        yield serial_number
+        return
 
     module = request.node.module
     no_reset = request.config.getoption("--no-reset", default=False)
@@ -630,7 +713,7 @@ def test_device_wrapped(test_device, _safety_mode_state):
 
     Many option-setting operations on D585S require service mode. No-op for all other
     device families. Service mode is entered on the first test in the module that uses
-    this fixture for a given serial, and restored once at module teardown — not toggled
+    this fixture for a given serial, and restored once at module teardown -- not toggled
     per test case. Multiple D585S cameras are each tracked independently by serial.
     """
     dev, ctx = test_device
@@ -643,7 +726,7 @@ def test_device_wrapped(test_device, _safety_mode_state):
         if not entry['entered']:
             safety_sensor = dev.first_safety_sensor()
             if safety_sensor.get_option(rs.option.safety_mode) != rs.safety_mode.service:
-                # Will throw on failure — intentional so we fail the test rather than run without service mode.
+                # Will throw on failure -- intentional so we fail the test rather than run without service mode.
                 safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.service)
             entry['sensor'] = safety_sensor
             entry['entered'] = True
