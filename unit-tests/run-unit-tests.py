@@ -753,6 +753,7 @@ try:
                     incompatible = []
                     for sn in serial_numbers:
                         ok, reason = _is_fw_update_compatible( devices.get( sn ) )
+                        log.d( f'[fw-gate] {devices.get( sn ).name}_{sn}: ok={ok} -- {reason}' )
                         if not ok:
                             incompatible.append( (sn, reason) )
                     if incompatible:
