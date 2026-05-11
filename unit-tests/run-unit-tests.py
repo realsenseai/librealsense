@@ -545,24 +545,24 @@ def _version_from_fw_filename( path ):
     return '.'.join( m.group( i ) for i in range( 1, 5 ) )
 
 
-def _is_fw_update_compatible( device ):
+def _is_fw_update_compatible( rspy_device ):
     """
     For test-fw-update, compare the candidate FW version (parsed from a custom-fw-*
     filename if supplied, otherwise RECOMMENDED_FIRMWARE_VERSION) against the device's
     minimum supported FW via rs2::device::get_firmware_min_version. Returns
     (compatible, reason). On any can't-decide path returns True so we err on the side
     of letting the test run.
+    Takes the rspy.devices.Device wrapper; the underlying pyrealsense2 device is
+    available at `.handle`.
     """
     try:
         import pyrealsense2 as rs
     except ImportError as e:
         return True, f'pyrealsense2 unavailable ({e})'
 
-    try:
-        product_line = device.get_info( rs.camera_info.product_line )
-        product_name = device.get_info( rs.camera_info.name )
-    except Exception as e:
-        return True, f'could not read device info ({e})'
+    handle = rspy_device.handle
+    product_line = rspy_device.product_line
+    product_name = rspy_device.name  # wrapper strips "Intel RealSense " prefix
 
     candidate = None
     source = ''
@@ -572,14 +572,14 @@ def _is_fw_update_compatible( device ):
     elif 'D555' in (product_name or '') and custom_fw_d555_path:
         candidate = _version_from_fw_filename( custom_fw_d555_path )
         source = f'--custom-fw-d555 ({os.path.basename( custom_fw_d555_path )})'
-    elif device.supports( rs.camera_info.recommended_firmware_version ):
-        candidate = device.get_info( rs.camera_info.recommended_firmware_version )
+    elif handle.supports( rs.camera_info.recommended_firmware_version ):
+        candidate = handle.get_info( rs.camera_info.recommended_firmware_version )
         source = 'RECOMMENDED_FIRMWARE_VERSION'
     if not candidate:
         return True, 'no candidate FW version available; deferring to test'
 
     try:
-        min_fw = device.get_firmware_min_version()
+        min_fw = handle.get_firmware_min_version()
     except Exception as e:
         return True, f'get_firmware_min_version raised ({e}); deferring to test'
 
