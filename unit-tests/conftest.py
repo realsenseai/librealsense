@@ -25,11 +25,15 @@ import logging
 # pytest entry-point transitively imports launch.logging, which installs a
 # logger class whose __init__ forces propagate=False on every new logger.
 # That stops pytest's live log handler (set up below) from ever seeing test
-# logs. Reset the class and re-enable propagate on anything already created.
-logging.setLoggerClass(logging.Logger)
-for _name, _lgr in list(logging.Logger.manager.loggerDict.items()):
-    if isinstance(_lgr, logging.Logger) and not _lgr.propagate:
-        _lgr.propagate = True
+# logs. Reset the class and re-enable propagate on already-poisoned loggers.
+# No-op on clean machines — only fires when a non-stdlib Logger class is in use.
+if logging.getLoggerClass() is not logging.Logger:
+    print("-W- non-default Logger class detected (likely ROS launch.logging): "
+          "resetting class and restoring propagate")
+    logging.setLoggerClass(logging.Logger)
+    for _name, _lgr in list(logging.Logger.manager.loggerDict.items()):
+        if isinstance(_lgr, logging.Logger) and type(_lgr) is not logging.Logger and not _lgr.propagate:
+            _lgr.propagate = True
 
 # unit-tests/py/ contains rspy -- the shared helper library used by all RealSense tests
 current_dir = os.path.dirname(os.path.abspath(__file__))
