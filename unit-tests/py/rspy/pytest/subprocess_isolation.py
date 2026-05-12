@@ -160,26 +160,24 @@ def _group_key(item):
 
 
 def _find_group(item):
-    """Consecutive non-skip items in session.items sharing item's group key.
+    """All non-skip items in session.items sharing item's group key.
 
-    pytest_collection_modifyitems already sorts by (module, device_serial),
-    so a group is contiguous. Skip-marked items are silently passed over -
-    they're handled by the skip-marker branch when their own protocol fires.
+    Most groups are contiguous (filter_and_sort_items sorts by module +
+    device_serial), but pytest-repeat with --repeat-scope=module interleaves
+    by step: step-0 of every parametrize, then step-1 of every parametrize.
+    For groups whose key strips the pytest-repeat suffix (so step-0 and
+    step-1 of the same parametrize share a key), the matching items are NOT
+    adjacent in the item list. We therefore scan the whole list rather than
+    walking forward until the key changes. The first item we walk through
+    "owns" the group; subsequent items in the same group hit _pending_reports
+    via the early-return branch in pytest_runtest_protocol. Skip-marked items
+    are passed over - they're handled by the skip-marker branch when their
+    own protocol fires.
     """
     items = item.session.items
-    try:
-        start = items.index(item)
-    except ValueError:
-        return [item]
     key = _group_key(item)
-    group = []
-    for it in items[start:]:
-        if _group_key(it) != key:
-            break
-        if it.get_closest_marker("skip"):
-            continue
-        group.append(it)
-    return group
+    return [it for it in items
+            if _group_key(it) == key and not it.get_closest_marker("skip")]
 
 
 # ---------------------------------------------------------------------------
