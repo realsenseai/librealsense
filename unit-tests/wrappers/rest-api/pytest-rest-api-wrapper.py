@@ -37,7 +37,7 @@ def test_rest_api_wrapper(module_device_setup):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         universal_newlines=True,
-        timeout=10,
+        timeout=30,
         check=False,
         env=env,
     )

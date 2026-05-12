@@ -1,7 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-"""Shared helpers for infra regression tests — fake devices, mock builders, E2E runner."""
+"""Shared helpers for infra regression tests -- fake devices, mock builders, E2E runner."""
 
 import json
 import os
@@ -27,7 +27,7 @@ import pytest
 #   D515   555     D500          USB
 #   D555   666     D500          USB
 #
-# The E2E conftest uses a subset (D455, D435, D515, D401) — enough to
+# The E2E conftest uses a subset (D455, D435, D515, D401) -- enough to
 # test wildcards, excludes, and multi-device parametrization without noise.
 
 DEVICES = {
@@ -138,12 +138,18 @@ _E2E_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'e2e')
 _E2E_CONFTEST = os.path.join(_E2E_DIR, 'e2e_conftest.py')
 
 
-def run_e2e(test_filename, *extra_pytest_args):
+def run_e2e(test_filename, *extra_pytest_args, with_subprocess_isolation=False):
     """Run a pytest subprocess on a static test file from e2e/.
 
     Copies e2e_conftest.py and the test file to a temp dir for isolation
-    from the parent unit-tests/conftest.py. No content is generated — both
+    from the parent unit-tests/conftest.py. No content is generated -- both
     files are static and checked into the repo.
+
+    By default, the rs_subprocess_isolation plugin is disabled in the inner
+    pytest. Most e2e tests assert on shared module state (enable_only call
+    counts, etc.) which doesn't survive subprocess wrapping. Pass
+    ``with_subprocess_isolation=True`` from a test that explicitly wants to
+    exercise the wrapping plugin (e.g. crash-containment regression tests).
 
     Returns (returncode, stdout, tracking) where tracking is a dict with:
         - enable_only_calls: list of {serials, recycle} dicts
@@ -159,8 +165,12 @@ def run_e2e(test_filename, *extra_pytest_args):
         env = os.environ.copy()
         env['INFRA_UNIT_TESTS_DIR'] = os.path.normpath(os.path.join(_E2E_DIR, '..', '..'))  # unit-tests/
 
+        cmd = [sys.executable, "-m", "pytest", test_filename, "-v"]
+        if not with_subprocess_isolation:
+            cmd += ["-p", "no:rs_subprocess_isolation"]
+        cmd += list(extra_pytest_args)
         p = subprocess.run(
-            [sys.executable, "-m", "pytest", test_filename, "-v", *extra_pytest_args],
+            cmd,
             cwd=tmpdir,
             env=env,
             stdout=subprocess.PIPE,

@@ -47,10 +47,16 @@ class TestDevicePortManagement:
         assert len(tracking["enable_only_calls"]) == 0
 
     def test_device_no_match_fails_without_enabling(self):
-        """@device('D999') with no match should fail and never call enable_only."""
+        """@device('D999') with no match should fail and never call enable_only.
+
+        Single-spec @device markers are parametrized at collection time with a
+        MISSING-<pattern> sentinel id when no device matches, so the test ID
+        carries the failure reason. module_device_setup turns the sentinel into
+        a pytest.fail() at setup, producing an ERROR outcome.
+        """
         rc, out, tracking = run_e2e("pytest-device-setup.py", "-k", "test_d999_no_match")
         assert_outcomes(out, error=1)
-        assert "No devices" in out
+        assert "MISSING-D999" in out, f"expected MISSING-D999 sentinel id in stdout; got:\n{out}"
         assert len(tracking["enable_only_calls"]) == 0
 
     def test_device_each_no_match_skips_without_enabling(self):

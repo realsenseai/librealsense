@@ -11,6 +11,45 @@ from rspy import devices
 log = logging.getLogger('librealsense')
 
 
+def resolve_item_serials(item, config):
+    """Set of device serial numbers an item needs, mirroring module_device_setup.
+
+    - parametrized via @device_each -> take the bracketed serial
+    - @device("D400*", "D400*") (multi) -> find_matching_devices_multi
+    - @device(...) / @device_each(...) (single) -> find_matching_devices(each=False)
+    - no markers -> empty set
+    """
+    callspec = getattr(item, "callspec", None)
+    if callspec and "_test_device_serial" in getattr(callspec, "params", {}):
+        return {callspec.params["_test_device_serial"]}
+
+    device_markers = [
+        m for m in item.iter_markers()
+        if m.name in ("device", "device_each", "device_exclude")
+    ]
+    if not device_markers:
+        return set()
+
+    cli_includes = config.getoption("--device", default=[])
+    cli_excludes = config.getoption("--exclude-device", default=[])
+
+    multi = next(
+        (m for m in device_markers if m.name == "device" and len(m.args) > 1),
+        None,
+    )
+    if multi:
+        sns, _ = find_matching_devices_multi(
+            device_markers, cli_includes=cli_includes, cli_excludes=cli_excludes
+        )
+        return set(sns)
+
+    sns, _ = find_matching_devices(
+        device_markers, each=False,
+        cli_includes=cli_includes, cli_excludes=cli_excludes,
+    )
+    return set(sns)
+
+
 def split_cli_patterns(patterns):
     """Flatten a list of patterns by splitting each entry on whitespace.
 
@@ -37,7 +76,7 @@ def _build_sn_filter(markers, cli_includes=None, cli_excludes=None):
        ``device_type_exclude`` markers.
 
     *cli_includes* / *cli_excludes* may be raw option strings (whitespace-separated
-    names in a single entry) or already-split lists — ``split_cli_patterns`` is
+    names in a single entry) or already-split lists -- ``split_cli_patterns`` is
     applied internally either way.
     """
     cli_includes = split_cli_patterns(cli_includes)
@@ -143,7 +182,7 @@ def resolve_device_each_serials(metafunc):
     Called from the pytest_generate_tests hook. Resolves exclude/include patterns from
     both markers and CLI options, then calls metafunc.parametrize() with matching serials.
 
-    - ``device_each(pattern)``: one instance per matching device (optional — no instance
+    - ``device_each(pattern)``: one instance per matching device (optional -- no instance
       if no device matches).
     - ``device(pattern)`` (single-spec form): exactly one instance using the first matching
       device.  If no device matches, a ``__MISSING__:pattern`` sentinel is added so that
@@ -153,16 +192,18 @@ def resolve_device_each_serials(metafunc):
     and lets the existing non-parametrized path in ``module_device_setup`` handle them.
     """
     device_each_markers = [m for m in metafunc.definition.iter_markers("device_each")]
-    # Single-spec device() markers only — multi-spec (e.g. device("A", "B")) are handled
+    # Single-spec device() markers only -- multi-spec (e.g. device("A", "B")) are handled
     # entirely inside module_device_setup via find_matching_devices_multi.
     single_device_markers = [
         m for m in metafunc.definition.iter_markers("device")
         if m.args and len(m.args) == 1
     ]
 
-    # Nothing to do if there are no device_each markers.
-    # (Pure device() markers are handled by the non-parametrized path in module_device_setup.)
-    if not device_each_markers:
+    # Nothing to do if there are no device markers at all.
+    # Single-spec device() markers are also parametrized here (one instance with the
+    # chosen serial as the test ID) so test names consistently show "<DevName>-<Serial>"
+    # in their brackets, instead of only when device_each is used.
+    if not device_each_markers and not single_device_markers:
         return
 
     all_serials = []
@@ -185,8 +226,8 @@ def resolve_device_each_serials(metafunc):
     # serial (the first matching device), or a sentinel if none is found.
     #
     # Two sentinel cases mirror the non-parametrized path in module_device_setup:
-    #   had_raw_match=True  → device exists but all filtered (exclude/type) → skip
-    #   had_raw_match=False → no device of this type in the lab at all      → fail
+    #   had_raw_match=True  -> device exists but all filtered (exclude/type) -> skip
+    #   had_raw_match=False -> no device of this type in the lab at all      -> fail
     for marker in single_device_markers:
         pattern = marker.args[0]
         found_sn = None
@@ -200,12 +241,12 @@ def resolve_device_each_serials(metafunc):
             if found_sn not in all_serials:
                 all_serials.append(found_sn)
         elif had_raw_match:
-            # Device(s) matched the pattern but were all excluded — skip gracefully.
+            # Device(s) matched the pattern but were all excluded -- skip gracefully.
             sentinel = f"{_SKIP_SENTINEL_PREFIX}{pattern}"
             if sentinel not in all_serials:
                 all_serials.append(sentinel)
         else:
-            # No candidates at all — device genuinely absent from the lab.
+            # No candidates at all -- device genuinely absent from the lab.
             sentinel = f"{_MISSING_SENTINEL_PREFIX}{pattern}"
             if sentinel not in all_serials:
                 all_serials.append(sentinel)
@@ -271,7 +312,7 @@ def find_matching_devices_multi(device_markers, cli_includes=None, cli_excludes=
 
 
 def is_jetson_platform():
-    """Detect NVIDIA Jetson — some tests behave differently on embedded platforms."""
+    """Detect NVIDIA Jetson -- some tests behave differently on embedded platforms."""
     try:
         with open('/proc/device-tree/model', 'r') as f:
             model = f.read()
@@ -287,18 +328,18 @@ def require_min_fw_version(dev, min_version, feature_name="", inclusive=True):
     """Skip the test if the device FW does not meet the minimum version requirement.
 
     Caches the result per (device serial, min_version, inclusive) so the check
-    runs at most once per module per device — subsequent calls for the same key
+    runs at most once per module per device -- subsequent calls for the same key
     are no-ops when the check already passed.  If the FW is too old, pytest.skip()
     is called (raising Skipped), so the cache entry is never written and every
     test that calls this function will also be skipped.
 
     Args:
         dev: RealSense device (rs.device).
-        min_version: rsutils.version — the minimum acceptable FW version.
+        min_version: rsutils.version -- the minimum acceptable FW version.
         feature_name: Optional name of the feature requiring this FW, included in
                       the skip message for clarity.
-        inclusive: True (default) → require fw >= min_version (skip if fw < min).
-                   False → require fw > min_version (skip if fw <= min).
+        inclusive: True (default) -> require fw >= min_version (skip if fw < min).
+                   False -> require fw > min_version (skip if fw <= min).
     """
     import pytest
     import pyrealsense2 as rs
