@@ -568,10 +568,10 @@ def _is_fw_update_compatible( rspy_device ):
     source = ''
     if product_line == 'D400' and custom_fw_path:
         candidate = _version_from_fw_filename( custom_fw_path )
-        source = f'--custom-fw-d400 ({os.path.basename( custom_fw_path )})'
+        source = f'--custom-fw-d400 {os.path.basename( custom_fw_path )}'
     elif 'D555' in (product_name or '') and custom_fw_d555_path:
         candidate = _version_from_fw_filename( custom_fw_d555_path )
-        source = f'--custom-fw-d555 ({os.path.basename( custom_fw_d555_path )})'
+        source = f'--custom-fw-d555 {os.path.basename( custom_fw_d555_path )}'
     elif handle.supports( rs.camera_info.recommended_firmware_version ):
         candidate = handle.get_info( rs.camera_info.recommended_firmware_version )
         source = 'RECOMMENDED_FIRMWARE_VERSION'
@@ -587,8 +587,8 @@ def _is_fw_update_compatible( rspy_device ):
         return True, f'device reports no minimum FW; deferring (candidate {candidate})'
 
     if _version_to_tuple( candidate ) >= _version_to_tuple( min_fw ):
-        return True, f'compatible -- candidate {candidate} >= min {min_fw} (from {source})'
-    return False, f'below device min FW -- candidate {candidate} < min {min_fw} (from {source})'
+        return True, f'compatible -- candidate {candidate} >= min {min_fw} (candidate from {source})'
+    return False, f'below device min FW -- candidate {candidate} < min {min_fw} (candidate from {source})'
 
 # Run all tests
 try:
