@@ -116,13 +116,14 @@ def _announce(line):
 
 
 def _announce_group(items):
-    # Skip single-test groups: the per-test line already shows the file + test
-    # name, so a header would just duplicate that.
+    # One line per group: <module> [<device>]. Device tag comes from the
+    # group key, which already strips pytest-repeat's step suffix.
     if len(items) <= 1:
         return
     rel = getattr(items[0], "location", (None,))[0] or items[0].fspath
-    func_names = [it.name for it in items]
-    _announce(f"group {rel}: {', '.join(func_names)}")
+    device_id = _group_key(items[0])[1]
+    suffix = f" [{device_id}]" if device_id else ""
+    _announce(f"{rel}{suffix}")
 
 
 # ---------------------------------------------------------------------------
