@@ -240,6 +240,7 @@ def pytest_configure(config):
     # pytest-retry's function-level retry is ALWAYS disabled when --retries is used.
     retries_val = config.getoption('retries', default=0)
     if retries_val:
+        config._rs_original_retries = retries_val   # preserve for subprocess_isolation forwarding
         config.option.retries = 0           # disable pytest-retry function-level retry
         if config.getoption('count', default=1) <= 1:
             # --retries without --repeat: add retry passes via pytest-repeat

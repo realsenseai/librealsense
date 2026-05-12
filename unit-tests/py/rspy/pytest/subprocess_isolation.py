@@ -93,16 +93,14 @@ def pytest_runtest_protocol(item, nextitem):
         _sync_setup_state(item, nextitem)
         return True
 
-    by_nodeid = _run_with_retries(item.config, _find_group(item))
+    group = _find_group(item)
+    _announce_group(group)
+    by_nodeid = _run_group_in_subprocess(item.config, group)
     _pending_reports.update(by_nodeid)
     for report in _pending_reports.pop(item.nodeid, []):
         item.ihook.pytest_runtest_logreport(report=report)
     _sync_setup_state(item, nextitem)
     return True
-
-
-def _is_failed(reports):
-    return any(r.outcome == "failed" for r in reports)
 
 
 def _announce(line):
@@ -127,47 +125,37 @@ def _announce_group(items):
     _announce(f"group {rel}: {', '.join(func_names)}")
 
 
-def _announce_retry(items, attempt, total_attempts):
-    _announce(f"retrying full module (attempt {attempt}/{total_attempts}): "
-              f"{len(items)} test(s) in {items[0].fspath}")
-
-
-def _run_with_retries(config, items):
-    """Run *items* in a child; if ANY test in the group fails, re-run the
-    full group as a fresh subprocess (with hub recycle in between).
-
-    Same semantics as --repeat: the module is the unit of retry, not the
-    individual function. A test failure can leave the device or module
-    state inconsistent for tests that ran in the same subprocess, so a
-    full re-run gives the next attempt a clean device + clean module
-    state. This mirrors the legacy run-unit-tests.py behavior where a
-    failing test caused the whole script to be re-spawned.
-
-    We don't forward --retries to the child, so pytest-retry sees
-    retries=0 inside the child and runs each test once.
-    """
-    _announce_group(items)
-    by_nodeid = _run_group_in_subprocess(config, items)
-    retries = int(config.getoption("--retries", default=0) or 0)
-    for attempt in range(retries):
-        if not any(_is_failed(reports) for reports in by_nodeid.values()):
-            break  # all good
-        _announce_retry(items, attempt + 2, retries + 1)
-        retry_results = _run_group_in_subprocess(config, items)
-        # Replace every item's reports with the latest attempt's reports.
-        by_nodeid.update(retry_results)
-    return by_nodeid
-
-
 # ---------------------------------------------------------------------------
 # Grouping
 # ---------------------------------------------------------------------------
 
 def _group_key(item):
-    """(fspath, device-id-from-brackets) - same key the per-test log uses."""
+    """(fspath, device-id-from-brackets) - same key the per-test log uses.
+
+    Strips pytest-repeat's "{step+1}-{count}" suffix so all repeat passes for
+    the same (file, device) share one subprocess. That preserves the in-process
+    skip-if-clean-pass optimisation in conftest's _module_retry_mode logic
+    (the failure dict is process-local; splitting passes across subprocesses
+    would empty it for retry passes and either always-skip or never-skip).
+    """
     name = item.name
     lb, rb = name.find("["), name.rfind("]")
-    device_id = name[lb + 1:rb] if 0 <= lb < rb else None
+    if not (0 <= lb < rb):
+        return (str(item.fspath), None)
+    device_id = name[lb + 1:rb]
+    callspec = getattr(item, "callspec", None)
+    if callspec is not None:
+        step = callspec.params.get("__pytest_repeat_step_number")
+        if step is not None:
+            try:
+                count = int(item.config.getoption("count", default=1) or 1)
+            except Exception:
+                count = 1
+            suffix = f"{step + 1}-{count}"
+            if device_id == suffix:
+                device_id = ""
+            elif device_id.endswith("-" + suffix):
+                device_id = device_id[: -(len(suffix) + 1)]
     return (str(item.fspath), device_id)
 
 
@@ -226,7 +214,7 @@ def _enable_target_devices_for_group(items, config):
 def _forwarded_args(config):
     """CLI flags that need to flow through to the child pytest.
 
-    Forwarded:    --context (runtime), --rslog, --repeat, --debug, --timeout
+    Forwarded:    --context (runtime), --rslog, --repeat, --retries, --debug, --timeout
     Not forwarded: --device / --exclude-device (parent's enable_only already
                   filters the hub), --no-reset / --hub-reset (parent owns the
                   hub), --live / --not-live (parent emits skipped reports
@@ -241,6 +229,15 @@ def _forwarded_args(config):
     repeat_val = config.getoption("repeat_count", default=0)
     if repeat_val:
         args.extend(["--repeat", str(repeat_val)])
+    # Forward --retries so the child fires conftest's --retries -> --count + repeat-scope
+    # expansion (which sets _module_retry_mode). Without this, the skip-if-clean hook
+    # in the child won't activate and pytest-repeat's count won't be set, so the child's
+    # collected items won't match the parametrized nodeids the parent dispatched.
+    # Read the original retries value -- conftest zeroes config.option.retries to disable
+    # pytest-retry's function-level retry, so config.getoption("retries") returns 0 here.
+    retries_val = getattr(config, "_rs_original_retries", 0)
+    if retries_val:
+        args.extend(["--retries", str(retries_val)])
     # --debug and --timeout are consumed before pytest parses sys.argv, so
     # config doesn't track them; re-read from the original invocation argv.
     invocation_args = list(getattr(getattr(config, "invocation_params", None), "args", ()) or ())

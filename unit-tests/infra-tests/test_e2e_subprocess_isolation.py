@@ -27,41 +27,46 @@ class TestSubprocessCrashContainment:
 
 class TestSubprocessRetry:
 
-    def test_retry_reruns_full_module(self):
-        # Fixture: test_a fails on the first attempt, passes on the second
-        # (using a marker file). test_b always passes.
-        # With --retries 1, the parent must:
-        #   - re-spawn the WHOLE module (both tests), not just the failed one
-        #   - so test_a's first attempt FAILS, then the retry re-runs both
-        #     test_a (now PASS, marker exists) and test_b (PASS)
-        # Final outcome: 2 passed (last-attempt reports win).
+    def test_retry_module_scope_under_isolation(self):
+        # Retry semantics are owned by conftest (--retries -> --count=N+1 +
+        # _module_retry_mode + skip-if-clean-pass hook). Subprocess isolation
+        # groups by (file, device) and strips pytest-repeat's "-step-total"
+        # suffix from the group key, so ALL repeat passes for one (file, device)
+        # share a single child subprocess. That preserves the in-process
+        # _module_pass_had_failure dict across passes -- pass 1 sees pass 0's
+        # failures and the skip-if-clean hook fires correctly.
+        #
+        # Fixture (upstream pytest-retry.py): test_always_passes always passes,
+        # test_fails_then_passes fails on pass 0 and passes on pass 1.
+        # --retries 1 -> count=2, module-scoped.
+        # Expected: pass 0 runs both (1P 1F), pass 1 runs both (both PASS
+        # because dict shows pass 0 had a failure, so the skip hook lets them
+        # through). Total: 3 passed, 1 failed.
         rc, out, tracking = run_e2e(
-            "pytest-retry-once.py",
+            "pytest-retry.py",
             "--retries", "1",
             with_subprocess_isolation=True,
         )
-        assert_outcomes(out, passed=2)
-        # The "retrying full module" announce line must appear in the parent
-        # output -- proves my plugin's parent-side retry actually fired.
-        assert "retrying full module" in out, (
-            f"expected 'retrying full module' in parent stdout; got:\n{out}"
-        )
-        # Two enable_only calls (initial + retry) prove the hub recycled
-        # between attempts.
+        assert_outcomes(out, passed=3, failed=1)
+        # Exactly one enable_only call: the parent recycles the hub once when
+        # dispatching the (file, device) group. Both repeat passes run inside
+        # that single child subprocess (no per-pass parent recycle, by design).
         ec = tracking.get("enable_only_calls", [])
-        assert len(ec) >= 2, f"expected >= 2 enable_only calls; got {ec}"
+        assert len(ec) == 1, (
+            f"expected exactly 1 enable_only call (single subprocess group for "
+            f"all repeat passes); got {len(ec)}: {ec}"
+        )
 
 
 class TestSubprocessRepeat:
 
-    def test_repeat_reruns_full_module(self):
-        # Fixture: a module with two trivially-passing tests. With --repeat 2,
-        # pytest-repeat must parametrize each test with 2 iterations AND
-        # group iterations by module (per our --repeat-scope=module default,
-        # set in conftest.pytest_configure).
-        # Collection order should be: test_a[1-2], test_b[1-2], test_a[2-2], test_b[2-2]
-        # That gives my plugin two groups (one per iteration), each containing
-        # both test functions.
+    def test_repeat_runs_all_passes_in_one_subprocess(self):
+        # Fixture: a module with two passing tests. With --repeat 2,
+        # pytest-repeat parametrizes each test with step 1 and 2 (--repeat
+        # implies --repeat-scope=module via conftest).
+        # Collection order: test_a[1-2], test_b[1-2], test_a[2-2], test_b[2-2]
+        # Subprocess isolation strips the "-1-2" / "-2-2" suffix from the group
+        # key so all four items live in ONE group -> ONE child subprocess.
         rc, out, tracking = run_e2e(
             "pytest-repeat-module.py",
             "--repeat", "2",
@@ -69,11 +74,11 @@ class TestSubprocessRepeat:
         )
         # 4 total: 2 tests * 2 iterations
         assert_outcomes(out, passed=4)
-        # Two enable_only calls (one per module iteration), not four (one per
-        # function-iteration). This is the proof that --repeat-scope=module
-        # is active.
+        # Exactly one enable_only call: the parent recycles the hub once for
+        # the (file, device) group. Both repeat passes run inside that single
+        # child subprocess.
         ec = tracking.get("enable_only_calls", [])
-        assert len(ec) == 2, (
-            f"expected exactly 2 enable_only calls (one per module iteration); "
-            f"got {len(ec)}: {ec}"
+        assert len(ec) == 1, (
+            f"expected exactly 1 enable_only call (single subprocess group for "
+            f"both repeat passes); got {len(ec)}: {ec}"
         )
