@@ -393,6 +393,20 @@ def pytest_collection_modifyitems(config, items):
     """Auto-skip nightly/dds tests, filter --live, sort by priority."""
     filter_and_sort_items(config, items)
 
+    # --retries / --repeat semantics apply to FAILED/ERROR results, not SKIPPED.
+    # filter_and_sort_items adds pytest.mark.skip markers to tests filtered by
+    # context, --live, --not-live, etc. -- those skips happen BEFORE the test
+    # runs, so retrying them is meaningless. pytest-repeat would otherwise emit
+    # one SKIPPED report per pass for every collection-time skip, doubling
+    # (with --retries 1) the log volume for skipped tests for no benefit.
+    # Drop the pass-1+ items for any test that already has a skip marker.
+    if config.getoption("count", default=1) > 1:
+        def _step(item):
+            cs = getattr(item, "callspec", None)
+            return cs.params.get("__pytest_repeat_step_number", 0) if cs else 0
+        items[:] = [it for it in items
+                    if not (_step(it) > 0 and it.get_closest_marker("skip"))]
+
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_protocol(item, nextitem):
