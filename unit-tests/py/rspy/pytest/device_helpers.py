@@ -199,9 +199,11 @@ def resolve_device_each_serials(metafunc):
         if m.args and len(m.args) == 1
     ]
 
-    # Nothing to do if there are no device_each markers.
-    # (Pure device() markers are handled by the non-parametrized path in module_device_setup.)
-    if not device_each_markers:
+    # Nothing to do if there are no device markers at all.
+    # Single-spec device() markers are also parametrized here (one instance with the
+    # chosen serial as the test ID) so test names consistently show "<DevName>-<Serial>"
+    # in their brackets, instead of only when device_each is used.
+    if not device_each_markers and not single_device_markers:
         return
 
     all_serials = []
