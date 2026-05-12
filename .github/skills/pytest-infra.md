@@ -57,6 +57,26 @@ silently differs from a non-isolated run. Selection-time flags (`--live`,
 `--no-reset`, `--hub-reset`, `--retries`) stay parent-only -- the parent
 already filters items, restricts hub visibility, and orchestrates retries.
 
+### Module-scope semantics (`--repeat`, `--retries`)
+
+**`--repeat` and `--retries` run at MODULE scope, not function scope** —
+deliberate deviation from pytest defaults. Driven by hub-cycle cost
+(~5s/cycle) and shared module-level state (globals, callbacks) that
+function-level retry can't recover.
+
+Wiring (touching any of these requires checking the others stay consistent):
+
+- `conftest.py`: `--repeat N` and `--retries N` both force `--repeat-scope=module`. `--retries` also sets `_module_retry_mode` + a skip-if-clean `pytest_runtest_setup` hook that reads `_module_pass_had_failure` populated by `pytest_runtest_makereport`. Original `--retries` value is stashed on `config._rs_original_retries` because `config.option.retries` gets zeroed.
+- `subprocess_isolation._group_key`: strips pytest-repeat's `{step+1}-{count}` suffix via `callspec.params`, so all repeat passes for `(file, device)` share ONE subprocess (required for the in-process failure dict to work).
+- `subprocess_isolation._find_group`: scans the ENTIRE item list — pytest-repeat with module scope interleaves step-0 then step-1, so matching items are not adjacent.
+- `subprocess_isolation._forwarded_args`: forwards `--retries` from `_rs_original_retries`, not `config.getoption("retries")`.
+
+Gotchas:
+
+- If `_group_key` doesn't strip the repeat suffix → retry passes land in separate subprocesses → pass-N's in-process dict is empty → `pytest.skip("Module retry skipped - no failures in previous pass")` fires after a real failure.
+- If `_find_group` walks only consecutive items → modules with extra parametrize dimensions (resolution × cfg × device) split pass-0 / pass-1 across subprocesses.
+- Adding a new CLI flag that drives module-scope behavior? Stash the pre-normalization value on `config` and read from there in `_forwarded_args`.
+
 ### Hub port management
 
 - CI machines may have multiple hubs (e.g., Acroname + UniFi) wrapped in a `CombinedHub`
