@@ -14,6 +14,9 @@ serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "1.5", features = ["shell-open"] }
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.11", features = ["json"] }
+openssl = "0.10.79"
+tar = "0.4.45"
+bytes = "1.11.1"
 
 [features]
 # This feature is used for production builds where `devPath` points to the filesystem

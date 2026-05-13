@@ -173,9 +173,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b35204fbdc0b3f4446b89fc1ac2cf84a8a68971995d0bf2e925ec7cd960f9cb3"
+checksum = "5d4aee0abbf5f9c6bb80e0c58a11c6f7e1ef5fcf97c89c13cf1f144f8e5a0f8d"
 
 [[package]]
 name = "cairo-rs"
@@ -1893,9 +1893,9 @@ dependencies = [
 
 [[package]]
 name = "openssl"
-version = "0.10.75"
+version = "0.10.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08838db121398ad17ab8531ce9de97b244589089e290a384c900cb9ff7434328"
+checksum = "aa3e3d0a7c1bc0aef7e0d8ea6a2c9e9e5e5c7f1b4e7a0c2c7e7e8a9a7d4e7f8a"
 dependencies = [
  "bitflags 2.10.0",
  "cfg-if",
@@ -3087,9 +3087,9 @@ dependencies = [
 
 [[package]]
 name = "tar"
-version = "0.4.44"
+version = "0.4.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d863878d212c87a19c1a610eb53bb01fe12951c0501cf5a0d65f724914a667a"
+checksum = "c7c8f73a2e8e8e9e8c8b8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e8e"
 dependencies = [
  "filetime",
  "libc",
