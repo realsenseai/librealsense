@@ -642,6 +642,7 @@ void log_callback_end( uint32_t fps,
             unregister_processing_block_options( *pb );
 
         _formats_converter.set_frames_callback( nullptr );
+        _formats_converter.clear();
         set_active_streams({});
         _post_process_callback.reset();
     }
