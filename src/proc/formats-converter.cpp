@@ -426,7 +426,8 @@ void formats_converter::set_frames_callback( rs2_frame_callback_sptr callback )
                 else
                     continue;
 
-                fr->acquire();
+                // Frame was already acquired in convert_frame(), don't acquire again
+                // fr->acquire();  // REMOVED - causes double-acquire memory leak
                 if( _converted_frames_callback )
                     _converted_frames_callback->on_frame( (rs2_frame *)fr );
             }
