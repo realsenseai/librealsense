@@ -134,6 +134,17 @@ void init_frame(py::module &m) {
         .def("swap", &rs2::frame::swap, "Swap the internal frame handle with the one in parameter", "other"_a)
         .def("__nonzero__", &rs2::frame::operator bool, "check if internal frame handle is valid") // Called to implement truth value testing in Python 2
         .def("__bool__", &rs2::frame::operator bool, "check if internal frame handle is valid") // Called to implement truth value testing in Python 3
+        .def("__del__", [](rs2::frame& self) {
+            // Explicitly release frame resources when Python object is deleted
+            self = rs2::frame();
+        })
+        .def("__enter__", [](rs2::frame& self) -> rs2::frame& {
+            return self;
+        })
+        .def("__exit__", [](rs2::frame& self, py::object, py::object, py::object) {
+            self = rs2::frame();  // Release on context manager exit
+            return false;
+        })
         .def("get_timestamp", &rs2::frame::get_timestamp, "Retrieve the time at which the frame was captured")
         .def_property_readonly("timestamp", &rs2::frame::get_timestamp, "Time at which the frame was captured. Identical to calling get_timestamp.")
         .def("get_frame_timestamp_domain", &rs2::frame::get_frame_timestamp_domain, "Retrieve the timestamp domain.")
