@@ -396,7 +396,7 @@ void formats_converter::set_frames_callback( rs2_frame_callback_sptr callback )
     _converted_frames_callback = callback;
 
     // After processing callback
-    auto output_cb = make_frame_callback( [this, callback]( frame_holder f ) {
+    auto output_cb = make_frame_callback( [&]( frame_holder f ) {
         std::vector< frame_interface * > frames_to_be_processed;
         frames_to_be_processed.push_back( f.frame );
 
@@ -426,8 +426,7 @@ void formats_converter::set_frames_callback( rs2_frame_callback_sptr callback )
                 else
                     continue;
 
-                // Frame was already acquired in convert_frame(), don't acquire again
-                // fr->acquire();  // REMOVED - causes double-acquire memory leak
+                fr->acquire();
                 if( _converted_frames_callback )
                     _converted_frames_callback->on_frame( (rs2_frame *)fr );
             }

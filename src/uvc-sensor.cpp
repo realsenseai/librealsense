@@ -398,6 +398,8 @@ void uvc_sensor::stop()
 
     _is_streaming = false;
     _device->stop_callbacks();
+    _source.flush();
+    _source.reset();
     _timestamp_reader->reset();
     _gyro_counter = 0;
     _accel_counter = 0;

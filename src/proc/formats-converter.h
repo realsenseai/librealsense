@@ -45,9 +45,8 @@ namespace librealsense
 
         stream_profiles const & get_source_profiles_from_target( std::shared_ptr< stream_profile_interface > const & target_profile ) const;
 
-        void clear_active_cache();
-
     protected:
+        void clear_active_cache();
         void update_target_profiles_data( const stream_profiles & from_profiles );
         void cache_from_profiles( const stream_profiles & from_profiles );
 

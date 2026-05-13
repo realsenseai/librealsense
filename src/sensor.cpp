@@ -642,7 +642,6 @@ void log_callback_end( uint32_t fps,
             unregister_processing_block_options( *pb );
 
         _formats_converter.set_frames_callback( nullptr );
-        _formats_converter.clear_active_cache();
         set_active_streams({});
         _post_process_callback.reset();
     }
@@ -665,7 +664,6 @@ void log_callback_end( uint32_t fps,
     {
         std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
         _raw_sensor->stop();
-        _formats_converter.set_frames_callback( nullptr );
     }
 
     float librealsense::synthetic_sensor::get_preset_max_value() const
