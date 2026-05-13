@@ -396,7 +396,7 @@ void formats_converter::set_frames_callback( rs2_frame_callback_sptr callback )
     _converted_frames_callback = callback;
 
     // After processing callback
-    auto output_cb = make_frame_callback( [&]( frame_holder f ) {
+    auto output_cb = make_frame_callback( [this, callback]( frame_holder f ) {
         std::vector< frame_interface * > frames_to_be_processed;
         frames_to_be_processed.push_back( f.frame );
 
