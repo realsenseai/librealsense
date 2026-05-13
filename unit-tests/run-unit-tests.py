@@ -459,7 +459,7 @@ def devices_by_test_config( test, exceptions ):
             continue
 
 
-def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_retry = 0, sns=None ):
+def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_retry = 0, sns=None, custom_fw_d400_override=None ):
     global rslog
     #
     if not log.is_debug_on():
@@ -471,9 +471,10 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
     opts = []
     if rslog:
         opts.append( '--rslog' )
-    if test.name == "test-fw-update" and custom_fw_path:
+    effective_custom_fw_d400 = custom_fw_d400_override or custom_fw_path
+    if test.name == "test-fw-update" and effective_custom_fw_d400:
         opts.append('--custom-fw-d400')
-        opts.append(custom_fw_path)
+        opts.append(effective_custom_fw_d400)
     if test.name == "test-fw-update" and custom_fw_d555_path:
         opts.append('--custom-fw-d555')
         opts.append(custom_fw_d555_path)
@@ -496,7 +497,7 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
     return False
 
 
-def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
+def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None, custom_fw_d400_override=None ):
     global n_tests, n_failed_tests, retries
     n_tests += 1
     retry_count = max(test.config.retries, retries)
@@ -510,7 +511,8 @@ def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
                 time.sleep(1)  # small pause between tries
             else:
                 devices.enable_only( serial_numbers, recycle=True )
-        if test_wrapper_( test, configuration, repetition, retry, retry_count, serial_numbers ):
+        if test_wrapper_( test, configuration, repetition, retry, retry_count, serial_numbers,
+                          custom_fw_d400_override=custom_fw_d400_override ):
             return True
 
     n_failed_tests += 1
@@ -527,6 +529,26 @@ def close_hubs():
             devices.hub.disable_ports()
             devices.wait_until_all_ports_disabled()
             devices.hub.disconnect()
+
+
+# Per-device FW image fallbacks used when the bundled FW is below the device's
+# minimum supported FW. Keyed by device name as exposed by rspy.devices.Device
+# (with "Intel RealSense " stripped). Paths are relative to libci.home so they
+# resolve correctly on both Linux (/usr/local/lib/ci) and Windows (C:\LibCI).
+_FW_FALLBACK_RELPATHS = {
+    'D436': 'data/FW/D400/Signed_Image_UVC_5_17_3_7.bin',
+}
+
+
+def _fw_fallback_image_for( rspy_device ):
+    relpath = _FW_FALLBACK_RELPATHS.get( rspy_device.name )
+    if not relpath:
+        return None
+    path = os.path.join( libci.home, relpath )
+    if not os.path.isfile( path ):
+        log.w( f'[fw-gate] fallback FW for {rspy_device.name} not found on disk: {path}' )
+        return None
+    return path
 
 
 def _version_to_tuple( s ):
@@ -749,17 +771,20 @@ try:
                     log.d( f'connection type does not fit {test.config.types}; skipping' )
                     continue
 
+                fw_d400_override = None
                 if test.name == 'test-fw-update':
-                    incompatible = []
                     for sn in serial_numbers:
-                        ok, reason = _is_fw_update_compatible( devices.get( sn ) )
-                        log.d( f'[fw-gate] {devices.get( sn ).name}_{sn}: ok={ok} -- {reason}' )
-                        if not ok:
-                            incompatible.append( (sn, reason) )
-                    if incompatible:
-                        for sn, reason in incompatible:
-                            log.w( f'{test.name}: skipping {devices.get( sn ).name}_{sn}: {reason}' )
-                        continue
+                        d = devices.get( sn )
+                        ok, reason = _is_fw_update_compatible( d )
+                        log.d( f'[fw-gate] {d.name}_{sn}: ok={ok} -- {reason}' )
+                        if ok:
+                            continue
+                        fallback = _fw_fallback_image_for( d )
+                        if fallback and not custom_fw_path:
+                            log.w( f'{test.name}: {d.name}_{sn} below min FW; using fallback {fallback}' )
+                            fw_d400_override = fallback
+                        else:
+                            log.w( f'{test.name}: {d.name}_{sn} below min FW with no fallback; test will fail' )
 
                 for repetition in range(repeat):
                     try:
@@ -772,7 +797,8 @@ try:
                         test_ok = False
                     else:
                         register_signal_handlers()
-                        test_ok = test_wrapper( test, configuration, repetition, serial_numbers ) and test_ok
+                        test_ok = test_wrapper( test, configuration, repetition, serial_numbers,
+                                                custom_fw_d400_override=fw_d400_override ) and test_ok
                     finally:
                         log.debug_unindent()
             if not test_ok:
