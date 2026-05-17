@@ -131,11 +131,25 @@ def find_first_device_or_exit():
     """
     :return: the first device that was found, if no device is found the test is skipped. That way we can still run
         the unit-tests when no device is connected and not fail the tests that check a connected device
+
+    If the env var RS2_FW_UPDATE_SERIAL is set (the harness sets it for test-fw-update on
+    multi-device rigs like Jetson, where a USB camera and a GMSL camera are both present),
+    the device with the matching serial number is preferred over a positional "first" pick.
     """
     import pyrealsense2 as rs
     c = rs.context()
     if not c.devices.size():  # if no device is connected we skip the test
         log.f("No device found")
+    requested_sn = os.environ.get( 'RS2_FW_UPDATE_SERIAL' )
+    if requested_sn:
+        for d in c.devices:
+            if not d.supports( rs.camera_info.serial_number ):
+                continue
+            if d.get_info( rs.camera_info.serial_number ) == requested_sn:
+                log.d( 'found (via RS2_FW_UPDATE_SERIAL)', d )
+                log.d( 'in', rs )
+                return d, c
+        log.f( f"No device with serial number {requested_sn} (from RS2_FW_UPDATE_SERIAL)" )
     dev = c.devices[0]
     log.d( 'found', dev )
     log.d( 'in', rs )
