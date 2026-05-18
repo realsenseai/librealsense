@@ -20,6 +20,10 @@ endif()
 macro(global_set_flags)
     set(LRS_LIB_NAME ${LRS_TARGET})
 
+    if (BUILD_WITH_CUDA AND BUILD_WITH_HIP)
+        message(FATAL_ERROR "BUILD_WITH_CUDA and BUILD_WITH_HIP are mutually exclusive. Please enable only one.")
+    endif()
+
     add_definitions(-DELPP_THREAD_SAFE)
 
     if (BUILD_GLSL_EXTENSIONS)
@@ -55,12 +59,21 @@ macro(global_set_flags)
         add_definitions(-DRS2_USE_CUDA)
     endif()
 
+    if (BUILD_WITH_HIP)
+        add_definitions(-DRS2_USE_CUDA)
+        add_definitions(-DRS2_USE_HIP)
+    endif()
+
     if (BUILD_SHARED_LIBS)
         add_definitions(-DBUILD_SHARED_LIBS)
     endif()
 
     if (BUILD_WITH_CUDA)
         include(CMake/cuda_config.cmake)
+    endif()
+
+    if (BUILD_WITH_HIP)
+        include(CMake/hip_config.cmake)
     endif()
 
     if(BUILD_PYTHON_BINDINGS)
@@ -86,6 +99,15 @@ endmacro()
 
 macro(global_target_config)
     target_link_libraries(${LRS_TARGET} PRIVATE realsense-file ${CMAKE_THREAD_LIBS_INIT})
+
+    if (BUILD_WITH_HIP)
+        if(WIN32)
+            target_link_libraries(${LRS_TARGET} PRIVATE amdhip64.lib)
+            target_link_directories(${LRS_TARGET} PRIVATE "${ROCM_PATH}/lib")
+        else()
+            target_link_libraries(${LRS_TARGET} PRIVATE amdhip64)
+        endif()
+    endif()
 
     set_target_properties (${LRS_TARGET} PROPERTIES FOLDER Library)
 

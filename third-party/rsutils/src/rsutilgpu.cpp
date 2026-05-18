@@ -5,7 +5,15 @@
 #include <rsutils/easylogging/easyloggingpp.h>
 
 #ifdef RS2_USE_CUDA
+#ifdef RS2_USE_HIP
+#include <hip/hip_runtime.h>
+#define cudaGetDeviceCount hipGetDeviceCount
+#define cudaGetErrorString hipGetErrorString
+#define cudaError_t hipError_t
+#define cudaSuccess hipSuccess
+#else
 #include <cuda_runtime.h>
+#endif
 #endif
 
 namespace rsutils {
@@ -25,11 +33,19 @@ namespace rsutils {
                 }
                 if (gpuDeviceCount <= 0)
                 {
+#ifdef RS2_USE_HIP
+                    LOG_INFO("Avoid HIP execution as no AMD GPU found.");
+                }
+                else
+                {
+                    LOG_INFO("Found " << gpuDeviceCount << " AMD GPU.");
+#else
                     LOG_INFO("Avoid CUDA execution as no NVIDIA GPU found.");
                 }
                 else
                 {
                     LOG_INFO("Found " << gpuDeviceCount << " NVIDIA GPU.");
+#endif
                 }
             }
 #endif

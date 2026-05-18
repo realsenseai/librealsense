@@ -34,6 +34,9 @@
 
 void glfw_error_callback(int error, const char* description)
 {
+    // Suppress Wayland window position warning (harmless, spams console)
+    if (std::string(description).find("window position") != std::string::npos)
+        return;
     std::cerr << "GLFW Driver Error: " << description << "\n";
 }
 

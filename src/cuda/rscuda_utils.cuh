@@ -5,8 +5,18 @@
 #include <memory>
 #include <cassert>
 
-// CUDA headers
+// GPU runtime headers
+#ifdef RS2_USE_HIP
+#include <hip/hip_runtime.h>
+#define cudaMalloc hipMalloc
+#define cudaFree hipFree
+#define cudaMemcpy hipMemcpy
+#define cudaMemcpyHostToDevice hipMemcpyHostToDevice
+#define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define cudaSuccess hipSuccess
+#else
 #include <cuda_runtime.h>
+#endif
 
 #ifdef _MSC_VER 
 // Add library dependencies if using VS

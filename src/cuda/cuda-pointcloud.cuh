@@ -11,8 +11,12 @@
 #include "../../include/librealsense2/rsutil.h"
 #include <functional>
 
-// CUDA headers
+// GPU runtime headers
+#ifdef RS2_USE_HIP
+#include <hip/hip_runtime.h>
+#else
 #include <cuda_runtime.h>
+#endif
 
 #ifdef _MSC_VER 
 // Add library dependencies if using VS

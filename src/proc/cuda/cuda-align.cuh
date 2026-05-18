@@ -5,6 +5,13 @@
 #include <memory>
 #include <stdint.h>
 
+// GPU runtime headers (for int2 vector type)
+#ifdef RS2_USE_HIP
+#include <hip/hip_runtime.h>
+#else
+#include <cuda_runtime.h>
+#endif
+
 namespace librealsense
 {
     class align_cuda_helper
