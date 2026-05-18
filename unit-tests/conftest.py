@@ -19,7 +19,6 @@ import pytest
 import sys
 import os
 import logging
-import time
 
 # Defense against ROS 2 launch.logging: when ROS is sourced, launch_testing's
 # pytest entry-point transitively imports launch.logging, which installs a
@@ -470,7 +469,7 @@ def _test_device_serial(request):
 
 @pytest.fixture(scope="function")
 def module_device_setup(request):
-    """Enable the target device via the hub. Recycles per test function on Linux, maintains state on Windows."""
+    """Enable the target device via the hub. Recycles (power-cycles) once per test file, not per test case."""
     serial_number = None
 
     # Check parametrized serial from device_each / device (injected by pytest_generate_tests)
@@ -547,53 +546,23 @@ def module_device_setup(request):
     log.info(f"Configuration: {device_name} [{serial_number}]")
 
     module = request.node.module
-    nodeid = request.node.nodeid
     no_reset = request.config.getoption("--no-reset", default=False)
     last_device = getattr(module, '_last_device_serial', None)
-    last_test = getattr(module, '_last_test_nodeid', None)
-
-    # Extract base test name without count suffix (e.g., "test[D585-123-1-5]" -> "test[D585-123]")
-    # pytest-repeat adds suffix like -1-5, -2-5, etc. at the end of the parametrization
-    import re
-    base_nodeid = re.sub(r'-\d+-\d+\]$', ']', nodeid)
-    last_base_test = re.sub(r'-\d+-\d+\]$', ']', last_test) if last_test else None
-
-    # Detect actual retry (pytest-retry plugin - same exact nodeid runs again after failure)
-    is_actual_retry = (last_test == nodeid)
-
-    count = request.config.getoption("count", default=1)
-    is_repeat = count > 1
-
-    # Track which iteration we're on for repeats (--count flag)
-    # Use base nodeid to track across all iterations of the same test
-    # Don't increment iteration count on retry - a retry is not a new iteration
-    iteration_key = f'_iteration_{base_nodeid}'
-    if is_actual_retry:
-        # Keep same iteration count on retry
-        current_iteration = getattr(module, iteration_key, 1)
-    else:
-        current_iteration = getattr(module, iteration_key, 0) + 1
-        setattr(module, iteration_key, current_iteration)
-    
-    is_first_iteration_of_test = (current_iteration == 1)
-
     device_changed = (last_device is not None and last_device != serial_number)
     first_setup = (last_device is None)
 
-    # Detect when moving to a new test function (not just iteration)
-    test_function_changed = (last_base_test is not None and last_base_test != base_nodeid)
+    # Detect the start of a new module-scoped repeat pass.
+    # pytest-repeat parametrizes __pytest_repeat_step_number (0-based); recycle when it advances.
+    callspec = getattr(request.node, 'callspec', None)
+    repeat_step = callspec.params.get('__pytest_repeat_step_number') if callspec else None
+    last_repeat_step = getattr(module, '_last_repeat_step', None)
+    is_new_repeat_pass = repeat_step is not None and last_repeat_step is not None and repeat_step != last_repeat_step
 
-    # Recycle on:
-    # - First setup (fresh start)
-    # - Device change (switching devices)
-    # - Actual retry (pytest-retry plugin - device needs fresh start)
-    # - First iteration of a NEW test function (ensures clean state between tests)
-    # NOT on subsequent iterations of the same test (--count flag)
-    recycle = not no_reset and (first_setup or device_changed or is_actual_retry or (test_function_changed and is_first_iteration_of_test))
+    recycle = not no_reset and (first_setup or device_changed or is_new_repeat_pass)
 
     if not recycle and not first_setup:
         log.debug(f"Device {serial_number} already enabled, skipping hub setup")
-        module._last_test_nodeid = nodeid
+        module._last_repeat_step = repeat_step
         yield serial_number
         return
 
@@ -601,32 +570,17 @@ def module_device_setup(request):
         log.debug(f"{'Recycling' if recycle else 'Enabling'} device via hub...")
         devices.enable_only([serial_number], recycle=recycle)
         module._last_device_serial = serial_number
-        module._last_test_nodeid = nodeid
+        module._last_repeat_step = repeat_step
         log.debug(f"Device enabled and ready")
-        
-        # On Linux, V4L2 backend needs time for device to stabilize after power cycle
-        if recycle and sys.platform.startswith('linux'):
-            import time
-            stabilization_time = 5  # seconds - longer delay for USB re-enumeration and firmware boot
-            log.debug(f"Linux platform: waiting {stabilization_time}s for device stabilization...")
-            time.sleep(stabilization_time)
-            log.debug("Device stabilization complete")
-            
     except Exception as e:
         pytest.fail(f"Failed to enable device {serial_number}: {e}")
 
     yield serial_number
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def test_context(request, module_device_setup):
-    """Create a fresh rs.context() for each test to re-enumerate devices.
-    
-    Function scope ensures device is re-enumerated between tests, which is
-    necessary after operational mode transitions on Linux V4L2 backend.
-    The device hardware is not recycled (that's handled by module_device_setup),
-    but the SDK context needs fresh enumeration to pick up device state changes.
-    """
+    """Create a fresh rs.context() for the test. Depends on module_device_setup for hub state."""
     if not rs:
         pytest.skip("pyrealsense2 not available")
 
@@ -634,32 +588,6 @@ def test_context(request, module_device_setup):
 
     if module_device_setup and len(list(ctx.devices)) == 0:
         pytest.fail("No devices visible in context after device setup")
-
-    # Linux V4L2 warm-up: flush stale buffered frames after device enumeration
-    # Without this, tests may receive frames with frozen/stale timestamps
-    if sys.platform.startswith('linux') and len(list(ctx.devices)) > 0:
-        try:
-            log.debug("Linux platform: flushing device buffers with warm-up frames...")
-            dev = list(ctx.devices)[0]
-            pipe = rs.pipeline(ctx)
-            cfg = rs.config()
-            # Use any available stream for warm-up
-            profiles = dev.query_sensors()[0].get_stream_profiles()
-            if profiles:
-                profile = profiles[0]
-                cfg.enable_stream(profile.stream_type(), profile.stream_index(), 
-                                profile.format(), profile.fps())
-                pipe.start(cfg)
-                # Pull and discard 15 frames to flush buffers
-                for _ in range(15):
-                    frames = pipe.wait_for_frames(timeout_ms=2000)
-                    if frames:
-                        log.debug(f"Warm-up frame: {frames.get_frame_number()}")
-                pipe.stop()
-                time.sleep(0.5)  # Allow device to settle after warm-up
-                log.debug("Device buffer flush complete")
-        except Exception as e:
-            log.warning(f"Warm-up flush failed (non-fatal): {e}")
 
     return ctx
 
