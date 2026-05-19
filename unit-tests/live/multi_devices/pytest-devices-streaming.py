@@ -23,7 +23,6 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.skipif(is_jetson_platform(), reason="Not supported on Jetson"),
     pytest.mark.device("D400*", "D400*"),
-    pytest.mark.skip(reason="until stabilized"),
 ]
 
 # Test configuration
