@@ -1,17 +1,20 @@
 # License: Apache 2.0. See LICENSE file in root directory.
-# Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Not frequently changing, no need to test for each commit
-# test:donotrun  # to be restored to run on nightly after FW issue is solved (:!nightly)
-# test:device D585S
-
+import pytest
 import pyrealsense2 as rs
-from rspy import test, log, tests_wrapper
+from rspy import tests_wrapper
+import logging
+log = logging.getLogger(__name__)
 
-dev, _ = test.find_first_device_or_exit()
-depth_sensor = dev.first_depth_sensor()
+# to be restored to run on nightly after FW issue is solved
+pytestmark = [
+    pytest.mark.device_each("D585S"),
+    pytest.mark.skip(reason="to be restored to run on nightly after FW issue is solved"),
+]
 
-def get_all_advanced_controls():
+
+def get_all_advanced_controls(dev, depth_sensor):
     advnc_mode = rs.rs400_advanced_mode(dev)
     color_sensor = dev.first_color_sensor()
     d = {}
@@ -56,24 +59,33 @@ def get_all_advanced_controls():
     return d
 
 
-test.start("Check startup values are the same as the default preset values")
+@pytest.fixture
+def _stop_wrapper_at_end(test_device):
+    """Cleanup-only fixture: ensures stop_wrapper runs even if the test fails."""
+    dev, _ = test_device
+    yield
+    try:
+        tests_wrapper.stop_wrapper(dev)
+    except Exception as e:
+        log.warning(f"stop_wrapper failed: {e}")
 
-# get startup values
-startup_advanced_controls = get_all_advanced_controls()
-log.d("Startup advanced controls values:")
-log.d(startup_advanced_controls)
 
-# switch to default preset
-tests_wrapper.start_wrapper(dev)
-depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.default))
+def test_startup_values_match_default_preset(test_device, _stop_wrapper_at_end):
+    dev, _ = test_device
+    depth_sensor = dev.first_depth_sensor()
 
-# get default preset values
-default_preset_advanced_controls = get_all_advanced_controls()
-log.d("Default preset advanced controls values:")
-log.d(default_preset_advanced_controls)
+    # get startup values (before start_wrapper changes safety mode)
+    startup_advanced_controls = get_all_advanced_controls(dev, depth_sensor)
+    log.debug("Startup advanced controls values:")
+    log.debug(startup_advanced_controls)
 
-test.check(startup_advanced_controls == default_preset_advanced_controls)
+    # switch to default preset
+    tests_wrapper.start_wrapper(dev)
+    depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.default))
 
-tests_wrapper.stop_wrapper(dev)
-test.finish()
-test.print_results_and_exit()
+    # get default preset values
+    default_preset_advanced_controls = get_all_advanced_controls(dev, depth_sensor)
+    log.debug("Default preset advanced controls values:")
+    log.debug(default_preset_advanced_controls)
+
+    assert startup_advanced_controls == default_preset_advanced_controls
