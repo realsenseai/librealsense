@@ -8,7 +8,8 @@
 
 #include <mfidl.h>
 #include <mfreadwrite.h>
-#include <atlcomcli.h>
+#include <wrl/client.h>
+#include <wrl/implements.h>
 #include <strmif.h>
 #include <Ks.h>
 #include <ksproxy.h>
@@ -107,9 +108,9 @@ namespace librealsense
             void check_connection() const;
             void close_all();
             IKsControl* get_ks_control(const extension_unit& xu) const;
-            CComPtr<IMFAttributes> create_device_attrs();
-            CComPtr<IMFAttributes> create_reader_attrs();
-            void foreach_profile(std::function<void(const mf_profile& profile, CComPtr<IMFMediaType> media_type, bool& quit)> action) const;
+            Microsoft::WRL::ComPtr<IMFAttributes> create_device_attrs();
+            Microsoft::WRL::ComPtr<IMFAttributes> create_reader_attrs();
+            void foreach_profile(std::function<void(const mf_profile& profile, Microsoft::WRL::ComPtr<IMFMediaType> media_type, bool& quit)> action) const;
 
             void set_d0();
             void set_d3();
@@ -120,14 +121,14 @@ namespace librealsense
             const uvc_device_info                   _info;
             power_state                             _power_state = D3;
 
-            CComPtr<IMFSourceReader>                _reader = nullptr;
-            CComPtr<IMFMediaSource>                 _source = nullptr;
-            CComPtr<IMFAttributes>                  _device_attrs = nullptr;
-            CComPtr<IMFAttributes>                  _reader_attrs = nullptr;
+            Microsoft::WRL::ComPtr<IMFSourceReader>                _reader = nullptr;
+            Microsoft::WRL::ComPtr<IMFMediaSource>                 _source = nullptr;
+            Microsoft::WRL::ComPtr<IMFAttributes>                  _device_attrs = nullptr;
+            Microsoft::WRL::ComPtr<IMFAttributes>                  _reader_attrs = nullptr;
 
-            CComPtr<IAMCameraControl>               _camera_control = nullptr;
-            CComPtr<IAMVideoProcAmp>                _video_proc = nullptr;
-            std::unordered_map<int, CComPtr<IKsControl>>      _ks_controls;
+            Microsoft::WRL::ComPtr<IAMCameraControl>               _camera_control = nullptr;
+            Microsoft::WRL::ComPtr<IAMVideoProcAmp>                _video_proc = nullptr;
+            std::unordered_map<int, Microsoft::WRL::ComPtr<IKsControl>>      _ks_controls;
 
             auto_reset_event                        _is_flushed;
             manual_reset_event                      _has_started;
@@ -148,26 +149,24 @@ namespace librealsense
             std::wstring                            _device_id;
         };
 
-        class source_reader_callback : public IMFSourceReaderCallback
+        class source_reader_callback : public Microsoft::WRL::RuntimeClass<
+            Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+            IMFSourceReaderCallback>
         {
         public:
-            explicit source_reader_callback(std::weak_ptr<wmf_uvc_device> owner) : _owner(owner)
-            {
-            };
-            virtual ~source_reader_callback() {};
-            STDMETHODIMP QueryInterface(REFIID iid, void** ppv) override;
-            STDMETHODIMP_(ULONG) AddRef() override;
-            STDMETHODIMP_(ULONG) Release() override;
-            STDMETHODIMP OnReadSample(HRESULT /*hrStatus*/,
+            explicit source_reader_callback(std::weak_ptr<wmf_uvc_device> owner) : _owner(std::move(owner)) {}
+            ~source_reader_callback() override = default;
+
+            IFACEMETHODIMP OnReadSample(HRESULT hrStatus,
                 DWORD dwStreamIndex,
-                DWORD /*dwStreamFlags*/,
-                LONGLONG /*llTimestamp*/,
-                IMFSample *sample) override;
-            STDMETHODIMP OnEvent(DWORD /*sidx*/, IMFMediaEvent* /*event*/) override;
-            STDMETHODIMP OnFlush(DWORD) override;
+                DWORD dwStreamFlags,
+                LONGLONG llTimestamp,
+                IMFSample * sample) override;
+            IFACEMETHODIMP OnEvent(DWORD sidx, IMFMediaEvent * event) override;
+            IFACEMETHODIMP OnFlush(DWORD) override;
+
         private:
             std::weak_ptr<wmf_uvc_device> _owner;
-            long _refCount = 0;
         };
 
     }
