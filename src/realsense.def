@@ -399,6 +399,7 @@ EXPORTS
     rs2_update_firmware_unsigned
     rs2_update_firmware_unsigned_cpp
     rs2_check_firmware_compatibility
+    rs2_get_firmware_min_version
     rs2_enter_update_state
 
     rs2_run_on_chip_calibration

@@ -38,6 +38,9 @@ void init_device(py::module &m) {
         .def("__bool__", &rs2::device::operator bool) // Called to implement truth value testing in Python 3
         .def( "is_connected", &rs2::device::is_connected )
         .def("is_in_recovery_mode", &rs2::device::is_in_recovery_mode)
+        .def("get_firmware_min_version", &rs2::device::get_firmware_min_version,
+             "Get the minimum firmware version supported by this device's SKU (e.g. \"5.10.0.17\"). "
+             "Throws if the device does not implement the FW-update protocol or has no defined minimum.")
         .def(BIND_DOWNCAST(device, debug_protocol))
         .def(BIND_DOWNCAST(device, playback))
         .def(BIND_DOWNCAST(device, recorder))
