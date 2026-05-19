@@ -20,6 +20,8 @@ struct uvc_device_info
     uint16_t mi = 0;
     std::string unique_id;
     std::string device_path;
+    std::string subdev_name;
+    std::string subdevice_path;
     std::string dfu_device_path; // for mipi multiple cameras
     std::string serial;
     usb_spec conn_spec = usb_undefined;

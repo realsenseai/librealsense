@@ -51,6 +51,7 @@
 #include <linux/media.h>
 #include <linux/uvcvideo.h>
 #include <linux/videodev2.h>
+#include <linux/v4l2-subdev.h>
 #include <regex>
 #include <list>
 
@@ -321,6 +322,15 @@ namespace librealsense
         buffer::buffer(int fd, v4l2_buf_type type, bool use_memory_map, uint32_t index)
             : _type(type), _use_memory_map(use_memory_map), _index(index)
         {
+            // Get and store the negotiated format
+            v4l2_format g_fmt = {};
+            g_fmt.type = _type;
+            if (xioctl(fd, VIDIOC_G_FMT, &g_fmt) < 0)
+            {
+                throw linux_backend_exception("xioctl(VIDIOC_G_FMT) failed");
+            }
+            _stride = g_fmt.fmt.pix.bytesperline;
+
             v4l2_buffer buf = {};
             struct v4l2_plane planes[VIDEO_MAX_PLANES] = {};
             buf.type = _type;
@@ -343,6 +353,7 @@ namespace librealsense
                 _offset = buf.m.planes[0].m.mem_offset;
                 md_extra = 0;
             }
+
             _length = _original_length + md_extra;
 
             if (use_memory_map)
@@ -1017,6 +1028,20 @@ namespace librealsense
             if (fd < 0)
                 throw linux_backend_exception("Mipi device PID could not be found");
 
+            // On Intel IPU6/IPU7 upstream pipelines controls are not propagated
+            // from the capture (video) node to the actual subdev, so the GVD
+            // ioctl below has to be issued on the subdev. Derive the subdev node
+            // path from the video node path:
+            //    /dev/video-rs-depth-0 -> /dev/video-rs-depth-sd-0
+            int sub_fd = -1;
+            {
+                std::string sub_path = dev_name;
+                auto pos = sub_path.rfind('-');
+                if (pos != std::string::npos)
+                    sub_path.insert(pos, "-sd");
+                sub_fd = open(sub_path.c_str(), O_RDWR);
+            }
+
             uint8_t gvd[276];
             struct v4l2_ext_control ctrl;
 
@@ -1036,7 +1061,10 @@ namespace librealsense
             bool opcode_ok = false;
             while (!opcode_ok && retries--)
             {
-                if (xioctl(fd, VIDIOC_G_EXT_CTRLS, &ext) == 0)
+                int rc = xioctl(fd, VIDIOC_G_EXT_CTRLS, &ext);
+                if (rc != 0 && sub_fd >= 0)
+                    rc = xioctl(sub_fd, VIDIOC_G_EXT_CTRLS, &ext);
+                if (rc == 0)
                 {
                     auto opcode = gvd[0];
                     if (opcode != 0x10)
@@ -1077,6 +1105,8 @@ namespace librealsense
                 std::this_thread::sleep_for( std::chrono::milliseconds(100));
             }
 
+            if (sub_fd >= 0)
+                ::close(sub_fd);
             ::close(fd);
 
             return device_pid;
@@ -1287,15 +1317,16 @@ namespace librealsense
                     int vfd = -1;
                     std::string device_path = "video-rs-" + vs + "-" + std::to_string(i);
                     std::string device_md_path = "video-rs-" + vs + "-md-" + std::to_string(i);
+                    std::string subdevice_path = "video-rs-" + vs + "-sd-" + std::to_string(i);
                     std::string video_path = "/dev/" + device_path;
                     std::string video_md_path = "/dev/" + device_md_path;
+                    std::string subdev_path = "/dev/" + subdevice_path;
                     std::string dfu_device_path = "/dev/d4xx-dfu-" + std::to_string(i);
                     uvc_device_info info{};
 
                     // Get Video node
                     // Check if file on video_path is exists
                     vfd = open(video_path.c_str(), O_RDONLY | O_NONBLOCK);
-
                     if (vfd < 0) // file does not exists, continue to the next one
                         continue;
                     else
@@ -1310,9 +1341,16 @@ namespace librealsense
                         continue;
                     }
 
+                    // Get Sub Device Node
+                    vfd = open(subdev_path.c_str(), O_RDONLY | O_NONBLOCK);
+                    if (vfd >= 0)
+                    {
+                        ::close(vfd); // file exists, close file and continue to assign it
+                        info.subdev_name = subdev_path;
+                    }
+
                     // Get DFU node for MIPI camera
                     vfd = open(dfu_device_path.c_str(), O_RDONLY | O_NONBLOCK);
-
                     if (vfd >= 0) {
                         ::close(vfd); // file exists, close file and continue to assign it
                         info.dfu_device_path = dfu_device_path;
@@ -1544,7 +1582,9 @@ namespace librealsense
 
         v4l_uvc_device::v4l_uvc_device(const uvc_device_info& info, bool use_memory_map)
             : _name(info.id), 
+              _subdev_name(info.subdev_name),
               _device_path(info.device_path),
+              _subdevice_path(info.subdevice_path),
               _device_usb_spec(info.conn_spec),
               _info(info),
               _is_capturing(false),
@@ -1579,62 +1619,89 @@ namespace librealsense
                 v4l2_fmtdesc pixel_format = {};
                 pixel_format.type = _dev.buf_type;
 
-                while (ioctl(_fd, VIDIOC_ENUM_FMT, &pixel_format) == 0)
+                if (_sub_fd > 0)
                 {
-                    v4l2_frmsizeenum frame_size = {};
-                    frame_size.pixel_format = pixel_format.pixelformat;
-
-                    uint32_t fourcc = (const big_endian<int> &)pixel_format.pixelformat;
-
-                    if (pixel_format.pixelformat == 0)
+                    v4l2_subdev_mbus_code_enum pixel_format_subdev = {};
+                    pixel_format_subdev.index = 0;
+                    pixel_format_subdev.pad = 0;
+                    while (ioctl(_sub_fd, VIDIOC_SUBDEV_ENUM_MBUS_CODE, &pixel_format_subdev) == 0)
                     {
-                        // Microsoft Depth GUIDs for R400 series are not yet recognized
-                        // by the Linux kernel, but they do not require a patch, since there
-                        // are "backup" Z16 and Y8 formats in place
-                        static const std::set<std::string> pending_formats = {
-                            "00000050-0000-0010-8000-00aa003",
-                            "00000032-0000-0010-8000-00aa003",
-                        };
+                        uint32_t temp_fourcc = mbus_code_to_fourcc(pixel_format_subdev.code);
+                        uint32_t fourcc = (const big_endian<int> &)temp_fourcc;
+                        ++pixel_format_subdev.index;
+                    }
+                }
+                else {
+                    while (ioctl(_fd, VIDIOC_ENUM_FMT, &pixel_format) == 0)
+                    {
+                        v4l2_frmsizeenum frame_size = {};
+                        frame_size.pixel_format = pixel_format.pixelformat;
 
-                        if (std::find(pending_formats.begin(),
-                                      pending_formats.end(),
-                                      (const char*)pixel_format.description) ==
-                            pending_formats.end())
+                        uint32_t fourcc = (const big_endian<int> &)pixel_format.pixelformat;
+
+                        if (pixel_format.pixelformat == 0)
                         {
-                            const std::string s(rsutils::string::from() << "!" << pixel_format.description);
-                            std::regex rgx("!([0-9a-f]+)-.*");
-                            std::smatch match;
+                            // Microsoft Depth GUIDs for R400 series are not yet recognized
+                            // by the Linux kernel, but they do not require a patch, since there
+                            // are "backup" Z16 and Y8 formats in place
+                            static const std::set<std::string> pending_formats = {
+                                "00000050-0000-0010-8000-00aa003",
+                                "00000032-0000-0010-8000-00aa003",
+                            };
 
-                            if (std::regex_search(s.begin(), s.end(), match, rgx))
+                            if (std::find(pending_formats.begin(),
+                                        pending_formats.end(),
+                                        (const char*)pixel_format.description) ==
+                                pending_formats.end())
                             {
-                                std::stringstream ss;
-                                ss <<  match[1];
-                                int id;
-                                ss >> std::hex >> id;
-                                fourcc = (const big_endian<int> &)id;
+                                const std::string s(rsutils::string::from() << "!" << pixel_format.description);
+                                std::regex rgx("!([0-9a-f]+)-.*");
+                                std::smatch match;
 
-                                if (fourcc == profile.format)
+                                if (std::regex_search(s.begin(), s.end(), match, rgx))
                                 {
-                                    throw linux_backend_exception(rsutils::string::from() << "The requested pixel format '"  << fourcc_to_string(id)
-                                                                  << "' is not natively supported by the running Linux kernel and likely requires a patch");
+                                    std::stringstream ss;
+                                    ss <<  match[1];
+                                    int id;
+                                    ss >> std::hex >> id;
+                                    fourcc = (const big_endian<int> &)id;
+
+                                    if (fourcc == profile.format)
+                                    {
+                                        throw linux_backend_exception(rsutils::string::from() << "The requested pixel format '"  << fourcc_to_string(id)
+                                                                    << "' is not natively supported by the running Linux kernel and likely requires a patch");
+                                    }
                                 }
                             }
                         }
+                        ++pixel_format.index;
                     }
-                    ++pixel_format.index;
                 }
-
                 set_format(profile);
 
                 v4l2_streamparm parm = {};
                 parm.type = _dev.buf_type;
-                if(xioctl(_fd, VIDIOC_G_PARM, &parm) < 0)
-                    throw linux_backend_exception("xioctl(VIDIOC_G_PARM) failed");
 
-                parm.parm.capture.timeperframe.numerator = 1;
-                parm.parm.capture.timeperframe.denominator = profile.fps;
-                if(xioctl(_fd, VIDIOC_S_PARM, &parm) < 0)
-                    throw linux_backend_exception("xioctl(VIDIOC_S_PARM) failed");
+                v4l2_subdev_frame_interval frame_interval = {};
+                frame_interval.pad = 0;
+
+                if(xioctl(_fd, VIDIOC_G_PARM, &parm) < 0) {
+                    if(xioctl(_sub_fd, VIDIOC_SUBDEV_G_FRAME_INTERVAL, &frame_interval) < 0)
+                        throw linux_backend_exception("xioctl(VIDIOC_G_PARM) and xioctl(VIDIOC_SUBDEV_G_FRAME_INTERVAL) failed");
+
+                    frame_interval.interval.numerator = 1;
+                    frame_interval.interval.denominator = profile.fps;
+
+                    if(xioctl(_sub_fd, VIDIOC_SUBDEV_S_FRAME_INTERVAL, &frame_interval) < 0)
+                        throw linux_backend_exception("xioctl(VIDIOC_SUBDEV_S_FRAME_INTERVAL) failed");
+
+                } else {
+                    parm.parm.capture.timeperframe.numerator = 1;
+                    parm.parm.capture.timeperframe.denominator = profile.fps;
+
+                    if(xioctl(_fd, VIDIOC_S_PARM, &parm) < 0)
+                        throw linux_backend_exception("xioctl(VIDIOC_S_PARM) failed");
+                }
 
                 // Init memory mapped IO
                 negotiate_kernel_buffers(static_cast<size_t>(buffers));
@@ -1880,7 +1947,6 @@ namespace librealsense
                             }
                             auto buffer = _buffers[buf.index];
                             buf_mgr.handle_buffer(e_video_buf, _fd, buf, buffer);
-
                             if (_is_started)
                             {
                                 if(buf.bytesused == 0)
@@ -1890,7 +1956,7 @@ namespace librealsense
                                 }
 
                                 // Drop partial and overflow frames (assumes D4XX metadata only)
-                                bool partial_frame = (!compressed_format && (buf.bytesused < buffer->get_full_length() - MAX_META_DATA_SIZE));
+                                bool partial_frame = (!compressed_format && (buf.bytesused < buffer->get_full_length() - MAX_META_DATA_SIZE - buffer->get_stride()));
                                 bool overflow_frame = (buf.bytesused ==  buffer->get_length_frame_only() + MAX_META_DATA_SIZE);
                                 if (_dev.buf_type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
                                     /* metadata size is one line of profile, temporary disable validation */
@@ -2360,15 +2426,122 @@ namespace librealsense
 
             return range;
         }
+        uint32_t v4l_uvc_device::mbus_code_to_fourcc(uint32_t mbus_code) const
+        {
+            // Common media bus code to fourcc mappings
+            switch (mbus_code) {
+                // RGB formats
+                case MEDIA_BUS_FMT_RGB888_1X24:
+                    return V4L2_PIX_FMT_RGB24;
+                case MEDIA_BUS_FMT_BGR888_1X24:
+                    return V4L2_PIX_FMT_BGR24;
+                // YUV formats
+                case MEDIA_BUS_FMT_YUYV8_2X8:
+                case MEDIA_BUS_FMT_YUYV8_1X16:
+                    //return V4L2_PIX_FMT_YUYV;
+                    return 0x59555956;
+                case MEDIA_BUS_FMT_UYVY8_2X8:
+                case MEDIA_BUS_FMT_UYVY8_1X16:
+                    return V4L2_PIX_FMT_UYVY;
+                case MEDIA_BUS_FMT_VYUY8_1X16:
+                    return V4L2_PIX_FMT_VYUY;
+                // RAW/Bayer formats
+                case MEDIA_BUS_FMT_SBGGR8_1X8:
+                    return V4L2_PIX_FMT_SBGGR8;
+                case MEDIA_BUS_FMT_SGBRG8_1X8:
+                    return V4L2_PIX_FMT_SGBRG8;
+                case MEDIA_BUS_FMT_SGRBG8_1X8:
+                    return V4L2_PIX_FMT_SGRBG8;
+                case MEDIA_BUS_FMT_SRGGB8_1X8:
+                    return V4L2_PIX_FMT_SRGGB8;
+                case MEDIA_BUS_FMT_SBGGR10_1X10:
+                    return V4L2_PIX_FMT_SBGGR10;
+                case MEDIA_BUS_FMT_SGBRG10_1X10:
+                    return V4L2_PIX_FMT_SGBRG10;
+                case MEDIA_BUS_FMT_SGRBG10_1X10:
+                    return V4L2_PIX_FMT_SGRBG10;
+                case MEDIA_BUS_FMT_SRGGB10_1X10:
+                    return V4L2_PIX_FMT_SRGGB10;
+                // Grayscale formats
+                case MEDIA_BUS_FMT_Y8_1X8:
+                    return V4L2_PIX_FMT_GREY;
+                case MEDIA_BUS_FMT_Y10_1X10:
+                    return V4L2_PIX_FMT_Y10;
+                case MEDIA_BUS_FMT_Y12_1X12:
+                    return V4L2_PIX_FMT_Y12;
 
+                // RealSense specific formats (if they exist)
+                case MEDIA_BUS_FMT_FIXED:
+                    return 0x5A313620; // 'Z16 ' in little-endian
+
+                default:
+                    return 0; // Unknown format
+            }
+        }
         std::vector<stream_profile> v4l_uvc_device::get_profiles() const
         {
             std::vector<stream_profile> results;
-
             // Retrieve the caps one by one, first get pixel format, then sizes, then
             // frame rates. See http://linuxtv.org/downloads/v4l-dvb-apis for reference.
+
+            if (_sub_fd > 0) {
+                std::vector<uint32_t> supported_mbus_codes;
+                // Get video node supported formats
+                std::set<uint32_t> video_fourccs;
+                v4l2_fmtdesc pixel_format = {};
+                pixel_format.type = _dev.buf_type;
+                pixel_format.index = 0;
+                while (ioctl(_fd, VIDIOC_ENUM_FMT, &pixel_format) == 0) {
+                   video_fourccs.insert(pixel_format.pixelformat);
+                    ++pixel_format.index;
+                }
+
+                v4l2_subdev_mbus_code_enum pixel_format_subdev = {};
+                pixel_format_subdev.pad = 0;
+                pixel_format_subdev.index = 0;
+
+                while (ioctl(_sub_fd, VIDIOC_SUBDEV_ENUM_MBUS_CODE, &pixel_format_subdev) == 0)
+                {
+                    uint32_t fourcc = mbus_code_to_fourcc(pixel_format_subdev.code);
+
+                    v4l2_subdev_frame_size_enum frame_size = {};
+                    frame_size.pad = 0;
+                    frame_size.code = pixel_format_subdev.code;
+                    frame_size.index = 0;
+                    while (ioctl(_sub_fd, VIDIOC_SUBDEV_ENUM_FRAME_SIZE, &frame_size) == 0)
+                    {
+                        v4l2_subdev_frame_interval_enum frame_interval = {};
+                        frame_interval.pad = 0;
+                        frame_interval.code = pixel_format_subdev.code;
+                        frame_interval.width = frame_size.max_width;
+                        frame_interval.height = frame_size.max_height;
+                        frame_interval.index = 0;
+
+                        while (ioctl(_sub_fd, VIDIOC_SUBDEV_ENUM_FRAME_INTERVAL, &frame_interval) == 0)
+                        {
+                            auto fps =
+                                static_cast<float>(frame_interval.interval.denominator) /
+                                static_cast<float>(frame_interval.interval.numerator);
+
+                            stream_profile p{};
+
+                            p.format = fourcc;
+                            p.width = frame_size.max_width;
+                            p.height = frame_size.max_height;
+                            p.fps = fps;
+                            results.push_back(p);
+                            ++frame_interval.index;
+                        }
+                        ++frame_size.index;
+                    }
+                    ++pixel_format_subdev.index;
+                }
+                return results;
+            }
+
             v4l2_fmtdesc pixel_format = {};
             pixel_format.type = _dev.buf_type;
+
             while (ioctl(_fd, VIDIOC_ENUM_FMT, &pixel_format) == 0)
             {
                 v4l2_frmsizeenum frame_size = {};
@@ -2553,6 +2726,11 @@ namespace librealsense
             _fd = open(_name.c_str(), O_RDWR | O_NONBLOCK, 0);
             if(_fd < 0)
                 throw linux_backend_exception(rsutils::string::from() <<__FUNCTION__ << " Cannot open '" << _name);
+
+            _sub_fd = open(_subdev_name.c_str(), O_RDWR | O_NONBLOCK, 0);
+            if(_sub_fd < 0)
+                printf("%s: Failed to open %s\n", __FUNCTION__, _subdev_name.c_str());
+                //throw linux_backend_exception(rsutils::string::from() <<__FUNCTION__ << " Cannot open subdev '" << _subdev_name);
 
             if (pipe(_stop_pipe_fd) < 0)
                 throw linux_backend_exception(rsutils::string::from() <<__FUNCTION__ << " Cannot create pipe!");
@@ -2895,7 +3073,6 @@ namespace librealsense
                     meta.height     = 1;
                     memcpy(fmt.fmt.raw_data, &meta, sizeof(meta));
                 }
-
                 if(xioctl(_md_fd, VIDIOC_S_FMT, &fmt) >= 0)
                 {
                     LOG_INFO("Metadata node was successfully configured to " << fourcc_to_string(request) << " format" <<", fd " << std::dec <<_md_fd);
@@ -3065,12 +3242,16 @@ namespace librealsense
             int retVal = xioctl(_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
             if (retVal < 0)
             {
-                if (errno == EIO || errno == EAGAIN) // TODO: Log?
-                    return false;
+                retVal = xioctl(_sub_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
+                if (retVal < 0)
+                {
+                    if (errno == EIO || errno == EAGAIN) // TODO: Log?
+                        return false;
 
-                throw linux_backend_exception(rsutils::string::from()
-                                              << "xioctl(VIDIOC_S_EXT_CTRLS) failed on control "
-                                              << static_cast< int >( control ) << ", errno=" << errno );
+                    throw linux_backend_exception(rsutils::string::from()
+                                                  << "xioctl(VIDIOC_S_EXT_CTRLS) failed on control "
+                                                  << static_cast< int >( control ) << ", errno=" << errno );
+                }
             }
             return true;
         }
@@ -3090,8 +3271,12 @@ namespace librealsense
                 int ret = xioctl(_fd, VIDIOC_G_EXT_CTRLS, &ext);
                 if (ret < 0)
                 {
-                    // exception is thrown if the ioctl fails twice
-                    continue;
+                    ret = xioctl(_sub_fd, VIDIOC_G_EXT_CTRLS, &ext);
+                    if (ret < 0)
+                    {
+                        // exception is thrown if the ioctl fails twice
+                        continue;
+                    }
                 }
 
                 if (control == RS_ENABLE_AUTO_EXPOSURE)
@@ -3116,8 +3301,9 @@ namespace librealsense
             v4l2_query_ext_ctrl xctrl_query{};
             xctrl_query.id = xu_to_cid(xu,control);
 
-            if(0 > ioctl(_fd,VIDIOC_QUERY_EXT_CTRL,&xctrl_query)){
-                throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_QUERY_EXT_CTRL) failed, errno=" << errno);
+            if(0 > ioctl(_fd, VIDIOC_QUERY_EXT_CTRL, &xctrl_query)){
+                if (0 > ioctl(_sub_fd, VIDIOC_QUERY_EXT_CTRL, &xctrl_query))
+                    throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_QUERY_EXT_CTRL) failed, errno=" << errno);
             }
 
             if ((xctrl_query.elems !=1 ) ||
