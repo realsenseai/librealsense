@@ -31,9 +31,16 @@
 #include <opengl3.h>
 
 #include <iostream>
+#include <cstring>
 
 void glfw_error_callback(int error, const char* description)
 {
+    // Suppress Wayland window position warning (harmless, spams console).
+    // Use strstr rather than std::string(description).find(...) -- this
+    // callback can fire in low-memory / error situations where a heap
+    // allocation inside the handler is unsafe.
+    if (description != nullptr && std::strstr(description, "window position") != nullptr)
+        return;
     std::cerr << "GLFW Driver Error: " << description << "\n";
 }
 

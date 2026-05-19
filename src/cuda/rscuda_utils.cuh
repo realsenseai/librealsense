@@ -3,15 +3,42 @@
 
 #include <stdexcept>
 #include <memory>
+#include <string>
 #include <cassert>
 
-// CUDA headers
+// GPU runtime headers
+#ifdef RS2_USE_HIP
+#include <hip/hip_runtime.h>
+#define cudaMalloc hipMalloc
+#define cudaFree hipFree
+#define cudaMemcpy hipMemcpy
+#define cudaMemcpyHostToDevice hipMemcpyHostToDevice
+#define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define cudaSuccess hipSuccess
+#define cudaGetErrorString hipGetErrorString
+#define cudaGetLastError hipGetLastError
+#define cudaStreamSynchronize hipStreamSynchronize
+#define cudaMemset hipMemset
+#else
 #include <cuda_runtime.h>
-
-#ifdef _MSC_VER 
-// Add library dependencies if using VS
+#ifdef _MSC_VER
+// Add library dependencies if using VS.  Gated to the CUDA branch only;
+// when building for HIP the linker must not pull in cudart_static.lib.
 #pragma comment(lib, "cudart_static")
 #endif
+#endif
+
+// Throw on any CUDA / HIP runtime error.  Using assert() instead would
+// compile out under -DNDEBUG, silently letting failed allocations and
+// copies propagate as use-after-free or stale data.
+#define RS_CUDA_CHECK(call)                                                    \
+    do {                                                                       \
+        auto _rs_rc = (call);                                                  \
+        if (_rs_rc != cudaSuccess)                                             \
+            throw std::runtime_error(std::string("CUDA/HIP error in ") +       \
+                                     #call + ": " +                            \
+                                     cudaGetErrorString(_rs_rc));              \
+    } while (0)
 
 namespace rscuda
 {

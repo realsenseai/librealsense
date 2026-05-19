@@ -59,6 +59,15 @@ if(CHECK_FOR_UPDATES)
     else()
         find_package(OpenSSL REQUIRED)
         target_link_libraries(curl INTERFACE OpenSSL::SSL OpenSSL::Crypto)
+        # libcurl may be built with libidn2 support — check and link if available
+        find_library(IDN2_LIBRARY idn2)
+        if(IDN2_LIBRARY)
+            target_link_libraries(curl INTERFACE ${IDN2_LIBRARY})
+        else()
+            message(WARNING "libidn2 not found. If you get linker errors (idn2_free, idn2_lookup_ul), either:\n"
+                            "  1. Install it: sudo apt-get install libidn2-dev\n"
+                            "  2. Disable update checks: cmake .. -DCHECK_FOR_UPDATES=OFF")
+        endif()
         if (APPLE)
             target_link_libraries(curl INTERFACE "-framework CoreFoundation -framework SystemConfiguration")
         endif()

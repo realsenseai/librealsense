@@ -1,17 +1,18 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
-
 #pragma once
 
 namespace rsutils {
 
-    // Returns true if a CUDA-capable NVIDIA GPU is usable on this machine.
-    // Runtime probe via the CUDA Driver API (libcuda.so.1 / nvcuda.dll) - no
-    // compile-time CUDA dependency, so the binary loads on systems without CUDA.
-    // Result is cached for the lifetime of the process; safe to call concurrently
-    // from multiple threads (C++11 magic-static one-time init).
-    // Do not call from DllMain / global constructors: the probe calls LoadLibrary
-    // on Windows which acquires the loader lock.
-    bool rs2_is_cuda_available();
+  // GPU acceleration probes.  Each probe runs at most once per process and
+  // caches its result, so repeated calls are cheap.  Detection is performed
+  // at runtime by dlopen/LoadLibrary'ing the vendor driver -- no link-time
+  // dependency on libcuda / libamdhip64 is introduced -- so these functions
+  // are safe to call from builds compiled without CUDA or HIP support and
+  // on hosts where the matching driver is absent.
+
+  bool rs2_is_cuda_available();   // true iff the NVIDIA CUDA driver reports >= 1 visible device
+  bool rs2_is_hip_available();    // true iff the AMD HIP runtime reports >= 1 visible device
+  bool rs2_is_gpu_available();    // true iff rs2_is_cuda_available() || rs2_is_hip_available()
 
 }  // namespace rsutils

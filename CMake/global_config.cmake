@@ -20,6 +20,10 @@ endif()
 macro(global_set_flags)
     set(LRS_LIB_NAME ${LRS_TARGET})
 
+    if (BUILD_WITH_CUDA AND BUILD_WITH_HIP)
+        message(FATAL_ERROR "BUILD_WITH_CUDA and BUILD_WITH_HIP are mutually exclusive. Please enable only one.")
+    endif()
+
     add_definitions(-DELPP_THREAD_SAFE)
 
     if (BUILD_GLSL_EXTENSIONS)
@@ -55,6 +59,11 @@ macro(global_set_flags)
         add_definitions(-DRS2_USE_CUDA)
     endif()
 
+    if (BUILD_WITH_HIP)
+        add_definitions(-DRS2_USE_CUDA)
+        add_definitions(-DRS2_USE_HIP)
+    endif()
+
     if (BUILD_WITH_NEON)
         add_definitions(-DBUILD_WITH_NEON)
     endif()
@@ -65,6 +74,10 @@ macro(global_set_flags)
 
     if (BUILD_WITH_CUDA)
         include(CMake/cuda_config.cmake)
+    endif()
+
+    if (BUILD_WITH_HIP)
+        include(CMake/hip_config.cmake)
     endif()
 
     if(BUILD_PYTHON_BINDINGS)
@@ -90,6 +103,18 @@ endmacro()
 
 macro(global_target_config)
     target_link_libraries(${LRS_TARGET} PRIVATE realsense-file ${CMAKE_THREAD_LIBS_INIT})
+
+    if (BUILD_WITH_HIP)
+        # hip::device is the imported target produced by find_package(hip)
+        # in CMake/hip_config.cmake.  It transitively provides:
+        #   - the correct linker flag for libamdhip64 (so we no longer need
+        #     a hard-coded "amdhip64" / "amdhip64.lib")
+        #   - the HIP include directories (so a separate
+        #     target_include_directories on HIP_INCLUDE_DIRS is unnecessary)
+        #   - the link search path on Windows (so target_link_directories
+        #     on ${ROCM_PATH}/lib is unnecessary)
+        target_link_libraries(${LRS_TARGET} PRIVATE hip::device)
+    endif()
 
     set_target_properties (${LRS_TARGET} PROPERTIES FOLDER Library)
 
