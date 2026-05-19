@@ -20,52 +20,139 @@
 | **Raspberry Pi** | GCC (ARM) | See `doc/installation_raspbian.md` |
 | **Android** | NDK (r20b+) | Cross-compilation; see `doc/android.md` |
 
-## Basic Build (All Platforms)
-
-```bash
-mkdir build && cd build
-cmake ..
-cmake --build . --config Release
-```
-
 ## Windows Build (Visual Studio)
+
+### Full Build
 
 ```powershell
 mkdir build; cd build
 cmake .. -G "Visual Studio 17 2022" -A x64
-cmake --build . --config Release
+cmake --build . --config Release --parallel
 # Or open build/realsense2.sln in Visual Studio
 ```
 
-To install:
+**Note**: Always use `--parallel` flag on Windows for faster parallel builds.
+
+### Build Specific Target
+
+To build only a specific target:
 ```powershell
-cmake --build . --config Release --target install
+cmake --build . --config Release --parallel --target <target-name>
+```
+
+Examples:
+```powershell
+# Build only the core library
+cmake --build . --config Release --parallel --target realsense2
+
+# Build only the viewer
+cmake --build . --config Release --parallel --target realsense-viewer
+```
+
+### Install
+
+```powershell
+cmake --build . --config Release --parallel --target install
 ```
 
 ## Linux Build
+
+### Full Build
 
 ```bash
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
+```
+
+### Build Specific Target
+
+To build only a specific target:
+```bash
+make <target-name>
+# Or with cmake:
+cmake --build . --target <target-name>
+```
+
+Examples:
+```bash
+# Build only the core library
+make realsense2
+
+# Build only the viewer
+make realsense-viewer
+```
+
+### List Available Targets
+
+```bash
+make help
+```
+
+### Install
+
+```bash
 sudo make install
 ```
 
 ## macOS Build
 
+**Note**: macOS requires `FORCE_RSUSB_BACKEND=ON`.
+
+### Full Build
+
 ```bash
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DFORCE_RSUSB_BACKEND=ON
 make -j$(sysctl -n hw.ncpu)
+```
+
+### Build Specific Target
+
+To build only a specific target:
+```bash
+make <target-name>
+# Or with cmake:
+cmake --build . --target <target-name>
+```
+
+Examples:
+```bash
+# Build only the core library
+make realsense2
+
+# Build only the viewer
+make realsense-viewer
+```
+
+### List Available Targets
+
+```bash
+make help
+```
+
+### Install
+
+```bash
 sudo make install
 ```
 
-Note: macOS requires `FORCE_RSUSB_BACKEND=ON`.
 
+## Common Target Reference
+
+| Target | Description |
+|---|---|
+| `realsense2` | Core library only |
+| `realsense-viewer` | Viewer application |
+| `rs-enumerate-devices` | Device enumeration tool |
+| `rs-fw-update` | Firmware update tool |
+| `pyrealsense2` | Python bindings |
 
 ## Common CMake Build Flags
 
 All flags are defined in `CMake/lrs_options.cmake`.
+
+> **Rule:** When adding a new CMake build flag, always declare it with `option()` in `CMake/lrs_options.cmake` — never inline in a subdirectory `CMakeLists.txt`. This keeps all flags discoverable in one place and ensures they appear in `cmake-gui`/`ccmake` regardless of which subdirectory is being configured.
 
 | Flag | Default | Description |
 |---|---|---|
@@ -83,11 +170,11 @@ All flags are defined in `CMake/lrs_options.cmake`.
 | `BUILD_WITH_STATIC_CRT` | ON | Link against static CRT (Windows/MSVC) |
 | `CHECK_FOR_UPDATES` | ON (OFF on macOS) | Enable checking for SDK updates |
 | `ENABLE_CCACHE` | ON | Use ccache if available |
-| `IMPORT_DEPTH_CAM_FW` | ON | Download latest depth camera firmware |
 | `BUILD_GLSL_EXTENSIONS` | ON | Build GLSL extensions API |
 | `BUILD_RS2_ALL` | ON | Build `realsense2-all` static bundle (when `BUILD_SHARED_LIBS=OFF`) |
 | `BUILD_ASAN` | OFF | Enable AddressSanitizer |
 | `ENABLE_SECURITY_FLAGS` | OFF | Enable additional compiler security flags |
+| `BUILD_WITH_MINZ` | OFF | Enable MinZ depth improvement in viewer (Jetson only); requires `librealsense2-enhanced-depth` installed on every system that runs the binary — **do not distribute this binary to systems without the package** |
 
 ## Example: Build with Python Bindings and Tests
 
@@ -97,6 +184,11 @@ cmake .. -DCMAKE_BUILD_TYPE=Release \
          -DBUILD_PYTHON_BINDINGS=ON \
          -DBUILD_UNIT_TESTS=ON
 cmake --build . --config Release
+```
+
+**On Windows**, always add `--parallel`:
+```powershell
+cmake --build . --config Release --parallel
 ```
 
 ## Example: Build with DDS Support

@@ -6,6 +6,10 @@ project( rsutils )
 add_library( ${PROJECT_NAME} STATIC "" )
 # We cannot directly interface with nlohmann_json (doesn't work on bionic)
 #target_link_libraries( ${PROJECT_NAME} PUBLIC nlohmann_json )
+# rsutilgpu.cpp uses dlopen on POSIX / LoadLibrary on Windows to probe for CUDA at
+# runtime; propagate the dl dependency so consumers of rsutils link it transitively.
+# CMAKE_DL_LIBS is empty on Windows (LoadLibrary is in kernel32, linked by default).
+target_link_libraries( ${PROJECT_NAME} PUBLIC ${CMAKE_DL_LIBS} )
 target_compile_features( ${PROJECT_NAME} PUBLIC cxx_std_14 )
 set_target_properties( ${PROJECT_NAME} PROPERTIES FOLDER Library )
 

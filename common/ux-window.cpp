@@ -59,9 +59,7 @@ namespace rs2
 
     void prepare_config_file()
     {
-        config_file::instance().set_default(configurations::update::allow_rc_firmware, false);
         config_file::instance().set_default(configurations::update::recommend_calibration, true);
-        config_file::instance().set_default(configurations::update::recommend_updates, true);
         config_file::instance().set_default(configurations::update::sw_updates_url, server_versions_db_url);
         config_file::instance().set_default(configurations::update::sw_updates_official_server, true);
 
@@ -526,7 +524,7 @@ namespace rs2
 
             if (!_missing_device)
             {
-                std::string rs_dev_detected = std::string(rsutils::string::from() << textual_icons::usb
+                _dev_stat_message = std::string(rsutils::string::from() << textual_icons::usb
                     << " RealSense device detected.");
                 _query_devices = false;
             }

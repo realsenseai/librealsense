@@ -871,6 +871,16 @@ namespace librealsense
                 _reader_attrs = create_reader_attrs();
             _streams.resize(_streamIndex);
 
+            // Release any stale COM pointers from a previously failed set_d0() or set_d3()
+            safe_release(_camera_control);
+            safe_release(_video_proc);
+            safe_release(_reader);
+            if (_source)
+            {
+                _source->Shutdown();
+                safe_release(_source);
+            }
+
             //enable source
             CHECK_HR(MFCreateDeviceSource(_device_attrs, &_source));
             LOG_HR(_source->QueryInterface(__uuidof(IAMCameraControl), reinterpret_cast<void **>(&_camera_control)));
@@ -892,8 +902,11 @@ namespace librealsense
             safe_release(_camera_control);
             safe_release(_video_proc);
             safe_release(_reader);
-            _source->Shutdown(); //Failure to call Shutdown can result in memory leak
-            safe_release(_source);
+            if (_source)
+            {
+                _source->Shutdown();
+                safe_release(_source);
+            }
             for (auto& elem : _streams)
                 elem.callback = nullptr;
             _power_state = D3;
@@ -941,9 +954,9 @@ namespace librealsense
                     uint32_t device_fourcc = reinterpret_cast<const big_endian<uint32_t> &>(subtype.Data1);
 
                     // On D585S, we need to distinguish the occupancy and the label point cloud streams.
-                    // The condition currently support 2 resolutions for LPC
+                    // The condition currently support 3 resolutions for LPC
                     // This needs to be refactored!
-                    if (this->_info.pid == 0x0b6b && width == 2880 && (height == 1040 || height == 260)) 
+                    if (this->_info.pid == 0x0b6b && width == 2880 && (height == 1040 || height == 260 || height == 32))
                     {
                         device_fourcc = 0x50414C38; // PAL8 used instead of FGREY in order to distinguish  between occupancy and point cloud streams
                     }

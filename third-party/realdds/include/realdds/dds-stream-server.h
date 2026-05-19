@@ -17,6 +17,7 @@ namespace realdds {
 namespace topics {
 class image_msg;
 class imu_msg;
+class string_msg;
 }
 
 
@@ -172,6 +173,37 @@ private:
 
     motion_intrinsics _accel_intrinsics;
     motion_intrinsics _gyro_intrinsics;
+};
+
+
+
+class dds_inference_stream_server : public dds_stream_server
+{
+    typedef dds_stream_server super;
+
+public:
+    dds_inference_stream_server( std::string const & stream_name, std::string const & sensor_name );
+
+    void open( std::string const & topic_name, std::shared_ptr< dds_publisher > const & ) override;
+
+    void start_streaming();
+    virtual void publish_inference( topics::string_msg const & msg );
+
+    char const * type_string() const override { return "inference"; }
+
+private:
+    void check_profile( std::shared_ptr< dds_stream_profile > const & ) const override;
+};
+
+
+class dds_object_detection_stream_server : public dds_inference_stream_server
+{
+    typedef dds_inference_stream_server super;
+
+public:
+    dds_object_detection_stream_server( std::string const & stream_name, std::string const & sensor_name );
+
+    char const * type_string() const override { return "object_detection"; }
 };
 
 

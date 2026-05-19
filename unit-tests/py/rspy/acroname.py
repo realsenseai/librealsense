@@ -12,6 +12,12 @@ from rspy import log, device_hub, signals
 import time
 import platform, re
 
+# Minimum elapsed time (seconds) required between issuing a port disable and a
+# subsequent port enable on the Acroname USBHub3p (firmware 2.12.2). Below this
+# threshold, sustained disable/enable traffic on high-current ports (observed
+# with D585S, ~1 A idle) can leave the BrainStem control endpoint unresponsive.
+_MIN_PORT_RECYCLE_GAP_S = 2.0
+
 if __name__ == '__main__':
     import os, sys, getopt
     def usage():
@@ -37,8 +43,9 @@ if __name__ == '__main__':
 
 try:
     import brainstem
+    log.d( f'brainstem {brainstem.version.get_version_string().split()[-1]} loaded from {brainstem.__file__}' )
 except ModuleNotFoundError:
-    log.d( 'no acroname library is available' )
+    log.d( 'no brainstem library is available' )
     raise
 
 class NoneFoundError( RuntimeError ):
@@ -55,6 +62,10 @@ class Acroname(device_hub.device_hub):
             raise NoneFoundError()
         self.hub = None
         self.all_hubs = None
+        # Tracks the time we last issued a port-disable command, so that a
+        # subsequent enable can wait out the minimum recycle gap (see
+        # _MIN_PORT_RECYCLE_GAP_S). None means no disable issued yet.
+        self._last_disable_t = None
 
     def get_name(self):
         """
@@ -201,6 +212,13 @@ class Acroname(device_hub.device_hub):
         :param sleep_on_change: Number of seconds to sleep if any change is made
         :return: True if no errors found, False otherwise
         """
+        # Wait out the minimum disable->enable gap if a disable was issued recently.
+        # See _MIN_PORT_RECYCLE_GAP_S for rationale.
+        if self._last_disable_t is not None:
+            settle = _MIN_PORT_RECYCLE_GAP_S - (time.monotonic() - self._last_disable_t)
+            if settle > 0:
+                log.d(f"waiting {settle:.2f}s for Acroname port-recycle gap")
+                time.sleep(settle)
         result = True
         changed = False
         log.d(f"Enabling ports {ports if ports is not None else 'all'} on Acroname"
@@ -226,7 +244,6 @@ class Acroname(device_hub.device_hub):
         #
         if changed and sleep_on_change:
             signals.register_signal_handlers()
-            import time
             time.sleep( sleep_on_change )
         #
         return result
@@ -250,9 +267,11 @@ class Acroname(device_hub.device_hub):
                     log.e("Failed to disable port", port)
                 else:
                     changed = True
+        if changed:
+            # Mark the time so a subsequent enable can wait out the minimum gap.
+            self._last_disable_t = time.monotonic()
         if changed and sleep_on_change:
             signals.register_signal_handlers()
-            import time
             time.sleep( sleep_on_change )
         #
         return result

@@ -1,7 +1,7 @@
-Python Wrapper for Intel RealSense SDK 2.0
-==========================================
+Python Wrapper for RealSense SDK 2.0
+====================================
 
-The python wrapper for Intel RealSense SDK 2.0 provides the C++ to Python binding required to access the SDK.
+The Python wrapper for RealSense SDK 2.0 provides the C++ to Python binding required to access the SDK.
 
 Quick start
 -----------

@@ -1,6 +1,8 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
 
+# Not frequently changing, no need to test for each commit
+# test:donotrun:!nightly
 # test:device D585S
 
 from rspy import test, log
@@ -60,6 +62,7 @@ app_config_json_str = '''
         "depth_roi": 0,
         "ir_for_sip": 0,
         "peripherals_sensors_disable_mask": 0,
+        "hw_configuration_setup": 0,
         "digital_signature": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 	}
 }

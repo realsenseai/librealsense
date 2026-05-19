@@ -39,6 +39,15 @@ void init_internal(py::module &m) {
         .def_readwrite("fps", &rs2_pose_stream::fps)
         .def_readwrite("fmt", &rs2_pose_stream::fmt);
 
+    py::class_<rs2_inference_stream> inference_stream(m, "inference_stream", "All the parameters"
+        " required to define an inference stream.");
+    inference_stream.def(py::init<>())
+        .def_readwrite("type",  &rs2_inference_stream::type)
+        .def_readwrite("index", &rs2_inference_stream::index)
+        .def_readwrite("uid",   &rs2_inference_stream::uid)
+        .def_readwrite("fps",   &rs2_inference_stream::fps)
+        .def_readwrite("fmt",   &rs2_inference_stream::fmt);
+
     py::class_< rs2_software_video_frame >( m,
                                             "software_video_frame",
                                             "All the parameters required to define a video frame" )
@@ -177,7 +186,7 @@ void init_internal(py::module &m) {
     
     /** rs_internal.hpp **/
     // rs2::software_sensor
-    py::class_<rs2::software_sensor, rs2::sensor> software_sensor(m, "software_sensor");
+    py::class_<rs2::software_sensor, rs2::sensor, py_holder<rs2::software_sensor>> software_sensor(m, "software_sensor");
     software_sensor
         .def( "add_video_stream",
               &rs2::software_sensor::add_video_stream,
@@ -188,6 +197,8 @@ void init_internal(py::module &m) {
             "motion_stream"_a, "is_default"_a = false)
         .def("add_pose_stream", &rs2::software_sensor::add_pose_stream, "Add pose stream to software sensor",
             "pose_stream"_a, "is_default"_a = false)
+        .def("add_inference_stream", &rs2::software_sensor::add_inference_stream, "Add inference stream to software sensor",
+            "inference_stream"_a, "is_default"_a = false)
         .def("on_video_frame", &rs2::software_sensor::on_video_frame, "Inject video frame into the sensor", "frame"_a)
         .def("on_motion_frame", &rs2::software_sensor::on_motion_frame, "Inject motion frame into the sensor", "frame"_a)
         .def("on_pose_frame", &rs2::software_sensor::on_pose_frame, "Inject pose frame into the sensor", "frame"_a)
@@ -201,7 +212,7 @@ void init_internal(py::module &m) {
         .def("on_notification", &rs2::software_sensor::on_notification, "notif"_a);
 
     // rs2::software_device
-    py::class_<rs2::software_device, rs2::device> software_device(m, "software_device");
+    py::class_<rs2::software_device, rs2::device, py_holder<rs2::software_device>> software_device(m, "software_device");
     software_device.def(py::init<>())
         .def("add_sensor", &rs2::software_device::add_sensor, "Add software sensor with given name "
             "to the software device.", "name"_a)
@@ -237,7 +248,7 @@ void init_internal(py::module &m) {
         .def("get_sequence_id", &rs2::firmware_log_parsed_message::sequence_id, "Get sequence id");
 
     // rs2::firmware_logger
-    py::class_<rs2::firmware_logger, rs2::device> firmware_logger(m, "firmware_logger");
+    py::class_<rs2::firmware_logger, rs2::device, py_holder<rs2::firmware_logger>> firmware_logger(m, "firmware_logger");
     firmware_logger.def(py::init<rs2::device>(), "device"_a)
         .def("create_message", &rs2::firmware_logger::create_message, "Create FW Log")
         .def("create_parsed_message", &rs2::firmware_logger::create_parsed_message, "Create FW Parsed Log")

@@ -6,6 +6,7 @@
 
 #include <signal.h>
 #include <atomic>
+#include <stdexcept>
 
 
 namespace rsutils {

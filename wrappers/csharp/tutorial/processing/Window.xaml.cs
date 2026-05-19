@@ -61,9 +61,8 @@ namespace Intel.RealSense
                     Console.WriteLine("    Serial number: {0}", dev.Info[CameraInfo.SerialNumber]);
                     Console.WriteLine("    Firmware version: {0}", dev.Info[CameraInfo.FirmwareVersion]);
 
-                    var sensors = dev.QuerySensors();
-                    var depthSensor = sensors[0];
-                    var colorSensor = sensors[1];
+                    var depthSensor = dev.FirstDepthSensor();
+                    var colorSensor = dev.FirstColorSensor();
 
                     var depthProfile = depthSensor.StreamProfiles
                                         .Where(p => p.Stream == Stream.Depth)
@@ -81,7 +80,7 @@ namespace Intel.RealSense
                 var pp = pipeline.Start(cfg);
 
                 // Get the recommended processing blocks for the depth sensor
-                var sensor = pp.Device.QuerySensors().First(s => s.Is(Extension.DepthSensor));
+                var sensor = pp.Device.FirstDepthSensor();
                 var blocks = sensor.ProcessingBlocks.ToList();
 
                 // Allocate bitmaps for rendring.

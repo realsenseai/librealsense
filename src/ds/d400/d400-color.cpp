@@ -242,7 +242,17 @@ namespace librealsense
                 offsetof(md_rgb_mode, rgb_mode) +
                 offsetof(md_rgb_normal_mode, intel_rgb_control);
 
-            color_ep.register_metadata(RS2_FRAME_METADATA_AUTO_EXPOSURE, make_attribute_parser(&md_rgb_control::ae_mode, md_rgb_control_attributes::ae_mode_attribute, md_prop_offset));
+            // FW < 5.17.3.0 reports ae_mode as 1=on/0=off; FW >= 5.17.3.0 reports
+            // the UVC-spec values 1=Manual, 8=Aperture Priority.
+            if (_fw_version >= firmware_version(5, 17, 3, 0))
+            {
+                color_ep.register_metadata(RS2_FRAME_METADATA_AUTO_EXPOSURE, make_attribute_parser(&md_rgb_control::ae_mode, md_rgb_control_attributes::ae_mode_attribute, md_prop_offset,
+                    [](rs2_metadata_type param) { return (param != 1); }));
+            }
+            else
+            {
+                color_ep.register_metadata(RS2_FRAME_METADATA_AUTO_EXPOSURE, make_attribute_parser(&md_rgb_control::ae_mode, md_rgb_control_attributes::ae_mode_attribute, md_prop_offset));
+            }
         }
 
         _ds_color_common->register_metadata();

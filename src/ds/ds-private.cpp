@@ -122,7 +122,7 @@ namespace librealsense
         bool is_partial_device_allowed( const std::shared_ptr< context > & ctx )
         {
             auto settings = ctx->get_settings();
-            return settings.nested( "partial-device-allowed" ).default_value< bool >( false );
+            return settings.nested( "partial-device-allowed" ).default_value< bool >( true );
         }
     } // librealsense::ds
 } // namespace librealsense

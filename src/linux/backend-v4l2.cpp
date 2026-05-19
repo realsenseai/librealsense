@@ -83,9 +83,9 @@ constexpr uint32_t RS_CAMERA_CID_AE_SETPOINT_SET            = (RS_CAMERA_CID_BAS
 constexpr uint32_t RS_CAMERA_CID_ERB                        = (RS_CAMERA_CID_BASE+13);
 constexpr uint32_t RS_CAMERA_CID_EWB                        = (RS_CAMERA_CID_BASE+14);
 constexpr uint32_t RS_CAMERA_CID_HWMC_LEGACY                = (RS_CAMERA_CID_BASE+15);
+constexpr uint32_t RS_CAMERA_CID_SYNC_MODE                  = (RS_CAMERA_CID_BASE+16);
 
 //const uint32_t RS_CAMERA_GENERIC_XU                     = (RS_CAMERA_CID_BASE+15); // RS_CAMERA_CID_HWMC duplicate??
-constexpr uint32_t RS_CAMERA_CID_LASER_POWER_MODE           = (RS_CAMERA_CID_BASE+16); // RS_CAMERA_CID_LASER_POWER duplicate ???
 constexpr uint32_t RS_CAMERA_CID_MANUAL_EXPOSURE            = (RS_CAMERA_CID_BASE+17);
 constexpr uint32_t RS_CAMERA_CID_LASER_POWER_LEVEL          = (RS_CAMERA_CID_BASE+18); // RS_CAMERA_CID_MANUAL_LASER_POWER ??
 constexpr uint32_t RS_CAMERA_CID_EXPOSURE_MODE              = (RS_CAMERA_CID_BASE+19);
@@ -162,11 +162,11 @@ namespace librealsense
         named_mutex::named_mutex(const std::string& device_path, unsigned timeout)
             : _device_path(device_path),
               _timeout(timeout), // TODO: try to lock with timeout
-              _fildes( open( _device_path.c_str(), O_RDWR, 0 ) ),
+              _fildes(-1),
               _lock_counter(0)
         {
-            if( _fildes < 0)
-                throw linux_backend_exception( rsutils::string::from() << __FUNCTION__ << ": Cannot open '" << _device_path << "'" );
+            // File descriptor will be opened lazily when lock() is called
+            // This prevents holding open file descriptors across hardware resets
         }
 
         named_mutex::~named_mutex()
@@ -176,7 +176,7 @@ namespace librealsense
                 // OFD lock will automatically release if locked only when file description closes (not file descriptor)
                 // If process was forked or cloned and unlock() was not properly called after a lock() then file will
                 // remain locked for the child process
-                close( _fildes );
+                close_fd();
             }
             catch(...)
             {
@@ -184,28 +184,67 @@ namespace librealsense
             }
         }
 
+        void named_mutex::ensure_fd_open()
+        {
+            if (_fildes < 0)
+            {
+                _fildes = open(_device_path.c_str(), O_RDWR, 0);
+                if (_fildes < 0)
+                {
+                    throw linux_backend_exception( rsutils::string::from() << "named_mutex: Cannot open '" << _device_path << "'" );
+                }
+            }
+        }
+
+        void named_mutex::close_fd()
+        {
+            // Close file descriptor if it was opened
+            if (_fildes >= 0)
+            {
+                close( _fildes );
+                _fildes = -1;
+            }
+        }
+
         void named_mutex::lock()
         {
             if( _lock_counter.fetch_add( 1 ) == 0 )
             {
-                // Using OFD locks to synchronize both interprocess and interthread.
-                // flock() is not good if we have multiple instances of the same device. i.e.
-                //     auto devs = context.query_devices();
-                //     auto dev1 = devs[0];
-                //     auto dev2 = devs[0];
-                // Closing file descriptor for one instance will unlock file for other instances.
-                // Note - OFD locks are linux standart not POSIX.
-                struct flock fl;
-                memset( &fl, 0, sizeof( fl ) );
-                fl.l_whence = SEEK_SET;
-                fl.l_start = 0;
-                fl.l_len = 0; // Lock the entire file
-                fl.l_type = F_WRLCK;
-                auto ret = fcntl( _fildes, F_OFD_SETLKW, &fl );
-                if( 0 != ret )
+                try
+                {
+                    // Open file descriptor only when first lock is acquired
+                    ensure_fd_open();
+
+                    // Using OFD locks to synchronize both interprocess and interthread.
+                    // flock() is not good if we have multiple instances of the same device. i.e.
+                    //     auto devs = context.query_devices();
+                    //     auto dev1 = devs[0];
+                    //     auto dev2 = devs[0];
+                    // Closing file descriptor for one instance will unlock file for other instances.
+                    // Note - OFD locks are linux standart not POSIX.
+                    struct flock fl;
+                    memset( &fl, 0, sizeof( fl ) );
+                    fl.l_whence = SEEK_SET;
+                    fl.l_start = 0;
+                    fl.l_len = 0; // Lock the entire file
+                    fl.l_type = F_WRLCK;
+                    auto ret = fcntl( _fildes, F_OFD_SETLKW, &fl );
+                    if( 0 != ret )
+                    {
+                        // Close file descriptor since we failed to acquire lock
+                        close_fd();
+                        
+                        throw linux_backend_exception( rsutils::string::from() << __FUNCTION__ << ": locking failed" );
+                    }
+                }
+                catch(...)
                 {
                     _lock_counter.fetch_add( -1 );
-                    throw linux_backend_exception( rsutils::string::from() << __FUNCTION__ << ": locking failed" );
+                    
+                    // Close file descriptor if it was opened
+                    close_fd();
+                    
+                    throw;
                 }
             }
         }
@@ -223,6 +262,9 @@ namespace librealsense
                 auto ret = fcntl( _fildes, F_OFD_SETLKW, &fl );
                 if( 0 != ret )
                     throw linux_backend_exception( rsutils::string::from() << __FUNCTION__ << ": unlocking failed" );
+
+                // Close file descriptor when last lock is released
+                close_fd();
             }
         }
 
@@ -230,16 +272,36 @@ namespace librealsense
         {
             if( _lock_counter.fetch_add( 1 ) == 0 )
             {
-                struct flock fl;
-                memset( &fl, 0, sizeof( fl ) );
-                fl.l_whence = SEEK_SET;
-                fl.l_start = 0;
-                fl.l_len = 0; // Lock the entire file
-                fl.l_type = F_WRLCK;
-                auto ret = fcntl( _fildes, F_OFD_SETLK, &fl );
-                if( 0 != ret && errno == EAGAIN)
+                try
+                {
+                    // Open file descriptor only when first lock is acquired
+                    ensure_fd_open();
+
+                    struct flock fl;
+                    memset( &fl, 0, sizeof( fl ) );
+                    fl.l_whence = SEEK_SET;
+                    fl.l_start = 0;
+                    fl.l_len = 0; // Lock the entire file
+                    fl.l_type = F_WRLCK;
+                    auto ret = fcntl( _fildes, F_OFD_SETLK, &fl );
+                    if( 0 != ret )
+                    {
+                        // fcntl failed - need to clean up
+                        // Close file descriptor since we failed to acquire lock
+                        close_fd();
+                        
+                        // Return false instead of throwing, but still need to decrement counter
+                        _lock_counter.fetch_add( -1 );
+                        return false;
+                    }
+                }
+                catch(...)
                 {
                     _lock_counter.fetch_add( -1 );
+                    
+                    // Close file descriptor if it was opened
+                    close_fd();
+                    
                     return false;
                 }
             }
@@ -837,7 +899,7 @@ namespace librealsense
             if (!is_usb_path_valid(video_path, dev_name, busnum, devnum, devpath))
             {
 #ifndef RS2_USE_CUDA
-                if (rsutils::rs2_is_gpu_available())
+                if (rsutils::rs2_is_cuda_available())
                 {
                     /* On the Jetson TX, the camera module is CSI & I2C and does not report as this code expects
                     Patch suggested by JetsonHacks: https://github.com/jetsonhacks/buildLibrealsense2TX */
@@ -2368,9 +2430,9 @@ namespace librealsense
                                     static_cast<float>(frame_interval.discrete.numerator);
 
                                 // On D585S, we need to distinguish the occupancy and the label point cloud streams.
-                                // The condition currently support 2 resolutions for LPC
+                                // The condition currently support 3 resolutions for LPC
                                 // This needs to be refactored!
-                                if (this->_info.pid == 0X0B6B && frame_size.discrete.width == 2880 && (frame_size.discrete.height == 1040 || frame_size.discrete.height == 260)) // 0x0B6B pid for D585S_PID
+                                if (this->_info.pid == 0X0B6B && frame_size.discrete.width == 2880 && (frame_size.discrete.height == 1040 || frame_size.discrete.height == 260 || frame_size.discrete.height == 32)) // 0x0B6B pid for D585S_PID
                                 {
                                     fourcc = 0x50414c38; // PAL8 used instead of GREY in order to distinguish between occupancy and point cloud streams
                                 }
@@ -2933,6 +2995,8 @@ namespace librealsense
         const uint8_t RS_ENABLE_AUTO_EXPOSURE            = 0xB;
         const uint8_t RS_LED_PWR                         = 0xE;
         const uint8_t RS_EMITTER_FREQUENCY               = 0x10; // Match to DS5_EMITTER_FREQUENCY
+        const uint8_t RS_DEPTH_AUTO_EXPOSURE_MODE        = 0x11;
+        const uint8_t RS_EXTERNAL_SYNC                   = 0x12;
 
 
         bool v4l_mipi_device::get_pu(rs2_option opt, int32_t& value) const
@@ -3044,7 +3108,7 @@ namespace librealsense
             // sending error on ioctl failure
             if (errno == EIO || errno == EAGAIN) // TODO: Log?
                 return false;
-            throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_G_EXT_CTRLS) failed on control " << control);
+            throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_G_EXT_CTRLS) failed on control " << static_cast<int>(control) << ", errno=" << errno);
         }
 
         control_range v4l_mipi_device::get_xu_range(const extension_unit& xu, uint8_t control, int len) const
@@ -3136,6 +3200,7 @@ namespace librealsense
                     case RS_ENABLE_AUTO_EXPOSURE: return V4L2_CID_EXPOSURE_AUTO; //RS_CAMERA_CID_EXPOSURE_MODE;
                     case RS_HARDWARE_PRESET : return RS_CAMERA_CID_PRESET;
                     case RS_EMITTER_FREQUENCY : return RS_CAMERA_CID_EMITTER_FREQUENCY;
+                    case RS_EXTERNAL_SYNC : return RS_CAMERA_CID_SYNC_MODE;
                     // D457 Missing functionality
                     //case RS_ERROR_REPORTING: TBD;
                     //case RS_EXT_TRIGGER: TBD;

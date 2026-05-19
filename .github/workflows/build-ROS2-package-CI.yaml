@@ -17,7 +17,7 @@ jobs:
       matrix:
         ros_distribution:
           - humble
-          - iron
+          - kilted
           - rolling
           - jazzy
 
@@ -26,9 +26,9 @@ jobs:
           - docker_image: ubuntu:jammy
             ros_distribution: humble
 
-          # Iron Irwini
-          - docker_image: ubuntu:jammy
-            ros_distribution: iron
+          # Kilted Kaiju
+          - docker_image: ubuntu:noble
+            ros_distribution: kilted
 
           # Rolling Ridley
           - docker_image: ubuntu:noble
@@ -43,12 +43,12 @@ jobs:
     steps:
 
       - name: setup ROS environment
-        uses: ros-tooling/setup-ros@87aeba050fd62d0ee5d5fdf4b6c9f847892ea864 #v0.7.13
+        uses: ros-tooling/setup-ros@2b7b7e10fd30ff131dfb33248ddd71c5ba31dd30 #v0.7.15
         with:
           required-ros-distributions: ${{ matrix.ros_distribution }}
 
       - name: build librealsense ROS 2
-        uses: ros-tooling/action-ros-ci@1ff2c804b4c2383146d8cd8444dfda64ab4bf7ac #v0.4.3
+        uses: ros-tooling/action-ros-ci@9125cf1fa1f87e7830ed1c77f8b1885ee649b9a0 #v0.4.6
         with:
           target-ros2-distro: ${{ matrix.ros_distribution }}
           skip-tests: true

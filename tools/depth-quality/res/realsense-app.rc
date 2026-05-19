@@ -1,0 +1,130 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "winres.h"
+
+#include "../include/librealsense2/rs.h"
+
+#define STR(x) #x
+#define STR_VERSION(MAJVER,MINVER,FIXNUM,BLDID) \
+STR(MAJVER) "." STR(MINVER) "." STR(FIXNUM) "." STR(BLDID) 
+
+#define TO_STRING(x) STR(x) 
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// Neutral (Default) (unknown sub-lang: 0x8) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ZZZ)
+LANGUAGE LANG_NEUTRAL, 0x8
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_ICON1               ICON                    "icon.ico"
+
+// GLFW looks for a resource named "GLFW_ICON" when registering the window
+// class.  Without it the Windows 11 taskbar falls back to the generic icon.
+GLFW_ICON             ICON                    "icon.ico"
+
+#endif    // Neutral (Default) (unknown sub-lang: 0x8) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""winres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION RS2_API_MAJOR_VERSION,RS2_API_MINOR_VERSION,RS2_API_PATCH_VERSION,RS2_API_BUILD_VERSION
+ PRODUCTVERSION RS2_API_MAJOR_VERSION,RS2_API_MINOR_VERSION,RS2_API_PATCH_VERSION,RS2_API_BUILD_VERSION
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "RealSense Corporation"
+            VALUE "FileDescription", "RealSense Depth Quality Tool"
+            VALUE "FileVersion", RS2_API_MAJOR_VERSION,RS2_API_MINOR_VERSION,RS2_API_PATCH_VERSION,RS2_API_BUILD_VERSION
+            VALUE "InternalName", "depth-quality.exe"
+            VALUE "LegalCopyright", "Copyright RealSense Inc 2018-2025. All rights reserved."
+            VALUE "OriginalFilename", "depth-quality.exe"
+            VALUE "ProductName", "RealSense Cross Platform SDK"
+            VALUE "ProductVersion", STR_VERSION(RS2_API_MAJOR_VERSION,RS2_API_MINOR_VERSION,RS2_API_PATCH_VERSION,RS2_API_BUILD_VERSION) "\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+#endif    // English (United States) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

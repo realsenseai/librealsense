@@ -138,7 +138,7 @@ H = 480
 BPP = 2
 
 temp_dir = tempfile.mkdtemp()
-filename = os.path.join(temp_dir, "recording.bag")
+filename = os.path.join(temp_dir, "recording.db3")
 
 video_frame = rs.software_video_frame()
 motion_frame = rs.software_motion_frame()

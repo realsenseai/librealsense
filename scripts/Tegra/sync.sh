@@ -56,6 +56,13 @@ SCRIPT_NAME=`readlink -f $0`
 SCRIPT_DIR=`dirname $SCRIPT_NAME`
 # source dir
 LDK_DIR=$SCRIPT_DIR
+
+# Git server constants.
+# nv-tegra.nvidia.com is being deprecated by NVIDIA in favour of GitLab.
+# detect_git_server() probes both in priority order and selects the first reachable server.
+NV_TEGRA_HOST="nv-tegra.nvidia.com"
+GITLAB_BASE="gitlab.com/nvidia/nv-tegra"  # host + org path prefix, not just a hostname
+GIT_SERVER="${NV_TEGRA_HOST}"  # default; overwritten by detect_git_server()
 # info about sources.
 # NOTE: *Add only kernel repos here. Add new repos separately below. Keep related repos together*
 # NOTE: nvethrnetrm.git should be listed after "linux-nv-oot.git" due to nesting of sync path
@@ -136,6 +143,27 @@ function UpdateTags {
 				| awk -F: -v OFS=: -v var="${TAG}" '{$4=var; print}')
 		fi
 	done
+}
+
+function detect_git_server {
+	if ! which curl > /dev/null 2>&1; then
+		echo -e "\e[33mWarning: curl not found; skipping git server detection, defaulting to ${GIT_SERVER}\e[0m" >&2
+		return 0
+	fi
+	local SERVERS=("${GITLAB_BASE}" "${NV_TEGRA_HOST}")
+	local SERVER
+	echo "Detecting available git server…"
+	for SERVER in "${SERVERS[@]}"; do
+		echo "Testing server: https://${SERVER}…"
+		local HTTP_CODE
+		HTTP_CODE=$(curl --silent --max-time 15 -o /dev/null -w "%{http_code}" "https://${SERVER}" 2>/dev/null || true)
+		if [[ "${HTTP_CODE}" =~ ^[23] ]]; then
+			GIT_SERVER="${SERVER}"
+			echo "Using git server: https://${GIT_SERVER}"
+			return 0
+		fi
+	done
+	echo -e "\e[33mWarning: Could not reach either git server; defaulting to ${GIT_SERVER}. Network operations may fail.\e[0m" >&2
 }
 
 function DownloadAndSync {
@@ -273,6 +301,8 @@ while getopts "$GETOPT" opt; do
 done
 shift $((OPTIND-1))
 
+detect_git_server
+
 for ((i=0; i < NSOURCES; i++)); do
 	OPT=$(echo "${SOURCE_INFO_PROCESSED[i]}" | cut -f 1 -d ':')
 	WHAT=$(echo "${SOURCE_INFO_PROCESSED[i]}" | cut -f 2 -d ':')
@@ -281,7 +311,7 @@ for ((i=0; i < NSOURCES; i++)); do
 	DNLOAD=$(echo "${SOURCE_INFO_PROCESSED[i]}" | cut -f 5 -d ':')
 
 	if [ $DALL -eq 1 -o "x${DNLOAD}" == "xy" ]; then
-		DownloadAndSync "$WHAT" "${LDK_DIR}/${WHAT}" "https://${REPO}" "${TAG}" "${OPT}"
+		DownloadAndSync "$WHAT" "${LDK_DIR}/${WHAT}" "https://${REPO/${NV_TEGRA_HOST}/${GIT_SERVER}}" "${TAG}" "${OPT}"
 		echo
 	fi
 done

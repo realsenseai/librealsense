@@ -38,7 +38,7 @@ namespace librealsense {
 
         if (config.is_discarded())
         {
-            LOG_ERROR( "No valid configuration file found at : " << filename << " loading defaults" );
+            LOG_WARNING( "No valid configuration file found at : " << filename << " loading defaults" );
         }
         // Take only the 'context' part of it
         config = rsutils::json_config::load_settings( config, "context", "config-file" );

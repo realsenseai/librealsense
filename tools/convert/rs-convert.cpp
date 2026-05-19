@@ -41,6 +41,7 @@ int main(int argc, char** argv) try
     cli::value <string> frameNumberEnd('t', "last-framenumber", "frame", "", "ignore frames whose frame number is greater than this value");
     cli::value <string> startTime('s', "start-time", "seconds", "", "ignore frames whose timestamp is less than this value (the first frame is at time 0)");
     cli::value <string> endTime('e', "end-time", "seconds", "", "ignore frames whose timestamp is greater than this value (the first frame is at time 0)" );
+    cli::value<string> outputFilenameDb3('D', "output-db3", "db3-path", "", "convert legacy .bag to .db3 format");
 
     auto settings = cli( "librealsense rs-convert tool" )
                         .default_log_level( RS2_LOG_SEVERITY_WARN )
@@ -58,7 +59,18 @@ int main(int argc, char** argv) try
                         .arg( switchDepth )
                         .arg( switchColor )
                         .arg( switchTextOutput )
+                        .arg( outputFilenameDb3 )
                         .process( argc, argv );
+
+    // Handle .bag to .db3 conversion separately (it uses the C API, not the frame pipeline)
+    if (outputFilenameDb3.isSet())
+    {
+        rs2::context ctx(settings.dump());
+        cout << "Converting " << inputFilename.getValue() << " to " << outputFilenameDb3.getValue() << " ..." << endl;
+        ctx.convert_bag_to_db3(inputFilename.getValue(), outputFilenameDb3.getValue());
+        cout << "Conversion complete: " << outputFilenameDb3.getValue() << endl;
+        return EXIT_SUCCESS;
+    }
 
     vector<shared_ptr<rs2::tools::converter::converter_base>> converters;
     shared_ptr<rs2::tools::converter::converter_ply> plyconverter;

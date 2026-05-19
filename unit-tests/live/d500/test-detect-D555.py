@@ -8,8 +8,10 @@
 # test:donotrun:!dds
 
 import pyrealsense2 as rs
-from rspy import test, log, config_file
+from rspy import test, log, config_file, devices
 import pyrsutils as rsutils
+from time import sleep
+from rspy.snippets import is_dds_dev
 
 # Make sure D555 is detected on CI machines (DDS connection)
 # To run locally with other devices use `--device` flag
@@ -24,7 +26,7 @@ with test.closure( "Detect D555 DDS device" ):
     devs = ctx.query_devices()
     if len(devs) > 0:
         dev = devs[0]
-        dev_found = dev.supports(rs.camera_info.connection_type) and dev.get_info(rs.camera_info.connection_type) == "DDS"
+        dev_found = is_dds_dev( dev )
     test.check( dev_found )
 
 with test.closure("restore d555 domain if was reset to 0"):
@@ -34,10 +36,11 @@ with test.closure("restore d555 domain if was reset to 0"):
     if not dev_found and domain_from_config != 0: # If device not previously found and domains might differ
         log.d("Domain from configuration is", domain_from_config, " trying to detect device on domain 0")
         ctx = rs.context({ "dds" : { "enabled" : True, "domain" : 0 } })
-        devices = ctx.query_devices()
+        sleep(devices.MAX_ENUMERATION_TIME) # Patch - when device is on domain 0, it was manually added to devices._device_by_sn and Unify hub did not wait for it to powerup properly. 
+        domain_0_devs = ctx.query_devices()
         dev = None
-        if devices:
-            dev = devices[0]
+        if domain_0_devs:
+            dev = domain_0_devs[0]
             
             # Get device configuration
             get_eth_config_opcode = 0xBB

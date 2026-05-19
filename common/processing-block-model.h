@@ -4,6 +4,7 @@
 #pragma once
 
 #include <librealsense2/rs.hpp>
+#include <functional>
 #include <string>
 
 
@@ -49,6 +50,15 @@ namespace rs2
         bool is_enabled() const { return _enabled; }
 
         bool visible = true;
+
+        // Optional predicate; null means always available.
+        // When it returns false the toggle is grayed out in the UI.
+        // Set by the owner after construction for filters with runtime constraints
+        // (e.g. in subdevice_model for MinZ: requires CUDA and specific stream config).
+        std::function<bool()> available;
+        std::string unavailable_tooltip;
+
+        bool is_available() const { return !available || available(); }
 
         // Callback when our state changes
         // NOTE: actual may not be same as is_enabled()! The latter is this particular pb,

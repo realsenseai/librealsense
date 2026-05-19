@@ -29,8 +29,10 @@ class CombinedHub(device_hub.device_hub):
                 name_and_port = (hub_name, port)
                 self.virtual_port_to_hub_port[port_number] = name_and_port
                 self.hub_port_to_virtual_port[name_and_port] = port_number
-                # log.d("Assigning virtual port", port_number, "to hub", hub_name, "port", port)
                 port_number += 1
+        log.d( 'CombinedHub virtual port mapping:' )
+        for vp, (hub_name, real_port) in self.virtual_port_to_hub_port.items():
+            log.d( f'  virtual {vp} -> {hub_name} port {real_port}' )
 
     def get_name(self):
         """Return the name of this virtual hub."""
@@ -105,7 +107,11 @@ class CombinedHub(device_hub.device_hub):
 
         success = True
         for name, hub in self.hubs.items():
-            ok = hub.enable_ports(targets[name], disable_other_ports)
+            target = targets[name]
+            # Skip hubs with no target ports (unless we need to disable their other ports)
+            if target == [] and not disable_other_ports:
+                continue
+            ok = hub.enable_ports(target, disable_other_ports)
             success = success and ok
 
         # We wait for the maximum time allowed for enumeration changes.
@@ -132,7 +138,11 @@ class CombinedHub(device_hub.device_hub):
 
         success = True
         for name, hub in self.hubs.items():
-            ok = hub.disable_ports(targets[name])
+            target = targets[name]
+            # Skip hubs with no target ports
+            if target == []:
+                continue
+            ok = hub.disable_ports(target)
             success = success and ok
 
         # We wait for the maximum time allowed for enumeration changes.

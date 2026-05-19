@@ -322,11 +322,18 @@ public:
         }
         catch( const std::exception & e )
         {
-            LOG_ERROR( rsutils::string::from() << "Failed to create device for PID 0x" << std::hex << std::setw( 4 )
-                                               << std::setfill( '0' ) << (int)pid << "! (" << e.what() << ")" );
-            // Create a device with partial capabilities instead of failing
+            // Create a device with partial capabilities instead of failing,
+            // but only if the caller opted in via `partial-device-allowed`.
+            if( ! ds::is_partial_device_allowed( get_context() ) )
+            {
+                LOG_ERROR( rsutils::string::from() << "Failed to create device for PID 0x" << std::hex << std::setw( 4 )
+                                                   << std::setfill( '0' ) << (int)pid << "! (" << e.what() << ")" );
+                throw;
+            }
+            LOG_WARNING( "PID 0x" << std::hex << std::setw( 4 ) << std::setfill( '0' ) << (int)pid
+                                  << " - falling back to partial device (partial-device-allowed=true): " << e.what() );
             return std::make_shared< rs500_device >( dev_info );
-        }        
+        }
     }
 
     std::vector<std::shared_ptr<d500_info>> d500_info::pick_d500_devices(
@@ -407,19 +414,25 @@ public:
     std::shared_ptr<matcher> rs_d585_device::create_matcher(const frame_holder& frame) const
     {
         std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get() };
-        std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(), 
-                                                      _ds_motion_common->get_gyro_stream().get()};
-        streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        if (!_has_motion_module_failed)
+        {
+            std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
+                                                          _ds_motion_common->get_gyro_stream().get()};
+            streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        }
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 
     std::shared_ptr<matcher> rs_d585s_device::create_matcher(const frame_holder& frame) const
     {
-        std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get(), 
+        std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get(),
             _safety_stream.get(), _occupancy_stream.get(), _point_cloud_stream.get()};
-        std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
-                                                      _ds_motion_common->get_gyro_stream().get() };
-        streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        if (!_has_motion_module_failed)
+        {
+            std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
+                                                          _ds_motion_common->get_gyro_stream().get() };
+            streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        }
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 }

@@ -5,10 +5,10 @@ build-backend = "hatchling.build"
 [project]
 name = "pyrealsense2"
 dynamic = ["version"]
-description = "Python Wrapper for Intel Realsense SDK 2.0."
+description = "Python Wrapper for Realsense SDK 2.0."
 readme = {file = "README.rst", content-type = "text/x-rst", charset = "utf-8"}
 authors = [
-    { name = "Intel(R) RealSense(TM)", email = "realsense@intel.com" },
+    { name = "RealSense", email = "rsswsdk@realsensecloud.onmicrosoft.com" },
 ]
 license = {text = "Apache License, Version 2.0"}
 requires-python = ">=3.9"

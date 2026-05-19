@@ -2,6 +2,7 @@
 // Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
 
 #include <librealsense2/rs.hpp>
+#include <common/fw-update-common.h>
 
 #include <rsutils/json.h>
 #include <vector>
@@ -171,33 +172,13 @@ void waiting_for_device_to_reconnect(rs2::context& ctx, rs2::cli::value<std::str
 
 bool is_fw_compatible(const rs2::device& dev, const std::vector< uint8_t >& fw_image)
 {
-    auto upd = dev.as<rs2::updatable>();
-    if ( !upd )
+    if( ! rs2::fw_update::check_fw_compatibility( dev, fw_image ) )
     {
-        throw std::runtime_error("Device could not be used as updatable device");
-    }
-    // checking compatibility bewtween firmware and device
-    if ( !upd.check_firmware_compatibility( fw_image ) )
-    {
-        std::stringstream ss;
-        ss << "This firmware version is not compatible with ";
-        ss << dev.get_info( RS2_CAMERA_INFO_NAME ) << std::endl;
-        std::cout << std::endl << ss.str() << std::endl;
+        std::cout << std::endl << "This firmware version is not compatible with "
+                  << dev.get_info( RS2_CAMERA_INFO_NAME ) << std::endl << std::endl;
         return false;
     }
     return true;
-}
-
-bool is_mipi_device(const rs2::device& dev)
-{
-    bool is_mipi_device = false;
-    if (dev.supports(RS2_CAMERA_INFO_CONNECTION_TYPE))
-    {
-        std::string connection_type = dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE);
-        if (connection_type == "GMSL")
-            is_mipi_device = true;
-    }
-    return is_mipi_device;
 }
 
 int update_recovery_device(rs2::context& ctx, rs2::cli::value<std::string>& file_arg)
@@ -230,7 +211,7 @@ int update_recovery_device(rs2::context& ctx, rs2::cli::value<std::string>& file
     try
     {
         auto update_serial_number = recovery_device.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
-        bool d457_recovery_device = strcmp(recovery_device.get_info(RS2_CAMERA_INFO_PRODUCT_ID), "BBCD") == 0;
+        bool d457_recovery_device = rs2::fw_update::is_mipi_recovery_device(recovery_device);
         volatile bool recovery_device_found = false;
         ctx.set_devices_changed_callback([&](rs2::event_information& info) {
             for (auto&& d : info.get_new_devices())
@@ -275,8 +256,7 @@ int update_recovery_device(rs2::context& ctx, rs2::cli::value<std::string>& file
         std::cout << std::endl << "Recovery done" << std::endl;
         if (d457_recovery_device)
         {
-            std::cout << std::endl << "For GMSL device please reload d4xx driver:" << std::endl;
-            std::cout << "sudo rmmod d4xx && sudo modprobe d4xx" << std::endl;
+            std::cout << std::endl << rs2::fw_update::mipi_recovery_message << std::endl;
             std::cout << "or reboot the system" << std::endl;
         }
         return EXIT_SUCCESS;
@@ -350,7 +330,7 @@ int update_signed_fw(rs2::device& d, const std::vector<uint8_t>& fw_image)
     if (!is_fw_compatible(d, fw_image))
         return EXIT_FAILURE;
 
-    if (!is_mipi_device(d))
+    if (!rs2::fw_update::is_mipi_device(d))
     {
         auto upd = d.as<rs2::updatable>();
         upd.enter_update_state();

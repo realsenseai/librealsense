@@ -67,6 +67,15 @@ rs2_processing_block* rs2_create_yuy_decoder(rs2_error** error);
 rs2_processing_block* rs2_create_m420_decoder(rs2_error** error);
 
 /**
+* Creates NV12 decoder processing block.
+* This block accepts raw NV12 frames and outputs frames of other formats.
+* NV12 is a semi-planar YUV 4:2:0 format: a full-resolution Y plane followed by
+* an interleaved half-resolution U,V plane. 12 bits per pixel.
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+rs2_processing_block* rs2_create_nv12_decoder(rs2_error** error);
+
+/**
 * Creates y411 decoder processing block. This block accepts raw y411 frames and outputs frames in RGB8.
 *     https://www.fourcc.org/pixel-format/yuv-y411/
 * Y411 is disguised as NV12 to allow Linux compatibility. Both are 12bpp encodings that allow high-resolution

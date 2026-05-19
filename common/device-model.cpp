@@ -135,8 +135,7 @@ namespace rs2
         {
             for (auto& kvp : dm->infos)
             {
-                if (kvp.first != "Recommended Firmware Version" &&
-                    kvp.first != "Debug Op Code" &&
+                if (kvp.first != "Debug Op Code" &&
                     kvp.first != "Physical Port" &&
                     kvp.first != "Product Id")
                     ss << "|**" << kvp.first << "**|" << kvp.second << "|\n";
@@ -204,155 +203,6 @@ namespace rs2
         {
             LOG_ERROR("Unknown exception in device_model destructor");
         }
-    }
-
-    bool device_model::should_bundle_fw_be_recommended(const std::string& pid, const std::string& fw, const std::string& recommended_fw_ver) const
-    {
-        bool recommend_fw = false;
-
-        // Don't suggest to update FW as the bundle fw doesn't support
-        std::vector<std::string> recommended_fw_blacklisted_pid;
-        recommended_fw_blacklisted_pid.push_back("1156"); // D436
-        recommended_fw_blacklisted_pid.push_back("ABCC"); // D401_GMSL
-        recommended_fw_blacklisted_pid.push_back("ABCF"); // D415_GMSL
-
-        bool is_pid_backlisted = (std::find(recommended_fw_blacklisted_pid.begin(), recommended_fw_blacklisted_pid.end(), pid)
-                != recommended_fw_blacklisted_pid.end());
-
-        bool is_mipi_device = dev.supports(RS2_CAMERA_INFO_CONNECTION_TYPE)
-                              && (std::string(dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE)) == "GMSL");
-
-        bool is_mipi_recovery = (pid == "BBCD");
-
-        // bellow logic has been added because all mipi devices are update_device
-        if (is_mipi_device)
-        {
-            recommend_fw = is_mipi_recovery || is_upgradeable( fw, recommended_fw_ver);
-        }
-        else
-        {
-            recommend_fw = dev.is<update_device>() || is_upgradeable( fw, recommended_fw_ver);
-        }
-
-        return ( recommend_fw && !is_pid_backlisted );
-    }
-
-
-    bool device_model::check_for_bundled_fw_update(const rs2::context &ctx, std::shared_ptr<notifications_model> not_model , bool reset_delay )
-    {
-        // LibRS can have a "bundled" FW binary downloaded during CMake. That's the version
-        // "available" to us, but it may not be there (e.g., no internet connection to download
-        // it). Lacking an available version, we try to let the user choose a "recommended"
-        // version for download. The recommended version is defined by the device (and comes
-        // from a #define).
-
-        // 'notification_type_is_displayed()' is used to detect if fw_update notification is on to avoid displaying it during FW update process when
-        // the device enters recovery mode
-        std::lock_guard<std::mutex> lock(dev_mutex); // locking to fix a bug where the destructor was called, destroying dev and causing access violation on this thread
-        if (stopping) return false;
-
-        if( ! not_model->notification_type_is_displayed< fw_update_notification_model >()
-            && ( dev.is< updatable >() || dev.is< update_device >() ) )
-        {
-            std::string fw;
-            std::string recommended_fw_ver;
-            int product_line = 0;
-
-            // Override with device info if info is available
-            if (dev.is<updatable>())
-            {
-                fw = dev.supports( RS2_CAMERA_INFO_FIRMWARE_VERSION )
-                       ? dev.get_info( RS2_CAMERA_INFO_FIRMWARE_VERSION )
-                       : "";
-
-                recommended_fw_ver = dev.supports(RS2_CAMERA_INFO_RECOMMENDED_FIRMWARE_VERSION)
-                    ? dev.get_info(RS2_CAMERA_INFO_RECOMMENDED_FIRMWARE_VERSION)
-                    : "";
-            }
-
-            product_line = dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE)
-                ? parse_product_line(dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE))
-                : -1; // invalid product line, will be handled later on
-
-            bool allow_rc_firmware = config_file::instance().get_or_default(
-                configurations::update::allow_rc_firmware,
-                false );
-
-            bool is_rc = ( product_line == RS2_PRODUCT_LINE_D400 ) && allow_rc_firmware;
-            std::string pid = dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
-            std::string available_fw_ver = get_available_firmware_version( product_line, pid);
-            std::shared_ptr< firmware_update_manager > manager = nullptr;
-
-            if( dev.is<update_device>() || is_upgradeable( fw, available_fw_ver) )
-            {
-                recommended_fw_ver = available_fw_ver;
-                auto image = get_default_fw_image(product_line, pid);
-                if (image.empty())
-                {
-                    not_model->add_log("could not detect a bundled FW version for the connected device", RS2_LOG_SEVERITY_WARN);
-                    return false;
-                }
-
-                manager = std::make_shared< firmware_update_manager >( not_model,
-                                                                       *this,
-                                                                       dev,
-                                                                       ctx,
-                                                                       image,
-                                                                       true );
-            }
-
-            auto dev_name = get_device_name(dev);
-            if( should_bundle_fw_be_recommended(pid, fw, recommended_fw_ver) )
-            {
-                std::stringstream msg;
-
-                if (dev.is<update_device>())
-                {
-                    msg << dev_name.first << "\n(S/N " << dev.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID) << ")\n";
-                }
-                else
-                {
-                    msg << dev_name.first << " (S/N " << dev_name.second << ")\n"
-                        << "Current Version: " << fw << "\n";
-                }
-
-                if (is_rc)
-                    msg << "Release Candidate: " << recommended_fw_ver << " Pre-Release";
-                else
-                    msg << "Recommended Version: " << recommended_fw_ver;
-
-                auto n = std::make_shared< fw_update_notification_model >( msg.str(),
-                                                                           manager,
-                                                                           false );
-                // The FW update delay ID include the dismissed recommended version and the device serial number
-                // This way a newer FW recommended version will not be dismissed
-                n->delay_id = "fw_update_alert." + recommended_fw_ver + "." + dev_name.second;
-                n->enable_complex_dismiss = true;
-
-                // If a delay request received in the past, reset it.
-                if( reset_delay ) n->reset_delay();
-
-                if( ! n->is_delayed() )
-                {
-                    not_model->add_notification( n );
-                    related_notifications.push_back( n );
-                    return true;
-                }
-            }
-            else
-            {
-                if( ! fw.empty() && ! recommended_fw_ver.empty() )
-                {
-                    std::stringstream msg;
-                    msg << "Current FW >= Bundled FW for: " << dev_name.first << " (S/N " << dev_name.second << ")\n"
-                        << "Current Version: " << fw << "\n"
-                        << "Recommended Version: " << recommended_fw_ver;
-
-                    not_model->add_log(msg.str(), RS2_LOG_SEVERITY_DEBUG);
-                }
-            }
-        }
-        return false;
     }
 
     void device_model::refresh_notifications(viewer_model& viewer)
@@ -484,6 +334,47 @@ namespace rs2
             LOG_WARNING( "Exception caught trying to detect presets: " << e.what() );
         }
     }
+
+    bool device_model::subdevice_has_inference_stream_enabled( const subdevice_model & sub )
+    {
+        for( auto const & kv : sub.stream_enabled )
+        {
+            if( ! kv.second ) continue;
+            for( auto const & p : sub.profiles )
+                if( p.unique_id() == kv.first && p.stream_type() == RS2_STREAM_OBJECT_DETECTION )
+                    return true;
+        }
+        return false;
+    }
+
+    bool device_model::are_color_and_depth_streaming() const
+    {
+        bool has_color = false, has_depth = false;
+        for( auto const & sub : subdevices )
+        {
+            if( ! sub->streaming ) continue;
+            for( auto const & p : sub->profiles )
+            {
+                if( p.stream_type() == RS2_STREAM_COLOR ) has_color = true;
+                if( p.stream_type() == RS2_STREAM_DEPTH ) has_depth = true;
+            }
+            if( has_color && has_depth ) return true;
+        }
+        return false;
+    }
+
+    void device_model::stop_inference_if_video_stopped( viewer_model & viewer )
+    {
+        // If color or depth are no longer both streaming, stop any inference subdevice that is still running.
+        if( are_color_and_depth_streaming() )
+            return;
+        for( auto & sub : subdevices )
+        {
+            if( sub->streaming && subdevice_has_inference_stream_enabled( *sub ) )
+                sub->stop( viewer.not_model );
+        }
+    }
+
     void device_model::play_defaults(viewer_model& viewer)
     {
         if (!dev_syncer)
@@ -1113,7 +1004,6 @@ namespace rs2
                                                       activated_by_user]() {
             try
             {
-                bool need_to_check_bundle = true;
                 std::string server_url
                     = config_file::instance().get( configurations::update::sw_updates_url );
                 bool use_local_file = false;
@@ -1131,7 +1021,6 @@ namespace rs2
                 bool fail_access_db = false;
                 bool sw_online_update_available = updates_profile.retrieve_updates( sw_update::LIBREALSENSE, fail_access_db);
                 bool fw_online_update_available = updates_profile.retrieve_updates( sw_update::FIRMWARE, fail_access_db);
-                bool fw_bundled_update_available = false;
                 if (sw_online_update_available || fw_online_update_available)
                 {
                     if (auto update_profile = update_profile_protected.lock())
@@ -1149,7 +1038,6 @@ namespace rs2
                             if (auto viewer_updates = updates_model_protected.lock())
                             {
                                 viewer_updates->add_profile(updates_profile_model);
-                                need_to_check_bundle = false;
 
                                 // Log the essential updates
                                 if (auto nm = notification_model_protected.lock())
@@ -1181,11 +1069,7 @@ namespace rs2
                             if (auto viewer_updates = updates_model_protected.lock())
                             {
                                 // Do not create pop ups if the viewer updates windows is on
-                                if (viewer_updates->has_updates())
-                                {
-                                    need_to_check_bundle = false;
-                                }
-                                else
+                                if (! viewer_updates->has_updates())
                                 {
                                     if (sw_online_update_available)
                                     {
@@ -1198,7 +1082,7 @@ namespace rs2
                                     {
                                         if (auto nm = notification_model_protected.lock())
                                         {
-                                            need_to_check_bundle = !handle_online_fw_update( ctx, nm, update_profile , activated_by_user);
+                                            handle_online_fw_update( ctx, nm, update_profile , activated_by_user);
                                         }
                                     }
                                 }
@@ -1221,19 +1105,9 @@ namespace rs2
                         nm->add_log( "No online SW / FW updates available" );
                 }
 
-                // If no on-line updates notification, offer bundled FW update if needed
-                if( need_to_check_bundle
-                    && (bool)config_file::instance().get( configurations::update::recommend_updates ) )
-                {
-                    if( auto nm = notification_model_protected.lock() )
-                    {
-                        fw_bundled_update_available = check_for_bundled_fw_update( ctx, nm , activated_by_user);
-                    }
-                }
-
-                // When no updates available (on-line + bundled), add a notification to indicate "all up to date"
+                // When no online updates available, add a notification to indicate "all up to date"
                 if( activated_by_user && ! fail_access_db && ! sw_online_update_available
-                    && ! fw_online_update_available && ! fw_bundled_update_available )
+                    && ! fw_online_update_available )
                 {
                     auto n = std::make_shared< sw_update_up_to_date_model >();
                     auto name = get_device_name(dev);
@@ -1309,18 +1183,26 @@ namespace rs2
                 std::string path = "";
                 std::string default_path = config_file::instance().get(configurations::record::default_path);
                 if (!ends_with(default_path, "/") && !ends_with(default_path, "\\")) default_path += "/";
-                std::string default_filename = rs2::get_timestamped_file_name() + ".bag";
+#ifdef BUILD_ROSBAG2
+                const char* rec_ext = ".db3";
+                const char* rec_filter = "ROS2-bag\0*.db3\0";
+#else
+                const char* rec_ext = ".bag";
+                const char* rec_filter = "ROS-bag\0*.bag\0";
+#endif
+                std::string default_filename = rs2::get_timestamped_file_name() + rec_ext;
                 if (recording_setting == 0 && default_path.size() > 1 )
                 {
                     path = default_path + default_filename;
                 }
                 else
                 {
-                    if (const char* ret = file_dialog_open(file_dialog_mode::save_file, "ROS-bag\0*.bag\0",
+                    if (const char* ret = file_dialog_open(file_dialog_mode::save_file, rec_filter,
                         default_path.c_str(), default_filename.c_str()))
                     {
                         path = ret;
-                        if (!ends_with(rsutils::string::to_lower(path), ".bag")) path += ".bag";
+                        if (!ends_with(rsutils::string::to_lower(path), rec_ext))
+                            path += rec_ext;
                     }
                 }
 
@@ -1329,7 +1211,7 @@ namespace rs2
         }}, disable_record_button_logic(is_streaming, is_playback_device));
         ImGui::PopFont();
         ImGui::PushFont(window.get_font());
-        if (ImGui::IsItemHovered())
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         {
             std::string record_button_hover_text = get_record_button_hover_text(is_streaming);
             RsImGui::CustomTooltip("%s", record_button_hover_text.c_str());
@@ -1552,7 +1434,7 @@ namespace rs2
 
         ImGui::PushStyleColor(ImGuiCol_Text, record_button_color);
         ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, record_button_color);
-        RsImGui::RsImButton([&]() {ImGui::ButtonEx(is_recording ? "Stop" : "Record", device_panel_icons_size);}, !is_streaming);
+        RsImGui::RsImButton([&]() {ImGui::ButtonEx(is_recording ? "Stop" : "Record", device_panel_icons_size);}, disable_record_button_logic(is_streaming, is_playback_device));
         if (ImGui::IsItemHovered() && is_streaming) window.link_hovered();
         ImGui::PopStyleColor(2);
 
@@ -2468,21 +2350,12 @@ namespace rs2
         {
             ImGui::PushFont(window.get_font());
             int line_h = 22;
-            info_control_panel_height = (int)infos.size() * line_h + 5;
+            info_control_panel_height = (int)infos.size() * line_h + 5 + line_h;
             for (auto&& pair : infos)
             {
                 rc = ImGui::GetCursorPos();
                 ImGui::SetCursorPos({ rc.x + 12, rc.y + 4 });
-                std::string info_category;
-                if (pair.first == "Recommended Firmware Version")
-                {
-                    info_category = "Min FW Version";
-                }
-                else
-                {
-                    info_category = pair.first.c_str();
-                }
-                ImGui::Text("%s:", info_category.c_str());
+                ImGui::Text("%s:", pair.first.c_str());
                 ImGui::SameLine();
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, sensor_bg);
                 ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue);
@@ -2496,6 +2369,11 @@ namespace rs2
                 ImGui::PopStyleColor(3);
                 ImGui::SetCursorPos({ rc.x, rc.y + line_h });
             }
+
+            rc = ImGui::GetCursorPos();
+            ImGui::SetCursorPos({ rc.x + 12, rc.y + 4 });
+            std::string download_label = rsutils::string::from() << "Download firmware...##" << id;
+            hyperlink(window, download_label.c_str(), fw_download_url());
 
             ImGui::SetCursorPos({ rc.x + 225, rc.y - 107 });
             ImGui::PopFont();
@@ -2577,6 +2455,11 @@ namespace rs2
                         }
                         if (can_stream)
                         {
+                            // Disable the start button for inference streams unless color and depth are already streaming.
+                            bool disable_inference = subdevice_has_inference_stream_enabled( *sub ) && ! are_color_and_depth_streaming();
+                            if( disable_inference )
+                                ImGui::BeginDisabled();
+
                             if( ImGui::Button( label.c_str(), button_size ) )
                             {
                                 if (profiles.empty()) // profiles might be already filled
@@ -2610,7 +2493,13 @@ namespace rs2
                                     viewer.begin_stream(sub, profile);
                                 }
                             }
-                            if (ImGui::IsItemHovered())
+                            if( disable_inference )
+                            {
+                                ImGui::EndDisabled();
+                                if( ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
+                                    RsImGui::CustomTooltip( "Color and Depth streams must be streaming before starting inference" );
+                            }
+                            else if (ImGui::IsItemHovered())
                             {
                                 window.link_hovered();
                                 RsImGui::CustomTooltip("Start streaming data from this sensor");
@@ -2628,6 +2517,7 @@ namespace rs2
                         if( ImGui::Button( label.c_str(), button_size ) )
                         {
                             sub->stop(viewer.not_model);
+                            stop_inference_if_video_stopped( viewer );
                             std::string friendly_name = sub->s->get_info(RS2_CAMERA_INFO_NAME);
                             if ((friendly_name.find("Tracking") != std::string::npos) ||
                                 (friendly_name.find("Motion") != std::string::npos))
@@ -2932,6 +2822,16 @@ namespace rs2
                     draw_later.push_back([windows_width, &window, sub, pos, &viewer, this, pb]() {
                         ImGui::SetCursorPos({ windows_width - 42, pos.y - 3 });
 
+                        const bool pb_available = pb->is_available();
+                        // RAII guard pairing BeginDisabled/EndDisabled: keeps them balanced
+                        // even if an exception is thrown between begin and the explicit end()
+                        // call below (which runs before the tooltip hover check).
+                        struct disable_guard {
+                            bool active, ended;
+                            disable_guard( bool a ) : active( a ), ended( false ) { if( active ) ImGui::BeginDisabled( true ); }
+                            void end() { if( active && !ended ) { ended = true; ImGui::EndDisabled(); } }
+                            ~disable_guard() { end(); }
+                        } dg( !pb_available );
                         try
                         {
                             ImGui::PushFont(window.get_font());
@@ -3013,6 +2913,11 @@ namespace rs2
                                     }
                                 }
                             }
+
+                            dg.end();
+                            if( !pb_available && !pb->unavailable_tooltip.empty()
+                                && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
+                                RsImGui::CustomTooltip( "%s", pb->unavailable_tooltip.c_str() );
 
                             ImGui::PopStyleColor(5);
                             ImGui::PopFont();

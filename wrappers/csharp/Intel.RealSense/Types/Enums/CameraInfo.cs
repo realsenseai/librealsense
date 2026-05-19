@@ -41,5 +41,32 @@ namespace Intel.RealSense
 
         /// <summary> Designated USB specification: USB2/USB3</summary>
         UsbTypeDescriptor = 9,
+
+        /// <summary> Device product line D400, etc.</summary>
+        ProductLine = 10,
+
+        /// <summary> ASIC serial number</summary>
+        AsicSerialNumber = 11,
+
+        /// <summary> Firmware update ID</summary>
+        FirmwareUpdateId = 12,
+
+        /// <summary> IP address for remote camera</summary>
+        IpAddress = 13,
+
+        /// <summary> DFU Device node path</summary>
+        DfuDevicePath = 14,
+
+        /// <summary> Connection type, for example USB, GMSL, DDS</summary>
+        ConnectionType = 15,
+
+        /// <summary> Safety MCU FW Version</summary>
+        SmcuFwVersion = 16,
+
+        /// <summary> IMU Type</summary>
+        ImuType = 17,
+
+        /// <summary> MIPI driver version (Jetson platform only)</summary>
+        MipiDriverVersion = 18,
     }
 }

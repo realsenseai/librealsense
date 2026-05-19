@@ -196,7 +196,7 @@ rs-pointcloud-stitching.exe C:\pc_stitching_ws calibration_60m.cfg
 [Download Full Resolution video](https://librealsense.realsenseai.com/rs-tests/TestData/pc-stitching-demo-guide/rs-pointcloud-stitching.mp4)
 </br>
 You can now see live depth and color images as if taken from the virtual device.
-The application project the original images onto the virtual device. You can record this device and play it back using Intel's realsense-viewer app.
+The application project the original images onto the virtual device. You can record this device and play it back using the realsense-viewer app.
 Use the "Record" button to start and stop a recording session. It starts recording when its caption is changed to "Stop Recording" suggesting that the next press on it will stop the recording process.
 The file ["record.bag"](https://librealsense.realsenseai.com/rs-tests/TestData/pc-stitching-demo-guide/record.bag) is saved under the given working directory. In this example: `C:\pc_stitching_ws\record.bag`</br>
 You can now open realsense-viewer, choose "Add source->Load recorded sequence" and choose `C:\pc_stitching_ws\record.bag`. Switch to 3D view and watch the pointcloud of the extended scene.

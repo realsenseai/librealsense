@@ -5,6 +5,7 @@
 #include <string>
 #include <fstream>
 #include "d400-mipi-device.h"
+#include "librealsense-exception.h"
 
 namespace librealsense
 {
@@ -18,12 +19,6 @@ namespace librealsense
     {
         options_watcher_pause_guard guard(*this);
         d400_device::hardware_reset();
-        simulate_device_reconnect(this->get_device_info());
-    }
-
-    void d400_mipi_device::toggle_advanced_mode(bool enable)
-    {
-        ds_advanced_mode_base::toggle_advanced_mode(enable);
         simulate_device_reconnect(this->get_device_info());
     }
 
@@ -43,7 +38,7 @@ namespace librealsense
                     {
                         strong->invoke_devices_changed_callbacks(devs, {});
                         // MIPI devices do not re-enumerate so we need to give them some time to restart
-                        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+                        std::this_thread::sleep_for(std::chrono::seconds(5));
                     }
                     if (auto strong = ctx.lock())
                         strong->invoke_devices_changed_callbacks({}, devs);
@@ -67,14 +62,17 @@ namespace librealsense
                     (RS2_CAMERA_INFO_PHYSICAL_PORT):(RS2_CAMERA_INFO_DFU_DEVICE_PATH);
 
         // Write signed firmware to appropriate file descriptor
-        std::ofstream fw_path_in_device(get_info(_dfu_port_info), std::ios::binary);
+        std::string dfu_path = get_info(_dfu_port_info);
+        std::ofstream fw_path_in_device(dfu_path, std::ios::binary);
         if (fw_path_in_device)
         {
-            bool burn_done = false;
+            // Progress thread runs for the full ~95 seconds to give the device
+            // time to process the firmware. The write may return instantly (OS
+            // buffering) but the device still needs time to burn.
             std::thread show_progress_thread(
                 [&]()
                 {
-                    for( int i = 0; i < 95 && !burn_done; ++i ) // Show percentage [0-100]
+                    for( int i = 0; i < 95; ++i ) // Show percentage [0-95]
                     {
                         if (callback)
                             callback->on_update_progress(static_cast<float>(i) / 100.f);
@@ -84,16 +82,23 @@ namespace librealsense
                 } );
 
             fw_path_in_device.write(reinterpret_cast<const char*>(image.data()), image.size());
-            burn_done = true;
+            fw_path_in_device.flush();
             show_progress_thread.join();
+
+            if( ! fw_path_in_device.good() )
+                throw librealsense::io_exception( "Firmware write to DFU path failed: " + dfu_path );
         }
         else
         {
-            LOG_WARNING("Firmware Update failed - wrong path or permissions missing");
-            return;
+            throw librealsense::io_exception("Firmware Update failed - DFU path: " + dfu_path
+                + " - wrong path or permissions missing");
         }
-        LOG_INFO("FW update process completed successfully.");
+
         fw_path_in_device.close();
+        if( ! fw_path_in_device )
+            throw librealsense::io_exception( "Firmware flush/close failed on DFU path: " + dfu_path );
+
+        LOG_INFO("FW update process completed successfully.");
 
         if (callback)
             callback->on_update_progress(0.95f);
@@ -104,8 +109,9 @@ namespace librealsense
                      "and restart the realsense-viewer");
         }
         // Restart the device to reconstruct with the new version information
+        // simulate_device_reconnect takes 5 seconds to fake the reconnect cycle
         hardware_reset();
-        std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
+        std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
         if (callback)
             callback->on_update_progress(1.f);
     }

@@ -309,19 +309,19 @@ namespace librealsense
         occupancy_grid_params(const json &j)
         {
             validate_json(j);
-            m_grid_cell_seed = j.at("grid_cell_seed");
-            m_close_range_quorum = j.at("close_range_quorum");
-            m_mid_range_quorum = j.at("mid_range_quorum");
-            m_long_range_quorum = j.at("long_range_quorum");
+            m_grid_cell_size = j.at("grid_cell_size");
+            m_cell_threshold_factor = j.at("cell_threshold_factor").get<float>();
+            m_polynomial_bias = j.at("polynomial_bias").get<float>();
+            m_surface_height = j.at("surface_height").get<float>();
         }
 
         json to_json() const
         {
             json j;
-            j["grid_cell_seed"] = m_grid_cell_seed;
-            j["close_range_quorum"] = m_close_range_quorum;
-            j["mid_range_quorum"] = m_mid_range_quorum;
-            j["long_range_quorum"] = m_long_range_quorum;
+            j["grid_cell_size"] = m_grid_cell_size;
+            j["cell_threshold_factor"] = m_cell_threshold_factor;
+            j["polynomial_bias"] = m_polynomial_bias;
+            j["surface_height"] = m_surface_height;
             return j;
         }
 
@@ -332,7 +332,7 @@ namespace librealsense
             {
                 throw librealsense::invalid_value_exception("Invalid occupancy_grid_params format");
             }
-            for (const auto &field : {"grid_cell_seed", "close_range_quorum", "mid_range_quorum", "long_range_quorum"})
+            for (const auto &field : {"grid_cell_size", "cell_threshold_factor", "polynomial_bias", "surface_height"})
             {
                 if (!j.contains(field))
                 {
@@ -341,10 +341,10 @@ namespace librealsense
             }
         }
 
-        uint16_t m_grid_cell_seed;
-        uint8_t m_close_range_quorum;
-        uint8_t m_mid_range_quorum;
-        uint8_t m_long_range_quorum;
+        uint16_t m_grid_cell_size;
+        float m_cell_threshold_factor;
+        float m_polynomial_bias;
+        float m_surface_height;
     };
 
     class smcu_arbitration_params
@@ -515,8 +515,10 @@ namespace librealsense
         occupancy_grid_params m_occupancy_grid_params;
         smcu_arbitration_params m_smcu_arbitration_params;
         std::array<uint8_t, 32> m_crypto_signature; // SHA2 or similar
-        std::array<uint8_t, 17> m_reserved2 = {0};  // Can be modified by changing the table minor version, without breaking back-compat
+        std::array<uint8_t, 324> m_reserved2 = {0};
     };
+    static_assert(sizeof(safety_interface_config) == 464,
+                  "safety_interface_config must remain 464 bytes to match the v0.95 flash table layout");
 
     /***
      *  safety_interface_config_with_header class

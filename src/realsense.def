@@ -92,6 +92,8 @@ EXPORTS
     rs2_frame_add_ref
     rs2_pose_frame_get_pose_data
     rs2_extract_target_dimensions
+    rs2_get_frame_object_detection_count
+    rs2_get_frame_object_detection
 
     rs2_get_option
     rs2_get_option_value
@@ -217,6 +219,7 @@ EXPORTS
     rs2_create_colorizer
     rs2_create_yuy_decoder
     rs2_create_m420_decoder
+    rs2_create_nv12_decoder
     rs2_create_threshold
     rs2_create_units_transform
     rs2_create_decimation_filter_block
@@ -298,6 +301,7 @@ EXPORTS
     rs2_playback_device_get_current_status
     rs2_playback_device_set_playback_speed
     rs2_playback_device_stop
+    rs2_convert_bag_to_db3
 
     rs2_create_align
 
@@ -356,6 +360,8 @@ EXPORTS
     rs2_software_sensor_add_motion_stream_ex
     rs2_software_sensor_add_pose_stream
     rs2_software_sensor_add_pose_stream_ex
+    rs2_software_sensor_add_inference_stream
+    rs2_software_sensor_add_inference_stream_ex
     rs2_software_sensor_add_read_only_option
     rs2_software_sensor_update_read_only_option
     rs2_software_sensor_add_option

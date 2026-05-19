@@ -46,10 +46,10 @@ namespace rs2
         std::function<bool( option_model&, std::string&, notifications_model& )> custom_draw_method = nullptr;
         bool edit_mode = false;
         std::string edit_value;
-    private:
         bool is_all_integers() const;
         bool is_enum() const;
         bool is_checkbox() const;
+    private:
         bool draw_checkbox( notifications_model& model, std::string& error_message, const char* description );
         bool draw_combobox( notifications_model& model, std::string& error_message, const char* description, bool new_line, bool use_option_name );
         bool draw_slider( notifications_model& model, std::string& error_message, const char* description, bool use_cm_units );

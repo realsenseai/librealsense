@@ -107,6 +107,18 @@ void rs2_context_remove_device(rs2_context* ctx, const char* file, rs2_error** e
 void rs2_context_unload_tracking_module(rs2_context* ctx, rs2_error** error);
 
 /**
+* Converts a legacy ROS1 .bag recording file to a ROS2 .db3 file.
+* \param[in] input_bag_path   Path to the input .bag file
+* \param[in] output_db3_path  Path for the output .db3 file
+* \param[in] ctx              A RealSense context
+* \param[in] callback         Optional progress callback, receives a float in [0,1]
+* \param[in] client_data      User data passed to the callback
+* \param[out] error           If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_convert_bag_to_db3(const char* input_bag_path, const char* output_db3_path, const rs2_context* ctx,
+                            rs2_update_progress_callback_ptr callback, void* client_data, rs2_error** error);
+
+/**
 * create a static snapshot of all connected devices at the time of the call
 * \param context     Object representing librealsense session
 * \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored

@@ -6,7 +6,8 @@
 #include "playback-device-info.h"
 #include "core/motion.h"
 #include "stream.h"
-#include "media/ros/ros_reader.h"
+#include "media/ros_factory.h"
+#include "media/ros_common.h"
 #include "environment.h"
 #include "sync.h"
 #include <src/depth-sensor.h>
@@ -19,6 +20,7 @@
 
 
 using namespace librealsense;
+using namespace device_serializer;
 
 static bool is_video_stream( rs2_stream stream )
 {
@@ -29,7 +31,7 @@ std::shared_ptr< device_interface > playback_device_info::create_device()
 {
     auto playback_dev
         = std::make_shared< playback_device >( shared_from_this(),
-                                               std::make_shared< ros_reader >( _filename, get_context() ) );
+                                               create_reader_for_file( _filename, get_context() ) );
     return playback_dev;
 }
 

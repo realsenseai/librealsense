@@ -9,7 +9,9 @@ rs2::config cfg;
 cfg.enable_device_from_file(<filename>);
 pipe.start(cfg); // Load from file
 ```
-`*.bag` files contain uncompressed and unfiltered data and hence tend to be rather large (in the order of 100 MB per one second of recording). Our file-format is an extension of open [ROS-bag](http://wiki.ros.org/rosbag) format, meaning they can also be opened using existing robotics tools like [rqt-bag](http://wiki.ros.org/rqt_bag)
+> **Note:** The sample files below are in the legacy ROS1 `.bag` format. New recordings use the `.db3` (ROS2 rosbag2) format. You can convert `.bag` files to `.db3` using `rs-convert -i file.bag -D file.db3`.
+
+`*.bag` files contain uncompressed and unfiltered data and hence tend to be rather large (in the order of 100 MB per one second of recording). The legacy `.bag` format is an extension of open [ROS-bag](http://wiki.ros.org/rosbag) format, meaning they can also be opened using existing robotics tools like [rqt-bag](http://wiki.ros.org/rqt_bag)
 
 
 > **Disclaimer**: The files below are not official marketing material. These are captured using pre-production hardware with the sole purpose of helping developers, makers and students get started with RealSense technology

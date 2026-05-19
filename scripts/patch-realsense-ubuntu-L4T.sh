@@ -79,38 +79,42 @@ fi
 #Select the kernel patches revision that matches the paltform configuration
 RELEASE_STRING="release"
 case ${JETSON_L4T_VERSION} in
-	"32.2.1" | "32.2.3" | "32.3.1" | "32.4.3")
-		PATCHES_REV="4.4"		# Baseline for the patches
+	32.2.1 | 32.2.3 | 32.3.1 | 32.4.3)
+		PATCHES_REV=4.4		# Baseline for the patches
 		echo -e "\e[32mNote: the patch makes changes to kernel device tree to support HID IMU sensors\e[0m"
 	;;
-	"32.4.4" | "32.5" | "32.5.1" | "32.6.1" | "32.7.1")
-		PATCHES_REV="4.4.1"	# JP 4.4.1, 32.7.1 is JP 4.6.1
+	32.4.4 | 32.5 | 32.5.1 | 32.6.1 | 32.7.1)
+		PATCHES_REV=4.4.1	# JP 4.4.1, 32.7.1 is JP 4.6.1
 	;;
-	"35.1" | "35.4.1")
-		PATCHES_REV="5.0"	# JP 5.0.2, JP 5.1.2
-		KERNEL_RELEASE="5.10"
-		[[ $JETSON_L4T_VERSION = "35.1" ]] && RELEASE_STRING="Release"
+	35.1 | 35.4.1 | 35.6.4)
+		# 35.1 --> JP 5.0.2
+		# 35.4.1 --> JP 5.1.2
+		# 35.6.4 --> JP 5.1.6
+		PATCHES_REV=5.0
+		KERNEL_RELEASE=5.10
+		[[ $JETSON_L4T_VERSION = 35.1 ]] && RELEASE_STRING="Release"
 		KBASE=./Tegra/kernel/kernel-$KERNEL_RELEASE
 	;;
-	"36.3" | "36.4" | "36.4.3" | "36.4.4" | "36.4.7")
-		# 36.3 --> 6.0
-		# 36.4 -> 6.1
-		# 36.4.3 --> 6.2
-		# 36.4.4, 36.4.7 --> 6.2.1
-		PATCHES_REV="6.0"
-		KERNEL_RELEASE="5.15"
+	36.3 | 36.4 | 36.4.3 | 36.4.4 | 36.4.7 | 36.5)
+		# 36.3 --> JP 6.0
+		# 36.4 -> JP 6.1
+		# 36.4.3 --> JP 6.2
+		# 36.4.4, 36.4.7 --> JP 6.2.1
+		# 36.5 --> JP 6.2.2
+		PATCHES_REV=6.0
+		KERNEL_RELEASE=5.15
 		UBUNTU_CODENAME=jammy
 		KBASE=./Tegra/kernel/kernel-${UBUNTU_CODENAME}-src
 	;;
-	"38.2" | "38.2.1" | "38.2.2")
+	38.2 | 38.2.1 | 38.2.2)
 		# for revisions 38 licence link is inconsistent
-		JETSON_L4T_REVISION_LONG="2.0"
-		# 38.2 --> 7.0
+		JETSON_L4T_REVISION_LONG=2.0
+		# 38.2 --> JP 7.0
 		;&
-	"38.4")
-		# 38.4 --> 7.1
-		PATCHES_REV="7.0"
-		KERNEL_RELEASE="6.8"
+	38.4)
+		# 38.4 --> JP 7.1
+		PATCHES_REV=7.0
+		KERNEL_RELEASE=6.8
 		UBUNTU_CODENAME=noble
 		KBASE=./Tegra/kernel/kernel-${UBUNTU_CODENAME}-src
 	;;
@@ -200,6 +204,7 @@ if version_lt "${PATCHES_REV}" "6.0"; then
 	patch -p1 < ./LRS_Patches/05-realsense-powerlinefrequency-control-fix.patch
 else
 	patch -p1 < ${sdk_dir}/scripts/realsense-camera-formats-"${UBUNTU_CODENAME}"-master.patch
+	patch -p1 < ${sdk_dir}/scripts/realsense-metadata-"${UBUNTU_CODENAME}"-master.patch
 	[[ -f ${sdk_dir}/scripts/realsense-powerlinefrequency-control-fix-"${UBUNTU_CODENAME}".patch ]] \
 		&& patch -p1 < ${sdk_dir}/scripts/realsense-powerlinefrequency-control-fix-"${UBUNTU_CODENAME}".patch
 	[[ -f ${sdk_dir}/scripts/makefile-${UBUNTU_CODENAME}-${PATCHES_REV}.patch ]] \
@@ -232,7 +237,9 @@ if version_lt "$PATCHES_REV" "6.0"; then # for JetPack 4-5
 else
 	echo -e "\e[32mCompiling hid support, accelerometer and gyro modules\e[0m"
 	make -j$(($(nproc)-1)) M=drivers/hid modules
-	KBUILD_EXTRA_SYMBOLS+=" drivers/hid/Module.symvers"
+	if [[ -n ${KBUILD_EXTRA_SYMBOLS} ]]; then
+		grep -w drivers/hid/hid-sensor-hub ${KBUILD_EXTRA_SYMBOLS} || KBUILD_EXTRA_SYMBOLS+=" drivers/hid/Module.symvers"
+	fi
 	make -j$(($(nproc)-1)) M=drivers/iio modules
 fi
 if [[ "$PATCHES_REV" = "4.4" ]]; then # for JetPack 4.4 only

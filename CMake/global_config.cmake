@@ -62,6 +62,8 @@ macro(global_set_flags)
     if (BUILD_WITH_HIP)
         add_definitions(-DRS2_USE_CUDA)
         add_definitions(-DRS2_USE_HIP)
+    if (BUILD_WITH_NEON)
+        add_definitions(-DBUILD_WITH_NEON)
     endif()
 
     if (BUILD_SHARED_LIBS)
@@ -114,9 +116,6 @@ macro(global_target_config)
     target_include_directories(${LRS_TARGET}
         PRIVATE
             src
-            ${ROSBAG_HEADER_DIRS}
-            ${BOOST_INCLUDE_PATH}
-            ${LZ4_INCLUDE_PATH}
             ${LIBUSB_LOCAL_INCLUDE_PATH}
         PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

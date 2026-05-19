@@ -17,6 +17,7 @@
 #include <array>
 #include <unordered_map>
 #include <fstream>
+#include <future>
 
 #include "objects-in-frame.h"
 #include "processing-block-model.h"
@@ -110,6 +111,7 @@ namespace rs2
         bool is_paused() const;
         void pause();
         void resume();
+        void wait_for_stop();
 
         void update_ui(std::vector<stream_profile> profiles_vec);
         void get_sorted_profiles(std::vector<stream_profile>& profiles);
@@ -207,6 +209,7 @@ namespace rs2
         std::shared_ptr<rs2::colorizer> depth_colorizer;
         std::shared_ptr<rs2::yuy_decoder> yuy2rgb;
         std::shared_ptr<rs2::m420_decoder> m420_to_rgb;
+        std::shared_ptr<rs2::nv12_decoder> nv12_to_rgb;
         std::shared_ptr<rs2::y411_decoder> y411;
 
         std::vector<std::shared_ptr<processing_block_model>> post_processing;
@@ -238,6 +241,7 @@ namespace rs2
         void set_extrinsics_from_depth_if_needed();
         bool is_post_processing_enabled_in_config_file() const;
         void avoid_streaming_on_embedded_filters_not_matching_configuration() const;
+        bool hide_resolutions(const stream_profile& profile) const;
         // used in method get_max_resolution per stream
         std::map<rs2_stream, std::vector<std::pair<int, int>>> resolutions_per_stream;
 
@@ -245,5 +249,7 @@ namespace rs2
         const float SHORT_RANGE_MAX_DISTANCE = 4.0f;  // 4 meters
         rs2_extrinsics _extrinsics_from_depth;
         std::atomic_bool _destructing;
+        std::mutex _stop_mutex;
+        std::future<void> _stop_future;
     };
 }

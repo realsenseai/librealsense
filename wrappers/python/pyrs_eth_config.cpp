@@ -35,8 +35,8 @@ void init_eth_config(py::module &m) {
         .value( "dynamic_usb_first", RS2_LINK_PRIORITY_DYNAMIC_USB_FIRST );
 
     // Bind the eth_config_device class
-    py::class_< rs2::eth_config_device, rs2::device > eth_config_device( m, "eth_config_device",
-                                                                         "Ethernet configuration extension for devices that support ethernet configuration");
+    py::class_< rs2::eth_config_device, rs2::device, py_holder<rs2::eth_config_device> > eth_config_device( m, "eth_config_device",
+                                                                                                            "Ethernet configuration extension for devices that support ethernet configuration");
     eth_config_device.def( py::init< rs2::device >(), "device"_a, "Create eth_config_device from regular device" )
         .def( "supports_eth_config", &rs2::eth_config_device::supports_eth_config, "Check if device supports ethernet configuration" )
         .def( "get_link_speed", &rs2::eth_config_device::get_link_speed, "Get Ethernet link speed, 0 if not linked" )

@@ -128,7 +128,6 @@ namespace librealsense
 
         std::shared_ptr<hw_monitor_extended_buffers> _hw_monitor;
         firmware_version _fw_version;
-        firmware_version _recommended_fw_version;
         ds::ds_caps _device_capabilities;
 
         std::shared_ptr<stream_interface> _depth_stream;

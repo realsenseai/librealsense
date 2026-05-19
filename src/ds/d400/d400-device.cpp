@@ -29,7 +29,6 @@
 
 #include <src/hdr-config.h>
 #include <src/ds/ds-thermal-monitor.h>
-#include <common/fw/firmware-version.h>
 #include <src/fw-update/fw-update-unsigned.h>
 
 #include <rsutils/lazy.h>
@@ -472,7 +471,7 @@ namespace librealsense
         if( 0x2 == gvd_buf[d400_gvd_offsets::depth_sensor_type] )
             val |= ds_caps::CAP_GLOBAL_SHUTTER;   // e.g. AWGC
         // Option INTER_CAM_SYNC_MODE is not enabled in D405
-        if (_pid != ds::RS405_PID)
+        if (is_d401_usb_device( gvd_buf[d400_gvd_offsets::hw_type_offset] ) || _pid != ds::RS405_PID)
             val |= ds_caps::CAP_INTERCAM_HW_SYNC;
         if (gvd_buf[d400_gvd_offsets::ip65_sealed_offset] == 0x1)
             val |= ds_caps::CAP_IP65;
@@ -610,6 +609,17 @@ namespace librealsense
 
         using namespace platform;
 
+        rsutils::version mipi_driver_version;
+        // Register MIPI driver version for Jetson platform (GMSL devices only)
+        if (_is_mipi_device)
+        {
+            auto uvc_dev = raw_depth_sensor->get_uvc_device();
+            if (uvc_dev && uvc_dev->is_platform_jetson())
+            {
+                mipi_driver_version = platform::get_jetson_driver_version();
+            }
+        }
+
         // minimal firmware version in which hdr feature is supported
         firmware_version hdr_firmware_version("5.12.8.100");
 
@@ -624,10 +634,9 @@ namespace librealsense
 
             _fw_version = firmware_version(fwv);
 
-            _recommended_fw_version = firmware_version(D4XX_RECOMMENDED_FIRMWARE_VERSION);
             if (_fw_version >= firmware_version("5.10.4.0"))
                 _device_capabilities = parse_device_capabilities( gvd_buff );
-        
+
             set_imu_type();
 
             //D457 Development
@@ -900,12 +909,18 @@ namespace librealsense
                 {
                     depth_sensor.register_option(RS2_OPTION_EMITTER_ON_OFF, alternating_emitter_opt);
                 }
-
             }
 
             if ((_device_capabilities & ds_caps::CAP_INTERCAM_HW_SYNC) == ds_caps::CAP_INTERCAM_HW_SYNC)
             {
-                if (_fw_version >= firmware_version("5.12.12.100") && (_device_capabilities & ds_caps::CAP_GLOBAL_SHUTTER) == ds_caps::CAP_GLOBAL_SHUTTER)
+                if(_fw_version >= firmware_version("5.17.2.5") &&
+                    (!_is_mipi_device || mipi_driver_version >= rsutils::version("1.0.2.6")))
+                {
+                    auto external_sync_xu_control = std::make_shared<uvc_xu_option<uint8_t>>( raw_depth_sensor, depth_xu,
+                                                                                       DS5_EXTERNAL_SYNC, "External sync");
+                    depth_sensor.register_option( RS2_OPTION_INTER_CAM_SYNC_MODE, external_sync_xu_control );
+                }
+                else if (_fw_version >= firmware_version("5.12.12.100") && (_device_capabilities & ds_caps::CAP_GLOBAL_SHUTTER) == ds_caps::CAP_GLOBAL_SHUTTER)
                 {
                     depth_sensor.register_option(RS2_OPTION_INTER_CAM_SYNC_MODE,
                         std::make_shared<external_sync_mode>(*_hw_monitor, raw_depth_sensor, 3));
@@ -970,7 +985,6 @@ namespace librealsense
             // used for mipi device
             register_metadata_mipi(depth_sensor, hdr_firmware_version);
         }
-        //mipi
 
         register_info(RS2_CAMERA_INFO_NAME, device_name);
         register_info(RS2_CAMERA_INFO_SERIAL_NUMBER, optic_serial);
@@ -982,9 +996,9 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_ADVANCED_MODE, ((advanced_mode) ? "YES" : "NO"));
         register_info(RS2_CAMERA_INFO_PRODUCT_ID, pid_hex_str);
         register_info(RS2_CAMERA_INFO_PRODUCT_LINE, "D400");
-        register_info(RS2_CAMERA_INFO_RECOMMENDED_FIRMWARE_VERSION, _recommended_fw_version);
         register_info(RS2_CAMERA_INFO_CAMERA_LOCKED, _is_locked ? "YES" : "NO");
-        register_info(RS2_CAMERA_INFO_DFU_DEVICE_PATH, group.uvc_devices.front().dfu_device_path);
+        if (_is_mipi_device)
+            register_info(RS2_CAMERA_INFO_DFU_DEVICE_PATH, group.uvc_devices.front().dfu_device_path);
         register_info(RS2_CAMERA_INFO_IMU_TYPE, _imu_type);
 
         if (usb_modality)
@@ -993,7 +1007,21 @@ namespace librealsense
             register_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR, usb_type_str);
         }
         else
+        {
             register_info(RS2_CAMERA_INFO_CONNECTION_TYPE, "GMSL");
+            if (mipi_driver_version.is_valid())
+            {
+                register_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION, mipi_driver_version.to_string());
+
+                // Log driver version only once across all devices
+                static bool logged = false;
+                if (!logged)
+                {
+                    LOG_INFO("MIPI driver version detected: " << mipi_driver_version.to_string());
+                    logged = true;
+                }
+            }
+        }
 
         std::string curr_version= _fw_version;
 
@@ -1009,7 +1037,6 @@ namespace librealsense
     void d400_device::register_features()
     {
         firmware_version fw_ver = firmware_version( get_info( RS2_CAMERA_INFO_FIRMWARE_VERSION ) );
-        auto pid = get_pid();
 
         if( val_in_range( _pid, { ds::RS455_PID, ds::RS457_PID } )
             && fw_ver >= firmware_version( 5, 14, 0, 0 ) )
@@ -1023,7 +1050,9 @@ namespace librealsense
 
         register_feature( std::make_shared< auto_exposure_roi_feature >( get_depth_sensor(), _hw_monitor ) );
 
-        if( !_is_mipi_device && fw_ver >= firmware_version( 5, 12, 10, 11 ) )
+        // ae / gain limit feature is not supported on rolling-shutter
+        if( fw_ver >= firmware_version( 5, 12, 10, 11 )
+            && ( _device_capabilities & ds::ds_caps::CAP_GLOBAL_SHUTTER ) == ds::ds_caps::CAP_GLOBAL_SHUTTER )
         {
             register_feature(
                 std::make_shared< auto_exposure_limit_feature >( get_depth_sensor(), d400_device::_hw_monitor ) );

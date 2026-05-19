@@ -46,9 +46,8 @@ namespace Intel.RealSense
             }
 
             // check for manual options setting
-            var sensors = device.QuerySensors();
-            var depthSensor = sensors[0];
-            var colorSensor = sensors[1];
+            var depthSensor = device.FirstDepthSensor();
+            var colorSensor = device.FirstColorSensor();
             Console.WriteLine($"\nManulally read options:");
             Console.WriteLine($"--------------------------------------------------");            
             Console.WriteLine($"DEPTH OPTIONS:");

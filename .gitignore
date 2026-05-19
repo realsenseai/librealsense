@@ -7,6 +7,8 @@ ubuntu-focal-master/
 
 .gitconfig
 
+BrainStemLog.txt
+
 
 # Docs
 doc/doxygen/html/
@@ -92,8 +94,13 @@ librealsense-log.txt
 *.ini
 *.cxx
 
+# React viewer config files (override the repo-wide *.json rule)
+!wrappers/rest-api/tools/react-viewer/**/*.json
+
 .vscode/*
 /unit-tests/.idea
 
 # agents
 .github/agents/
+
+unit-tests/logs/pytest-results.xml

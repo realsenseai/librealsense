@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.10)
 
 set( LRS_TARGET realsense2 )
@@ -14,12 +13,6 @@ include(CMake/connectivity_check.cmake)
 if(${FORCE_LIBUVC} OR ${FORCE_WINUSB_UVC} OR ${ANDROID_USB_HOST_UVC})
     MESSAGE(DEPRECATION "FORCE_LIBUVC, FORCE_WINUSB_UVC and ANDROID_USB_HOST_UVC are deprecated, use FORCE_RSUSB_BACKEND instead")
     set(FORCE_RSUSB_BACKEND ON)
-endif()
-
-# Checking Internet connection, as DEPTH CAM needs to download the FW from amazon cloud
-if(IMPORT_DEPTH_CAM_FW AND NOT INTERNET_CONNECTION)
-    message(WARNING "No internet connection, disabling IMPORT_DEPTH_CAM_FW")
-    set(IMPORT_DEPTH_CAM_FW OFF)
 endif()
 
 if (BUILD_PC_STITCHING AND NOT BUILD_GLSL_EXTENSIONS)
@@ -76,6 +69,13 @@ if(BUILD_WITH_DDS)
 	include(CMake/external_fastdds.cmake)
 
 	target_link_libraries( ${LRS_TARGET} PRIVATE realdds )
+else()
+    if(BUILD_ROSBAG2)
+        # Even without full DDS support, we need fastcdr for ROS2 bag file serialization
+        message(STATUS "Building with FastCDR for ROS2 bag support")
+        include(CMake/external_fastcdr.cmake)
+        target_link_libraries( ${LRS_TARGET} PRIVATE fastcdr )
+    endif()
 endif()
 
 # configure the project according to OS specific requirments
@@ -109,10 +109,6 @@ endif()
 if(BUILD_UNIT_TESTS)
     include( CMake/external_catch2.cmake )
     add_subdirectory(unit-tests)
-endif()
-
-if(IMPORT_DEPTH_CAM_FW)
-    add_subdirectory(common/fw)
 endif()
 
 include(CMake/embedd_udev_rules.cmake)

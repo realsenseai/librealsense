@@ -1,3 +1,6 @@
+# License: Apache 2.0. See LICENSE file in root directory.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
 """
 Mock implementation of pyrealsense2 for testing purposes.
 This mock implements all the classes and functions used in rs_manager.py.
@@ -194,6 +197,9 @@ class sensor:
 
     def is_depth_sensor(self):
         return False
+
+    def get_recommended_filters(self):
+        return []
 
     def is_color_sensor(self):
         return False

@@ -22,11 +22,25 @@ jobs:
 
 
   #--------------------------------------------------------------------------------
+  Infra_Tests:  # Pytest infrastructure regression tests (no build, no devices)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+
+    - name: Install
+      run: pip3 install -r unit-tests/requirements.txt
+
+    - name: Run infra tests
+      run: cd unit-tests && python3 -m pytest infra-tests/ -v
+
+
+  #--------------------------------------------------------------------------------
   Win_SH_EX_CfU:  # Windows, shared, with Examples & Tools, and Check for Updates
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
     - name: Enable Long Paths
       shell: powershell
@@ -54,7 +68,7 @@ jobs:
         cd ${{env.WIN_BUILD_DIR}}
         pwd
         ls        
-        cmake ${LRS_SRC_DIR} -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=true -DBUILD_TOOLS=true -DCHECK_FOR_UPDATES=true
+        cmake ${LRS_SRC_DIR} -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=true -DBUILD_TOOLS=true -DCHECK_FOR_UPDATES=true
 
     - name: Build
       # Build your program with the given configuration
@@ -68,7 +82,7 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
     - name: Enable Long Paths
       shell: powershell
@@ -96,7 +110,7 @@ jobs:
         cd ${{env.WIN_BUILD_DIR}}
         pwd
         ls        
-        cmake ${LRS_SRC_DIR} -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=true -DBUILD_TOOLS=true -DCHECK_FOR_UPDATES=false -DBUILD_EASYLOGGINGPP=false
+        cmake ${LRS_SRC_DIR} -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=true -DBUILD_TOOLS=true -DCHECK_FOR_UPDATES=false -DBUILD_EASYLOGGINGPP=false
 
     - name: Build
       # Build your program with the given configuration
@@ -110,8 +124,8 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
-    - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 #v5
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 #v6.2.0
       with:
        python-version: '3.9'
 
@@ -140,7 +154,7 @@ jobs:
       run: |        
         LRS_SRC_DIR=$(pwd)
         cd ${{env.WIN_BUILD_DIR}}
-        cmake ${LRS_SRC_DIR} -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=false -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=true -DUNIT_TESTS_ARGS="--not-live --context=windows" -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_PYTHON_BINDINGS=true 
+        cmake ${LRS_SRC_DIR} -A x64 -DBUILD_SHARED_LIBS=false -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=true -DUNIT_TESTS_ARGS="--not-live --context=windows" -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_PYTHON_BINDINGS=true
 
     - name: Build
       # Build your program with the given configuration
@@ -155,12 +169,18 @@ jobs:
       run: |
         python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "windows" ${{env.WIN_BUILD_DIR}}/Release
 
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "windows"
+
     - name: Client for realsense2-all
       shell: bash
       run: |
         mkdir ${{env.WIN_BUILD_DIR}}/rs-all-client
         cd ${{env.WIN_BUILD_DIR}}/rs-all-client
-        cmake $GITHUB_WORKSPACE/.github/workflows/rs-all-client -G "Visual Studio 17 2022"
+        cmake $GITHUB_WORKSPACE/.github/workflows/rs-all-client -A x64
         cmake --build . --config Release -- -m
         ./Release/rs-all-client
 
@@ -170,8 +190,8 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
-    - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 #v5
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 #v6.2.0
       with:
        python-version: '3.9'
 
@@ -198,7 +218,7 @@ jobs:
       run: |        
         LRS_SRC_DIR=$(pwd)   
         cd ${{env.WIN_BUILD_DIR}}
-        cmake ${LRS_SRC_DIR} -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true 
+        cmake ${LRS_SRC_DIR} -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=true -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true
 
     - name: Build
       # Build your program with the given configuration
@@ -208,19 +228,23 @@ jobs:
         cmake --build . --config ${{env.LRS_RUN_CONFIG}} -- -m
 
     - name: LibCI
-      # Note: we specifically disable BUILD_UNIT_TESTS so the executable C++ unit-tests won't run
-      # This is to save time as DDS already lengthens the build...
       shell: bash
       run: |
         python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "dds windows" ${{env.WIN_BUILD_DIR}}/Release
+
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "dds windows"
 
 #--------------------------------------------------------------------------------
   Win_SH_Py_DDS_SEC:  # Windows, Shared, Python, Tools, DDS, additional security checks
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 #v6.2.0
       with:
        python-version: '3.9'
 
@@ -247,7 +271,7 @@ jobs:
       run: |        
         LRS_SRC_DIR=$(pwd)   
         cd ${{env.WIN_BUILD_DIR}}
-        cmake ${LRS_SRC_DIR} -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DENABLE_SECURITY_FLAGS=true
+        cmake ${LRS_SRC_DIR} -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DENABLE_SECURITY_FLAGS=true
 
     - name: Build
       # Build your program with the given configuration
@@ -263,8 +287,8 @@ jobs:
     timeout-minutes: 60
       
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
-    - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 #v5
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 #v6.2.0
       with:
        python-version: '3.9'
 
@@ -290,7 +314,7 @@ jobs:
       run: |   
         LRS_SRC_DIR=$(pwd)
         cd ${{env.WIN_BUILD_DIR}}
-        cmake ${LRS_SRC_DIR} -G "Visual Studio 17 2022" -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DCHECK_FOR_UPDATES=false -DBUILD_PYTHON_BINDINGS=true -DFORCE_RSUSB_BACKEND=true -DBUILD_CSHARP_BINDINGS=true -DDOTNET_VERSION_LIBRARY="4.6" -DDOTNET_VERSION_EXAMPLES="4.6"
+        cmake ${LRS_SRC_DIR} -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DCHECK_FOR_UPDATES=false -DBUILD_PYTHON_BINDINGS=true -DFORCE_RSUSB_BACKEND=true -DBUILD_CSHARP_BINDINGS=true -DDOTNET_VERSION_LIBRARY="4.8" -DDOTNET_VERSION_EXAMPLES="4.8"
 
     - name: Build
       # Build your program with the given configuration
@@ -311,11 +335,17 @@ jobs:
             name: U22
           - os: ubuntu-24.04
             name: U24
-    name: ${{ matrix.name }}_ST_Py_EX_CfU 
+    name: ${{ matrix.name }}_ST_Py_EX_CfU
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
-    
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+
+    - name: Install CMake 4
+      if: matrix.os == 'ubuntu-24.04'
+      uses: jwlawson/actions-setup-cmake@0d6a7d60b009d01c9e7523be22153ff8f19460d3 # v2.2.0
+      with:
+        cmake-version: '4.x'
+
     - name: Prebuild
       shell: bash
       run: |
@@ -342,7 +372,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
     - name: Prebuild
       shell: bash
@@ -376,13 +406,19 @@ jobs:
       run: |
         python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "linux"
 
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "linux"
+
 
   #--------------------------------------------------------------------------------
   U22_ST_Py_DDS_RSUSB_CI:  # Ubuntu 2020, Static, Python, DDS, RSUSB, LibCI without executables
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
     - name: Prebuild
       shell: bash
@@ -410,7 +446,7 @@ jobs:
       shell: bash
       run: |
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=false -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DFORCE_RSUSB_BACKEND=true
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=false -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DBUILD_UNIT_TESTS=true -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DFORCE_RSUSB_BACKEND=true
         cmake --build . -- -j4
 
     - name: Client for realsense2-all
@@ -423,19 +459,23 @@ jobs:
         ./rs-all-client
 
     - name: LibCI
-      # Note: we specifically disable BUILD_UNIT_TESTS so the executable C++ unit-tests won't run
-      # This is to save time as DDS already lengthens the build...
       shell: bash
       run: |
         python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "dds linux" --tag dds
-  
+
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "dds linux" --tag dds
+
 
   #--------------------------------------------------------------------------------
   U22_ST_Py_DDS_RSUSB_SEC:  # Ubuntu 2020, Static, Python, DDS, RSUSB, additional security checks
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
     - name: Prebuild
       shell: bash
@@ -490,8 +530,14 @@ jobs:
     name: ${{ matrix.name }}_SH_Py_DDS_CI
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
-          
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+
+    - name: Install CMake 4
+      if: matrix.os == 'ubuntu-24.04'
+      uses: jwlawson/actions-setup-cmake@0d6a7d60b009d01c9e7523be22153ff8f19460d3 # v2.2.0
+      with:
+        cmake-version: '4.x'
+
     - name: Prebuild
       shell: bash
       run: |
@@ -516,22 +562,26 @@ jobs:
       # Adding -DENABLE_SECURITY_FLAGS=true here to also check DDS. See RSDSO-RSDSO-20629.
       run: | 
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DENABLE_SECURITY_FLAGS=true
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DBUILD_UNIT_TESTS=true -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DENABLE_SECURITY_FLAGS=true
         cmake --build . -- -j4
 
     - name: LibCI
-      # Note: we specifically disable BUILD_UNIT_TESTS so the executable C++ unit-tests won't run
-      # This is to save time as DDS already lengthens the build...
       shell: bash
       run: |
         python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "dds linux" --tag dds
+
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "dds linux" --tag dds
 
   #--------------------------------------------------------------------------------
   U-Latest_ST_Py_EX_CfU:  # Ubuntu latest, Static, Python, Examples & Tools, Check for Updates
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
     
     - name: Prebuild
       shell: bash
@@ -560,7 +610,7 @@ jobs:
     timeout-minutes: 60
     
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
     - name: Prebuild
       run: |
@@ -587,7 +637,7 @@ jobs:
     runs-on: ubuntu-22.04   
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
     - name: Check_API
       shell: bash
@@ -612,4 +662,63 @@ jobs:
        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_BUILD_CONFIG}} -DCMAKE_TOOLCHAIN_FILE=../android-ndk-r20b/build/cmake/android.toolchain.cmake -DFORCE_RSUSB_BACKEND=true
        cmake --build . -- -j4
        ls
-  
+
+
+  #--------------------------------------------------------------------------------
+  U22_SH_No_Rosbag2:  # Ubuntu 22.04, Shared, without rosbag2 (ROS2) support
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+
+    - name: Prebuild
+      shell: bash
+      run: |
+        sudo apt-get update;
+        sudo apt-get install -qq build-essential xorg-dev libgl1-mesa-dev libglu1-mesa-dev libglew-dev libglm-dev;
+        sudo apt-get install -qq libusb-1.0-0-dev;
+        sudo apt-get install -qq libgtk-3-dev;
+        sudo apt-get install libglfw3-dev libglfw3;
+
+    - name: Check_API
+      shell: bash
+      run: |
+        cd scripts
+        ./api_check.sh
+        cd ..
+        mkdir build
+
+    - name: Build
+      shell: bash
+      run: |
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_ROSBAG2=OFF
+        cmake --build . -- -j4
+
+  #--------------------------------------------------------------------------------
+  Win_SH_No_Rosbag2:  # Windows, Shared, without rosbag2 (ROS2) support
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+
+    - name: Enable Long Paths
+      shell: powershell
+      run: |
+       New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+
+    - name: Check_API
+      shell: bash
+      run: |
+        cd scripts
+        ./api_check.sh
+        cd ..
+
+    - name: Build
+      shell: bash
+      run: |
+        mkdir build
+        cd build
+        cmake .. -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_ROSBAG2=OFF
+        cmake --build . --config ${{env.LRS_RUN_CONFIG}} -- -m
+

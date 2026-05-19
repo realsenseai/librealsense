@@ -390,6 +390,7 @@ namespace rs2
         std::shared_ptr<colorizer> colorize;
         std::shared_ptr<yuy_decoder> yuy2rgb;
         std::shared_ptr<m420_decoder> m420_to_rgb;
+        std::shared_ptr<nv12_decoder> nv12_to_rgb;
         std::shared_ptr<y411_decoder> y411;
         bool zoom_preview = false;
         rect curr_preview_rect{};
@@ -560,6 +561,46 @@ namespace rs2
                     else
                     {
                         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, data);
+                    }
+                    break;
+                case RS2_FORMAT_M420:
+                    if (m420_to_rgb)
+                    {
+                        if (auto colorized_frame = m420_to_rgb->process(frame).as<video_frame>())
+                        {
+                            if (!colorized_frame.is<gl::gpu_frame>())
+                            {
+                                glBindTexture(GL_TEXTURE_2D, texture);
+                                data = colorized_frame.get_data();
+
+                                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                                    colorized_frame.get_width(),
+                                    colorized_frame.get_height(),
+                                    0, GL_RGB, GL_UNSIGNED_BYTE,
+                                    colorized_frame.get_data());
+                            }
+                            rendered_frame = colorized_frame;
+                        }
+                    }
+                    break;
+                case RS2_FORMAT_NV12:
+                    if (nv12_to_rgb)
+                    {
+                        if (auto colorized_frame = nv12_to_rgb->process(frame).as<video_frame>())
+                        {
+                            if (!colorized_frame.is<gl::gpu_frame>())
+                            {
+                                glBindTexture(GL_TEXTURE_2D, texture);
+                                data = colorized_frame.get_data();
+
+                                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                                    colorized_frame.get_width(),
+                                    colorized_frame.get_height(),
+                                    0, GL_RGB, GL_UNSIGNED_BYTE,
+                                    colorized_frame.get_data());
+                            }
+                            rendered_frame = colorized_frame;
+                        }
                     }
                     break;
                 case RS2_FORMAT_Y411:
@@ -1224,6 +1265,7 @@ namespace rs2
             case RS2_FORMAT_XYZ32F:
             case RS2_FORMAT_MOTION_RAW:
             case RS2_FORMAT_MOTION_XYZ32F:
+            case RS2_FORMAT_COMBINED_MOTION:
             case RS2_FORMAT_GPIO_RAW:
             case RS2_FORMAT_6DOF:
                 return false;

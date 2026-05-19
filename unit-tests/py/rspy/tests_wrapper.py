@@ -5,6 +5,7 @@
 # Don't remove this file even if current implementation is empty...
 
 import pyrealsense2 as rs
+from rspy import log
 
 # Many operations, such as setting options, can take place only in safety service mode
 def start_wrapper( dev = None ):
@@ -14,5 +15,8 @@ def start_wrapper( dev = None ):
 
 def stop_wrapper( dev = None ):
     if "D585S" in dev.get_info(rs.camera_info.name):
-        safety_sensor = dev.first_safety_sensor()
-        safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.run)
+        try:
+            safety_sensor = dev.first_safety_sensor()
+            safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.run)
+        except Exception as e:
+            log.e(f"Cleanup failed: could not set safety_mode back to run: {e}")

@@ -1,4 +1,4 @@
-# Wrappers for Intel® RealSense™ Technology
+# Wrappers for RealSense Technology
 
 * [Python](./python/) - Supports Python 3
 * [ROS](https://github.com/intel-ros/realsense/releases) - Integration with Robot Operating System

@@ -1,0 +1,67 @@
+# License: Apache 2.0. See LICENSE file in root directory.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
+import logging
+import pytest
+import pyrealsense2 as rs
+
+log = logging.getLogger(__name__)
+
+# D555 excluded until RSDEV-9175 (translation values ~1000x off with sign flip) is resolved
+pytestmark = [
+    pytest.mark.device_each("D400*"),
+    pytest.mark.device_each("D500*"),
+    pytest.mark.device_exclude("D555"),
+]
+
+
+def test_depth_imu_extrinsics(test_device):
+    device, _ = test_device
+    device_name = device.get_info( rs.camera_info.name )
+
+    sensors = {sensor.get_info( rs.camera_info.name ) : sensor for sensor in device.query_sensors()}
+
+    if 'Motion Module' not in sensors:
+        pytest.skip("device has no Motion Module")
+
+    depth_profile = rs.stream_profile()
+    imu_profile = rs.stream_profile()
+
+    sensor = sensors['Stereo Module']
+    for profile in sensor.get_stream_profiles() :
+        if profile.stream_type() == rs.stream.depth:
+            depth_profile = profile
+            break
+
+    sensor = sensors['Motion Module']
+    log.debug("Found Sensor: " +  sensor.get_info(rs.camera_info.name) + " of type: " + device.get_info(rs.camera_info.imu_type))
+    for profile in sensor.get_stream_profiles() :
+        if profile.stream_type() == rs.stream.motion: # For combined motion profiles.
+            imu_profile = profile
+            break
+        if profile.stream_type() == rs.stream.gyro:
+            imu_profile = profile
+            break
+
+    actual_extrinsics = depth_profile.get_extrinsics_to( imu_profile )
+    # Using default (CAD) values. Currently no specific IMU extrinsic calibration
+    expected_rotation = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    expected_translation = [0, 0, 0]
+
+    compatible_devices = ["D435I", "D436"]
+    if any(device in device_name for device in compatible_devices):
+        expected_translation = [-0.005520000122487545, 0.005100000184029341, 0.011739999987185001]
+    compatible_devices = ["D455"]
+    if any(device in device_name for device in compatible_devices):
+        expected_translation = [-0.030220000073313713, 0.007400000002235174, 0.016019999980926514]
+    compatible_devices = ["D457"]
+    if any(device in device_name for device in compatible_devices):
+        expected_translation = [-0.09529999643564224, -0.000560000014957041, 0.017400000244379044]
+    compatible_devices = ["D555"]
+    if any(device in device_name for device in compatible_devices):
+        expected_translation = [-0.03739999979734421, 0.007189999800175428, 0.022299999371170998]
+    compatible_devices = ["D585"]
+    if any(device in device_name for device in compatible_devices):
+        expected_translation = [-0.01950000040233135, 0, -0.011400000192224979]
+    assert list(actual_extrinsics.rotation) == pytest.approx(expected_rotation, abs=1e-6)
+    assert list(actual_extrinsics.translation) == pytest.approx(expected_translation, abs=1e-6)

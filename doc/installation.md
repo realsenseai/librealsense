@@ -39,8 +39,11 @@ Some OEM/Vendors choose to lock the kernel for modifications. Unlocking this cap
    
 3. Install the core packages required to build _librealsense_ binaries and the affected kernel modules:
    ```sh
-   sudo apt-get install libssl-dev libusb-1.0-0-dev libudev-dev pkg-config libgtk-3-dev
+   sudo apt-get install libusb-1.0-0-dev
+   sudo apt-get install libudev-dev
+   sudo apt-get install libssl-dev pkg-config libgtk-3-dev
    ```
+   > Note: The installation is split into separate commands because some platforms encounter dependency issues when installing these packages in a single step. Running them separately helps avoid those issues.
    **Cmake Note:** certain _librealsense_ [CMAKE](https://cmake.org/download/) flags (e.g. CUDA) require version 3.8+ which is currently not made available via apt manager for Ubuntu LTS.
 4. Install build tools
    ```sh

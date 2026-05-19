@@ -557,6 +557,33 @@ namespace rs2
         }
     };
 
+    class nv12_decoder : public filter
+    {
+    public:
+        /**
+        * Creates NV12 decoder processing block.
+        * This block accepts raw NV12 frames and outputs frames of other formats.
+        * NV12 is a semi-planar YUV 4:2:0 format: a full-resolution Y plane followed by
+        * an interleaved half-resolution U,V plane. 12 bits per pixel.
+        */
+        nv12_decoder() : filter(init(), 1) { }
+
+    protected:
+        nv12_decoder(std::shared_ptr<rs2_processing_block> block) : filter(block, 1) {}
+
+    private:
+        std::shared_ptr<rs2_processing_block> init()
+        {
+            rs2_error* e = nullptr;
+            auto block = std::shared_ptr<rs2_processing_block>(
+                rs2_create_nv12_decoder(&e),
+                rs2_delete_processing_block);
+            error::handle(e);
+
+            return block;
+        }
+    };
+
     class y411_decoder : public filter
     {
     public:

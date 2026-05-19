@@ -108,6 +108,42 @@ namespace Intel.RealSense
         public ReadOnlyCollection<Sensor> Sensors => QuerySensors();
 
         /// <summary>
+        /// Returns the first sensor matching the given <see cref="Extension"/>.
+        /// </summary>
+        /// <remarks>
+        /// Index-based access to sensors is unreliable across transports — for example, the depth
+        /// sensor index on DDS differs from USB. Use this method (or the typed wrappers below)
+        /// instead of <c>Sensors[0]</c> / <c>Sensors[1]</c>.
+        /// </remarks>
+        /// <param name="extension">The sensor extension to look for</param>
+        /// <returns>The first <see cref="Sensor"/> that supports the requested extension</returns>
+        /// <exception cref="InvalidOperationException">No sensor matching the requested extension was found</exception>
+        public Sensor First(Extension extension)
+        {
+            foreach (var s in QuerySensors())
+            {
+                if (s.Is(extension))
+                    return s;
+            }
+            throw new InvalidOperationException($"Could not find a sensor matching {extension}");
+        }
+
+        /// <summary>Returns the first depth sensor on the device.</summary>
+        public Sensor FirstDepthSensor() => First(Extension.DepthSensor);
+
+        /// <summary>Returns the first color sensor on the device.</summary>
+        public Sensor FirstColorSensor() => First(Extension.ColorSensor);
+
+        /// <summary>Returns the first motion sensor on the device.</summary>
+        public Sensor FirstMotionSensor() => First(Extension.MotionSensor);
+
+        /// <summary>Returns the first fisheye sensor on the device.</summary>
+        public Sensor FirstFisheyeSensor() => First(Extension.FisheyeSensor);
+
+        /// <summary>Returns the first pose sensor on the device.</summary>
+        public PoseSensor FirstPoseSensor() => PoseSensor.FromSensor(First(Extension.PoseSensor));
+
+        /// <summary>
         /// Send hardware reset request to the device. The actual reset is asynchronous.
         /// Note: Invalidates all handles to this device.
         /// </summary>

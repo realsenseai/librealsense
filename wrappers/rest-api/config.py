@@ -1,7 +1,10 @@
+# License: Apache 2.0. See LICENSE file in root directory.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
 from typing import Optional
 
 class Settings():
-    API_V1_STR: str = "/api"
+    API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "RealSense REST API"
 
     # Security

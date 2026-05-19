@@ -170,6 +170,7 @@ namespace rs2
         texture->colorize = d->depth_colorizer;
         texture->yuy2rgb = d->yuy2rgb;
         texture->m420_to_rgb = d->m420_to_rgb;
+        texture->nv12_to_rgb = d->nv12_to_rgb;
         texture->y411 = d->y411;
 
         if (auto vd = p.as<video_stream_profile>())
@@ -204,7 +205,7 @@ namespace rs2
     void stream_model::show_metadata_by_default(const rs2::stream_profile& p)
     {
         // The purpose is to show metadata to a user by default because a user will not see frames in this stream.
-        if (p.stream_type() == RS2_STREAM_SAFETY)
+        if( p.stream_type() == RS2_STREAM_SAFETY || p.stream_type() == RS2_STREAM_OBJECT_DETECTION )
             show_metadata = true;
     }
 

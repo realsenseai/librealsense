@@ -3,11 +3,15 @@
 
 #include "post-processing-filters-list.h"
 #include "post-processing-block-model.h"
+#ifdef BUILD_WITH_MINZ
+#include "minz-filter.h"
+#endif
 #include <imgui_internal.h>
 #include <realsense_imgui.h>
 
 #include "metadata-helper.h"
 #include "subdevice-model.h"
+#include <rsutils/accelerators/gpu.h>
 
 namespace rs2
 {
@@ -73,6 +77,7 @@ namespace rs2
         depth_colorizer(std::make_shared<rs2::gl::colorizer>()),
         yuy2rgb(std::make_shared<rs2::gl::yuy_decoder>()),
         m420_to_rgb(std::make_shared<rs2::gl::m420_decoder>()),
+        nv12_to_rgb(std::make_shared<rs2::gl::nv12_decoder>()),
         y411(std::make_shared<rs2::gl::y411_decoder>()),
         viewer(viewer),
         detected_objects(device_detected_objects),
@@ -82,6 +87,7 @@ namespace rs2
         restore_processing_block("colorizer", depth_colorizer);
         restore_processing_block("yuy2rgb", yuy2rgb);
         restore_processing_block("m420_to_rgb", m420_to_rgb);
+        restore_processing_block("nv12_to_rgb", nv12_to_rgb);
         restore_processing_block("y411", y411);
 
         post_processing_enabled = is_post_processing_enabled_in_config_file();
@@ -112,6 +118,68 @@ namespace rs2
 
         bool const is_rgb_camera = s->is< color_sensor >();
 
+        // MinZ must run before get_recommended_filters() (decimation, spatial, temporal…).
+        // Decimation halves depth resolution while leaving IR unchanged; the mismatch would
+        // trigger the resolution guard in min_z_depth_improver::apply() and silently skip MinZ.
+#ifdef BUILD_WITH_MINZ
+        if( !is_rgb_camera && s->supports( RS2_OPTION_STEREO_BASELINE ) )
+        {
+            auto block = std::make_shared< minz_filter >();
+            auto model = std::make_shared< processing_block_model >(
+                this, "Min-Z Improvement", block,
+                [block]( rs2::frame f ) { return block->process( f ); },
+                error_message, false );
+
+            if( !rsutils::rs2_is_cuda_available() )
+            {
+                model->available = []() { return false; };
+                model->unavailable_tooltip = "MinZ requires CUDA (not detected on this system)";
+            }
+            else
+            {
+                // Safe to capture this: the lambda lives in model which lives in post_processing,
+                // a member of this subdevice_model — so the lambda cannot outlive its owner.
+                model->available = [this]()
+                {
+                    // Resolution check — VGA (640x480) minimum
+                    if( ui.is_multiple_resolutions )
+                    {
+                        // Per-stream resolutions: check depth and IR independently
+                        auto check = [&]( rs2_stream stream ) {
+                            auto it = ui.selected_stream_to_res.find( stream );
+                            if( it == ui.selected_stream_to_res.end() ) return false;
+                            return it->second.first >= 640 && it->second.second >= 480;
+                        };
+                        if( !check( RS2_STREAM_DEPTH ) || !check( RS2_STREAM_INFRARED ) )
+                            return false;
+                    }
+                    else if( !res_values.empty()
+                             && ui.selected_res_id >= 0
+                             && ui.selected_res_id < static_cast< int >( res_values.size() ) )
+                    {
+                        const auto& res = res_values.at( ui.selected_res_id );
+                        if( res.first < 640 || res.second < 480 )
+                            return false;
+                    }
+
+                    bool depth = false, ir1 = false, ir2 = false;
+                    for( auto& p : profiles )
+                    {
+                        auto it = stream_enabled.find( p.unique_id() );
+                        if( it == stream_enabled.end() || !it->second ) continue;
+                        if( p.stream_type() == RS2_STREAM_DEPTH ) depth = true;
+                        else if( p.stream_type() == RS2_STREAM_INFRARED && p.stream_index() == 1 ) ir1 = true;
+                        else if( p.stream_type() == RS2_STREAM_INFRARED && p.stream_index() == 2 ) ir2 = true;
+                    }
+                    return depth && ir1 && ir2;
+                };
+                model->unavailable_tooltip = "Depth, IR Left/Right streams have to be enabled at VGA or higher resolution";
+            }
+
+            post_processing.push_back( model );
+        }
+#endif
+
         for (auto&& f : s->get_recommended_filters())
         {
             auto shared_filter = std::make_shared<filter>(f);
@@ -132,7 +200,7 @@ namespace rs2
             }
 
             if( shared_filter->is< rotation_filter >() )
-                model->enable( false ); 
+                model->enable( false );
 
             if (shared_filter->is<threshold_filter>())
             {
@@ -142,19 +210,17 @@ namespace rs2
                     std::string device_pid = s->get_info(RS2_CAMERA_INFO_PRODUCT_ID);
                     if (device_pid == "0B5B")
                     {
-                        std::string error_msg;
                         auto threshold_pb = shared_filter->as<threshold_filter>();
                         threshold_pb.set_option(RS2_OPTION_MIN_DISTANCE, SHORT_RANGE_MIN_DISTANCE);
                         threshold_pb.set_option(RS2_OPTION_MAX_DISTANCE, SHORT_RANGE_MAX_DISTANCE);
                     }
                 }
-                model->enable( false ); 
+                model->enable( false );
             }
 
             if (shared_filter->is<hdr_merge>())
             {
                 // processing block will be skipped if the requested option is not supported
-                auto supported_options = s->get_supported_options();
                 if (std::find(supported_options.begin(), supported_options.end(), RS2_OPTION_SEQUENCE_ID) == supported_options.end())
                     continue;
             }
@@ -272,10 +338,14 @@ namespace rs2
                             }
                         }
                     }
-                    res << vid_prof.width() << " x " << vid_prof.height();
-                    push_back_if_not_exists(res_values, std::pair<int, int>(vid_prof.width(), vid_prof.height()));
-                    push_back_if_not_exists(resolutions, res.str());
-                    push_back_if_not_exists(resolutions_per_stream[profile.stream_type()], std::pair<int, int>(vid_prof.width(), vid_prof.height()));
+                    
+                    if (!hide_resolutions(profile))
+                    {
+                        res << vid_prof.width() << " x " << vid_prof.height();
+                        push_back_if_not_exists(res_values, std::pair<int, int>(vid_prof.width(), vid_prof.height()));
+                        push_back_if_not_exists(resolutions, res.str());
+                        push_back_if_not_exists(resolutions_per_stream[profile.stream_type()], std::pair<int, int>(vid_prof.width(), vid_prof.height()));
+                    }
                 }
 
                 std::stringstream fps;
@@ -397,6 +467,13 @@ namespace rs2
     subdevice_model::~subdevice_model()
     {
         _destructing = true;
+        try
+        {
+            wait_for_stop();
+        }
+        catch( ... )
+        {
+        }
         try
         {
             s->on_options_changed( []( const options_list & list ) {} );
@@ -583,6 +660,37 @@ namespace rs2
                     if (ImGui::Checkbox(label.c_str(), &stream_enabled[f.first]))
                     {
                         prev_stream_enabled = tmp;
+                        res = true;
+
+                        if (stream_enabled[f.first])
+                        {
+                            // Find the stream type for this unique_id
+                            rs2_stream stream_type = RS2_STREAM_ANY;
+                            for (auto& p : profiles)
+                            {
+                                if (p.unique_id() == f.first)
+                                {
+                                    stream_type = p.stream_type();
+                                    break;
+                                }
+                            }
+
+                            // If the currently selected resolution is not valid for the newly
+                            // enabled stream, auto-select the first resolution that is
+                            if (stream_type != RS2_STREAM_ANY)
+                            {
+                                auto it = resolutions_per_stream.find(stream_type);
+                                if (it != resolutions_per_stream.end() && !it->second.empty())
+                                {
+                                    auto& valid_res = it->second;
+                                    auto current_res = res_values[ui.selected_res_id];
+                                    bool valid = std::any_of(valid_res.begin(), valid_res.end(),
+                                        [&](const std::pair<int, int>& r) { return r == current_res; });
+                                    if (!valid)
+                                        select_resolution(valid_res[0].first, valid_res[0].second);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1335,8 +1443,11 @@ namespace rs2
 
     bool subdevice_model::is_multiple_resolutions_supported() const
     {
-        std::string product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
-        std::string sensor_name = s->get_info(RS2_CAMERA_INFO_NAME);
+        if( !dev.supports( RS2_CAMERA_INFO_PRODUCT_LINE ) || !s->supports( RS2_CAMERA_INFO_NAME ) )
+            return false;
+
+        std::string product_line = dev.get_info( RS2_CAMERA_INFO_PRODUCT_LINE );
+        std::string sensor_name = s->get_info( RS2_CAMERA_INFO_NAME );
 
         return product_line == "D500" && sensor_name == "Stereo Module";
     }
@@ -1471,11 +1582,32 @@ namespace rs2
         return results;
     }
 
+    // Move-and-wait pattern: the first caller that enters takes ownership of the
+    // future via std::move, so a concurrent second caller sees an invalid future
+    // and returns immediately.  All current call sites (destructor, play(),
+    // fw-update) are mutually exclusive flows, so at most one thread waits on
+    // the background stop at any given time.
+    //
+    // NOTE: exceptions from the background stop propagate through the future
+    // and are re-thrown here.  Callers that must not throw (e.g. destructor)
+    // are responsible for their own try/catch around this call.
+    void subdevice_model::wait_for_stop()
+    {
+        std::future< void > local;
+        {
+            std::lock_guard< std::mutex > lock(_stop_mutex);
+            local = std::move(_stop_future);
+        }
+        if (local.valid())
+            local.get();
+    }
+
     void subdevice_model::stop(std::shared_ptr<notifications_model> not_model)
     {
         if (not_model)
             not_model->add_log("Stopping streaming");
 
+        // --- Immediate UI state (synchronous) ---
         streaming = false;
         _pause = false;
 
@@ -1496,17 +1628,31 @@ namespace rs2
             viewer.disable_measurements();
         }
 
-        s->stop();
+        // --- Heavy operations (background) ---
+        // Chain with any prior pending stop without blocking the caller:
+        // move the old future into the lambda so it waits internally.
+        std::lock_guard< std::mutex > lock(_stop_mutex);
+        auto prev_stop = std::move(_stop_future);
 
-        _options_invalidated = true;
-
-        queues.foreach([&](frame_queue& q)
+        auto sensor_ptr = s;
+        _stop_future = std::async(std::launch::async, [this, sensor_ptr, prev_stop = std::move(prev_stop)]() mutable
             {
-                frame f;
-                while (q.poll_for_frame(&f));
-            });
+                if (prev_stop.valid())
+                    prev_stop.get();
 
-        s->close();
+                sensor_ptr->stop();
+
+                queues.foreach([&](frame_queue& q)
+                    {
+                        frame f;
+                        while (q.poll_for_frame(&f));
+                    });
+
+                sensor_ptr->close();
+
+                // Invalidate after close() so options whose read-only depends on is_opened() refresh correctly.
+                _options_invalidated = true;
+            });
     }
 
     bool subdevice_model::is_paused() const
@@ -1588,6 +1734,7 @@ namespace rs2
 
     void subdevice_model::play(const std::vector<stream_profile>& profiles, viewer_model& viewer, std::shared_ptr<rs2::asynchronous_syncer> syncer)
     {
+        wait_for_stop();
         avoid_streaming_on_embedded_filters_not_matching_configuration();
         set_extrinsics_from_depth_if_needed();
 
@@ -1653,6 +1800,7 @@ namespace rs2
             save_processing_block_to_config_file("colorizer", depth_colorizer);
             save_processing_block_to_config_file("yuy2rgb", yuy2rgb);
             save_processing_block_to_config_file("m420_to_rgb", m420_to_rgb);
+            save_processing_block_to_config_file("nv12_to_rgb", nv12_to_rgb);
             save_processing_block_to_config_file("y411", y411);
 
             for (auto&& pbm : post_processing) pbm->save_to_config_file();
@@ -1785,4 +1933,20 @@ namespace rs2
         }
     }
 
+    bool subdevice_model::hide_resolutions(const stream_profile& profile) const
+    {
+        if (s->supports(RS2_CAMERA_INFO_NAME) &&
+            s->get_info(RS2_CAMERA_INFO_NAME) == std::string("Depth Mapping Camera"))
+        {
+            if (auto vid_prof = profile.as<video_stream_profile>())
+            {
+                int width = vid_prof.width();
+                int height = vid_prof.height();
+
+                if ((width == 2880 && height == 32) || (width == 128 && height == 128))
+                    return true;
+            }
+        }
+        return false;
+    }
 }

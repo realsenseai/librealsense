@@ -8,9 +8,9 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 
 PYBIND11_MODULE(NAME, m) {
     m.doc() = R"pbdoc(
-        LibrealsenseTM Python Bindings
+        Librealsense Python Bindings
         ==============================
-        Library for accessing Intel RealSenseTM cameras
+        Library for accessing RealSense cameras
     )pbdoc";
     m.attr("__version__") = RS2_API_VERSION_STR;
     m.attr("__full_version__") = RS2_API_FULL_VERSION_STR;

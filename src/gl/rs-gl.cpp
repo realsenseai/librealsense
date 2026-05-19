@@ -5,6 +5,7 @@
 #include "synthetic-stream-gl.h"
 #include "yuy2rgb-gl.h"
 #include "m420-to-rgb-gl.h"
+#include "nv12-to-rgb-gl.h"
 #include "y4112rgb-gl.h"
 #include "align-gl.h"
 #include "pointcloud-gl.h"
@@ -88,6 +89,19 @@ rs2_processing_block* rs2_gl_create_m420_decoder(int api_version, rs2_error** er
 
     auto block = std::make_shared<librealsense::gl::m420_to_rgb>();
     auto backup = std::make_shared<librealsense::m420_converter>(RS2_FORMAT_RGB8);
+    auto dual = std::make_shared<librealsense::gl::dual_processing_block>();
+    dual->add(block);
+    dual->add(backup);
+    return new rs2_processing_block{ dual };
+}
+NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
+
+rs2_processing_block* rs2_gl_create_nv12_decoder(int api_version, rs2_error** error) BEGIN_API_CALL
+{
+    verify_version_compatibility(api_version);
+
+    auto block = std::make_shared<librealsense::gl::nv12_to_rgb>();
+    auto backup = std::make_shared<librealsense::nv12_converter>(RS2_FORMAT_RGB8);
     auto dual = std::make_shared<librealsense::gl::dual_processing_block>();
     dual->add(block);
     dual->add(backup);

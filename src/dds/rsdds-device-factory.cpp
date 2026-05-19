@@ -157,7 +157,7 @@ rsdds_device_factory::rsdds_device_factory( std::shared_ptr< context > const & c
                                       << domain_id << "; cannot create '" << participant_name << "'" );
         }
         size_t device_initialization_timeout = dds_settings.nested( "device-initialization-timeout-ms" ).default_value< size_t >( 5000 );
-        bool partial_capabilities_allowed = ctx->get_settings().nested( "partial-device-allowed" ).default_value< bool >( false );
+        bool partial_capabilities_allowed = ctx->get_settings().nested( "partial-device-allowed" ).default_value< bool >( true );
         _watcher_singleton = domain.device_watcher.instance( _participant, device_initialization_timeout, partial_capabilities_allowed );
         _subscription = _watcher_singleton->subscribe(
             [liveliness = std::weak_ptr< context >( ctx ),

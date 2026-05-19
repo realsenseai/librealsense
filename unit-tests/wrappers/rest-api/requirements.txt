@@ -1,0 +1,9 @@
+# Test-only extras for wrappers/rest-api/tests/ (on top of wrappers/rest-api/requirements.txt)
+# Usage: pip install -r wrappers/rest-api/requirements.txt -r unit-tests/wrappers/rest-api/requirements.txt
+pytest==8.3.5;          platform_machine != "aarch64"
+pytest-asyncio==0.26.0; platform_machine != "aarch64"
+typeguard==4.4.4;       platform_machine != "aarch64"
+jinja2==3.1.6;          platform_machine != "aarch64"
+pyyaml==6.0.2;          platform_machine != "aarch64"
+lark==1.2.2;            platform_machine != "aarch64"
+httpx==0.28.1;          platform_machine != "aarch64"

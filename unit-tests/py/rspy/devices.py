@@ -43,14 +43,24 @@ from rspy import device_hub
 try:
     import pyrealsense2 as rs
     log.d( rs )
-    hub = device_hub.create() # if there's no hub, this will hold None
-    sys.path = sys.path[:-1]  # remove what we added
 except ModuleNotFoundError:
     log.w( 'No pyrealsense2 library is available! Running as if no cameras available...' )
     import sys
     log.d( 'sys.path=', sys.path )
     rs = None
-    hub = None
+
+hub = None
+_hub_attempted = False
+
+def init_hub():
+    """Create the hub instance. Call after logging is configured so discovery prints are visible."""
+    global hub, _hub_attempted
+    if _hub_attempted:
+        return
+    _hub_attempted = True
+    hub = device_hub.create()
+    if pyrs_dir in sys.path:
+        sys.path.remove( pyrs_dir )
 
 import time
 
@@ -72,6 +82,7 @@ class Device:
             self._product_line = dev.get_info( rs.camera_info.product_line )
         self._physical_port = dev.supports( rs.camera_info.physical_port ) and dev.get_info( rs.camera_info.physical_port ) or None
 
+        self._connection_type = None  # remains None if camera_info.connection_type is unsupported
         if dev.supports(rs.camera_info.connection_type):
             self._connection_type = dev.get_info(rs.camera_info.connection_type)
             self._is_dds = self._connection_type == "DDS"
@@ -125,8 +136,8 @@ class Device:
         return self._physical_port
 
     @property
-    def usb_location( self ):
-        return self._usb_location
+    def location( self ):
+        return self._location
 
     @property
     def port( self ):
@@ -167,6 +178,10 @@ def map_unknown_ports():
     global _device_by_sn
     devices_with_unknown_ports = [device for device in _device_by_sn.values() if device.port is None]
     if not devices_with_unknown_ports:
+        # All ports are known, but still enabled from query(). Disable all so unmapped ports
+        # (e.g. loose cables) can't produce rogue devices mid-test.
+        hub.disable_ports()
+        wait_until_all_ports_disabled()
         return
     #
     ports = hub.ports()
@@ -224,6 +239,9 @@ def map_unknown_ports():
             hub.disable_ports( [port] )
             wait_until_all_ports_disabled()
     finally:
+        # Disable all ports so tests start from a clean state
+        hub.disable_ports()
+        wait_until_all_ports_disabled()
         log.debug_unindent()
 
 
@@ -239,6 +257,7 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
     global rs
     if not rs:
         return
+    init_hub()
     #
     # Before we can start a context and query devices, we need to enable all the ports
     # on the hub, if any:
@@ -270,25 +289,30 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
 
     d555_found = False
     try:
-        devices = _context.query_devices()
-        for dev in devices:
-            try:
-                sn = dev.get_info( rs.camera_info.firmware_update_id )
-            except RuntimeError as e:
-                log.e( f'Found device but trying to get fw-update-id failed: {e}' )
-                continue
-
-            if sn not in detected_sns:
-                # New device detected
-                detected_sns.add(sn)
-                device = Device( sn, dev )
-                _device_by_sn[sn] = device
-                log.d( '... port {}:'.format( device.port is None and '?' or device.port ), sn, dev, 'detected and added to devices list' )
-
-                name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
-                d555_found = "D555" in name        
+        devices = list( _context.query_devices() )
     except RuntimeError as e:
-        log.d( 'FAILED to query devices:', e )
+        log.e( f'FAILED to query devices: {e}' )
+        devices = []
+    for dev in devices:
+        try:
+            sn = dev.get_info( rs.camera_info.serial_number ) if dev.supports( rs.camera_info.serial_number ) \
+                 else dev.get_info( rs.camera_info.firmware_update_id )
+        except RuntimeError as e:
+            log.e( f'Found device but failed to get serial number: {e}' )
+            continue
+
+        if sn in detected_sns:
+            name = dev.get_info( rs.camera_info.name ) if dev.supports( rs.camera_info.name ) else 'Unknown'
+            log.w( f'Duplicate serial number detected: {sn} ({name}) — skipping' )
+            continue
+        detected_sns.add( sn )
+        device = Device( sn, dev )
+        _device_by_sn[sn] = device
+        port_str = f'port {device.port}: ' if device.port is not None else ''
+        log.d( f'...{port_str}{sn} {dev}' )
+
+        name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
+        d555_found = "D555" in name
 
     if hub and not d555_found:
         # All CI machines with a D555 connected have a hub. Detect camera even in case domain have reset to 0 so applicable tests will run.
@@ -298,7 +322,8 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
             name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
             if "D555" in name:
                 log.i("Found D555 device with domain 0, not same as in configuration file")
-                sn = dev.get_info( rs.camera_info.firmware_update_id ) # Supported by D555 devices
+                sn = dev.get_info( rs.camera_info.serial_number ) if dev.supports( rs.camera_info.serial_number ) \
+                     else dev.get_info( rs.camera_info.firmware_update_id )
                 device = Device( sn, dev )
                 _device_by_sn[sn] = device
 
@@ -321,7 +346,8 @@ def _device_change_callback( info ):
             device._removed = True
             log.d( 'device removed:', device.serial_number )
     for handle in info.get_new_devices():
-        sn = handle.get_info( rs.camera_info.firmware_update_id )
+        sn = handle.get_info( rs.camera_info.serial_number ) if handle.supports( rs.camera_info.serial_number ) \
+             else handle.get_info( rs.camera_info.firmware_update_id )
         log.d( 'device added:', sn, handle )
         if sn in _device_by_sn:
             device = _device_by_sn[sn]
@@ -366,9 +392,9 @@ def by_product_line( product_line, ignored_products ):
     global _device_by_sn
     result = set()
     for device in _device_by_sn.values():
-        if device.product_line == product_line:
+        if device.product_line.upper() == product_line.upper():
             for ignored_product in ignored_products:
-                if ignored_product in device.name:
+                if ignored_product.upper() in device.name.upper():
                     break
             else:
                 result.add(device.serial_number)
@@ -384,9 +410,9 @@ def by_name( name, ignored_products ):
     global _device_by_sn
     result = set()
     ignored_list_as_str = " ".join(ignored_products)
-    if name not in ignored_list_as_str:
+    if name.upper() not in ignored_list_as_str.upper():
         for device in _device_by_sn.values():
-            if device.name and device.name.find( name ) >= 0:
+            if device.name and device.name.upper().find( name.upper() ) >= 0:
                 result.add(device.serial_number)
     return result
 
@@ -571,44 +597,51 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
                     re-enabling
     :param timeout: The maximum seconds to wait to make sure the devices are indeed online
     """
+    if recycle:
+        # let the driver/device settle before we disrupt it; helps the MIPI driver in particular
+        # recover cleanly when a preceding test left it in a bad state
+        time.sleep(1)
     if hub:
         #
         ports = [ get( sn ).port for sn in serial_numbers ]
         # DDS (and other non-hub) devices have port=None; filter them out of hub operations
-        hub_ports = [ p for p in ports if p is not None ]
+        wanted_ports = sorted( p for p in ports if p is not None )
+        enabled_ports = [ get( sn ).port for sn in enabled() if get( sn ).port is not None ]
         #
         if recycle:
             #
-            if hub_ports:
-                # Only recycle if there are actual hub devices to manage
-                log.d( 'recycling ports via hub:', ports )
-                #
-                # Only wait for removal of devices that are actually on hub ports (exclude DDS devices)
-                enabled_devices = { sn for sn in enabled() if get( sn ).port is not None }
-                hub.disable_ports( )
-                _wait_until_removed( enabled_devices, timeout = timeout )
-                #
-                hub.enable_ports( hub_ports )
-            else:
+            if not wanted_ports and not enabled_ports:
                 log.d( 'no hub ports to recycle; leaving hub as-is' )
+            elif enabled_ports:
+                log.d( 'enabling ports', wanted_ports,
+                       'disabling currently enabled ports', enabled_ports )
+                sns_to_remove = { sn for sn in enabled() if get( sn ).port in enabled_ports }
+                hub.disable_ports( enabled_ports )
+                _wait_until_removed( sns_to_remove, timeout = timeout )
+            #
+            if wanted_ports:
+                hub.enable_ports( wanted_ports )
             #
         else:
             #
-            if hub_ports:
-                hub.enable_ports( hub_ports, disable_other_ports = True )
+            if wanted_ports:
+                hub.enable_ports( wanted_ports, disable_other_ports = True )
             else:
                 log.d( 'no hub ports to enable; leaving hub as-is' )
         #
-        _wait_for( serial_numbers, timeout = timeout )
+        if not _wait_for( serial_numbers, timeout = timeout ):
+            raise TimeoutError( f'devices did not enumerate within {timeout}s after hub enable: {serial_numbers}' )
         #
     elif recycle:
         #
-        hw_reset( serial_numbers )
+        if not hw_reset( serial_numbers, timeout = timeout ):
+            raise RuntimeError( f'hw_reset failed for: {serial_numbers}' )
         #
     else:
         log.d( 'no hub; ports left as-is' )
         # even without reset, enable_only should wait for the devices to be available again
-        _wait_for(serial_numbers, timeout=timeout)
+        if not _wait_for( serial_numbers, timeout = timeout ):
+            raise TimeoutError( f'devices did not enumerate within {timeout}s: {serial_numbers}' )
 
 
 def enable_all():
@@ -696,7 +729,12 @@ def hw_reset( serial_numbers, timeout = MAX_ENUMERATION_TIME ):
     _wait_for(serial_numbers, timeout=timeout) # make sure devices are added before doing hw reset
     for sn in serial_numbers:
         dev = get( sn ).handle
-        dev.hardware_reset()
+        try:
+            dev.hardware_reset()
+        except Exception as e:
+            # swallow so one failing SN doesn't skip reset on the others and, more importantly,
+            # doesn't skip the post-reset settle that lets the driver re-enumerate
+            log.w( f'hardware_reset() failed for {sn}: {e}' )
     #
 
     if removable_devs_sns:
@@ -705,7 +743,7 @@ def hw_reset( serial_numbers, timeout = MAX_ENUMERATION_TIME ):
     else:
         # normally we will get here with a mipi device,
         # we want to allow some time for the device to reinitialize as it was not disconnected
-        time.sleep(3)
+        time.sleep(8)
     #
     return _wait_for( serial_numbers, timeout = timeout )
 
@@ -793,6 +831,7 @@ if __name__ == '__main__':
     if args:
         usage()
     try:
+        init_hub()
         if hub:
             if not hub.is_connected():
                 hub.connect()
@@ -852,6 +891,7 @@ if __name__ == '__main__':
             hub.recycle_ports()
     finally:
         # Disconnect from the hub -- if we don't it might crash on Linux...
-        hub.disconnect()
+        if hub:
+            hub.disconnect()
 
 

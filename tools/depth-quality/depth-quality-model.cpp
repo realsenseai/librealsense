@@ -995,6 +995,7 @@ namespace rs2
                     _viewer_model.streams[profile.unique_id()].texture->colorize = sub->depth_colorizer;
                     _viewer_model.streams[profile.unique_id()].texture->yuy2rgb = sub->yuy2rgb;
                     _viewer_model.streams[profile.unique_id()].texture->m420_to_rgb = sub->m420_to_rgb;
+                    _viewer_model.streams[profile.unique_id()].texture->nv12_to_rgb = sub->nv12_to_rgb;
                     _viewer_model.streams[profile.unique_id()].texture->y411 = sub->y411;
 
                     if (profile.stream_type() == RS2_STREAM_DEPTH)

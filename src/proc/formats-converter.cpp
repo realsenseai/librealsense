@@ -176,9 +176,7 @@ formats_converter::clone_profile( const std::shared_ptr< stream_profile_interfac
 {
     std::shared_ptr< stream_profile_interface > cloned = nullptr;
 
-    auto vsp = std::dynamic_pointer_cast< video_stream_profile >( raw_profile );
-    auto msp = std::dynamic_pointer_cast< motion_stream_profile >( raw_profile );
-    if( vsp )
+    if( auto vsp = std::dynamic_pointer_cast< video_stream_profile >( raw_profile ) )
     {
         cloned = std::make_shared< video_stream_profile >();
         if( ! cloned )
@@ -191,7 +189,7 @@ formats_converter::clone_profile( const std::shared_ptr< stream_profile_interfac
         // There is a default implementation throwing if no other function is set.
         // video_clone->set_intrinsics( [vsp]() { return vsp->get_intrinsics(); } );
     }
-    else if( msp )
+    else if( auto msp = std::dynamic_pointer_cast< motion_stream_profile >( raw_profile ) )
     {
         cloned = std::make_shared< motion_stream_profile >();
         if( ! cloned )
@@ -199,6 +197,12 @@ formats_converter::clone_profile( const std::shared_ptr< stream_profile_interfac
 
         auto motion_clone = std::dynamic_pointer_cast< motion_stream_profile >( cloned );
         // motion_clone->set_intrinsics( [msp]() { return msp->get_intrinsics(); } );
+    }
+    else if( auto isp = std::dynamic_pointer_cast< inference_stream_profile >( raw_profile ) )
+    {
+        cloned = std::make_shared< inference_stream_profile >();
+        if( ! cloned )
+            throw librealsense::invalid_value_exception( "failed to clone profile" );
     }
     else
         throw librealsense::not_implemented_exception( "Unsupported profile type to clone" );
