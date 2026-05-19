@@ -58,35 +58,35 @@ index 08fcd2ffa..0409f5bca 100644
  	  .bInterfaceSubClass	= 1,
  	  .bInterfaceProtocol	= 0,
  	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
-+	/* Intel D555 Depth Camera */
++	/* Realsense D555 Depth Camera */
 +	{ .match_flags		= USB_DEVICE_ID_MATCH_DEVICE
 +				| USB_DEVICE_ID_MATCH_INT_INFO,
-+	  .idVendor		= 0x8086,
++	  .idVendor		= 0x38E5,
 +	  .idProduct		= 0x0b56,
 +	  .bInterfaceClass	= USB_CLASS_VIDEO,
 +	  .bInterfaceSubClass	= 1,
 +	  .bInterfaceProtocol	= UVC_PC_PROTOCOL_15,
 +	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
- 	/* Intel D405 Depth Camera */
+ 	/* Realsense D405 Depth Camera */
  	{ .match_flags		= USB_DEVICE_ID_MATCH_DEVICE
  				| USB_DEVICE_ID_MATCH_INT_INFO,
 @@ -3102,6 +3111,24 @@ static const struct usb_device_id uvc_ids[] = {
  	  .bInterfaceSubClass	= 1,
  	  .bInterfaceProtocol	= 0,
  	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
-+	  /* Intel D585 Depth Camera */
++	  /* Realsense D585 Depth Camera */
 +	{ .match_flags		= USB_DEVICE_ID_MATCH_DEVICE
 +				| USB_DEVICE_ID_MATCH_INT_INFO,
-+	  .idVendor		= 0x8086,
++	  .idVendor			= 0x38E5,
 +	  .idProduct		= 0x0b6a,
 +	  .bInterfaceClass	= USB_CLASS_VIDEO,
 +	  .bInterfaceSubClass	= 1,
 +	  .bInterfaceProtocol	= UVC_PC_PROTOCOL_15,
 +	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
-+	  /* Intel 585 Camera */
++	  /* Realsense 585 Camera */
 +	{ .match_flags		= USB_DEVICE_ID_MATCH_DEVICE
 +				| USB_DEVICE_ID_MATCH_INT_INFO,
-+	  .idVendor		= 0x8086,
++	  .idVendor			= 0x38E5,
 +	  .idProduct		= 0x0b6b,
 +	  .bInterfaceClass	= USB_CLASS_VIDEO,
 +	  .bInterfaceSubClass	= 1,
