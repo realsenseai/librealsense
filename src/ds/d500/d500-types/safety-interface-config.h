@@ -408,6 +408,66 @@ namespace librealsense
         uint8_t m_ossd_self_test_pulse_width;
     };
 
+    class calibration_monitor_params
+    {
+    public:
+        calibration_monitor_params() = default;
+
+        calibration_monitor_params(const json &j)
+        {
+            validate_json(j);
+            m_alpha_rect = j.at("alpha_rect").get<float>();
+            m_c_min_rect_threshold = j.at("c_min_rect_threshold").get<float>();
+            m_rect_err_max_limit_abs = j.at("rect_err_max_limit_abs").get<float>();
+            m_alpha_scale = j.at("alpha_scale").get<float>();
+            m_c_min_scale_threshold = j.at("c_min_scale_threshold").get<float>();
+            m_scale_low_limit_threshold = j.at("scale_low_limit_threshold").get<float>();
+            m_scale_high_limit_threshold = j.at("scale_high_limit_threshold").get<float>();
+        }
+
+        json to_json() const
+        {
+            json j;
+            j["alpha_rect"] = m_alpha_rect;
+            j["c_min_rect_threshold"] = m_c_min_rect_threshold;
+            j["rect_err_max_limit_abs"] = m_rect_err_max_limit_abs;
+            j["alpha_scale"] = m_alpha_scale;
+            j["c_min_scale_threshold"] = m_c_min_scale_threshold;
+            j["scale_low_limit_threshold"] = m_scale_low_limit_threshold;
+            j["scale_high_limit_threshold"] = m_scale_high_limit_threshold;
+            return j;
+        }
+
+    private:
+        void validate_json(const json &j) const
+        {
+            if (!j.is_object())
+            {
+                throw librealsense::invalid_value_exception("Invalid calibration_monitor_params format");
+            }
+            for (const auto &field : {"alpha_rect", "c_min_rect_threshold", "rect_err_max_limit_abs",
+                                      "alpha_scale", "c_min_scale_threshold",
+                                      "scale_low_limit_threshold", "scale_high_limit_threshold"})
+            {
+                if (!j.contains(field))
+                {
+                    throw librealsense::invalid_value_exception(std::string("Invalid calibration_monitor_params format: missing field: ") + field);
+                }
+            }
+        }
+
+        // Calib Rectification Error params
+        float m_alpha_rect;                  // Smoothing factor (alpha rect)
+        float m_c_min_rect_threshold;
+        float m_rect_err_max_limit_abs;
+        // Calib Scale Error params
+        float m_alpha_scale;                 // Smoothing factor (alpha scale)
+        float m_c_min_scale_threshold;
+        float m_scale_low_limit_threshold;
+        float m_scale_high_limit_threshold;
+        std::array<uint8_t, 36> m_reserved = {0};
+    };
+
     class safety_interface_config
     {
     public:
@@ -425,6 +485,7 @@ namespace librealsense
             {
                 m_crypto_signature[i] = j.at("crypto_signature")[i].get<uint8_t>();
             }
+            m_calibration_monitor_params = calibration_monitor_params(j.at("calibration_monitor_params"));
         }
 
         json to_json()
@@ -437,6 +498,7 @@ namespace librealsense
             sic["occupancy_grid_params"] = m_occupancy_grid_params.to_json();
             sic["smcu_arbitration_params"] = m_smcu_arbitration_params.to_json();
             sic["crypto_signature"] = m_crypto_signature;
+            sic["calibration_monitor_params"] = m_calibration_monitor_params.to_json();
             return j;
         }
 
@@ -455,7 +517,8 @@ namespace librealsense
                 "camera_position",
                 "occupancy_grid_params",
                 "smcu_arbitration_params",
-                "crypto_signature"};
+                "crypto_signature",
+                "calibration_monitor_params"};
 
             for (const auto &field : required_fields)
             {
@@ -507,6 +570,12 @@ namespace librealsense
                     throw librealsense::invalid_value_exception("Invalid format: crypto_signature contains non-unsigned values");
                 }
             }
+
+            // Validate calibration_monitor_params
+            if (!j["calibration_monitor_params"].is_object())
+            {
+                throw librealsense::invalid_value_exception("Invalid format: calibration_monitor_params must be a JSON object");
+            }
         }
 
         m12_safety_pins_configuration m_pins_configs;
@@ -515,10 +584,11 @@ namespace librealsense
         occupancy_grid_params m_occupancy_grid_params;
         smcu_arbitration_params m_smcu_arbitration_params;
         std::array<uint8_t, 32> m_crypto_signature; // SHA2 or similar
-        std::array<uint8_t, 324> m_reserved2 = {0};
+        calibration_monitor_params m_calibration_monitor_params;
+        std::array<uint8_t, 260> m_reserved2 = {0};
     };
     static_assert(sizeof(safety_interface_config) == 464,
-                  "safety_interface_config must remain 464 bytes to match the v0.95 flash table layout");
+                  "safety_interface_config must remain 464 bytes to match the v0.96 flash table layout");
 
     /***
      *  safety_interface_config_with_header class

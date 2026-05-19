@@ -134,7 +134,17 @@ valid_sic_table_as_json_str = """
             "sustained_aicv_frame_drops": 95,
             "ossd_self_test_pulse_width": 23
         },
-        "crypto_signature": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        "crypto_signature": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "calibration_monitor_params":
+        {
+            "alpha_rect" : 0.1,
+            "c_min_rect_threshold" : 0.5,
+            "rect_err_max_limit_abs" : 1.0,
+            "alpha_scale" : 0.1,
+            "c_min_scale_threshold" : 0.5,
+            "scale_low_limit_threshold" : 0.9,
+            "scale_high_limit_threshold" : 1.1
+        }
     }
 }
 """
