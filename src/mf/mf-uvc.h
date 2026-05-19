@@ -8,7 +8,7 @@
 
 #include <mfidl.h>
 #include <mfreadwrite.h>
-#include <atlcomcli.h>
+#include <wrl/client.h>
 #include <strmif.h>
 #include <Ks.h>
 #include <ksproxy.h>
@@ -107,9 +107,9 @@ namespace librealsense
             void check_connection() const;
             void close_all();
             IKsControl* get_ks_control(const extension_unit& xu) const;
-            CComPtr<IMFAttributes> create_device_attrs();
-            CComPtr<IMFAttributes> create_reader_attrs();
-            void foreach_profile(std::function<void(const mf_profile& profile, CComPtr<IMFMediaType> media_type, bool& quit)> action) const;
+            Microsoft::WRL::ComPtr<IMFAttributes> create_device_attrs();
+            Microsoft::WRL::ComPtr<IMFAttributes> create_reader_attrs();
+            void foreach_profile(std::function<void(const mf_profile& profile, Microsoft::WRL::ComPtr<IMFMediaType> media_type, bool& quit)> action) const;
 
             void set_d0();
             void set_d3();
@@ -120,14 +120,14 @@ namespace librealsense
             const uvc_device_info                   _info;
             power_state                             _power_state = D3;
 
-            CComPtr<IMFSourceReader>                _reader = nullptr;
-            CComPtr<IMFMediaSource>                 _source = nullptr;
-            CComPtr<IMFAttributes>                  _device_attrs = nullptr;
-            CComPtr<IMFAttributes>                  _reader_attrs = nullptr;
+            Microsoft::WRL::ComPtr<IMFSourceReader>                _reader = nullptr;
+            Microsoft::WRL::ComPtr<IMFMediaSource>                 _source = nullptr;
+            Microsoft::WRL::ComPtr<IMFAttributes>                  _device_attrs = nullptr;
+            Microsoft::WRL::ComPtr<IMFAttributes>                  _reader_attrs = nullptr;
 
-            CComPtr<IAMCameraControl>               _camera_control = nullptr;
-            CComPtr<IAMVideoProcAmp>                _video_proc = nullptr;
-            std::unordered_map<int, CComPtr<IKsControl>>      _ks_controls;
+            Microsoft::WRL::ComPtr<IAMCameraControl>               _camera_control = nullptr;
+            Microsoft::WRL::ComPtr<IAMVideoProcAmp>                _video_proc = nullptr;
+            std::unordered_map<int, Microsoft::WRL::ComPtr<IKsControl>>      _ks_controls;
 
             auto_reset_event                        _is_flushed;
             manual_reset_event                      _has_started;
