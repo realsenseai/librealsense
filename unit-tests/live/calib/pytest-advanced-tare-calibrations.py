@@ -20,12 +20,11 @@ from calibrations_common import (
 
 log = logging.getLogger(__name__)
 
-# Disabled until we stabilize the lab (was #test:donotrun in the legacy directive form).
 pytestmark = [
-    pytest.mark.skip(reason="disabled until lab stabilization is complete"),
+    pytest.mark.context("nightly"),
     pytest.mark.context("calibration"),
     pytest.mark.device_each("D400*"),
-    pytest.mark.device("D555"),
+    pytest.mark.device_exclude("D555"),
 ]
 def tare_calibration_json(tare_json_file, host_assistance):
     tare_json = None
@@ -264,11 +263,18 @@ def test_advanced_tare_calibration(test_device):
                 _target_z = calculate_target_z()
                 assert _target_z > TARGET_Z_MIN and _target_z < TARGET_Z_MAX
             except Exception as e:
-                _target_z = 1200.0
-                log.warning(f"calculate_target_z failed ({e}); falling back to default target_z={_target_z} mm for test")
+                log.warning(f"calculate_target_z failed ({e}); will measure average depth as fallback baseline")
         image_width, image_height, fps = (256, 144, 90)
         config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
         restore_calibration_table(calib_dev, None)
+        if _target_z is None:
+            baseline_m = measure_average_depth(config, pipeline, width=image_width, height=image_height, fps=fps, center_fraction=0.3)
+            if baseline_m is not None:
+                _target_z = baseline_m * 1000.0
+                log.info(f"Using measured average depth as fallback baseline: {_target_z:.1f} mm")
+            else:
+                _target_z = 700.0
+                log.warning(f"Average depth measurement also failed; using default target_z={_target_z} mm")
         calib_dev, saved_table = run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_dev, image_width, image_height, fps, _target_z)
     except Exception as e:
         log.error(f"Tare calibration with principal point modification failed: {e}")
