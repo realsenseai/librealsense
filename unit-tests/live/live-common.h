@@ -4,6 +4,8 @@
 #include <unit-tests/test.h>
 #include <librealsense2/rs.hpp>
 #include <condition_variable>
+#include <cstdlib>
+#include <thread>
 #include <src/hw-monitor.h>
 #include <src/firmware-version.h>
 
@@ -51,6 +53,28 @@ inline std::string repr( rs2::device_list const & list )
 
 inline rs2::device find_first_device_or_exit()
 {
+    const char * target_sn = std::getenv( "RS2_TARGET_SERIAL_NUMBER" );
+    if( target_sn )
+    {
+        // When targeting a specific device (e.g. parallel test runs), retry a few times
+        // in case the device is still initializing after a reset
+        for( int attempt = 0; attempt < 5; ++attempt )
+        {
+            rs2::context ctx( "{\"dds\":false}" );
+            for( auto && dev : ctx.query_devices() )
+            {
+                if( dev.supports( RS2_CAMERA_INFO_SERIAL_NUMBER )
+                    && std::string( dev.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) ) == target_sn )
+                {
+                    test::log.d( "found", repr( dev ) );
+                    return dev;
+                }
+            }
+            std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+        }
+        std::cout << "Target device " << target_sn << " not found" << std::endl;
+        exit( 1 );
+    }
     rs2::context ctx( "{\"dds\":false}" );
     rs2::device_list devices_list = ctx.query_devices();
     if( devices_list.size() == 0 )
@@ -67,6 +91,25 @@ inline rs2::device_list find_devices_by_product_line_or_exit( int product )
 {
     rs2::context ctx( "{\"dds\":false}" );
     rs2::device_list devices_list = ctx.query_devices( product );
+    const char * target_sn = std::getenv( "RS2_TARGET_SERIAL_NUMBER" );
+    if( target_sn )
+    {
+        bool found = false;
+        for( auto && dev : devices_list )
+        {
+            if( dev.supports( RS2_CAMERA_INFO_SERIAL_NUMBER )
+                && std::string( dev.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) ) == target_sn )
+            {
+                found = true;
+                break;
+            }
+        }
+        if( ! found )
+        {
+            std::cout << "Target device " << target_sn << " not found in product line " << product << std::endl;
+            exit( 1 );
+        }
+    }
     if( devices_list.size() == 0 )
     {
         std::cout << "No device of the " << product << " product line was found"
