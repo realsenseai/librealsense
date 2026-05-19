@@ -5,6 +5,7 @@
 #include <rsutils/json.h>
 
 #include <map>
+#include <mutex>
 #include <string>
 #include <sstream>
 #include <functional>
@@ -91,6 +92,7 @@ namespace rs2
         template< typename T >
         T get_nested( const std::string & path, const T & def ) const
         {
+            std::lock_guard< std::recursive_mutex > lk( _mutex );
             std::istringstream ss( path );
             std::string token;
             const rsutils::json * current = &_j;
@@ -116,6 +118,7 @@ namespace rs2
         template< typename T >
         void set_nested( const std::string & path, const T & val )
         {
+            std::lock_guard< std::recursive_mutex > lk( _mutex );
             std::vector< std::string > keys;
             std::istringstream ss( path );
             std::string token;
@@ -143,6 +146,7 @@ namespace rs2
         template< typename T >
         void set_nested_default( const std::string & path, const T & default_val )
         {
+            std::lock_guard< std::recursive_mutex > lk( _mutex );
             std::vector< std::string > keys;
             std::istringstream ss( path );
             std::string token;
@@ -186,6 +190,13 @@ namespace rs2
         std::string get_default(const char* key, const char* def) const;
 
         void save();
+
+        // Serializes all reads/writes of `_j` and the on-disk file. Required because
+        // viewer reads/writes config_file from multiple threads (UI thread, the
+        // config_save_worker background thread in subdevice-model.cpp, and ad-hoc
+        // call sites like the processing-block checkbox handlers in device-model.cpp).
+        // mutable so const accessors (get/contains/get_default) can lock it.
+        mutable std::recursive_mutex _mutex;
 
         std::map<std::string, std::string> _defaults;
         std::string _filename;
