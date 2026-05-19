@@ -1,6 +1,10 @@
+// License: Apache 2.0. See LICENSE file in root directory.
+// Copyright(c) 2026 Intel Corporation. All Rights Reserved.
+
 #ifdef RS2_USE_CUDA
 
 #include "cuda-pointcloud.cuh"
+#include "rscuda_utils.cuh"
 #include <iostream>
 #include <chrono>
 
@@ -16,14 +20,14 @@ void deproject_pixel_to_point_cuda(float points[3], const struct rs2_intrinsics 
     assert(intrin->model != RS2_DISTORTION_FTHETA); // Cannot deproject to an ftheta image
     //assert(intrin->model != RS2_DISTORTION_BROWN_CONRADY); // Cannot deproject to an brown conrady model
     float x = (pixel[0] - intrin->ppx) / intrin->fx;
-    float y = (pixel[1] - intrin->ppy) / intrin->fy;    
+    float y = (pixel[1] - intrin->ppy) / intrin->fy;
 
     float xo = x;
     float yo = y;
 
     if (intrin->model == RS2_DISTORTION_INVERSE_BROWN_CONRADY)
     {
-        // need to loop until convergence 
+        // need to loop until convergence
         // 10 iterations determined empirically
         for (int i = 0; i < 10; i++)
         {
@@ -39,7 +43,7 @@ void deproject_pixel_to_point_cuda(float points[3], const struct rs2_intrinsics 
     }
     else if (intrin->model == RS2_DISTORTION_BROWN_CONRADY)
     {
-        // need to loop until convergence 
+        // need to loop until convergence
         // 10 iterations determined empirically
         for (int i = 0; i < 10; i++)
         {
@@ -54,7 +58,7 @@ void deproject_pixel_to_point_cuda(float points[3], const struct rs2_intrinsics 
     points[0] = depth * x;
     points[1] = depth * y;
     points[2] = depth;
-    
+
 }
 
 
@@ -64,18 +68,18 @@ __global__
 void kernel_deproject_depth_cuda(float * points, const rs2_intrinsics* intrin, const uint16_t * depth, float depth_scale)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
-    
+
     if (i >= (*intrin).height * (*intrin).width) {
         return;
     }
     int stride = blockDim.x * gridDim.x;
     int a, b;
-    
+
     for (int j = i; j < (*intrin).height * (*intrin).width; j += stride) {
         b = j / (*intrin).width;
         a = j - b * (*intrin).width;
         const float pixel[] = { (float)a, (float)b };
-        deproject_pixel_to_point_cuda(points + j * 3, intrin, pixel, depth_scale * depth[j]);               
+        deproject_pixel_to_point_cuda(points + j * 3, intrin, pixel, depth_scale * depth[j]);
    }
 }
 
@@ -83,35 +87,29 @@ void kernel_deproject_depth_cuda(float * points, const rs2_intrinsics* intrin, c
 void rscuda::deproject_depth_cuda(float * points, const rs2_intrinsics & intrin, const uint16_t * depth, float depth_scale)
 {
     int count = intrin.height * intrin.width;
-    int numBlocks = count / RS2_CUDA_THREADS_PER_BLOCK;
-    
-    float *dev_points = 0;	
-    uint16_t *dev_depth = 0;
-    rs2_intrinsics* dev_intrin = 0;
-    hipError_t result;
+    // Ceiling division: avoid numBlocks == 0 when count < RS2_CUDA_THREADS_PER_BLOCK.
+    int numBlocks = (count + RS2_CUDA_THREADS_PER_BLOCK - 1) / RS2_CUDA_THREADS_PER_BLOCK;
 
-    result = hipMalloc(&dev_points, count * sizeof(float) * 3);
-    assert(result == hipSuccess);
-    result = hipMalloc(&dev_depth, count * sizeof(uint16_t));
-    assert(result == hipSuccess);
-    result = hipMalloc(&dev_intrin, sizeof(rs2_intrinsics));
-    assert(result == hipSuccess);
-       
-    result = hipMemcpy(dev_depth, depth, count * sizeof(uint16_t), hipMemcpyHostToDevice);
-    assert(result == hipSuccess); 
-    result = hipMemcpy(dev_intrin, &intrin, sizeof(rs2_intrinsics), hipMemcpyHostToDevice);
-    assert(result == hipSuccess); 
-     
-    kernel_deproject_depth_cuda<<<numBlocks, RS2_CUDA_THREADS_PER_BLOCK>>>(dev_points, dev_intrin, dev_depth, depth_scale); 
+    // Use the RAII allocator from rscuda_utils.cuh so device memory is
+    // automatically released on any exception thrown by RS_CUDA_CHECK
+    // (the previous raw hipMalloc + manual hipFree code leaked on error
+    // paths and required a `if (result);` warning-suppression hack).
+    auto d_points = alloc_dev<float>(count * 3);
+    auto d_depth  = alloc_dev<uint16_t>(count);
+    auto d_intrin = alloc_dev<rs2_intrinsics>(1);
 
-     result = hipMemcpy(points, dev_points, count * sizeof(float) * 3, hipMemcpyDeviceToHost);
-     assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(d_depth.get(), depth, count * sizeof(uint16_t), hipMemcpyHostToDevice));
+    RS_CUDA_CHECK(hipMemcpy(d_intrin.get(), &intrin, sizeof(rs2_intrinsics), hipMemcpyHostToDevice));
 
-     if (result); // suppress warning about "variable "result" was set but never used"
+    kernel_deproject_depth_cuda<<<numBlocks, RS2_CUDA_THREADS_PER_BLOCK>>>(d_points.get(), d_intrin.get(), d_depth.get(), depth_scale);
 
-    hipFree(dev_points);
-    hipFree(dev_depth);
-    hipFree(dev_intrin);
+    // Kernel launches are asynchronous on HIP: synchronise before reading
+    // the output back to the host, otherwise hipMemcpy may race with an
+    // unfinished kernel and return stale data.
+    RS_CUDA_CHECK(hipStreamSynchronize(0));
+    RS_CUDA_CHECK(hipGetLastError());
+
+    RS_CUDA_CHECK(hipMemcpy(points, d_points.get(), count * sizeof(float) * 3, hipMemcpyDeviceToHost));
 }
 
 #endif

@@ -1,4 +1,8 @@
-//This file is partly based on Mehran Maghoumi's work: https://github.com/Maghoumi/culibrealsense
+// License: Apache 2.0. See LICENSE file in root directory.
+// Copyright(c) 2026 Intel Corporation. All Rights Reserved.
+//
+// This file is partly based on Mehran Maghoumi's work:
+// https://github.com/Maghoumi/culibrealsense
 
 #ifdef RS2_USE_CUDA
 
@@ -235,21 +239,19 @@ __global__ void kernel_uyvy_to_yuyv_cuda(uint16_t* src, uint16_t* dst, int count
 
 void rscuda::uyvy_to_yuyv_cuda_helper(const uint16_t* src, uint16_t* dst, int count)
 {
-    int numBlocks = count / RS2_CUDA_THREADS_PER_BLOCK;
+    // Ceiling division: avoid numBlocks == 0 when count < RS2_CUDA_THREADS_PER_BLOCK,
+    // which would launch the kernel with 0 blocks and leave d_dst uninitialised.
+    int numBlocks = (count + RS2_CUDA_THREADS_PER_BLOCK - 1) / RS2_CUDA_THREADS_PER_BLOCK;
     auto d_src = alloc_dev<uint16_t>(count);
     auto d_dst = alloc_dev<uint16_t>(count);
 
-    auto result = hipMemcpy(d_src.get(), src, count * sizeof(uint16_t), hipMemcpyHostToDevice);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(d_src.get(), src, count * sizeof(uint16_t), hipMemcpyHostToDevice));
 
     kernel_uyvy_to_yuyv_cuda <<<numBlocks, RS2_CUDA_THREADS_PER_BLOCK>>>(d_src.get(), d_dst.get(), count);
-    hipStreamSynchronize(0);
+    RS_CUDA_CHECK(hipStreamSynchronize(0));
+    RS_CUDA_CHECK(hipGetLastError());
 
-    result = hipGetLastError();
-    assert(result == hipSuccess);
-
-    result = hipMemcpy(dst, d_dst.get(), count * sizeof(uint16_t), hipMemcpyDeviceToHost);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(dst, d_dst.get(), count * sizeof(uint16_t), hipMemcpyDeviceToHost));
 }
 
 void rscuda::unpack_yuy2_cuda_helper(const uint8_t* h_src, uint8_t* h_dst, int n, rs2_format format)
@@ -264,10 +266,9 @@ void rscuda::unpack_yuy2_cuda_helper(const uint8_t* h_src, uint8_t* h_dst, int n
     std::shared_ptr<uint8_t> d_dst;
     std::shared_ptr<uint8_t> d_src = alloc_dev<uint8_t>(superPix * 4);
 
-    auto result = hipMemcpy(d_src.get(), h_src, superPix * sizeof(uint8_t) * 4, hipMemcpyHostToDevice);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(d_src.get(), h_src, superPix * sizeof(uint8_t) * 4, hipMemcpyHostToDevice));
 
-    int numBlocks = superPix / RS2_CUDA_THREADS_PER_BLOCK;
+    int numBlocks = (superPix + RS2_CUDA_THREADS_PER_BLOCK - 1) / RS2_CUDA_THREADS_PER_BLOCK;
     int size;
 
     switch (format)
@@ -305,15 +306,12 @@ void rscuda::unpack_yuy2_cuda_helper(const uint8_t* h_src, uint8_t* h_dst, int n
         kernel_unpack_yuy2_bgra8_cuda <<<numBlocks, RS2_CUDA_THREADS_PER_BLOCK>>> (d_src.get(), d_dst.get(), superPix);
         break;
     default:
-        assert(false);
+        throw std::runtime_error("unpack_yuy2_cuda_helper: unsupported rs2_format");
     }
-    result = hipGetLastError();
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipStreamSynchronize(0));
+    RS_CUDA_CHECK(hipGetLastError());
 
-    hipStreamSynchronize(0);
-
-    result = hipMemcpy(h_dst, d_dst.get(), n * sizeof(uint8_t) * size, hipMemcpyDeviceToHost);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(h_dst, d_dst.get(), n * sizeof(uint8_t) * size, hipMemcpyDeviceToHost));
 
     /*	hipEventRecord(stop);
         hipEventSynchronize(stop);
@@ -341,7 +339,7 @@ void rscuda::y8_y8_from_y8i_cuda_helper(uint8_t* const dest[], int count, const 
         hipEventCreate(&stop);
         hipEventRecord(start); */
 
-    int numBlocks = count / RS2_CUDA_THREADS_PER_BLOCK;
+    int numBlocks = (count + RS2_CUDA_THREADS_PER_BLOCK - 1) / RS2_CUDA_THREADS_PER_BLOCK;
     uint8_t* a = dest[0];
     uint8_t* b = dest[1];
 
@@ -349,19 +347,14 @@ void rscuda::y8_y8_from_y8i_cuda_helper(uint8_t* const dest[], int count, const 
     auto d_dst_0 = alloc_dev<uint8_t>(count);
     auto d_dst_1 = alloc_dev<uint8_t>(count);
 
-    auto result = hipMemcpy(d_src.get(), source, count * sizeof(rscuda::y8i_pixel), hipMemcpyHostToDevice);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(d_src.get(), source, count * sizeof(rscuda::y8i_pixel), hipMemcpyHostToDevice));
 
     kernel_split_frame_y8_y8_from_y8i_cuda <<<numBlocks, RS2_CUDA_THREADS_PER_BLOCK>>> (d_dst_0.get(), d_dst_1.get(), count, d_src.get());
-    hipStreamSynchronize(0);
+    RS_CUDA_CHECK(hipStreamSynchronize(0));
+    RS_CUDA_CHECK(hipGetLastError());
 
-    result = hipGetLastError();
-    assert(result == hipSuccess);
-
-    result = hipMemcpy(a, d_dst_0.get(), count * sizeof(uint8_t), hipMemcpyDeviceToHost);
-    assert(result == hipSuccess);
-    result = hipMemcpy(b, d_dst_1.get(), count * sizeof(uint8_t), hipMemcpyDeviceToHost);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(a, d_dst_0.get(), count * sizeof(uint8_t), hipMemcpyDeviceToHost));
+    RS_CUDA_CHECK(hipMemcpy(b, d_dst_1.get(), count * sizeof(uint8_t), hipMemcpyDeviceToHost));
 
     /*    hipEventRecord(stop);
         hipEventSynchronize(stop);
@@ -391,7 +384,7 @@ __global__ void kernel_split_frame_y8_y8_from_y8i_mipi_cuda(uint8_t* a, uint8_t*
 void rscuda::y8_y8_from_y8i_mipi_cuda_helper(uint8_t* const dest[], int count, const rscuda::y8i_pixel_mipi * source)
 {
     int pair_count = count / 2;
-    int numBlocks = pair_count / RS2_CUDA_THREADS_PER_BLOCK;
+    int numBlocks = (pair_count + RS2_CUDA_THREADS_PER_BLOCK - 1) / RS2_CUDA_THREADS_PER_BLOCK;
     uint8_t* a = dest[0];
     uint8_t* b = dest[1];
 
@@ -399,19 +392,14 @@ void rscuda::y8_y8_from_y8i_mipi_cuda_helper(uint8_t* const dest[], int count, c
     auto d_dst_0 = alloc_dev<uint8_t>(count);
     auto d_dst_1 = alloc_dev<uint8_t>(count);
 
-    auto result = hipMemcpy(d_src.get(), source, count * sizeof(rscuda::y8i_pixel_mipi), hipMemcpyHostToDevice);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(d_src.get(), source, count * sizeof(rscuda::y8i_pixel_mipi), hipMemcpyHostToDevice));
 
     kernel_split_frame_y8_y8_from_y8i_mipi_cuda <<<numBlocks, RS2_CUDA_THREADS_PER_BLOCK>>> (d_dst_0.get(), d_dst_1.get(), count, d_src.get());
-    hipStreamSynchronize(0);
+    RS_CUDA_CHECK(hipStreamSynchronize(0));
+    RS_CUDA_CHECK(hipGetLastError());
 
-    result = hipGetLastError();
-    assert(result == hipSuccess);
-
-    result = hipMemcpy(a, d_dst_0.get(), count * sizeof(uint8_t), hipMemcpyDeviceToHost);
-    assert(result == hipSuccess);
-    result = hipMemcpy(b, d_dst_1.get(), count * sizeof(uint8_t), hipMemcpyDeviceToHost);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(a, d_dst_0.get(), count * sizeof(uint8_t), hipMemcpyDeviceToHost));
+    RS_CUDA_CHECK(hipMemcpy(b, d_dst_1.get(), count * sizeof(uint8_t), hipMemcpyDeviceToHost));
 }
 
 
@@ -437,9 +425,11 @@ void rscuda::y16_y16_from_y12i_10_cuda_helper(uint8_t* const dest[], int count, 
         hipEventCreate(&stop);
         hipEventRecord(start); */
 
-    source = reinterpret_cast<const SOURCE*>(source);
+    // (Removed no-op `source = reinterpret_cast<const SOURCE*>(source);` --
+    //  `source` is already const SOURCE*; the cast was a copy-paste artifact
+    //  from a CUDA version that started from void*.)
 
-    int numBlocks = count / RS2_CUDA_THREADS_PER_BLOCK;
+    int numBlocks = (count + RS2_CUDA_THREADS_PER_BLOCK - 1) / RS2_CUDA_THREADS_PER_BLOCK;
     uint16_t* a = reinterpret_cast<uint16_t*>(dest[0]);
     uint16_t* b = reinterpret_cast<uint16_t*>(dest[1]);
 
@@ -447,20 +437,14 @@ void rscuda::y16_y16_from_y12i_10_cuda_helper(uint8_t* const dest[], int count, 
     auto d_dst_0 = alloc_dev<uint16_t>(count);
     auto d_dst_1 = alloc_dev<uint16_t>(count);
 
-
-    auto result = hipMemcpy(d_src.get(), source, count * sizeof(SOURCE), hipMemcpyHostToDevice);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(d_src.get(), source, count * sizeof(SOURCE), hipMemcpyHostToDevice));
 
     kernel_split_frame_y16_y16_from_y12i_cuda <<<numBlocks, RS2_CUDA_THREADS_PER_BLOCK>>> (d_dst_0.get(), d_dst_1.get(), count, d_src.get());
-    hipStreamSynchronize(0);
+    RS_CUDA_CHECK(hipStreamSynchronize(0));
+    RS_CUDA_CHECK(hipGetLastError());
 
-    result = hipGetLastError();
-    assert(result == hipSuccess);
-
-    result = hipMemcpy(a, d_dst_0.get(), count * sizeof(uint16_t), hipMemcpyDeviceToHost);
-    assert(result == hipSuccess);
-    result = hipMemcpy(b, d_dst_1.get(), count * sizeof(uint16_t), hipMemcpyDeviceToHost);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(a, d_dst_0.get(), count * sizeof(uint16_t), hipMemcpyDeviceToHost));
+    RS_CUDA_CHECK(hipMemcpy(b, d_dst_1.get(), count * sizeof(uint16_t), hipMemcpyDeviceToHost));
 
     /*
     hipEventRecord(stop);
@@ -496,16 +480,15 @@ void rscuda::unpack_z16_y8_from_sr300_inzi_cuda(uint8_t * const dest, const uint
     auto d_src = alloc_dev<uint16_t>(count);
     auto d_dst = alloc_dev<uint8_t>(count);
 
-    int numBlocks = count / RS2_CUDA_THREADS_PER_BLOCK;
+    int numBlocks = (count + RS2_CUDA_THREADS_PER_BLOCK - 1) / RS2_CUDA_THREADS_PER_BLOCK;
 
-    auto result = hipMemcpy(d_src.get(), source, count * sizeof(uint16_t), hipMemcpyHostToDevice);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(d_src.get(), source, count * sizeof(uint16_t), hipMemcpyHostToDevice));
 
     kernel_z16_y8_from_sr300_inzi_cuda <<<numBlocks, RS2_CUDA_THREADS_PER_BLOCK>>> (d_src.get(), d_dst.get(), count);
-    hipStreamSynchronize(0);
+    RS_CUDA_CHECK(hipStreamSynchronize(0));
+    RS_CUDA_CHECK(hipGetLastError());
 
-    result = hipMemcpy(dest, d_dst.get(), count * sizeof(uint8_t), hipMemcpyDeviceToHost);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(dest, d_dst.get(), count * sizeof(uint8_t), hipMemcpyDeviceToHost));
 
     /*  hipEventRecord(stop);
         hipEventSynchronize(stop);
@@ -534,16 +517,15 @@ void rscuda::unpack_z16_y16_from_sr300_inzi_cuda(uint16_t * const dest, const ui
     auto d_src = alloc_dev<uint16_t>(count);
     auto d_dst = alloc_dev<uint16_t>(count);
 
-    int numBlocks = count / RS2_CUDA_THREADS_PER_BLOCK;
+    int numBlocks = (count + RS2_CUDA_THREADS_PER_BLOCK - 1) / RS2_CUDA_THREADS_PER_BLOCK;
 
-    auto result = hipMemcpy(d_src.get(), source, count * sizeof(uint16_t), hipMemcpyHostToDevice);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(d_src.get(), source, count * sizeof(uint16_t), hipMemcpyHostToDevice));
 
     kernel_z16_y16_from_sr300_inzi_cuda <<<numBlocks, RS2_CUDA_THREADS_PER_BLOCK>>> (d_src.get(), d_dst.get(), count);
-    hipStreamSynchronize(0);
+    RS_CUDA_CHECK(hipStreamSynchronize(0));
+    RS_CUDA_CHECK(hipGetLastError());
 
-    result = hipMemcpy(dest, d_dst.get(), count * sizeof(uint16_t), hipMemcpyDeviceToHost);
-    assert(result == hipSuccess);
+    RS_CUDA_CHECK(hipMemcpy(dest, d_dst.get(), count * sizeof(uint16_t), hipMemcpyDeviceToHost));
 
     /*	hipEventRecord(stop);
         hipEventSynchronize(stop);

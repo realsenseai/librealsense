@@ -1,9 +1,17 @@
+// License: Apache 2.0. See LICENSE file in root directory.
+// Copyright(c) 2026 Intel Corporation. All Rights Reserved.
+
 #ifdef RS2_USE_CUDA
 
 #include "cuda-align.cuh"
 #include "../../../include/librealsense2/rsutil.h"
 #include "../../cuda/rscuda_utils.cuh"
 
+// Local per-axis block size for the 2D launches below (dim3(32,32) = 1024
+// threads/block, the gfx1100 / SM hard limit).  This intentionally differs
+// from the 1D RS2_CUDA_THREADS_PER_BLOCK = 256 used by the conversion and
+// point-cloud kernels (defined in their own headers), so it cannot share
+// a single global constant.  Matches cuda-align.cu.
 #define RS2_CUDA_THREADS_PER_BLOCK 32
 
 using namespace librealsense;
@@ -11,7 +19,11 @@ using namespace rscuda;
 
 template<int N> struct bytes { unsigned char b[N]; };
 
-int calc_block_size(int pixel_count, int thread_count)
+// `static` gives this helper internal linkage so it cannot collide with a
+// same-named free function in another translation unit (e.g. the CUDA .cu
+// build of this file) at link time -- the previous external-linkage
+// definition was an ODR violation waiting to happen.
+static int calc_block_size(int pixel_count, int thread_count)
 {
     return ((pixel_count % thread_count) == 0) ? (pixel_count / thread_count) : (pixel_count / thread_count + 1);
 }

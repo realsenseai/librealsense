@@ -1,5 +1,4 @@
-info("Building with HIP/ROCm for AMD GPUs..")
-cmake_minimum_required(VERSION 3.21)
+message(STATUS "Building with HIP/ROCm for AMD GPUs..")
 
 # Find ROCm/HIP SDK installation (Linux and Windows)
 if(NOT DEFINED ROCM_PATH)
@@ -64,7 +63,11 @@ enable_language(HIP)
 find_package(hip REQUIRED CONFIG
     PATHS "${ROCM_PATH}" "${ROCM_PATH}/lib/cmake/hip" "${ROCM_PATH}/cmake")
 
-include_directories(${HIP_INCLUDE_DIRS})
+# NOTE: include paths and the link target are applied to ${LRS_TARGET}
+# (and any other consumer) in CMake/global_config.cmake via
+# target_include_directories / target_link_libraries against hip::device.
+# Do NOT call include_directories() here -- that would leak the paths into
+# every target in the build tree.
 
 message(STATUS "HIP_INCLUDE_DIRS: ${HIP_INCLUDE_DIRS}")
 
@@ -77,6 +80,3 @@ endif()
 add_definitions(-D__HIP_PLATFORM_AMD__)
 
 message(STATUS "HIP architectures: ${CMAKE_HIP_ARCHITECTURES}")
-
-# Store HIP link target for use by realsense2 target
-set(HIP_LINK_LIBRARIES hip::device CACHE INTERNAL "HIP libraries to link")
