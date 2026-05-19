@@ -46,8 +46,11 @@ homepage = "https://github.com/realsenseai/librealsense"
 [tool.hatch.build]
 artifacts = [
     "pyrealsense2/*.so",
+    "pyrealsense2/*.so.*",
     "pyrealsense2/*.pyd",
-    "pyrealsense2/*.dll"
+    "pyrealsense2/*.dll",
+    "pyrealsense2/*.dylib",
+    "pyrealsense2/*.dylib.*"
 ]
 packages = ["pyrealsense2"]
 
