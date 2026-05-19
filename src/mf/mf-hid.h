@@ -7,7 +7,8 @@
 #include "win/win-helpers.h"
 
 #include <Sensorsapi.h>
-#include <atlcomcli.h>
+#include <wrl/client.h>
+#include <rsutils/string/windows.h>
 
 namespace librealsense
 {
@@ -16,24 +17,24 @@ namespace librealsense
 
         class wmf_hid_sensor {
         public:
-            wmf_hid_sensor(const hid_device_info& device_info, CComPtr<ISensor> pISensor) :
-                _hid_device_info(device_info), _pISensor(pISensor) 
+            wmf_hid_sensor(const hid_device_info& device_info, Microsoft::WRL::ComPtr<ISensor> pISensor) :
+                _hid_device_info(device_info), _pISensor(pISensor)
             {
-                BSTR fName;
+                BSTR fName = nullptr;
                 auto res = pISensor->GetFriendlyName( &fName );
                 if( FAILED( res ) )
                 {
-                    _name = CW2A( L"Unidentified HID Sensor" );
+                    _name = "Unidentified HID Sensor";
                 }
                 else
                 {
-                    _name = CW2A( fName );
+                    _name = rsutils::string::windows::win_to_utf( fName );
                     SysFreeString( fName );
                 }
             };
 
             const std::string& get_sensor_name() const { return _name; }
-            const CComPtr<ISensor>& get_sensor() const { return _pISensor; }
+            const Microsoft::WRL::ComPtr<ISensor>& get_sensor() const { return _pISensor; }
 
             HRESULT start_capture(ISensorEvents* sensorEvents)
             {
@@ -42,13 +43,13 @@ namespace librealsense
 
             HRESULT stop_capture()
             {
-                return _pISensor->SetEventSink(NULL);
+                return _pISensor->SetEventSink(nullptr);
             }
 
         private:
 
             hid_device_info _hid_device_info;
-            CComPtr<ISensor> _pISensor;
+            Microsoft::WRL::ComPtr<ISensor> _pISensor;
             std::string _name;
         };
 
@@ -57,7 +58,7 @@ namespace librealsense
         class wmf_hid_device : public hid_device
         {
         public:
-            static void foreach_hid_device(std::function<void(hid_device_info, CComPtr<ISensor>)> action);
+            static void foreach_hid_device(std::function<void(hid_device_info, Microsoft::WRL::ComPtr<ISensor>)> action);
             wmf_hid_device(const hid_device_info& info, std::shared_ptr<const wmf_backend> backend);
 
             void register_profiles(const std::vector<hid_profile>& hid_profiles) override { _hid_profiles = hid_profiles;}
@@ -77,7 +78,7 @@ namespace librealsense
             std::vector<std::shared_ptr<wmf_hid_sensor>> _opened_sensors;    // Vector of all opened sensors of this device (subclass of _connected_sensors)
             std::vector<std::shared_ptr<wmf_hid_sensor>> _streaming_sensors; // Vector of all streaming sensors of this device (subclass of _connected_sensors)
 
-            CComPtr<ISensorEvents> _cb;
+            Microsoft::WRL::ComPtr<ISensorEvents> _cb;
             std::vector<hid_profile> _hid_profiles;
             //10.0 was used for D400 before FW support to gyro sensitivity control
             double _gyro_scale_factor = 10.0;

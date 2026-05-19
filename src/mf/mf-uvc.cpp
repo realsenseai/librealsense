@@ -1,23 +1,6 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2015 RealSense, Inc. All Rights Reserved.
 
-#if (_MSC_FULL_VER < 180031101)
-#error At least Visual Studio 2013 Update 4 is required to compile this backend
-#endif
-
-#include <ntverp.h>
-#if VER_PRODUCTBUILD <= 9600    // (WinSDK 8.1)
-#ifdef ENFORCE_METADATA
-#error( "Librealsense Error!: Featuring UVC Metadata requires WinSDK 10.0.10586.0. \
- Install the required toolset to proceed. Alternatively, uncheck ENFORCE_METADATA option in CMake GUI tool")
-#else
-#pragma message ( "\nLibrealsense notification: Featuring UVC Metadata requires WinSDK 10.0.10586.0 toolset. \
-The library will be compiled without the metadata support!\n")
-#endif // ENFORCE_METADATA
-#else
-#define METADATA_SUPPORT
-#endif      // (WinSDK 8.1)
-
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -60,7 +43,6 @@ namespace librealsense
 {
     namespace platform
     {
-#ifdef METADATA_SUPPORT
 
 #pragma pack(push, 1)
             struct ms_proprietary_md_blob
@@ -83,8 +65,8 @@ namespace librealsense
 
             bool try_read_metadata(IMFSample *pSample, uint8_t& metadata_size, uint8_t ** bytes)
             {
-                CComPtr<IUnknown>       spUnknown;
-                CComPtr<IMFAttributes>  spSample;
+                Microsoft::WRL::ComPtr<IUnknown>       spUnknown;
+                Microsoft::WRL::ComPtr<IMFAttributes>  spSample;
                 HRESULT hr = S_OK;
 
                 CHECK_HR(hr = pSample->QueryInterface(IID_PPV_ARGS(&spSample)));
@@ -92,8 +74,8 @@ namespace librealsense
 
                 if (SUCCEEDED(hr))
                 {
-                    CComPtr<IMFAttributes>          spMetadata;
-                    CComPtr<IMFMediaBuffer>         spBuffer;
+                    Microsoft::WRL::ComPtr<IMFAttributes>          spMetadata;
+                    Microsoft::WRL::ComPtr<IMFMediaBuffer>         spBuffer;
                     PKSCAMERA_METADATA_ITEMHEADER   pMetadata = nullptr;
                     DWORD                           dwMaxLength = 0;
                     DWORD                           dwCurrentLength = 0;
@@ -142,7 +124,6 @@ namespace librealsense
                 else
                     return false;
             }
-#endif // METADATA_SUPPORT
 
         STDMETHODIMP source_reader_callback::QueryInterface(REFIID iid, void** ppv)
         {
@@ -196,7 +177,7 @@ namespace librealsense
 
                 if (sample)
                 {
-                    CComPtr<IMFMediaBuffer> buffer = nullptr;
+                    Microsoft::WRL::ComPtr<IMFMediaBuffer> buffer = nullptr;
                     if (SUCCEEDED(sample->GetBufferByIndex(0, &buffer)))
                     {
                         uint8_t * byte_buffer=nullptr;
@@ -205,9 +186,7 @@ namespace librealsense
                         {
                             uint8_t * metadata = nullptr;
                             uint8_t metadata_size = 0;
-#ifdef METADATA_SUPPORT
                             try_read_metadata(sample, metadata_size, &metadata);
-#endif
                             try
                             {
                                 auto& stream = owner->_streams[dwStreamIndex];
@@ -257,7 +236,7 @@ namespace librealsense
         IKsControl* wmf_uvc_device::get_ks_control(const extension_unit & xu) const
         {
             auto it = _ks_controls.find(xu.node);
-            if (it != std::end(_ks_controls)) return it->second;
+            if (it != std::end(_ks_controls)) return it->second.Get();
             throw std::runtime_error("Extension control must be initialized before use!");
         }
 
@@ -267,20 +246,18 @@ namespace librealsense
                 throw std::runtime_error("Could not initialize extensions controls!");
 
             // Attempt to retrieve IKsControl
-            CComPtr<IKsTopologyInfo> ks_topology_info = nullptr;
-            CHECK_HR(_source->QueryInterface(__uuidof(IKsTopologyInfo),
-                reinterpret_cast<void **>(&ks_topology_info)));
+            Microsoft::WRL::ComPtr<IKsTopologyInfo> ks_topology_info;
+            CHECK_HR(_source.As(&ks_topology_info));
 
             DWORD nNodes=0;
             LOG_HR_STR("get_NumNodes", ks_topology_info->get_NumNodes(&nNodes));
 
-            CComPtr<IUnknown> unknown = nullptr;
+            Microsoft::WRL::ComPtr<IUnknown> unknown;
             CHECK_HR(ks_topology_info->CreateNodeInstance(xu.node, IID_IUnknown,
-                reinterpret_cast<LPVOID *>(&unknown)));
+                reinterpret_cast<LPVOID *>(unknown.GetAddressOf())));
 
-            CComPtr<IKsControl> ks_control = nullptr;
-            CHECK_HR(unknown->QueryInterface(__uuidof(IKsControl),
-                reinterpret_cast<void **>(&ks_control)));
+            Microsoft::WRL::ComPtr<IKsControl> ks_control;
+            CHECK_HR(unknown.As(&ks_control));
             _ks_controls[xu.node] = ks_control;
         }
 
@@ -727,23 +704,27 @@ namespace librealsense
         {
             for (auto attributes_params_set : attributes_params)
             {
-                CComPtr<IMFAttributes> pAttributes = nullptr;
+                Microsoft::WRL::ComPtr<IMFAttributes> pAttributes;
                 CHECK_HR(MFCreateAttributes(&pAttributes, 1));
                 for (auto attribute_params : attributes_params_set)
                 {
                     CHECK_HR(pAttributes->SetGUID(attribute_params.first, attribute_params.second));
                 }
 
-                IMFActivate ** ppDevices;
-                UINT32 numDevices;
-                CHECK_HR(MFEnumDeviceSources(pAttributes, &ppDevices, &numDevices));
+                IMFActivate ** ppDevices = nullptr;
+                UINT32 numDevices = 0;
+                CHECK_HR(MFEnumDeviceSources(pAttributes.Get(), &ppDevices, &numDevices));
+                // Free the array (and AddRef'd entries we copy below) on every exit path.
+                std::unique_ptr<IMFActivate*, void(*)(IMFActivate**)> devices_guard(
+                    ppDevices,
+                    [](IMFActivate** p) { if (p) CoTaskMemFree(p); });
 
                 for (UINT32 i = 0; i < numDevices; ++i)
                 {
-                    CComPtr<IMFActivate> pDevice;
-                    *&pDevice = ppDevices[i];
+                    Microsoft::WRL::ComPtr<IMFActivate> pDevice = ppDevices[i];
 
-                    WCHAR * wchar_name = nullptr; UINT32 length;
+                    WCHAR * wchar_name = nullptr;
+                    UINT32 length = 0;
                     CHECK_HR(pDevice->GetAllocatedString(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK, &wchar_name, &length));
                     auto name = rsutils::string::windows::win_to_utf(wchar_name);
                     CoTaskMemFree(wchar_name);
@@ -766,8 +747,6 @@ namespace librealsense
                         // TODO
                     }
                 }
-                safe_release(pAttributes);
-                CoTaskMemFree(ppDevices);
             }
         }
 
@@ -813,7 +792,8 @@ namespace librealsense
                 if (i == _info && device)
                 {
                     _device_id.resize(DEVICE_ID_MAX_SIZE);
-                    CHECK_HR(device->GetString(did_guid, const_cast<LPWSTR>(_device_id.c_str()), UINT32(_device_id.size()), nullptr));
+                    CHECK_HR(device->GetString(did_guid, &_device_id[0], UINT32(_device_id.size()), nullptr));
+                    _device_id.resize(wcslen(_device_id.c_str()));
                 }
             });
         }
@@ -828,10 +808,8 @@ namespace librealsense
 
                 set_power_state(D3);
 
-                safe_release(_device_attrs);
-                safe_release(_reader_attrs);
-                for (auto&& c : _ks_controls)
-                    safe_release(c.second);
+                _device_attrs.Reset();
+                _reader_attrs.Reset();
                 _ks_controls.clear();
             }
             catch (...)
@@ -840,9 +818,9 @@ namespace librealsense
             }
         }
 
-        CComPtr<IMFAttributes> wmf_uvc_device::create_device_attrs()
+        Microsoft::WRL::ComPtr<IMFAttributes> wmf_uvc_device::create_device_attrs()
         {
-            CComPtr<IMFAttributes> device_attrs = nullptr;
+            Microsoft::WRL::ComPtr<IMFAttributes> device_attrs;
 
             CHECK_HR(MFCreateAttributes(&device_attrs, 2));
             CHECK_HR(device_attrs->SetGUID(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE, type_guid));
@@ -850,9 +828,9 @@ namespace librealsense
             return device_attrs;
         }
 
-        CComPtr<IMFAttributes> wmf_uvc_device::create_reader_attrs()
+        Microsoft::WRL::ComPtr<IMFAttributes> wmf_uvc_device::create_reader_attrs()
         {
-            CComPtr<IMFAttributes> reader_attrs = nullptr;
+            Microsoft::WRL::ComPtr<IMFAttributes> reader_attrs;
 
             CHECK_HR(MFCreateAttributes(&reader_attrs, 3));
             CHECK_HR(reader_attrs->SetUINT32(MF_SOURCE_READER_DISCONNECT_MEDIASOURCE_ON_SHUTDOWN, FALSE));
@@ -872,60 +850,60 @@ namespace librealsense
             _streams.resize(_streamIndex);
 
             // Release any stale COM pointers from a previously failed set_d0() or set_d3()
-            safe_release(_camera_control);
-            safe_release(_video_proc);
-            safe_release(_reader);
+            _camera_control.Reset();
+            _video_proc.Reset();
+            _reader.Reset();
             if (_source)
             {
                 _source->Shutdown();
-                safe_release(_source);
+                _source.Reset();
             }
 
             //enable source
-            CHECK_HR(MFCreateDeviceSource(_device_attrs, &_source));
-            LOG_HR(_source->QueryInterface(__uuidof(IAMCameraControl), reinterpret_cast<void **>(&_camera_control)));
+            CHECK_HR(MFCreateDeviceSource(_device_attrs.Get(), &_source));
+            LOG_HR(_source.As(&_camera_control));
             // The IAMVideoProcAmp interface adjusts the qualities of an incoming video signal, such as brightness,
             // contrast, hue, saturation, gamma, and sharpness.
-            auto hr = _source->QueryInterface( __uuidof( IAMVideoProcAmp ), reinterpret_cast< void ** >( &_video_proc ) );
+            auto hr = _source.As( &_video_proc );
             // E_NOINTERFACE is expected... especially when no video camera
             if( hr != E_NOINTERFACE )
                 LOG_HR_STR( "QueryInterface(IAMVideoProcAmp)", hr );
 
             //enable reader
-            CHECK_HR(MFCreateSourceReaderFromMediaSource(_source, _reader_attrs, &_reader));
+            CHECK_HR(MFCreateSourceReaderFromMediaSource(_source.Get(), _reader_attrs.Get(), &_reader));
             CHECK_HR(_reader->SetStreamSelection(static_cast<DWORD>(MF_SOURCE_READER_ALL_STREAMS), TRUE));
             _power_state = D0;
         }
 
         void wmf_uvc_device::set_d3()
         {
-            safe_release(_camera_control);
-            safe_release(_video_proc);
-            safe_release(_reader);
+            _camera_control.Reset();
+            _video_proc.Reset();
+            _reader.Reset();
             if (_source)
             {
                 _source->Shutdown();
-                safe_release(_source);
+                _source.Reset();
             }
             for (auto& elem : _streams)
                 elem.callback = nullptr;
             _power_state = D3;
         }
 
-        void wmf_uvc_device::foreach_profile(std::function<void(const mf_profile& profile, CComPtr<IMFMediaType> media_type, bool& quit)> action) const
+        void wmf_uvc_device::foreach_profile(std::function<void(const mf_profile& profile, Microsoft::WRL::ComPtr<IMFMediaType> media_type, bool& quit)> action) const
         {
             bool quit = false;
-            CComPtr<IMFMediaType> pMediaType = nullptr;
+            Microsoft::WRL::ComPtr<IMFMediaType> pMediaType;
             for (unsigned int sIndex = 0; sIndex < _streams.size(); ++sIndex)
             {
                 for (auto k = 0;; k++)
                 {
-                    auto hr = _reader->GetNativeMediaType(sIndex, k, &pMediaType.p);
+                    auto hr = _reader->GetNativeMediaType(sIndex, k, pMediaType.ReleaseAndGetAddressOf());
                     if (FAILED(hr) || pMediaType == nullptr)
                     {
-                        safe_release(pMediaType);
+                        pMediaType.Reset();
                         if (hr != MF_E_NO_MORE_TYPES) // An object ran out of media types to suggest therefore the requested chain of streaming objects cannot be completed
-                            LOG_HR_STR("_reader->GetNativeMediaType(sIndex, k, &pMediaType.p)",hr);
+                            LOG_HR_STR("_reader->GetNativeMediaType",hr);
 
                         break;
                     }
@@ -936,13 +914,13 @@ namespace librealsense
                     unsigned width = 0;
                     unsigned height = 0;
 
-                    CHECK_HR(MFGetAttributeSize(pMediaType, MF_MT_FRAME_SIZE, &width, &height));
+                    CHECK_HR(MFGetAttributeSize(pMediaType.Get(), MF_MT_FRAME_SIZE, &width, &height));
 
                     frame_rate frameRateMin;
                     frame_rate frameRateMax;
 
-                    CHECK_HR(MFGetAttributeRatio(pMediaType, MF_MT_FRAME_RATE_RANGE_MIN, &frameRateMin.numerator, &frameRateMin.denominator));
-                    CHECK_HR(MFGetAttributeRatio(pMediaType, MF_MT_FRAME_RATE_RANGE_MAX, &frameRateMax.numerator, &frameRateMax.denominator));
+                    CHECK_HR(MFGetAttributeRatio(pMediaType.Get(), MF_MT_FRAME_RATE_RANGE_MIN, &frameRateMin.numerator, &frameRateMin.denominator));
+                    CHECK_HR(MFGetAttributeRatio(pMediaType.Get(), MF_MT_FRAME_RATE_RANGE_MAX, &frameRateMax.numerator, &frameRateMax.denominator));
 
                     if (static_cast<float>(frameRateMax.numerator) / frameRateMax.denominator <
                         static_cast<float>(frameRateMin.numerator) / frameRateMin.denominator)
@@ -978,7 +956,7 @@ namespace librealsense
 
                     action(mfp, pMediaType, quit);
 
-                    safe_release(pMediaType);
+                    pMediaType.Reset();
 
                     if (quit)
                         return;
@@ -995,7 +973,7 @@ namespace librealsense
 
             std::vector<stream_profile> results;
             foreach_profile(
-                [&results]( const mf_profile & mfp, CComPtr< IMFMediaType > media_type, bool & quit )
+                [&results]( const mf_profile & mfp, Microsoft::WRL::ComPtr< IMFMediaType > media_type, bool & quit )
                 {
                     //LOG_DEBUG( mfp.profile.width << 'x' << mfp.profile.height << ' ' << fourcc( mfp.profile.format )
                     //                             << " @ " << mfp.profile.fps << " Hz" );
@@ -1008,7 +986,7 @@ namespace librealsense
         void wmf_uvc_device::play_profile(stream_profile profile, frame_callback callback)
         {
             bool profile_found = false;
-            foreach_profile([this, profile, callback, &profile_found](const mf_profile& mfp, CComPtr<IMFMediaType> media_type, bool& quit)
+            foreach_profile([this, profile, callback, &profile_found](const mf_profile& mfp, Microsoft::WRL::ComPtr<IMFMediaType> media_type, bool& quit)
             {
                 if (mfp.profile.format != profile.format &&
                     (fourcc_map.count(mfp.profile.format) == 0 ||
@@ -1021,7 +999,7 @@ namespace librealsense
                     {
                         if (mfp.profile.fps == int(profile.fps))
                         {
-                            auto hr = _reader->SetCurrentMediaType(mfp.index, nullptr, media_type);
+                            auto hr = _reader->SetCurrentMediaType(mfp.index, nullptr, media_type.Get());
                             if (SUCCEEDED(hr) && media_type)
                             {
                                 for (unsigned int i = 0; i < _streams.size(); ++i)
@@ -1084,18 +1062,18 @@ namespace librealsense
         {
             if (get_power_state() != D0)
                 throw std::runtime_error("Device must be powered to query video_proc!");
-            if (!_video_proc.p)
+            if (!_video_proc)
                 throw std::runtime_error("The device does not support adjusting the qualities of an incoming video signal, such as brightness, contrast, hue, saturation, gamma, and sharpness.");
-            return _video_proc.p;
+            return _video_proc.Get();
         }
 
         IAMCameraControl* wmf_uvc_device::get_camera_control() const
         {
             if (get_power_state() != D0)
                 throw std::runtime_error("Device must be powered to query camera_control!");
-            if (!_camera_control.p)
+            if (!_camera_control)
                 throw std::runtime_error("The device does not support camera settings such as zoom, pan, aperture adjustment, or shutter speed.");
-            return _camera_control.p;
+            return _camera_control.Get();
         }
 
         void wmf_uvc_device::stream_on(std::function<void(const notification& n)> error_handler)
