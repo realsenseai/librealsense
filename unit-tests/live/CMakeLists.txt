@@ -20,3 +20,9 @@ dl_file( ${PP_Rosbag_Recordings_URL} recordings [pointcloud]_all_combinations_de
 # for 3D/projection-from-recording.bag
 dl_file( ${PP_Rosbag_Recordings_URL} recordings single_depth_color_640x480.bag OFF )
 
+# for rec-play/pytest-native-ros2-playback.py
+dl_file( ${PP_Rosbag_Recordings_URL} recordings d555_all_streams_native_ros2.db3 OFF )
+dl_file( ${PP_Rosbag_Recordings_URL} recordings d555_all_streams_native_ros2_zstd_compressed.db3 OFF )
+dl_file( ${PP_Rosbag_Recordings_URL} recordings d455_all_streams_imu_native_ros2.db3 OFF )
+dl_file( ${PP_Rosbag_Recordings_URL} recordings d455_all_streams_imu_native_ros2_zstd_compressed.db3 OFF )
+

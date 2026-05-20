@@ -232,7 +232,8 @@ def run_test(dev, ctx, depth_resolution, depth_fps, color_resolution, color_fps)
                                             last_depth_cube, last_depth_bg, last_measured_diff))
 
     except Exception as e:
-        save_failure_snapshot(__file__, pipeline)
+        if pipeline_profile is not None:
+            save_failure_snapshot(__file__, pipeline)
         log.exception("Unexpected exception")
         check.fail(f"Unexpected exception: {e}")
     finally:

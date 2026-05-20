@@ -181,10 +181,11 @@ def pytest_addoption(parser):
     )
     group.addoption(
         "--test-dir",
-        action="store",
-        default=None,
-        help="Restrict pytest discovery to tests under this directory "
-             "(matches run-unit-tests.py --test-dir for shared UNIT_TESTS_ARGS)."
+        action="append",
+        default=[],
+        help="Restrict pytest discovery to tests under this directory or file. "
+             "May be repeated (e.g. `--test-dir live/image-quality --test-dir test-fw-update.py`). "
+             "Matches run-unit-tests.py --test-dir for shared UNIT_TESTS_ARGS."
     )
 
 
@@ -348,10 +349,13 @@ def pytest_generate_tests(metafunc):
 
 def pytest_collection_modifyitems(config, items):
     """Auto-skip nightly/dds tests, filter --live, sort by priority."""
-    test_dir = config.getoption("--test-dir", default=None)
-    if test_dir:
-        abs_test_dir = os.path.abspath(test_dir)
-        items[:] = [item for item in items if str(item.path).startswith(abs_test_dir)]
+    test_dirs = config.getoption("--test-dir", default=[])
+    if test_dirs:
+        abs_dirs = [os.path.abspath(p) for p in test_dirs]
+        included = [item for item in items
+                    if any(str(item.path).startswith(p) for p in abs_dirs)]
+        config.hook.pytest_deselected(items=[item for item in items if item not in included])
+        items[:] = included
     filter_and_sort_items(config, items)
 
 

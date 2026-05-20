@@ -2,7 +2,6 @@
 // Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 #include "ros2_reader.h"
-#include <zstd.h>
 #include "image.h"
 #include "ds/ds-device-common.h"
 #include "ds/d400/d400-private.h"
@@ -94,27 +93,9 @@ namespace librealsense
         }
     }
 
-    ros2_reader::ros2_reader(const std::string& file, const std::shared_ptr<context> ctx) :
-        m_metadata_parser_map(md_constant_parser::create_metadata_parser_map()),
-        m_total_duration(0),
-        m_file_path(file),
-        m_context(ctx)
+    ros2_reader::ros2_reader(const std::string& file, const std::shared_ptr<context> ctx)
+        : ros2_reader_base(file, ctx)
     {
-        try
-        {
-            reset(); //Note: calling a virtual function inside c'tor, safe while base function is pure virtual
-            m_total_duration = get_file_duration();
-        }
-        catch (const std::exception& e)
-        {
-            //Rethrowing with better clearer message
-            throw io_exception( rsutils::string::from() << "Failed to create ros reader: " << e.what() );
-        }
-    }
-
-    device_snapshot ros2_reader::query_device_description(const nanoseconds& time)
-    {
-        return read_device_description(time);
     }
 
     std::shared_ptr< serialized_data > ros2_reader::read_next_data()
@@ -175,75 +156,6 @@ namespace librealsense
             LOG_ERROR("read_next_data: unknown message type on topic: " << topic);
         }
         return std::make_shared<serialized_end_of_file>();
-    }
-
-    void ros2_reader::seek_to_time(const nanoseconds& seek_time)
-    {
-        // read all messages up to the requested time, updating the last frame is done inside the read function
-
-        if (seek_time > m_total_duration)
-        {
-            throw invalid_value_exception( rsutils::string::from()
-                                           << "Requested time is out of playback length. (Requested = "
-                                           << seek_time.count() << ", Duration = " << m_total_duration.count() << ")" );
-        }
-
-        reset();
-
-        auto msg = peek_next_cached();
-        while (msg && nanoseconds(msg->time_stamp) < seek_time)
-        {
-            read_next_cached();
-            msg = peek_next_cached();
-        }
-    }
-
-    std::vector<std::shared_ptr<serialized_data>> ros2_reader::fetch_last_frames(const nanoseconds& seek_time)
-    {
-        std::vector<std::shared_ptr<serialized_data>> frames;
-        for (auto&& kv : _last_frame_cache)
-        {
-            // Filter by enabled streams
-            if (_enabled_streams.empty() || _enabled_streams.count(kv.first))
-            {
-                if (kv.second) frames.push_back(kv.second);
-            }
-        }
-        return frames;
-    }
-    nanoseconds ros2_reader::query_duration() const
-    {
-        return m_total_duration;
-    }
-
-    void ros2_reader::reset()
-    {
-        _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
-        _storage->open(m_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
-        m_frame_source = std::make_shared<frame_source>(32);
-        m_frame_source->init(m_metadata_parser_map);
-        _cache_valid = false;
-
-        // Reapply streaming filter if it was previously set
-        if (!_streaming_filter_topics.empty())
-        {
-            _storage->set_filter({ _streaming_filter_topics });
-        }
-    }
-
-    void ros2_reader::enable_stream(const std::vector<device_serializer::stream_identifier>& stream_ids)
-    {
-        for (const auto& id : stream_ids) _enabled_streams.insert(id);
-    }
-
-    void ros2_reader::disable_stream(const std::vector<device_serializer::stream_identifier>& stream_ids)
-    {
-        for (const auto& id : stream_ids) _enabled_streams.erase(id);
-    }
-
-    const std::string& ros2_reader::get_file_name() const 
-    {
-        return m_file_path;
     }
 
     std::shared_ptr< serialized_frame > ros2_reader::create_frame(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg)
@@ -366,12 +278,6 @@ namespace librealsense
         auto result = std::make_shared<serialized_frame>(timestamp, stream_id, std::move(frame));
         _last_frame_cache[stream_id] = result;
         return result;
-    }
-
-    nanoseconds ros2_reader::get_file_duration()
-    {
-        auto meta = _storage->get_metadata();
-        return nanoseconds(meta.duration.count());
     }
 
     std::shared_ptr<stream_profile_interface> ros2_reader::read_next_stream_profile()
@@ -519,32 +425,6 @@ namespace librealsense
         }
 
         return sensor_options;
-    }
-
-    frame_holder ros2_reader::alloc_and_move_frame(std::vector<uint8_t>&& data,
-        const stream_identifier& stream_id,
-        frame_additional_data additional_data) const
-    {
-        auto frame_ext = frame_source::stream_to_frame_types(stream_id.stream_type);
-        frame_interface* frame = m_frame_source->alloc_frame(
-            { stream_id.stream_type, stream_id.stream_index, frame_ext },
-            data.size(),
-            std::move(additional_data),
-            true);
-
-        if (frame == nullptr)
-        {
-            LOG_WARNING("Failed to allocate new frame");
-            return frame_holder{};
-        }
-
-        // Move the deserialized data directly — avoids a full memcpy of image data
-        auto base_frame = static_cast<librealsense::frame*>(frame);
-        base_frame->data = std::move(data);
-
-        setup_frame(frame, stream_id);
-
-        return frame_holder{ frame };
     }
 
     std::shared_ptr<processing_block_interface> ros2_reader::create_processing_block(const std::string& name_in, bool& depth_to_disparity, std::shared_ptr<options_interface> options)
@@ -1148,29 +1028,25 @@ namespace librealsense
         return m_initial_device_description;
     }
 
-    void ros2_reader::prepare_for_streaming()
+    std::vector<std::string> ros2_reader::get_stream_topics() const
     {
-        // Reopen storage to reset the filter, and apply relevant filters for streaming
-        _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
-        _storage->open(m_file_path, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
+        // /device_N/sensor_N/StreamType_Idx/<ros_type>/(data|metadata)
+        auto re = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/[^/]+/[^/]+/(data|metadata)$").str());
+        return filter_topics_by_regex(re);
+    }
 
-        // Stream topics: /device_N/sensor_N/StreamType_Idx/<ros_type>/(data|metadata)
-        auto stream_topics_regex = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/[^/]+/[^/]+/(data|metadata)$").str());
-        auto stream_topics = filter_topics_by_regex(stream_topics_regex);
+    std::vector<std::string> ros2_reader::get_option_topics() const
+    {
+        // /device_{device_index}/sensor_{sensor_index}/option/{option_name}/value
+        auto re = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/option/[^/]+/value$").str());
+        return filter_topics_by_regex(re);
+    }
 
-        // Option topics: /device_{device_index}/sensor_{sensor_index}/option/{option_name}/value
-        auto option_topics_regex = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/option/[^/]+/value$").str());
-        auto option_topics = filter_topics_by_regex(option_topics_regex);
-
-        // Notification topics: /device_{device_index}/sensor_{sensor_index}/notification/{notification_type}
-        auto notification_topics_regex = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/notification/[^/]+$").str());
-        auto notification_topics = filter_topics_by_regex(notification_topics_regex);
-
-        _streaming_filter_topics.insert(_streaming_filter_topics.end(), stream_topics.begin(), stream_topics.end());
-        _streaming_filter_topics.insert(_streaming_filter_topics.end(), option_topics.begin(), option_topics.end());
-        _streaming_filter_topics.insert(_streaming_filter_topics.end(), notification_topics.begin(), notification_topics.end());
-
-        _storage->set_filter({ _streaming_filter_topics });
+    std::vector<std::string> ros2_reader::get_notification_topics() const
+    {
+        // /device_{device_index}/sensor_{sensor_index}/notification/{notification_type}
+        auto re = std::regex((rsutils::string::from() << "^/device_" << get_device_index() << "/sensor_\\d+/notification/[^/]+$").str());
+        return filter_topics_by_regex(re);
     }
 
     std::shared_ptr<info_container> ros2_reader::read_info_snapshot(const std::string& topic)
@@ -1283,90 +1159,4 @@ namespace librealsense
         return "";
     }
 
-    bool ros2_reader::has_next_cached() const
-    {
-        // If we have a valid cached message, we have next
-        if (_cache_valid)
-            return true;
-
-        return _storage->has_next();
-    }
-
-    static bool is_zstd_compressed(const uint8_t* src, size_t src_size)
-    {
-        // Zstd frame magic number: 0xFD2FB528 (little-endian)
-        return src_size >= 4 && src[0] == 0x28 && src[1] == 0xB5 && src[2] == 0x2F && src[3] == 0xFD;
-    }
-
-    void ros2_reader::decompress_if_needed(std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg)
-    {
-        if (!msg || !msg->serialized_data || !msg->serialized_data->buffer || msg->serialized_data->buffer_length == 0)
-            return;
-
-        auto src = msg->serialized_data->buffer;
-        auto src_size = msg->serialized_data->buffer_length;
-
-        if (!is_zstd_compressed(src, src_size))
-            return;
-
-        auto frame_content_size = ZSTD_getFrameContentSize(src, src_size);
-        if (frame_content_size == ZSTD_CONTENTSIZE_UNKNOWN || frame_content_size == ZSTD_CONTENTSIZE_ERROR)
-            throw std::runtime_error("Failed to determine decompressed size for zstd-compressed message");
-
-        // Guard against malformed frames claiming an absurd decompressed size — zstd's frame
-        // header is untrusted input and a malicious file could request a huge allocation.
-        constexpr size_t MAX_DECOMPRESSED_SIZE = 256 * 1024 * 1024; // 256 MB
-        if (frame_content_size > MAX_DECOMPRESSED_SIZE)
-            throw std::runtime_error(rsutils::string::from()
-                << "Zstd decompressed size " << frame_content_size << " exceeds safety limit");
-
-        auto decompressed_size = static_cast<size_t>(frame_content_size);
-
-        // We create a new buffer for the decompressed data each time. We could use
-        // a reusable member buffer like the writer does, but here the frame data may
-        // still be in use when the metadata is read next and overwrite it — allowing
-        // it to reallocate for simplicity for now.
-        auto out = create_buffer(decompressed_size);
-
-        auto result = ZSTD_decompress(out->buffer, out->buffer_capacity, src, src_size);
-        if (ZSTD_isError(result))
-            throw std::runtime_error(rsutils::string::from() << "Zstd decompression failed: " << ZSTD_getErrorName(result));
-
-        out->buffer_length = result;
-        msg->serialized_data = std::move(out);
-    }
-
-    std::shared_ptr<rosbag2_storage::SerializedBagMessage> ros2_reader::read_next_cached()
-    {
-        // If cache is valid, return cached message and mark as consumed
-        if (_cache_valid)
-        {
-            _cache_valid = false;
-            return _cached_message;
-        }
-
-        // Otherwise, read from storage and return immediately (no caching)
-        if (!_storage->has_next())
-            return nullptr;
-
-        auto msg = _storage->read_next();
-        decompress_if_needed(msg);
-        return msg;
-    }
-
-    std::shared_ptr<rosbag2_storage::SerializedBagMessage> ros2_reader::peek_next_cached()
-    {
-        // If cache is valid, return cached message without consuming
-        if (_cache_valid)
-            return _cached_message;
-
-        // Otherwise, read from storage and cache it
-        if (!_storage->has_next())
-            return nullptr;
-
-        _cached_message = _storage->read_next();
-        decompress_if_needed(_cached_message);
-        _cache_valid = true;
-        return _cached_message;
-    }
 }

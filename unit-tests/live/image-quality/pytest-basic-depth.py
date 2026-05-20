@@ -173,7 +173,8 @@ def run_test(dev, ctx, resolution, fps):
                                             last_depth_cube, last_depth_bg, last_measured_diff))
 
     except Exception as e:
-        save_failure_snapshot(__file__, pipeline)
+        if profile is not None:
+            save_failure_snapshot(__file__, pipeline)
         raise e
     finally:
         cv2.destroyAllWindows()

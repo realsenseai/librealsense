@@ -53,8 +53,8 @@ def usage():
     print( '        --custom-fw-d555          If custom fw provided flash it if its different that the current fw installed' )
     print( '        --rslog              Enable LibRS logging (LOG_DEBUG etc.) to console in each test' )
     print( '        --skip-disconnected  Skip live test if required device is disconnected (only applies w/o a hub)' )
-    print( '        --test-dir <>        Path to test dir; default: librealsense/unit-tests' )
-    print( '                             ex: --test-dir $HOME/my_ws/my_tests; logs are stored in the same dir' )
+    print( '        --test-dir <>        Restrict discovery to tests under this dir or file (repeatable);' )
+    print( '                             ex: --test-dir live/image-quality --test-dir test-fw-update.py' )
     print( 'Examples:' )
     print( 'Running: python run-unit-tests.py -s' )
     print( '    Runs all tests, but direct their output to the console rather than log files' )
@@ -104,8 +104,7 @@ custom_fw_d555_path=''
 rslog = False
 only_live = False
 only_not_live = False
-test_dir = current_dir
-test_dir_log =  False
+test_dirs = []  # accumulator for --test-dir values; defaults to [current_dir] after parsing
 skip_regex = None
 for opt, arg in opts:
     if opt in ('-h', '--help'):
@@ -171,10 +170,8 @@ for opt, arg in opts:
             usage()
         only_not_live = True
     elif opt == '--test-dir':
-        test_dir = os.path.abspath(arg)
-        libci.unit_tests_dir = test_dir
-        log.i(f'Tests dir changed from default to: {test_dir}')
-        test_dir_log = True
+        test_dirs.append( os.path.abspath(arg) )
+        log.i(f'Restricting tests to: {test_dirs[-1]}')
     elif opt in ('--skip-regex'):
         skip_regex = arg
     elif opt == '--custom-fw-d400':
@@ -183,6 +180,10 @@ for opt, arg in opts:
     elif opt == '--custom-fw-d555':
         custom_fw_d555_path = arg  # Store the custom D555 firmware path
         log.i(f"custom D555 firmware path was provided ${custom_fw_d555_path}")
+
+if not test_dirs:
+    test_dirs = [current_dir]
+
 
 def find_build_dir( dir ):
     """
@@ -263,10 +264,7 @@ if not exe_dir and build_dir:
 
 if not to_stdout:
     # If no test executables were found, put the logs directly in the build directory
-    if not test_dir_log:
-        logdir = os.path.join( exe_dir or build_dir or os.path.join( repo.root, 'build' ), 'unit-tests' )
-    else:
-        logdir = os.path.join( test_dir, 'logs' )
+    logdir = os.path.join( exe_dir or build_dir or os.path.join( repo.root, 'build' ), 'unit-tests' )
     os.makedirs( logdir, exist_ok=True )
     libci.logdir = logdir
         
@@ -354,12 +352,15 @@ def check_log_for_fails( path_to_log, testname, configuration=None, repetition=1
 
 
 def get_tests():
-    global regex, build_dir, exe_dir, pyrs, test_dir, linux, context, list_only, skip_regex
+    global regex, build_dir, exe_dir, pyrs, linux, context, list_only, skip_regex, current_dir, test_dirs
     if regex:
         run_pattern = re.compile( regex )
 
     if skip_regex:
         skip_pattern = re.compile( skip_regex )
+
+    def in_test_dirs( script_abspath ):
+        return any( script_abspath.startswith( p ) for p in test_dirs )
 
     # In Linux, the build targets are located elsewhere than on Windows
     # Go over all the tests from a "manifest" we take from the result of the last CMake
@@ -371,6 +372,8 @@ def get_tests():
             # We need to first create the test name so we can see if it fits the regex
             testdir = manifest_ctx['match'].group( 0 )  # "log/internal/test-all"
             # log.d( testdir )
+            if not in_test_dirs( os.path.join( current_dir, testdir ) ):
+                continue
             testparent = os.path.dirname( testdir )  # "log/internal"
             if testparent:
                 testname = 'test-' + testparent.replace( '/', '-' ) + '-' + os.path.basename( testdir )[
@@ -395,7 +398,9 @@ def get_tests():
     elif list_only:
         # We want to list all tests, even if they weren't built.
         # So we look for the source files instead of using the manifest
-        for cpp_test in file.find( test_dir, r'(^|/)test-.*\.cpp' ):
+        for cpp_test in file.find( current_dir, r'(^|/)test-.*\.cpp' ):
+            if not in_test_dirs( os.path.join( current_dir, cpp_test ) ):
+                continue
             testparent = os.path.dirname( cpp_test )  # "log/internal" <-  "log/internal/test-all.py"
             if testparent:
                 testname = 'test-' + testparent.replace( '/', '-' ) + '-' + os.path.basename( cpp_test )[
@@ -413,7 +418,9 @@ def get_tests():
 
     # Python unit-test scripts are in the same directory as us... we want to consider running them
     # (we may not if they're live and we have no pyrealsense2.pyd):
-    for py_test in file.find( test_dir, r'(^|/)test-.*\.py' ):
+    for py_test in file.find( current_dir, r'(^|/)test-.*\.py' ):
+        if not in_test_dirs( os.path.join( current_dir, py_test ) ):
+            continue
         testparent = os.path.dirname( py_test )  # "log/internal" <-  "log/internal/test-all.py"
         if testparent:
             testname = 'test-' + testparent.replace( '/', '-' ) + '-' + os.path.basename( py_test )[5:-3]  # remove .py

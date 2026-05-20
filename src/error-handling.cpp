@@ -13,11 +13,13 @@
 namespace librealsense
 {
     polling_error_handler::polling_error_handler(unsigned int poll_intervals_ms, std::shared_ptr<option> option,
+        std::weak_ptr<std::atomic<bool>> device_alive,
         std::shared_ptr <notifications_processor> processor, std::shared_ptr<notification_decoder> decoder)
         :_poll_intervals_ms(poll_intervals_ms),
-        _option(option),
-        _notifications_processor(processor),
-        _decoder(decoder)
+        _option(std::move(option)),
+        _device_alive(std::move(device_alive)),
+        _notifications_processor(std::move(processor)),
+        _decoder(std::move(decoder))
     {
         _active_object = std::make_shared<active_object<>>([this](dispatcher::cancellable_timer cancellable_timer)
             {  polling(cancellable_timer);  });
@@ -26,15 +28,6 @@ namespace librealsense
     polling_error_handler::~polling_error_handler()
     {
         stop();
-    }
-
-    polling_error_handler::polling_error_handler(const polling_error_handler& h)
-    {
-        _poll_intervals_ms = h._poll_intervals_ms;
-        _active_object = h._active_object;
-        _option = h._option;
-        _notifications_processor = h._notifications_processor;
-        _decoder = h._decoder;
     }
 
     void polling_error_handler::start( unsigned int poll_intervals_ms )
@@ -54,6 +47,18 @@ namespace librealsense
         {
             if( ! _silenced )
             {
+                // The owning device sets *_device_alive = false in its destructor body,
+                // before any of its members destruct. That's our signal to exit cleanly
+                // without firing another (failing) FW query. An expired weak_ptr is
+                // treated the same as a false flag for robustness against destruction
+                // ordering changes.
+                auto alive = _device_alive.lock();
+                if( ! alive || ! alive->load() )
+                {
+                    LOG_DEBUG( "Device marked dead; shutting down polling loop" );
+                    _silenced = true;
+                    return;
+                }
                 try
                 {
                     auto val = static_cast< uint8_t >( _option->query() );

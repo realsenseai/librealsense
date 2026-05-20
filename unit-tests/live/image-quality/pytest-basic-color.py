@@ -143,7 +143,8 @@ def run_test(ctx, resolution, fps):
             save_failure_snapshot(__file__, pipeline, draw_debug(last_frame_bgr, last_roi))
 
     except Exception as e:
-        save_failure_snapshot(__file__, pipeline)
+        if pipeline_profile is not None:
+            save_failure_snapshot(__file__, pipeline)
         raise e
     finally:
         cv2.destroyAllWindows()

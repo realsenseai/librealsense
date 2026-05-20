@@ -5,6 +5,8 @@
 
 #include "d400-private.h"
 
+#include <atomic>
+
 #include "algo.h"
 #include "error-handling.h"
 #include "core/debug.h"
@@ -82,6 +84,7 @@ namespace librealsense
         }
 
         d400_device( std::shared_ptr< const d400_info > const & );
+        ~d400_device() override;
 
         std::vector<uint8_t> send_receive_raw_data(const std::vector<uint8_t>& input) override;
 
@@ -149,6 +152,12 @@ namespace librealsense
         rsutils::lazy< std::vector< uint8_t > > _coefficients_table_raw;
         rsutils::lazy< std::vector< uint8_t > > _new_calib_table_raw;
 
+        // MUST be declared before _polling_error_handler — destruction order matters:
+        // members destruct in reverse declaration order, so _polling_error_handler's
+        // worker thread joins (and dereferences this weak_ptr) while _device_alive is
+        // still alive.
+        std::shared_ptr<std::atomic<bool>> _device_alive
+            = std::make_shared<std::atomic<bool>>(true);
         std::shared_ptr<polling_error_handler> _polling_error_handler;
         std::shared_ptr<ds_thermal_monitor> _thermal_monitor;
         std::shared_ptr< rsutils::lazy< rs2_extrinsics > > _left_right_extrinsics;

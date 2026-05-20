@@ -33,8 +33,12 @@ if(BUILD_ROSBAG2)
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_file_format.h"
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.h"
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.cpp"
+            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader_base.h"
+            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader_base.cpp"
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.h"
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.cpp"
+            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_native_reader.h"
+            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_native_reader.cpp"
             # ROS2 message types for CDR serialization
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/builtin_interfaces/msg/Time.h"
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/builtin_interfaces/msg/Time.cpp"
@@ -48,5 +52,9 @@ if(BUILD_ROSBAG2)
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Image.cpp"
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Imu.h"
             "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Imu.cpp"
+            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/RegionOfInterest.h"
+            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/RegionOfInterest.cpp"
+            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/CameraInfo.h"
+            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/CameraInfo.cpp"
     )
 endif()

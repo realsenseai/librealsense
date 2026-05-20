@@ -7,8 +7,11 @@
 #include "ros/ros_writer.h"
 #ifdef BUILD_ROSBAG2
 #include "ros2/ros2_reader.h"
+#include "ros2/ros2_native_reader.h"
 #include "ros2/ros2_writer.h"
+#include "ros2/ros2_file_format.h"
 #include "rcutils/logging.h"
+#include <rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp>
 #endif
 
 namespace librealsense
@@ -38,6 +41,29 @@ namespace librealsense
         return filename.substr(filename.size() - 4) == ".db3";
     }
 
+#ifdef BUILD_ROSBAG2
+    // ros2_writer always emits /file_version first; anything else is a native ROS2 bag.
+    static bool is_native_ros2_format(const std::string& filename)
+    {
+        auto storage = std::make_shared<rosbag2_storage_plugins::SqliteStorage>();
+        try
+        {
+            storage->open(filename, rosbag2_storage::storage_interfaces::IOFlag::READ_ONLY);
+        }
+        catch (const std::exception& e)
+        {
+            throw invalid_value_exception(rsutils::string::from()
+                << "Failed to open .db3 file '" << filename << "': " << e.what());
+        }
+        if (!storage->has_next()) return true;
+        auto msg = storage->read_next();
+        if (!msg)
+            throw invalid_value_exception(rsutils::string::from()
+                << "Corrupt .db3 file '" << filename << "': storage claimed has_next() but read_next() returned null");
+        return msg->topic_name != ros2_topic::file_version_topic();
+    }
+#endif
+
     std::shared_ptr<device_serializer::reader> create_reader_for_file(
         const std::string& filename, const std::shared_ptr<context>& ctx)
     {
@@ -45,6 +71,8 @@ namespace librealsense
         {
 #ifdef BUILD_ROSBAG2
             rcutils_logging_set_output_handler(rcutils_to_librealsense_log);
+            if (is_native_ros2_format(filename))
+                return std::make_shared<ros2_native_reader>(filename, ctx);
             return std::make_shared<ros2_reader>(filename, ctx);
 #else
             throw invalid_value_exception("Cannot open .db3 files without BUILD_ROSBAG2");
