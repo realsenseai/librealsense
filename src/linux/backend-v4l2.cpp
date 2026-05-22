@@ -1037,9 +1037,13 @@ namespace librealsense
             {
                 std::string sub_path = dev_name;
                 auto pos = sub_path.rfind('-');
-                if (pos != std::string::npos)
+                if (pos != std::string::npos) {
                     sub_path.insert(pos, "-sd");
-                sub_fd = open(sub_path.c_str(), O_RDWR);
+                    sub_fd = open(sub_path.c_str(), O_RDWR);
+                } else {
+                    LOG_WARNING("Could not derive subdev path from " << dev_name);
+                    sub_fd = -1;
+                }
             }
 
             uint8_t gvd[276];
@@ -1619,13 +1623,15 @@ namespace librealsense
                 v4l2_fmtdesc pixel_format = {};
                 pixel_format.type = _dev.buf_type;
 
-                if (_sub_fd > 0)
+                if (_sub_fd >= 0)
                 {
                     v4l2_subdev_mbus_code_enum pixel_format_subdev = {};
                     pixel_format_subdev.index = 0;
                     pixel_format_subdev.pad = 0;
                     while (ioctl(_sub_fd, VIDIOC_SUBDEV_ENUM_MBUS_CODE, &pixel_format_subdev) == 0)
                     {
+                        // subdev only returns mbus code. Convert it to fourcc using mbus_code_to_fourcc, but system only returns little-endian.
+                        // results is expecting big_endian, so convert it again into big_endian.
                         uint32_t temp_fourcc = mbus_code_to_fourcc(pixel_format_subdev.code);
                         uint32_t fourcc = (const big_endian<int> &)temp_fourcc;
                         ++pixel_format_subdev.index;
@@ -1686,7 +1692,9 @@ namespace librealsense
                 frame_interval.pad = 0;
 
                 if(xioctl(_fd, VIDIOC_G_PARM, &parm) < 0) {
-                    if(xioctl(_sub_fd, VIDIOC_SUBDEV_G_FRAME_INTERVAL, &frame_interval) < 0)
+                    if (_sub_fd < 0)
+                        throw linux_backend_exception("xioctl(VIDIOC_G_PARM) failed and no subdev to query frame interval");
+                    else if(xioctl(_sub_fd, VIDIOC_SUBDEV_G_FRAME_INTERVAL, &frame_interval) < 0)
                         throw linux_backend_exception("xioctl(VIDIOC_G_PARM) and xioctl(VIDIOC_SUBDEV_G_FRAME_INTERVAL) failed");
 
                     frame_interval.interval.numerator = 1;
@@ -1956,6 +1964,9 @@ namespace librealsense
                                 }
 
                                 // Drop partial and overflow frames (assumes D4XX metadata only)
+                                // For Intel IPU6/IPU7 upstream driver, there is extra padding when the buffer is first queued into the driver in order to meet IPU ISYS and DMA alignment requirements. 
+                                // This caused the actual byteused is always one stride shorter than the queued buffer.
+                                // Without this relaxation, the frame will always be marked as 99% frame, even though the actual video payload is fully present.
                                 bool partial_frame = (!compressed_format && (buf.bytesused < buffer->get_full_length() - MAX_META_DATA_SIZE - buffer->get_stride()));
                                 bool overflow_frame = (buf.bytesused ==  buffer->get_length_frame_only() + MAX_META_DATA_SIZE);
                                 if (_dev.buf_type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
@@ -2438,8 +2449,7 @@ namespace librealsense
                 // YUV formats
                 case MEDIA_BUS_FMT_YUYV8_2X8:
                 case MEDIA_BUS_FMT_YUYV8_1X16:
-                    //return V4L2_PIX_FMT_YUYV;
-                    return 0x59555956;
+                    return V4L2_PIX_FMT_YUYV;
                 case MEDIA_BUS_FMT_UYVY8_2X8:
                 case MEDIA_BUS_FMT_UYVY8_1X16:
                     return V4L2_PIX_FMT_UYVY;
@@ -2472,7 +2482,7 @@ namespace librealsense
 
                 // RealSense specific formats (if they exist)
                 case MEDIA_BUS_FMT_FIXED:
-                    return 0x5A313620; // 'Z16 ' in little-endian
+                    return V4L2_PIX_FMT_Z16;
 
                 default:
                     return 0; // Unknown format
@@ -2484,15 +2494,13 @@ namespace librealsense
             // Retrieve the caps one by one, first get pixel format, then sizes, then
             // frame rates. See http://linuxtv.org/downloads/v4l-dvb-apis for reference.
 
-            if (_sub_fd > 0) {
+            if (_sub_fd >= 0) {
                 std::vector<uint32_t> supported_mbus_codes;
                 // Get video node supported formats
-                std::set<uint32_t> video_fourccs;
                 v4l2_fmtdesc pixel_format = {};
                 pixel_format.type = _dev.buf_type;
                 pixel_format.index = 0;
                 while (ioctl(_fd, VIDIOC_ENUM_FMT, &pixel_format) == 0) {
-                   video_fourccs.insert(pixel_format.pixelformat);
                     ++pixel_format.index;
                 }
 
@@ -2502,7 +2510,10 @@ namespace librealsense
 
                 while (ioctl(_sub_fd, VIDIOC_SUBDEV_ENUM_MBUS_CODE, &pixel_format_subdev) == 0)
                 {
-                    uint32_t fourcc = mbus_code_to_fourcc(pixel_format_subdev.code);
+                    // subdev only returns mbus code. Convert it to fourcc using mbus_code_to_fourcc, but system only returns little-endian.
+                    // results is expecting big_endian, so convert it again into big_endian.
+                    uint32_t temp_fourcc = mbus_code_to_fourcc(pixel_format_subdev.code);
+                    uint32_t fourcc = (const big_endian<int> &)temp_fourcc;
 
                     v4l2_subdev_frame_size_enum frame_size = {};
                     frame_size.pad = 0;
@@ -2729,8 +2740,9 @@ namespace librealsense
 
             _sub_fd = open(_subdev_name.c_str(), O_RDWR | O_NONBLOCK, 0);
             if(_sub_fd < 0)
-                printf("%s: Failed to open %s\n", __FUNCTION__, _subdev_name.c_str());
-                //throw linux_backend_exception(rsutils::string::from() <<__FUNCTION__ << " Cannot open subdev '" << _subdev_name);
+                LOG_WARNING( __FUNCTION__ << ": Failed to open subdev '" << _subdev_name
+                            << "' (non-fatal, subdev controls will be unavailable)" );
+            // sub_fd is only fatal for Intel IPU6/IPU7 upstream. Avoid throw here for other platforms.
 
             if (pipe(_stop_pipe_fd) < 0)
                 throw linux_backend_exception(rsutils::string::from() <<__FUNCTION__ << " Cannot create pipe!");
@@ -3185,8 +3197,11 @@ namespace librealsense
             int rc = xioctl(_fd, VIDIOC_G_EXT_CTRLS, &ctrls_block);
             // On Intel IPU6/IPU7 upstream pipelines V4L2 controls live on the subdev,
             // not the capture (video) node. Fall back to the subdev when available.
-            if (rc < 0 && _sub_fd > 0)
+            if (rc < 0) {
+                if (_sub_fd < 0)
+                    throw linux_backend_exception("xioctl(VIDIOC_G_EXT_CTRLS) failed and no subdev to get ext_ctrls from");
                 rc = xioctl(_sub_fd, VIDIOC_G_EXT_CTRLS, &ctrls_block);
+            }
 
             if (rc < 0)
             {
@@ -3216,8 +3231,11 @@ namespace librealsense
             int rc = xioctl(_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
             // On Intel IPU6/IPU7 upstream pipelines V4L2 controls live on the subdev,
             // not the capture (video) node. Fall back to the subdev when available.
-            if (rc < 0 && _sub_fd > 0)
+            if (rc < 0) {
+                if (_sub_fd < 0)
+                    throw linux_backend_exception("xioctl(VIDIOC_S_EXT_CTRLS) failed and no subdev to set ext_ctrls");
                 rc = xioctl(_sub_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
+            }
 
             if (rc < 0)
             {
@@ -3254,6 +3272,9 @@ namespace librealsense
             int retVal = xioctl(_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
             if (retVal < 0)
             {
+                if (_sub_fd < 0)
+                    throw linux_backend_exception("xioctl(VIDIOC_S_EXT_CTRLS) failed and no subdev to set ext_ctrls");
+
                 retVal = xioctl(_sub_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
                 if (retVal < 0)
                 {
@@ -3283,6 +3304,11 @@ namespace librealsense
                 int ret = xioctl(_fd, VIDIOC_G_EXT_CTRLS, &ext);
                 if (ret < 0)
                 {
+                    if (_sub_fd < 0) {
+                        LOG_WARNING("xioctl(VIDIOC_G_EXT_CTRLS) failed and no subdev to get ext_ctrls from");
+                        continue;
+                    }
+
                     ret = xioctl(_sub_fd, VIDIOC_G_EXT_CTRLS, &ext);
                     if (ret < 0)
                     {
@@ -3314,6 +3340,10 @@ namespace librealsense
             xctrl_query.id = xu_to_cid(xu,control);
 
             if(0 > ioctl(_fd, VIDIOC_QUERY_EXT_CTRL, &xctrl_query)){
+                if (_sub_fd < 0)
+                    throw linux_backend_exception(rsutils::string::from() <<
+                        "xioctl(VIDIOC_QUERY_EXT_CTRL) failed, errno=" << errno << " and no subdev to query ext_ctrls from");
+
                 if (0 > ioctl(_sub_fd, VIDIOC_QUERY_EXT_CTRL, &xctrl_query))
                     throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_QUERY_EXT_CTRL) failed, errno=" << errno);
             }
@@ -3349,8 +3379,11 @@ namespace librealsense
             int rc = xioctl(_fd, VIDIOC_QUERY_EXT_CTRL, &query);
             // On Intel IPU6/IPU7 upstream pipelines V4L2 controls live on the subdev,
             // not the capture (video) node. Fall back to the subdev when available.
-            if (rc < 0 && _sub_fd > 0)
+            if (rc < 0) {
+                if (_sub_fd < 0)
+                    throw linux_backend_exception("xioctl(VIDIOC_QUERY_EXT_CTRL) failed and no subdev to query ext_ctrls from");
                 rc = xioctl(_sub_fd, VIDIOC_QUERY_EXT_CTRL, &query);
+            }
             if (rc < 0)
             {
                 // Some controls (exposure, auto exposure, auto hue) do not seem to work on V4L2
