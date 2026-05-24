@@ -90,6 +90,11 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:a2e80bc1628728ed972a4e015fe31ac5d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a54da7c39c59d648d3da1ca1e8c710cc0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1context.html#a54da7c39c59d648d3da1ca1e8c710cc0">unload_tracking_module</a> ()</td></tr>
 <tr class="separator:a54da7c39c59d648d3da1ca1e8c710cc0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac6b8d64f75f7a9a60c4def364ec142d2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1context.html#ac6b8d64f75f7a9a60c4def364ec142d2">convert_bag_to_db3</a> (const std::string &amp;input, const std::string &amp;output)</td></tr>
+<tr class="separator:ac6b8d64f75f7a9a60c4def364ec142d2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae16070ec70d79c8d4449f3af200f2e3b"><td class="memTemplParams" colspan="2">template&lt;class T &gt; </td></tr>
+<tr class="memitem:ae16070ec70d79c8d4449f3af200f2e3b"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classrs2_1_1context.html#ae16070ec70d79c8d4449f3af200f2e3b">convert_bag_to_db3</a> (const std::string &amp;input, const std::string &amp;output, T callback)</td></tr>
+<tr class="separator:ae16070ec70d79c8d4449f3af200f2e3b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae663e2ccd950a625a2c72777a53cd14c"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1context.html#ae663e2ccd950a625a2c72777a53cd14c">context</a> (std::shared_ptr&lt; <a class="el" href="rs__types_8h.html#afd11a8b49d022780bcb990ae0e8f13c0">rs2_context</a> &gt; ctx)</td></tr>
 <tr class="separator:ae663e2ccd950a625a2c72777a53cd14c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8c0294189e56af7dc56c3c0029f4c7ad"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classrs2_1_1context.html#a8c0294189e56af7dc56c3c0029f4c7ad">operator std::shared_ptr&lt; rs2_context &gt;</a> ()</td></tr>
@@ -235,6 +240,86 @@ Friends</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
+<a id="ac6b8d64f75f7a9a60c4def364ec142d2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac6b8d64f75f7a9a60c4def364ec142d2">&#9670;&nbsp;</a></span>convert_bag_to_db3() <span class="overload">[1/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void rs2::context::convert_bag_to_db3 </td>
+          <td>(</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>output</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ae16070ec70d79c8d4449f3af200f2e3b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae16070ec70d79c8d4449f3af200f2e3b">&#9670;&nbsp;</a></span>convert_bag_to_db3() <span class="overload">[2/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;class T &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void rs2::context::convert_bag_to_db3 </td>
+          <td>(</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>input</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>output</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">T&#160;</td>
+          <td class="paramname"><em>callback</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="ac68bb4d86384e4086a3d91ba246aa64e"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ac68bb4d86384e4086a3d91ba246aa64e">&#9670;&nbsp;</a></span>get_sensor_parent()</h2>
 

@@ -35,6 +35,7 @@ pyrealsense2.camera_info
       ~camera_info.firmware_version
       ~camera_info.imu_type
       ~camera_info.ip_address
+      ~camera_info.mipi_driver_version
       ~camera_info.name
       ~camera_info.physical_port
       ~camera_info.product_id

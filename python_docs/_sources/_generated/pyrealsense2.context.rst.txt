@@ -16,6 +16,7 @@ pyrealsense2.context
    .. autosummary::
    
       ~context.__init__
+      ~context.convert_bag_to_db3
       ~context.get_sensor_parent
       ~context.load_device
       ~context.query_all_sensors

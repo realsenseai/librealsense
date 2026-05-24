@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.context &#8212; pyrealsense2 2.57.7 documentation</title>
+    <title>pyrealsense2.context &#8212; pyrealsense2 2.58.1 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=69589b5d"></script>
+    <script src="../_static/documentation_options.js?v=b0ba200d"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.1 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.context</a></li> 
       </ul>
     </div>  
@@ -57,25 +57,28 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.context.__init__" title="pyrealsense2.context.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(*args, **kwargs)</p></td>
 <td><p>Overloaded function.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.context.get_sensor_parent" title="pyrealsense2.context.get_sensor_parent"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_sensor_parent</span></code></a>(self, s)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.context.convert_bag_to_db3" title="pyrealsense2.context.convert_bag_to_db3"><code class="xref py py-obj docutils literal notranslate"><span class="pre">convert_bag_to_db3</span></code></a>(self, input, output)</p></td>
+<td><p>Convert a legacy ROS1 .bag recording to a ROS2 .db3 file.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.context.get_sensor_parent" title="pyrealsense2.context.get_sensor_parent"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_sensor_parent</span></code></a>(self, s)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.context.load_device" title="pyrealsense2.context.load_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_device</span></code></a>(self, filename)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.context.load_device" title="pyrealsense2.context.load_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_device</span></code></a>(self, filename)</p></td>
 <td><p>Creates a devices from a RealSense file.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.context.query_all_sensors" title="pyrealsense2.context.query_all_sensors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">query_all_sensors</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.context.query_all_sensors" title="pyrealsense2.context.query_all_sensors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">query_all_sensors</span></code></a>(self)</p></td>
 <td><p>Generate a flat list of all available sensors from all RealSense devices.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.context.query_devices" title="pyrealsense2.context.query_devices"><code class="xref py py-obj docutils literal notranslate"><span class="pre">query_devices</span></code></a>(*args, **kwargs)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.context.query_devices" title="pyrealsense2.context.query_devices"><code class="xref py py-obj docutils literal notranslate"><span class="pre">query_devices</span></code></a>(*args, **kwargs)</p></td>
 <td><p>Overloaded function.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.context.set_devices_changed_callback" title="pyrealsense2.context.set_devices_changed_callback"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_devices_changed_callback</span></code></a>(self, callback)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.context.set_devices_changed_callback" title="pyrealsense2.context.set_devices_changed_callback"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_devices_changed_callback</span></code></a>(self, callback)</p></td>
 <td><p>Register devices changed callback.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.context.unload_device" title="pyrealsense2.context.unload_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unload_device</span></code></a>(self, filename)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.context.unload_device" title="pyrealsense2.context.unload_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unload_device</span></code></a>(self, filename)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.context.unload_tracking_module" title="pyrealsense2.context.unload_tracking_module"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unload_tracking_module</span></code></a>(self)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.context.unload_tracking_module" title="pyrealsense2.context.unload_tracking_module"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unload_tracking_module</span></code></a>(self)</p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -91,6 +94,12 @@
 </tr>
 </tbody>
 </table>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyrealsense2.context.convert_bag_to_db3">
+<span class="sig-name descname"><span class="pre">convert_bag_to_db3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.context" title="pyrealsense2.context"><span class="pre">pyrealsense2.context</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">input</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pyrealsense2.context.convert_bag_to_db3" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a legacy ROS1 .bag recording to a ROS2 .db3 file.</p>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="pyrealsense2.context.devices">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">devices</span></span><a class="headerlink" href="#pyrealsense2.context.devices" title="Link to this definition">¶</a></dt>
@@ -168,6 +177,7 @@ On successful load, the device will be appended to the context and a devices_cha
 <li><a class="reference internal" href="#">pyrealsense2.context</a><ul>
 <li><a class="reference internal" href="#pyrealsense2.context"><code class="docutils literal notranslate"><span class="pre">context</span></code></a><ul>
 <li><a class="reference internal" href="#pyrealsense2.context.__init__"><code class="docutils literal notranslate"><span class="pre">context.__init__()</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.context.convert_bag_to_db3"><code class="docutils literal notranslate"><span class="pre">context.convert_bag_to_db3()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.context.devices"><code class="docutils literal notranslate"><span class="pre">context.devices</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.context.get_sensor_parent"><code class="docutils literal notranslate"><span class="pre">context.get_sensor_parent()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.context.load_device"><code class="docutils literal notranslate"><span class="pre">context.load_device()</span></code></a></li>
@@ -214,7 +224,7 @@ On successful load, the device will be appended to the context and a devices_cha
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.57.7 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.1 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.context</a></li> 
       </ul>
     </div>

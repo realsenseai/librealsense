@@ -173,6 +173,8 @@
         <LI><OBJECT type="text/sitemap"><param name="Name" value="context"><param name="Local" value="classrs2_1_1context.html#a1b2dc0f1533b3d531ce62849eb571d75"><param name="ImageNumber" value="11"></OBJECT>
         <LI><OBJECT type="text/sitemap"><param name="Name" value="context"><param name="Local" value="classrs2_1_1context.html#a0a5e544da872cf8866c7faf80a065c3e"><param name="ImageNumber" value="11"></OBJECT>
         <LI><OBJECT type="text/sitemap"><param name="Name" value="context"><param name="Local" value="classrs2_1_1context.html#ae663e2ccd950a625a2c72777a53cd14c"><param name="ImageNumber" value="11"></OBJECT>
+        <LI><OBJECT type="text/sitemap"><param name="Name" value="convert_bag_to_db3"><param name="Local" value="classrs2_1_1context.html#ac6b8d64f75f7a9a60c4def364ec142d2"><param name="ImageNumber" value="11"></OBJECT>
+        <LI><OBJECT type="text/sitemap"><param name="Name" value="convert_bag_to_db3"><param name="Local" value="classrs2_1_1context.html#ae16070ec70d79c8d4449f3af200f2e3b"><param name="ImageNumber" value="11"></OBJECT>
         <LI><OBJECT type="text/sitemap"><param name="Name" value="get_sensor_parent"><param name="Local" value="classrs2_1_1context.html#ac68bb4d86384e4086a3d91ba246aa64e"><param name="ImageNumber" value="11"></OBJECT>
         <LI><OBJECT type="text/sitemap"><param name="Name" value="load_device"><param name="Local" value="classrs2_1_1context.html#a7d650bdbb59e9cddf370601df212bf8b"><param name="ImageNumber" value="11"></OBJECT>
         <LI><OBJECT type="text/sitemap"><param name="Name" value="operator bool"><param name="Local" value="classrs2_1_1context.html#aa71f749430f7ca687962354a8c5d65ad"><param name="ImageNumber" value="11"></OBJECT>
@@ -1940,6 +1942,7 @@
             <LI><OBJECT type="text/sitemap"><param name="Name" value="rs2_context_add_software_device"><param name="Local" value="rs__context_8h.html#a2a31f40ecdbc8c7026649046733cdd12"><param name="ImageNumber" value="11"></OBJECT>
             <LI><OBJECT type="text/sitemap"><param name="Name" value="rs2_context_remove_device"><param name="Local" value="rs__context_8h.html#a9386472c0d4f366073f8596978a63616"><param name="ImageNumber" value="11"></OBJECT>
             <LI><OBJECT type="text/sitemap"><param name="Name" value="rs2_context_unload_tracking_module"><param name="Local" value="rs__context_8h.html#a804963a46ab0b3ea6c65eced34170e69"><param name="ImageNumber" value="11"></OBJECT>
+            <LI><OBJECT type="text/sitemap"><param name="Name" value="rs2_convert_bag_to_db3"><param name="Local" value="rs__context_8h.html#a896a3800b0ef3a6af191287924362943"><param name="ImageNumber" value="11"></OBJECT>
             <LI><OBJECT type="text/sitemap"><param name="Name" value="rs2_create_context"><param name="Local" value="rs__context_8h.html#abed5b866ee0d54ee0223aad61bf05fcb"><param name="ImageNumber" value="11"></OBJECT>
             <LI><OBJECT type="text/sitemap"><param name="Name" value="rs2_create_context_ex"><param name="Local" value="rs__context_8h.html#a9199e0e20ef76772270ac3f15b44f917"><param name="ImageNumber" value="11"></OBJECT>
             <LI><OBJECT type="text/sitemap"><param name="Name" value="rs2_create_device_hub"><param name="Local" value="rs__context_8h.html#a7b41377e2cedcd840064e99b7ad0eb7e"><param name="ImageNumber" value="11"></OBJECT>
@@ -2870,6 +2873,7 @@
               <LI><OBJECT type="text/sitemap"><param name="Name" value="RS2_CAMERA_INFO_CONNECTION_TYPE"><param name="Local" value="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa1b027097e95305f36f89b9e6b625e303"><param name="ImageNumber" value="11"></OBJECT>
               <LI><OBJECT type="text/sitemap"><param name="Name" value="RS2_CAMERA_INFO_SMCU_FW_VERSION"><param name="Local" value="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa74d7e68543fc4ac65d10e3a3ab1097b8"><param name="ImageNumber" value="11"></OBJECT>
               <LI><OBJECT type="text/sitemap"><param name="Name" value="RS2_CAMERA_INFO_IMU_TYPE"><param name="Local" value="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa1e8b788e42ad8bc21a50bb39da5d2d70"><param name="ImageNumber" value="11"></OBJECT>
+              <LI><OBJECT type="text/sitemap"><param name="Name" value="RS2_CAMERA_INFO_MIPI_DRIVER_VERSION"><param name="Local" value="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa04b6fbfdc87438ed14e5526480ca6650"><param name="ImageNumber" value="11"></OBJECT>
               <LI><OBJECT type="text/sitemap"><param name="Name" value="RS2_CAMERA_INFO_COUNT"><param name="Local" value="rs__sensor_8h.html#aa607d93c1bac40af3ec1c9b0345f59afa8f5df734ba9377454f9575c706201907"><param name="ImageNumber" value="11"></OBJECT>
               </UL>
             <LI><OBJECT type="text/sitemap"><param name="Name" value="rs2_format"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7"><param name="ImageNumber" value="1"></OBJECT>
@@ -3314,6 +3318,8 @@
               <LI><OBJECT type="text/sitemap"><param name="Name" value="context"><param name="Local" value="classrs2_1_1context.html#a1b2dc0f1533b3d531ce62849eb571d75"><param name="ImageNumber" value="11"></OBJECT>
               <LI><OBJECT type="text/sitemap"><param name="Name" value="context"><param name="Local" value="classrs2_1_1context.html#a0a5e544da872cf8866c7faf80a065c3e"><param name="ImageNumber" value="11"></OBJECT>
               <LI><OBJECT type="text/sitemap"><param name="Name" value="context"><param name="Local" value="classrs2_1_1context.html#ae663e2ccd950a625a2c72777a53cd14c"><param name="ImageNumber" value="11"></OBJECT>
+              <LI><OBJECT type="text/sitemap"><param name="Name" value="convert_bag_to_db3"><param name="Local" value="classrs2_1_1context.html#ac6b8d64f75f7a9a60c4def364ec142d2"><param name="ImageNumber" value="11"></OBJECT>
+              <LI><OBJECT type="text/sitemap"><param name="Name" value="convert_bag_to_db3"><param name="Local" value="classrs2_1_1context.html#ae16070ec70d79c8d4449f3af200f2e3b"><param name="ImageNumber" value="11"></OBJECT>
               <LI><OBJECT type="text/sitemap"><param name="Name" value="get_sensor_parent"><param name="Local" value="classrs2_1_1context.html#ac68bb4d86384e4086a3d91ba246aa64e"><param name="ImageNumber" value="11"></OBJECT>
               <LI><OBJECT type="text/sitemap"><param name="Name" value="load_device"><param name="Local" value="classrs2_1_1context.html#a7d650bdbb59e9cddf370601df212bf8b"><param name="ImageNumber" value="11"></OBJECT>
               <LI><OBJECT type="text/sitemap"><param name="Name" value="operator bool"><param name="Local" value="classrs2_1_1context.html#aa71f749430f7ca687962354a8c5d65ad"><param name="ImageNumber" value="11"></OBJECT>

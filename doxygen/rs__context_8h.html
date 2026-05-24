@@ -105,6 +105,8 @@ Functions</h2></td></tr>
 <tr class="separator:a9386472c0d4f366073f8596978a63616"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a804963a46ab0b3ea6c65eced34170e69"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__context_8h.html#a804963a46ab0b3ea6c65eced34170e69">rs2_context_unload_tracking_module</a> (<a class="el" href="rs__types_8h.html#afd11a8b49d022780bcb990ae0e8f13c0">rs2_context</a> *ctx, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:a804963a46ab0b3ea6c65eced34170e69"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a896a3800b0ef3a6af191287924362943"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__context_8h.html#a896a3800b0ef3a6af191287924362943">rs2_convert_bag_to_db3</a> (const char *input_bag_path, const char *output_db3_path, const <a class="el" href="rs__types_8h.html#afd11a8b49d022780bcb990ae0e8f13c0">rs2_context</a> *ctx, <a class="el" href="rs__types_8h.html#a60a099c83ec9152eafd74ed3455d7278">rs2_update_progress_callback_ptr</a> callback, void *client_data, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a896a3800b0ef3a6af191287924362943"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9abab4538537b581a746e1d67ff1f157"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#aae87a51cf47685a0b7e28884a8970dd6">rs2_device_list</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__context_8h.html#a9abab4538537b581a746e1d67ff1f157">rs2_query_devices</a> (const <a class="el" href="rs__types_8h.html#afd11a8b49d022780bcb990ae0e8f13c0">rs2_context</a> *context, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:a9abab4538537b581a746e1d67ff1f157"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a44e4f120943fb26f43fbcb95b2e71e79"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#aae87a51cf47685a0b7e28884a8970dd6">rs2_device_list</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__context_8h.html#a44e4f120943fb26f43fbcb95b2e71e79">rs2_query_devices_ex</a> (const <a class="el" href="rs__types_8h.html#afd11a8b49d022780bcb990ae0e8f13c0">rs2_context</a> *context, int product_mask, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
@@ -431,6 +433,69 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>Removes tracking module. function query_devices() locks the tracking module in the tm_context object. If the tracking module device is not used it should be removed using this function, so that other applications could find it. This function can be used both before the call to query_device() to prevent enabling tracking modules or afterwards to release them. </p>
+
+</div>
+</div>
+<a id="a896a3800b0ef3a6af191287924362943"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a896a3800b0ef3a6af191287924362943">&#9670;&nbsp;</a></span>rs2_convert_bag_to_db3()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void rs2_convert_bag_to_db3 </td>
+          <td>(</td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>input_bag_path</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>output_db3_path</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#afd11a8b49d022780bcb990ae0e8f13c0">rs2_context</a> *&#160;</td>
+          <td class="paramname"><em>ctx</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#a60a099c83ec9152eafd74ed3455d7278">rs2_update_progress_callback_ptr</a>&#160;</td>
+          <td class="paramname"><em>callback</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>client_data</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Converts a legacy ROS1 .bag recording file to a ROS2 .db3 file. </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">input_bag_path</td><td>Path to the input .bag file </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">output_db3_path</td><td>Path for the output .db3 file </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">ctx</td><td>A RealSense context </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">callback</td><td>Optional progress callback, receives a float in [0,1] </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">client_data</td><td>User data passed to the callback </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>If non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
