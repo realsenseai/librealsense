@@ -246,8 +246,78 @@ def stream_multi_and_check_frames(devs, stream_configs, duration_sec=STREAM_DURA
     return aggregate_results(all_frame_counters, all_frames, all_stream_frame_counts, device_info, actual_duration)
 
 
+def run_phase(phase_label, device_list, stream_configs):
+    """Run one streaming phase, print the results table, and assert drop/independence checks."""
+    log.info("=" * 80)
+    log.info(f"{phase_label}")
+    log.info(f"Found {len(stream_configs)} common stream types")
+    for stream_type, stream_index, w, h, fmt, fps in stream_configs:
+        log.info(f"  Selected profile: {stream_type} (stream_index {stream_index}): {w}x{h} @ {fps}fps, format {fmt}")
+    log.info(f"Will stream all of them simultaneously from all {len(device_list)} devices")
+    log.info("=" * 80)
+
+    success, drop_percentages, stats = stream_multi_and_check_frames(
+        device_list, stream_configs=stream_configs
+    )
+
+    if len(stats['devices']) == 0:
+        log.error(f"{phase_label} FAIL - No device statistics collected")
+        check.is_true(False, f"{phase_label}: Should collect statistics from all devices")
+        return
+
+    log.info("=" * 80)
+    log.info(f"{phase_label} RESULTS:")
+    log.info("=" * 80)
+    log.info(f"Duration: {stats['duration']:.2f} seconds")
+
+    for i, dev_stats in enumerate(stats['devices'], 1):
+        log.info(f"Device {i} ({dev_stats['name']}):")
+        log.info(f"  Total frames: {dev_stats['total_frames']}")
+        log.info(f"  Overall drop rate: {dev_stats['drop_pct']:.2f}%")
+        for stream_type, stream_stats in dev_stats['streams'].items():
+            log.info(f"  {stream_type}:")
+            log.info(f"    Received: {stream_stats['received']}/{stream_stats['expected']}")
+            log.info(f"    Dropped: {stream_stats['dropped']} ({stream_stats['drop_pct']:.2f}%)")
+
+    log.info("=" * 80)
+
+    if success:
+        log.info(f"{phase_label} PASS - Multi-stream test successful!")
+        for i, drop_pct in enumerate(drop_percentages, 1):
+            log.info(f"  Device {i} drop rate: {drop_pct:.2f}%")
+    else:
+        log.warning(f"{phase_label} FAIL - Excessive frame drops detected!")
+        for i, drop_pct in enumerate(drop_percentages, 1):
+            log.warning(f"  Device {i} drop rate: {drop_pct:.2f}% (max: {MAX_FRAME_DROP_PERCENTAGE}%)")
+
+    check.is_true(success,
+        f"{phase_label}: Multi-stream operation should have <{MAX_FRAME_DROP_PERCENTAGE}% drops on all devices")
+
+    log.info(f"{phase_label}: Verifying stream independence...")
+    all_streams_ok = True
+    for i, dev_stats in enumerate(stats['devices'], 1):
+        for stream_type, stream_stats in dev_stats['streams'].items():
+            min_expected_frames = int(stream_stats['expected'] * 0.8)
+            if stream_stats['received'] < min_expected_frames:
+                log.warning(f"{phase_label} Device {i} {stream_type} received only {stream_stats['received']} frames (expected >={min_expected_frames})")
+                all_streams_ok = False
+
+    if all_streams_ok:
+        log.info(f"{phase_label} PASS - All streams received adequate frame counts (independence verified)")
+    else:
+        log.warning(f"{phase_label} FAIL - Some streams received fewer frames than expected")
+
+    check.is_true(all_streams_ok,
+        f"{phase_label}: All streams should receive frames independently without interference")
+
+
 def test_multi_stream_operation(test_devices):
-    """Simultaneous multi-stream operation (depth + color + IR) on multiple devices"""
+    """Simultaneous multi-stream operation on multiple devices.
+
+    Runs in two phases to isolate whether color streaming contributes to depth drops:
+      Phase 1: depth + IR only (no color)
+      Phase 2: depth + IR + color
+    """
     device_list, ctx = test_devices
 
     log.info("=" * 80)
@@ -258,72 +328,15 @@ def test_multi_stream_operation(test_devices):
         log.info(f"  Device {i}: {name} (SN: {sn})")
     log.info("=" * 80)
 
-    # Get common multi-stream configuration
     log.info("Finding common multi-stream configuration...")
-    stream_configs = get_common_multi_stream_config(*device_list)
+    all_stream_configs = get_common_multi_stream_config(*device_list)
 
-    if len(stream_configs) < 2:
-        pytest.fail(f"At least 2 stream types needed for multi-stream test, but found {len(stream_configs)}")
+    if len(all_stream_configs) < 2:
+        pytest.fail(f"At least 2 stream types needed for multi-stream test, but found {len(all_stream_configs)}")
 
-    log.info(f"Found {len(stream_configs)} common stream types")
-    for stream_type, stream_index, w, h, fmt, fps in stream_configs:
-        log.info(f"  Selected profile: {stream_type} (stream_index {stream_index}): {w}x{h} @ {fps}fps, format {fmt}")
-    log.info(f"Will stream all of them simultaneously from all {len(device_list)} devices")
+    no_color_configs = [c for c in all_stream_configs if c[0] != rs.stream.color]
+    if len(no_color_configs) < 2:
+        pytest.fail(f"At least 2 non-color streams needed for phase 1, but found {len(no_color_configs)}")
 
-    success, drop_percentages, stats = stream_multi_and_check_frames(
-        device_list, stream_configs=stream_configs
-    )
-
-    # Check for analysis errors
-    if len(stats['devices']) == 0:
-        log.error("FAIL - No device statistics collected")
-        assert False, "Should collect statistics from all devices"
-    else:
-        # Print detailed results
-        log.info("=" * 80)
-        log.info("RESULTS:")
-        log.info("=" * 80)
-        log.info(f"Duration: {stats['duration']:.2f} seconds")
-
-        for i, dev_stats in enumerate(stats['devices'], 1):
-            log.info(f"Device {i} ({dev_stats['name']}):")
-            log.info(f"  Total frames: {dev_stats['total_frames']}")
-            log.info(f"  Overall drop rate: {dev_stats['drop_pct']:.2f}%")
-            for stream_type, stream_stats in dev_stats['streams'].items():
-                log.info(f"  {stream_type}:")
-                log.info(f"    Received: {stream_stats['received']}/{stream_stats['expected']}")
-                log.info(f"    Dropped: {stream_stats['dropped']} ({stream_stats['drop_pct']:.2f}%)")
-
-        log.info("=" * 80)
-
-        if success:
-            log.info("PASS - Multi-stream test successful!")
-            for i, drop_pct in enumerate(drop_percentages, 1):
-                log.info(f"  Device {i} drop rate: {drop_pct:.2f}%")
-        else:
-            log.warning("FAIL - Excessive frame drops detected!")
-            for i, drop_pct in enumerate(drop_percentages, 1):
-                log.warning(f"  Device {i} drop rate: {drop_pct:.2f}% (max: {MAX_FRAME_DROP_PERCENTAGE}%)")
-
-        check.is_true(success,
-            f"Multi-stream operation should have <{MAX_FRAME_DROP_PERCENTAGE}% drops on all devices")
-
-        # Verify stream independence: Check that each stream type received adequate frames
-        # (at least 80% of expected based on actual duration and configured FPS)
-        log.info("Verifying stream independence...")
-        all_streams_ok = True
-
-        for i, dev_stats in enumerate(stats['devices'], 1):
-            for stream_type, stream_stats in dev_stats['streams'].items():
-                min_expected_frames = int(stream_stats['expected'] * 0.8)
-                if stream_stats['received'] < min_expected_frames:
-                    log.warning(f"Device {i} {stream_type} received only {stream_stats['received']} frames (expected >={min_expected_frames})")
-                    all_streams_ok = False
-
-        if all_streams_ok:
-            log.info("PASS - All streams received adequate frame counts (independence verified)")
-        else:
-            log.warning("FAIL - Some streams received fewer frames than expected")
-
-        check.is_true(all_streams_ok,
-            "All streams should receive frames independently without interference")
+    run_phase("PHASE 1 (no color)", device_list, no_color_configs)
+    run_phase("PHASE 2 (with color)", device_list, all_stream_configs)

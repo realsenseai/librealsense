@@ -5,7 +5,7 @@
 #test:priority 1
 #test:timeout 500
 #test:donotrun:gha
-#test:device each(D400*) !D401
+#test:device each(D400*)
 #test:device each(D555)
 
 import sys

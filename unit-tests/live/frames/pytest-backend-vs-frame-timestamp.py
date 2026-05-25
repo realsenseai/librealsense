@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device("D400*"),
     pytest.mark.device_each("D500*"),
+    pytest.mark.device_type_exclude("DDS"), # DDS devices no longer support Global Timestamp option. See Jira RSDEV-6299
 ]
 
 FPS = 30
