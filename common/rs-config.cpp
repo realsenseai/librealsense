@@ -123,7 +123,6 @@ config_file::config_file( std::string const & filename )
     }
     catch(...)
     {
-
     }
     _save_thread = std::thread( &config_file::save_loop, this );
 }

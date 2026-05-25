@@ -87,6 +87,18 @@ namespace rs2
         config_file::instance().set_default(configurations::viewer::commands_xml, "./Commands.xml");
         config_file::instance().set_default(configurations::viewer::hwlogger_xml, "./HWLoggerEvents.xml");
 
+        if( config_file::instance().is_empty() )
+        {
+            namespace cfg = configurations::viewer::viewport_grid;
+            auto& cf = config_file::instance();
+            cf.set_nested_default( cfg::horizontal_lines, 1   );
+            cf.set_nested_default( cfg::vertical_lines,   1   );
+            cf.set_nested_default( cfg::line_width,       1   );
+            cf.set_nested_default( cfg::line_color_r,     255 );
+            cf.set_nested_default( cfg::line_color_g,     255 );
+            cf.set_nested_default( cfg::line_color_b,     255 );
+        }
+
         std::string path;
         try
         {
