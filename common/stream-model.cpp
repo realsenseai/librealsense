@@ -7,6 +7,10 @@
 #include "os.h"
 #include <imgui_internal.h>
 #include <realsense_imgui.h>
+#ifdef BUILD_VIEWPORT_GRID_OVERLAY
+#include <iomanip>
+#include <sstream>
+#endif
 
 struct attribute
 {
@@ -28,6 +32,23 @@ namespace rs2
             configurations::viewer::show_stream_details, false);
         show_safety_zones_2d = config_file::instance().get_or_default(
             configurations::viewer::show_safety_zones_2d, true);
+#ifdef BUILD_VIEWPORT_GRID_OVERLAY
+        {
+            namespace cfg = configurations::viewer::viewport_grid;
+            auto& cf = config_file::instance();
+
+            auto valid_lines = []( int v ) { return ( v >= 1 && v <= 5 ) ? v : 1; };
+            grid_h_lines    = valid_lines( cf.get_nested<int>( cfg::horizontal_lines, 1   ) );
+            grid_v_lines    = valid_lines( cf.get_nested<int>( cfg::vertical_lines,   1   ) );
+            int w           = cf.get_nested<int>( cfg::line_width, 1 );
+            if ( w >= 1 ) grid_line_width = w;
+            int r = cf.get_nested<int>( cfg::line_color_r, 255 );
+            int g = cf.get_nested<int>( cfg::line_color_g, 255 );
+            int b = cf.get_nested<int>( cfg::line_color_b, 255 );
+            if ( r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255 )
+            { grid_color_r = r; grid_color_g = g; grid_color_b = b; }
+        }
+#endif
     }
 
     std::shared_ptr<texture_buffer> stream_model::upload_frame(frame&& f)
@@ -130,6 +151,34 @@ namespace rs2
 
         glPopAttrib();
     }
+
+#ifdef BUILD_VIEWPORT_GRID_OVERLAY
+    static void draw_2d_grid(const rect& r, int h_lines, int v_lines, int line_width,
+                              int cr, int cg, int cb)
+    {
+        glPushAttrib(GL_ENABLE_BIT | GL_LINE_BIT | GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT);
+        glLineWidth(static_cast<GLfloat>(line_width));
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glColor4f(cr / 255.f, cg / 255.f, cb / 255.f, 0.7f);
+        glBegin(GL_LINES);
+        for (int c = 1; c <= v_lines; ++c)
+        {
+            float x = r.x + r.w * c / static_cast<float>(v_lines + 1);
+            glVertex2f(x, r.y);
+            glVertex2f(x, r.y + r.h);
+        }
+        for (int row = 1; row <= h_lines; ++row)
+        {
+            float y = r.y + r.h * row / static_cast<float>(h_lines + 1);
+            glVertex2f(r.x, y);
+            glVertex2f(r.x + r.w, y);
+        }
+        glEnd();
+        glPopAttrib();
+    }
+
+#endif
 
     bool stream_model::is_stream_visible() const
     {
@@ -413,6 +462,9 @@ namespace rs2
         if (RS2_STREAM_DEPTH == profile.stream_type()) ++num_of_buttons; // Color map ruler button
         if (RS2_FORMAT_MOTION_XYZ32F == profile.format()) ++num_of_buttons; // Motion graph button
         if (RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1) ++num_of_buttons; // Safety zones button
+#ifdef BUILD_VIEWPORT_GRID_OVERLAY
+        ++num_of_buttons; // Grid overlay button
+#endif
 
         RsImGui_ScopePushFont(font);
         ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
@@ -547,6 +599,33 @@ namespace rs2
             }
         }
         ImGui::SameLine();
+
+#ifdef BUILD_VIEWPORT_GRID_OVERLAY
+        label = rsutils::string::from() << textual_icons::grid << "##Grid " << profile.unique_id();
+        if (show_grid)
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
+            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue);
+            if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
+            {
+                show_grid = false;
+            }
+            if (ImGui::IsItemHovered())
+                RsImGui::CustomTooltip("Hide grid overlay");
+            ImGui::PopStyleColor(2);
+        }
+        else
+        {
+            if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
+            {
+                show_grid = true;
+            }
+            if (ImGui::IsItemHovered())
+                RsImGui::CustomTooltip("Show grid overlay");
+        }
+        ImGui::SameLine();
+#endif
+
 
         if (RS2_STREAM_DEPTH == profile.stream_type())
         {
@@ -2036,6 +2115,13 @@ namespace rs2
             }
 
             update_ae_roi_rect(stream_rect, g, error_message);
+
+#ifdef BUILD_VIEWPORT_GRID_OVERLAY
+            if (show_grid)
+                draw_2d_grid(stream_rect, grid_h_lines, grid_v_lines, grid_line_width,
+                             grid_color_r, grid_color_g, grid_color_b);
+#endif
+
         }
         texture->show_preview(stream_rect, _normalized_zoom);
 

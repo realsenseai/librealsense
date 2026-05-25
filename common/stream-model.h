@@ -106,6 +106,16 @@ namespace rs2
         bool show_metadata = false;
         bool show_safety_zones_2d = true;
 
+#ifdef BUILD_VIEWPORT_GRID_OVERLAY
+        bool show_grid     = false;
+        int  grid_h_lines  = 1;
+        int  grid_v_lines  = 1;
+        int  grid_line_width = 1;
+        int  grid_color_r  = 255;
+        int  grid_color_g  = 255;
+        int  grid_color_b  = 255;
+#endif
+
         std::shared_ptr<graph_model> graph;
         bool show_graph = false;
         bool graph_initialized = false;

@@ -63,3 +63,4 @@ option(USE_EXTERNAL_LZ4 "Use externally build LZ4 library instead of building an
 option(BUILD_ASAN "Enable AddressSanitizer" OFF)
 option(BUILD_ROSBAG2 "Build and use rosbag2 recording system" ON) # temporary flag, should be removed when deprecated ROSBAG1 recording system is removed
 mark_as_advanced(BUILD_ASAN)
+option(BUILD_VIEWPORT_GRID_OVERLAY "Build 2D viewport grid overlay for realsense-viewer (configurable via config-settings.xml)" OFF)

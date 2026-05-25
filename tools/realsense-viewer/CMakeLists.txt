@@ -256,6 +256,11 @@ if(OPENVINO_NGRAPH)
     target_compile_definitions(realsense-viewer PRIVATE OPENVINO_NGRAPH)
 endif()
 
+if(BUILD_VIEWPORT_GRID_OVERLAY)
+    message(STATUS "Viewport grid overlay enabled for realsense-viewer")
+    target_compile_definitions(realsense-viewer PRIVATE BUILD_VIEWPORT_GRID_OVERLAY)
+endif()
+
 source_group("SW-Update" FILES ${SW_UPDATE_FILES})
 
 include_directories(

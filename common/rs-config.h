@@ -78,12 +78,14 @@ namespace rs2
         }
 
         bool contains(const char* key) const;
-        
+
         void save(const char* filename);
 
         void reset();
 
         void remove(const char* key);
+
+        bool is_new_file() const { return _j.empty(); }
 
         static config_file& instance();
 

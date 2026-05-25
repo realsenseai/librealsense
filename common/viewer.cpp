@@ -2983,6 +2983,17 @@ namespace rs2
                     {
                         reload_required = true;
                         temp_cfg = config_file();
+#ifdef BUILD_VIEWPORT_GRID_OVERLAY
+                        {
+                            namespace cfg = configurations::viewer::viewport_grid;
+                            temp_cfg.set_nested( cfg::horizontal_lines, 1   );
+                            temp_cfg.set_nested( cfg::vertical_lines,   1   );
+                            temp_cfg.set_nested( cfg::line_width,       1   );
+                            temp_cfg.set_nested( cfg::line_color_r,     255 );
+                            temp_cfg.set_nested( cfg::line_color_g,     255 );
+                            temp_cfg.set_nested( cfg::line_color_b,     255 );
+                        }
+#endif
                     }
                     ImGui::SameLine();
                     if (ImGui::Button(" Export Settings "))

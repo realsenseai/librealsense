@@ -96,7 +96,6 @@ config_file::config_file( std::string const & filename )
     }
     catch(...)
     {
-
     }
 }
 
