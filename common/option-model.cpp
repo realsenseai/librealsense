@@ -745,48 +745,51 @@ bool option_model::draw_checkbox( notifications_model & model,
 
 bool option_model::slider_selected( rs2_option opt,
                                     float value,
-                                    std::string & error_message,
+                                    std::string & /*error_message*/,
                                     notifications_model & model )
 {
     check_opt( opt, __func__ );
-    // Dispatch the write to a background thread so the UI/render loop keeps drawing
-    // frames while the FW round-trip is in flight. The worker coalesces — only the
-    // latest posted value gets applied between two FW writes, so dragging the slider
-    // never queues stale values.
-    set_option_async( value );
-    have_unset_value = false;
-    if( invalidate_flag )
-        *invalidate_flag = true;
-
-    // Throttle the log to ~5 Hz to keep the notifications panel readable during drag.
+    // Rate-limit FW writes to at most one per 200 ms while the slider is being
+    // dragged. The worker thread already coalesces post()s, but per-tick posts
+    // would still let the worker write every intermediate value when the FW
+    // round-trip is faster than the drag rate — flooding the bus with values the
+    // user never paused on. Within the throttle window we capture the latest
+    // value into unset_value; slider_unselected dispatches it on release so the
+    // user's final position always reaches the firmware.
     if( last_set_stopwatch.get_elapsed() >= std::chrono::milliseconds( 200 ) )
     {
         last_set_stopwatch.reset();
+        set_option_async( value );
+        have_unset_value = false;
+        if( invalidate_flag )
+            *invalidate_flag = true;
         model.add_log( rsutils::string::from() << "Setting " << opt << " to " << value );
+    }
+    else
+    {
+        unset_value = value;
+        have_unset_value = true;
     }
     return true;
 }
-bool option_model::slider_unselected( rs2_option /*opt*/,
+bool option_model::slider_unselected( rs2_option opt,
                                       float /*value*/,
                                       std::string & /*error_message*/,
-                                      notifications_model & /*model*/ )
+                                      notifications_model & model )
 {
-    // Intentionally a no-op. The pre-PR body retried a rate-limited write on slider
-    // release: when the synchronous set_option was throttled by `ignore_period` it
-    // returned false, slider_selected captured the value into `unset_value`, and
-    // slider_unselected re-attempted that write. That retry existed only because the
-    // rate-limiter could otherwise drop the user's final slider position.
-    //
-    // With async dispatch, no value is ever dropped: option_async_setter coalesces
-    // — between two FW writes it always delivers the latest posted value — so the
-    // user's release-position value (the last `slider_selected` call before release)
-    // is guaranteed to reach the firmware on the next worker iteration. There is no
-    // rate-limit to retry around. slider_selected accordingly clears
-    // `have_unset_value` unconditionally, so the old `if (have_unset_value) { ... }`
-    // body would be dead code anyway.
-    //
-    // The function is kept (as a no-op) so the slider_selected / slider_unselected
-    // pairing in draw_slider doesn't need to change.
+    check_opt( opt, __func__ );
+    // Flush the most-recent value captured by slider_selected during the 200 ms
+    // throttle window so the user's final slider position always reaches FW.
+    if( have_unset_value )
+    {
+        last_set_stopwatch.reset();
+        set_option_async( unset_value );
+        have_unset_value = false;
+        if( invalidate_flag )
+            *invalidate_flag = true;
+        model.add_log( rsutils::string::from() << "Setting " << opt << " to " << unset_value );
+        return true;
+    }
     return false;
 }
 
@@ -846,8 +849,10 @@ void option_model::set_option(rs2_option opt, float req_value)
     // All UI-thread option writes go through the async worker so the render loop is never
     // blocked on the FW round-trip (set_option is ~200 ms on UVC; readback is another ~200 ms;
     // and they serialize on the per-device USB lock against options_watcher's 1 s poll cycle).
-    // Coalescing in option_async_setter replaces the previous ignore_period rate-limit, and
-    // the cached `value` is refreshed by options_watcher -> on_options_changed -> update_value.
+    // No 200 ms gate here: this entry point is reached from checkboxes / combos / edit-text
+    // submit — one click = one write, so there is nothing to throttle. The slider drag path
+    // (slider_selected) keeps an explicit 200 ms gate. We still reset last_set_stopwatch so
+    // a click immediately before a drag doesn't burn the slider's first throttle window.
     last_set_stopwatch.reset();
     set_option_async( req_value );
 }
