@@ -2740,7 +2740,7 @@ namespace librealsense
 
             _sub_fd = open(_subdev_name.c_str(), O_RDWR | O_NONBLOCK, 0);
             if(_sub_fd < 0)
-                LOG_WARNING( __FUNCTION__ << ": Failed to open subdev '" << _subdev_name
+                LOG_DEBUG( __FUNCTION__ << ": Failed to open subdev '" << _subdev_name
                             << "' (non-fatal, subdev controls will be unavailable)" );
             // sub_fd is only fatal for Intel IPU6/IPU7 upstream. Avoid throw here for other platforms.
 
