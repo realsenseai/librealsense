@@ -318,6 +318,7 @@ def test_multi_stream_operation(test_devices):
       Phase 1: depth + IR only (no color)
       Phase 2: depth + IR + color
     """
+    rs.log_to_console(rs.log_severity.debug)
     device_list, ctx = test_devices
 
     log.info("=" * 80)
