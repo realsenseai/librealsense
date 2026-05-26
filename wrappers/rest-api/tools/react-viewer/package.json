@@ -30,9 +30,6 @@
     "three": "^0.158.0",
     "zustand": "^4.4.0"
   },
-  "overrides": {
-    "ws": "8.20.1"
-  },
   "devDependencies": {
     "@playwright/test": "^1.39.0",
     "@testing-library/jest-dom": "^6.1.4",
