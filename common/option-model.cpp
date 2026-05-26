@@ -43,79 +43,6 @@ namespace rs2
 
 using namespace rs2;
 
-option_async_setter::option_async_setter( std::shared_ptr< options > endpoint, rs2_option opt, error_callback on_error )
-    : _endpoint( std::move( endpoint ) )
-    , _opt( opt )
-    , _on_error( std::move( on_error ) )
-{
-    _worker = std::thread( [this]() { run(); } );
-}
-
-option_async_setter::~option_async_setter()
-{
-    {
-        std::lock_guard< std::mutex > lock( _mtx );
-        _stop = true;
-    }
-    _cv.notify_all();
-    if( _worker.joinable() )
-        _worker.join();
-}
-
-void option_async_setter::post( float value )
-{
-    {
-        std::lock_guard< std::mutex > lock( _mtx );
-        _pending_value = value;
-        _has_pending = true;
-    }
-    _cv.notify_one();
-}
-
-void option_async_setter::run()
-{
-    while( true )
-    {
-        float value;
-        {
-            std::unique_lock< std::mutex > lock( _mtx );
-            _cv.wait( lock, [this]() { return _has_pending || _stop; } );
-            if( _stop && ! _has_pending )
-                return;
-            value = _pending_value;
-            _has_pending = false;
-        }
-        std::string err_msg;
-        try
-        {
-            _endpoint->set_option( _opt, value );
-        }
-        catch( const rs2::error & e )
-        {
-            // Surface the FW-side reason via the log so silent rejections/clamps are
-            // diagnosable. We also forward to the optional UI callback below so the
-            // notification panel can show the user why their slider snapped back.
-            LOG_WARNING( "async set_option opt=" << _opt << " value=" << value
-                                                 << " failed: " << e.what() );
-            err_msg = e.what();
-        }
-        catch( const std::exception & e )
-        {
-            LOG_WARNING( "async set_option opt=" << _opt << " value=" << value
-                                                 << " failed: " << e.what() );
-            err_msg = e.what();
-        }
-        catch( ... )
-        {
-            LOG_WARNING( "async set_option opt=" << _opt << " value=" << value
-                                                 << " failed with unknown exception" );
-            err_msg = "unknown error";
-        }
-        if( ! err_msg.empty() && _on_error )
-            _on_error( err_msg );
-    }
-}
-
 std::string option_model::adjust_description(const std::string& str_in, const std::string& to_be_replaced, const std::string& to_replace)
 {
     std::string adjusted_string(str_in);
@@ -749,47 +676,33 @@ bool option_model::slider_selected( rs2_option opt,
                                     notifications_model & model )
 {
     check_opt( opt, __func__ );
-    // Rate-limit FW writes to at most one per 200 ms while the slider is being
-    // dragged. The worker thread already coalesces post()s, but per-tick posts
-    // would still let the worker write every intermediate value when the FW
-    // round-trip is faster than the drag rate — flooding the bus with values the
-    // user never paused on. Within the throttle window we capture the latest
-    // value into unset_value; slider_unselected dispatches it on release so the
-    // user's final position always reaches the firmware.
+    // Dispatch every UI tick: the dispatcher action coalesces (per-option
+    // _latest_pending_value), and its try_sleep(200ms) enforces the FW-write
+    // floor that used to live in this function. set_option_async is O(atomic-CAS)
+    // when a job is already pending, so per-tick calls are cheap.
+    set_option_async( value );
+    if( invalidate_flag )
+        *invalidate_flag = true;
+    // Throttle the log line to ~5 Hz so the notifications panel stays readable
+    // during a drag. The actual FW writes are throttled independently by the
+    // dispatcher action's try_sleep(200ms).
     if( last_set_stopwatch.get_elapsed() >= std::chrono::milliseconds( 200 ) )
     {
         last_set_stopwatch.reset();
-        set_option_async( value );
-        have_unset_value = false;
-        if( invalidate_flag )
-            *invalidate_flag = true;
         model.add_log( rsutils::string::from() << "Setting " << opt << " to " << value );
-    }
-    else
-    {
-        unset_value = value;
-        have_unset_value = true;
     }
     return true;
 }
+
 bool option_model::slider_unselected( rs2_option opt,
                                       float /*value*/,
                                       std::string & /*error_message*/,
-                                      notifications_model & model )
+                                      notifications_model & /*model*/ )
 {
     check_opt( opt, __func__ );
-    // Flush the most-recent value captured by slider_selected during the 200 ms
-    // throttle window so the user's final slider position always reaches FW.
-    if( have_unset_value )
-    {
-        last_set_stopwatch.reset();
-        set_option_async( unset_value );
-        have_unset_value = false;
-        if( invalidate_flag )
-            *invalidate_flag = true;
-        model.add_log( rsutils::string::from() << "Setting " << opt << " to " << unset_value );
-        return true;
-    }
+    // No-op. slider_selected dispatches on every tick (cheap, coalesced), so
+    // the user's final position is already in _latest_pending_value and will
+    // be picked up by the dispatcher's next action. No retry-on-release needed.
     return false;
 }
 
@@ -846,13 +759,12 @@ bool option_model::draw_option(bool update_read_only_options,
 void option_model::set_option(rs2_option opt, float req_value)
 {
     check_opt( opt, __func__ );
-    // All UI-thread option writes go through the async worker so the render loop is never
-    // blocked on the FW round-trip (set_option is ~200 ms on UVC; readback is another ~200 ms;
-    // and they serialize on the per-device USB lock against options_watcher's 1 s poll cycle).
-    // No 200 ms gate here: this entry point is reached from checkboxes / combos / edit-text
-    // submit — one click = one write, so there is nothing to throttle. The slider drag path
-    // (slider_selected) keeps an explicit 200 ms gate. We still reset last_set_stopwatch so
-    // a click immediately before a drag doesn't burn the slider's first throttle window.
+    // All UI-thread option writes go through the subdevice dispatcher so the render
+    // loop is never blocked on the FW round-trip (set_option is ~200 ms on UVC;
+    // readback is another ~200 ms; and they serialize on the per-device USB lock
+    // against options_watcher's 1 s poll cycle). The dispatcher's try_sleep(200ms)
+    // after each action enforces a uniform FW-write floor across all entry points
+    // (slider, checkbox, calibration) — no separate per-call rate-limit needed here.
     last_set_stopwatch.reset();
     set_option_async( req_value );
 }
@@ -867,31 +779,6 @@ void option_model::check_opt( rs2_option opt, char const * caller ) const
 
 void option_model::set_option_async( float value )
 {
-    if( ! _async_setter )
-    {
-        // Capture shared_ptrs (not `this`) so the callback is UAF-safe if option_model
-        // is destroyed while the worker is mid-FW-call. ~option_async_setter joins the
-        // worker before its own member fields are destroyed, but option_model's other
-        // members (including _async_state and _has_user_request) may already be gone
-        // by then if the worker called back via `this`.
-        auto state             = _async_state;
-        auto has_user_request  = _has_user_request;
-        _async_setter = std::make_shared< option_async_setter >( endpoint, opt,
-            [ state, has_user_request ]( std::string const & msg )
-            {
-                {
-                    std::lock_guard< std::mutex > lk( state->mutex );
-                    state->last_error = msg;
-                }
-                // FW rejected the write: drop the user-request mask immediately so
-                // the slider snaps back to the actual cached value within a frame
-                // rather than waiting for the 2 s timeout. The user sees the snap-back
-                // plus a notification (surfaced from draw_option below) explaining why.
-                has_user_request->store( false );
-            } );
-    }
-    _async_setter->post( value );
-
     // Mask the stale cached `value` with the user's just-requested value until the
     // FW echo refreshes it, so draw_slider doesn't snap back to the old value next
     // frame. Write _user_request_value and the stopwatch BEFORE flipping the atomic
@@ -901,10 +788,106 @@ void option_model::set_option_async( float value )
     _has_user_request->store( true );
     // Tell the parent subdevice_model to back off its per-frame option polling for a
     // bit, otherwise the UI thread will issue a sync get_option_value() that serializes
-    // on the per-device USB lock behind our worker's in-flight write (and behind any
+    // on the per-device USB lock behind the dispatcher's in-flight write (and behind any
     // concurrent options_watcher poll cycle), reintroducing the visible UI freeze.
     if( dev )
         dev->last_user_set_stopwatch.reset();
+
+    // Coalesce on the subdevice dispatcher: store the latest requested value, and
+    // only enqueue a new action if one isn't already queued. The action clears the
+    // pending flag BEFORE re-reading _latest_pending_value, so any post() that
+    // arrives during the in-flight FW call gets to enqueue a fresh action for that
+    // update. Result: between any two FW writes only the latest user value survives;
+    // a 60-Hz slider drag produces ~5 Hz of FW writes (paced by the action's
+    // try_sleep below), never queues stale values, and never blocks the UI thread.
+    _latest_pending_value->store( value );
+    if( _has_pending_job->exchange( true ) )
+        return;  // an action is already queued; it will pick up the latest value
+
+    if( ! dev )
+        return;
+    auto disp = dev->set_dispatcher();
+    if( ! disp )
+        return;
+
+    // Capture shared_ptrs by value (NOT `this`) so the action is UAF-safe if
+    // option_model is destroyed mid-FW-call. ~subdevice_model destroys the
+    // dispatcher first (declared last), which stops/joins the worker before any
+    // option_model is gone — but `endpoint` (sensor) outlives both via shared_ptr,
+    // and the atomics outlive the action via these captured shared_ptrs.
+    auto endpoint_copy    = endpoint;
+    auto opt_copy         = opt;
+    auto state            = _async_state;
+    auto has_user_request = _has_user_request;
+    auto pending          = _has_pending_job;
+    auto latest           = _latest_pending_value;
+
+    disp->invoke(
+        [ endpoint_copy, opt_copy, state, has_user_request, pending, latest ](
+            dispatcher::cancellable_timer c )
+        {
+            // Clear the "queued" flag FIRST so a concurrent post() during the FW
+            // call can enqueue a follow-up action; then read back the latest value.
+            pending->store( false );
+            float v = latest->load();
+            std::string err_msg;
+            try
+            {
+                endpoint_copy->set_option( opt_copy, v );
+            }
+            catch( const rs2::error & e )
+            {
+                LOG_WARNING( "async set_option opt=" << opt_copy << " value=" << v
+                                                     << " failed: " << e.what() );
+                err_msg = e.what();
+            }
+            catch( const std::exception & e )
+            {
+                LOG_WARNING( "async set_option opt=" << opt_copy << " value=" << v
+                                                     << " failed: " << e.what() );
+                err_msg = e.what();
+            }
+            catch( ... )
+            {
+                LOG_WARNING( "async set_option opt=" << opt_copy << " value=" << v
+                                                     << " failed with unknown exception" );
+                err_msg = "unknown error";
+            }
+            if( ! err_msg.empty() )
+            {
+                {
+                    std::lock_guard< std::mutex > lk( state->mutex );
+                    state->last_error = err_msg;
+                }
+                // FW rejected the write: drop the user-request mask immediately so
+                // the slider snaps back to the actual cached value within a frame
+                // rather than waiting for the 2 s timeout.
+                has_user_request->store( false );
+            }
+            // Protective floor — at least 200 ms between FW writes on this subdevice.
+            // Returns early if the dispatcher is shutting down (device disconnect).
+            c.try_sleep( std::chrono::milliseconds( 200 ) );
+        } );
+}
+
+void option_model::set_option_sync( float value )
+{
+    // Synchronous variant for callers that need to verify the write took effect
+    // (e.g., on_chip_calib_manager). Goes through the same dispatcher as async
+    // writes so it can't race with concurrent UI option writes on the USB bus.
+    // Blocks the calling thread until the action runs.
+    if( ! dev )
+        return;
+    auto disp = dev->set_dispatcher();
+    if( ! disp )
+        return;
+    disp->invoke_and_wait(
+        [ this, value ]( dispatcher::cancellable_timer c )
+        {
+            endpoint->set_option( opt, value );
+            c.try_sleep( std::chrono::milliseconds( 200 ) );
+        },
+        []() { return false; } );
 }
 
 void option_model::update_value( const rs2::option_value & updated_value, notifications_model & model )

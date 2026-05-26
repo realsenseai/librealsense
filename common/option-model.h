@@ -5,57 +5,21 @@
 #include <librealsense2/rs.hpp>
 #include <rsutils/time/stopwatch.h>
 #include <atomic>
-#include <condition_variable>
 #include <mutex>
-#include <thread>
 namespace rs2
 {
     struct notifications_model;
     class subdevice_model;
 
     // Holds the cross-thread state for async option writes: the latest FW error
-    // message (written by the worker thread, read+cleared by the UI thread). Held
-    // via shared_ptr by both option_model and the worker callback so the worker
-    // can outlive option_model without dangling — the worker captures shared_ptrs
+    // message (written by the dispatcher action, read+cleared by the UI thread). Held
+    // via shared_ptr by both option_model and the dispatcher action so the action
+    // can outlive option_model without dangling — the action captures shared_ptrs
     // by value, never `this`, so destruction of option_model is UAF-safe.
     struct option_async_state
     {
         std::mutex mutex;
         std::string last_error;  // non-empty = pending error to surface
-    };
-
-    // Background worker that applies option writes to the device asynchronously.
-    // Coalescing: only the latest posted value between two FW round-trips is applied,
-    // so spamming post() (e.g., during slider drag) never queues up stale values.
-    class option_async_setter
-    {
-    public:
-        // Optional callback invoked from the worker thread when set_option throws
-        // (rs2::error / std::exception / unknown). Receives a human-readable message.
-        // Used to surface FW rejections (e.g., "exposure can't be changed with AE
-        // enabled") back to the UI thread, where they become notifications.
-        using error_callback = std::function< void( std::string const & ) >;
-
-        option_async_setter( std::shared_ptr< options > endpoint, rs2_option opt, error_callback on_error = {} );
-        ~option_async_setter();
-
-        option_async_setter( option_async_setter const & ) = delete;
-        option_async_setter & operator=( option_async_setter const & ) = delete;
-
-        void post( float value );
-
-    private:
-        void run();
-
-        std::shared_ptr< options > _endpoint;
-        rs2_option _opt;
-        error_callback _on_error;
-        std::mutex _mtx;
-        std::condition_variable _cv;
-        float _pending_value = 0.f;
-        bool _has_pending = false;
-        bool _stop = false;
-        std::thread _worker;
     };
 
     class option_model
@@ -65,12 +29,18 @@ namespace rs2
         void update_supported( std::string& error_message );
         void update_read_only_status( std::string& error_message );
         void update_all_fields( std::string& error_message, notifications_model& model );
-        // Fire-and-forget option write. Always dispatches via the async worker;
+        // Fire-and-forget option write. Always dispatches via the subdevice dispatcher;
         // FW errors are surfaced asynchronously through the next periodic readback
         // (option_model::update_all_fields), so this method has no error-out parameter
         // and no return value. The previous synchronous error_message / ignore_period
         // parameters are no longer applicable.
         void set_option( rs2_option opt, float value );
+        // Synchronous variant: blocks the caller until the dispatcher action has run
+        // the FW write. Routes through the same per-subdevice dispatcher as the async
+        // path so it can't race with concurrent UI writes on the USB bus. Used by
+        // on_chip_calib for set+verify semantics — the caller does the verify read
+        // separately via the endpoint (or option_model::value after the next readback).
+        void set_option_sync( float value );
         bool draw_option( bool update_read_only_options, bool is_streaming,
             std::string& error_message, notifications_model& model );
 
@@ -83,8 +53,6 @@ namespace rs2
         rs2_option opt;
         option_range range;
         std::shared_ptr<options> endpoint;
-        float unset_value = 0;
-        bool have_unset_value = false;
         rsutils::time::stopwatch last_set_stopwatch;
         rsutils::time::stopwatch last_slider_hold_stopwatch;
         bool* invalidate_flag = nullptr;
@@ -131,8 +99,18 @@ namespace rs2
 
         std::string adjust_description( const std::string& str_in, const std::string& to_be_replaced, const std::string& to_replace );
 
-        // Lazily created on first async dispatch; shared so option_model stays copyable.
-        std::shared_ptr< option_async_setter > _async_setter;
+        // Per-option coalescing state for the subdevice dispatcher. Every UI-thread
+        // set_option_async stores into _latest_pending_value, then atomically claims
+        // the right to enqueue a dispatcher action via _has_pending_job (CAS false→true).
+        // The action clears _has_pending_job at entry and reads back the latest value, so
+        // any post() arriving during the FW call re-enqueues for that update.
+        // Held via shared_ptr so the dispatcher action (which captures these by value)
+        // is UAF-safe across option_model destruction, AND so option_model stays
+        // copyable (std::atomic deletes its copy ctor).
+        std::shared_ptr< std::atomic< float > > _latest_pending_value
+            = std::make_shared< std::atomic< float > >( 0.f );
+        std::shared_ptr< std::atomic< bool > > _has_pending_job
+            = std::make_shared< std::atomic< bool > >( false );
 
         // Tracks the value the user just requested via the slider / checkbox / edit
         // field, and is displayed locally until the firmware confirms (or contradicts)

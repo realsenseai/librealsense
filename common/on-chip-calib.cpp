@@ -133,13 +133,16 @@ namespace rs2
 
     void on_chip_calib_manager::set_laser_emitter_state( float value )
     {
-        // Calibration needs synchronous semantics: write, then read back to verify
-        // the FW actually applied the value. option_model::set_option is now async
-        // (its value_as_float() reads a local user-request cache, so the round-trip
-        // check would always pass) — go through the sensor endpoint directly here.
-        if( _sub->options_metadata.find( RS2_OPTION_EMITTER_ENABLED ) != _sub->options_metadata.end() )
+        // Route the write through option_model::set_option_sync so it goes via the
+        // subdevice dispatcher — that way the FW write can't interleave with concurrent
+        // UI option writes on the same USB bus. The read-back verify uses the sensor
+        // endpoint directly (a single get_option is harmless to issue outside the
+        // dispatcher; if needed for stricter ordering, a second invoke_and_wait would
+        // do).
+        auto it = _sub->options_metadata.find( RS2_OPTION_EMITTER_ENABLED );
+        if( it != _sub->options_metadata.end() )
         {
-            _sub->s->set_option( RS2_OPTION_EMITTER_ENABLED, value );
+            it->second.set_option_sync( value );
             if( _sub->s->get_option( RS2_OPTION_EMITTER_ENABLED ) != value )
                 throw std::runtime_error( rsutils::string::from()
                                           << "Failed to set laser " << ( value == off_value ? "off" : "on" ) );
@@ -148,10 +151,11 @@ namespace rs2
 
     void on_chip_calib_manager::set_thermal_loop_state( float value )
     {
-        // See set_laser_emitter_state for why we bypass option_model here.
-        if( _sub->options_metadata.find( RS2_OPTION_THERMAL_COMPENSATION ) != _sub->options_metadata.end() )
+        // See set_laser_emitter_state for why we route through option_model::set_option_sync.
+        auto it = _sub->options_metadata.find( RS2_OPTION_THERMAL_COMPENSATION );
+        if( it != _sub->options_metadata.end() )
         {
-            _sub->s->set_option( RS2_OPTION_THERMAL_COMPENSATION, value );
+            it->second.set_option_sync( value );
             if( _sub->s->get_option( RS2_OPTION_THERMAL_COMPENSATION ) != value )
                 throw std::runtime_error( rsutils::string::from()
                                           << "Failed to set thermal compensation " << ( value == off_value ? "off" : "on" ) );

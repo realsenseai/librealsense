@@ -143,7 +143,11 @@ namespace rs2
         y411(std::make_shared<rs2::gl::y411_decoder>()),
         viewer(viewer),
         detected_objects(device_detected_objects),
-        _destructing( false )
+        _destructing( false ),
+        // Queue capacity is generous: even rapid slider drags coalesce into at most one
+        // queued job per option (see option_model::set_option_async), so realistically
+        // depth ≪ 16.
+        _set_dispatcher( std::make_shared< dispatcher >( 64u ) )
     {
         supported_options = s->get_supported_options();
         restore_processing_block("colorizer", depth_colorizer);

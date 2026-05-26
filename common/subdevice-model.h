@@ -33,6 +33,7 @@
 #include <rsutils/time/periodic-timer.h>
 #include <rsutils/time/stopwatch.h>
 #include <rsutils/number/stabilized-value.h>
+#include <rsutils/concurrency/concurrency.h>
 #include "option-model.h"
 
 namespace rs2
@@ -231,6 +232,22 @@ namespace rs2
         bool uvmapping_calib_full = false;
         device_model* dev_model;
         std::string _opt_base_label;
+
+        // Single per-subdevice worker that serializes every FW option write on this
+        // sensor. Replaces the per-option threads from earlier in this PR:
+        //   - Cross-option ordering is now FIFO (no races on the per-device USB bus).
+        //   - The dispatcher action runs try_sleep(200ms) after each set_option, which
+        //     enforces the protective FW-write floor uniformly (slider drag, checkbox,
+        //     calibration — all paths).
+        //   - on_chip_calib routes through this same dispatcher via invoke_and_wait so
+        //     calibration writes can't interleave with concurrent UI writes.
+        // shared_ptr so option_model copies (the map[id] = create_option_model(...)
+        // insertion) hold the same instance. Declared after options_metadata so it is
+        // destroyed first; ~dispatcher stops/joins the worker before option_models go
+        // away, keeping in-flight actions UAF-safe.
+        std::shared_ptr< dispatcher > _set_dispatcher;
+
+        std::shared_ptr< dispatcher > set_dispatcher() const { return _set_dispatcher; }
 
     private:
         bool draw_resolutions(std::string& error_message, std::string& label, std::function<void()> streaming_tooltip, float col0, float col1);
