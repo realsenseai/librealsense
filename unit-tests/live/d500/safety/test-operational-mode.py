@@ -3,11 +3,19 @@
 
 #test:device D585S
 
+import os
 import pyrealsense2 as rs
 from rspy import test, log
+from rspy.cdc_log import start_cdc_log
 import time
 
 device, _ = test.find_first_device_or_exit();
+
+sensor_names = [s.get_info(rs.camera_info.name) for s in device.sensors
+                if s.supports(rs.camera_info.name)]
+log.d("Enumerated sensors:", sensor_names)
+
+_cdc = start_cdc_log(os.path.splitext(os.path.basename(__file__))[0])
 
 def verify_frames_received(pipe, count):
     for i in range(count):
@@ -135,4 +143,7 @@ with test.closure("Resume --> Maintenance keeps safety streaming on"):
     pipe.stop()
 
 ################################################################################################
+if _cdc is not None:
+    _cdc.stop()
+
 test.print_results_and_exit()

@@ -5,13 +5,22 @@
 # test:donotrun:!nightly
 # test:device D585S
 
+import os
 import pyrealsense2 as rs
 from rspy import test, log
+from rspy.cdc_log import start_cdc_log
 
 # D500 devices support an extended buffer (> 1 KB) on HWMC for reading / writing calibration tables.
 # This test only test the 'read' part as we don't want to ruin our calibration tables in the device.
 
 dev, _ = test.find_first_device_or_exit()
+
+sensor_names = [s.get_info(rs.camera_info.name) for s in dev.sensors
+                if s.supports(rs.camera_info.name)]
+log.d("Enumerated sensors:", sensor_names)
+
+_cdc = start_cdc_log(os.path.splitext(os.path.basename(__file__))[0])
+
 dp_device = dev.as_debug_protocol()
 
 #############################################################################################
@@ -101,5 +110,8 @@ test.check_equal(len(ans), rgb_lens_shading_table_size + twice_opcode_length)
 
 test.finish()
 #############################################################################################
+
+if _cdc is not None:
+    _cdc.stop()
 
 test.print_results_and_exit()
