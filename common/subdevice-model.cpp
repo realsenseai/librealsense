@@ -149,6 +149,10 @@ namespace rs2
         // depth ≪ 16.
         _set_dispatcher( std::make_shared< dispatcher >( 64u ) )
     {
+        // dispatcher's worker thread starts in _was_stopped=true; invoke() is a
+        // silent no-op until start() is called. (The header comment claiming it
+        // "starts out 'started'" disagrees with the constructor in src/dispatcher.cpp.)
+        _set_dispatcher->start();
         supported_options = s->get_supported_options();
         restore_processing_block("colorizer", depth_colorizer);
         restore_processing_block("yuy2rgb", yuy2rgb);

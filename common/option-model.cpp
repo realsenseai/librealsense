@@ -864,9 +864,14 @@ void option_model::set_option_async( float value )
                 // rather than waiting for the 2 s timeout.
                 has_user_request->store( false );
             }
-            // Protective floor — at least 200 ms between FW writes on this subdevice.
+            // Bus-fairness floor between FW writes on this subdevice. The FW
+            // round-trip itself already rate-limits the bus; this small extra idle
+            // window (~20 Hz cap when FW is fast) keeps the video frame stream from
+            // starving during sustained option-write traffic. 200 ms was too long
+            // when one of the queued writes is for a slow option like exposure at
+            // high values — subsequent writes (e.g. gain) waited behind it.
             // Returns early if the dispatcher is shutting down (device disconnect).
-            c.try_sleep( std::chrono::milliseconds( 200 ) );
+            c.try_sleep( std::chrono::milliseconds( 50 ) );
         } );
 }
 
@@ -885,7 +890,7 @@ void option_model::set_option_sync( float value )
         [ this, value ]( dispatcher::cancellable_timer c )
         {
             endpoint->set_option( opt, value );
-            c.try_sleep( std::chrono::milliseconds( 200 ) );
+            c.try_sleep( std::chrono::milliseconds( 50 ) );
         },
         []() { return false; } );
 }
