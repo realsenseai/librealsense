@@ -11,13 +11,40 @@ that interface into a timestamped text file for the duration of a test.
 
 import atexit
 import datetime
+import errno
 import os
 import select
 import threading
+import time
 
 from rspy import log
 
 DEFAULT_DEVICE = "/dev/ttyACM1"
+
+# When the device is freshly enumerated (or re-enumerated after a librealsense
+# USB claim), services like ModemManager probe the tty and hold it open with
+# TIOCEXCL for a short window. We retry the open for a few seconds to ride
+# that probe out instead of giving up immediately.
+OPEN_RETRY_TIMEOUT_SEC = 10
+OPEN_RETRY_DELAY_SEC = 0.5
+
+
+def _open_with_retry( device_path, timeout=OPEN_RETRY_TIMEOUT_SEC, delay=OPEN_RETRY_DELAY_SEC ):
+    """Open `device_path` non-blocking, retrying on EBUSY for up to `timeout` seconds."""
+    deadline = time.monotonic() + timeout
+    busy_logged = False
+    while True:
+        try:
+            return os.open( device_path, os.O_RDONLY | os.O_NONBLOCK )
+        except OSError as e:
+            if e.errno == errno.EBUSY and time.monotonic() < deadline:
+                if not busy_logged:
+                    log.d( f"CDC log capture: {device_path} busy (likely ModemManager probe), retrying up to {timeout}s" )
+                    busy_logged = True
+                time.sleep( delay )
+                continue
+            log.w( f"CDC log capture skipped: cannot open {device_path}: {e}" )
+            return None
 
 
 class CDCLogCapture:
@@ -54,10 +81,8 @@ def start_cdc_log( test_name, device_path=DEFAULT_DEVICE, out_dir="." ):
     timestamp = datetime.datetime.now().strftime( "%Y%m%d_%H%M%S" )
     out_path = os.path.join( out_dir, f"{test_name}_{timestamp}.txt" )
 
-    try:
-        fd = os.open( device_path, os.O_RDONLY | os.O_NONBLOCK )
-    except OSError as e:
-        log.w( f"CDC log capture skipped: cannot open {device_path}: {e}" )
+    fd = _open_with_retry( device_path )
+    if fd is None:
         return None
 
     out_file = open( out_path, "w", buffering=1 )
