@@ -14,6 +14,8 @@ import datetime
 import errno
 import os
 import select
+import shutil
+import subprocess
 import threading
 import time
 
@@ -23,10 +25,24 @@ DEFAULT_DEVICE = "/dev/ttyACM1"
 
 # When the device is freshly enumerated (or re-enumerated after a librealsense
 # USB claim), services like ModemManager probe the tty and hold it open with
-# TIOCEXCL for a short window. We retry the open for a few seconds to ride
-# that probe out instead of giving up immediately.
-OPEN_RETRY_TIMEOUT_SEC = 10
+# TIOCEXCL for a short window. We retry the open for a while to ride that out.
+OPEN_RETRY_TIMEOUT_SEC = 30
 OPEN_RETRY_DELAY_SEC = 0.5
+
+
+def _identify_holder( device_path ):
+    """Best-effort: return a short string naming the process(es) holding the device, or None."""
+    for cmd in ( ["fuser", "-v", device_path], ["lsof", device_path] ):
+        if not shutil.which( cmd[0] ):
+            continue
+        try:
+            result = subprocess.run( cmd, capture_output=True, text=True, timeout=2 )
+            out = (result.stdout + result.stderr).strip()
+            if out:
+                return f"{cmd[0]}: {out}"
+        except (subprocess.TimeoutExpired, OSError):
+            continue
+    return None
 
 
 def _open_with_retry( device_path, timeout=OPEN_RETRY_TIMEOUT_SEC, delay=OPEN_RETRY_DELAY_SEC ):
@@ -39,11 +55,15 @@ def _open_with_retry( device_path, timeout=OPEN_RETRY_TIMEOUT_SEC, delay=OPEN_RE
         except OSError as e:
             if e.errno == errno.EBUSY and time.monotonic() < deadline:
                 if not busy_logged:
-                    log.d( f"CDC log capture: {device_path} busy (likely ModemManager probe), retrying up to {timeout}s" )
+                    holder = _identify_holder( device_path )
+                    holder_msg = f" -- holder: {holder}" if holder else ""
+                    log.d( f"CDC log capture: {device_path} busy, retrying up to {timeout}s{holder_msg}" )
                     busy_logged = True
                 time.sleep( delay )
                 continue
-            log.w( f"CDC log capture skipped: cannot open {device_path}: {e}" )
+            holder = _identify_holder( device_path ) if e.errno == errno.EBUSY else None
+            holder_msg = f" (holder: {holder})" if holder else ""
+            log.w( f"CDC log capture skipped: cannot open {device_path}: {e}{holder_msg}" )
             return None
 
 
