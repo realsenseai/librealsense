@@ -6,7 +6,7 @@
 import os
 import pyrealsense2 as rs
 from rspy import test, log
-from rspy.cdc_log import start_cdc_log
+from rspy.d500_log import start_cdc_log
 import time
 
 device, _ = test.find_first_device_or_exit();
@@ -15,7 +15,9 @@ sensor_names = [s.get_info(rs.camera_info.name) for s in device.sensors
                 if s.supports(rs.camera_info.name)]
 log.d("Enumerated sensors:", sensor_names)
 
-_cdc = start_cdc_log(os.path.splitext(os.path.basename(__file__))[0])
+_test_base = os.path.splitext(os.path.basename(__file__))[0]
+_cdc  = start_cdc_log(_test_base + "-cdc")
+_smcu = start_cdc_log(_test_base + "-smcu", device_path="/dev/ttyUSB1", baud=460800)
 
 def verify_frames_received(pipe, count):
     for i in range(count):
@@ -145,5 +147,7 @@ with test.closure("Resume --> Maintenance keeps safety streaming on"):
 ################################################################################################
 if _cdc is not None:
     _cdc.stop()
+if _smcu is not None:
+    _smcu.stop()
 
 test.print_results_and_exit()

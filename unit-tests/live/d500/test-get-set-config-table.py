@@ -6,7 +6,7 @@
 import os
 import pyrealsense2 as rs
 from rspy import test, log
-from rspy.cdc_log import start_cdc_log
+from rspy.d500_log import start_cdc_log
 
 # D500 devices support an extended buffer (> 1 KB) on HWMC for reading / writing calibration tables.
 # This test only test the 'read' part as we don't want to ruin our calibration tables in the device.
