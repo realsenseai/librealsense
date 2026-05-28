@@ -11,7 +11,8 @@ from rspy.cdc_log import start_cdc_log
 # D500 devices support an extended buffer (> 1 KB) on HWMC for reading / writing calibration tables.
 # This test only test the 'read' part as we don't want to ruin our calibration tables in the device.
 
-# d500_calib_location enum (src/ds/d500/d500-private.h): flash=1, ram=2 -- 0 is not valid.
+# d500_calib_location enum (src/ds/d500/d500-private.h): eeprom=0, flash=1, ram=2.
+d500_calib_eeprom = 0
 d500_calib_flash_memory = 1
 
 dev, _ = test.find_first_device_or_exit()
@@ -80,7 +81,7 @@ test.start("Get buffer more than 1 KB - getting the whole table at once")
 rgb_lens_shading_table_id = 0xb2
 rgb_lens_shading_table_size = 1088
 get_hkr_config_table_opcode = 0xa7
-cmd = dp_device.build_command(opcode=get_hkr_config_table_opcode, param1=d500_calib_flash_memory, param2=rgb_lens_shading_table_id, param3=0)
+cmd = dp_device.build_command(opcode=get_hkr_config_table_opcode, param1=d500_calib_eeprom, param2=rgb_lens_shading_table_id, param3=0)
 ans = dp_device.send_and_receive_raw_data(cmd)
 test.check_equal(ans[0], get_hkr_config_table_opcode)
 test.check_equal(len(ans), rgb_lens_shading_table_size + 4)
@@ -96,12 +97,12 @@ rgb_lens_shading_table_id = 0xb2
 rgb_lens_shading_table_size = 1088
 get_hkr_config_table_opcode = 0xa7
 first_chunk_from_two_param = 0x10000
-cmd1 = dp_device.build_command(opcode=get_hkr_config_table_opcode, param1=d500_calib_flash_memory, param2=rgb_lens_shading_table_id, param3=0, param4=first_chunk_from_two_param)
+cmd1 = dp_device.build_command(opcode=get_hkr_config_table_opcode, param1=d500_calib_eeprom, param2=rgb_lens_shading_table_id, param3=0, param4=first_chunk_from_two_param)
 ans1 = dp_device.send_and_receive_raw_data(cmd1)
 test.check_equal(ans1[0], get_hkr_config_table_opcode)
 
 second_chunk_from_two_param = 0x10001
-cmd2 = dp_device.build_command(opcode=get_hkr_config_table_opcode, param1=d500_calib_flash_memory, param2=rgb_lens_shading_table_id, param3=0, param4=second_chunk_from_two_param)
+cmd2 = dp_device.build_command(opcode=get_hkr_config_table_opcode, param1=d500_calib_eeprom, param2=rgb_lens_shading_table_id, param3=0, param4=second_chunk_from_two_param)
 ans2 = dp_device.send_and_receive_raw_data(cmd2)
 test.check_equal(ans2[0], get_hkr_config_table_opcode)
 
