@@ -4,6 +4,18 @@ import { server } from '../../mocks/server'
 import { mockDeviceList, mockDevice } from '../../mocks/fixtures/devices'
 import { mockSensors, mockDepthOptions } from '../../mocks/fixtures/sensors'
 
+// Helper: capture the query string the apiClient sends on /devices/
+function captureDevicesQuery(): { current: string | null } {
+  const seen = { current: null as string | null }
+  server.use(
+    http.get('/api/v1/devices/', ({ request }) => {
+      seen.current = new URL(request.url).search
+      return HttpResponse.json(mockDeviceList)
+    })
+  )
+  return seen
+}
+
 // Note: apiClient is a singleton, so we need to import it fresh or reset state
 // For these tests, we'll test the API endpoints through MSW handlers
 
@@ -28,11 +40,29 @@ describe('API Client', () => {
     it('returns device properties correctly', async () => {
       const devices = await apiClient.getDevices()
       const device = devices.find((d: any) => d.device_id === mockDevice.device_id)
-      
+
       expect(device).toBeDefined()
       expect(device.name).toBe('RealSense D435')
       expect(device.serial_number).toBe('123456789')
       expect(device.firmware_version).toBe('5.16.0.1')
+    })
+
+    it('omits force_refresh from the query by default', async () => {
+      const seen = captureDevicesQuery()
+      await apiClient.getDevices()
+      expect(seen.current).toBe('')
+    })
+
+    it('omits force_refresh when forceRefresh=false', async () => {
+      const seen = captureDevicesQuery()
+      await apiClient.getDevices(false)
+      expect(seen.current).toBe('')
+    })
+
+    it('sends force_refresh=true when forceRefresh=true', async () => {
+      const seen = captureDevicesQuery()
+      await apiClient.getDevices(true)
+      expect(seen.current).toContain('force_refresh=true')
     })
   })
 
@@ -184,7 +214,7 @@ describe('API Client', () => {
   describe('Firmware', () => {
     it('fetches firmware status', async () => {
       server.use(
-        http.get('/api/v1/devices/:deviceId/status/', () => {
+        http.get('/api/v1/devices/:deviceId/status', () => {
           return HttpResponse.json({
             device_id: mockDevice.device_id,
             current: '5.16.0.1',

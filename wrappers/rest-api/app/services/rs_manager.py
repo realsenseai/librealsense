@@ -69,6 +69,10 @@ class RealSenseManager:
         # Store latest raw depth frames for pixel depth queries
         self.depth_frames: Dict[str, Any] = {}  # device_id -> rs.depth_frame
 
+        # Cache of supported frame_metadata values per stream profile uid.
+        # Avoids re-probing every metadata key on every frame in the hot loop.
+        self._supported_md_by_profile: Dict[int, list] = {}
+
         self.sio = sio
         self.metadata_socket_server = MetadataSocketServer(sio, self)
 
@@ -1005,6 +1009,7 @@ class RealSenseManager:
                     self.pipeline_signatures.pop(device_id, None)
                     self.frame_queues.pop(device_id, None)
                     self.metadata_queues.pop(device_id, None)
+                    self._supported_md_by_profile.clear()
                     self.stopping.discard(device_id)
                     # Reset streaming mode to idle
                     self.streaming_mode[device_id] = "idle"
@@ -1177,6 +1182,68 @@ class RealSenseManager:
                     detail=f"Stream type '{stream_key}' is not active for device {device_id}.",
                 )
 
+    # TODO: replace with `list(rs.frame_metadata_value)` once pyrealsense2 ships
+    # with pybind11 >= 2.12 (added __iter__ on py::enum_). Current PyPI wheels
+    # use older pybind11 where the enum is not iterable.
+    _FRAME_METADATA_VALUES = list(rs.frame_metadata_value.__members__.values())
+
+    @staticmethod
+    def _build_viewer_info(frame_data) -> Dict[str, Any]:
+        """Top metadata block, mirrors C++ realsense-viewer."""
+        profile = frame_data.get_profile()
+        actual_fps_key = rs.frame_metadata_value.actual_fps
+        hardware_fps = profile.fps()
+        if frame_data.supports_frame_metadata(actual_fps_key):
+            try:
+                hardware_fps = frame_data.get_frame_metadata(actual_fps_key) / 1000.0
+            except Exception as exc:
+                logging.debug("[METADATA] failed to read %s: %s", actual_fps_key.name, exc)
+        info: Dict[str, Any] = {
+            "timestamp": frame_data.get_timestamp(),
+            "frame_number": frame_data.get_frame_number(),
+            "clock_domain": frame_data.get_frame_timestamp_domain().name,
+            "pixel_format": profile.format().name,
+            "hardware_fps": hardware_fps,
+        }
+        try:  # video frames only; motion frames have no width/height
+            info["width"] = frame_data.get_width()
+            info["height"] = frame_data.get_height()
+            vsp = profile.as_video_stream_profile()
+            info["hardware_width"] = vsp.width()
+            info["hardware_height"] = vsp.height()
+        except Exception:
+            pass
+        return info
+
+    def _get_frame_metadata(self, frame_data) -> Dict[str, int]:
+        """Return all rs2_frame_metadata_value attributes the frame supports.
+        Mirrors common/stream-model.cpp:52-59 in the C++ realsense-viewer.
+        Caches the supported subset per stream profile uid so the steady-state
+        per-frame cost is one dict lookup + N get_frame_metadata calls."""
+        try:
+            profile_uid = frame_data.get_profile().unique_id()
+        except Exception:
+            profile_uid = None
+
+        supported = self._supported_md_by_profile.get(profile_uid) if profile_uid is not None else None
+        # Build the supported set from the 2nd frame on: delta-computed metadata
+        # (e.g. actual_fps) is not yet available on the first frame.
+        if supported is None and frame_data.get_frame_number() >= 2:
+            supported = [md for md in self._FRAME_METADATA_VALUES
+                         if frame_data.supports_frame_metadata(md)]
+            if profile_uid is not None:
+                self._supported_md_by_profile[profile_uid] = supported
+
+        attrs: Dict[str, int] = {}
+        for md in (supported or []):
+            try:
+                attrs[md.name] = frame_data.get_frame_metadata(md)
+            except Exception as e:
+                # supports_frame_metadata said yes; getting the value should not throw.
+                logging.debug("[METADATA] failed to read %s: %s", md.name, e)
+                continue
+        return attrs
+
     def _collect_frames(self, device_id: str, align_processor=None):
         """Thread function to collect frames from the pipeline"""
         logging.debug("[INFO] Frame collection thread started for device %s", device_id)
@@ -1272,10 +1339,8 @@ class RealSenseManager:
 
                             # Add metadata
                             metadata = {
-                                "timestamp": frame_data.get_timestamp(),
-                                "frame_number": frame_data.get_frame_number(),
-                                "width": getattr(frame_data, "get_width", lambda: 640)() or 640,
-                                "height": getattr(frame_data, "get_height", lambda: 480)() or 480,
+                                "frame_metadata": self._get_frame_metadata(frame_data),
+                                **self._build_viewer_info(frame_data),
                             }
 
                             if rs_stream == rs.stream.gyro or rs_stream == rs.stream.accel:
@@ -1337,6 +1402,7 @@ class RealSenseManager:
                             del self.metadata_queues[device_id]
                         if device_id in self.depth_frames:
                             del self.depth_frames[device_id]
+                        self._supported_md_by_profile.clear()
                         if device_id in self.device_infos:
                             self.device_infos[device_id].is_streaming = False
             except Exception:
@@ -1575,9 +1641,9 @@ class RealSenseManager:
     ) -> Tuple[Optional[Any], dict]:
         """Process a single sensor frame; return (processed_frame, metadata)."""
         processed_frame = None
+        info_source = frame  # frame to read info from after post processing is done
         metadata: dict = {
-            "timestamp": frame.get_timestamp(),
-            "frame_number": frame.get_frame_number(),
+            "frame_metadata": self._get_frame_metadata(frame),
         }
 
         if "depth" in frame_stream_name:
@@ -1586,20 +1652,17 @@ class RealSenseManager:
             self.depth_frames[device_id] = depth_frame
             colorized = colorizer.colorize(depth_frame)
             processed_frame = np.asanyarray(colorized.get_data())
-            metadata["width"] = depth_frame.get_width()
-            metadata["height"] = depth_frame.get_height()
+            info_source = depth_frame
 
         elif "color" in frame_stream_name:
             color_frame = frame.as_video_frame()
             color_frame = self._apply_color_filters(device_id, color_frame)
             processed_frame = np.asanyarray(color_frame.get_data())
-            metadata["width"] = color_frame.get_width()
-            metadata["height"] = color_frame.get_height()
+            info_source = color_frame
 
         elif "infrared" in frame_stream_name:
             processed_frame = np.asanyarray(frame.get_data())
-            metadata["width"] = frame.as_video_frame().get_width()
-            metadata["height"] = frame.as_video_frame().get_height()
+            info_source = frame.as_video_frame()
 
         elif "gyro" in frame_stream_name or "accel" in frame_stream_name:
             motion_frame = frame.as_motion_frame()
@@ -1616,9 +1679,8 @@ class RealSenseManager:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 255, 100), 1)
             cv2.putText(processed_frame, f"Z: {motion_data.z:.3f}", (10, 90),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1)
-            metadata["width"] = 320
-            metadata["height"] = 120
 
+        metadata.update(self._build_viewer_info(info_source))
         return processed_frame, metadata
 
     def _collect_sensor_frames(

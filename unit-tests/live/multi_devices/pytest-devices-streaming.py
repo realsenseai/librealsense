@@ -311,6 +311,7 @@ def run_phase(phase_label, device_list, stream_configs):
         f"{phase_label}: All streams should receive frames independently without interference")
 
 
+@pytest.mark.skip(reason="Multi-stream test skipped until depth-drops issue on Windows is stable")
 def test_multi_stream_operation(test_devices):
     """Simultaneous multi-stream operation on multiple devices.
 

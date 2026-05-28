@@ -112,7 +112,7 @@ interface AppState {
   deviceStates: Record<string, DeviceState> // keyed by device_id
   isLoadingDevices: boolean
   hasUserInteracted: boolean // Track if user manually toggled a device (skip auto-activate)
-  fetchDevices: () => Promise<void>
+  fetchDevices: (forceRefresh?: boolean) => Promise<void>
   checkFirmwareUpdates: (deviceId: string) => Promise<void>
 
   // Device activation (multi-select support)
@@ -215,10 +215,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
   isLoadingDevices: false,
   hasUserInteracted: false,
   
-  fetchDevices: async () => {
+  fetchDevices: async (forceRefresh = false) => {
+    // Guard against concurrent fetches: a slow force-refresh must not be clobbered
+    // by a cache-hit poll that resolves after it.
+    if (get().isLoadingDevices) return
     set({ isLoadingDevices: true, error: null })
     try {
-      const devices = await apiClient.getDevices()
+      const devices = await apiClient.getDevices(forceRefresh)
       // Update devices list, preserve existing device states for known devices
       set((state) => {
         const newDeviceStates = { ...state.deviceStates }
@@ -259,7 +262,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
           }
         }
 
-        return { devices, deviceStates: newDeviceStates, isLoadingDevices: false }
+        // Only reconcile selectedDevice on a forced re-enumeration. The 5s poll
+        // can return a momentarily-stale cached list and must not silently null
+        // the user's selection.
+        let selectedDevice = state.selectedDevice
+        if (forceRefresh && state.selectedDevice) {
+          selectedDevice =
+            devices.find(d => d.device_id === state.selectedDevice!.device_id) || null
+        }
+
+        return { devices, deviceStates: newDeviceStates, selectedDevice, isLoadingDevices: false }
       })
       
       // Auto-activate if exactly 1 device and user hasn't manually interacted

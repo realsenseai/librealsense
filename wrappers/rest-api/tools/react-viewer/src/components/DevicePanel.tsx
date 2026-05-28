@@ -55,9 +55,12 @@ export function DevicePanel() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="panel-header mb-0">Devices</h2>
         <button
-          onClick={() => fetchDevices()}
-          className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-          title="Refresh devices"
+          onClick={() => fetchDevices(true)}
+          disabled={isLoadingDevices}
+          aria-label={isLoadingDevices ? 'Refreshing devices…' : 'Refresh devices'}
+          aria-busy={isLoadingDevices}
+          className="p-2 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={isLoadingDevices ? 'Refreshing…' : 'Refresh devices'}
         >
           <svg
             className={`w-5 h-5 ${isLoadingDevices ? 'animate-spin' : ''}`}

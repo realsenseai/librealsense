@@ -2,10 +2,11 @@
 
 These examples demonstrate usage of the **Enhanced depth** library. The library
 is a closed-source depth enhancement module designed to operate on top of the
-Intel RealSense SDK 2.0 pipeline. It improves minimum sensing distance (min-Z)
-to ~12 cm on NVIDIA Jetson platforms. It integrates transparently into
-existing RealSense-based applications and requires no modification to camera
-firmware and/or SDK.
+RealSense SDK 2.0 pipeline. It improves minimum sensing distance (min-Z):
+regular stereo cameras reach ~12 cm, while short-range stereo cameras (D401,
+D405) can reach up to ~2 cm. It integrates transparently into existing
+RealSense-based applications and requires no modification to camera firmware
+and/or SDK.
 
 <p align="center">
   <a href="https://realsenseai.com/case-studies/?capability_application=autonomous-mobile-robots"><img src="https://librealsense.realsenseai.com/readme-media/minz/minz_600.gif" width="720"/></a>
@@ -43,7 +44,7 @@ Latency measured at 640x480 on Jetson AGX Orin.
 
 | Component | Class | What it does |
 |-----------|-------|-------------|
-| Close-range improvement | `DepthRangeImprover` | Extends min distance from 520 mm to 120 mm |
+| Close-range improvement | `DepthRangeImprover` | Extends min distance down to ~120 mm (regular stereo) or ~20 mm (D401/D405 short-range) |
 
 ---
 
@@ -301,7 +302,8 @@ from rs_depth import Calibration
 
 ### DepthRangeImprover
 
-Extends RealSense minimum working distance from ~520 mm to ~120 mm.
+Extends RealSense minimum working distance to ~120 mm on regular stereo cameras,
+or ~20 mm on short-range stereo cameras (D401, D405).
 Recovers close-range depth that the RealSense hardware cannot measure and blends it with the hardware depth for a seamless result.
 
 ```python
@@ -397,7 +399,8 @@ Headers at `/opt/librealsense2-enhanced-depth/include/`, library at `/opt/librea
 
 ### DepthRangeImprover (C++)
 
-Extends RealSense minimum working distance from ~520 mm to ~120 mm.
+Extends RealSense minimum working distance to ~120 mm on regular stereo cameras,
+or ~20 mm on short-range stereo cameras (D401, D405).
 Pure C++ — no Python runtime required.
 
 ```cpp

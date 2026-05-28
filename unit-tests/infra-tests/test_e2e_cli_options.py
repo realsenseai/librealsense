@@ -78,6 +78,24 @@ class TestCliOptionsRegistered:
         assert len(calls) == 2
         assert all(c['recycle'] is True for c in calls)
 
+    def test_retries_on_setup_error(self):
+        """Setup-phase ERROR in pass 0 must still trigger the retry pass.
+
+        Regression for Jenkins win #113344: pytest_runtest_makereport gated
+        failure-tracking on ``report.when == "call"``, so fixture setup failures
+        (reported as ERROR, not FAILED) were silently treated as "pass had no
+        failures" and skip-if-clean dropped the retry.  Also covers the step-
+        ordering fix in collection.py — without it, the retry pass could run
+        before the original pass and observe an empty failure record."""
+        rc, out, tracking = run_e2e("pytest-retry-setup-fail.py", "--retries", "1")
+        # Pass 0: fixture raises in setup → 1 error.
+        # Pass 1 (retry): fixture returns → 1 passed.
+        assert_outcomes(out, passed=1, error=1)
+        calls = tracking["enable_only_calls"]
+        # Two enable_only calls: pass 0 setup + pass 1 retry recycle.
+        assert len(calls) == 2
+        assert all(c['recycle'] is True for c in calls)
+
     def test_repeat(self):
         """--repeat 3 should repeat the test 3 times, recycling the device each time."""
         rc, out, tracking = run_e2e("pytest-device-setup.py", "-k", "test_d455 and not excluded",

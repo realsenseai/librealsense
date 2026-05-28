@@ -173,13 +173,39 @@ describe('DevicePanel', () => {
     it('calls fetchDevices when refresh is clicked', async () => {
       const fetchDevices = vi.fn().mockResolvedValue(undefined)
       useAppStore.setState({ fetchDevices })
-      
+
       render(<DevicePanel />)
-      
+
       const refreshButton = screen.getByTitle('Refresh devices')
       await userEvent.click(refreshButton)
-      
+
       expect(fetchDevices).toHaveBeenCalled()
+    })
+
+    it('passes forceRefresh=true when refresh is clicked manually', async () => {
+      const fetchDevices = vi.fn().mockResolvedValue(undefined)
+      useAppStore.setState({ fetchDevices })
+
+      render(<DevicePanel />)
+
+      const refreshButton = screen.getByLabelText('Refresh devices')
+      await userEvent.click(refreshButton)
+
+      // The polling effect also calls fetchDevices() with no args on mount.
+      // The manual-click call must explicitly pass true.
+      expect(fetchDevices).toHaveBeenCalledWith(true)
+    })
+
+    it('is disabled while a fetch is in flight', () => {
+      // Must use initialStoreState (not pre-render setState) because
+      // renderWithProviders calls resetStore() first, which would reset
+      // isLoadingDevices back to false.
+      render(<DevicePanel />, {
+        initialStoreState: { isLoadingDevices: true },
+      })
+
+      const refreshButton = screen.getByLabelText('Refreshing devices…')
+      expect(refreshButton).toBeDisabled()
     })
   })
 

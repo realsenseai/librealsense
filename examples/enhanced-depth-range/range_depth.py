@@ -24,9 +24,9 @@ from rs_depth import Calibration, DepthRangeImprover
 # ── 1. Open the camera ──────────────────────────────────────────────────
 pipeline = rs.pipeline()
 cfg = rs.config()
-cfg.enable_stream(rs.stream.infrared, 1, 640, 480, rs.format.y8,  30)
-cfg.enable_stream(rs.stream.infrared, 2, 640, 480, rs.format.y8,  30)
-cfg.enable_stream(rs.stream.depth,       640, 480, rs.format.z16, 30)
+cfg.enable_stream(rs.stream.infrared, 1, 1280, 720, rs.format.y8,  30)
+cfg.enable_stream(rs.stream.infrared, 2, 1280, 720, rs.format.y8,  30)
+cfg.enable_stream(rs.stream.depth,       1280, 720, rs.format.z16, 30)
 profile = pipeline.start(cfg)
 
 # ── 2. Build calibration from the camera's own intrinsics/extrinsics ────
@@ -42,10 +42,10 @@ try:
 except Exception:
     depth_scale = 0.001
 
-# ── 3. Construct the improver (auto threshold = focal × baseline / 105) ─
+# ── 3. Construct the improver (auto threshold = 1.2 * focal × baseline / 126) ─
 improver = DepthRangeImprover(calib)
 T = improver.min_z_threshold_mm
-N = 640 * 480
+N = 1280 * 720
 print(f"MinZ threshold: {T} mm  (pixels closer than this are improved)")
 print("Press Ctrl-C to stop\n")
 

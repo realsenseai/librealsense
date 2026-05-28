@@ -150,6 +150,9 @@ export function renderWithProviders(
   }
 }
 
-// Re-export everything from React Testing Library except render (avoid duplicate export)
+// Re-export everything from React Testing Library, but alias the wrapped
+// `renderWithProviders` as `render` so tests that import `render` from this
+// module get the version that honours `initialStoreState`. The explicit
+// named export takes precedence over the one re-exported by `export *`.
 export * from '@testing-library/react'
-export { renderWithProviders }
+export { renderWithProviders as render }

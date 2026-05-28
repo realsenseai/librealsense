@@ -3,6 +3,8 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 
 #include "pyrealsense2.h"
 #include <librealsense2/hpp/rs_processing.hpp>
+#include "proc/synthetic-stream.h"
+#include "proc/color-formats-converter.h"
 #include <memory>
 
 void init_processing(py::module &m) {
@@ -89,6 +91,21 @@ void init_processing(py::module &m) {
                                                           "but the SDK will automatically try to use SSE2, AVX, or CUDA instructions where available to "
                                                           "get better performance. Othere implementations (GLSL, OpenCL, Neon, NCS) should follow.");
     yuy_decoder.def(py::init<>());
+
+    // Parameterized converters: same internal classes the SDK uses for live cameras,
+    // exposed here as factories so tests can pick the output format.
+#define BIND_CONVERTER(name) \
+    m.def(#name, [](rs2_format target) { \
+        auto block = std::shared_ptr<rs2_processing_block>( \
+            new rs2_processing_block{ std::make_shared<librealsense::name>(target) }, \
+            rs2_delete_processing_block); \
+        return rs2::filter(block, 1); \
+    }, "target_format"_a)
+    BIND_CONVERTER(yuy2_converter);
+    BIND_CONVERTER(uyvy_converter);
+    BIND_CONVERTER(m420_converter);
+    BIND_CONVERTER(nv12_converter);
+#undef BIND_CONVERTER
 
     py::class_<rs2::threshold_filter, rs2::filter> threshold(m, "threshold_filter", "Depth thresholding filter. By controlling min and "
                                                              "max options on the block, one could filter out depth values that are either too large "

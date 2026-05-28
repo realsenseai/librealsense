@@ -19,7 +19,8 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device("D400*"),
-    pytest.mark.device("D500*"),
+    pytest.mark.device_each("D500*"),
+    pytest.mark.device_exclude("D555"), # D555 (DDS) records an empty bag for compressed recording. Tracked in RSDEV-11513
 ]
 
 W, H, BPP = 640, 480, 2
@@ -182,12 +183,14 @@ def _record_live_bag(filename, dev):
         if p.is_default() and p.stream_type() == rs.stream.depth
     )
 
+    recorder = rs.recorder(filename, dev, True)  # force compression
+
     frame_queue = rs.frame_queue(100)
     depth_sensor.open(depth_profile)
     depth_sensor.start(frame_queue)
 
-    recorder = rs.recorder(filename, dev, True)  # force compression
     time.sleep(LIVE_RECORD_SECONDS)
+
     recorder.pause()
     recorder = None
 

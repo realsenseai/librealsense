@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { http, HttpResponse } from 'msw'
+import { server } from '../../mocks/server'
 import { useAppStore } from '@/store'
 import { resetStore, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 
@@ -19,10 +21,10 @@ describe('AppStore', () => {
       expect(state.error).toBeNull()
     })
 
-    it('starts with grid view mode', () => {
+    it('starts in 2d view mode', () => {
       const state = useAppStore.getState()
-      
-      expect(state.viewMode).toBe('grid')
+
+      expect(state.viewMode).toBe('2d')
     })
 
     it('starts with chat closed', () => {
@@ -246,6 +248,64 @@ describe('AppStore', () => {
       })
       
       expect(useAppStore.getState().isAnyDeviceStreaming()).toBe(false)
+    })
+  })
+
+  describe('fetchDevices', () => {
+    const presentDevice = createMockDevice({ device_id: 'present-1', serial_number: 'present-1' })
+    const goneDevice = createMockDevice({ device_id: 'gone-1', serial_number: 'gone-1' })
+
+    function mockDevicesEndpoint(list: ReturnType<typeof createMockDevice>[]) {
+      server.use(
+        http.get('/api/v1/devices/', () => HttpResponse.json(list))
+      )
+    }
+
+    it('clears selectedDevice on forceRefresh when its device disappeared', async () => {
+      useAppStore.setState({ selectedDevice: goneDevice, hasUserInteracted: true })
+      mockDevicesEndpoint([presentDevice])
+
+      await useAppStore.getState().fetchDevices(true)
+
+      expect(useAppStore.getState().selectedDevice).toBeNull()
+    })
+
+    it('keeps selectedDevice on forceRefresh when its device is still present', async () => {
+      useAppStore.setState({ selectedDevice: presentDevice, hasUserInteracted: true })
+      mockDevicesEndpoint([presentDevice])
+
+      await useAppStore.getState().fetchDevices(true)
+
+      expect(useAppStore.getState().selectedDevice?.device_id).toBe(presentDevice.device_id)
+    })
+
+    it('does NOT clear selectedDevice on the polling path even if the cached list omits it', async () => {
+      // Simulates a transient cache hiccup: poll returns a list missing the selected device.
+      useAppStore.setState({ selectedDevice: goneDevice, hasUserInteracted: true })
+      mockDevicesEndpoint([presentDevice])
+
+      await useAppStore.getState().fetchDevices(/* default false */)
+
+      expect(useAppStore.getState().selectedDevice?.device_id).toBe(goneDevice.device_id)
+    })
+
+    it('guards against concurrent fetches', async () => {
+      let calls = 0
+      server.use(
+        http.get('/api/v1/devices/', async () => {
+          calls += 1
+          // Hold the response so the second call overlaps the first.
+          await new Promise((resolve) => setTimeout(resolve, 20))
+          return HttpResponse.json([presentDevice])
+        })
+      )
+
+      const first = useAppStore.getState().fetchDevices(true)
+      // Second call starts while the first is still in flight → must short-circuit.
+      const second = useAppStore.getState().fetchDevices(true)
+      await Promise.all([first, second])
+
+      expect(calls).toBe(1)
     })
   })
 

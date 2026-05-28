@@ -33,7 +33,7 @@ static volatile std::sig_atomic_t g_stop = 0;
 
 int main() {
     std::signal(SIGINT, [](int){ g_stop = 1; });
-    constexpr int W = 640, H = 480, FPS = 30;
+    constexpr int W = 1280, H = 720, FPS = 30;
     constexpr int N = W * H;
 
     // ── 1. Open the camera ────────────────────────────────────────────
@@ -58,7 +58,7 @@ int main() {
                                      .get_depth_scale();
     const float depth_to_mm = depth_scale * 1000.0f;
 
-    // ── 3. Construct the improver (auto threshold = focal × baseline / 105)
+    // ── 3. Construct the improver (auto threshold = 1.2 * focal × baseline / 126)
     rs_depth::DepthRangeImprover improver(calib);
     const int T = calib.min_z_threshold_mm();
     std::printf("MinZ threshold: %d mm  (pixels closer than this are improved)\n", T);

@@ -21,9 +21,9 @@ pytestmark = [
 
 
 @pytest.fixture(autouse=True)
-def _disable_hdr(test_device):
+def _disable_hdr(function_scoped_device):
     yield
-    dev, _ = test_device
+    dev = function_scoped_device
     depth_sensor = dev.first_depth_sensor()
     if depth_sensor and depth_sensor.supports(rs.option.hdr_enabled):
         depth_sensor.set_option(rs.option.hdr_enabled, 0)
@@ -45,8 +45,8 @@ def retry_on_exception(func, max_retries=10):
 
 
 # HDR CONFIGURATION TESTS
-def test_hdr_config_default_config(test_device):
-    dev, ctx = test_device
+def test_hdr_config_default_config(function_scoped_device):
+    dev = function_scoped_device # Get a new device object with default configuration
     depth_sensor = dev.first_depth_sensor()
     exposure_range = depth_sensor.get_option_range(rs.option.exposure)
     gain_range = depth_sensor.get_option_range(rs.option.gain)
@@ -69,8 +69,8 @@ def test_hdr_config_default_config(test_device):
     assert depth_sensor.get_option(rs.option.hdr_enabled) == 0
 
 
-def test_hdr_config_custom_config(test_device):
-    dev, ctx = test_device
+def test_hdr_config_custom_config(function_scoped_device):
+    dev = function_scoped_device # Get a new device object with default configuration
     depth_sensor = dev.first_depth_sensor()
     depth_sensor.set_option(rs.option.sequence_size, 2)
     assert depth_sensor.get_option(rs.option.sequence_size) == 2
@@ -130,8 +130,9 @@ def _hdr_streaming_default_config(dev, ctx):
 
 
 # HDR STREAMING TEST
-def test_hdr_streaming_default_config(test_device):
-    dev, ctx = test_device
+def test_hdr_streaming_default_config(function_scoped_device, test_context):
+    ctx = test_context
+    dev = function_scoped_device # Get a new device object with default configuration
     retry_on_exception(lambda: _hdr_streaming_default_config(dev, ctx))
 
 
@@ -162,8 +163,9 @@ def _hdr_running_restart_hdr_at_restream(dev, ctx):
 
 
 # CHECKING HDR AFTER PIPE RESTART
-def test_hdr_running_restart_hdr_at_restream(test_device):
-    dev, ctx = test_device
+def test_hdr_running_restart_hdr_at_restream(function_scoped_device, test_context):
+    ctx = test_context
+    dev = function_scoped_device # Get a new device object with default configuration
     retry_on_exception(lambda: _hdr_running_restart_hdr_at_restream(dev, ctx))
 
 
@@ -253,8 +255,9 @@ def _hdr_running_hdr_merge_after_hdr_restart(dev, ctx):
 
 
 # CHECKING HDR MERGE AFTER HDR RESTART
-def test_hdr_running_hdr_merge_after_hdr_restart(test_device):
-    dev, ctx = test_device
+def test_hdr_running_hdr_merge_after_hdr_restart(function_scoped_device, test_context):
+    ctx = test_context
+    dev = function_scoped_device # Get a new device object with default configuration
     retry_on_exception(lambda: _hdr_running_hdr_merge_after_hdr_restart(dev, ctx))
 
 
@@ -337,8 +340,9 @@ def _hdr_streaming_checking_sequence_id(dev, ctx):
 
 
 # CHECKING SEQUENCE ID WHILE STREAMING
-def test_hdr_streaming_checking_sequence_id(test_device):
-    dev, ctx = test_device
+def test_hdr_streaming_checking_sequence_id(function_scoped_device, test_context):
+    ctx = test_context
+    dev = function_scoped_device # Get a new device object with default configuration
     retry_on_exception(lambda: _hdr_streaming_checking_sequence_id(dev, ctx))
 
 
@@ -363,8 +367,9 @@ def _emitter_on_off_check_sequence_id(dev, ctx):
     assert depth_sensor.get_option(rs.option.emitter_on_off) == 0
 
 
-def test_emitter_on_off_checking_sequence_id(test_device):
-    dev, ctx = test_device
+def test_emitter_on_off_checking_sequence_id(function_scoped_device, test_context):
+    ctx = test_context
+    dev = function_scoped_device # Get a new device object with default configuration
     _skip_if_fw_unsupported(dev)
     retry_on_exception(lambda: _emitter_on_off_check_sequence_id(dev, ctx))
 
@@ -429,8 +434,9 @@ def _hdr_merge_discard_merged_frame(dev, ctx):
 
 
 # This tests checks that the previously saved merged frame is discarded after a pipe restart
-def test_hdr_merge_discard_merged_frame(test_device):
-    dev, ctx = test_device
+def test_hdr_merge_discard_merged_frame(function_scoped_device, test_context):
+    ctx = test_context
+    dev = function_scoped_device # Get a new device object with default configuration
     retry_on_exception(lambda: _hdr_merge_discard_merged_frame(dev, ctx))
 
 
@@ -482,12 +488,13 @@ def _hdr_start_stop_recover_manual_exposure_and_gain(dev, ctx):
         pipe.stop()
 
 
-def test_hdr_start_stop_recover_manual_exposure_and_gain(test_device):
-    dev, ctx = test_device
+def test_hdr_start_stop_recover_manual_exposure_and_gain(function_scoped_device, test_context):
+    ctx = test_context
+    dev = function_scoped_device # Get a new device object with default configuration
     retry_on_exception(lambda: _hdr_start_stop_recover_manual_exposure_and_gain(dev, ctx))
 
 
-def _hdr_active_set_locked_options(dev, ctx):
+def _hdr_active_set_locked_options(dev):
     depth_sensor = dev.first_depth_sensor()
     
     if not depth_sensor.supports(rs.option.laser_power):
@@ -524,9 +531,9 @@ def _hdr_active_set_locked_options(dev, ctx):
 
 
 # CONTROLS STABILITY WHILE HDR ACTIVE
-def test_hdr_active_set_locked_options(test_device):
-    dev, ctx = test_device
-    retry_on_exception(lambda: _hdr_active_set_locked_options(dev, ctx))
+def test_hdr_active_set_locked_options(function_scoped_device):
+    dev = function_scoped_device # Get a new device object with default configuration
+    retry_on_exception(lambda: _hdr_active_set_locked_options(dev))
 
 
 def _hdr_streaming_set_locked_options(dev, ctx):
@@ -572,8 +579,9 @@ def _hdr_streaming_set_locked_options(dev, ctx):
         depth_sensor.set_option(rs.option.hdr_enabled, 0)  # disable hdr before next tests
 
 
-def test_hdr_streaming_set_locked_options(test_device):
-    dev, ctx = test_device
+def test_hdr_streaming_set_locked_options(function_scoped_device, test_context):
+    ctx = test_context
+    dev = function_scoped_device # Get a new device object with default configuration
     retry_on_exception(lambda: _hdr_streaming_set_locked_options(dev, ctx))
 
 
@@ -619,6 +627,7 @@ def _hdr_streaming_enable_runtime_exposure_update(dev, ctx):
         depth_sensor.set_option(rs.option.hdr_enabled, 0)  # disable hdr before next tests
 
 
-def test_hdr_streaming_enable_runtime_exposure_update_in_hdr_mode(test_device):
-    dev, ctx = test_device
+def test_hdr_streaming_enable_runtime_exposure_update_in_hdr_mode(function_scoped_device, test_context):
+    ctx = test_context
+    dev = function_scoped_device # Get a new device object with default configuration
     retry_on_exception(lambda: _hdr_streaming_enable_runtime_exposure_update(dev, ctx))

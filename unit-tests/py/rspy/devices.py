@@ -37,6 +37,12 @@ sys.path.insert( 1, pyrs_dir )
 
 MAX_ENUMERATION_TIME = 20  # [sec]
 
+# Worst-case device removal delay after port disable / hw_reset.
+# DDS devices (e.g. D555 over PoE) are only declared gone after the participant
+# lease (3s) expires past the last announcement (1.5s cycle), plus propagation
+# latency in the device-changed callback. Observed on D555/PoE: ~8s after PoE cut.
+PORTS_DISABLED_TIMEOUT = 10  # [sec]
+
 # We need both pyrealsense2 and hub. We can work without hub, but
 # without pyrealsense2 no devices at all will be returned.
 from rspy import device_hub
@@ -156,14 +162,16 @@ class Device:
         return self._is_dds
 
 
-def wait_until_all_ports_disabled( timeout = 5 ):
+def wait_until_all_ports_disabled( timeout = PORTS_DISABLED_TIMEOUT ):
     """
-    Waits for all ports to be disabled
+    Waits for all ports to be disabled.
     """
     for retry in range( timeout ):
         if len( enabled() ) == 0:
             return True
         time.sleep( 1 )
+    if len( enabled() ) == 0:
+        return True
     log.w( 'Timed out waiting for 0 devices' )
     return False
 
@@ -651,7 +659,7 @@ def enable_all():
     hub.enable_ports()
 
 
-def _wait_until_removed( serial_numbers, timeout = 5 ):
+def _wait_until_removed( serial_numbers, timeout = PORTS_DISABLED_TIMEOUT ):
     """
     Wait until the given serial numbers are all offline
 

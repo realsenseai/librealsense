@@ -12,8 +12,6 @@ log = logging.getLogger(__name__)
 fps = 30
 w = 640
 h = 480
-bpp = 2  # bytes
-pixels = bytearray( b'\x69' * ( w * h * bpp ))  # Dummy data
 domain = rs.timestamp_domain.hardware_clock     # For either depth/color
 
 global_frame_number = 0
@@ -38,8 +36,8 @@ class sensor:
     def __exit__( self, *args ):
         self.stop()
 
-    def video_stream( self, stream_name:str, type:rs.stream, format:rs.format ):
-        return video_stream( self, stream_name, type, format )
+    def video_stream( self, stream_name:str, type:rs.stream, format:rs.format, bpp:int = 2 ):
+        return video_stream( self, stream_name, type, format, bpp )
 
     def start( self, *streams ):
         """
@@ -101,8 +99,10 @@ class sensor:
 
 
 class video_stream:
-    def __init__( self, sensor:sensor, stream_name:str, type:rs.stream, format:rs.format ):
+    def __init__( self, sensor:sensor, stream_name:str, type:rs.stream, format:rs.format, bpp:int = 2 ):
         self._sensor = sensor
+        self._bpp = bpp
+        self._pixels = bytearray( b'\x69' * ( w * h * self._bpp ) )
         self._handle = rs.video_stream()
         self._handle.type = type
         self._handle.uid = 0
@@ -114,9 +114,9 @@ class video_stream:
     #
     def frame( self, frame_number = None, timestamp = None ):
         f = rs.software_video_frame()
-        f.pixels = pixels
-        f.stride = w * bpp
-        f.bpp = bpp
+        f.pixels = self._pixels
+        f.stride = w * self._bpp
+        f.bpp = self._bpp
         if frame_number is not None:
             f.frame_number = frame_number
         else:

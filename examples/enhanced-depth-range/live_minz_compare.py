@@ -31,9 +31,9 @@ from rs_depth import Calibration, DepthRangeImprover
 # ── 1. Open the camera ──────────────────────────────────────────────────
 pipeline = rs.pipeline()
 cfg = rs.config()
-cfg.enable_stream(rs.stream.infrared, 1, 640, 480, rs.format.y8,  30)
-cfg.enable_stream(rs.stream.infrared, 2, 640, 480, rs.format.y8,  30)
-cfg.enable_stream(rs.stream.depth,       640, 480, rs.format.z16, 30)
+cfg.enable_stream(rs.stream.infrared, 1, 1280, 720, rs.format.y8,  30)
+cfg.enable_stream(rs.stream.infrared, 2, 1280, 720, rs.format.y8,  30)
+cfg.enable_stream(rs.stream.depth,       1280, 720, rs.format.z16, 30)
 profile = pipeline.start(cfg)
 
 # ── 2. Build calibration from the camera's own intrinsics/extrinsics ────
@@ -58,7 +58,7 @@ print("Press 'q' or ESC to stop\n")
 # ── 4. Helpers ──────────────────────────────────────────────────────────
 # Visualisation depth range — invalid (depth==0) and beyond MAX_MM both
 # render as black so the eye notices them clearly.
-MIN_MM, MAX_MM = 120, 3000
+MIN_MM, MAX_MM = 100, 3000
 
 
 def colorize_depth_mm(depth_mm: np.ndarray) -> np.ndarray:

@@ -105,8 +105,10 @@ class ApiClient {
 
   // ============ Devices ============
 
-  async getDevices(): Promise<DeviceInfo[]> {
-    const response = await this.client.get<DeviceInfo[]>('/devices/')
+  async getDevices(forceRefresh: boolean = false): Promise<DeviceInfo[]> {
+    const response = await this.client.get<DeviceInfo[]>('/devices/', {
+      params: { force_refresh: forceRefresh || undefined },
+    })
     return response.data
   }
 
