@@ -35,6 +35,9 @@ import pytest
 
 log = logging.getLogger('librealsense')
 
+# NOT thread-safe: assumes single-process (non-xdist) execution. If pytest-xdist
+# is adopted, these dicts must be replaced with a per-worker mechanism.
+#
 # Per-logical-test buffer for 'call'-phase reports. Populated as tests run.
 # Key:  canonical nodeid (pytest-repeat suffix stripped).
 # Value: list of (step, TestReport) tuples.
@@ -44,7 +47,18 @@ _call_reports = {}
 # in TerminalReporter.stats). Same key/shape as _call_reports.
 _error_reports = {}
 
+# Activated by conftest.py when --retries is in use. While inactive, record_report
+# is a no-op so the buffers don't accumulate TestReport objects across a long
+# session that never asked for retries.
+_enabled = False
+
 _STEP_SUFFIX_RE = re.compile(r'\[([^\]]*)\]$')
+
+
+def enable():
+    """Activate report buffering. Called by conftest at --retries setup."""
+    global _enabled
+    _enabled = True
 
 
 def reset():
@@ -61,6 +75,12 @@ def canonical_id(nodeid_or_name):
         test_x[D455-114222251278-1-2]  -> test_x[D455-114222251278]
         test_x[1-2]                     -> test_x
         test_x[D455]                    -> test_x[D455]   # no repeat suffix
+        test_x[SN-7-8]                  -> test_x[SN-7-8] # not a valid repeat tail
+
+    The last two components must look like pytest-repeat's ``step-count`` pair:
+    both decimal, ``count >= 2``, and ``1 <= step <= count``. Any other tail is
+    treated as part of the parametrize id and left alone, so test ids whose
+    serial numbers happen to end in digits aren't mis-merged.
     """
     m = _STEP_SUFFIX_RE.search(nodeid_or_name)
     if not m:
@@ -68,28 +88,40 @@ def canonical_id(nodeid_or_name):
     parts = m.group(1).split('-')
     if len(parts) < 2 or not parts[-1].isdigit() or not parts[-2].isdigit():
         return nodeid_or_name
+    step_val, count_val = int(parts[-2]), int(parts[-1])
+    if count_val < 2 or step_val < 1 or step_val > count_val:
+        return nodeid_or_name
     base = nodeid_or_name[:m.start()]
     remaining = parts[:-2]
     return f"{base}[{'-'.join(remaining)}]" if remaining else base
 
 
 def _step_from_nodeid(nodeid):
+    """Return the pytest-repeat step (1-indexed) or None if the tail isn't a valid pair."""
     m = _STEP_SUFFIX_RE.search(nodeid)
     if not m:
         return None
     parts = m.group(1).split('-')
     if len(parts) < 2 or not parts[-1].isdigit() or not parts[-2].isdigit():
         return None
-    return int(parts[-2])
+    step_val, count_val = int(parts[-2]), int(parts[-1])
+    if count_val < 2 or step_val < 1 or step_val > count_val:
+        return None
+    return step_val
 
 
 def record_report(report):
     """Buffer report keyed by canonical id.
 
+    No-op unless ``enable()`` was called (i.e. unless --retries is active), so a
+    plain pytest run doesn't accumulate TestReport objects in module-level dicts.
+
     'call' phase reports are tracked for pass/fail aggregation. Failed
     'setup'/'teardown' reports (which surface as 'error' in the terminal stats)
     are tracked separately so a later successful call attempt can rescue them.
     """
+    if not _enabled:
+        return
     cid = canonical_id(report.nodeid)
     step = _step_from_nodeid(report.nodeid) or 0
     if report.when == 'call':
@@ -221,9 +253,12 @@ def rewrite_junit_xml(xmlpath):
     """Collapse parametrized retry attempts into one ``<testcase>`` per logical test.
 
     For each group of ``<testcase>`` sharing the same (classname, canonical name):
-        - If any attempt has no failure/error child → keep one PASSED testcase
-          (strip any failure/error children from the kept entry).
+        - If any attempt has no failure/error/skipped child → keep one PASSED
+          testcase (strip any failure/error children from the kept entry).
         - Else → keep the last testcase (most recent failure).
+
+    The kept ``<testcase>``'s ``time`` attribute is replaced with the SUM of all
+    attempts so trend graphs reflect the real cost of a retried test.
 
     Updates the parent ``<testsuite>`` aggregate counts.
     """
@@ -261,7 +296,9 @@ def rewrite_junit_xml(xmlpath):
             if has_pass:
                 keep = next(
                     (tc for tc in tcs
-                     if not tc.findall('failure') and not tc.findall('error')),
+                     if not tc.findall('failure')
+                     and not tc.findall('error')
+                     and not tc.findall('skipped')),
                     tcs[-1],
                 )
                 for child in list(keep):
@@ -269,6 +306,13 @@ def rewrite_junit_xml(xmlpath):
                         keep.remove(child)
             else:
                 keep = tcs[-1]
+            total_time = 0.0
+            for tc in tcs:
+                try:
+                    total_time += float(tc.get('time', '0') or 0)
+                except ValueError:
+                    pass
+            keep.set('time', f'{total_time:.3f}')
             keep.set('name', key[1])
             for tc in tcs:
                 if tc is not keep:

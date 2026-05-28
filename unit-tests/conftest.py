@@ -231,6 +231,10 @@ def pytest_configure(config):
             config.option.count = retries_val + 1
             config.option.repeat_scope = 'module'
             config._module_retry_mode = True    # skip retry passes when previous pass was clean
+            # Clear any stale state from a previous in-process session and start buffering
+            # reports for this run's aggregation.
+            retry_aggregation.reset()
+            retry_aggregation.enable()
 
     # We override pytest-repeat's `__pytest_repeat_step_number` to module scope so
     # module-scoped fixtures (e.g. module_device_setup) can depend on it and re-instantiate
