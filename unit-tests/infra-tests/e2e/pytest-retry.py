@@ -1,18 +1,22 @@
-# Test module-scoped retry: the module has two tests, one fails on the first pass.
-# --retries 1 should rerun the entire module (both tests) after recycling.
+# Test module-scoped retry aggregation: three logical tests exercise the three
+# outcomes the conftest reconciler must collapse.
 import pytest
 
 pytestmark = [pytest.mark.device("D455")]
 
-_fail_attempt = 0
+_fail_then_pass_attempt = 0
 
 def test_always_passes(module_device_setup):
-    """This test always passes — included to verify the entire module reruns."""
+    """Logical PASS — runs twice (module reruns) but reports once."""
     pass
 
 def test_fails_then_passes(module_device_setup):
-    """Fail on first pass (step 0), pass on retry (step 1)."""
-    global _fail_attempt
-    _fail_attempt += 1
-    if _fail_attempt == 1:
+    """Logical PASS via retry — fails on step 0, passes on step 1 (rescued)."""
+    global _fail_then_pass_attempt
+    _fail_then_pass_attempt += 1
+    if _fail_then_pass_attempt == 1:
         assert False, "intentional first-pass failure"
+
+def test_always_fails(module_device_setup):
+    """Logical FAIL — fails every attempt; report keeps one FAILED."""
+    assert False, "intentional permanent failure"

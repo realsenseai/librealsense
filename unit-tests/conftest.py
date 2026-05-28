@@ -63,6 +63,7 @@ from rspy.pytest.cli import consume_legacy_flags, apply_pending_flags
 from rspy.pytest.device_helpers import resolve_device_each_serials, _MISSING_SENTINEL_PREFIX, _SKIP_SENTINEL_PREFIX
 from rspy.pytest.collection import filter_and_sort_items
 from rspy.pytest.plugins import check_required_plugins
+from rspy.pytest import retry_aggregation
 
 log = logging.getLogger('librealsense')
 
@@ -427,9 +428,45 @@ def pytest_runtest_setup(item):
             pytest.skip("Module retry skipped — no failures in previous pass")
 
 
+def pytest_runtest_logreport(report):
+    """Buffer call-phase reports for --retries aggregation (cheap no-op otherwise)."""
+    retry_aggregation.record_report(report)
+
+
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_sessionfinish(session, exitstatus):
+    """Reconcile --retries aggregation.
+
+    pre-yield: reconcile terminalreporter.stats and adjust session.exitstatus so the
+        downstream summary line and the process exit code reflect logical-test counts.
+    post-yield: rewrite JUnit XML *after* the junitxml plugin's hookwrapper writes it.
+    """
+    config = session.config
+    if getattr(config, '_module_retry_mode', False):
+        terminalreporter = config.pluginmanager.get_plugin('terminalreporter')
+        if terminalreporter is not None:
+            rescued, hard_failed = retry_aggregation.reconcile_terminal_stats(terminalreporter)
+            config._retry_summary_lists = (rescued, hard_failed)
+            retry_aggregation.adjust_session_exitstatus(session, terminalreporter)
+
+    yield
+
+    if getattr(config, '_module_retry_mode', False):
+        xmlpath = getattr(config.option, 'xmlpath', None)
+        if xmlpath:
+            retry_aggregation.rewrite_junit_xml(xmlpath)
+
+
+@pytest.hookimpl(tryfirst=True)
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
-    """Print pass/fail/skip summary for Jenkins Groovy parsing."""
+    """Print the Jenkins-friendly summary and the retry rescue/fail listing.
+
+    Stats and exit code were already reconciled in pytest_sessionfinish's pre-yield.
+    """
     print_terminal_summary(terminalreporter)
+    rescued, hard_failed = getattr(config, '_retry_summary_lists', ([], []))
+    if rescued or hard_failed:
+        retry_aggregation.print_retry_summary(terminalreporter, rescued, hard_failed)
 
 
 # ============================================================================
