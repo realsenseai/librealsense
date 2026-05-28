@@ -193,10 +193,6 @@ def pytest_addoption(parser):
 # Shared context tags (e.g. "nightly", "weekly") — tests check this to adjust behavior
 context_list = []
 
-# Module-scoped retry: tracks which (module, repeat_step) passes had failures.
-# Used by --retries to skip retry passes when the previous pass was clean.
-_module_pass_had_failure = {}  # (module_file, step) -> True
-
 
 def pytest_configure(config):
     """Early setup: register markers, configure defaults, and query connected devices."""
@@ -232,9 +228,11 @@ def pytest_configure(config):
             config.option.repeat_scope = 'module'
             config._module_retry_mode = True    # skip retry passes when previous pass was clean
             # Clear any stale state from a previous in-process session and start buffering
-            # reports for this run's aggregation.
+            # reports for this run's aggregation. Register the module as a plugin so its
+            # tryfirst pytest_runtest_protocol hook can bypass the protocol for clean retries.
             retry_aggregation.reset()
             retry_aggregation.enable()
+            config.pluginmanager.register(retry_aggregation, "rs_retry_aggregation")
 
     # We override pytest-repeat's `__pytest_repeat_step_number` to module scope so
     # module-scoped fixtures (e.g. module_device_setup) can depend on it and re-instantiate
@@ -377,17 +375,25 @@ def pytest_collection_modifyitems(config, items):
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_protocol(item, nextitem):
-    """Wrap each test with log separators and write per-test log file."""
-    file_handler = start_test_log(item)
-    ensure_newline()
-    log.info("-" * 80)
-    log.info(f"Test: {item.nodeid}")
-    log.info("-" * 80)
+    """Wrap each test with log separators and write per-test log file.
+
+    For retry-skip-if-clean items, skip log creation entirely - the plugin's
+    tryfirst pytest_runtest_protocol returns True before we get here, so no
+    test phases will run; opening a log file would just create an empty stub.
+    """
+    bypass = retry_aggregation.should_skip_if_clean(item)
+    if not bypass:
+        file_handler = start_test_log(item)
+        ensure_newline()
+        log.info("-" * 80)
+        log.info(f"Test: {item.nodeid}")
+        log.info("-" * 80)
 
     outcome = yield
-    stop_test_log(file_handler, nextitem)
 
-    ensure_newline()
+    if not bypass:
+        stop_test_log(file_handler, nextitem)
+        ensure_newline()
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -415,26 +421,29 @@ def pytest_runtest_makereport(item, call):
     if report.failed and getattr(item.config, '_module_retry_mode', False):
         callspec = getattr(item, 'callspec', None)
         step = callspec.params.get('__pytest_repeat_step_number', 0) if callspec else 0
-        mod = item.module.__file__
-        _module_pass_had_failure[(mod, step)] = True
-
-
-@pytest.hookimpl(tryfirst=True)
-def pytest_runtest_setup(item):
-    """Skip retry passes whose previous pass had no failures (--retries optimisation)."""
-    if not getattr(item.config, '_module_retry_mode', False):
-        return
-    callspec = getattr(item, 'callspec', None)
-    step = callspec.params.get('__pytest_repeat_step_number', 0) if callspec else 0
-    if step > 0:
-        mod = item.module.__file__
-        if not _module_pass_had_failure.get((mod, step - 1), False):
-            pytest.skip("Module retry skipped — no failures in previous pass")
+        retry_aggregation.record_module_failure(item.module.__file__, step)
 
 
 def pytest_runtest_logreport(report):
     """Buffer call-phase reports for --retries aggregation (cheap no-op otherwise)."""
     retry_aggregation.record_report(report)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_report_teststatus(report, config):
+    """Hide skip-if-clean retry entries from per-line output and stats buckets.
+
+    With ``--retries N``, pytest-repeat parametrizes every test at ``count = N+1``;
+    the conftest's setup hook then ``pytest.skip()``s any retry pass after a clean
+    module. Those SKIPPED reports are pure optimisation noise — they didn't run
+    and aren't a real test skip. Returning ``("", "", "")`` makes
+    ``TerminalReporter.pytest_runtest_logreport`` early-return without printing
+    a per-line entry and without appending to stats. Real ``pytest.skip()`` calls
+    in tests are untouched.
+    """
+    if getattr(config, '_module_retry_mode', False) and retry_aggregation.is_retry_skip_if_clean(report):
+        return "", "", ""
+    return None
 
 
 @pytest.hookimpl(hookwrapper=True, tryfirst=True)

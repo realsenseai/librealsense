@@ -47,12 +47,22 @@ _call_reports = {}
 # in TerminalReporter.stats). Same key/shape as _call_reports.
 _error_reports = {}
 
+# Module-scoped retry tracking. Set to True per (module_path, step) when ANY
+# phase report for the module's tests at that step is failed. Used by the
+# skip-if-clean optimisation - if step N had no failures, step N+1 doesn't
+# need to run for that module.
+_module_pass_had_failure = {}
+
 # Activated by conftest.py when --retries is in use. While inactive, record_report
 # is a no-op so the buffers don't accumulate TestReport objects across a long
 # session that never asked for retries.
 _enabled = False
 
 _STEP_SUFFIX_RE = re.compile(r'\[([^\]]*)\]$')
+
+# Conftest's skip-if-clean optimisation calls pytest.skip() with this exact prefix.
+# We detect those reports here so they can be suppressed from per-line output and stats.
+_RETRY_SKIP_PREFIX = "Module retry skipped"
 
 
 def enable():
@@ -65,6 +75,50 @@ def reset():
     """Clear state (for tests that re-enter pytest_configure within one process)."""
     _call_reports.clear()
     _error_reports.clear()
+    _module_pass_had_failure.clear()
+
+
+def record_module_failure(mod_path, step):
+    """Mark that the module's ``step`` had at least one failed report.
+
+    Drives the skip-if-clean optimisation: a clean module pass means the next
+    pass doesn't need to run.
+    """
+    _module_pass_had_failure[(mod_path, step)] = True
+
+
+def should_skip_if_clean(item):
+    """True if this item is a retry pass (step > 0) and the previous pass was clean.
+
+    Called from both the protocol-bypass hook and conftest's pytest_runtest_protocol
+    hookwrapper so the latter doesn't open a per-test log file for items that won't run.
+    """
+    if not getattr(item.config, '_module_retry_mode', False):
+        return False
+    callspec = getattr(item, 'callspec', None)
+    if not callspec:
+        return False
+    step = callspec.params.get('__pytest_repeat_step_number', 0)
+    if step <= 0:
+        return False
+    mod = item.module.__file__
+    return not _module_pass_had_failure.get((mod, step - 1), False)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_protocol(item, nextitem):
+    """Bypass the default protocol entirely for retry-skip-if-clean items.
+
+    Returning True signals pytest we handled this item, which prevents the
+    default protocol from running pytest_runtest_logstart (which would print
+    a location line to the terminal), the setup/call/teardown phases, and
+    pytest_runtest_logfinish. The item disappears completely from the per-line
+    output and from the test count - exactly what we want for the
+    skip-if-clean optimisation.
+    """
+    if _enabled and should_skip_if_clean(item):
+        return True
+    return None
 
 
 def canonical_id(nodeid_or_name):
@@ -110,6 +164,23 @@ def _step_from_nodeid(nodeid):
     return step_val
 
 
+def is_retry_skip_if_clean(report):
+    """True if this report is the skip-if-clean optimisation's SKIPPED, not a real test skip.
+
+    The conftest emits ``pytest.skip("Module retry skipped — no failures …")`` from
+    ``pytest_runtest_setup`` when step > 0 and the previous module pass was clean.
+    Those entries are pure UX noise — the test didn't run and isn't a real skip.
+    """
+    if not (report.skipped and report.when == 'setup'):
+        return False
+    longrepr = getattr(report, 'longrepr', None)
+    if longrepr is None:
+        return False
+    if isinstance(longrepr, tuple) and len(longrepr) >= 3:
+        return _RETRY_SKIP_PREFIX in str(longrepr[2])
+    return _RETRY_SKIP_PREFIX in str(longrepr)
+
+
 def record_report(report):
     """Buffer report keyed by canonical id.
 
@@ -119,8 +190,11 @@ def record_report(report):
     'call' phase reports are tracked for pass/fail aggregation. Failed
     'setup'/'teardown' reports (which surface as 'error' in the terminal stats)
     are tracked separately so a later successful call attempt can rescue them.
+    Skip-if-clean reports are ignored (they're optimisation noise, not test results).
     """
     if not _enabled:
+        return
+    if is_retry_skip_if_clean(report):
         return
     cid = canonical_id(report.nodeid)
     step = _step_from_nodeid(report.nodeid) or 0
