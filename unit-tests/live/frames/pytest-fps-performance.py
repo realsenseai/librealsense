@@ -1571,6 +1571,7 @@ def settled_device(test_device):
 # ============================================================================
 
 @pytest.mark.timeout(14400)
+@pytest.mark.device_exclude("D457")  # RSDSO-21568: skip pending FW 5.17.3.14 FPS regression fix
 def test_depth_configurations(settled_device):
     """Test depth FPS accuracy for all supported configurations"""
     dev, ctx = settled_device
@@ -1636,6 +1637,8 @@ def test_ir_configurations(settled_device):
 
 
 @pytest.mark.timeout(14400)
+@pytest.mark.device_exclude("D457")  # RSDSO-21568: FW 5.17.3.14 FPS regression
+@pytest.mark.device_exclude("D455")  # RSDSO-21568: FW 5.17.3.14 multistream 90fps regression
 def test_multistream_configurations(settled_device):
     """Test depth + color multi-stream FPS accuracy for all supported configurations"""
     dev, ctx = settled_device
@@ -1696,6 +1699,7 @@ def test_color_fps_rates(settled_device):
 
 
 @pytest.mark.timeout(14400)
+@pytest.mark.device_exclude("D457")  # RSDSO-21568: skip pending FW 5.17.3.14 FPS regression fix
 def test_ir_fps_rates(settled_device):
     """Test IR FPS accuracy for all supported frame rates"""
     dev, ctx = settled_device

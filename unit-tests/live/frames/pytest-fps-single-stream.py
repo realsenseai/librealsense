@@ -27,6 +27,7 @@ TIME_TO_TEST_FPS =    [8,  8,  5,  4,  3,  2]
 fps_helper.TIME_FOR_STEADY_STATE = 1.2  # t2ff KPI is 1 second + some extra
 
 
+@pytest.mark.device_exclude("D457")  # RSDSO-21568: skip pending FW 5.17.3.14 FPS regression fix
 def test_depth_fps(test_device):
     dev, ctx = test_device
     product_line = dev.get_info(rs.camera_info.product_line)
