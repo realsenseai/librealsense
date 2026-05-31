@@ -896,7 +896,7 @@ void option_model::set_option_async( rs2_option opt, float value )
         } );
 }
 
-void option_model::set_option_sync( float value )
+void option_model::set_option_sync( float req_value )
 {
     // Synchronous variant for callers that need to verify the write took effect
     // (e.g., on_chip_calib_manager). Goes through the same dispatcher as async
@@ -908,9 +908,20 @@ void option_model::set_option_sync( float value )
     if( ! disp )
         return;
     disp->invoke_and_wait(
-        [ this, value ]( dispatcher::cancellable_timer c )
+        [ this, req_value ]( dispatcher::cancellable_timer c )
         {
-            endpoint->set_option( opt, value );
+            endpoint->set_option( opt, req_value );
+            // Refresh the cached value under the dispatcher so callers that follow up
+            // with value_as_float() see what the FW actually accepted (which may clamp
+            // or reject the requested value). Mirrors the post-write readback that the
+            // synchronous set_option() does.
+            try
+            {
+                this->value = endpoint->get_option_value( opt );
+            }
+            catch( ... )
+            {
+            }
             c.try_sleep( std::chrono::milliseconds( 50 ) );
         },
         []() { return false; } );

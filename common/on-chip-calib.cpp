@@ -135,15 +135,14 @@ namespace rs2
     {
         // Route the write through option_model::set_option_sync so it goes via the
         // subdevice dispatcher — that way the FW write can't interleave with concurrent
-        // UI option writes on the same USB bus. The read-back verify uses the sensor
-        // endpoint directly (a single get_option is harmless to issue outside the
-        // dispatcher; if needed for stricter ordering, a second invoke_and_wait would
-        // do).
+        // UI option writes on the same USB bus. set_option_sync also refreshes the
+        // cached option_model::value before returning, so value_as_float() reads the
+        // post-write value here.
         auto it = _sub->options_metadata.find( RS2_OPTION_EMITTER_ENABLED );
         if( it != _sub->options_metadata.end() )
         {
             it->second.set_option_sync( value );
-            if( _sub->s->get_option( RS2_OPTION_EMITTER_ENABLED ) != value )
+            if( it->second.value_as_float() != value )
                 throw std::runtime_error( rsutils::string::from()
                                           << "Failed to set laser " << ( value == off_value ? "off" : "on" ) );
         }
@@ -156,7 +155,7 @@ namespace rs2
         if( it != _sub->options_metadata.end() )
         {
             it->second.set_option_sync( value );
-            if( _sub->s->get_option( RS2_OPTION_THERMAL_COMPENSATION ) != value )
+            if( it->second.value_as_float() != value )
                 throw std::runtime_error( rsutils::string::from()
                                           << "Failed to set thermal compensation " << ( value == off_value ? "off" : "on" ) );
         }
