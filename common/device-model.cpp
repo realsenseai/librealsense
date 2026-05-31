@@ -1973,7 +1973,7 @@ namespace rs2
                                             << "Setting " << opt_model.opt << " to " << new_val << " ("
                                             << labels[selected] << ")");
 
-                                        opt_model.set_option(opt_model.opt, static_cast<float>(new_val));
+                                        opt_model.set_option_async(opt_model.opt, static_cast<float>(new_val));
 
                                         // Only apply preset to GUI if set_option was succesful
                                         selected_file_preset = "";

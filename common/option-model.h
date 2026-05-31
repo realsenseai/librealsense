@@ -29,17 +29,23 @@ namespace rs2
         void update_supported( std::string& error_message );
         void update_read_only_status( std::string& error_message );
         void update_all_fields( std::string& error_message, notifications_model& model );
-        // Fire-and-forget option write. Always dispatches via the subdevice dispatcher;
-        // FW errors are surfaced asynchronously through the next periodic readback
-        // (option_model::update_all_fields), so this method has no error-out parameter
-        // and no return value. The previous synchronous error_message / ignore_period
-        // parameters are no longer applicable.
-        void set_option( rs2_option opt, float value );
-        // Synchronous variant: blocks the caller until the dispatcher action has run
-        // the FW write. Routes through the same per-subdevice dispatcher as the async
-        // path so it can't race with concurrent UI writes on the USB bus. Used by
-        // on_chip_calib for set+verify semantics — the caller does the verify read
-        // separately via the endpoint (or option_model::value after the next readback).
+        // Synchronous option write — thin wrapper around the rs2 API set_option,
+        // followed by a readback to refresh the cached `value`. Blocks the caller for
+        // the FW round-trip (~200 ms on UVC), so do NOT call from the UI thread when
+        // a freeze would be visible — use set_option_async() for UI-thread writes.
+        bool set_option( rs2_option opt,
+            float req_value,
+            std::string & error_message,
+            std::chrono::steady_clock::duration ignore_period = std::chrono::seconds( 0 ) );
+        // Fire-and-forget option write. Dispatches via the subdevice dispatcher so
+        // the UI thread is never blocked on the FW round-trip. FW errors are surfaced
+        // asynchronously through the next periodic readback (update_all_fields), so
+        // this method has no error-out parameter and no return value.
+        void set_option_async( rs2_option opt, float value );
+        // Blocking variant of set_option_async: routes through the same per-subdevice
+        // dispatcher so it can't race with concurrent UI writes on the USB bus, but
+        // waits for the action to run before returning. Used by on_chip_calib for
+        // set+verify semantics.
         void set_option_sync( float value );
         bool draw_option( bool update_read_only_options, bool is_streaming,
             std::string& error_message, notifications_model& model );
@@ -82,19 +88,12 @@ namespace rs2
             std::string& error_message,
             notifications_model& model );
 
-        // Dispatches the option write to a background worker so the UI thread
-        // (and therefore the viewer's render loop) is not blocked on the FW round-trip.
-        // Always uses `this->opt` as the target — option_model is bound to a single
-        // rs2_option at construction, so a separate `opt` parameter would only invite
-        // mismatch bugs.
-        void set_option_async( float value );
-
-        // Guard for the public entry points that still take an `opt` parameter
-        // (set_option, slider_selected): an option_model is bound to a single
-        // rs2_option for its lifetime, so a caller passing a different opt is a bug
-        // — throw rather than silently write to the wrong option through the cached
-        // _async_setter. `caller` is used to make the error message tell the reader
-        // which entry point detected the mismatch (pass __func__).
+        // Guard for the public entry points that take an `opt` parameter
+        // (set_option, set_option_async, slider_selected): an option_model is bound
+        // to a single rs2_option for its lifetime, so a caller passing a different
+        // opt is a bug — throw rather than silently write to the wrong option.
+        // `caller` is used to make the error message tell the reader which entry
+        // point detected the mismatch (pass __func__).
         void check_opt( rs2_option opt, char const * caller ) const;
 
         std::string adjust_description( const std::string& str_in, const std::string& to_be_replaced, const std::string& to_replace );
