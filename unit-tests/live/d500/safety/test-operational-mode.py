@@ -147,107 +147,52 @@ with test.closure("Resume --> Maintenance keeps safety streaming on"):
     pipe.stop()
 
 ############################## DIAGNOSTIC PROBES ##############################################
-# Each probe primes the failure state with a baseline safety+depth+color session,
-# stops it cleanly, sleeps, then starts a variant configuration and tries to
-# receive a single frame. The variant that does NOT time out localizes the
-# trigger of "Resume --> Maintenance keep video streaming" failing on some
-# hosts (e.g. vtglnx163, vtglnx164) but not others (e.g. rslnx391, vtgu24).
+# First 12 iterations of safety+depth+color (the canonical failing combo),
+# then 12 iterations of safety+depth (no color). Each iteration is a clean
+# pipe.start / wait_for_frames / pipe.stop with a 1s gap between iterations.
 #
-# Interpretation matrix (assuming the canonical probe fails):
-#   "drop safety" passes      -> safety stream specifically is the trigger
-#   "drop color"  passes      -> color stream specifically is the trigger
-#   "drop depth"  passes      -> depth stream specifically is the trigger
-#   "5s settle"   passes      -> race/cleanup-time issue, not stream-set
-#   "no priming"  passes      -> needs prior multi-stream session to break
+# Reading the result matrix:
+#   - 3-stream block fails periodically, 2-stream block all-pass  -> color
+#     stream is the trigger (most likely, given the ~2.5 MB color allocation
+#     and the Psys-size-mismatch observed on the CDC log)
+#   - both blocks fail periodically with the same cadence          -> any
+#     multi-stream restart leaks, not color-specific
+#   - both blocks all-pass                                          -> the
+#     leak depends on something not exercised here (the original closures'
+#     option-setting sequence, the test framework, etc.)
 
-def _drain_one_frame(pipe, label):
-    log.d(f"diagnostic {label}: waiting for first frame")
-    f = pipe.wait_for_frames()  # default 5s timeout -- raises if it doesn't arrive
-    log.d(f"diagnostic {label}: got frame {f}")
-
-def _prime_baseline():
-    """Run a quick safety+depth+color session and stop it cleanly. Models the
-    state Closure 2 sees when it tries to start the same combo a second time."""
-    cfg = rs.config()
-    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
-    cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
-    cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
+def _run_iteration(label, cfg):
     pipe = rs.pipeline()
     pipe.start(cfg)
-    pipe.wait_for_frames()
-    pipe.stop()
-
-def _run_probe(label, probe_cfg, prime=True, sleep_sec=1):
-    if prime:
-        _prime_baseline()
-    time.sleep(sleep_sec)
-    pipe = rs.pipeline()
-    pipe.start(probe_cfg)
     try:
-        _drain_one_frame(pipe, label)
+        pipe.wait_for_frames()
+        log.d(f"{label}: first frame received")
     finally:
-        pipe.stop()
+        try:
+            pipe.stop()
+        except Exception as e:
+            log.w(f"{label}: pipe.stop() raised {e}")
 
-with test.closure("diag: canonical (safety+depth+color restart, 1s settle)"):
-    cfg = rs.config()
-    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
-    cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
-    cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
-    _run_probe("canonical", cfg)
+ITERATIONS = 12
 
-with test.closure("diag: drop safety (depth+color restart)"):
-    cfg = rs.config()
-    cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
-    cfg.enable_stream(rs.stream.color, rs.format.rgb8, 30)
-    _run_probe("drop-safety", cfg)
-
-with test.closure("diag: drop color (safety+depth restart)"):
-    cfg = rs.config()
-    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
-    cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
-    _run_probe("drop-color", cfg)
-
-with test.closure("diag: drop depth (safety+color restart)"):
-    cfg = rs.config()
-    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
-    cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
-    _run_probe("drop-depth", cfg)
-
-with test.closure("diag: full combo with 5s settle"):
-    cfg = rs.config()
-    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
-    cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
-    cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
-    _run_probe("5s-settle", cfg, sleep_sec=5)
-
-with test.closure("diag: full combo without priming (first-ever start)"):
-    cfg = rs.config()
-    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
-    cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
-    cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
-    _run_probe("no-priming", cfg, prime=False)
-
-# 10 consecutive safety+depth+color start/wait/stop cycles with nothing else in
-# between. Previous probes showed an apparent 2-pass / 1-fail period; this
-# confirms (or refutes) that pattern as a clean repro. If failures land at
-# positions 3, 6, 9 we have a tight resource-leak fingerprint.
-for _i in range(1, 11):
-    with test.closure(f"diag: periodic leak probe -- restart #{_i:02d}"):
+# Block A: 12 iterations of safety+depth+color
+for _i in range(1, ITERATIONS + 1):
+    with test.closure(f"diag: 3-stream (safety+depth+color) -- restart #{_i:02d}"):
         cfg = rs.config()
         cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
         cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
         cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
-        pipe = rs.pipeline()
-        pipe.start(cfg)
-        try:
-            pipe.wait_for_frames()
-            log.d(f"periodic probe #{_i:02d}: first frame received")
-        finally:
-            try:
-                pipe.stop()
-            except Exception as e:
-                log.w(f"periodic probe #{_i:02d}: pipe.stop() raised {e}")
-        time.sleep(1)  # match the inter-probe spacing used earlier
+        _run_iteration(f"3-stream #{_i:02d}", cfg)
+    time.sleep(1)
+
+# Block B: 12 iterations of safety+depth (no color)
+for _i in range(1, ITERATIONS + 1):
+    with test.closure(f"diag: 2-stream (safety+depth)         -- restart #{_i:02d}"):
+        cfg = rs.config()
+        cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
+        cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
+        _run_iteration(f"2-stream #{_i:02d}", cfg)
+    time.sleep(1)
 
 ################################################################################################
 if _cdc is not None:
