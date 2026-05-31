@@ -227,6 +227,28 @@ with test.closure("diag: full combo without priming (first-ever start)"):
     cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
     _run_probe("no-priming", cfg, prime=False)
 
+# 10 consecutive safety+depth+color start/wait/stop cycles with nothing else in
+# between. Previous probes showed an apparent 2-pass / 1-fail period; this
+# confirms (or refutes) that pattern as a clean repro. If failures land at
+# positions 3, 6, 9 we have a tight resource-leak fingerprint.
+for _i in range(1, 11):
+    with test.closure(f"diag: periodic leak probe -- restart #{_i:02d}"):
+        cfg = rs.config()
+        cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
+        cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
+        cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
+        pipe = rs.pipeline()
+        pipe.start(cfg)
+        try:
+            pipe.wait_for_frames()
+            log.d(f"periodic probe #{_i:02d}: first frame received")
+        finally:
+            try:
+                pipe.stop()
+            except Exception as e:
+                log.w(f"periodic probe #{_i:02d}: pipe.stop() raised {e}")
+        time.sleep(1)  # match the inter-probe spacing used earlier
+
 ################################################################################################
 if _cdc is not None:
     _cdc.stop()
