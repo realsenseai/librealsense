@@ -146,6 +146,87 @@ with test.closure("Resume --> Maintenance keeps safety streaming on"):
 
     pipe.stop()
 
+############################## DIAGNOSTIC PROBES ##############################################
+# Each probe primes the failure state with a baseline safety+depth+color session,
+# stops it cleanly, sleeps, then starts a variant configuration and tries to
+# receive a single frame. The variant that does NOT time out localizes the
+# trigger of "Resume --> Maintenance keep video streaming" failing on some
+# hosts (e.g. vtglnx163, vtglnx164) but not others (e.g. rslnx391, vtgu24).
+#
+# Interpretation matrix (assuming the canonical probe fails):
+#   "drop safety" passes      -> safety stream specifically is the trigger
+#   "drop color"  passes      -> color stream specifically is the trigger
+#   "drop depth"  passes      -> depth stream specifically is the trigger
+#   "5s settle"   passes      -> race/cleanup-time issue, not stream-set
+#   "no priming"  passes      -> needs prior multi-stream session to break
+
+def _drain_one_frame(pipe, label):
+    log.d(f"diagnostic {label}: waiting for first frame")
+    f = pipe.wait_for_frames()  # default 5s timeout -- raises if it doesn't arrive
+    log.d(f"diagnostic {label}: got frame {f}")
+
+def _prime_baseline():
+    """Run a quick safety+depth+color session and stop it cleanly. Models the
+    state Closure 2 sees when it tries to start the same combo a second time."""
+    cfg = rs.config()
+    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
+    cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
+    cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
+    pipe = rs.pipeline()
+    pipe.start(cfg)
+    pipe.wait_for_frames()
+    pipe.stop()
+
+def _run_probe(label, probe_cfg, prime=True, sleep_sec=1):
+    if prime:
+        _prime_baseline()
+    time.sleep(sleep_sec)
+    pipe = rs.pipeline()
+    pipe.start(probe_cfg)
+    try:
+        _drain_one_frame(pipe, label)
+    finally:
+        pipe.stop()
+
+with test.closure("diag: canonical (safety+depth+color restart, 1s settle)"):
+    cfg = rs.config()
+    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
+    cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
+    cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
+    _run_probe("canonical", cfg)
+
+with test.closure("diag: drop safety (depth+color restart)"):
+    cfg = rs.config()
+    cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
+    cfg.enable_stream(rs.stream.color, rs.format.rgb8, 30)
+    _run_probe("drop-safety", cfg)
+
+with test.closure("diag: drop color (safety+depth restart)"):
+    cfg = rs.config()
+    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
+    cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
+    _run_probe("drop-color", cfg)
+
+with test.closure("diag: drop depth (safety+color restart)"):
+    cfg = rs.config()
+    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
+    cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
+    _run_probe("drop-depth", cfg)
+
+with test.closure("diag: full combo with 5s settle"):
+    cfg = rs.config()
+    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
+    cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
+    cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
+    _run_probe("5s-settle", cfg, sleep_sec=5)
+
+with test.closure("diag: full combo without priming (first-ever start)"):
+    cfg = rs.config()
+    cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
+    cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
+    cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
+    _run_probe("no-priming", cfg, prime=False)
+
 ################################################################################################
 if _cdc is not None:
     _cdc.stop()
