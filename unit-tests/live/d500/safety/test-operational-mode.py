@@ -103,6 +103,7 @@ with test.closure("Resume --> Maintenance keep video streaming"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
+    time.sleep(5)
 
 ########################### SRS - 3.3.1.14.c ##############################################
 
@@ -146,6 +147,7 @@ with test.closure("Resume --> Maintenance keeps safety streaming on"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
+    time.sleep(5)
 
 ############################## DIAGNOSTIC PROBES ##############################################
 # First 12 iterations of safety+depth+color (the canonical failing combo),
