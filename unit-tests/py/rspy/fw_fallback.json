@@ -1,0 +1,6 @@
+{
+    "_comment": "Per-device FW image fallbacks used when the bundled FW is below the device's minimum supported FW. Keys are device names as exposed by rspy.devices.Device (with the 'Intel RealSense ' or 'RealSense ' prefix stripped). Paths are relative to libci.home so they resolve on both Linux (/usr/local/lib/ci) and Windows (C:\\LibCI). Add an entry per device as needed.",
+    "fallbacks": {
+        "D436": "data/FW/D400/Signed_Image_UVC_5_17_3_10.bin"
+    }
+}

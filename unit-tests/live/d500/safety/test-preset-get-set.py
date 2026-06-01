@@ -60,8 +60,8 @@ valid_sp_json_str = """
                 "zone_polygon":
                 {
                     "p0": {"x": 0.5, "y":  0.1},
-                    "p1": {"x": 0.8, "y":  0.1},
-                    "p2": {"x": 0.8, "y": -0.1},
+                    "p1": {"x": 1.2, "y":  0.1},
+                    "p2": {"x": 1.2, "y": -0.1},
                     "p3": {"x": 0.5, "y": -0.1}
                 },
                 "safety_trigger_confidence": 3,
@@ -71,10 +71,10 @@ valid_sp_json_str = """
             {
                 "zone_polygon":
                 {
-                    "p0": {"x": 0.8, "y":  0.1},
-                    "p1": {"x": 1.2, "y":  0.1},
-                    "p2": {"x": 1.2, "y": -0.1},
-                    "p3": {"x": 0.8, "y": -0.1}
+                    "p0": {"x": 0.3, "y":  0.1},
+                    "p1": {"x": 0.5, "y":  0.1},
+                    "p2": {"x": 0.5, "y": -0.1},
+                    "p3": {"x": 0.3, "y": -0.1}
                 },
                 "safety_trigger_confidence": 3,
                 "reserved": [0, 0, 0, 0, 0, 0, 0]
@@ -169,7 +169,7 @@ valid_sp_json_str = """
             "7":
             {
                 "attributes": 0,
-                "minimal_range": 0,
+                "minimal_range": 0.5,
                 "region_of_interests":
                 {
                     "vertex_0": [0, 0],

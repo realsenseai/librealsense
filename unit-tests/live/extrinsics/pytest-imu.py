@@ -7,11 +7,9 @@ import pyrealsense2 as rs
 
 log = logging.getLogger(__name__)
 
-# D555 excluded until RSDEV-9175 (translation values ~1000x off with sign flip) is resolved
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
-    pytest.mark.device_exclude("D555"),
 ]
 
 

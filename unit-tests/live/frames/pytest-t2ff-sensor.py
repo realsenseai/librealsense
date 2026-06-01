@@ -24,16 +24,17 @@ pytestmark = [
 ]
 
 
-_device_settled = False
-
-@pytest.fixture
+@pytest.fixture(scope="module")
 def sensor_device(test_device):
-    """Return (dev, ctx), waiting once for device to reach idle state."""
-    global _device_settled
+    """Return (dev, ctx), waiting once for device to reach idle state.
+
+    Module-scoped so the settle-sleep fires once per module under normal runs
+    AND re-fires after a --retries-triggered re-instantiation (pytest-retry
+    tears down module fixtures between attempts, so the device may have been
+    recycled and needs to settle again).
+    """
     dev, ctx = test_device
-    if not _device_settled:
-        time.sleep(3)  # device starts at D0 (Operational), wait for idle
-        _device_settled = True
+    time.sleep(3)  # device starts at D0 (Operational), wait for idle
     return dev, ctx
 
 

@@ -37,7 +37,6 @@ import os, time
 from pprint import pformat
 import pyrealsense2 as rs
 import pyrsutils as rsutils
-from rspy import tests_wrapper as tw
 from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
@@ -47,13 +46,6 @@ pytestmark = [
     pytest.mark.timeout(600),
 ]
 
-
-@pytest.fixture(autouse=True)
-def _start_stop_wrapper(test_device):
-    dev, _ = test_device
-    tw.start_wrapper(dev)
-    yield
-    tw.stop_wrapper(dev)
 
 # -----------------------------------------------------------------------------------------------
 # Configuration (with environment overrides)
@@ -265,8 +257,8 @@ def check_metadata_availability(sensor, profile, timeout=2.0):
 # -----------------------------------------------------------------------------------------------
 # Run Tests
 
-def test_depth_ae_convergence(test_device):
-    dev, _ = test_device
+def test_depth_ae_convergence(test_device_wrapped):
+    dev, _ = test_device_wrapped
     require_min_fw_version(dev, rsutils.version(5, 17, 0, 10), "AE convergence", inclusive=False)
 
     sensor = dev.first_depth_sensor()

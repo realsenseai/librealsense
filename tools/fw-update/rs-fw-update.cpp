@@ -160,7 +160,7 @@ void waiting_for_device_to_reconnect(rs2::context& ctx, rs2::cli::value<std::str
         for (auto&& d : devs)
         {
             auto sn = d.supports(RS2_CAMERA_INFO_SERIAL_NUMBER) ? d.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) : "unknown";
-            if (serial_number_arg.isSet() && sn != selected_serial_number)
+            if (!selected_serial_number.empty() && sn != selected_serial_number)
                 continue;
 
             auto fw = d.supports(RS2_CAMERA_INFO_FIRMWARE_VERSION) ? d.get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION) : "unknown";
@@ -440,7 +440,7 @@ try
 
     auto devs = ctx.query_devices();
 
-    if (!serial_number_arg.isSet() && devs.size() > 1)
+    if (selected_serial_number.empty() && devs.size() > 1)
     {
         std::cout << std::endl << "Several devices are connected, serial number must be selected using -s <serial_number>" << std::endl;
         return EXIT_FAILURE;
@@ -523,7 +523,7 @@ try
 
     if (!device_found)
     {
-        if (serial_number_arg.isSet())
+        if (!selected_serial_number.empty())
             std::cout << std::endl << "Couldn't find the requested serial number" << std::endl;
         else if (devs.size() == 1)
         {

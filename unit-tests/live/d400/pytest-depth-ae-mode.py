@@ -7,7 +7,6 @@ import pytest
 import platform
 import pyrealsense2 as rs
 import pyrsutils as rsutils
-from rspy import tests_wrapper as tw
 from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
@@ -21,17 +20,9 @@ REGULAR = 0.0
 ACCELERATED = 1.0
 
 
-@pytest.fixture(autouse=True)
-def _start_stop_wrapper(test_device):
-    dev, _ = test_device
-    tw.start_wrapper(dev)
-    yield
-    tw.stop_wrapper(dev)
-
-
 @pytest.fixture
-def depth_sensor(test_device):
-    dev, _ = test_device
+def depth_sensor(test_device_wrapped):
+    dev, _ = test_device_wrapped
     require_min_fw_version(dev, rsutils.version(5, 15, 0, 0), "DEPTH_AUTO_EXPOSURE_MODE")
     return dev.first_depth_sensor()
 

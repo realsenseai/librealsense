@@ -8,7 +8,6 @@ Test FPS accuracy on D585S with various sensor permutations
 
 import pytest
 import pyrealsense2 as rs
-from rspy import tests_wrapper as tw
 import fps_helper
 import logging
 log = logging.getLogger(__name__)
@@ -60,12 +59,8 @@ PERMUTATIONS = [
 ]
 
 
-def test_ah_configurations(test_device):
-    dev, ctx = test_device
+def test_ah_configurations(test_device_wrapped):
+    dev, ctx = test_device_wrapped
 
-    tw.start_wrapper(dev)
-    try:
-        sensor_profiles_array = get_sensors_and_profiles(dev)
-        fps_helper.perform_fps_test(sensor_profiles_array, PERMUTATIONS)
-    finally:
-        tw.stop_wrapper(dev)
+    sensor_profiles_array = get_sensors_and_profiles(dev)
+    fps_helper.perform_fps_test(sensor_profiles_array, PERMUTATIONS)

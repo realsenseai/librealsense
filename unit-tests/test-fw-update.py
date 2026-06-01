@@ -23,6 +23,7 @@ import argparse
 parser = argparse.ArgumentParser(description="Test firmware update")
 parser.add_argument('--custom-fw-d400', type=str, help='Path to custom D400 firmware file')
 parser.add_argument('--custom-fw-d555', type=str, help='Path to custom D555 firmware file')
+parser.add_argument('--serial', type=str, default=None, help='Serial number of the device to update (for multi-device rigs)')
 args = parser.parse_args()
 
 
@@ -123,7 +124,7 @@ for tool in file.find( repo.build, fw_updater_exe_regex ):
 if not fw_updater_exe:
     log.f( "Could not find the update tool file (rs-fw-update.exe)" )
 
-device, ctx = test.find_first_device_or_exit()
+device, ctx = test.find_first_device_or_exit( args.serial )
 product_line = device.get_info( rs.camera_info.product_line )
 product_name = device.get_info( rs.camera_info.name )
 log.d( 'product line:', product_line )
@@ -184,7 +185,7 @@ if device.is_in_recovery_mode():
         test.unexpected_exception()
         log.f( "Unexpected error while trying to recover device:", e )
     else:
-        device, ctx = test.find_first_device_or_exit()
+        device, ctx = test.find_first_device_or_exit( args.serial )
         current_fw_version = rsutils.version(device.get_info(rs.camera_info.firmware_version))
         log.d("FW version after recovery:", current_fw_version)
 
@@ -217,6 +218,8 @@ elif downgrade_counter >= 19:
 image_file = custom_fw_path
 
 cmd = [fw_updater_exe, '-f', image_file]
+if args.serial:
+    cmd += ['-s', args.serial]
 # Add '-u' only if the path doesn't include 'signed'
 if ('signed' not in custom_fw_path.lower()
         and "d555" not in product_name.lower()): # currently -u is not supported for D555
@@ -228,18 +231,18 @@ log.d( 'running:', cmd )
 sys.stdout.flush()
 result = subprocess.run( cmd )   # may throw
 
-# Wait for the camera to finish rebooting before doing anything else;
-# the test exit flow may cut USB power (hub port disable) so we must not exit mid-reboot
-wait_for_reboot( same_version )
-
 if result.returncode != 0:
     log.e( 'rs-fw-update returned exit code', result.returncode )
     test.check( False, description='rs-fw-update should return exit code 0' )
     test.finish()
     test.print_results_and_exit()
 
+# Wait for the camera to finish rebooting before doing anything else;
+# the test exit flow may cut USB power (hub port disable) so we must not exit mid-reboot
+wait_for_reboot( same_version )
+
 # make sure update worked and check FW version and update counter
-device, ctx = test.find_first_device_or_exit()
+device, ctx = test.find_first_device_or_exit( args.serial )
 current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
 
 # camera_locked returns "YES" (locked) or "NO" (unlocked)

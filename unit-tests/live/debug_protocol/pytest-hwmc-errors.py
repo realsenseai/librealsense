@@ -9,7 +9,6 @@
 
 import pytest
 import pyrealsense2 as rs
-from rspy import tests_wrapper as tw
 import logging
 log = logging.getLogger(__name__)
 
@@ -45,20 +44,12 @@ def send_hardware_monitor_command(device, command):
     return status, result
 
 
-@pytest.fixture(autouse=True)
-def _start_stop_wrapper(test_device):
-    dev, _ = test_device
-    tw.start_wrapper(dev)
-    yield
-    tw.stop_wrapper(dev)
-
-
 #############################################################################################
 # Tests
 #############################################################################################
 
-def test_invalid_command(test_device):
-    dev, ctx = test_device
+def test_invalid_command(test_device_wrapped):
+    dev, ctx = test_device_wrapped
 
     command_opcode_as_int = 0xee
     failure_opcode_as_string = "ff ff ff ff"
@@ -70,8 +61,8 @@ def test_invalid_command(test_device):
     assert status == expected_status
 
 
-def test_no_data_to_return(test_device):
-    dev, ctx = test_device
+def test_no_data_to_return(test_device_wrapped):
+    dev, ctx = test_device_wrapped
 
     product_line = dev.get_info(rs.camera_info.product_line)
     if product_line != "D400":
@@ -87,8 +78,8 @@ def test_no_data_to_return(test_device):
     assert status == expected_status
 
 
-def test_wrong_parameter(test_device):
-    dev, ctx = test_device
+def test_wrong_parameter(test_device_wrapped):
+    dev, ctx = test_device_wrapped
 
     product_line = dev.get_info(rs.camera_info.product_line)
     command_opcode_as_int = 0x2b  # SET_ADV
