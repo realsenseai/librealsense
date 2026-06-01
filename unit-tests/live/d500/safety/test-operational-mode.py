@@ -3,23 +3,11 @@
 
 #test:device D585S
 
-import os
 import pyrealsense2 as rs
 from rspy import test, log
-from rspy.d500_log import start_cdc_log
-from rspy.host_trace import start_dmesg_log
 import time
 
 device, _ = test.find_first_device_or_exit();
-
-sensor_names = [s.get_info(rs.camera_info.name) for s in device.sensors
-                if s.supports(rs.camera_info.name)]
-log.d("Enumerated sensors:", sensor_names)
-
-_test_base = os.path.splitext(os.path.basename(__file__))[0]
-_cdc   = start_cdc_log(_test_base + "-cdc")
-_smcu  = start_cdc_log(_test_base + "-smcu", device_path="/dev/ttyUSB1", baud=460800)
-_dmesg = start_dmesg_log(_test_base)
 
 def verify_frames_received(pipe, count):
     for i in range(count):
@@ -55,7 +43,7 @@ with test.closure("Pause / Resume - no impact on streaming"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
-    time.sleep(1) # allow some time for the streaming to actually stop
+    time.sleep(2) # allow some time for the streaming to actually stop
     pipe.start(cfg)
     verify_frames_received(pipe, count = 10)
 
@@ -65,7 +53,7 @@ with test.closure("Pause / Resume - no impact on streaming"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
-    time.sleep(5)
+    time.sleep(2)
 
 ########################### SRS - 3.3.1.14.c ##############################################
 
@@ -103,7 +91,7 @@ with test.closure("Resume --> Maintenance keep video streaming"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
-    time.sleep(5)
+    time.sleep(2)
 
 ########################### SRS - 3.3.1.14.c ##############################################
 
@@ -140,69 +128,14 @@ with test.closure("Resume --> Maintenance keeps safety streaming on"):
     # We know that returning to run mode will not restart the safety stream.
     # FW expect the user to restart the stream at host side
     pipe.stop()
-    time.sleep(1) # allow some time for the streaming to actually stop
+    time.sleep(2) # allow some time for the streaming to actually stop
     pipe.start(cfg)
 
     # Verify that on RUN mode we get frames
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
-    time.sleep(5)
-
-############################## DIAGNOSTIC PROBES ##############################################
-# First 12 iterations of safety+depth+color (the canonical failing combo),
-# then 12 iterations of safety+depth (no color). Each iteration is a clean
-# pipe.start / wait_for_frames / pipe.stop with a 1s gap between iterations.
-#
-# Reading the result matrix:
-#   - 3-stream block fails periodically, 2-stream block all-pass  -> color
-#     stream is the trigger (most likely, given the ~2.5 MB color allocation
-#     and the Psys-size-mismatch observed on the CDC log)
-#   - both blocks fail periodically with the same cadence          -> any
-#     multi-stream restart leaks, not color-specific
-#   - both blocks all-pass                                          -> the
-#     leak depends on something not exercised here (the original closures'
-#     option-setting sequence, the test framework, etc.)
-
-def _run_iteration(label, cfg):
-    pipe = rs.pipeline()
-    pipe.start(cfg)
-    try:
-        pipe.wait_for_frames()
-        log.d(f"{label}: first frame received")
-    finally:
-        try:
-            pipe.stop()
-        except Exception as e:
-            log.w(f"{label}: pipe.stop() raised {e}")
-
-ITERATIONS = 12
-
-# Block A: 12 iterations of safety+depth+color
-for _i in range(1, ITERATIONS + 1):
-    with test.closure(f"diag: 3-stream (safety+depth+color) -- restart #{_i:02d}"):
-        cfg = rs.config()
-        cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
-        cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
-        cfg.enable_stream(rs.stream.color,  rs.format.rgb8, 30)
-        _run_iteration(f"3-stream #{_i:02d}", cfg)
-    time.sleep(1)
-
-# Block B: 12 iterations of safety+depth (no color)
-for _i in range(1, ITERATIONS + 1):
-    with test.closure(f"diag: 2-stream (safety+depth)         -- restart #{_i:02d}"):
-        cfg = rs.config()
-        cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
-        cfg.enable_stream(rs.stream.depth,  rs.format.z16, 30)
-        _run_iteration(f"2-stream #{_i:02d}", cfg)
-    time.sleep(1)
+    time.sleep(2)
 
 ################################################################################################
-if _cdc is not None:
-    _cdc.stop()
-if _smcu is not None:
-    _smcu.stop()
-if _dmesg is not None:
-    _dmesg.stop()
-
 test.print_results_and_exit()
