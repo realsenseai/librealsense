@@ -43,7 +43,7 @@ with test.closure("Pause / Resume - no impact on streaming"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
-    time.sleep(2) # allow some time for the streaming to actually stop
+    time.sleep(1) # allow some time for the streaming to actually stop
     pipe.start(cfg)
     verify_frames_received(pipe, count = 10)
 
@@ -53,7 +53,7 @@ with test.closure("Pause / Resume - no impact on streaming"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
-    time.sleep(2)
+    time.sleep(1)
 
 ########################### SRS - 3.3.1.14.c ##############################################
 
@@ -91,7 +91,7 @@ with test.closure("Resume --> Maintenance keep video streaming"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
-    time.sleep(2)
+    time.sleep(1)
 
 ########################### SRS - 3.3.1.14.c ##############################################
 
@@ -128,14 +128,14 @@ with test.closure("Resume --> Maintenance keeps safety streaming on"):
     # We know that returning to run mode will not restart the safety stream.
     # FW expect the user to restart the stream at host side
     pipe.stop()
-    time.sleep(2) # allow some time for the streaming to actually stop
+    time.sleep(1) # allow some time for the streaming to actually stop
     pipe.start(cfg)
 
     # Verify that on RUN mode we get frames
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
-    time.sleep(2)
+    time.sleep(1)
 
 ################################################################################################
 test.print_results_and_exit()
