@@ -9,7 +9,7 @@ import sys, os, subprocess, re, platform, getopt, time
 current_dir = os.path.dirname( os.path.abspath( __file__ ) )
 sys.path.append( os.path.join( current_dir, 'py' ))
 
-from rspy import log, file, repo, libci, python_path
+from rspy import log, file, repo, libci, python_path, fw_compat
 from rspy.signals import register_signal_handlers
 
 # Make sure the freshly-built pyrealsense2/pyrealdds/pyrsutils win over any copy
@@ -466,7 +466,7 @@ def devices_by_test_config( test, exceptions ):
             continue
 
 
-def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_retry = 0, sns=None ):
+def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_retry = 0, sns=None, custom_fw_d400_override=None ):
     global rslog
     #
     if not log.is_debug_on():
@@ -478,12 +478,23 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
     opts = []
     if rslog:
         opts.append( '--rslog' )
-    if test.name == "test-fw-update" and custom_fw_path:
+    # custom_fw_d400_override comes from the FW-compat gate below (rspy.fw_compat): when
+    # the bundled FW (or a user-supplied --custom-fw-d400) is below the device's minimum
+    # supported FW, the gate swaps in a per-device fallback image listed in
+    # rspy/fw_fallback.json so test-fw-update can still exercise the flash path. The
+    # override wins over --custom-fw-d400. Only D400 has both a populated min-FW map and
+    # a fallback entry today; adding D555/D585S would require a D5xx override of
+    # get_firmware_min_version() and a parallel --custom-fw-d555 override pipe.
+    effective_custom_fw_d400 = custom_fw_d400_override or custom_fw_path
+    if test.name == "test-fw-update" and effective_custom_fw_d400:
         opts.append('--custom-fw-d400')
-        opts.append(custom_fw_path)
+        opts.append(effective_custom_fw_d400)
     if test.name == "test-fw-update" and custom_fw_d555_path:
         opts.append('--custom-fw-d555')
         opts.append(custom_fw_d555_path)
+    if test.name == 'test-fw-update' and sns and len( sns ) == 1:
+        opts.append( '--serial' )
+        opts.append( next( iter( sns ) ) )
     try:
         test.run_test( configuration = configuration, log_path = log_path, opts = opts )
     except FileNotFoundError as e:
@@ -503,7 +514,7 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
     return False
 
 
-def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
+def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None, custom_fw_d400_override=None ):
     global n_tests, n_failed_tests, retries
     n_tests += 1
     retry_count = max(test.config.retries, retries)
@@ -517,7 +528,8 @@ def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
                 time.sleep(1)  # small pause between tries
             else:
                 devices.enable_only( serial_numbers, recycle=True )
-        if test_wrapper_( test, configuration, repetition, retry, retry_count, serial_numbers ):
+        if test_wrapper_( test, configuration, repetition, retry, retry_count, serial_numbers,
+                          custom_fw_d400_override=custom_fw_d400_override ):
             return True
 
     n_failed_tests += 1
@@ -534,6 +546,7 @@ def close_hubs():
             devices.hub.disable_ports()
             devices.wait_until_all_ports_disabled()
             devices.hub.disconnect()
+
 
 # Run all tests
 try:
@@ -694,6 +707,26 @@ try:
                     log.d( f'connection type does not fit {test.config.types}; skipping' )
                     continue
 
+                fw_d400_override = None
+                fw_gate_skip = False
+                if test.name == 'test-fw-update':
+                    for sn in serial_numbers:
+                        d = devices.get( sn )
+                        skip_for_d, override = fw_compat.resolve_fw_gate(
+                            d, libci.home, test.name, sn=sn,
+                            custom_fw_d400_path=custom_fw_path,
+                            custom_fw_d555_path=custom_fw_d555_path )
+                        if skip_for_d:
+                            fw_gate_skip = True
+                        if override:
+                            fw_d400_override = override
+
+                if fw_gate_skip:
+                    n_tests += 1
+                    n_failed_tests += 1
+                    test_ok = False
+                    continue
+
                 for repetition in range(repeat):
                     try:
                         log.d( 'configuration:', configuration_str( configuration, repetition, sns=serial_numbers ) )
@@ -705,7 +738,8 @@ try:
                         test_ok = False
                     else:
                         register_signal_handlers()
-                        test_ok = test_wrapper( test, configuration, repetition, serial_numbers ) and test_ok
+                        test_ok = test_wrapper( test, configuration, repetition, serial_numbers,
+                                                custom_fw_d400_override=fw_d400_override ) and test_ok
                     finally:
                         log.debug_unindent()
             if not test_ok:

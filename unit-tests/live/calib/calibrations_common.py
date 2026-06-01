@@ -222,6 +222,78 @@ def measure_average_depth(config, pipe, width=640, height=480, fps=30, frames=10
         return None
 
 
+def measure_depth_fill_rate(config, pipe, width=640, height=480, fps=30, frames=10, timeout_s=12, enable_emitter=True, center_fraction=1.0, depth_range_mm=None):
+    """Measure the average depth fill rate (fraction of valid pixels) across a series of frames.
+
+    Valid depth pixels are > 0 (raw units). Fill rate per frame = valid_pixels / total_pixels.
+
+    Args: same as measure_average_depth.
+
+    Returns:
+        float | None: Mean fill rate in [0.0, 1.0] over collected frames, or None if no data.
+    """
+    try:
+        import numpy as np
+
+        conf = pipe.start(config)
+        try:
+            depth_sensor = conf.get_device().first_depth_sensor()
+            if enable_emitter and depth_sensor.supports(rs.option.emitter_enabled):
+                depth_sensor.set_option(rs.option.emitter_enabled, 1)
+            if depth_sensor.supports(rs.option.thermal_compensation):
+                depth_sensor.set_option(rs.option.thermal_compensation, 0)
+            depth_scale = depth_sensor.get_depth_scale()
+        except Exception:
+            depth_scale = 0.001
+
+        start = time.time()
+        collected = 0
+        fill_rate_sum = 0.0
+        fill_rate_count = 0
+
+        while collected < frames and (time.time() - start) < timeout_s:
+            try:
+                fs = pipe.wait_for_frames(3000)
+            except Exception:
+                continue
+            depth = fs.get_depth_frame()
+            if not depth:
+                continue
+            data = np.asanyarray(depth.get_data())
+            if data.size == 0:
+                continue
+            if center_fraction < 1.0:
+                h, w = data.shape
+                y0 = int(h * (1.0 - center_fraction) / 2)
+                y1 = h - y0
+                x0 = int(w * (1.0 - center_fraction) / 2)
+                x1 = w - x0
+                data = data[y0:y1, x0:x1]
+            valid_mask = data > 0
+            if depth_range_mm is not None:
+                min_raw = int(depth_range_mm[0] / (depth_scale * 1000.0))
+                max_raw = int(depth_range_mm[1] / (depth_scale * 1000.0))
+                valid_mask = valid_mask & (data >= min_raw) & (data <= max_raw)
+            fill_rate_sum += float(valid_mask.sum()) / float(data.size)
+            fill_rate_count += 1
+            collected += 1
+            if collected >= 5 and (time.time() - start) > 1.5:
+                break
+
+        pipe.stop()
+        if fill_rate_count == 0:
+            return None
+        return fill_rate_sum / fill_rate_count
+    except Exception as e:
+        log.warning(f"measure_depth_fill_rate failed: {e}")
+        try:
+            if pipe:
+                pipe.stop()
+        except Exception:
+            pass
+        return None
+
+
 def is_mipi_device():
     ctx = rs.context()
     device = ctx.query_devices()[0]

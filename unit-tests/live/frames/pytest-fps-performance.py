@@ -1553,16 +1553,17 @@ def print_multistream_test_summary(all_results, all_passed, product_line):
 # Fixtures
 # ============================================================================
 
-_device_settled = False
-
-@pytest.fixture
+@pytest.fixture(scope="module")
 def settled_device(test_device):
-    """Return (dev, ctx), waiting once for device to reach idle state."""
-    global _device_settled
+    """Return (dev, ctx), waiting once for device to reach idle state.
+
+    Module-scoped so the settle-sleep fires once per module under normal runs
+    AND re-fires after a --retries-triggered re-instantiation (pytest-retry
+    tears down module fixtures between attempts, so the device may have been
+    recycled and needs to settle again).
+    """
     dev, ctx = test_device
-    if not _device_settled:
-        time.sleep(DEVICE_INIT_SLEEP_SEC)
-        _device_settled = True
+    time.sleep(DEVICE_INIT_SLEEP_SEC)
     return dev, ctx
 
 

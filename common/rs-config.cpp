@@ -5,9 +5,11 @@
 
 #include <librealsense2/rs.h>
 #include <rsutils/os/special-folder.h>
+#include <rsutils/os/atomic-write-file.h>
 #include <rsutils/json.h>
 #include <rsutils/json-config.h>
-#include <fstream>
+#include <sstream>
+#include <rsutils/easylogging/easyloggingpp.h>
 
 using json = rsutils::json;
 
@@ -75,16 +77,20 @@ config_value config_file::get(const char* key) const
 
 void config_file::save(const char* filename)
 {
-    std::lock_guard< std::recursive_mutex > lk( _mutex );
-    try
+    std::string serialized;
     {
-        std::ofstream out(filename);
-        out << std::setw( 2 ) << _j;
-        out.close();
+        std::lock_guard< std::recursive_mutex > lk( _mutex );
+        if( ! filename )
+        {
+            LOG_ERROR( "Config file name is null, cannot save config." );
+            return;
+        }
+        std::ostringstream oss;
+        oss << std::setw( 2 ) << _j;
+        serialized = oss.str();
     }
-    catch (...)
-    {
-    }
+    if( ! rsutils::os::atomic_write_file( filename, serialized ) )
+        LOG_ERROR( "Failed to save config file '" + std::string( filename ) + "'" );
 }
 
 config_file& config_file::instance()
@@ -111,8 +117,7 @@ config_file::config_file( std::string const & filename )
 
 void config_file::save()
 {
-    std::lock_guard< std::recursive_mutex > lk( _mutex );
-    save(_filename.c_str());
+    save( _filename.c_str() );
 }
 
 config_file::config_file()
