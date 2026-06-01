@@ -30,7 +30,7 @@ configfile = home + os.sep + 'configfile'
 exceptionsfile = home + os.sep + 'exceptions.specs'
 
 
-def run( cmd, stdout = None, timeout = 200, append = False ):
+def run( cmd, stdout = None, timeout = 200, append = False, env = None ):
     """
     Wrapper function for subprocess.run.
     If the child process times out or ends with a non-zero exit status an exception is raised!
@@ -40,6 +40,7 @@ def run( cmd, stdout = None, timeout = 200, append = False ):
     :param timeout: number of seconds to give the process before forcefully ending it (None to disable)
     :param append: if True and stdout is not None, the log of the test will be appended to the file instead of
                    overwriting it
+    :param env: environment variables dict for the subprocess (None to inherit parent environment)
     :return: the output written by the child, if stdout is None -- otherwise N/A
     """
     log.d( 'running:', cmd )
@@ -63,7 +64,8 @@ def run( cmd, stdout = None, timeout = 200, append = False ):
                              stderr=subprocess.STDOUT,
                              universal_newlines=True,
                              timeout=timeout,
-                             check=True )
+                             check=True,
+                             env=env )
         result = rv.stdout
         if not result:
             result = []
@@ -287,7 +289,7 @@ class Test( ABC ):  # Abstract Base Class
         self._ran = False
 
     @abstractmethod
-    def run_test( self, configuration = None, log_path = None, opts = set() ):
+    def run_test( self, configuration = None, log_path = None, opts = set(), env = None, append = None ):
         pass
 
     def debug_dump( self ):
@@ -424,12 +426,12 @@ class PyTest( Test ):
                 cmd += ['--context', ' '.join(self.config.context)]
         return cmd
 
-    def run_test( self, configuration = None, log_path = None, opts = set() ):
+    def run_test( self, configuration = None, log_path = None, opts = set(), env = None, append = None ):
         try:
             cmd = self.command( to_file = log_path and log_path != subprocess.PIPE )
             if opts:
                 cmd += [opt for opt in opts]
-            run( cmd, stdout=log_path, append=self.ran, timeout=self.config.timeout )
+            run( cmd, stdout=log_path, append=self.ran if append is None else append, timeout=self.config.timeout, env=env )
         finally:
             self._ran = True
             # Small delay to allow any async background commands to complete before port reset
@@ -485,14 +487,14 @@ class ExeTest( Test ):
                 cmd += ['--context', ' '.join(self.config.context)]
         return cmd
 
-    def run_test( self, configuration = None, log_path = None, opts = set() ):
+    def run_test( self, configuration = None, log_path = None, opts = set(), env = None, append = None ):
         if not self.exe:
             raise RuntimeError("Tried to run test " + self.name + " with no exe file provided")
         try:
             cmd = self.command( to_file = log_path and log_path != subprocess.PIPE )
             if opts:
                 cmd += [opt for opt in opts]
-            run( cmd, stdout=log_path, append=self.ran, timeout=self.config.timeout )
+            run( cmd, stdout=log_path, append=self.ran if append is None else append, timeout=self.config.timeout, env=env )
         finally:
             self._ran = True
             # Small delay to allow any async background commands to complete before port reset
