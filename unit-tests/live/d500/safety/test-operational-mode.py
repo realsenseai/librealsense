@@ -65,6 +65,7 @@ with test.closure("Pause / Resume - no impact on streaming"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
+    time.sleep(5)
 
 ########################### SRS - 3.3.1.14.c ##############################################
 
