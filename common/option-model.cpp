@@ -314,8 +314,6 @@ bool option_model::draw_combobox( notifications_model & model,
             model.add_log( rsutils::string::from()
                            << "Setting " << opt << " to " << tmp_value << " (" << labels[selected] << ")" );
             set_option_async( opt, tmp_value );
-            if( invalidate_flag )
-                *invalidate_flag = true;
             item_clicked = true;
         }
     }
@@ -538,8 +536,6 @@ bool option_model::draw_slider( notifications_model & model,
                 {
                     // run when the value is valid and the enter key is pressed to submit the new value
                     set_option_async(opt, new_value);
-                    if (invalidate_flag)
-                        *invalidate_flag = true;
                     model.add_log( rsutils::string::from() << "Setting " << opt << " to " << value_as_string() );
                 }
                 edit_mode = false;
@@ -660,8 +656,6 @@ bool option_model::draw_checkbox( notifications_model & model,
                                                << ( bool_value ? "ON" : "OFF" ) << ")" );
 
         set_option_async( opt, bool_value ? 1.f : 0.f );
-        if (invalidate_flag)
-            *invalidate_flag = true;
     }
     if( ImGui::IsItemHovered() && description )
     {
@@ -673,23 +667,14 @@ bool option_model::draw_checkbox( notifications_model & model,
 bool option_model::slider_selected( rs2_option opt,
                                     float value,
                                     std::string & /*error_message*/,
-                                    notifications_model & model )
+                                    notifications_model & /*model*/ )
 {
     // Dispatch every UI tick: the dispatcher action coalesces (per-option
     // _latest_pending_value), and its try_sleep enforces the FW-write floor.
     // set_option_async is O(atomic-CAS) when a job is already pending, so
-    // per-tick calls are cheap.
+    // per-tick calls are cheap. Invalidate + add_log fire later from draw_option
+    // once the worker reports an actual FW write completed.
     set_option_async( opt, value );
-    if( invalidate_flag )
-        *invalidate_flag = true;
-    // Throttle the log line to ~5 Hz so the notifications panel stays readable
-    // during a drag. The actual FW writes are throttled independently by the
-    // dispatcher action's try_sleep(200ms).
-    if( last_set_stopwatch.get_elapsed() >= std::chrono::milliseconds( 200 ) )
-    {
-        last_set_stopwatch.reset();
-        model.add_log( rsutils::string::from() << "Setting " << opt << " to " << value );
-    }
     return true;
 }
 
@@ -709,21 +694,25 @@ bool option_model::draw_option(bool update_read_only_options,
     bool is_streaming,
     std::string& error_message, notifications_model& model)
 {
-    // Surface any pending async FW error (e.g., "exposure can't be changed while AE
-    // is enabled" on certain D4xx variants). The async worker stashes the message
-    // under _async_state->mutex; we swap it out here on the UI thread and write it
-    // to the error_message out-param. The caller chain eventually feeds that to
-    // viewer_model::popup_if_error which shows a centered modal — matching the
-    // pre-PR synchronous flow's error UX. The popup deduplicates by message and
-    // honors the user's "don't show this error again" preference, so we don't need
-    // to throttle here: a continuous failing slider drag gets one modal until
-    // dismissed, and dismissed-as-ignored errors fall back to the notifications
-    // panel automatically.
+    // Drain the async worker's cross-thread state on the UI thread:
+    //  - last_error: any FW write failure — surface as an error_message that
+    //    eventually drives viewer_model::popup_if_error (matching the pre-PR
+    //    synchronous flow's error UX; deduplicated by message and honoring the
+    //    user's "don't show this error again" preference).
+    //  - did_write / written_value: a FW write completed since the last drain.
+    //    Fire *invalidate_flag and add_log here so both are tied to the actual
+    //    FW write rather than to UI-thread dispatch — keeps cross-option re-polls
+    //    from reading stale values while a write is still queued.
     {
         std::string async_err;
+        bool did_write = false;
+        float written_value = 0.f;
         {
             std::lock_guard< std::mutex > lk( _async_state->mutex );
             async_err.swap( _async_state->last_error );
+            did_write = _async_state->did_write;
+            written_value = _async_state->written_value;
+            _async_state->did_write = false;
         }
         if( ! async_err.empty() )
         {
@@ -734,6 +723,12 @@ bool option_model::draw_option(bool update_read_only_options,
                               << ": " << async_err;
             }
             catch( ... ) {}
+        }
+        if( did_write )
+        {
+            if( invalidate_flag )
+                *invalidate_flag = true;
+            model.add_log( rsutils::string::from() << "Setting " << opt << " to " << written_value );
         }
     }
 
@@ -885,14 +880,21 @@ void option_model::set_option_async( rs2_option opt, float value )
                 // rather than waiting for the 2 s timeout.
                 has_user_request->store( false );
             }
-            // Bus-fairness floor between FW writes on this subdevice. The FW
-            // round-trip itself already rate-limits the bus; this small extra idle
-            // window (~20 Hz cap when FW is fast) keeps the video frame stream from
-            // starving during sustained option-write traffic. 200 ms was too long
-            // when one of the queued writes is for a slow option like exposure at
-            // high values — subsequent writes (e.g. gain) waited behind it.
-            // Returns early if the dispatcher is shutting down (device disconnect).
-            c.try_sleep( std::chrono::milliseconds( 50 ) );
+            else
+            {
+                // Record that a FW write completed so the UI thread can drive
+                // invalidate + add_log off the actual write, not off dispatch.
+                std::lock_guard< std::mutex > lk( state->mutex );
+                state->did_write     = true;
+                state->written_value = v;
+            }
+            // FW-write floor between actions on this subdevice. 200 ms matches the
+            // pre-PR `ignore_period` gate that used to live on the UI thread, so a
+            // 60 Hz slider drag produces ~5 Hz of FW writes — paced enough to keep
+            // the video frame stream from starving during sustained option traffic,
+            // and to give each invalidate + cross-option re-poll a real value to
+            // read back. Returns early if the dispatcher is shutting down.
+            c.try_sleep( std::chrono::milliseconds( 200 ) );
         } );
 }
 

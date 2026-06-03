@@ -12,14 +12,18 @@ namespace rs2
     class subdevice_model;
 
     // Holds the cross-thread state for async option writes: the latest FW error
-    // message (written by the dispatcher action, read+cleared by the UI thread). Held
-    // via shared_ptr by both option_model and the dispatcher action so the action
-    // can outlive option_model without dangling — the action captures shared_ptrs
-    // by value, never `this`, so destruction of option_model is UAF-safe.
+    // message, plus a "completed write" notification carrying the value that was
+    // actually sent to FW. Written by the dispatcher action, read+cleared by the
+    // UI thread in option_model::draw_option. Held via shared_ptr by both
+    // option_model and the dispatcher action so the action can outlive option_model
+    // without dangling — the action captures shared_ptrs by value, never `this`,
+    // so destruction of option_model is UAF-safe.
     struct option_async_state
     {
         std::mutex mutex;
-        std::string last_error;  // non-empty = pending error to surface
+        std::string last_error;     // non-empty = pending error to surface
+        bool did_write = false;     // a FW write completed since the last drain
+        float written_value = 0.f;  // value that was sent to FW
     };
 
     class option_model
