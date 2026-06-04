@@ -1211,7 +1211,8 @@ namespace librealsense
                         throw std::runtime_error( rsutils::string::from() << "Flush failed" << sts );
                     }
 
-                    _is_flushed.wait(INFINITE);
+                    if (!_is_flushed.wait(RS2_DEFAULT_TIMEOUT))
+                        LOG_WARNING("Flush timed out after " << RS2_DEFAULT_TIMEOUT << "ms");
                 }
             }
         }
