@@ -202,12 +202,12 @@ public:
         , no_eth_arg( "no-eth", "Do not detect DDS devices, even if enabled in the configuration" )
         , domain_id_arg( "domain-id", "0-232", 0, "Domain ID to use with DDS devices" )
     {
-#ifdef BUILD_WITH_DDS
+        // Register these flags unconditionally so non-DDS builds still accept (and ignore) them;
+        // build_cli_settings() applies their effect only when BUILD_WITH_DDS is defined.
         add( eth_arg );
         add( eth_only_arg );
         add( no_eth_arg );
         add( domain_id_arg );
-#endif
     }
     cli( std::string const & tool_name )
         : cli( tool_name, RS2_API_FULL_VERSION_STR ) {}
