@@ -1,6 +1,26 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
 
+// Modifications Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -31,9 +51,16 @@
 #include <opengl3.h>
 
 #include <iostream>
+#include <cstring>
 
 void glfw_error_callback(int error, const char* description)
 {
+    // Suppress Wayland window position warning (harmless, spams console).
+    // Use strstr rather than std::string(description).find(...) -- this
+    // callback can fire in low-memory / error situations where a heap
+    // allocation inside the handler is unsafe.
+    if (description != nullptr && std::strstr(description, "window position") != nullptr)
+        return;
     std::cerr << "GLFW Driver Error: " << description << "\n";
 }
 

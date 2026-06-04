@@ -1,17 +1,67 @@
+// License: Apache 2.0. See LICENSE file in root directory.
+// Copyright(c) 2026 Intel Corporation. All Rights Reserved.
+
+// Modifications Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 #pragma once
 #ifdef RS2_USE_CUDA
 
 #include <stdexcept>
 #include <memory>
+#include <string>
 #include <cassert>
 
-// CUDA headers
+// GPU runtime headers
+#ifdef RS2_USE_HIP
+#include <hip/hip_runtime.h>
+#define cudaMalloc hipMalloc
+#define cudaFree hipFree
+#define cudaMemcpy hipMemcpy
+#define cudaMemcpyHostToDevice hipMemcpyHostToDevice
+#define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define cudaSuccess hipSuccess
+#define cudaGetErrorString hipGetErrorString
+#define cudaGetLastError hipGetLastError
+#define cudaStreamSynchronize hipStreamSynchronize
+#define cudaMemset hipMemset
+#else
 #include <cuda_runtime.h>
-
-#ifdef _MSC_VER 
-// Add library dependencies if using VS
+#ifdef _MSC_VER
+// Add library dependencies if using VS.  Gated to the CUDA branch only;
+// when building for HIP the linker must not pull in cudart_static.lib.
 #pragma comment(lib, "cudart_static")
 #endif
+#endif
+
+// Throw on any CUDA / HIP runtime error.  Using assert() instead would
+// compile out under -DNDEBUG, silently letting failed allocations and
+// copies propagate as use-after-free or stale data.
+#define RS_CUDA_CHECK(call)                                                    \
+    do {                                                                       \
+        auto _rs_rc = (call);                                                  \
+        if (_rs_rc != cudaSuccess)                                             \
+            throw std::runtime_error(std::string("CUDA/HIP error in ") +       \
+                                     #call + ": " +                            \
+                                     cudaGetErrorString(_rs_rc));              \
+    } while (0)
 
 namespace rscuda
 {

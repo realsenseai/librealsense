@@ -6,6 +6,7 @@
 
 option(ENABLE_CCACHE "Build with ccache." ON)
 option(BUILD_WITH_CUDA "Enable CUDA" OFF)
+option(BUILD_WITH_HIP "Enable HIP/ROCm for AMD GPUs" OFF)
 option(BUILD_GLSL_EXTENSIONS "Build GLSL extensions API" ON)
 option(BUILD_WITH_OPENMP "Use OpenMP" OFF)
 option(BUILD_EASYLOGGINGPP "Build EasyLogging++ as a part of the build" ON)
