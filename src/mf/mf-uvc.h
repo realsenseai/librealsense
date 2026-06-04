@@ -169,9 +169,12 @@ namespace librealsense
             struct read_sample_retry_context
             {
                 std::weak_ptr<wmf_uvc_device> owner;
-                DWORD stream_index;
+                DWORD stream_index = 0;
+                PTP_TIMER timer = nullptr;
+                int attempts = 0;
+                DWORD next_sleep_ms = 1;
             };
-            static VOID CALLBACK read_sample_retry_work(PTP_CALLBACK_INSTANCE, PVOID context);
+            static VOID CALLBACK read_sample_retry_work(PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER timer);
             static void schedule_read_sample_retry(std::weak_ptr<wmf_uvc_device> owner, DWORD stream_index);
 
             std::weak_ptr<wmf_uvc_device> _owner;

@@ -168,33 +168,90 @@ namespace librealsense
             return count;
         }
 
-        // Runs on a Win32 thread-pool worker. The MF source reader returned
-        // MF_E_NOTACCEPTING on the only ReadSample request for this pin, so the
-        // pin would never call OnReadSample again unless we re-issue the request.
-        // Retry with short exponential backoff (~30 ms total) and give up if the
-        // pin stays backpressured.
-        VOID CALLBACK source_reader_callback::read_sample_retry_work(PTP_CALLBACK_INSTANCE, PVOID context)
+        namespace
         {
-            std::unique_ptr<read_sample_retry_context> ctx(static_cast<read_sample_retry_context*>(context));
-            DWORD sleep_ms = 1;
-            for (int attempts = 0; attempts < 6; ++attempts)
+            constexpr int   k_max_readsample_retries = 6;   // 1+2+4+8+16+16 ms ≈ 47 ms worst case
+            constexpr DWORD k_max_retry_sleep_ms     = 16;
+        }
+
+        // Re-issues ReadSample after MF returned MF_E_NOTACCEPTING.
+        //
+        // Uses a thread-pool *timer* (not Sleep + thread-pool work item) so we never
+        // hold a worker thread across the backoff interval — under sustained
+        // backpressure on multiple pins, blocking workers would starve the MF pipeline
+        // itself (which shares the default thread pool). The callback re-arms the
+        // timer for each subsequent attempt and exits immediately.
+        //
+        // Backoff: 1, 2, 4, 8, 16, 16 ms (k_max_readsample_retries attempts, worst-case
+        // ~47 ms total) — longer than a frame interval at 30 fps so we comfortably
+        // outlast transient hiccups; short enough not to leak resources if the pin
+        // is genuinely dead.
+        //
+        // On the standard MF source reader, MF_E_NOTACCEPTING means "a ReadSample is
+        // already pending for this stream". In the symptom this PR addresses, the
+        // pending request never completes (the pin is stuck) — without a retry there
+        // is no further OnReadSample, so the stream dies. If the pending request
+        // does eventually complete in parallel with our retry, MF returns
+        // MF_E_NOTACCEPTING to whichever ReadSample finds an in-flight one, and the
+        // pipeline self-stabilizes back to a single in-flight request within a few
+        // callback cycles.
+        VOID CALLBACK source_reader_callback::read_sample_retry_work(PTP_CALLBACK_INSTANCE, PVOID context, PTP_TIMER /*timer*/)
+        {
+            auto* ctx = static_cast<read_sample_retry_context*>(context);
+            bool done = false;
+
+            if (auto owner = ctx->owner.lock())
             {
-                Sleep(sleep_ms);
-                sleep_ms = std::min<DWORD>(sleep_ms * 2, 16);
-
-                auto owner = ctx->owner.lock();
-                if (!owner || !owner->_reader || !owner->_is_started)
-                    return;
-
-                HRESULT hr = owner->_reader->ReadSample(ctx->stream_index, 0, nullptr, nullptr, nullptr, nullptr);
-                if (hr != MF_E_NOTACCEPTING)
+                if (owner->_is_started)
                 {
-                    if (FAILED(hr))
-                        LOG_HR(hr);
-                    return;
+                    // Snapshot the reader so a concurrent close()/flush() that
+                    // resets owner->_reader can't invalidate it between our
+                    // null-check and the ReadSample call.
+                    CComPtr<IMFSourceReader> reader = owner->_reader;
+                    if (reader)
+                    {
+                        HRESULT hr = reader->ReadSample(ctx->stream_index, 0, nullptr, nullptr, nullptr, nullptr);
+                        if (hr != MF_E_NOTACCEPTING)
+                        {
+                            if (SUCCEEDED(hr))
+                                LOG_DEBUG("MF ReadSample retry succeeded on stream " << ctx->stream_index
+                                          << " after attempt " << (ctx->attempts + 1));
+                            else
+                                LOG_HR(hr);
+                            done = true;
+                        }
+                    }
+                    else
+                    {
+                        done = true;
+                    }
+                }
+                else
+                {
+                    done = true;
                 }
             }
-            LOG_WARNING("MF_E_NOTACCEPTING persisted on stream " << ctx->stream_index << " after retries; sample stream may be stalled");
+            else
+            {
+                done = true;
+            }
+
+            if (!done && ++ctx->attempts < k_max_readsample_retries)
+            {
+                ctx->next_sleep_ms = std::min<DWORD>(ctx->next_sleep_ms * 2, k_max_retry_sleep_ms);
+                LARGE_INTEGER due;
+                due.QuadPart = -static_cast<LONGLONG>(ctx->next_sleep_ms) * 10000; // -ve = relative, 100-ns units
+                FILETIME due_ft = { due.LowPart, static_cast<DWORD>(due.HighPart) };
+                SetThreadpoolTimer(ctx->timer, &due_ft, 0, 0);
+                return;
+            }
+
+            if (!done)
+                LOG_WARNING("MF_E_NOTACCEPTING persisted on stream " << ctx->stream_index
+                            << " after " << k_max_readsample_retries << " retries; sample stream may be stalled");
+
+            CloseThreadpoolTimer(ctx->timer);
+            delete ctx;
         }
 
         void source_reader_callback::schedule_read_sample_retry(std::weak_ptr<wmf_uvc_device> owner, DWORD stream_index)
@@ -202,10 +259,19 @@ namespace librealsense
             auto ctx = std::make_unique<read_sample_retry_context>();
             ctx->owner = std::move(owner);
             ctx->stream_index = stream_index;
-            if (TrySubmitThreadpoolCallback(read_sample_retry_work, ctx.get(), nullptr))
-                ctx.release();
-            else
-                LOG_WARNING("Failed to schedule MF ReadSample retry on stream " << stream_index);
+
+            ctx->timer = CreateThreadpoolTimer(read_sample_retry_work, ctx.get(), nullptr);
+            if (!ctx->timer)
+            {
+                LOG_WARNING("Failed to create thread-pool timer for MF ReadSample retry on stream " << stream_index);
+                return; // ctx auto-freed via unique_ptr
+            }
+
+            LARGE_INTEGER due;
+            due.QuadPart = -static_cast<LONGLONG>(ctx->next_sleep_ms) * 10000;
+            FILETIME due_ft = { due.LowPart, static_cast<DWORD>(due.HighPart) };
+            SetThreadpoolTimer(ctx->timer, &due_ft, 0, 0);
+            ctx.release(); // ownership transferred to the timer callback
         }
 
         STDMETHODIMP source_reader_callback::OnReadSample(HRESULT hrStatus,
