@@ -295,10 +295,31 @@ void uvc_sensor::open( const stream_profiles & requests )
     {
         _device->stream_on( [&]( const notification & n ) { _notifications_processor->raise_notification( n ); } );
     }
-    catch( ... )
+    catch( const backend_exception & )
     {
+        // Preserve backend errors (e.g. "Device or resource busy") with their type so
+        // they surface as a backend error instead of being relabeled as an invalid request.
+        for( auto && profile : _internal_config )
+        {
+            try
+            {
+                _device->close( profile );
+            }
+            catch( ... )
+            {
+            }
+        }
+        reset_streaming();
+        _power.reset();
+        _is_opened = false;
+
+        throw;
+    }
+    catch( const std::exception & e )
+    {
+        // Lead with the underlying cause so it is not lost behind the format list.
         std::stringstream error_msg;
-        error_msg << "\tFormats: \n";
+        error_msg << e.what() << "\n\tFormats: \n";
         for( auto && profile : _internal_config )
         {
             rs2_format fmt = fourcc_to_rs2_format( profile.format );

@@ -183,7 +183,13 @@ namespace librealsense
                     owner->_readsample_result = hrStatus;
                     if (dwStreamFlags == MF_SOURCE_READERF_ERROR)
                     {
-                        owner->close_all();
+                        // Signal the opener so it fails fast instead of waiting the full
+                        // timeout. Don't tear down on this MF callback thread during startup:
+                        // flush() would wait for OnFlush on the same work queue and deadlock.
+                        // The opener unwinds the open on its own thread via stream_on.
+                        if (owner->_is_started)
+                            owner->close_all();
+                        owner->_has_started.set();
                         return S_OK;
                     }
                 }
@@ -1050,6 +1056,8 @@ namespace librealsense
                                 if (_has_started.wait(timeout_ms))
                                 {
                                     LOG_HR_STR("_reader->ReadSample(...)", _readsample_result);
+                                    if (_readsample_result == MF_E_HW_MFT_FAILED_START_STREAMING)
+                                        throw windows_backend_exception("Device or resource busy");
                                 }
                                 else
                                 {
