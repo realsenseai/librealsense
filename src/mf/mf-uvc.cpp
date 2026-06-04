@@ -168,6 +168,45 @@ namespace librealsense
             return count;
         }
 
+        // Runs on a Win32 thread-pool worker. The MF source reader returned
+        // MF_E_NOTACCEPTING on the only ReadSample request for this pin, so the
+        // pin would never call OnReadSample again unless we re-issue the request.
+        // Retry with short exponential backoff (~30 ms total) and give up if the
+        // pin stays backpressured.
+        VOID CALLBACK source_reader_callback::read_sample_retry_work(PTP_CALLBACK_INSTANCE, PVOID context)
+        {
+            std::unique_ptr<read_sample_retry_context> ctx(static_cast<read_sample_retry_context*>(context));
+            DWORD sleep_ms = 1;
+            for (int attempts = 0; attempts < 6; ++attempts)
+            {
+                Sleep(sleep_ms);
+                sleep_ms = std::min<DWORD>(sleep_ms * 2, 16);
+
+                auto owner = ctx->owner.lock();
+                if (!owner || !owner->_reader || !owner->_is_started)
+                    return;
+
+                HRESULT hr = owner->_reader->ReadSample(ctx->stream_index, 0, nullptr, nullptr, nullptr, nullptr);
+                if (hr != MF_E_NOTACCEPTING)
+                {
+                    if (FAILED(hr))
+                        LOG_HR(hr);
+                    return;
+                }
+            }
+            LOG_WARNING("MF_E_NOTACCEPTING persisted on stream " << ctx->stream_index << " after retries; sample stream may be stalled");
+        }
+
+        void source_reader_callback::schedule_read_sample_retry(std::weak_ptr<wmf_uvc_device> owner, DWORD stream_index)
+        {
+            auto ctx = std::make_unique<read_sample_retry_context>();
+            ctx->owner = std::move(owner);
+            ctx->stream_index = stream_index;
+            if (TrySubmitThreadpoolCallback(read_sample_retry_work, ctx.get(), nullptr))
+                ctx.release();
+            else
+                LOG_WARNING("Failed to schedule MF ReadSample retry on stream " << stream_index);
+        }
 
         STDMETHODIMP source_reader_callback::OnReadSample(HRESULT hrStatus,
             DWORD dwStreamIndex,
@@ -189,7 +228,18 @@ namespace librealsense
                 }
                 owner->_has_started.set();
 
-                LOG_HR(owner->_reader->ReadSample(dwStreamIndex, 0, nullptr, nullptr, nullptr, nullptr));
+                HRESULT hr_read = owner->_reader->ReadSample(dwStreamIndex, 0, nullptr, nullptr, nullptr, nullptr);
+                if (hr_read == MF_E_NOTACCEPTING)
+                {
+                    // Without a retry the source reader will never call us again on
+                    // this pin and the stream effectively dies. Schedule a deferred
+                    // retry on the thread pool so we don't block the MF callback.
+                    schedule_read_sample_retry(_owner, dwStreamIndex);
+                }
+                else if (FAILED(hr_read))
+                {
+                    LOG_HR(hr_read);
+                }
 
                 if (!owner->_is_started)
                     return S_OK;

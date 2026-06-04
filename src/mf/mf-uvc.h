@@ -166,6 +166,14 @@ namespace librealsense
             STDMETHODIMP OnEvent(DWORD /*sidx*/, IMFMediaEvent* /*event*/) override;
             STDMETHODIMP OnFlush(DWORD) override;
         private:
+            struct read_sample_retry_context
+            {
+                std::weak_ptr<wmf_uvc_device> owner;
+                DWORD stream_index;
+            };
+            static VOID CALLBACK read_sample_retry_work(PTP_CALLBACK_INSTANCE, PVOID context);
+            static void schedule_read_sample_retry(std::weak_ptr<wmf_uvc_device> owner, DWORD stream_index);
+
             std::weak_ptr<wmf_uvc_device> _owner;
             long _refCount = 0;
         };
