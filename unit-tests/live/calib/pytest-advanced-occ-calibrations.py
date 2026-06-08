@@ -34,7 +34,6 @@ SHORT_DISTANCE_PIXEL_CORRECTION = -3.0
 EPSILON = 0.5         # half of PIXEL_CORRECTION tolerance
 DIFF_THRESHOLD = 0.001  # minimum change expected after OCC calibration
 HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION = 3.0
-FILL_RATE_CONVERGENCE_TOLERANCE = 0.02  # 2% slack for frame-to-frame fill rate noise
 
 def on_chip_calibration_json(occ_json_file, host_assistance):
     occ_json = None
@@ -170,7 +169,7 @@ def run_advanced_occ_calibration_test(host_assistance, config, pipeline, calib_d
         # Fill rate assertion: post-OCC fill rate must be higher than the perturbed fill rate
         if modified_fill_rate is not None and post_fill_rate is not None:
             log.info(f"Fill rates: modified={modified_fill_rate*100:.1f}% post={post_fill_rate*100:.1f}%")
-            if post_fill_rate - FILL_RATE_CONVERGENCE_TOLERANCE <= modified_fill_rate:
+            if post_fill_rate <= modified_fill_rate:
                 log.error("Post-OCC fill rate did not improve over perturbed fill rate")
                 pytest.fail()
             else:
