@@ -29,7 +29,10 @@ describe('StreamViewer', () => {
       const device = createMockDevice()
       const deviceState = createMockDeviceState(device, {
         isActive: true,
-        streamConfigs: [createMockStreamConfig({ enabled: false })],
+        // Use `enable` (singular) — the actual StreamConfig field name. The
+        // mock factory defaults `enable: true`, so the wrong field name leaves
+        // the stream enabled and the empty-state branch never renders.
+        streamConfigs: [createMockStreamConfig({ enable: false })],
       })
       
       render(<StreamViewer />, {

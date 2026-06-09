@@ -9,7 +9,7 @@ import sys, os, subprocess, re, platform, getopt, time
 current_dir = os.path.dirname( os.path.abspath( __file__ ) )
 sys.path.append( os.path.join( current_dir, 'py' ))
 
-from rspy import log, file, repo, libci, python_path
+from rspy import log, file, repo, libci, python_path, fw_compat
 from rspy.signals import register_signal_handlers
 
 # Make sure the freshly-built pyrealsense2/pyrealdds/pyrsutils win over any copy
@@ -53,8 +53,8 @@ def usage():
     print( '        --custom-fw-d555          If custom fw provided flash it if its different that the current fw installed' )
     print( '        --rslog              Enable LibRS logging (LOG_DEBUG etc.) to console in each test' )
     print( '        --skip-disconnected  Skip live test if required device is disconnected (only applies w/o a hub)' )
-    print( '        --test-dir <>        Path to test dir; default: librealsense/unit-tests' )
-    print( '                             ex: --test-dir $HOME/my_ws/my_tests; logs are stored in the same dir' )
+    print( '        --test-dir <>        Restrict discovery to tests under this dir or file (repeatable);' )
+    print( '                             ex: --test-dir live/image-quality --test-dir test-fw-update.py' )
     print( 'Examples:' )
     print( 'Running: python run-unit-tests.py -s' )
     print( '    Runs all tests, but direct their output to the console rather than log files' )
@@ -104,8 +104,7 @@ custom_fw_d555_path=''
 rslog = False
 only_live = False
 only_not_live = False
-test_dir = current_dir
-test_dir_log =  False
+test_dirs = []  # accumulator for --test-dir values; defaults to [current_dir] after parsing
 skip_regex = None
 for opt, arg in opts:
     if opt in ('-h', '--help'):
@@ -171,10 +170,8 @@ for opt, arg in opts:
             usage()
         only_not_live = True
     elif opt == '--test-dir':
-        test_dir = os.path.abspath(arg)
-        libci.unit_tests_dir = test_dir
-        log.i(f'Tests dir changed from default to: {test_dir}')
-        test_dir_log = True
+        test_dirs.append( os.path.abspath(arg) )
+        log.i(f'Restricting tests to: {test_dirs[-1]}')
     elif opt in ('--skip-regex'):
         skip_regex = arg
     elif opt == '--custom-fw-d400':
@@ -183,6 +180,10 @@ for opt, arg in opts:
     elif opt == '--custom-fw-d555':
         custom_fw_d555_path = arg  # Store the custom D555 firmware path
         log.i(f"custom D555 firmware path was provided ${custom_fw_d555_path}")
+
+if not test_dirs:
+    test_dirs = [current_dir]
+
 
 def find_build_dir( dir ):
     """
@@ -263,10 +264,7 @@ if not exe_dir and build_dir:
 
 if not to_stdout:
     # If no test executables were found, put the logs directly in the build directory
-    if not test_dir_log:
-        logdir = os.path.join( exe_dir or build_dir or os.path.join( repo.root, 'build' ), 'unit-tests' )
-    else:
-        logdir = os.path.join( test_dir, 'logs' )
+    logdir = os.path.join( exe_dir or build_dir or os.path.join( repo.root, 'build' ), 'unit-tests' )
     os.makedirs( logdir, exist_ok=True )
     libci.logdir = logdir
         
@@ -354,12 +352,15 @@ def check_log_for_fails( path_to_log, testname, configuration=None, repetition=1
 
 
 def get_tests():
-    global regex, build_dir, exe_dir, pyrs, test_dir, linux, context, list_only, skip_regex
+    global regex, build_dir, exe_dir, pyrs, linux, context, list_only, skip_regex, current_dir, test_dirs
     if regex:
         run_pattern = re.compile( regex )
 
     if skip_regex:
         skip_pattern = re.compile( skip_regex )
+
+    def in_test_dirs( script_abspath ):
+        return any( script_abspath.startswith( p ) for p in test_dirs )
 
     # In Linux, the build targets are located elsewhere than on Windows
     # Go over all the tests from a "manifest" we take from the result of the last CMake
@@ -371,6 +372,8 @@ def get_tests():
             # We need to first create the test name so we can see if it fits the regex
             testdir = manifest_ctx['match'].group( 0 )  # "log/internal/test-all"
             # log.d( testdir )
+            if not in_test_dirs( os.path.join( current_dir, testdir ) ):
+                continue
             testparent = os.path.dirname( testdir )  # "log/internal"
             if testparent:
                 testname = 'test-' + testparent.replace( '/', '-' ) + '-' + os.path.basename( testdir )[
@@ -395,7 +398,9 @@ def get_tests():
     elif list_only:
         # We want to list all tests, even if they weren't built.
         # So we look for the source files instead of using the manifest
-        for cpp_test in file.find( test_dir, r'(^|/)test-.*\.cpp' ):
+        for cpp_test in file.find( current_dir, r'(^|/)test-.*\.cpp' ):
+            if not in_test_dirs( os.path.join( current_dir, cpp_test ) ):
+                continue
             testparent = os.path.dirname( cpp_test )  # "log/internal" <-  "log/internal/test-all.py"
             if testparent:
                 testname = 'test-' + testparent.replace( '/', '-' ) + '-' + os.path.basename( cpp_test )[
@@ -413,7 +418,9 @@ def get_tests():
 
     # Python unit-test scripts are in the same directory as us... we want to consider running them
     # (we may not if they're live and we have no pyrealsense2.pyd):
-    for py_test in file.find( test_dir, r'(^|/)test-.*\.py' ):
+    for py_test in file.find( current_dir, r'(^|/)test-.*\.py' ):
+        if not in_test_dirs( os.path.join( current_dir, py_test ) ):
+            continue
         testparent = os.path.dirname( py_test )  # "log/internal" <-  "log/internal/test-all.py"
         if testparent:
             testname = 'test-' + testparent.replace( '/', '-' ) + '-' + os.path.basename( py_test )[5:-3]  # remove .py
@@ -459,7 +466,7 @@ def devices_by_test_config( test, exceptions ):
             continue
 
 
-def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_retry = 0, sns=None ):
+def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_retry = 0, sns=None, custom_fw_d400_override=None ):
     global rslog
     #
     if not log.is_debug_on():
@@ -471,12 +478,23 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
     opts = []
     if rslog:
         opts.append( '--rslog' )
-    if test.name == "test-fw-update" and custom_fw_path:
+    # custom_fw_d400_override comes from the FW-compat gate below (rspy.fw_compat): when
+    # the bundled FW (or a user-supplied --custom-fw-d400) is below the device's minimum
+    # supported FW, the gate swaps in a per-device fallback image listed in
+    # rspy/fw_fallback.json so test-fw-update can still exercise the flash path. The
+    # override wins over --custom-fw-d400. Only D400 has both a populated min-FW map and
+    # a fallback entry today; adding D555/D585S would require a D5xx override of
+    # get_firmware_min_version() and a parallel --custom-fw-d555 override pipe.
+    effective_custom_fw_d400 = custom_fw_d400_override or custom_fw_path
+    if test.name == "test-fw-update" and effective_custom_fw_d400:
         opts.append('--custom-fw-d400')
-        opts.append(custom_fw_path)
+        opts.append(effective_custom_fw_d400)
     if test.name == "test-fw-update" and custom_fw_d555_path:
         opts.append('--custom-fw-d555')
         opts.append(custom_fw_d555_path)
+    if test.name == 'test-fw-update' and sns and len( sns ) == 1:
+        opts.append( '--serial' )
+        opts.append( next( iter( sns ) ) )
     try:
         test.run_test( configuration = configuration, log_path = log_path, opts = opts )
     except FileNotFoundError as e:
@@ -496,7 +514,7 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
     return False
 
 
-def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
+def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None, custom_fw_d400_override=None ):
     global n_tests, n_failed_tests, retries
     n_tests += 1
     retry_count = max(test.config.retries, retries)
@@ -510,7 +528,8 @@ def test_wrapper( test, configuration=None, repetition=1, serial_numbers=None ):
                 time.sleep(1)  # small pause between tries
             else:
                 devices.enable_only( serial_numbers, recycle=True )
-        if test_wrapper_( test, configuration, repetition, retry, retry_count, serial_numbers ):
+        if test_wrapper_( test, configuration, repetition, retry, retry_count, serial_numbers,
+                          custom_fw_d400_override=custom_fw_d400_override ):
             return True
 
     n_failed_tests += 1
@@ -527,6 +546,7 @@ def close_hubs():
             devices.hub.disable_ports()
             devices.wait_until_all_ports_disabled()
             devices.hub.disconnect()
+
 
 # Run all tests
 try:
@@ -687,6 +707,26 @@ try:
                     log.d( f'connection type does not fit {test.config.types}; skipping' )
                     continue
 
+                fw_d400_override = None
+                fw_gate_skip = False
+                if test.name == 'test-fw-update':
+                    for sn in serial_numbers:
+                        d = devices.get( sn )
+                        skip_for_d, override = fw_compat.resolve_fw_gate(
+                            d, libci.home, test.name, sn=sn,
+                            custom_fw_d400_path=custom_fw_path,
+                            custom_fw_d555_path=custom_fw_d555_path )
+                        if skip_for_d:
+                            fw_gate_skip = True
+                        if override:
+                            fw_d400_override = override
+
+                if fw_gate_skip:
+                    n_tests += 1
+                    n_failed_tests += 1
+                    test_ok = False
+                    continue
+
                 for repetition in range(repeat):
                     try:
                         log.d( 'configuration:', configuration_str( configuration, repetition, sns=serial_numbers ) )
@@ -698,7 +738,8 @@ try:
                         test_ok = False
                     else:
                         register_signal_handlers()
-                        test_ok = test_wrapper( test, configuration, repetition, serial_numbers ) and test_ok
+                        test_ok = test_wrapper( test, configuration, repetition, serial_numbers,
+                                                custom_fw_d400_override=fw_d400_override ) and test_ok
                     finally:
                         log.debug_unindent()
             if not test_ok:

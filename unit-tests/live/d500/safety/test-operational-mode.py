@@ -53,6 +53,7 @@ with test.closure("Pause / Resume - no impact on streaming"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
+    time.sleep(1) # allow some time for the streaming to actually stop
 
 ########################### SRS - 3.3.1.14.c ##############################################
 
@@ -90,6 +91,7 @@ with test.closure("Resume --> Maintenance keep video streaming"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
+    time.sleep(1) # allow some time for the streaming to actually stop
 
 ########################### SRS - 3.3.1.14.c ##############################################
 
@@ -133,6 +135,7 @@ with test.closure("Resume --> Maintenance keeps safety streaming on"):
     verify_frames_received(pipe, count = 10)
 
     pipe.stop()
+    time.sleep(1) # allow some time for the streaming to actually stop
 
 ################################################################################################
 test.print_results_and_exit()

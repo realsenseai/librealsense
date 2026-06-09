@@ -241,10 +241,6 @@ public:
 
             depth_sensor.register_option( RS2_OPTION_THERMAL_COMPENSATION,
                                           std::make_shared< thermal_compensation >( _thermal_monitor, thermal_compensation_toggle ) );
-
-            // We usually use "Custom" visual preset becasue we don't know what is the current setting.
-            // When connected by Ethernet D555 does not support "Custom" so we set here to "Default" to match.
-            depth_sensor.get_option( RS2_OPTION_VISUAL_PRESET ).set( RS2_RS400_VISUAL_PRESET_DEFAULT );
         } );  // group_multiple_fw_calls
     }
 

@@ -1,11 +1,12 @@
-# librealsense2-enhanced-depth (Close-Range)
+# Improved Close Range Depth (librealsense2-enhanced-depth)
 
-These examples demonstrate usage of the **Enhanced depth** library. The library
+These examples demonstrate usage of the **Improved Close Range Depth** library. The library
 is a closed-source depth enhancement module designed to operate on top of the
-Intel RealSense SDK 2.0 pipeline. It improves minimum sensing distance (min-Z)
-to ~12 cm on NVIDIA Jetson platforms. It integrates transparently into
-existing RealSense-based applications and requires no modification to camera
-firmware and/or SDK.
+RealSense SDK 2.0 pipeline. It improves minimum sensing distance (min-Z):
+regular stereo cameras reach ~12 cm, while short-range stereo cameras (D401,
+D405) can reach up to ~2 cm. It integrates transparently into existing
+RealSense-based applications and requires no modification to camera firmware
+and/or SDK.
 
 <p align="center">
   <a href="https://realsenseai.com/case-studies/?capability_application=autonomous-mobile-robots"><img src="https://librealsense.realsenseai.com/readme-media/minz/minz_600.gif" width="720"/></a>
@@ -17,9 +18,10 @@ firmware and/or SDK.
 
 - [What's Included](#whats-included)
 - [Installation](#installation)
+- [RealSense Viewer: Improved Close Range Depth Post-Processing Filter](#realsense-viewer-improved-close-range-depth-post-processing-filter)
 - [Running the Bundled Examples](#running-the-bundled-examples)
   - [Python (headless stats): `range_depth.py`](#python-headless-stats-range_depthpy)
-  - [Python (live windowed compare): `live_minz_compare.py`](#python-live-windowed-compare-live_minz_comparepy)
+  - [Python (live windowed compare): `live_close_range_compare.py`](#python-live-windowed-compare-live_close_range_comparepy)
   - [C++: `range_depth.cpp`](#c-range_depthcpp)
 - [Quick Start](#quick-start)
   - [Python](#quick-start-python)
@@ -43,7 +45,7 @@ Latency measured at 640x480 on Jetson AGX Orin.
 
 | Component | Class | What it does |
 |-----------|-------|-------------|
-| Close-range improvement | `DepthRangeImprover` | Extends min distance from 520 mm to 120 mm |
+| Close-range improvement | `DepthRangeImprover` | Extends min distance down to ~120 mm (regular stereo) or ~20 mm (D401/D405 short-range) |
 
 ---
 
@@ -60,6 +62,17 @@ same Artifactory / apt source so the SONAMEs line up.
 
 ---
 
+## RealSense Viewer: Improved Close Range Depth Post-Processing Filter
+
+When the viewer is built with `-DBUILD_WITH_CLOSE_RANGE_DEPTH=ON` and the
+`librealsense2-enhanced-depth` package is installed, an Improved Close Range Depth toggle appears in the Post-Processing panel for depth sensors.
+`BUILD_WITH_CLOSE_RANGE_DEPTH` is an ARM64-only CMake option (Jetson / aarch64 builds).
+Enable Depth, IR Left, and IR Right streams at 640×480 or higher, then switch
+the toggle on — the filter runs automatically before decimation on every frameset. The toggle is greyed out if the library is not found at runtime, CUDA is unavailable, or the required streams are not
+active.
+
+---
+
 ## Running the Bundled Examples
 
 This folder ships three minimal end-to-end demos that pull live IR + depth
@@ -69,7 +82,7 @@ and either print stats or display the result.
 | Example | What it does | Extra deps |
 |---|---|---|
 | [`range_depth.py`](#python-headless-stats-range_depthpy) | Headless Python stats: prints valid-pixel counts + recovered close-range pixels per frame | none beyond the SDK |
-| [`live_minz_compare.py`](#python-live-windowed-compare-live_minz_comparepy) | Two live windows side-by-side: raw HW depth vs MinZ-improved depth | OpenCV (`python3-opencv`) |
+| [`live_close_range_compare.py`](#python-live-windowed-compare-live_close_range_comparepy) | Two live windows side-by-side: raw HW depth vs improved close-range depth | OpenCV (`python3-opencv`) |
 | [`range_depth.cpp`](#c-range_depthcpp) | C++ equivalent of `range_depth.py` (headless stats) | librealsense2-dev |
 
 ### Python (headless stats): `range_depth.py`
@@ -92,15 +105,15 @@ export PYTHONPATH=/opt/librealsense2-enhanced-depth/python:$PYTHONPATH
 python3 range_depth.py
 ```
 
-### Python (live windowed compare): `live_minz_compare.py`
+### Python (live windowed compare): `live_close_range_compare.py`
 
 Visual side-by-side: opens two OpenCV windows showing **raw HW depth** (left,
-black-out below ~520 mm) and **MinZ-improved depth** (right, close-range
-filled in via the Enhanced Depth library). Useful for eyeballing what MinZ recovers.
+black-out below ~520 mm) and **improved close-range depth** (right, close-range
+filled in via the Improved Close Range Depth library). Useful for eyeballing what the library recovers.
 
 ```bash
 sudo apt install python3-opencv      # one-time, if not already installed
-python3 live_minz_compare.py         # press 'q' or ESC in either window to stop
+python3 live_close_range_compare.py  # press 'q' or ESC in either window to stop
 ```
 
 The script doesn't pop up empty windows during camera warm-up — it prints
@@ -113,7 +126,7 @@ If you're running from a non-standard install or build tree, the same
 
 ```bash
 export PYTHONPATH=/opt/librealsense2-enhanced-depth/python:$PYTHONPATH
-python3 live_minz_compare.py
+python3 live_close_range_compare.py
 ```
 
 ### C++: `range_depth.cpp`
@@ -301,7 +314,8 @@ from rs_depth import Calibration
 
 ### DepthRangeImprover
 
-Extends RealSense minimum working distance from ~520 mm to ~120 mm.
+Extends RealSense minimum working distance to ~120 mm on regular stereo cameras,
+or ~20 mm on short-range stereo cameras (D401, D405).
 Recovers close-range depth that the RealSense hardware cannot measure and blends it with the hardware depth for a seamless result.
 
 ```python
@@ -397,7 +411,8 @@ Headers at `/opt/librealsense2-enhanced-depth/include/`, library at `/opt/librea
 
 ### DepthRangeImprover (C++)
 
-Extends RealSense minimum working distance from ~520 mm to ~120 mm.
+Extends RealSense minimum working distance to ~120 mm on regular stereo cameras,
+or ~20 mm on short-range stereo cameras (D401, D405).
 Pure C++ — no Python runtime required.
 
 ```cpp
@@ -540,4 +555,4 @@ rs-enumerate-devices    # from librealsense2-utils
 ### No display (headless / SSH)
 
 Use `range_depth.py` or `range_depth.cpp` — both are headless and print per-frame
-stats to stdout. `live_minz_compare.py` requires a display.
+stats to stdout. `live_close_range_compare.py` requires a display.

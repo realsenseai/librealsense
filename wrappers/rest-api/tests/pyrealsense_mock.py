@@ -106,10 +106,11 @@ class context:
 
 # Mock for rs.device class
 class device:
-    def __init__(self, serial_number="1234", name="Test Device"):
+    def __init__(self, serial_number="1234", name="Test Device", supports_debug=True):
         self.serial = serial_number
         self.name = name
         self.sensors = []
+        self._supports_debug = supports_debug
         self._info = {
             camera_info.serial_number: serial_number,
             camera_info.name: name,
@@ -126,6 +127,19 @@ class device:
 
     def add_sensor(self, sensor):
         self.sensors.append(sensor)
+
+    def is_debug_protocol(self):
+        """Return True if this device exposes the RS2_EXTENSION_DEBUG extension."""
+        return self._supports_debug
+
+    def as_debug_protocol(self):
+        """Return a debug_protocol handle for hardware monitor commands.
+
+        Callers should check is_debug_protocol() first; this mirrors the real
+        SDK behaviour where as_debug_protocol() returns an empty handle (not an
+        exception) when the extension is unsupported.
+        """
+        return debug_protocol(self)
 
 # Mock for sensor base class
 class sensor:
@@ -607,6 +621,29 @@ class disparity_transform:
     def process(self, frame):
         # Return the same frame, pretending we've transformed it
         return frame
+
+# Mock for debug_protocol (hardware monitor)
+class debug_protocol:
+    """Mock for the pyrealsense2 debug_protocol extension.
+
+    build_command packs the opcode + 4 params into a 20-byte little-endian
+    header and appends any caller-supplied data bytes.  send_and_receive_raw_data
+    echoes back a minimal 4-byte OK response so the service layer can round-trip
+    without touching real hardware.
+    """
+
+    def __init__(self, dev):
+        self._device = dev
+
+    def build_command(self, opcode, param1=0, param2=0, param3=0, param4=0, data=None):
+        import struct
+        header = struct.pack("<IIIII", opcode, param1, param2, param3, param4)
+        return list(header) + list(data or [])
+
+    def send_and_receive_raw_data(self, input_data):
+        # Return a 4-byte little-endian 0 to signal STATUS_OK.
+        return [0, 0, 0, 0]
+
 
 # Mock exception types
 class error(Exception):

@@ -260,6 +260,17 @@ void rs2_update_firmware_unsigned_cpp(const rs2_device* device, const void* fw_i
 int rs2_check_firmware_compatibility(const rs2_device* device, const void* fw_image, int fw_image_size, rs2_error** error);
 
 /**
+* Get the minimum firmware version supported by this device's SKU.
+* The device must implement the firmware-update protocol; otherwise the call fails.
+* \param[in]  device  Device to query
+* \param[out] error   If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return             Minimum supported FW version as a dotted string (e.g. "5.10.0.17"),
+*                     or null on error. The pointer is valid until the next call to this
+*                     function on the same thread.
+*/
+const char* rs2_get_firmware_min_version(const rs2_device* device, rs2_error** error);
+
+/**
 * Update device to the provided firmware by writing raw data directly to the flash, this command can be executed only on unlocked camera.
 * The device must be extendable to RS2_EXTENSION_UPDATABLE.
 * This call is executed on the caller's thread and it supports progress notifications via the optional callback.

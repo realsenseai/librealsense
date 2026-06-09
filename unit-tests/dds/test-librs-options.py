@@ -64,7 +64,7 @@ with test.remote.fork( nested_indent=None ) as remote:
         for s in dev.query_sensors():
             break
         options = test.info( "supported options", s.get_supported_options() )
-        test.check_equal( len(options), 8 )  # 'Frames Queue Size' and 'Global Time Enabled' gets added by SDK
+        test.check_equal( len(options), 7 )  # 'Frames Queue Size' gets added by SDK
 
     with test.closure( 'Play with integer option' ):
         io = next( o for o in options if str(o) == 'Integer Option' )

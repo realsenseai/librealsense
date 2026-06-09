@@ -1,12 +1,41 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { ReactElement } from 'react'
 import { useAppStore } from '../store'
-import type { DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, SensorConfig } from '../api/types'
+import type { DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState, SensorConfig } from '../api/types'
+import { FirmwareProgressModal } from './FirmwareProgressModal'
 import { ToastContainer, type ToastType } from './Toast'
 
 interface Toast {
   id: string
   type: ToastType
   message: string
+}
+
+// Reusable hidden-file-input hook. Returns the JSX to render once at a stable
+// location in the tree (so the OS file picker callback fires even after the
+// menu that triggered it unmounts) and an `open()` function to trigger it.
+function useFilePicker(onPick: (file: File) => void, accept: string): {
+  open: () => void
+  input: ReactElement
+} {
+  const ref = useRef<HTMLInputElement>(null)
+  const open = () => ref.current?.click()
+  const input = (
+    <input
+      ref={ref}
+      type="file"
+      accept={accept}
+      className="hidden"
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        const f = e.target.files?.[0]
+        if (f) onPick(f)
+        // Reset so selecting the same file again still triggers onChange.
+        e.target.value = ''
+      }}
+    />
+  )
+  return { open, input }
 }
 
 export function DevicePanel() {
@@ -19,27 +48,24 @@ export function DevicePanel() {
     resetDevice,
     error,
     clearError,
-    isAnyDeviceStreaming,
     updateStreamConfig,
     updateSensorConfig,
     setOption,
     startSensorStreaming,
     stopSensorStreaming,
     checkFirmwareUpdates,
+    updateFirmwareFromFile,
   } = useAppStore()
 
   const [toasts, setToasts] = useState<Toast[]>([])
-
-  const isStreaming = isAnyDeviceStreaming()
+  // Only one FW update can run at a time, so a single-value state is enough.
+  const [firmwareProgressDeviceId, setFirmwareProgressDeviceId] = useState<string | null>(null)
+  const [firmwareProgressState, setFirmwareProgressState] = useState<FirmwareState | null>(null)
+  const [firmwareFileName, setFirmwareFileName] = useState<string | null>(null)
 
   useEffect(() => {
     fetchDevices()
-    // Only poll for device changes when NOT streaming (polling causes frame hiccups)
-    if (!isStreaming) {
-      const interval = setInterval(fetchDevices, 5000)
-      return () => clearInterval(interval)
-    }
-  }, [fetchDevices, isStreaming])
+  }, [fetchDevices])
 
   const addToast = (type: ToastType, message: string) => {
     const id = Date.now().toString()
@@ -50,14 +76,73 @@ export function DevicePanel() {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }
 
+  const handleFirmwareProgressUpdate = (progress: number) => {
+    setFirmwareProgressState((prev) =>
+      prev ? { ...prev, progress } : { status: 'unknown' as const, is_updating: true, progress }
+    )
+  }
+
+  const handleFirmwareSuccess = (fwVersion: string | null) => {
+    setFirmwareProgressState((prev) =>
+      prev
+        ? { ...prev, progress: 1.0, is_updating: false }
+        : { status: 'unknown' as const, is_updating: false, progress: 1.0 }
+    )
+    addToast('success', `Firmware update successful! Version: ${fwVersion || 'Unknown'}`)
+    // Backend has already refreshed the device list (in _refresh_until_device_returns)
+    // by the time it emits firmware_update_success; pull the new device_infos so
+    // the UI shows the updated firmware_version without a manual Refresh click.
+    fetchDevices(true)
+  }
+
+  const handleFirmwareError = (error: string) => {
+    setFirmwareProgressState((prev) =>
+      prev
+        ? { ...prev, is_updating: false, last_error: error }
+        : { status: 'unknown' as const, is_updating: false, progress: 0, last_error: error }
+    )
+    addToast('error', `Firmware update failed: ${error}`)
+    // Device may or may not have returned; refresh so the UI reflects the
+    // current connection state (e.g. stuck-in-DFU disappears from the list).
+    fetchDevices(true)
+  }
+
+  const handleCloseFirmwareModal = () => {
+    setFirmwareProgressDeviceId(null)
+    setFirmwareProgressState(null)
+    setFirmwareFileName(null)
+  }
+
+  const handleUpdateFirmwareFromFile = (device: DeviceInfo, file: File) => {
+    const deviceId = device.device_id
+    setFirmwareFileName(file.name)
+    setFirmwareProgressDeviceId(deviceId)
+    const baseFirmware = deviceStates[deviceId]?.firmware || {
+      current: device.firmware_version,
+      recommended: device.recommended_firmware_version,
+      status: 'unknown' as const,
+      file_available: device.firmware_file_available,
+    }
+    setFirmwareProgressState({
+      ...baseFirmware,
+      is_updating: true,
+      progress: 0,
+      last_error: null,
+    })
+    updateFirmwareFromFile(deviceId, file)
+  }
+
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
         <h2 className="panel-header mb-0">Devices</h2>
         <button
-          onClick={() => fetchDevices()}
-          className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-          title="Refresh devices"
+          onClick={() => fetchDevices(true)}
+          disabled={isLoadingDevices}
+          aria-label={isLoadingDevices ? 'Refreshing devices…' : 'Refresh devices'}
+          aria-busy={isLoadingDevices}
+          className="p-2 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={isLoadingDevices ? 'Refreshing…' : 'Refresh devices'}
         >
           <svg
             className={`w-5 h-5 ${isLoadingDevices ? 'animate-spin' : ''}`}
@@ -134,11 +219,42 @@ export function DevicePanel() {
                 onStartSensorStreaming={(sensorId) => startSensorStreaming(device.device_id, sensorId)}
                 onStopSensorStreaming={(sensorId) => stopSensorStreaming(device.device_id, sensorId)}
                 onCheckFirmwareUpdates={() => checkFirmwareUpdates(device.device_id)}
+                onUpdateFirmwareFromFile={(file) => handleUpdateFirmwareFromFile(device, file)}
                 onShowToast={addToast}
               />
             )
           })}
         </div>
+      )}
+
+      {firmwareProgressDeviceId && (
+        <FirmwareProgressModal
+          isOpen={true}
+          device={
+            devices.find((d) => d.device_id === firmwareProgressDeviceId) || {
+              // Keep the real device_id so the modal's socket subscriptions
+              // remain bound to firmware_*_<id> across DFU/re-enumeration.
+              device_id: firmwareProgressDeviceId,
+              name: firmwareFileName || 'Updating device',
+            }
+          }
+          firmware={
+            firmwareProgressState || {
+              current: undefined,
+              recommended: undefined,
+              status: 'unknown' as const,
+              file_available: false,
+              is_updating: true,
+              progress: 0,
+              last_error: null,
+            }
+          }
+          fileName={firmwareFileName || undefined}
+          onClose={handleCloseFirmwareModal}
+          onProgressUpdate={handleFirmwareProgressUpdate}
+          onSuccess={handleFirmwareSuccess}
+          onError={handleFirmwareError}
+        />
       )}
 
       {/* Toast Notifications */}
@@ -158,6 +274,7 @@ interface DeviceCardProps {
   onStartSensorStreaming: (sensorId: string) => void
   onStopSensorStreaming: (sensorId: string) => void
   onCheckFirmwareUpdates: () => void
+  onUpdateFirmwareFromFile: (file: File) => void
   onShowToast: (type: ToastType, message: string) => void
 }
 
@@ -172,10 +289,12 @@ function DeviceCard({
   onStartSensorStreaming,
   onStopSensorStreaming,
   onCheckFirmwareUpdates,
+  onUpdateFirmwareFromFile,
   onShowToast,
 }: DeviceCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [expandedSensor, setExpandedSensor] = useState<string | null>(null)
+  const fwPicker = useFilePicker(onUpdateFirmwareFromFile, '.bin')
 
   const isActive = deviceState?.isActive || false
   const isLoading = deviceState?.isLoading || false
@@ -210,6 +329,10 @@ function DeviceCard({
       data-testid="device-card"
       onClick={!isActive && !isLoading ? onToggle : undefined}
     >
+      {/* Hidden file input — rendered at card root so it persists when the
+          hamburger menu closes; otherwise the OS file picker resolves into
+          an unmounted input and onChange never fires. */}
+      {fwPicker.input}
       {/* Device Header */}
       <div className="p-3">
         <div className="flex items-start justify-between">
@@ -280,6 +403,25 @@ function DeviceCard({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                       Check for Firmware Updates
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false)
+                        // Defer the click so React unmounts the menu first; the
+                        // file input lives outside the menu and persists.
+                        setTimeout(() => fwPicker.open(), 0)
+                      }}
+                      disabled={isStreaming}
+                      className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
+                        isStreaming
+                          ? 'text-gray-500 cursor-not-allowed'
+                          : 'hover:bg-gray-700'
+                      }`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12" />
+                      </svg>
+                      Update FW from File
                     </button>
                     <div className="border-t border-gray-600 my-1" />
                     <button

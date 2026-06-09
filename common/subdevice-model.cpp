@@ -3,8 +3,9 @@
 
 #include "post-processing-filters-list.h"
 #include "post-processing-block-model.h"
-#ifdef BUILD_WITH_MINZ
-#include "minz-filter.h"
+#ifdef BUILD_WITH_CLOSE_RANGE_DEPTH
+#include "close-range-depth-filter.h"
+#include "rs-depth-range-loader.h"
 #endif
 #include <imgui_internal.h>
 #include <realsense_imgui.h>
@@ -118,22 +119,27 @@ namespace rs2
 
         bool const is_rgb_camera = s->is< color_sensor >();
 
-        // MinZ must run before get_recommended_filters() (decimation, spatial, temporal…).
+        // The close-range improver must run before get_recommended_filters() (decimation, spatial, temporal…).
         // Decimation halves depth resolution while leaving IR unchanged; the mismatch would
-        // trigger the resolution guard in min_z_depth_improver::apply() and silently skip MinZ.
-#ifdef BUILD_WITH_MINZ
+        // trigger the resolution guard in close_range_depth_improver::apply() and silently skip the improver.
+#ifdef BUILD_WITH_CLOSE_RANGE_DEPTH
         if( !is_rgb_camera && s->supports( RS2_OPTION_STEREO_BASELINE ) )
         {
-            auto block = std::make_shared< minz_filter >();
+            auto block = std::make_shared< close_range_depth_filter >();
             auto model = std::make_shared< processing_block_model >(
-                this, "Min-Z Improvement", block,
+                this, "Improved Close Range Depth", block,
                 [block]( rs2::frame f ) { return block->process( f ); },
                 error_message, false );
 
-            if( !rsutils::rs2_is_cuda_available() )
+            if( ! get_rs_depth_range_loader().is_loaded() )
             {
                 model->available = []() { return false; };
-                model->unavailable_tooltip = "MinZ requires CUDA (not detected on this system)";
+                model->unavailable_tooltip = "Improved Close Range Depth library not found; install librealsense2-enhanced-depth package";
+            }
+            else if( !rsutils::rs2_is_cuda_available() )
+            {
+                model->available = []() { return false; };
+                model->unavailable_tooltip = "Improved Close Range Depth requires CUDA (not detected on this system)";
             }
             else
             {

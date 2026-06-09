@@ -103,10 +103,18 @@ export interface StreamMetadata {
   stream_type: string
   timestamp: number
   frame_number: number
+  // frame dims after post processing
   width: number
   height: number
   motion_data?: IMUData
   point_cloud?: PointCloudData
+  frame_metadata?: Record<string, number>
+  clock_domain?: string
+  hardware_fps?: number
+  pixel_format?: string
+  // frame dims as received from camera
+  hardware_width?: number
+  hardware_height?: number
 }
 
 export interface IMUData {

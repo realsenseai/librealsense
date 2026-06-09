@@ -9,7 +9,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device("D400*"),
-    pytest.mark.device("D500*"),
+    pytest.mark.device_each("D500*"),
     pytest.mark.device_exclude("D555"),
 ]
 
@@ -20,6 +20,9 @@ def test_depth_units_metadata(test_device):
 
     pipeline = rs.pipeline(ctx)
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
 
     try:
         pipeline_profile = pipeline.start(cfg)

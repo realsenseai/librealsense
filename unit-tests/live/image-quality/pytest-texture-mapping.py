@@ -103,6 +103,9 @@ def run_test(dev, ctx, depth_resolution, depth_fps, color_resolution, color_fps)
     try:
         pipeline = rs.pipeline(ctx)
         cfg = rs.config()
+        # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+        # connected device; without enable_device(sn) the pipeline picks the first match.
+        cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
         cfg.enable_stream(rs.stream.depth, depth_resolution[0], depth_resolution[1], rs.format.z16, depth_fps)
         cfg.enable_stream(rs.stream.color, color_resolution[0], color_resolution[1], rs.format.bgr8, color_fps)
         if not cfg.can_resolve(pipeline):
@@ -232,7 +235,8 @@ def run_test(dev, ctx, depth_resolution, depth_fps, color_resolution, color_fps)
                                             last_depth_cube, last_depth_bg, last_measured_diff))
 
     except Exception as e:
-        save_failure_snapshot(__file__, pipeline)
+        if pipeline_profile is not None:
+            save_failure_snapshot(__file__, pipeline)
         log.exception("Unexpected exception")
         check.fail(f"Unexpected exception: {e}")
     finally:

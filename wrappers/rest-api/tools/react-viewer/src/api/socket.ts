@@ -32,6 +32,8 @@ class SocketService {
       if (import.meta.env.DEV) console.log('Socket.IO connected:', this.socket?.id)
       this.isConnecting = false
       useAppStore.getState().setConnected(true)
+      // Refresh devices in case any were plugged in/out while disconnected.
+      useAppStore.getState().fetchDevices()
     })
 
     this.socket.on('disconnect', (reason) => {
@@ -46,6 +48,12 @@ class SocketService {
 
     this.socket.on('metadata_update', (data: MetadataUpdate) => {
       useAppStore.getState().updateMetadata(data)
+    })
+
+    this.socket.on('devices_changed', (data: { added?: string[]; removed?: string[] }) => {
+      if (import.meta.env.DEV) console.log('Socket.IO devices_changed:', data)
+      // Refresh device list. fetchDevices itself handles first-load auto-activate.
+      useAppStore.getState().fetchDevices()
     })
 
     this.socket.on('welcome', (data) => {

@@ -25,8 +25,9 @@ namespace librealsense
     private:
         device_snapshot read_device_description(const nanoseconds& time, bool reset = false) override;
         device_snapshot read_native_device_description();
-        std::shared_ptr<serialized_frame> create_frame(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg);
+        std::shared_ptr<serialized_frame> create_frame(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg) override;
         void setup_frame(frame_interface* frame_ptr, const stream_identifier& sid) const override;
+        bool is_stream_topic(const std::string& topic, stream_identifier& sid) const override;
         std::vector<std::string> get_stream_topics() const override;
         std::vector<std::string> get_option_topics() const override;
         std::vector<std::string> get_notification_topics() const override;

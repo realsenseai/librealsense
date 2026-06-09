@@ -17,6 +17,9 @@ def test_rgb_ae_metadata(test_device):
                   if any(p.stream_type() == rs.stream.color for p in s.profiles))
 
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.color)
     pipe = rs.pipeline(ctx)
     pipe.start(cfg)

@@ -46,7 +46,7 @@ option(BUILD_WITH_CPU_EXTENSIONS "Enable compiler optimizations using CPU extens
 # Enable NEON option only on 64-bit ARM platforms (ARM64/AArch64)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|ARM64|aarch64|AARCH64)")
     option(BUILD_WITH_NEON "Enable ARM64 NEON optimizations" ON)
-    option(BUILD_WITH_MINZ "Enable MinZ depth improvement (Jetson only, requires enhanced-depth library)" OFF)
+    option(BUILD_WITH_CLOSE_RANGE_DEPTH "Enable Improved Close Range Depth (Jetson only, requires enhanced-depth library)" OFF)
 endif()
 set(UNIT_TESTS_ARGS "" CACHE STRING "Command-line arguments to pass to unit-tests-config.py, e.g. '-t <tag> -r <regex>'")
 #Performance improvement with Ubuntu 18/20

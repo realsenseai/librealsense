@@ -1,11 +1,11 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-// Live MinZ (close-range depth) demo using rs_depth + librealsense2.
+// Live Improved Close Range Depth demo using rs_depth + librealsense2.
 //
 // Streams from a RealSense D4xx, runs DepthRangeImprover on each frame, and
 // prints a single live-updating status line showing how much of the
-// close-range band MinZ recovered that the camera couldn't see on its own.
+// close-range band the improver recovered that the camera couldn't see on its own.
 //
 // Build:
 //   g++ -std=c++17 range_depth.cpp \
@@ -33,7 +33,7 @@ static volatile std::sig_atomic_t g_stop = 0;
 
 int main() {
     std::signal(SIGINT, [](int){ g_stop = 1; });
-    constexpr int W = 640, H = 480, FPS = 30;
+    constexpr int W = 1280, H = 720, FPS = 30;
     constexpr int N = W * H;
 
     // ── 1. Open the camera ────────────────────────────────────────────
@@ -52,16 +52,16 @@ int main() {
 
     // Meters per Z16 unit (RS2_OPTION_DEPTH_UNITS). Typical D4xx = 0.001 (raw
     // Z16 == mm), but high-accuracy presets and SR300 use other values — scale
-    // raw values to mm before passing to the improver and the MinZ comparison.
+    // raw values to mm before passing to the improver and the min-Z comparison.
     const float depth_scale = profile.get_device()
                                      .first<rs2::depth_sensor>()
                                      .get_depth_scale();
     const float depth_to_mm = depth_scale * 1000.0f;
 
-    // ── 3. Construct the improver (auto threshold = focal × baseline / 105)
+    // ── 3. Construct the improver (auto threshold = 1.2 * focal × baseline / 126)
     rs_depth::DepthRangeImprover improver(calib);
     const int T = calib.min_z_threshold_mm();
-    std::printf("MinZ threshold: %d mm  (pixels closer than this are improved)\n", T);
+    std::printf("Min-Z threshold: %d mm  (pixels closer than this are improved)\n", T);
     std::printf("Press Ctrl-C to stop\n\n");
 
     // ── 4. Stream + improve + live status line ────────────────────────
@@ -112,7 +112,7 @@ int main() {
         const double recovery_pct = (n_imp > 0) ? 100.0 * (n_imp - n_hw) / n_imp : 0.0;
 
         std::printf("\rframe %5lld | close-range: HW %5.2f%% -> improved %5.2f%% "
-                    "| MinZ recovered %5.1f%% | +%6d px",
+                    "| recovered %5.1f%% | +%6d px",
                     static_cast<long long>(depth.get_frame_number()),
                     hw_pct, imp_pct, recovery_pct, rescued);
         std::fflush(stdout);

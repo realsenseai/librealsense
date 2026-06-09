@@ -36,7 +36,7 @@ For a detailed explanations and API documentation see our [Documentation](../doc
 |[Sensor Control](./sensor-control)| C++ | A tutorial for using the `rs2::sensor` API | :star::star::star: | [![Depth Sensing - Structured Light, Stereo and L500](https://img.shields.io/badge/-Depth-5bc3ff.svg)](./depth.md) |
 |[GrabCuts](../wrappers/opencv/grabcuts)| C++ & [OpenCV](https://github.com/realsenseai/librealsense/tree/master/wrappers/opencv#getting-started) | Simple background removal using the GrabCut algorithm | :star::star::star: | [![Depth Sensing - Structured Light, Stereo and L500](https://img.shields.io/badge/-Depth-5bc3ff.svg)](./depth.md)  |
 |[Latency](../wrappers/opencv/latency-tool)| C++ & [OpenCV](https://github.com/realsenseai/librealsense/tree/master/wrappers/opencv#getting-started) | Basic latency estimation using computer vision | :star::star::star: | [![Depth Sensing - Structured Light, Stereo and L500](https://img.shields.io/badge/-Depth-5bc3ff.svg)](./depth.md)  |
-|[Enhanced Depth (MinZ)](./enhanced-depth-range) | C++ & Python | Extends close-range min sensing distance from ~520 mm down to ~120 mm on Jetson — headless stats, live side-by-side compare, and a C++ demo | :star::star::star: | [![Depth Sensing - Structured Light, Stereo and L500](https://img.shields.io/badge/-Depth-5bc3ff.svg)](./depth.md) |
+|[Improved Close Range Depth](./enhanced-depth-range) | C++ & Python | Extends close-range min sensing distance from ~520 mm down to ~120 mm on Jetson — headless stats, live side-by-side compare, and a C++ demo | :star::star::star: | [![Depth Sensing - Structured Light, Stereo and L500](https://img.shields.io/badge/-Depth-5bc3ff.svg)](./depth.md) |
 
 ### Community Projects:
 

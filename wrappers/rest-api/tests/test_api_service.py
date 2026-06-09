@@ -1,6 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
+import logging
 import pytest
 import numpy as np
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,6 +11,8 @@ from .setup_fake_devices import setup_fake_devices
 from .mock_dependencies import patch_dependencies, DummyOfferStat
 from .pyrealsense_mock import camera_info
 from main import app
+
+log = logging.getLogger(__name__)
 
 # Create test client
 client = TestClient(app)
@@ -335,6 +338,83 @@ class TestRealSenseAPI:
         assert status["device_id"] == "device1"
         assert "is_streaming" in status
 
+    # ----- Tests for the firmware update_from_file endpoint -----
+
+    def test_update_firmware_from_file_happy_path(self, patch_dependencies):
+        rs_manager = patch_dependencies["rs_manager"]
+        rs_manager.update_firmware_from_bytes = MagicMock(
+            return_value={
+                "device_id": "device1",
+                "progress": 1.0,
+                "firmware_version": "1.2.3",
+                "status": "success",
+            }
+        )
+        files = {"file": ("D4XX_FW.bin", b"\x00\x01\x02\x03", "application/octet-stream")}
+        response = client.post(
+            "/api/v1/devices/device1/firmware/update_from_file", files=files
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        # Manager called with device_id + bytes payload
+        args, _ = rs_manager.update_firmware_from_bytes.call_args
+        assert args[0] == "device1"
+        assert args[1] == b"\x00\x01\x02\x03"
+
+    def test_update_firmware_from_file_rejects_non_bin_extension(self, patch_dependencies):
+        rs_manager = patch_dependencies["rs_manager"]
+        rs_manager.update_firmware_from_bytes = MagicMock()
+        files = {"file": ("firmware.txt", b"hello", "text/plain")}
+        response = client.post(
+            "/api/v1/devices/device1/firmware/update_from_file", files=files
+        )
+        assert response.status_code == 400
+        assert ".bin" in response.json()["detail"]
+        rs_manager.update_firmware_from_bytes.assert_not_called()
+
+    def test_update_firmware_from_file_rejects_empty(self, patch_dependencies):
+        rs_manager = patch_dependencies["rs_manager"]
+        rs_manager.update_firmware_from_bytes = MagicMock()
+        files = {"file": ("empty.bin", b"", "application/octet-stream")}
+        response = client.post(
+            "/api/v1/devices/device1/firmware/update_from_file", files=files
+        )
+        assert response.status_code == 400
+        assert "empty" in response.json()["detail"].lower()
+        rs_manager.update_firmware_from_bytes.assert_not_called()
+
+    def test_update_firmware_from_file_rejects_oversize(self, patch_dependencies):
+        from app.api.endpoints import firmware as firmware_module
+
+        rs_manager = patch_dependencies["rs_manager"]
+        rs_manager.update_firmware_from_bytes = MagicMock()
+        # Temporarily shrink the cap so we don't have to allocate 64 MiB just to test the path.
+        original_cap = firmware_module.MAX_FW_UPLOAD_BYTES
+        firmware_module.MAX_FW_UPLOAD_BYTES = 16
+        try:
+            files = {"file": ("big.bin", b"X" * 32, "application/octet-stream")}
+            response = client.post(
+                "/api/v1/devices/device1/firmware/update_from_file", files=files
+            )
+        finally:
+            firmware_module.MAX_FW_UPLOAD_BYTES = original_cap
+        assert response.status_code == 413
+        rs_manager.update_firmware_from_bytes.assert_not_called()
+
+    def test_update_firmware_from_file_propagates_sdk_error(self, patch_dependencies):
+        from app.services.rs_manager import RealSenseError
+
+        rs_manager = patch_dependencies["rs_manager"]
+        rs_manager.update_firmware_from_bytes = MagicMock(
+            side_effect=RealSenseError(status_code=400, detail="Firmware is not compatible")
+        )
+        files = {"file": ("bad.bin", b"\xff" * 8, "application/octet-stream")}
+        response = client.post(
+            "/api/v1/devices/device1/firmware/update_from_file", files=files
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Firmware is not compatible"
+
     # ----- Tests for the WebRTC API -----
 
     @pytest.mark.asyncio
@@ -418,6 +498,92 @@ class TestRealSenseAPI:
         assert result["session_id"] == session_id
         assert result["device_id"] == "device1"
         assert "depth" in result["stream_types"]
+
+    # ----- Tests for the HWM API -----
+
+    def test_hwm_command_basic(self, setup_mock_managers):
+        """POST /devices/{id}/hwm with a minimal request returns 200 and a response list."""
+        response = client.post(
+            "/api/v1/devices/device1/hwm",
+            json={"opcode": 0xA6},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["device_id"] == "device1"
+        assert isinstance(body["response"], list)
+        # Mock returns 4-byte STATUS_OK
+        assert body["response"] == [0, 0, 0, 0]
+
+    def test_hwm_command_with_params(self, setup_mock_managers):
+        """Params and data payload are accepted without error."""
+        response = client.post(
+            "/api/v1/devices/device1/hwm",
+            json={
+                "opcode": 0x14,
+                "param1": 1,
+                "param2": 0xC0DE,
+                "param3": 0,
+                "param4": 0,
+                "data": [0x01, 0x02, 0x03],
+            },
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["device_id"] == "device1"
+        assert isinstance(body["response"], list)
+
+    def test_hwm_command_unknown_device(self, setup_mock_managers):
+        """POST to an unknown device_id returns 404."""
+        response = client.post(
+            "/api/v1/devices/no-such-device/hwm",
+            json={"opcode": 0xA6},
+        )
+        assert response.status_code == 404
+
+    def test_hwm_command_unsupported_device(self, setup_mock_managers):
+        """POST to a device that lacks debug_protocol extension returns 400."""
+        from .pyrealsense_mock import device as MockDevice
+        rs_manager = setup_mock_managers["rs_manager"]
+
+        # Inject a device that does NOT support debug_protocol
+        no_debug_device = MockDevice(serial_number="no-debug", name="Limited Device", supports_debug=False)
+        rs_manager.devices["no-debug"] = no_debug_device
+
+        response = client.post(
+            "/api/v1/devices/no-debug/hwm",
+            json={"opcode": 0xA6},
+        )
+        assert response.status_code == 400
+        assert "does not support" in response.json()["detail"].lower()
+
+    def test_hwm_no_deadlock_on_unknown_device(self, patch_dependencies):
+        """send_hwm_command must not deadlock when the device is absent and refresh_devices is called.
+
+        Uses the real refresh_devices (not the mock) so that its internal lock
+        acquisition actually happens.  With the buggy implementation the call
+        would block forever; the 2-second timeout makes that a hard failure.
+        """
+        import threading
+        from app.core.errors import RealSenseError
+
+        rs_manager = patch_dependencies["rs_manager"]
+        rs_manager.devices.clear()
+        rs_manager.device_infos.clear()
+
+        caught = []
+
+        def _call():
+            try:
+                rs_manager.send_hwm_command("no-such-device", opcode=0xA6)
+            except RealSenseError as e:
+                caught.append(e)
+
+        t = threading.Thread(target=_call, daemon=True)
+        t.start()
+        t.join(timeout=2.0)
+
+        assert not t.is_alive(), "send_hwm_command deadlocked — refresh_devices was called while holding self.lock"
+        assert caught and caught[0].status_code == 404
 
     @pytest.mark.asyncio
     async def test_close_webrtc_session(self, setup_mock_managers):
@@ -696,3 +862,58 @@ class TestRealSenseAPIIntegration:
 
         retrieved_option = response.json()
         assert retrieved_option["option_id"] == option_id
+
+    @staticmethod
+    def _parse_gvd_d400(data):
+        """Parse the first 6 fields of a D400-series GVD response."""
+        if len(data) < 70:
+            return {"raw": data}
+        return {
+            "version":           data[4],
+            "gvd_version":       data[6],
+            "fw_version":        f"{data[19]}.{data[18]}.{data[17]}.{data[16]}",
+            "is_camera_locked":  bool(data[29]),
+            "module_serial":     "".join(f"{b:02X}" for b in data[52:58]),
+            "module_asic_serial":"".join(f"{b:02X}" for b in data[68:74]),
+        }
+
+    def test_hwm_command_gvd_rs(self):
+        """Test sending a hardware monitor command (GVD opcode) to a real device."""
+        import importlib
+        import sys
+
+        if 'app.api.dependencies' in sys.modules:
+            importlib.reload(sys.modules['app.api.dependencies'])
+
+        from main import app
+        from fastapi.testclient import TestClient
+
+        real_client = TestClient(app)
+
+        response = real_client.get("/api/v1/devices")
+        if response.status_code == 500:
+            pytest.skip("No RealSense devices connected or RealSense library issue")
+
+        devices = response.json()
+        if not devices:
+            pytest.skip("No RealSense devices connected")
+
+        device_id = devices[0]["device_id"]
+        log.info("Testing HWM command on device: %s", device_id)
+
+        # GVD (Get Version and Date) is opcode 0x10 — safe read-only command
+        hwm_response = real_client.post(
+            f"/api/v1/devices/{device_id}/hwm",
+            json={"opcode": 0x10},
+        )
+        body = hwm_response.json()
+        parsed = self._parse_gvd_d400(body.get("response", []))
+        log.info("HWM response: status=%s parsed=%s", hwm_response.status_code, parsed)
+
+        if hwm_response.status_code == 400:
+            pytest.skip(f"Device {device_id} does not support hardware monitor commands")
+
+        assert hwm_response.status_code == 200
+        assert body["device_id"] == device_id
+        assert isinstance(body["response"], list)
+        assert len(body["response"]) > 0

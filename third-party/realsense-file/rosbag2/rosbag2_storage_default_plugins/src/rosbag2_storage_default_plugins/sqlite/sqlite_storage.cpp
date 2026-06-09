@@ -287,6 +287,30 @@ void SqliteStorage::prepare_for_reading()
   current_message_row_ = message_result_.begin();
 }
 
+void SqliteStorage::seek(const rcutils_time_point_value_t & timestamp)
+{
+  std::string topic_clause;
+  if (!storage_filter_.topics.empty()) {
+    std::string topic_list{""};
+    for (auto & topic : storage_filter_.topics) {
+      topic_list += "'" + topic + "'";
+      if (&topic != &storage_filter_.topics.back()) {
+        topic_list += ",";
+      }
+    }
+    topic_clause = " AND topics.name IN (" + topic_list + ")";
+  }
+
+  read_statement_ = database_->prepare_statement(
+    "SELECT data, timestamp, topics.name "
+    "FROM messages JOIN topics ON messages.topic_id = topics.id "
+    "WHERE messages.timestamp >= " + std::to_string(timestamp) + topic_clause +
+    " ORDER BY messages.timestamp, messages.id;");
+  message_result_ = read_statement_->execute_query<
+    std::shared_ptr<rcutils_uint8_array_t>, rcutils_time_point_value_t, std::string>();
+  current_message_row_ = message_result_.begin();
+}
+
 void SqliteStorage::fill_topics_and_types()
 {
   auto statement = database_->prepare_statement(

@@ -18,7 +18,6 @@ import pytest
 import pyrealsense2 as rs
 import pyrsutils as rsutils
 from pytest_check import check
-from rspy import tests_wrapper as tw
 from rspy.pytest.device_helpers import is_jetson_platform, require_min_fw_version
 import time
 import threading
@@ -43,8 +42,8 @@ MAX_FRAME_DROP_THRESHOLD = 0.05  # Maximum acceptable frame drop ratio (5%)
 
 
 @pytest.fixture(autouse=True)
-def _setup_teardown(test_device):
-    dev, _ = test_device
+def _setup_teardown(test_device_wrapped):
+    dev, _ = test_device_wrapped
     require_min_fw_version(dev, rsutils.version(5, 17, 1, 3), "intra-camera sync")
 
     depth_sensor = dev.first_depth_sensor()
@@ -52,8 +51,6 @@ def _setup_teardown(test_device):
         color_sensor = dev.first_color_sensor()
     except RuntimeError:
         pytest.skip("Color sensor not available on this device")
-
-    tw.start_wrapper(dev)
 
     # Save original option values for cleanup
     original_sync_mode = None
@@ -81,8 +78,6 @@ def _setup_teardown(test_device):
             color_sensor.set_option(rs.option.global_time_enabled, original_color_global_time)
     except Exception as e:
         log.warning(f"Error restoring original options: {e}")
-
-    tw.stop_wrapper(dev)
 
 
 ################################################################################################

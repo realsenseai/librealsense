@@ -409,6 +409,15 @@ namespace librealsense
         return device_snapshot(device_extensions, sensor_descriptions, {});
     }
 
+    bool ros2_native_reader::is_stream_topic(const std::string& topic, stream_identifier& sid) const
+    {
+        auto it = _topic_to_stream_id.find(topic);
+        if (it == _topic_to_stream_id.end())
+            return false;
+        sid = it->second;
+        return true;
+    }
+
     std::shared_ptr<serialized_frame> ros2_native_reader::create_frame(
         const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg)
     {
@@ -486,8 +495,6 @@ namespace librealsense
         if (frame.frame == nullptr)
             return std::make_shared<serialized_invalid_frame>(timestamp, stream_id);
 
-        auto result = std::make_shared<serialized_frame>(timestamp, stream_id, std::move(frame));
-        _last_frame_cache[stream_id] = result;
-        return result;
+        return std::make_shared<serialized_frame>(timestamp, stream_id, std::move(frame));
     }
 }

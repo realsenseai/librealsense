@@ -143,6 +143,9 @@ def test_pipeline_interface(test_device):
         # creating a pipeline and recording to a file
         pipeline = rs.pipeline(ctx)
         cfg = rs.config()
+        # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+        # connected device; without enable_device(sn) the pipeline picks the first match.
+        cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
         cfg.enable_record_to_file( file_name )
         pipeline.start( cfg )
         time.sleep(3)

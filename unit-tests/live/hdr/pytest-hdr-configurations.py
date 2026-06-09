@@ -64,6 +64,9 @@ def test_disable_auto_hdr(test_device):
     check.equal(sensor.get_option(rs.option.hdr_enabled), 0)
 
     # Verify we're back to default single-frame behavior
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(hdr_helper.device.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
     pipe.start(cfg)
 

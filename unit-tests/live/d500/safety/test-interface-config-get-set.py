@@ -131,7 +131,7 @@ valid_sic_table_as_json_str = """
             "l_2_total_threshold": 10,
             "hkr_stl_timeout": 15,
             "mcu_stl_timeout": 10,
-            "sustained_aicv_frame_drops": 95,
+            "sustained_aicv_frame_drops": 90,
             "ossd_self_test_pulse_width": 23
         },
         "crypto_signature": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

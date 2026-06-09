@@ -58,6 +58,9 @@ def run_test(device, ctx, resolution, fps):
     """Run timestamp synchronization test for a specific resolution and FPS"""
     pipeline = rs.pipeline(ctx)
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(device.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, fps)
     cfg.enable_stream(rs.stream.infrared, 1, resolution[0], resolution[1], rs.format.y8, fps)
     cfg.enable_stream(rs.stream.infrared, 2, resolution[0], resolution[1], rs.format.y8, fps)
@@ -123,23 +126,23 @@ def run_test(device, ctx, resolution, fps):
             consecutive_drops = 0
 
             # Test timestamp synchronization
-            log.debug(f"Global TS - Depth:{depth_frame.timestamp}, IR1:{ir1_frame.timestamp}, "
-                       f"IR2:{ir2_frame.timestamp}, Color:{color_frame.timestamp}")
+            log.debug(f"Global TS - Depth:#{current_frame_counters['depth']} {depth_frame.timestamp}, IR1:#{current_frame_counters['ir1']} {ir1_frame.timestamp}, "
+                       f"IR2:#{current_frame_counters['ir2']} {ir2_frame.timestamp}, Color:#{current_frame_counters['color']} {color_frame.timestamp}")
 
             check.almost_equal(depth_frame.timestamp, ir1_frame.timestamp, abs=TS_TOLERANCE_MS,
-                msg=f"Depth-IR1 timestamp diff {abs(depth_frame.timestamp - ir1_frame.timestamp):.3f}ms exceeds tolerance {TS_TOLERANCE_MS}ms")
+                msg=f"Depth-IR1 Global TS diff {abs(depth_frame.timestamp - ir1_frame.timestamp):.3f}ms exceeds tolerance {TS_TOLERANCE_MS}ms")
             check.almost_equal(depth_frame.timestamp, ir2_frame.timestamp, abs=TS_TOLERANCE_MS,
-                msg=f"Depth-IR2 timestamp diff {abs(depth_frame.timestamp - ir2_frame.timestamp):.3f}ms exceeds tolerance {TS_TOLERANCE_MS}ms")
+                msg=f"Depth-IR2 Global TS diff {abs(depth_frame.timestamp - ir2_frame.timestamp):.3f}ms exceeds tolerance {TS_TOLERANCE_MS}ms")
             check.almost_equal(depth_frame.timestamp, color_frame.timestamp, abs=TS_TOLERANCE_MS,
-                msg=f"Depth-Color timestamp diff {abs(depth_frame.timestamp - color_frame.timestamp):.3f}ms exceeds tolerance {TS_TOLERANCE_MS}ms")
+                msg=f"Depth-Color Global TS diff {abs(depth_frame.timestamp - color_frame.timestamp):.3f}ms exceeds tolerance {TS_TOLERANCE_MS}ms")
 
             # Test frame metadata timestamps if supported
             if all(f.supports_frame_metadata(rs.frame_metadata_value.frame_timestamp) for f in frames_dict.values()):
                 frame_timestamps = {name: f.get_frame_metadata(rs.frame_metadata_value.frame_timestamp)
                                     for name, f in frames_dict.items()}
 
-                log.debug(f"Frame TS - Depth:{frame_timestamps['depth']}, IR1:{frame_timestamps['ir1']}, "
-                           f"IR2:{frame_timestamps['ir2']}, Color:{frame_timestamps['color']}")
+                log.debug(f"Frame TS - Depth:#{current_frame_counters['depth']} {frame_timestamps['depth']}, IR1:#{current_frame_counters['ir1']} {frame_timestamps['ir1']}, "
+                           f"IR2:#{current_frame_counters['ir2']} {frame_timestamps['ir2']}, Color:#{current_frame_counters['color']} {frame_timestamps['color']}")
 
                 check.almost_equal(frame_timestamps['depth'], frame_timestamps['ir1'], abs=TS_TOLERANCE_MICROSEC,
                     msg=f"Depth-IR1 frame TS diff exceeds tolerance {TS_TOLERANCE_MICROSEC}us")

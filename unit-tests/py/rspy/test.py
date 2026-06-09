@@ -127,15 +127,37 @@ def set_env_vars( env_vars ):
     sys.argv = sys.argv[:-1]  # Remove the rerun
 
 
-def find_first_device_or_exit():
+def find_first_device_or_exit( serial_number=None ):
     """
     :return: the first device that was found, if no device is found the test is skipped. That way we can still run
         the unit-tests when no device is connected and not fail the tests that check a connected device
+
+    If serial_number is provided, the device with the matching identifier is returned instead
+    of the positional "first" pick. The harness passes this for test-fw-update on multi-device
+    rigs (e.g. Jetson with a GMSL camera alongside the USB one being flashed).
+
+    The match is done against `camera_info.serial_number` when available, and falls back to
+    `camera_info.firmware_update_id` for devices in DFU/recovery mode (where serial_number
+    isn't exposed). This mirrors how rspy.devices registers devices on discovery, so a SN
+    that the harness derived from a recovery-mode device still resolves here.
     """
     import pyrealsense2 as rs
     c = rs.context()
     if not c.devices.size():  # if no device is connected we skip the test
         log.f("No device found")
+    if serial_number:
+        for d in c.devices:
+            if d.supports( rs.camera_info.serial_number ):
+                d_sn = d.get_info( rs.camera_info.serial_number )
+            elif d.supports( rs.camera_info.firmware_update_id ):
+                d_sn = d.get_info( rs.camera_info.firmware_update_id )
+            else:
+                continue
+            if d_sn == serial_number:
+                log.d( 'found', d )
+                log.d( 'in', rs )
+                return d, c
+        log.f( f"No device with serial number / firmware-update ID '{serial_number}' is visible" )
     dev = c.devices[0]
     log.d( 'found', dev )
     log.d( 'in', rs )

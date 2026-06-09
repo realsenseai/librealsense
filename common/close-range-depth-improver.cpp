@@ -1,23 +1,23 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-#include "min-z-depth-improver.h"
+#include "close-range-depth-improver.h"
 
-#ifdef BUILD_WITH_MINZ
-#include <rs_depth_calibration.hpp>
-#include <rs_depth_range.hpp>
-#include <rsutils/easylogging/easyloggingpp.h>
-#include <cstring>
+#ifdef BUILD_WITH_CLOSE_RANGE_DEPTH
+#include "rs-depth-range-loader.h"  // pulls in calibration headers + easylogging
 #include <cmath>
 #include <limits>
 #endif
 
-min_z_depth_improver::min_z_depth_improver()  = default;
-min_z_depth_improver::~min_z_depth_improver() = default;
+close_range_depth_improver::close_range_depth_improver()  = default;
+close_range_depth_improver::~close_range_depth_improver() = default;
 
-rs2::frame min_z_depth_improver::apply( rs2::frame f, rs2::frame_source const & src )
+rs2::frame close_range_depth_improver::apply( rs2::frame f, rs2::frame_source const & src )
 {
-#ifdef BUILD_WITH_MINZ
+#ifdef BUILD_WITH_CLOSE_RANGE_DEPTH
+    if( _library_absent )
+        return f;
+
     auto fs = f.as< rs2::frameset >();
     if( ! fs )
         return f;
@@ -50,9 +50,9 @@ rs2::frame min_z_depth_improver::apply( rs2::frame f, rs2::frame_source const & 
 #endif
 }
 
-#ifdef BUILD_WITH_MINZ
+#ifdef BUILD_WITH_CLOSE_RANGE_DEPTH
 
-bool min_z_depth_improver::init( rs2::video_frame const & ir_left,
+bool close_range_depth_improver::init( rs2::video_frame const & ir_left,
                                  rs2::video_frame const & ir_right )
 {
     auto ir1_prof = ir_left.get_profile().as< rs2::video_stream_profile >();
@@ -62,13 +62,19 @@ bool min_z_depth_improver::init( rs2::video_frame const & ir_left,
 
     auto cal = rs_depth::Calibration::from_sdk( intrin, extrin );
 
+    if( ! get_rs_depth_range_loader().is_loaded() )
+    {
+        _library_absent = true;
+        return false;
+    }
+
     try
     {
-        _impl.reset( new rs_depth::DepthRangeImprover( cal ) );
+        _impl.reset( new rs_depth_range_impl( cal ) );
     }
     catch( std::exception const & e )
     {
-        LOG_WARNING( "MinZ init failed: " << e.what() );
+        LOG_WARNING( "Improved Close Range Depth init failed: " << e.what() );
         _impl.reset();
         return false;
     }
@@ -78,7 +84,7 @@ bool min_z_depth_improver::init( rs2::video_frame const & ir_left,
     return true;
 }
 
-rs2::frame min_z_depth_improver::run( rs2::frameset            original_fs,
+rs2::frame close_range_depth_improver::run( rs2::frameset            original_fs,
                                       rs2::video_frame         ir_left,
                                       rs2::video_frame         ir_right,
                                       rs2::depth_frame         depth,
@@ -124,7 +130,7 @@ rs2::frame min_z_depth_improver::run( rs2::frameset            original_fs,
         dst,
         meta );
 
-    // MinZ output is in mm; convert back to the camera's original depth units so the
+    // The improver's output is in mm; convert back to the camera's original depth units so the
     // frame handed to the user has the same unit convention as any other depth frame.
     // (The user's downstream code — e.g. depth_frame::get_distance() — will multiply
     // by depth_units again when it needs metres or mm.)
@@ -138,7 +144,7 @@ rs2::frame min_z_depth_improver::run( rs2::frameset            original_fs,
     return new_frame;
 }
 
-rs2::frame min_z_depth_improver::replace_depth( rs2::frame            filtered,
+rs2::frame close_range_depth_improver::replace_depth( rs2::frame            filtered,
                                                  rs2::frame            new_depth,
                                                  rs2::frame_source const & src )
 {

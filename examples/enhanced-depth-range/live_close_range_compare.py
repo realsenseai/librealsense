@@ -2,21 +2,21 @@
 
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
-"""Live side-by-side comparison: raw HW depth vs MinZ-improved depth.
+"""Live side-by-side comparison: raw HW depth vs improved close-range depth.
 
 Streams from a RealSense D4xx and shows two live OpenCV windows:
 
     ┌─────────────────────┐    ┌─────────────────────┐
-    │ Raw HW depth        │    │ MinZ-improved depth │
+    │ Raw HW depth        │    │ Improved depth      │
     │ (camera output)     │    │ (close-range filled)│
     └─────────────────────┘    └─────────────────────┘
 
-Pixels closer than the camera's MinZ threshold (~520 mm by default) are
-typically dropped by the hardware (shown black on the left). The MinZ
-processor recovers them via the Enhanced Depth library (right window).
+Pixels closer than the camera's min-Z threshold (~520 mm by default) are
+typically dropped by the hardware (shown black on the left). The Improved
+Close Range Depth library recovers them (right window).
 
 Run:
-    python3 live_minz_compare.py        # press 'q' or ESC to stop
+    python3 live_close_range_compare.py # press 'q' or ESC to stop
 """
 
 import sys
@@ -31,9 +31,9 @@ from rs_depth import Calibration, DepthRangeImprover
 # ── 1. Open the camera ──────────────────────────────────────────────────
 pipeline = rs.pipeline()
 cfg = rs.config()
-cfg.enable_stream(rs.stream.infrared, 1, 640, 480, rs.format.y8,  30)
-cfg.enable_stream(rs.stream.infrared, 2, 640, 480, rs.format.y8,  30)
-cfg.enable_stream(rs.stream.depth,       640, 480, rs.format.z16, 30)
+cfg.enable_stream(rs.stream.infrared, 1, 1280, 720, rs.format.y8,  30)
+cfg.enable_stream(rs.stream.infrared, 2, 1280, 720, rs.format.y8,  30)
+cfg.enable_stream(rs.stream.depth,       1280, 720, rs.format.z16, 30)
 profile = pipeline.start(cfg)
 
 # ── 2. Build calibration from the camera's own intrinsics/extrinsics ────
@@ -52,13 +52,13 @@ print(f"Depth scale: {depth_scale} m/unit ({depth_scale * 1000:.4f} mm/unit)")
 
 # ── 3. Construct the improver ───────────────────────────────────────────
 improver = DepthRangeImprover(calib)
-print(f"MinZ threshold: {improver.min_z_threshold_mm} mm")
+print(f"Min-Z threshold: {improver.min_z_threshold_mm} mm")
 print("Press 'q' or ESC to stop\n")
 
 # ── 4. Helpers ──────────────────────────────────────────────────────────
 # Visualisation depth range — invalid (depth==0) and beyond MAX_MM both
 # render as black so the eye notices them clearly.
-MIN_MM, MAX_MM = 120, 3000
+MIN_MM, MAX_MM = 100, 3000
 
 
 def colorize_depth_mm(depth_mm: np.ndarray) -> np.ndarray:
@@ -73,7 +73,7 @@ def colorize_depth_mm(depth_mm: np.ndarray) -> np.ndarray:
     return bgr
 
 
-WIN_HW, WIN_IMP = "Raw HW depth", "MinZ-improved depth"
+WIN_HW, WIN_IMP = "Raw HW depth", "Improved close-range depth"
 
 # ── 5. Stream + improve + display loop ──────────────────────────────────
 # Windows are NOT pre-created — letting cv2.imshow create them on the

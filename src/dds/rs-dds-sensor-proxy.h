@@ -40,7 +40,7 @@ class dds_device_proxy;
 class roi_sensor_interface;
 
 
-class dds_sensor_proxy : public software_sensor, public global_time_interface
+class dds_sensor_proxy : public software_sensor
 {
     using super = software_sensor;
 
@@ -101,10 +101,6 @@ public:
     rsutils::subscription register_options_changed_callback( options_watcher::callback && ) override;
     stream_profiles get_active_streams() const override;
 
-    // global_time_interface
-public:
-    virtual double get_device_time_ms() override;  // Returns time in miliseconds.
-
 protected:
     void register_converters();
     stream_profiles init_stream_profiles() override;
@@ -139,9 +135,6 @@ protected:
 
     void add_processing_block_settings( const std::string & filter_name,
                                         std::shared_ptr< librealsense::processing_block_interface > & ppb ) const;
-
-    void update_timestamp_if_needed( librealsense::frame_additional_data & data, streaming_impl & );
-    bool _handle_global_timestamp_locally = false;
 
     friend class dds_device_proxy;  // Currently calls handle_new_metadata
 };

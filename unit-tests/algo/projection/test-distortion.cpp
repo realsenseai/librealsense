@@ -120,7 +120,8 @@ TEST_CASE("inverse_brown_conrady_cuda_deproject")
     librealsense::float2 pixel = { 0, 0 };
 
     std::vector<uint16_t> depth(1280 * 720, 1000);
-    rscuda::deproject_depth_cuda((float*)point.data(), intrin, depth.data(), 1);
+    rscuda::pointcloud_cuda_helper helper;
+    helper.deproject_depth_cuda((float*)point.data(), intrin, depth.data(), 1);
     for (auto i = 0; i < 720; i++)
     {
         for (auto j = 0; j < 1280; j++)
@@ -139,7 +140,8 @@ TEST_CASE("brown_conrady_cuda_deproject")
     librealsense::float2 pixel = { 0, 0 };
 
     std::vector<uint16_t> depth(1280 * 720, 1000);
-    rscuda::deproject_depth_cuda((float*)point.data(), intrin, depth.data(), 1);
+    rscuda::pointcloud_cuda_helper helper;
+    helper.deproject_depth_cuda((float*)point.data(), intrin, depth.data(), 1);
     for (auto i = 0; i < 720; i++)
     {
         for (auto j = 0; j < 1280; j++)

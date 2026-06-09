@@ -3824,6 +3824,20 @@ int rs2_check_firmware_compatibility(const rs2_device* device, const void* fw_im
 }
 HANDLE_EXCEPTIONS_AND_RETURN(0, fw_image, device)
 
+const char* rs2_get_firmware_min_version(const rs2_device* device, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+
+    auto fwud = std::dynamic_pointer_cast< firmware_check_interface >( device->device );
+    if( ! fwud )
+        throw std::runtime_error("This device does not support update protocol!");
+
+    thread_local std::string min_version;
+    min_version = fwud->get_firmware_min_version();
+    return min_version.c_str();
+}
+HANDLE_EXCEPTIONS_AND_RETURN(nullptr, device)
+
 void rs2_enter_update_state(const rs2_device* device, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(device);

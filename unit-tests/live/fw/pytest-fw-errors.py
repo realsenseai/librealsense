@@ -145,9 +145,13 @@ def test_firmware_error_monitoring(test_device):
 
     # Start streaming
     pipe = rs.pipeline(ctx)
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg = rs.config()
+    cfg.enable_device(device_serial)
 
     try:
-        pipe.start()
+        pipe.start(cfg)
         log.info("Started streaming, monitoring for firmware errors for %d seconds...", STREAMING_DURATION_SECONDS)
 
         stopwatch = Stopwatch()

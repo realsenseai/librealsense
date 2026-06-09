@@ -48,8 +48,9 @@ NUM_ITERATIONS = 1
 
 
 def test_occ_calibration(test_device):
+    dev, _ = test_device
     # mipi devices do not support OCC calibration without host assistance
-    if is_mipi_device():
+    if is_mipi_device(dev):
         pytest.skip("MIPI/GMSL devices require host assistance — covered by test_occ_calibration_with_host_assistance")
     for iteration in range(1, NUM_ITERATIONS + 1):
         try:
@@ -57,7 +58,7 @@ def test_occ_calibration(test_device):
             host_assistance = False
             occ_json = on_chip_calibration_json(None, host_assistance)
             image_width, image_height, fps = 256, 144, 90
-            config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
+            config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps, dev=dev)
             health_factor, new_calib_bytes = calibration_main(config, pipeline, calib_dev, True, occ_json, None, return_table=True)
             assert abs(health_factor) < HEALTH_FACTOR_THRESHOLD or new_calib_bytes is None
             log.info(f"Completed OCC calibration iteration {iteration}/{NUM_ITERATIONS} - Health factor: {health_factor}")
@@ -67,7 +68,8 @@ def test_occ_calibration(test_device):
 
 
 def test_occ_calibration_with_host_assistance(test_device):
-    if not is_mipi_device():
+    dev, _ = test_device
+    if not is_mipi_device(dev):
         pytest.skip("Host-assistance OCC calibration is only run on MIPI/GMSL devices")
     for iteration in range(1, NUM_ITERATIONS + 1):
         try:
@@ -75,7 +77,7 @@ def test_occ_calibration_with_host_assistance(test_device):
             host_assistance = True
             image_width, image_height, fps = 1280, 720, 30
             occ_json = on_chip_calibration_json(None, host_assistance)
-            config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
+            config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps, dev=dev)
             health_factor, new_calib_bytes = calibration_main(config, pipeline, calib_dev, True, occ_json, None, host_assistance=host_assistance, return_table=True)
             assert abs(health_factor) < HEALTH_FACTOR_THRESHOLD or new_calib_bytes is None
             log.info(f"Completed OCC calibration iteration {iteration}/{NUM_ITERATIONS} - Health factor: {health_factor}")
