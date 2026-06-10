@@ -29,6 +29,9 @@ int main(int argc, char * argv[]) try
     // If a device is capable to stream IMU data, both Gyro and Accelerometer are enabled by default
     pipe.start(cfg);
 
+    // Keep a running count of how many framesets we have processed
+    int * frame_counter = new int(0);
+
     while (app) // Application still alive?
     {
         rs2::frameset data = pipe.wait_for_frames().    // Wait for next set of frames from the camera
@@ -38,7 +41,10 @@ int main(int argc, char * argv[]) try
         // The show method, when applied on frameset, break it to frames and upload each frame into a gl textures
         // Each texture is displayed on different viewport according to it's stream unique id
         app.show(data);
+        (*frame_counter)++;
     }
+
+    std::cout << "Captured " << *frame_counter << " framesets" << std::endl;
 
     return EXIT_SUCCESS;
 }
