@@ -29,7 +29,7 @@ int main(int argc, char * argv[]) try
     // If a device is capable to stream IMU data, both Gyro and Accelerometer are enabled by default
     pipe.start(cfg);
 
-    // Keep a running count of how many framesets we have processed so far
+    // Keep a running count of how many framesets we have processed during the session
     int * frame_counter = new int(0);
 
     while (app) // Application still alive?
