@@ -3,7 +3,7 @@
 
 """
 Test FPS accuracy on D585S with various sensor permutations
-(Depth+Color, Depth+Color+Safety, etc.).
+(Depth+Color, Depth+Color+Safety, etc.)..
 """
 
 import pytest
