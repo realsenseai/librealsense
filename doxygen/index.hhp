@@ -99,6 +99,8 @@ structrs2__frame__callback.html
 structrs2__frame__callback-members.html
 structrs2__frame__processor__callback.html
 structrs2__frame__processor__callback-members.html
+structrs2__inference__stream.html
+structrs2__inference__stream-members.html
 structrs2__intrinsics.html
 structrs2__intrinsics-members.html
 structrs2__log__callback.html
@@ -109,6 +111,8 @@ structrs2__motion__stream.html
 structrs2__motion__stream-members.html
 structrs2__notifications__callback.html
 structrs2__notifications__callback-members.html
+structrs2__object__detection.html
+structrs2__object__detection-members.html
 structrs2__option__rect.html
 structrs2__option__rect-members.html
 structrs2__option__value.html
@@ -268,6 +272,12 @@ classrs2_1_1hdr__merge.html
 classrs2_1_1hdr__merge-members.html
 classrs2_1_1hole__filling__filter.html
 classrs2_1_1hole__filling__filter-members.html
+classrs2_1_1inference__frame.html
+classrs2_1_1inference__frame-members.html
+classrs2_1_1inference__sensor.html
+classrs2_1_1inference__sensor-members.html
+classrs2_1_1inference__stream__profile.html
+classrs2_1_1inference__stream__profile-members.html
 classrs2_1_1labeled__points.html
 classrs2_1_1labeled__points-members.html
 classrs2_1_1log__callback.html
@@ -288,6 +298,12 @@ classrs2_1_1notification.html
 classrs2_1_1notification-members.html
 classrs2_1_1notifications__callback.html
 classrs2_1_1notifications__callback-members.html
+classrs2_1_1nv12__decoder.html
+classrs2_1_1nv12__decoder-members.html
+classrs2_1_1object__detection__frame.html
+classrs2_1_1object__detection__frame-members.html
+classrs2_1_1object__detection__sensor.html
+classrs2_1_1object__detection__sensor-members.html
 structrs2_1_1option__range.html
 structrs2_1_1option__range-members.html
 classrs2_1_1option__value.html
@@ -395,6 +411,8 @@ classrs2_1_1gl_1_1gpu__frame.html
 classrs2_1_1gl_1_1gpu__frame-members.html
 classrs2_1_1gl_1_1m420__decoder.html
 classrs2_1_1gl_1_1m420__decoder-members.html
+classrs2_1_1gl_1_1nv12__decoder.html
+classrs2_1_1gl_1_1nv12__decoder-members.html
 classrs2_1_1gl_1_1pointcloud.html
 classrs2_1_1gl_1_1pointcloud-members.html
 classrs2_1_1gl_1_1pointcloud__renderer.html
@@ -575,6 +593,9 @@ classrs2_1_1frame__processor__callback.png
 classrs2_1_1frameset.png
 classrs2_1_1hdr__merge.png
 classrs2_1_1hole__filling__filter.png
+classrs2_1_1inference__frame.png
+classrs2_1_1inference__sensor.png
+classrs2_1_1inference__stream__profile.png
 classrs2_1_1labeled__points.png
 classrs2_1_1log__callback.png
 classrs2_1_1m420__decoder.png
@@ -583,6 +604,9 @@ classrs2_1_1motion__frame.png
 classrs2_1_1motion__sensor.png
 classrs2_1_1motion__stream__profile.png
 classrs2_1_1notifications__callback.png
+classrs2_1_1nv12__decoder.png
+classrs2_1_1object__detection__frame.png
+classrs2_1_1object__detection__sensor.png
 classrs2_1_1options.png
 classrs2_1_1options__changed__callback.png
 classrs2_1_1playback.png
@@ -624,6 +648,7 @@ classrs2_1_1gl_1_1camera__renderer.png
 classrs2_1_1gl_1_1colorizer.png
 classrs2_1_1gl_1_1gpu__frame.png
 classrs2_1_1gl_1_1m420__decoder.png
+classrs2_1_1gl_1_1nv12__decoder.png
 classrs2_1_1gl_1_1pointcloud.png
 classrs2_1_1gl_1_1pointcloud__renderer.png
 classrs2_1_1gl_1_1uploader.png

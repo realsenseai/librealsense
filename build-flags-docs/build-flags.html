@@ -8,7 +8,7 @@
 <body>
   <div class="container">
     <h1>RealSense SDK Build Customization Flags</h1>
-    <h2>Version 2.58.1.10581</h2>
+    <h2>Version 2.58.2.10643</h2>
     <table>
       <tr>
         <th style="width: 25%">Option</th>
@@ -501,6 +501,20 @@
 	</td>
 	<td>
 	  <span class="tooltip">Environment dependant<span class="tooltip-text"><span style="color: #4CAF50;">ON</span> if <b><code>CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|ARM64|aarch64|AARCH64)"</code></b><br/></span></span>
+	</td>
+	<td>
+	  <span style="color: #E74C3C;">NO</span>
+	</td>
+      </tr>
+      <tr>
+	<td>
+	  <b><code>BUILD_WITH_CLOSE_RANGE_DEPTH</code></b>
+	</td>
+	<td>
+	  Enable Improved Close Range Depth (Jetson only, requires enhanced-depth library)
+	</td>
+	<td>
+	  <span class="tooltip">Environment dependant<span class="tooltip-text"><span style="color: #E74C3C;">OFF</span> if <b><code>CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|ARM64|aarch64|AARCH64)"</code></b><br/></span></span>
 	</td>
 	<td>
 	  <span style="color: #E74C3C;">NO</span>

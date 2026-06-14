@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2 &#8212; pyrealsense2 2.58.1 documentation</title>
+    <title>pyrealsense2 &#8212; pyrealsense2 2.58.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=b0ba200d"></script>
+    <script src="../_static/documentation_options.js?v=8742aa67"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -29,7 +29,7 @@
         <li class="right" >
           <a href="../index.html" title="Welcome to pyrealsense2’s documentation!"
              accesskey="P">previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2</a></li> 
       </ul>
     </div>  
@@ -280,6 +280,18 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.hole_filling_filter.html#pyrealsense2.hole_filling_filter" title="pyrealsense2.hole_filling_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hole_filling_filter</span></code></a></p></td>
 <td><p>The processing performed depends on the selected hole filling mode.</p></td>
 </tr>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.inference_frame.html#pyrealsense2.inference_frame" title="pyrealsense2.inference_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inference_frame</span></code></a></p></td>
+<td><p>Extends the frame class with attributes inferred from the frame content, such as object detection results.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.inference_sensor.html#pyrealsense2.inference_sensor" title="pyrealsense2.inference_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inference_sensor</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.inference_stream.html#pyrealsense2.inference_stream" title="pyrealsense2.inference_stream"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inference_stream</span></code></a></p></td>
+<td><p>All the parameters required to define an inference stream.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.inference_stream_profile.html#pyrealsense2.inference_stream_profile" title="pyrealsense2.inference_stream_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inference_stream_profile</span></code></a></p></td>
+<td><p>Stream profile for inference streams.</p></td>
+</tr>
 <tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.intrinsics.html#pyrealsense2.intrinsics" title="pyrealsense2.intrinsics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">intrinsics</span></code></a></p></td>
 <td><p>Video stream intrinsics.</p></td>
 </tr>
@@ -328,181 +340,190 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.notification_category.html#pyrealsense2.notification_category" title="pyrealsense2.notification_category"><code class="xref py py-obj docutils literal notranslate"><span class="pre">notification_category</span></code></a></p></td>
 <td><p>Category of the librealsense notification.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.option.html#pyrealsense2.option" title="pyrealsense2.option"><code class="xref py py-obj docutils literal notranslate"><span class="pre">option</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.object_detection.html#pyrealsense2.object_detection" title="pyrealsense2.object_detection"><code class="xref py py-obj docutils literal notranslate"><span class="pre">object_detection</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.object_detection_frame.html#pyrealsense2.object_detection_frame" title="pyrealsense2.object_detection_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">object_detection_frame</span></code></a></p></td>
+<td><p>Extends inference_frame class with additional object detection related attributes and functions.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.object_detection_sensor.html#pyrealsense2.object_detection_sensor" title="pyrealsense2.object_detection_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">object_detection_sensor</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.option.html#pyrealsense2.option" title="pyrealsense2.option"><code class="xref py py-obj docutils literal notranslate"><span class="pre">option</span></code></a></p></td>
 <td><p>Defines general configuration controls.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.option_range.html#pyrealsense2.option_range" title="pyrealsense2.option_range"><code class="xref py py-obj docutils literal notranslate"><span class="pre">option_range</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.option_range.html#pyrealsense2.option_range" title="pyrealsense2.option_range"><code class="xref py py-obj docutils literal notranslate"><span class="pre">option_range</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.option_type.html#pyrealsense2.option_type" title="pyrealsense2.option_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">option_type</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.option_type.html#pyrealsense2.option_type" title="pyrealsense2.option_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">option_type</span></code></a></p></td>
 <td><p>The different types option values can take on</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.option_value.html#pyrealsense2.option_value" title="pyrealsense2.option_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">option_value</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.option_value.html#pyrealsense2.option_value" title="pyrealsense2.option_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">option_value</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.options.html#pyrealsense2.options" title="pyrealsense2.options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">options</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.options.html#pyrealsense2.options" title="pyrealsense2.options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">options</span></code></a></p></td>
 <td><p>Base class for options interface.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.options_list.html#pyrealsense2.options_list" title="pyrealsense2.options_list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">options_list</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.options_list.html#pyrealsense2.options_list" title="pyrealsense2.options_list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">options_list</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.pipeline.html#pyrealsense2.pipeline" title="pyrealsense2.pipeline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pipeline</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.pipeline.html#pyrealsense2.pipeline" title="pyrealsense2.pipeline"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pipeline</span></code></a></p></td>
 <td><p>The pipeline simplifies the user interaction with the device and computer vision processing modules.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.pipeline_profile.html#pyrealsense2.pipeline_profile" title="pyrealsense2.pipeline_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pipeline_profile</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.pipeline_profile.html#pyrealsense2.pipeline_profile" title="pyrealsense2.pipeline_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pipeline_profile</span></code></a></p></td>
 <td><p>The pipeline profile includes a device and a selection of active streams, with specific profiles.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.pipeline_wrapper.html#pyrealsense2.pipeline_wrapper" title="pyrealsense2.pipeline_wrapper"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pipeline_wrapper</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.pipeline_wrapper.html#pyrealsense2.pipeline_wrapper" title="pyrealsense2.pipeline_wrapper"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pipeline_wrapper</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.playback.html#pyrealsense2.playback" title="pyrealsense2.playback"><code class="xref py py-obj docutils literal notranslate"><span class="pre">playback</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.playback.html#pyrealsense2.playback" title="pyrealsense2.playback"><code class="xref py py-obj docutils literal notranslate"><span class="pre">playback</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.playback_status.html#pyrealsense2.playback_status" title="pyrealsense2.playback_status"><code class="xref py py-obj docutils literal notranslate"><span class="pre">playback_status</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.playback_status.html#pyrealsense2.playback_status" title="pyrealsense2.playback_status"><code class="xref py py-obj docutils literal notranslate"><span class="pre">playback_status</span></code></a></p></td>
 <td><p>Members:</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.pointcloud.html#pyrealsense2.pointcloud" title="pyrealsense2.pointcloud"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pointcloud</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.pointcloud.html#pyrealsense2.pointcloud" title="pyrealsense2.pointcloud"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pointcloud</span></code></a></p></td>
 <td><p>Generates 3D point clouds based on a depth frame.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.points.html#pyrealsense2.points" title="pyrealsense2.points"><code class="xref py py-obj docutils literal notranslate"><span class="pre">points</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.points.html#pyrealsense2.points" title="pyrealsense2.points"><code class="xref py py-obj docutils literal notranslate"><span class="pre">points</span></code></a></p></td>
 <td><p>Extends the frame class with additional point cloud related attributes and functions.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.pose.html#pyrealsense2.pose" title="pyrealsense2.pose"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.pose.html#pyrealsense2.pose" title="pyrealsense2.pose"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.pose_frame.html#pyrealsense2.pose_frame" title="pyrealsense2.pose_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose_frame</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.pose_frame.html#pyrealsense2.pose_frame" title="pyrealsense2.pose_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose_frame</span></code></a></p></td>
 <td><p>Extends the frame class with additional pose related attributes and functions.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.pose_sensor.html#pyrealsense2.pose_sensor" title="pyrealsense2.pose_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose_sensor</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.pose_sensor.html#pyrealsense2.pose_sensor" title="pyrealsense2.pose_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose_sensor</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.pose_stream.html#pyrealsense2.pose_stream" title="pyrealsense2.pose_stream"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose_stream</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.pose_stream.html#pyrealsense2.pose_stream" title="pyrealsense2.pose_stream"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose_stream</span></code></a></p></td>
 <td><p>All the parameters required to define a pose stream.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.pose_stream_profile.html#pyrealsense2.pose_stream_profile" title="pyrealsense2.pose_stream_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose_stream_profile</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.pose_stream_profile.html#pyrealsense2.pose_stream_profile" title="pyrealsense2.pose_stream_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose_stream_profile</span></code></a></p></td>
 <td><p>Stream profile instance with an explicit pose extension type.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.processing_block.html#pyrealsense2.processing_block" title="pyrealsense2.processing_block"><code class="xref py py-obj docutils literal notranslate"><span class="pre">processing_block</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.processing_block.html#pyrealsense2.processing_block" title="pyrealsense2.processing_block"><code class="xref py py-obj docutils literal notranslate"><span class="pre">processing_block</span></code></a></p></td>
 <td><p>Define the processing block workflow, inherit this class to generate your own processing_block.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.product_line.html#pyrealsense2.product_line" title="pyrealsense2.product_line"><code class="xref py py-obj docutils literal notranslate"><span class="pre">product_line</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.product_line.html#pyrealsense2.product_line" title="pyrealsense2.product_line"><code class="xref py py-obj docutils literal notranslate"><span class="pre">product_line</span></code></a></p></td>
 <td><p>Members:</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.quaternion.html#pyrealsense2.quaternion" title="pyrealsense2.quaternion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">quaternion</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.quaternion.html#pyrealsense2.quaternion" title="pyrealsense2.quaternion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">quaternion</span></code></a></p></td>
 <td><p>Quaternion used to represent rotation.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.recorder.html#pyrealsense2.recorder" title="pyrealsense2.recorder"><code class="xref py py-obj docutils literal notranslate"><span class="pre">recorder</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.recorder.html#pyrealsense2.recorder" title="pyrealsense2.recorder"><code class="xref py py-obj docutils literal notranslate"><span class="pre">recorder</span></code></a></p></td>
 <td><p>Records the given device and saves it to the given file as rosbag format.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.region_of_interest.html#pyrealsense2.region_of_interest" title="pyrealsense2.region_of_interest"><code class="xref py py-obj docutils literal notranslate"><span class="pre">region_of_interest</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.region_of_interest.html#pyrealsense2.region_of_interest" title="pyrealsense2.region_of_interest"><code class="xref py py-obj docutils literal notranslate"><span class="pre">region_of_interest</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.roi_sensor.html#pyrealsense2.roi_sensor" title="pyrealsense2.roi_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">roi_sensor</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.roi_sensor.html#pyrealsense2.roi_sensor" title="pyrealsense2.roi_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">roi_sensor</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.rotation_filter.html#pyrealsense2.rotation_filter" title="pyrealsense2.rotation_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rotation_filter</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.rotation_filter.html#pyrealsense2.rotation_filter" title="pyrealsense2.rotation_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rotation_filter</span></code></a></p></td>
 <td><p>Performs rotation of frames.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.rs400_advanced_mode.html#pyrealsense2.rs400_advanced_mode" title="pyrealsense2.rs400_advanced_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rs400_advanced_mode</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.rs400_advanced_mode.html#pyrealsense2.rs400_advanced_mode" title="pyrealsense2.rs400_advanced_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rs400_advanced_mode</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.rs400_visual_preset.html#pyrealsense2.rs400_visual_preset" title="pyrealsense2.rs400_visual_preset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rs400_visual_preset</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.rs400_visual_preset.html#pyrealsense2.rs400_visual_preset" title="pyrealsense2.rs400_visual_preset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rs400_visual_preset</span></code></a></p></td>
 <td><p>For D400 devices: provides optimized settings (presets) for specific types of usage.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.safety_mode.html#pyrealsense2.safety_mode" title="pyrealsense2.safety_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_mode</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.safety_mode.html#pyrealsense2.safety_mode" title="pyrealsense2.safety_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_mode</span></code></a></p></td>
 <td><p>Safety Mode</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.safety_sensor.html#pyrealsense2.safety_sensor" title="pyrealsense2.safety_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_sensor</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.safety_sensor.html#pyrealsense2.safety_sensor" title="pyrealsense2.safety_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety_sensor</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.save_single_frameset.html#pyrealsense2.save_single_frameset" title="pyrealsense2.save_single_frameset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">save_single_frameset</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.save_single_frameset.html#pyrealsense2.save_single_frameset" title="pyrealsense2.save_single_frameset"><code class="xref py py-obj docutils literal notranslate"><span class="pre">save_single_frameset</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.save_to_ply.html#pyrealsense2.save_to_ply" title="pyrealsense2.save_to_ply"><code class="xref py py-obj docutils literal notranslate"><span class="pre">save_to_ply</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.save_to_ply.html#pyrealsense2.save_to_ply" title="pyrealsense2.save_to_ply"><code class="xref py py-obj docutils literal notranslate"><span class="pre">save_to_ply</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.sensor.html#pyrealsense2.sensor" title="pyrealsense2.sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sensor</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.sensor.html#pyrealsense2.sensor" title="pyrealsense2.sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sensor</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.sequence_id_filter.html#pyrealsense2.sequence_id_filter" title="pyrealsense2.sequence_id_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sequence_id_filter</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.sequence_id_filter.html#pyrealsense2.sequence_id_filter" title="pyrealsense2.sequence_id_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sequence_id_filter</span></code></a></p></td>
 <td><p>Splits depth frames with different sequence ID</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.serializable_device.html#pyrealsense2.serializable_device" title="pyrealsense2.serializable_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">serializable_device</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.serializable_device.html#pyrealsense2.serializable_device" title="pyrealsense2.serializable_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">serializable_device</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.software_device.html#pyrealsense2.software_device" title="pyrealsense2.software_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_device</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.software_device.html#pyrealsense2.software_device" title="pyrealsense2.software_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_device</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.software_motion_frame.html#pyrealsense2.software_motion_frame" title="pyrealsense2.software_motion_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_motion_frame</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.software_motion_frame.html#pyrealsense2.software_motion_frame" title="pyrealsense2.software_motion_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_motion_frame</span></code></a></p></td>
 <td><p>All the parameters required to define a motion frame.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.software_notification.html#pyrealsense2.software_notification" title="pyrealsense2.software_notification"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_notification</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.software_notification.html#pyrealsense2.software_notification" title="pyrealsense2.software_notification"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_notification</span></code></a></p></td>
 <td><p>All the parameters required to define a sensor notification.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.software_pose_frame.html#pyrealsense2.software_pose_frame" title="pyrealsense2.software_pose_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_pose_frame</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.software_pose_frame.html#pyrealsense2.software_pose_frame" title="pyrealsense2.software_pose_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_pose_frame</span></code></a></p></td>
 <td><p>All the parameters required to define a pose frame.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.software_sensor.html#pyrealsense2.software_sensor" title="pyrealsense2.software_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_sensor</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.software_sensor.html#pyrealsense2.software_sensor" title="pyrealsense2.software_sensor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_sensor</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.software_video_frame.html#pyrealsense2.software_video_frame" title="pyrealsense2.software_video_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_video_frame</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.software_video_frame.html#pyrealsense2.software_video_frame" title="pyrealsense2.software_video_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">software_video_frame</span></code></a></p></td>
 <td><p>All the parameters required to define a video frame</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.spatial_filter.html#pyrealsense2.spatial_filter" title="pyrealsense2.spatial_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_filter</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.spatial_filter.html#pyrealsense2.spatial_filter" title="pyrealsense2.spatial_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_filter</span></code></a></p></td>
 <td><p>Spatial filter smooths the image by calculating frame with alpha and delta settings.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.stream.html#pyrealsense2.stream" title="pyrealsense2.stream"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stream</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.stream.html#pyrealsense2.stream" title="pyrealsense2.stream"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stream</span></code></a></p></td>
 <td><p>Streams are different types of data provided by RealSense devices.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.stream_profile.html#pyrealsense2.stream_profile" title="pyrealsense2.stream_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stream_profile</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.stream_profile.html#pyrealsense2.stream_profile" title="pyrealsense2.stream_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stream_profile</span></code></a></p></td>
 <td><p>Stores details about the profile of a stream.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.syncer.html#pyrealsense2.syncer" title="pyrealsense2.syncer"><code class="xref py py-obj docutils literal notranslate"><span class="pre">syncer</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.syncer.html#pyrealsense2.syncer" title="pyrealsense2.syncer"><code class="xref py py-obj docutils literal notranslate"><span class="pre">syncer</span></code></a></p></td>
 <td><p>Sync instance to align frames from different streams</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.temporal_filter.html#pyrealsense2.temporal_filter" title="pyrealsense2.temporal_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">temporal_filter</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.temporal_filter.html#pyrealsense2.temporal_filter" title="pyrealsense2.temporal_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">temporal_filter</span></code></a></p></td>
 <td><p>Temporal filter smooths the image by calculating multiple frames with alpha and delta settings.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.terminal_parser.html#pyrealsense2.terminal_parser" title="pyrealsense2.terminal_parser"><code class="xref py py-obj docutils literal notranslate"><span class="pre">terminal_parser</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.terminal_parser.html#pyrealsense2.terminal_parser" title="pyrealsense2.terminal_parser"><code class="xref py py-obj docutils literal notranslate"><span class="pre">terminal_parser</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.texture_coordinate.html#pyrealsense2.texture_coordinate" title="pyrealsense2.texture_coordinate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">texture_coordinate</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.texture_coordinate.html#pyrealsense2.texture_coordinate" title="pyrealsense2.texture_coordinate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">texture_coordinate</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.threshold_filter.html#pyrealsense2.threshold_filter" title="pyrealsense2.threshold_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">threshold_filter</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.threshold_filter.html#pyrealsense2.threshold_filter" title="pyrealsense2.threshold_filter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">threshold_filter</span></code></a></p></td>
 <td><p>Depth thresholding filter.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.timestamp_domain.html#pyrealsense2.timestamp_domain" title="pyrealsense2.timestamp_domain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">timestamp_domain</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.timestamp_domain.html#pyrealsense2.timestamp_domain" title="pyrealsense2.timestamp_domain"><code class="xref py py-obj docutils literal notranslate"><span class="pre">timestamp_domain</span></code></a></p></td>
 <td><p>Specifies the clock in relation to which the frame timestamp was measured.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.units_transform.html#pyrealsense2.units_transform" title="pyrealsense2.units_transform"><code class="xref py py-obj docutils literal notranslate"><span class="pre">units_transform</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.units_transform.html#pyrealsense2.units_transform" title="pyrealsense2.units_transform"><code class="xref py py-obj docutils literal notranslate"><span class="pre">units_transform</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.updatable.html#pyrealsense2.updatable" title="pyrealsense2.updatable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">updatable</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.updatable.html#pyrealsense2.updatable" title="pyrealsense2.updatable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">updatable</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.update_device.html#pyrealsense2.update_device" title="pyrealsense2.update_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update_device</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.update_device.html#pyrealsense2.update_device" title="pyrealsense2.update_device"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update_device</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.vector.html#pyrealsense2.vector" title="pyrealsense2.vector"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vector</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.vector.html#pyrealsense2.vector" title="pyrealsense2.vector"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vector</span></code></a></p></td>
 <td><p>3D vector in Euclidean coordinate space.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.vertex.html#pyrealsense2.vertex" title="pyrealsense2.vertex"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vertex</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.vertex.html#pyrealsense2.vertex" title="pyrealsense2.vertex"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vertex</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.video_frame.html#pyrealsense2.video_frame" title="pyrealsense2.video_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">video_frame</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.video_frame.html#pyrealsense2.video_frame" title="pyrealsense2.video_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">video_frame</span></code></a></p></td>
 <td><p>Extends the frame class with additional video related attributes and functions.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.video_stream.html#pyrealsense2.video_stream" title="pyrealsense2.video_stream"><code class="xref py py-obj docutils literal notranslate"><span class="pre">video_stream</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.video_stream.html#pyrealsense2.video_stream" title="pyrealsense2.video_stream"><code class="xref py py-obj docutils literal notranslate"><span class="pre">video_stream</span></code></a></p></td>
 <td><p>All the parameters required to define a video stream.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.video_stream_profile.html#pyrealsense2.video_stream_profile" title="pyrealsense2.video_stream_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">video_stream_profile</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.video_stream_profile.html#pyrealsense2.video_stream_profile" title="pyrealsense2.video_stream_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">video_stream_profile</span></code></a></p></td>
 <td><p>Stream profile instance which contains additional video attributes.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.wheel_odometer.html#pyrealsense2.wheel_odometer" title="pyrealsense2.wheel_odometer"><code class="xref py py-obj docutils literal notranslate"><span class="pre">wheel_odometer</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.wheel_odometer.html#pyrealsense2.wheel_odometer" title="pyrealsense2.wheel_odometer"><code class="xref py py-obj docutils literal notranslate"><span class="pre">wheel_odometer</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="pyrealsense2.yuy_decoder.html#pyrealsense2.yuy_decoder" title="pyrealsense2.yuy_decoder"><code class="xref py py-obj docutils literal notranslate"><span class="pre">yuy_decoder</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pyrealsense2.yuy_decoder.html#pyrealsense2.yuy_decoder" title="pyrealsense2.yuy_decoder"><code class="xref py py-obj docutils literal notranslate"><span class="pre">yuy_decoder</span></code></a></p></td>
 <td><p>Converts frames in raw YUY format to RGB.</p></td>
 </tr>
 </tbody>
@@ -565,7 +586,7 @@
         <li class="right" >
           <a href="../index.html" title="Welcome to pyrealsense2’s documentation!"
              >previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2</a></li> 
       </ul>
     </div>

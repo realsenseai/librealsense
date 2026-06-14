@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.composite_frame &#8212; pyrealsense2 2.58.1 documentation</title>
+    <title>pyrealsense2.composite_frame &#8212; pyrealsense2 2.58.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=b0ba200d"></script>
+    <script src="../_static/documentation_options.js?v=8742aa67"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.composite_frame</a></li> 
       </ul>
     </div>  
@@ -61,10 +61,16 @@
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_frameset</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_labeled_points</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_inference_frame</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_motion_frame</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_labeled_points</span></code>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_motion_frame</span></code>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_object_detection_frame</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">as_points</span></code>(self)</p></td>
@@ -115,22 +121,28 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.composite_frame.get_labeled_point_cloud_frame" title="pyrealsense2.composite_frame.get_labeled_point_cloud_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_labeled_point_cloud_frame</span></code></a>(self)</p></td>
 <td><p>Retrieve the labeled point cloud frame, if no frame is found, return an empty frame instance.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.composite_frame.get_pose_frame" title="pyrealsense2.composite_frame.get_pose_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_pose_frame</span></code></a>(self[, index])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.composite_frame.get_object_detection_frame" title="pyrealsense2.composite_frame.get_object_detection_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_object_detection_frame</span></code></a>(self[, index])</p></td>
+<td><p>Retrieve the object detection frame, if no frame is found, return an empty frame instance.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.composite_frame.get_pose_frame" title="pyrealsense2.composite_frame.get_pose_frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_pose_frame</span></code></a>(self[, index])</p></td>
 <td><p>Retrieve the pose frame</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_profile</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_profile</span></code>(self)</p></td>
 <td><p>Retrieve stream profile from frame handle.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_timestamp</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_timestamp</span></code>(self)</p></td>
 <td><p>Retrieve the time at which the frame was captured</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_depth_frame</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_depth_frame</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_frame</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_frame</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_frameset</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_frameset</span></code>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_inference_frame</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_labeled_points</span></code>(self)</p></td>
@@ -139,25 +151,28 @@
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_motion_frame</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_points</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_object_detection_frame</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_pose_frame</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_points</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_video_frame</span></code>(self)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_pose_frame</span></code>(self)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">keep</span></code>(self)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_video_frame</span></code>(self)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">keep</span></code>(self)</p></td>
 <td><p>Keep the frame, otherwise if no refernce to the frame, the frame will be released.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.composite_frame.size" title="pyrealsense2.composite_frame.size"><code class="xref py py-obj docutils literal notranslate"><span class="pre">size</span></code></a>(self)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.composite_frame.size" title="pyrealsense2.composite_frame.size"><code class="xref py py-obj docutils literal notranslate"><span class="pre">size</span></code></a>(self)</p></td>
 <td><p>Return the size of the frameset</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">supports_frame_metadata</span></code>(self, frame_metadata)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">supports_frame_metadata</span></code>(self, frame_metadata)</p></td>
 <td><p>Determine if the device allows a specific metadata to be queried.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">swap</span></code>(self, other)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">swap</span></code>(self, other)</p></td>
 <td><p>Swap the internal frame handle with the one in parameter</p></td>
 </tr>
 </tbody>
@@ -231,6 +246,12 @@
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="pyrealsense2.composite_frame.get_object_detection_frame">
+<span class="sig-name descname"><span class="pre">get_object_detection_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.composite_frame" title="pyrealsense2.composite_frame"><span class="pre">pyrealsense2.composite_frame</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="pyrealsense2.object_detection_frame.html#pyrealsense2.object_detection_frame" title="pyrealsense2.object_detection_frame"><span class="pre">pyrealsense2.object_detection_frame</span></a></span></span><a class="headerlink" href="#pyrealsense2.composite_frame.get_object_detection_frame" title="Link to this definition">¶</a></dt>
+<dd><p>Retrieve the object detection frame, if no frame is found, return an empty frame instance.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.composite_frame.get_pose_frame">
 <span class="sig-name descname"><span class="pre">get_pose_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#pyrealsense2.composite_frame" title="pyrealsense2.composite_frame"><span class="pre">pyrealsense2.composite_frame</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="pyrealsense2.pose_frame.html#pyrealsense2.pose_frame" title="pyrealsense2.pose_frame"><span class="pre">pyrealsense2.pose_frame</span></a></span></span><a class="headerlink" href="#pyrealsense2.composite_frame.get_pose_frame" title="Link to this definition">¶</a></dt>
 <dd><p>Retrieve the pose frame</p>
@@ -267,6 +288,7 @@
 <li><a class="reference internal" href="#pyrealsense2.composite_frame.get_fisheye_frame"><code class="docutils literal notranslate"><span class="pre">composite_frame.get_fisheye_frame()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.composite_frame.get_infrared_frame"><code class="docutils literal notranslate"><span class="pre">composite_frame.get_infrared_frame()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.composite_frame.get_labeled_point_cloud_frame"><code class="docutils literal notranslate"><span class="pre">composite_frame.get_labeled_point_cloud_frame()</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.composite_frame.get_object_detection_frame"><code class="docutils literal notranslate"><span class="pre">composite_frame.get_object_detection_frame()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.composite_frame.get_pose_frame"><code class="docutils literal notranslate"><span class="pre">composite_frame.get_pose_frame()</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.composite_frame.size"><code class="docutils literal notranslate"><span class="pre">composite_frame.size()</span></code></a></li>
 </ul>
@@ -306,7 +328,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.composite_frame</a></li> 
       </ul>
     </div>

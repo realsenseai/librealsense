@@ -81,6 +81,9 @@ Classes</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structrs2__pose.html">rs2_pose</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structrs2__object__detection.html">rs2_object_detection</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Object detection result from algorithm.  <a href="structrs2__object__detection.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="typedef-members"></a>
 Typedefs</h2></td></tr>
@@ -113,6 +116,9 @@ Typedefs</h2></td></tr>
 <tr class="separator:a0fb3e030ebd65aa28c1db1831706e309"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7dbd6d9f3f868e7450f6702877d8fbd0"><td class="memItemLeft" align="right" valign="top">typedef struct <a class="el" href="structrs2__pose.html">rs2_pose</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__types_8h.html#a7dbd6d9f3f868e7450f6702877d8fbd0">rs2_pose</a></td></tr>
 <tr class="separator:a7dbd6d9f3f868e7450f6702877d8fbd0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac7f2e949a8d4751dad7e4086bf8dfb80"><td class="memItemLeft" align="right" valign="top">typedef struct <a class="el" href="structrs2__object__detection.html">rs2_object_detection</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__types_8h.html#ac7f2e949a8d4751dad7e4086bf8dfb80">rs2_object_detection</a></td></tr>
+<tr class="memdesc:ac7f2e949a8d4751dad7e4086bf8dfb80"><td class="mdescLeft">&#160;</td><td class="mdescRight">Object detection result from algorithm.  <a href="#ac7f2e949a8d4751dad7e4086bf8dfb80">More...</a><br /></td></tr>
+<tr class="separator:ac7f2e949a8d4751dad7e4086bf8dfb80"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac77f7e934bf53ca440e9994da42b8f0f"><td class="memItemLeft" align="right" valign="top">typedef enum <a class="el" href="rs__types_8h.html#a312ebc7e1d7f444e97bbb998bee035d4">rs2_log_severity</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__types_8h.html#ac77f7e934bf53ca440e9994da42b8f0f">rs2_log_severity</a></td></tr>
 <tr class="memdesc:ac77f7e934bf53ca440e9994da42b8f0f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Severity of the librealsense logger.  <a href="#ac77f7e934bf53ca440e9994da42b8f0f">More...</a><br /></td></tr>
 <tr class="separator:ac77f7e934bf53ca440e9994da42b8f0f"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -369,7 +375,13 @@ Enumerations</h2></td></tr>
 <a class="el" href="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aab42b87d5a45c3e26f89ac5bd939420bc">RS2_EXTENSION_DECIMATION_EMBEDDED_FILTER</a>, 
 <a class="el" href="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa5cf76ecc09fb096eaf65e6c13d2829db">RS2_EXTENSION_TEMPORAL_EMBEDDED_FILTER</a>, 
 <br />
-&#160;&#160;<a class="el" href="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa0b4f59b824f69d456b53638b0f4ddef4">RS2_EXTENSION_COUNT</a>
+&#160;&#160;<a class="el" href="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aadb1cf457414858731289907e2bba09d4">RS2_EXTENSION_INFERENCE_FRAME</a>, 
+<a class="el" href="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aaafdd4bd2eb58da68c1b39b5c6398a948">RS2_EXTENSION_OBJECT_DETECTION_FRAME</a>, 
+<a class="el" href="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa8cddfbce1a183915c493a0c124661a03">RS2_EXTENSION_INFERENCE_SENSOR</a>, 
+<a class="el" href="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa7e24d5e845ae43ee06a8685d76bf93b4">RS2_EXTENSION_OBJECT_DETECTION_SENSOR</a>, 
+<br />
+&#160;&#160;<a class="el" href="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa86b64b3e214b99dfaee1f517a72ec64e">RS2_EXTENSION_INFERENCE_PROFILE</a>, 
+<a class="el" href="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa0b4f59b824f69d456b53638b0f4ddef4">RS2_EXTENSION_COUNT</a>
 <br />
  }</td></tr>
 <tr class="memdesc:a7b6061f32e49fc7c6ff0e5734a380d8a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Specifies advanced interfaces (capabilities) objects may implement.  <a href="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8a">More...</a><br /></td></tr>
@@ -1013,6 +1025,22 @@ Functions</h2></td></tr>
 
 </div>
 </div>
+<a id="ac7f2e949a8d4751dad7e4086bf8dfb80"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac7f2e949a8d4751dad7e4086bf8dfb80">&#9670;&nbsp;</a></span>rs2_object_detection</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef struct <a class="el" href="structrs2__object__detection.html">rs2_object_detection</a>  <a class="el" href="structrs2__object__detection.html">rs2_object_detection</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Object detection result from algorithm. </p>
+
+</div>
+</div>
 <a id="ae51b2a412b632c6caef98bf91629f274"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ae51b2a412b632c6caef98bf91629f274">&#9670;&nbsp;</a></span>rs2_options</h2>
 
@@ -1601,6 +1629,11 @@ Functions</h2></td></tr>
 <tr><td class="fieldname"><a id="a7b6061f32e49fc7c6ff0e5734a380d8aa2f191f40256c6ff2c5844e11c7707f48"></a>RS2_EXTENSION_SUPPORTED_EMBEDDED_FILTERS&#160;</td><td class="fielddoc"></td></tr>
 <tr><td class="fieldname"><a id="a7b6061f32e49fc7c6ff0e5734a380d8aab42b87d5a45c3e26f89ac5bd939420bc"></a>RS2_EXTENSION_DECIMATION_EMBEDDED_FILTER&#160;</td><td class="fielddoc"></td></tr>
 <tr><td class="fieldname"><a id="a7b6061f32e49fc7c6ff0e5734a380d8aa5cf76ecc09fb096eaf65e6c13d2829db"></a>RS2_EXTENSION_TEMPORAL_EMBEDDED_FILTER&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a7b6061f32e49fc7c6ff0e5734a380d8aadb1cf457414858731289907e2bba09d4"></a>RS2_EXTENSION_INFERENCE_FRAME&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a7b6061f32e49fc7c6ff0e5734a380d8aaafdd4bd2eb58da68c1b39b5c6398a948"></a>RS2_EXTENSION_OBJECT_DETECTION_FRAME&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a7b6061f32e49fc7c6ff0e5734a380d8aa8cddfbce1a183915c493a0c124661a03"></a>RS2_EXTENSION_INFERENCE_SENSOR&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a7b6061f32e49fc7c6ff0e5734a380d8aa7e24d5e845ae43ee06a8685d76bf93b4"></a>RS2_EXTENSION_OBJECT_DETECTION_SENSOR&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="a7b6061f32e49fc7c6ff0e5734a380d8aa86b64b3e214b99dfaee1f517a72ec64e"></a>RS2_EXTENSION_INFERENCE_PROFILE&#160;</td><td class="fielddoc"></td></tr>
 <tr><td class="fieldname"><a id="a7b6061f32e49fc7c6ff0e5734a380d8aa0b4f59b824f69d456b53638b0f4ddef4"></a>RS2_EXTENSION_COUNT&#160;</td><td class="fielddoc"></td></tr>
 </table>
 

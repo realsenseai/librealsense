@@ -19,8 +19,10 @@ pyrealsense2.motion_frame
       ~motion_frame.as_depth_frame
       ~motion_frame.as_frame
       ~motion_frame.as_frameset
+      ~motion_frame.as_inference_frame
       ~motion_frame.as_labeled_points
       ~motion_frame.as_motion_frame
+      ~motion_frame.as_object_detection_frame
       ~motion_frame.as_points
       ~motion_frame.as_pose_frame
       ~motion_frame.as_video_frame
@@ -36,8 +38,10 @@ pyrealsense2.motion_frame
       ~motion_frame.is_depth_frame
       ~motion_frame.is_frame
       ~motion_frame.is_frameset
+      ~motion_frame.is_inference_frame
       ~motion_frame.is_labeled_points
       ~motion_frame.is_motion_frame
+      ~motion_frame.is_object_detection_frame
       ~motion_frame.is_points
       ~motion_frame.is_pose_frame
       ~motion_frame.is_video_frame

@@ -50,6 +50,9 @@ pyrealsense2.extension
       ~extension.global_timer
       ~extension.hdr_merge
       ~extension.hole_filling_filter
+      ~extension.inference_frame
+      ~extension.inference_profile
+      ~extension.inference_sensor
       ~extension.info
       ~extension.l500_depth_sensor
       ~extension.labeled_points
@@ -59,6 +62,8 @@ pyrealsense2.extension
       ~extension.motion_profile
       ~extension.motion_sensor
       ~extension.name
+      ~extension.object_detection_frame
+      ~extension.object_detection_sensor
       ~extension.options
       ~extension.playback
       ~extension.points

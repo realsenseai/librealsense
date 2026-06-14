@@ -20,8 +20,10 @@ pyrealsense2.sensor
       ~sensor.as_debug_stream_sensor
       ~sensor.as_depth_sensor
       ~sensor.as_fisheye_sensor
+      ~sensor.as_inference_sensor
       ~sensor.as_max_usable_range_sensor
       ~sensor.as_motion_sensor
+      ~sensor.as_object_detection_sensor
       ~sensor.as_pose_sensor
       ~sensor.as_roi_sensor
       ~sensor.as_safety_sensor
@@ -45,8 +47,10 @@ pyrealsense2.sensor
       ~sensor.is_debug_stream_sensor
       ~sensor.is_depth_sensor
       ~sensor.is_fisheye_sensor
+      ~sensor.is_inference_sensor
       ~sensor.is_max_usable_range_sensor
       ~sensor.is_motion_sensor
+      ~sensor.is_object_detection_sensor
       ~sensor.is_option_read_only
       ~sensor.is_pose_sensor
       ~sensor.is_roi_sensor

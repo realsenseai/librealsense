@@ -1,0 +1,80 @@
+pyrealsense2.inference_sensor
+=============================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: inference_sensor
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~inference_sensor.__init__
+      ~inference_sensor.as_color_sensor
+      ~inference_sensor.as_debug_stream_sensor
+      ~inference_sensor.as_depth_sensor
+      ~inference_sensor.as_fisheye_sensor
+      ~inference_sensor.as_inference_sensor
+      ~inference_sensor.as_max_usable_range_sensor
+      ~inference_sensor.as_motion_sensor
+      ~inference_sensor.as_object_detection_sensor
+      ~inference_sensor.as_pose_sensor
+      ~inference_sensor.as_roi_sensor
+      ~inference_sensor.as_safety_sensor
+      ~inference_sensor.as_wheel_odometer
+      ~inference_sensor.close
+      ~inference_sensor.from_frame
+      ~inference_sensor.get_active_streams
+      ~inference_sensor.get_embedded_decimation_filter
+      ~inference_sensor.get_embedded_filter
+      ~inference_sensor.get_embedded_temporal_filter
+      ~inference_sensor.get_info
+      ~inference_sensor.get_option
+      ~inference_sensor.get_option_description
+      ~inference_sensor.get_option_range
+      ~inference_sensor.get_option_value
+      ~inference_sensor.get_option_value_description
+      ~inference_sensor.get_recommended_filters
+      ~inference_sensor.get_stream_profiles
+      ~inference_sensor.get_supported_options
+      ~inference_sensor.is_color_sensor
+      ~inference_sensor.is_debug_stream_sensor
+      ~inference_sensor.is_depth_sensor
+      ~inference_sensor.is_fisheye_sensor
+      ~inference_sensor.is_inference_sensor
+      ~inference_sensor.is_max_usable_range_sensor
+      ~inference_sensor.is_motion_sensor
+      ~inference_sensor.is_object_detection_sensor
+      ~inference_sensor.is_option_read_only
+      ~inference_sensor.is_pose_sensor
+      ~inference_sensor.is_roi_sensor
+      ~inference_sensor.is_safety_sensor
+      ~inference_sensor.is_wheel_odometer
+      ~inference_sensor.on_options_changed
+      ~inference_sensor.open
+      ~inference_sensor.query_embedded_filters
+      ~inference_sensor.set_notifications_callback
+      ~inference_sensor.set_option
+      ~inference_sensor.set_option_value
+      ~inference_sensor.start
+      ~inference_sensor.stop
+      ~inference_sensor.supports
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~inference_sensor.name
+      ~inference_sensor.profiles
+   
+   

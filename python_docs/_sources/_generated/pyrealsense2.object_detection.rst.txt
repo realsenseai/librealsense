@@ -1,0 +1,36 @@
+pyrealsense2.object_detection
+=============================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: object_detection
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~object_detection.__init__
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~object_detection.bottom_right_x
+      ~object_detection.bottom_right_y
+      ~object_detection.class_id
+      ~object_detection.depth
+      ~object_detection.score
+      ~object_detection.top_left_x
+      ~object_detection.top_left_y
+   
+   

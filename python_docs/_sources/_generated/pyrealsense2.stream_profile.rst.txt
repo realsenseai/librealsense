@@ -16,6 +16,7 @@ pyrealsense2.stream_profile
    .. autosummary::
    
       ~stream_profile.__init__
+      ~stream_profile.as_inference_stream_profile
       ~stream_profile.as_motion_stream_profile
       ~stream_profile.as_pose_stream_profile
       ~stream_profile.as_stream_profile
@@ -26,6 +27,7 @@ pyrealsense2.stream_profile
       ~stream_profile.fps
       ~stream_profile.get_extrinsics_to
       ~stream_profile.is_default
+      ~stream_profile.is_inference_stream_profile
       ~stream_profile.is_motion_stream_profile
       ~stream_profile.is_pose_stream_profile
       ~stream_profile.is_stream_profile

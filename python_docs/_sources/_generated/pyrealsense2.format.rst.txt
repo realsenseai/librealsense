@@ -41,6 +41,7 @@ pyrealsense2.format
       ~format.motion_raw
       ~format.motion_xyz32f
       ~format.name
+      ~format.nv12
       ~format.raw10
       ~format.raw16
       ~format.raw8

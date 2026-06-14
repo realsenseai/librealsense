@@ -19,8 +19,10 @@ pyrealsense2.disparity_frame
       ~disparity_frame.as_depth_frame
       ~disparity_frame.as_frame
       ~disparity_frame.as_frameset
+      ~disparity_frame.as_inference_frame
       ~disparity_frame.as_labeled_points
       ~disparity_frame.as_motion_frame
+      ~disparity_frame.as_object_detection_frame
       ~disparity_frame.as_points
       ~disparity_frame.as_pose_frame
       ~disparity_frame.as_video_frame
@@ -43,8 +45,10 @@ pyrealsense2.disparity_frame
       ~disparity_frame.is_depth_frame
       ~disparity_frame.is_frame
       ~disparity_frame.is_frameset
+      ~disparity_frame.is_inference_frame
       ~disparity_frame.is_labeled_points
       ~disparity_frame.is_motion_frame
+      ~disparity_frame.is_object_detection_frame
       ~disparity_frame.is_points
       ~disparity_frame.is_pose_frame
       ~disparity_frame.is_video_frame

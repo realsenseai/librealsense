@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>pyrealsense2.stream &#8212; pyrealsense2 2.58.1 documentation</title>
+    <title>pyrealsense2.stream &#8212; pyrealsense2 2.58.2 documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../_static/documentation_options.js?v=b0ba200d"></script>
+    <script src="../_static/documentation_options.js?v=8742aa67"></script>
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -25,7 +25,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.stream</a></li> 
       </ul>
     </div>  
@@ -57,6 +57,7 @@
 <p>safety</p>
 <p>occupancy</p>
 <p>labeled_point_cloud</p>
+<p>object_detection</p>
 </div></blockquote>
 <dl class="py method">
 <dt class="sig sig-object py" id="pyrealsense2.stream.__init__">
@@ -110,16 +111,19 @@
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code>(-&gt; str)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.occupancy" title="pyrealsense2.stream.occupancy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">occupancy</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.object_detection" title="pyrealsense2.stream.object_detection"><code class="xref py py-obj docutils literal notranslate"><span class="pre">object_detection</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.stream.pose" title="pyrealsense2.stream.pose"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.stream.occupancy" title="pyrealsense2.stream.occupancy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">occupancy</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.safety" title="pyrealsense2.stream.safety"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.pose" title="pyrealsense2.stream.pose"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pose</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.stream.value" title="pyrealsense2.stream.value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">value</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#pyrealsense2.stream.safety" title="pyrealsense2.stream.safety"><code class="xref py py-obj docutils literal notranslate"><span class="pre">safety</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#pyrealsense2.stream.value" title="pyrealsense2.stream.value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">value</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -185,6 +189,11 @@
 <dd></dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="pyrealsense2.stream.object_detection">
+<span class="sig-name descname"><span class="pre">object_detection</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.object_detection:</span> <span class="pre">14&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.object_detection" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="pyrealsense2.stream.occupancy">
 <span class="sig-name descname"><span class="pre">occupancy</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;stream.occupancy:</span> <span class="pre">12&gt;</span></span><a class="headerlink" href="#pyrealsense2.stream.occupancy" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -232,6 +241,7 @@
 <li><a class="reference internal" href="#pyrealsense2.stream.infrared"><code class="docutils literal notranslate"><span class="pre">stream.infrared</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.stream.labeled_point_cloud"><code class="docutils literal notranslate"><span class="pre">stream.labeled_point_cloud</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.stream.motion"><code class="docutils literal notranslate"><span class="pre">stream.motion</span></code></a></li>
+<li><a class="reference internal" href="#pyrealsense2.stream.object_detection"><code class="docutils literal notranslate"><span class="pre">stream.object_detection</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.stream.occupancy"><code class="docutils literal notranslate"><span class="pre">stream.occupancy</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.stream.pose"><code class="docutils literal notranslate"><span class="pre">stream.pose</span></code></a></li>
 <li><a class="reference internal" href="#pyrealsense2.stream.safety"><code class="docutils literal notranslate"><span class="pre">stream.safety</span></code></a></li>
@@ -273,7 +283,7 @@
         <li class="right" >
           <a href="../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">pyrealsense2 2.58.2 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">pyrealsense2.stream</a></li> 
       </ul>
     </div>

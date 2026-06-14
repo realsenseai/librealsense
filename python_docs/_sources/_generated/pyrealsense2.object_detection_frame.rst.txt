@@ -1,0 +1,66 @@
+pyrealsense2.object_detection_frame
+===================================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: object_detection_frame
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~object_detection_frame.__init__
+      ~object_detection_frame.as_depth_frame
+      ~object_detection_frame.as_frame
+      ~object_detection_frame.as_frameset
+      ~object_detection_frame.as_inference_frame
+      ~object_detection_frame.as_labeled_points
+      ~object_detection_frame.as_motion_frame
+      ~object_detection_frame.as_object_detection_frame
+      ~object_detection_frame.as_points
+      ~object_detection_frame.as_pose_frame
+      ~object_detection_frame.as_video_frame
+      ~object_detection_frame.get_data
+      ~object_detection_frame.get_data_size
+      ~object_detection_frame.get_detection
+      ~object_detection_frame.get_detection_count
+      ~object_detection_frame.get_frame_metadata
+      ~object_detection_frame.get_frame_number
+      ~object_detection_frame.get_frame_timestamp_domain
+      ~object_detection_frame.get_profile
+      ~object_detection_frame.get_timestamp
+      ~object_detection_frame.is_depth_frame
+      ~object_detection_frame.is_frame
+      ~object_detection_frame.is_frameset
+      ~object_detection_frame.is_inference_frame
+      ~object_detection_frame.is_labeled_points
+      ~object_detection_frame.is_motion_frame
+      ~object_detection_frame.is_object_detection_frame
+      ~object_detection_frame.is_points
+      ~object_detection_frame.is_pose_frame
+      ~object_detection_frame.is_video_frame
+      ~object_detection_frame.keep
+      ~object_detection_frame.supports_frame_metadata
+      ~object_detection_frame.swap
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~object_detection_frame.data
+      ~object_detection_frame.frame_number
+      ~object_detection_frame.frame_timestamp_domain
+      ~object_detection_frame.profile
+      ~object_detection_frame.timestamp
+   
+   

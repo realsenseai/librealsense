@@ -342,6 +342,10 @@ Functions</h2></td></tr>
 <tr class="separator:ab3126dc5f202aa932afba37158d73928"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0c544793f4b910c65766d8039486eaf9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#a0c544793f4b910c65766d8039486eaf9">rs2_extract_target_dimensions</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, <a class="el" href="rs__frame_8h.html#af8743d6d49fdfbcb5f242c32840f2a16">rs2_calib_target_type</a> calib_type, float *target_dims, unsigned int target_dims_size, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:a0c544793f4b910c65766d8039486eaf9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae7a35c7bba27b468607eabe21feba90f"><td class="memItemLeft" align="right" valign="top">unsigned int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#ae7a35c7bba27b468607eabe21feba90f">rs2_get_frame_object_detection_count</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:ae7a35c7bba27b468607eabe21feba90f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae8119142df1f679459f8f917877ef292"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__frame_8h.html#ae8119142df1f679459f8f917877ef292">rs2_get_frame_object_detection</a> (const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *frame, unsigned int index, <a class="el" href="structrs2__object__detection.html">rs2_object_detection</a> *detection, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:ae8119142df1f679459f8f917877ef292"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Exposes RealSense frame functionality for C compilers. </p>
@@ -1707,6 +1711,91 @@ Functions</h2></td></tr>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>the frame number </dd></dl>
+
+</div>
+</div>
+<a id="ae8119142df1f679459f8f917877ef292"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae8119142df1f679459f8f917877ef292">&#9670;&nbsp;</a></span>rs2_get_frame_object_detection()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void rs2_get_frame_object_detection </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *&#160;</td>
+          <td class="paramname"><em>frame</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">unsigned int&#160;</td>
+          <td class="paramname"><em>index</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="structrs2__object__detection.html">rs2_object_detection</a> *&#160;</td>
+          <td class="paramname"><em>detection</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>When called on Object Detection frame type, this method returns a specific detection by index </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">frame</td><td>Object Detection frame </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">index</td><td>Index of detection to retrieve </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">detection</td><td>Pointer to struct to fill with detection data </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>If non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="ae7a35c7bba27b468607eabe21feba90f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae7a35c7bba27b468607eabe21feba90f">&#9670;&nbsp;</a></span>rs2_get_frame_object_detection_count()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">unsigned int rs2_get_frame_object_detection_count </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="rs__types_8h.html#af280a50e5484323c1b20b76eda3d370d">rs2_frame</a> *&#160;</td>
+          <td class="paramname"><em>frame</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>When called on Object Detection frame type, this method returns the number of detections in the frame </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">frame</td><td>Object Detection frame </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>If non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Number of detections </dd></dl>
 
 </div>
 </div>

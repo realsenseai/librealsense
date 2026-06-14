@@ -1,0 +1,80 @@
+pyrealsense2.object_detection_sensor
+====================================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: object_detection_sensor
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~object_detection_sensor.__init__
+      ~object_detection_sensor.as_color_sensor
+      ~object_detection_sensor.as_debug_stream_sensor
+      ~object_detection_sensor.as_depth_sensor
+      ~object_detection_sensor.as_fisheye_sensor
+      ~object_detection_sensor.as_inference_sensor
+      ~object_detection_sensor.as_max_usable_range_sensor
+      ~object_detection_sensor.as_motion_sensor
+      ~object_detection_sensor.as_object_detection_sensor
+      ~object_detection_sensor.as_pose_sensor
+      ~object_detection_sensor.as_roi_sensor
+      ~object_detection_sensor.as_safety_sensor
+      ~object_detection_sensor.as_wheel_odometer
+      ~object_detection_sensor.close
+      ~object_detection_sensor.from_frame
+      ~object_detection_sensor.get_active_streams
+      ~object_detection_sensor.get_embedded_decimation_filter
+      ~object_detection_sensor.get_embedded_filter
+      ~object_detection_sensor.get_embedded_temporal_filter
+      ~object_detection_sensor.get_info
+      ~object_detection_sensor.get_option
+      ~object_detection_sensor.get_option_description
+      ~object_detection_sensor.get_option_range
+      ~object_detection_sensor.get_option_value
+      ~object_detection_sensor.get_option_value_description
+      ~object_detection_sensor.get_recommended_filters
+      ~object_detection_sensor.get_stream_profiles
+      ~object_detection_sensor.get_supported_options
+      ~object_detection_sensor.is_color_sensor
+      ~object_detection_sensor.is_debug_stream_sensor
+      ~object_detection_sensor.is_depth_sensor
+      ~object_detection_sensor.is_fisheye_sensor
+      ~object_detection_sensor.is_inference_sensor
+      ~object_detection_sensor.is_max_usable_range_sensor
+      ~object_detection_sensor.is_motion_sensor
+      ~object_detection_sensor.is_object_detection_sensor
+      ~object_detection_sensor.is_option_read_only
+      ~object_detection_sensor.is_pose_sensor
+      ~object_detection_sensor.is_roi_sensor
+      ~object_detection_sensor.is_safety_sensor
+      ~object_detection_sensor.is_wheel_odometer
+      ~object_detection_sensor.on_options_changed
+      ~object_detection_sensor.open
+      ~object_detection_sensor.query_embedded_filters
+      ~object_detection_sensor.set_notifications_callback
+      ~object_detection_sensor.set_option
+      ~object_detection_sensor.set_option_value
+      ~object_detection_sensor.start
+      ~object_detection_sensor.stop
+      ~object_detection_sensor.supports
+   
+   
+   
+   
+   
+   .. rubric:: Attributes
+   
+   .. autosummary::
+   
+      ~object_detection_sensor.name
+      ~object_detection_sensor.profiles
+   
+   

@@ -19,8 +19,10 @@ pyrealsense2.labeled_points
       ~labeled_points.as_depth_frame
       ~labeled_points.as_frame
       ~labeled_points.as_frameset
+      ~labeled_points.as_inference_frame
       ~labeled_points.as_labeled_points
       ~labeled_points.as_motion_frame
+      ~labeled_points.as_object_detection_frame
       ~labeled_points.as_points
       ~labeled_points.as_pose_frame
       ~labeled_points.as_video_frame
@@ -39,8 +41,10 @@ pyrealsense2.labeled_points
       ~labeled_points.is_depth_frame
       ~labeled_points.is_frame
       ~labeled_points.is_frameset
+      ~labeled_points.is_inference_frame
       ~labeled_points.is_labeled_points
       ~labeled_points.is_motion_frame
+      ~labeled_points.is_object_detection_frame
       ~labeled_points.is_points
       ~labeled_points.is_pose_frame
       ~labeled_points.is_video_frame

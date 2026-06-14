@@ -75,6 +75,9 @@ Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structrs2__pose__stream.html">rs2_pose_stream</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">All the parameters required to define a pose stream.  <a href="structrs2__pose__stream.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structrs2__inference__stream.html">rs2_inference_stream</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">All the parameters required to define an inference stream.  <a href="structrs2__inference__stream.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structrs2__software__video__frame.html">rs2_software_video_frame</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">All the parameters required to define a video frame.  <a href="structrs2__software__video__frame.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -103,6 +106,9 @@ Typedefs</h2></td></tr>
 <tr class="memitem:a9310153fbd2ad415909a9b20f67be510"><td class="memItemLeft" align="right" valign="top">typedef struct <a class="el" href="structrs2__pose__stream.html">rs2_pose_stream</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__internal_8h.html#a9310153fbd2ad415909a9b20f67be510">rs2_pose_stream</a></td></tr>
 <tr class="memdesc:a9310153fbd2ad415909a9b20f67be510"><td class="mdescLeft">&#160;</td><td class="mdescRight">All the parameters required to define a pose stream.  <a href="#a9310153fbd2ad415909a9b20f67be510">More...</a><br /></td></tr>
 <tr class="separator:a9310153fbd2ad415909a9b20f67be510"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af8f0fe8308c656c3c43cd52f3c1a8297"><td class="memItemLeft" align="right" valign="top">typedef struct <a class="el" href="structrs2__inference__stream.html">rs2_inference_stream</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__internal_8h.html#af8f0fe8308c656c3c43cd52f3c1a8297">rs2_inference_stream</a></td></tr>
+<tr class="memdesc:af8f0fe8308c656c3c43cd52f3c1a8297"><td class="mdescLeft">&#160;</td><td class="mdescRight">All the parameters required to define an inference stream.  <a href="#af8f0fe8308c656c3c43cd52f3c1a8297">More...</a><br /></td></tr>
+<tr class="separator:af8f0fe8308c656c3c43cd52f3c1a8297"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2015d5775b0f625ab6aa1682951256ac"><td class="memItemLeft" align="right" valign="top">typedef struct <a class="el" href="structrs2__software__video__frame.html">rs2_software_video_frame</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__internal_8h.html#a2015d5775b0f625ab6aa1682951256ac">rs2_software_video_frame</a></td></tr>
 <tr class="memdesc:a2015d5775b0f625ab6aa1682951256ac"><td class="mdescLeft">&#160;</td><td class="mdescRight">All the parameters required to define a video frame.  <a href="#a2015d5775b0f625ab6aa1682951256ac">More...</a><br /></td></tr>
 <tr class="separator:a2015d5775b0f625ab6aa1682951256ac"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -169,6 +175,10 @@ Functions</h2></td></tr>
 <tr class="separator:a37915568bbaedfd302142aea510b6f11"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7ea939c6bd0d9b6024d6ef4bdf09269e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#a338107a48471d20ecacac3e4c9e024e2">rs2_stream_profile</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__internal_8h.html#a7ea939c6bd0d9b6024d6ef4bdf09269e">rs2_software_sensor_add_pose_stream_ex</a> (<a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *sensor, <a class="el" href="structrs2__pose__stream.html">rs2_pose_stream</a> pose_stream, int is_default, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:a7ea939c6bd0d9b6024d6ef4bdf09269e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a274bbfad1d75bed0943ff1b483de28c1"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#a338107a48471d20ecacac3e4c9e024e2">rs2_stream_profile</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__internal_8h.html#a274bbfad1d75bed0943ff1b483de28c1">rs2_software_sensor_add_inference_stream</a> (<a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *sensor, <a class="el" href="structrs2__inference__stream.html">rs2_inference_stream</a> inference_stream, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a274bbfad1d75bed0943ff1b483de28c1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a99de97ed0d0b5591f8e46c81de28344c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#a338107a48471d20ecacac3e4c9e024e2">rs2_stream_profile</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__internal_8h.html#a99de97ed0d0b5591f8e46c81de28344c">rs2_software_sensor_add_inference_stream_ex</a> (<a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *sensor, <a class="el" href="structrs2__inference__stream.html">rs2_inference_stream</a> inference_stream, int is_default, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a99de97ed0d0b5591f8e46c81de28344c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa4f4e6ca6a0e29a5ba44b8e5e0083ce2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__internal_8h.html#aa4f4e6ca6a0e29a5ba44b8e5e0083ce2">rs2_software_sensor_add_read_only_option</a> (<a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *sensor, <a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2">rs2_option</a> option, float val, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:aa4f4e6ca6a0e29a5ba44b8e5e0083ce2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a838f4caa02635e8f74aad8aed17623f7"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__internal_8h.html#a838f4caa02635e8f74aad8aed17623f7">rs2_software_sensor_update_read_only_option</a> (<a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *sensor, <a class="el" href="rs__option_8h.html#a8b9c011f705cfab20c7eaaa7a26040e2">rs2_option</a> option, float val, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
@@ -268,6 +278,22 @@ Variables</h2></td></tr>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Exposes RealSense internal functionality for C compilers. </p>
 </div><h2 class="groupheader">Typedef Documentation</h2>
+<a id="af8f0fe8308c656c3c43cd52f3c1a8297"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af8f0fe8308c656c3c43cd52f3c1a8297">&#9670;&nbsp;</a></span>rs2_inference_stream</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef struct <a class="el" href="structrs2__inference__stream.html">rs2_inference_stream</a>  <a class="el" href="structrs2__inference__stream.html">rs2_inference_stream</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>All the parameters required to define an inference stream. </p>
+
+</div>
+</div>
 <a id="a2fb417faa4b03664b42ffd274caa4506"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a2fb417faa4b03664b42ffd274caa4506">&#9670;&nbsp;</a></span>rs2_motion_stream</h2>
 
@@ -1746,6 +1772,97 @@ Variables</h2></td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">dev</td><td>the software device </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">info</td><td>identifier for the camera info to add. </td></tr>
     <tr><td class="paramdir">[in]</td><td class="paramname">val</td><td>string value for this new camera info. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a274bbfad1d75bed0943ff1b483de28c1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a274bbfad1d75bed0943ff1b483de28c1">&#9670;&nbsp;</a></span>rs2_software_sensor_add_inference_stream()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="rs__types_8h.html#a338107a48471d20ecacac3e4c9e024e2">rs2_stream_profile</a>* rs2_software_sensor_add_inference_stream </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *&#160;</td>
+          <td class="paramname"><em>sensor</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="structrs2__inference__stream.html">rs2_inference_stream</a>&#160;</td>
+          <td class="paramname"><em>inference_stream</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Add inference stream to sensor </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">sensor</td><td>the software sensor </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">inference_stream</td><td>all the stream components </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a99de97ed0d0b5591f8e46c81de28344c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a99de97ed0d0b5591f8e46c81de28344c">&#9670;&nbsp;</a></span>rs2_software_sensor_add_inference_stream_ex()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="rs__types_8h.html#a338107a48471d20ecacac3e4c9e024e2">rs2_stream_profile</a>* rs2_software_sensor_add_inference_stream_ex </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#a0847baf8b5a57c456d2d950ff21c5096">rs2_sensor</a> *&#160;</td>
+          <td class="paramname"><em>sensor</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="structrs2__inference__stream.html">rs2_inference_stream</a>&#160;</td>
+          <td class="paramname"><em>inference_stream</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>is_default</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Add inference stream to sensor </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">sensor</td><td>the software sensor </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">inference_stream</td><td>all the stream components </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">is_default</td><td>whether or not the stream should be a default stream for the device </td></tr>
     <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
   </table>
   </dd>

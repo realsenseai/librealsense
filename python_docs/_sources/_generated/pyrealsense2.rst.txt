@@ -97,6 +97,10 @@
       frame_source
       hdr_merge
       hole_filling_filter
+      inference_frame
+      inference_sensor
+      inference_stream
+      inference_stream_profile
       intrinsics
       ip_address
       l500_visual_preset
@@ -113,6 +117,9 @@
       motion_stream_profile
       notification
       notification_category
+      object_detection
+      object_detection_frame
+      object_detection_sensor
       option
       option_range
       option_type

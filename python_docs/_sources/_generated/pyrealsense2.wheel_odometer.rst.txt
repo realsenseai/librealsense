@@ -20,8 +20,10 @@ pyrealsense2.wheel_odometer
       ~wheel_odometer.as_debug_stream_sensor
       ~wheel_odometer.as_depth_sensor
       ~wheel_odometer.as_fisheye_sensor
+      ~wheel_odometer.as_inference_sensor
       ~wheel_odometer.as_max_usable_range_sensor
       ~wheel_odometer.as_motion_sensor
+      ~wheel_odometer.as_object_detection_sensor
       ~wheel_odometer.as_pose_sensor
       ~wheel_odometer.as_roi_sensor
       ~wheel_odometer.as_safety_sensor
@@ -45,8 +47,10 @@ pyrealsense2.wheel_odometer
       ~wheel_odometer.is_debug_stream_sensor
       ~wheel_odometer.is_depth_sensor
       ~wheel_odometer.is_fisheye_sensor
+      ~wheel_odometer.is_inference_sensor
       ~wheel_odometer.is_max_usable_range_sensor
       ~wheel_odometer.is_motion_sensor
+      ~wheel_odometer.is_object_detection_sensor
       ~wheel_odometer.is_option_read_only
       ~wheel_odometer.is_pose_sensor
       ~wheel_odometer.is_roi_sensor

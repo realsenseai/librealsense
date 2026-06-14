@@ -116,6 +116,8 @@ Functions</h2></td></tr>
 <tr class="separator:ac13896604a9a543f9d3ffff2351573f1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aab8f66910dd882e2e40236b4acc44d3f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#af50408eba1d9935d29eb72553ae53dd0">rs2_processing_block</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__processing__gl_8h.html#aab8f66910dd882e2e40236b4acc44d3f">rs2_gl_create_m420_decoder</a> (int api_version, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:aab8f66910dd882e2e40236b4acc44d3f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4b436bea672505e7c0a2e2be6d1ce4fb"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#af50408eba1d9935d29eb72553ae53dd0">rs2_processing_block</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__processing__gl_8h.html#a4b436bea672505e7c0a2e2be6d1ce4fb">rs2_gl_create_nv12_decoder</a> (int api_version, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
+<tr class="separator:a4b436bea672505e7c0a2e2be6d1ce4fb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af547849b9cd7b263d36923d3826b195f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="rs__types_8h.html#af50408eba1d9935d29eb72553ae53dd0">rs2_processing_block</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__processing__gl_8h.html#af547849b9cd7b263d36923d3826b195f">rs2_gl_create_y411_decoder</a> (int api_version, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
 <tr class="separator:af547849b9cd7b263d36923d3826b195f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aabef0c03482665c7162a4441a7eb1085"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="rs__processing__gl_8h.html#aabef0c03482665c7162a4441a7eb1085">rs2_gl_set_matrix</a> (<a class="el" href="rs__types_8h.html#af50408eba1d9935d29eb72553ae53dd0">rs2_processing_block</a> *block, <a class="el" href="rs__processing__gl_8h.html#aca7b40eb6f12ae3824924d349eb0dea9">rs2_gl_matrix_type</a> type, float *m4x4, <a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **error)</td></tr>
@@ -512,6 +514,41 @@ Functions</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>Creates a processing block that can efficiently convert M420 image format to RGB variants This is specifically useful for rendering the RGB frame to the screen (since the output is ready for rendering on the GPU) </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">api_version</td><td>Users are expected to pass their version of <code>RS2_API_VERSION</code> to make sure they are running the correct librealsense version. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a4b436bea672505e7c0a2e2be6d1ce4fb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4b436bea672505e7c0a2e2be6d1ce4fb">&#9670;&nbsp;</a></span>rs2_gl_create_nv12_decoder()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="rs__types_8h.html#af50408eba1d9935d29eb72553ae53dd0">rs2_processing_block</a>* rs2_gl_create_nv12_decoder </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>api_version</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="rs__types_8h.html#ab2e9b1e9fd4b0cb3ed42f33f0c9dec03">rs2_error</a> **&#160;</td>
+          <td class="paramname"><em>error</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Creates a processing block that can efficiently convert NV12 image format to RGB variants This is specifically useful for rendering the RGB frame to the screen (since the output is ready for rendering on the GPU) </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramdir">[in]</td><td class="paramname">api_version</td><td>Users are expected to pass their version of <code>RS2_API_VERSION</code> to make sure they are running the correct librealsense version. </td></tr>
     <tr><td class="paramdir">[out]</td><td class="paramname">error</td><td>if non-null, receives any error that occurs during this call, otherwise, errors are ignored </td></tr>

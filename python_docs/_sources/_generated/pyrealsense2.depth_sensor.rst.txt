@@ -20,8 +20,10 @@ pyrealsense2.depth_sensor
       ~depth_sensor.as_debug_stream_sensor
       ~depth_sensor.as_depth_sensor
       ~depth_sensor.as_fisheye_sensor
+      ~depth_sensor.as_inference_sensor
       ~depth_sensor.as_max_usable_range_sensor
       ~depth_sensor.as_motion_sensor
+      ~depth_sensor.as_object_detection_sensor
       ~depth_sensor.as_pose_sensor
       ~depth_sensor.as_roi_sensor
       ~depth_sensor.as_safety_sensor
@@ -46,8 +48,10 @@ pyrealsense2.depth_sensor
       ~depth_sensor.is_debug_stream_sensor
       ~depth_sensor.is_depth_sensor
       ~depth_sensor.is_fisheye_sensor
+      ~depth_sensor.is_inference_sensor
       ~depth_sensor.is_max_usable_range_sensor
       ~depth_sensor.is_motion_sensor
+      ~depth_sensor.is_object_detection_sensor
       ~depth_sensor.is_option_read_only
       ~depth_sensor.is_pose_sensor
       ~depth_sensor.is_roi_sensor

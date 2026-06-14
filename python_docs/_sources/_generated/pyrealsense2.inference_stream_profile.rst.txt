@@ -1,0 +1,45 @@
+pyrealsense2.inference_stream_profile
+=====================================
+
+.. currentmodule:: pyrealsense2
+
+.. autoclass:: inference_stream_profile
+   :members:
+   :undoc-members:
+
+   
+   .. automethod:: __init__
+   
+   
+   .. rubric:: Methods
+   
+   .. autosummary::
+   
+      ~inference_stream_profile.__init__
+      ~inference_stream_profile.as_inference_stream_profile
+      ~inference_stream_profile.as_motion_stream_profile
+      ~inference_stream_profile.as_pose_stream_profile
+      ~inference_stream_profile.as_stream_profile
+      ~inference_stream_profile.as_video_stream_profile
+      ~inference_stream_profile.bytes_per_pixel
+      ~inference_stream_profile.clone
+      ~inference_stream_profile.format
+      ~inference_stream_profile.fps
+      ~inference_stream_profile.get_extrinsics_to
+      ~inference_stream_profile.is_default
+      ~inference_stream_profile.is_inference_stream_profile
+      ~inference_stream_profile.is_motion_stream_profile
+      ~inference_stream_profile.is_pose_stream_profile
+      ~inference_stream_profile.is_stream_profile
+      ~inference_stream_profile.is_video_stream_profile
+      ~inference_stream_profile.register_extrinsics_to
+      ~inference_stream_profile.stream_index
+      ~inference_stream_profile.stream_name
+      ~inference_stream_profile.stream_type
+      ~inference_stream_profile.unique_id
+   
+   
+   
+   
+   
+   

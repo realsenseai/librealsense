@@ -24,6 +24,7 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__pose.html#a0212d32dec83abc4a4ba94fb16c72b12"><param name="Name" value="rs2_pose"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__software__pose__frame_1_1pose__frame__info.html#a948710f5c18f423a95b4f006b9cdc80c"><param name="Name" value="rs2_software_pose_frame::pose_frame_info"></OBJECT>
   </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1software__sensor.html#af3686d77f1f15919287df6743a88126e"><param name="Name" value="add_inference_stream"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1software__sensor.html#af63e9168c41e7aa6107d3333713ec919"><param name="Name" value="add_motion_stream"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1software__sensor.html#a63f7d039094fd842cffa13ce46a4237f"><param name="Name" value="add_option"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1software__sensor.html#a3e081bcdd022b866d959f3b4611ed8e2"><param name="Name" value="add_pose_stream"></OBJECT>
@@ -78,6 +79,8 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1options__list.html#a45a8253b4ec3eab90176e24fdec8b027"><param name="Name" value="rs2::options_list"></OBJECT>
   </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__motion__device__intrinsic.html#a8049f7d6c97e85c30dbf418482e95782"><param name="Name" value="bias_variances"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#a8ab4c57350a98316fca3032c50120026"><param name="Name" value="bottom_right_x"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#a25ff07b3a7c7d085bef7c1d4fa700ef1"><param name="Name" value="bottom_right_y"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__software__video__frame.html#a956b3d8fcef85505fd2dc01a175207b7"><param name="Name" value="bpp"></OBJECT>
   <UL>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__software__video__frame.html#a956b3d8fcef85505fd2dc01a175207b7"><param name="Name" value="rs2_software_video_frame"></OBJECT>
@@ -99,6 +102,7 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frame__queue.html#a34f14537ad04442d54dff7d49c1bd4c5"><param name="Name" value="capacity"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__software__notification.html#a22ccab7d78d6391c35307384a54c582e"><param name="Name" value="category"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1updatable.html#a3207791e49b8f8d8e5eb96a853924165"><param name="Name" value="check_firmware_compatibility"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#ad88f21bbe949d4f2f83a62e3df5ef925"><param name="Name" value="class_id"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1stream__profile.html#af5b3199359d26ce41dbbfcec844ceea8"><param name="Name" value="clone"></OBJECT>
   <UL>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1stream__profile.html#af5b3199359d26ce41dbbfcec844ceea8"><param name="Name" value="rs2::stream_profile"></OBJECT>
@@ -186,6 +190,7 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__software__video__frame.html#a9b8168bd8fbf756e7a6be013af1d76e5"><param name="Name" value="rs2_software_video_frame"></OBJECT>
   </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="deprecated.html"><param name="Name" value="Deprecated List"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#a7102e6a377899872637f2de19cc2efd7"><param name="Name" value="depth"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1depth__frame.html#a5e50167b88e0eb3264b7c8709c4ffe99"><param name="Name" value="depth_frame"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1depth__huffman__decoder.html#ab81da617d52afde694075ccc478b83bb"><param name="Name" value="depth_huffman_decoder"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1depth__mapping__sensor.html#acf3dede4006d182685a5f158c2884b87"><param name="Name" value="depth_mapping_sensor"></OBJECT>
@@ -281,8 +286,9 @@
   </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frameset.html#a0ed00a056eb31a53f106189989dd73b0"><param name="Name" value="first_or_default"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1fisheye__sensor.html#af0493c7ac2095b50268e55d4ae47d16a"><param name="Name" value="fisheye_sensor"></OBJECT>
-  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__motion__stream.html#a67268428bf9bb19bc609f3a0d7409f1e"><param name="Name" value="fmt"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#a1a80e3d31655de9154b8dc72131ac725"><param name="Name" value="fmt"></OBJECT>
   <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#a1a80e3d31655de9154b8dc72131ac725"><param name="Name" value="rs2_inference_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__motion__stream.html#a67268428bf9bb19bc609f3a0d7409f1e"><param name="Name" value="rs2_motion_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__pose__stream.html#a80cc95775ab0f9150de14a1e7b1333d8"><param name="Name" value="rs2_pose_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__video__stream.html#afaa4955a174c72cda7e81f3ae9d02d1e"><param name="Name" value="rs2_video_stream"></OBJECT>
@@ -292,6 +298,7 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1stream__profile.html#a98c300cb3304233f6b53e3e405b964bc"><param name="Name" value="fps"></OBJECT>
   <UL>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1stream__profile.html#a98c300cb3304233f6b53e3e405b964bc"><param name="Name" value="rs2::stream_profile"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#ad4585903a104a40468a3cac9815bc21a"><param name="Name" value="rs2_inference_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__motion__stream.html#ab62577deec42d196f6a50efd2a9906e1"><param name="Name" value="rs2_motion_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__pose__stream.html#ade7acdecd963007d2a4460e05108f145"><param name="Name" value="rs2_pose_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__video__stream.html#ad3a31da22155b810ba3e1c1c91cc4f9c"><param name="Name" value="rs2_video_stream"></OBJECT>
@@ -366,6 +373,8 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1device.html#a075a5d3905b036bd53f45af851544321"><param name="Name" value="rs2::device"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1notification.html#ab96448ae1e966672fc776acc47c47662"><param name="Name" value="rs2::notification"></OBJECT>
   </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__frame.html#aa47aab981dc9445f3a1b6244246fc424"><param name="Name" value="get_detection"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__frame.html#a94d52916c9ea20e7876894c974d3b0d4"><param name="Name" value="get_detection_count"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1pipeline__profile.html#afee24c7bef16dc554ee80333446e0f49"><param name="Name" value="get_device"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1eth__config__device.html#adae688c44fdca26afec84ca515f16cfb"><param name="Name" value="get_dhcp_config"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1depth__frame.html#a5090d69d04ade6dd67175cae9b6bee9c"><param name="Name" value="get_distance"></OBJECT>
@@ -414,6 +423,7 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1eth__config__device.html#a4f2c6cfbbb370f6968fc547b0b4b75d8"><param name="Name" value="get_netmask"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1event__information.html#ad2c23859ea425ccceff4423d963a1927"><param name="Name" value="get_new_devices"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1firmware__logger.html#ae4cb69017966e1d18fdf9b36763a2e8f"><param name="Name" value="get_number_of_fw_logs"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frameset.html#a95236d7c7ab3529f8f06a85467defeb1"><param name="Name" value="get_object_detection_frame"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1debug__protocol.html#a3ee60ee0e7026fb86f2a32b6d9d545c7"><param name="Name" value="get_opcode_string"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1options.html#a0bc42a585de805c151f1255ae3318ebe"><param name="Name" value="get_option"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1options.html#a0901f6042b65573773eab4c8196a2de7"><param name="Name" value="get_option_description"></OBJECT>
@@ -529,12 +539,16 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="struct_s_t_hdad.html#a516e328900b8d88d7971b348c03f4221"><param name="Name" value="ignoreSAD"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__pixel.html#a70c228bce39c823f63efa6f20bc09702"><param name="Name" value="ij"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1pose__sensor.html#a68728a7f1a9a7c0f19bada4fcb3fef2c"><param name="Name" value="import_localization_map"></OBJECT>
-  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__motion__stream.html#a1667df2a236e51dcc20a7ad5a9af83b4"><param name="Name" value="index"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#ae3eeed9b3d898b2a070581a4f3655006"><param name="Name" value="index"></OBJECT>
   <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#ae3eeed9b3d898b2a070581a4f3655006"><param name="Name" value="rs2_inference_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__motion__stream.html#a1667df2a236e51dcc20a7ad5a9af83b4"><param name="Name" value="rs2_motion_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__pose__stream.html#a0bcb5360ff5a72d8d7b8dfacab2ee687"><param name="Name" value="rs2_pose_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__video__stream.html#adf5de326720f2228666e91da53f40f1a"><param name="Name" value="rs2_video_stream"></OBJECT>
   </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__frame.html#aef6247f75a64c21f73cd51991e44fb0f"><param name="Name" value="inference_frame"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__sensor.html#ae5d4ca2f166be5eaa2caea7435417dd5"><param name="Name" value="inference_sensor"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__stream__profile.html#afd1a0ed4d60edba38da2a47b0476a59b"><param name="Name" value="inference_stream_profile"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1firmware__logger.html#aa27de006e3c9b5994ea9648dd241096c"><param name="Name" value="init_parser"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="namespacers2_1_1gl.html#a92f7b1661d9b8dc88c074248e36c5525"><param name="Name" value="init_processing"></OBJECT>
   <UL>
@@ -654,6 +668,13 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2_1_1vec3d.html#a7ec7bad053920dd3b1a4d641e13cf8cd"><param name="Name" value="normalize"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1notification.html#a1134d55f8d85fd8b84196d20646ebaa5"><param name="Name" value="notification"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1notifications__callback.html#aa43d3e80c2fc006e6dae9dffb05f8da7"><param name="Name" value="notifications_callback"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1gl_1_1nv12__decoder.html#a192c35cb52d6d902b30f9e165580fff6"><param name="Name" value="nv12_decoder"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1gl_1_1nv12__decoder.html#a192c35cb52d6d902b30f9e165580fff6"><param name="Name" value="rs2::gl::nv12_decoder"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1nv12__decoder.html#a79c023e6aefc77f073ecc345ba167e34"><param name="Name" value="rs2::nv12_decoder"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__frame.html#a2d57f6b5f537dc49e755856fc9e67af2"><param name="Name" value="object_detection_frame"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__sensor.html#a8253da0794db72b15a2b8e2cc7be3bab"><param name="Name" value="object_detection_sensor"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1calibration__change__callback.html#a8e697def9da955c7a5721ef90686cb86"><param name="Name" value="on_calibration_change"></OBJECT>
   <UL>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1calibration__change__callback.html#a8e697def9da955c7a5721ef90686cb86"><param name="Name" value="rs2::calibration_change_callback"></OBJECT>
@@ -722,8 +743,10 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1filter.html#afae74db0eadf6026f033e89fab78dc98"><param name="Name" value="rs2::filter"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1fisheye__sensor.html#a411104130fe12f5bc57c007a893f401d"><param name="Name" value="rs2::fisheye_sensor"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frame.html#a00366ad9a456e6e65b56a7f63c6e633b"><param name="Name" value="rs2::frame"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__sensor.html#ad9410dd8c9b33afa10f75c04b0cf853b"><param name="Name" value="rs2::inference_sensor"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1max__usable__range__sensor.html#aeafa0c386b0683c83dc6ff97c34fb54a"><param name="Name" value="rs2::max_usable_range_sensor"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1motion__sensor.html#aa5fe93f934045c621305a604c30f147c"><param name="Name" value="rs2::motion_sensor"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__sensor.html#a9b3ec6a47b0e561410a7e91c3ac849ac"><param name="Name" value="rs2::object_detection_sensor"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1pipeline__profile.html#a66140ff896065a2b0eab1b5dd4f0d463"><param name="Name" value="rs2::pipeline_profile"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1pose__sensor.html#a9f5b6808826bb59c5d31d24650b3037e"><param name="Name" value="rs2::pose_sensor"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1roi__sensor.html#a640e02c4e1cfb61169b8406b170e5091"><param name="Name" value="rs2::roi_sensor"></OBJECT>
@@ -1448,6 +1471,7 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frameset.html#a4a774543bae3b4b03eee98d4df8157d7"><param name="Name" value="get_fisheye_frame"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frameset.html#a50202d911e7a29b74419ba144525f9b3"><param name="Name" value="get_infrared_frame"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frameset.html#a160673561898c2102acd6abda286bc74"><param name="Name" value="get_labeled_point_cloud_frame"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frameset.html#a95236d7c7ab3529f8f06a85467defeb1"><param name="Name" value="get_object_detection_frame"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frameset.html#a163484e85ab5a001308b1b4b6592a8e7"><param name="Name" value="get_pose_frame"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frameset.html#a9ec1f35df917d54bff9fc976f9f121b1"><param name="Name" value="operator[]"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1frameset.html#aff92fae98fb83eef0ee6a10a6d39c236"><param name="Name" value="size"></OBJECT>
@@ -1481,6 +1505,10 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1gl_1_1m420__decoder.html"><param name="Name" value="rs2::gl::m420_decoder"></OBJECT>
   <UL>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1gl_1_1m420__decoder.html#acdfb680f7dbbcd43c09bf25ddb7afb4e"><param name="Name" value="m420_decoder"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1gl_1_1nv12__decoder.html"><param name="Name" value="rs2::gl::nv12_decoder"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1gl_1_1nv12__decoder.html#a192c35cb52d6d902b30f9e165580fff6"><param name="Name" value="nv12_decoder"></OBJECT>
   </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1gl_1_1pointcloud.html"><param name="Name" value="rs2::gl::pointcloud"></OBJECT>
   <UL>
@@ -1536,6 +1564,19 @@
   <UL>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1hole__filling__filter.html#ac78d499d6bdacfe4cc1f67b4ce865513"><param name="Name" value="context"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1hole__filling__filter.html#aa35153ba37c8cb7f09ad4674508426ac"><param name="Name" value="hole_filling_filter"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__frame.html"><param name="Name" value="rs2::inference_frame"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__frame.html#aef6247f75a64c21f73cd51991e44fb0f"><param name="Name" value="inference_frame"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__sensor.html"><param name="Name" value="rs2::inference_sensor"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__sensor.html#ae5d4ca2f166be5eaa2caea7435417dd5"><param name="Name" value="inference_sensor"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__sensor.html#ad9410dd8c9b33afa10f75c04b0cf853b"><param name="Name" value="operator bool"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__stream__profile.html"><param name="Name" value="rs2::inference_stream_profile"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1inference__stream__profile.html#afd1a0ed4d60edba38da2a47b0476a59b"><param name="Name" value="inference_stream_profile"></OBJECT>
   </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="namespacers2_1_1internal.html"><param name="Name" value="rs2::internal"></OBJECT>
   <UL>
@@ -1606,6 +1647,21 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1notifications__callback.html#aa43d3e80c2fc006e6dae9dffb05f8da7"><param name="Name" value="notifications_callback"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1notifications__callback.html#a3c7a3103036204a5010baa838e02ce8e"><param name="Name" value="on_notification"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1notifications__callback.html#aa6fb592b6559999155d67c5f6502e9c8"><param name="Name" value="release"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1nv12__decoder.html"><param name="Name" value="rs2::nv12_decoder"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1nv12__decoder.html#a79c023e6aefc77f073ecc345ba167e34"><param name="Name" value="nv12_decoder"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__frame.html"><param name="Name" value="rs2::object_detection_frame"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__frame.html#aa47aab981dc9445f3a1b6244246fc424"><param name="Name" value="get_detection"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__frame.html#a94d52916c9ea20e7876894c974d3b0d4"><param name="Name" value="get_detection_count"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__frame.html#a2d57f6b5f537dc49e755856fc9e67af2"><param name="Name" value="object_detection_frame"></OBJECT>
+  </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__sensor.html"><param name="Name" value="rs2::object_detection_sensor"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__sensor.html#a8253da0794db72b15a2b8e2cc7be3bab"><param name="Name" value="object_detection_sensor"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1object__detection__sensor.html#a9b3ec6a47b0e561410a7e91c3ac849ac"><param name="Name" value="operator bool"></OBJECT>
   </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2_1_1option__range.html"><param name="Name" value="rs2::option_range"></OBJECT>
   <UL>
@@ -1874,6 +1930,7 @@
   </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1software__sensor.html"><param name="Name" value="rs2::software_sensor"></OBJECT>
   <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1software__sensor.html#af3686d77f1f15919287df6743a88126e"><param name="Name" value="add_inference_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1software__sensor.html#af63e9168c41e7aa6107d3333713ec919"><param name="Name" value="add_motion_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1software__sensor.html#a63f7d039094fd842cffa13ce46a4237f"><param name="Name" value="add_option"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1software__sensor.html#a3e081bcdd022b866d959f3b4611ed8e2"><param name="Name" value="add_pose_stream"></OBJECT>
@@ -2190,6 +2247,7 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing_8h.html#abca051972ea197c271d06135ff317483"><param name="Name" value="rs2_create_m420_decoder"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a2ce903ea64ce3264160f940060c79d8b"><param name="Name" value="rs2_create_mock_context"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a99e602e40dbd43105ee5c4dc44f80819"><param name="Name" value="rs2_create_mock_context_versioned"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing_8h.html#afdb571f57c8f4e2011694d9dfa8ed00a"><param name="Name" value="rs2_create_nv12_decoder"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__pipeline_8h.html#ac23c69f8d9e7bf7a373b149ff9c432f3"><param name="Name" value="rs2_create_pipeline"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__record__playback_8h.html#a7d79a778397be50b92fc23898e27ab8f"><param name="Name" value="rs2_create_playback_device"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing_8h.html#a938d8bf686d1bd682a2bd325566984c9"><param name="Name" value="rs2_create_pointcloud"></OBJECT>
@@ -2349,6 +2407,9 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aad2814254defb10cb44b1c189e3eac211"><param name="Name" value="RS2_EXTENSION_GLOBAL_TIMER"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa08c5658e1c511432fc2abaa037b8372c"><param name="Name" value="RS2_EXTENSION_HDR_MERGE"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa101bf1e5d8dae9ea3e094f3f2431ef39"><param name="Name" value="RS2_EXTENSION_HOLE_FILLING_FILTER"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aadb1cf457414858731289907e2bba09d4"><param name="Name" value="RS2_EXTENSION_INFERENCE_FRAME"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa86b64b3e214b99dfaee1f517a72ec64e"><param name="Name" value="RS2_EXTENSION_INFERENCE_PROFILE"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa8cddfbce1a183915c493a0c124661a03"><param name="Name" value="RS2_EXTENSION_INFERENCE_SENSOR"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa040d8741d908b6a09b470e38368b5fc1"><param name="Name" value="RS2_EXTENSION_INFO"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa1d2bcd64e483ea14e0aba3a0cdaee12a"><param name="Name" value="RS2_EXTENSION_L500_DEPTH_SENSOR"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aaca65d216e15a20f5b6cf02bb3d991ed1"><param name="Name" value="RS2_EXTENSION_LABELED_POINTS"></OBJECT>
@@ -2357,6 +2418,8 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa0375b1103516c3bf8adc57799a280a2a"><param name="Name" value="RS2_EXTENSION_MOTION_FRAME"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa135eaf8c130b298d1c1a4f91fc5a122b"><param name="Name" value="RS2_EXTENSION_MOTION_PROFILE"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aaeef4e27f41b821bd00422c9a74cdb94c"><param name="Name" value="RS2_EXTENSION_MOTION_SENSOR"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aaafdd4bd2eb58da68c1b39b5c6398a948"><param name="Name" value="RS2_EXTENSION_OBJECT_DETECTION_FRAME"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa7e24d5e845ae43ee06a8685d76bf93b4"><param name="Name" value="RS2_EXTENSION_OBJECT_DETECTION_SENSOR"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aad0b471682a80b618915cd94ca1811f0d"><param name="Name" value="RS2_EXTENSION_OPTIONS"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa50a39af1635929851fac646b3fe13e7c"><param name="Name" value="RS2_EXTENSION_PLAYBACK"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aaf18d10426a1efc4bef5c88ab3c84581c"><param name="Name" value="RS2_EXTENSION_POINTS"></OBJECT>
@@ -2419,6 +2482,7 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7a04ecec4dbd0e34203d35e8051df8733d"><param name="Name" value="RS2_FORMAT_MJPEG"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7aad993ee37afdd24d0eacd296f0d379a8"><param name="Name" value="RS2_FORMAT_MOTION_RAW"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7a0ed023ec98b6b074a5dfd5421bc68a69"><param name="Name" value="RS2_FORMAT_MOTION_XYZ32F"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7af3ba78e2077e811510fa3953a3e6fdf7"><param name="Name" value="RS2_FORMAT_NV12"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7a5d862a212fe8cb46a7d096ad8067daad"><param name="Name" value="RS2_FORMAT_RAW10"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7ade5a2ef53896420d36fa99a2b05b114e"><param name="Name" value="RS2_FORMAT_RAW16"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7ad97669872df3615816013885ebf2cc43"><param name="Name" value="RS2_FORMAT_RAW8"></OBJECT>
@@ -2638,6 +2702,8 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#a41b37d688a49791700e1f92f09f03363"><param name="Name" value="rs2_get_frame_labels"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#a4144751389183deda852bb4d8545ea34"><param name="Name" value="rs2_get_frame_metadata"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#a252e706a5ad636fc18fe4b1df4dcca0f"><param name="Name" value="rs2_get_frame_number"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#ae8119142df1f679459f8f917877ef292"><param name="Name" value="rs2_get_frame_object_detection"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#ae7a35c7bba27b468607eabe21feba90f"><param name="Name" value="rs2_get_frame_object_detection_count"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#a1a87bb32e1cf696ea02864982e3bc758"><param name="Name" value="rs2_get_frame_points_count"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#ad71a8d90691f31870e48cc5d7948eab9"><param name="Name" value="rs2_get_frame_sensor"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#a934adc8566831a683872452fdf9c1b3e"><param name="Name" value="rs2_get_frame_stream_profile"></OBJECT>
@@ -2719,6 +2785,7 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#a8dc2ab06bddd96498a3b6b37a1647f0d"><param name="Name" value="rs2_gl_create_camera_renderer"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#adb823136824390db59f3b62f719935cd"><param name="Name" value="rs2_gl_create_colorizer"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#aab8f66910dd882e2e40236b4acc44d3f"><param name="Name" value="rs2_gl_create_m420_decoder"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#a4b436bea672505e7c0a2e2be6d1ce4fb"><param name="Name" value="rs2_gl_create_nv12_decoder"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#a0667056f4022d504aa55f66b0fff64c1"><param name="Name" value="rs2_gl_create_pointcloud"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#a91b4b9ea764aaeaab5b9f8879f9127bb"><param name="Name" value="rs2_gl_create_pointcloud_renderer"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#aefa6118c5e67861e595bcc12253d0e3f"><param name="Name" value="rs2_gl_create_uploader"></OBJECT>
@@ -2760,6 +2827,15 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__option_8h.html#ab79e64686909fc03da4c8042043243b5"><param name="Name" value="rs2_host_perf_mode_to_string"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs_8h.html#af6a34cca34b575d89b36229d082e704c"><param name="Name" value="rs2_hw_monitor_get_opcode_string"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ac902eb3c40da9c95ee4eb0119a15b5e2"><param name="Name" value="rs2_import_localization_map"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html"><param name="Name" value="rs2_inference_stream"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#a1a80e3d31655de9154b8dc72131ac725"><param name="Name" value="fmt"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#ad4585903a104a40468a3cac9815bc21a"><param name="Name" value="fps"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#ae3eeed9b3d898b2a070581a4f3655006"><param name="Name" value="index"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#af8f0fe8308c656c3c43cd52f3c1a8297"><param name="Name" value="rs_internal.h"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#a494eadabd086d067631bf0bb525bb693"><param name="Name" value="type"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#a98bf8496a9693911297a127f9f99b11e"><param name="Name" value="uid"></OBJECT>
+  </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a965d893d71ae858df154e6fdc8d4d039"><param name="Name" value="rs2_init_fw_log_parser"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__intrinsics.html"><param name="Name" value="rs2_intrinsics"></OBJECT>
   <UL>
@@ -2880,6 +2956,17 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__notifications__callback.html#ae1402aef6b1219162e08115edb446d3a"><param name="Name" value="~rs2_notifications_callback"></OBJECT>
   </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8hpp.html#a590ed1dfd0969a8dba8bd2dc73f9570f"><param name="Name" value="rs2_notifications_callback_sptr"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html"><param name="Name" value="rs2_object_detection"></OBJECT>
+  <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#a8ab4c57350a98316fca3032c50120026"><param name="Name" value="bottom_right_x"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#a25ff07b3a7c7d085bef7c1d4fa700ef1"><param name="Name" value="bottom_right_y"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#ad88f21bbe949d4f2f83a62e3df5ef925"><param name="Name" value="class_id"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#a7102e6a377899872637f2de19cc2efd7"><param name="Name" value="depth"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#ac7f2e949a8d4751dad7e4086bf8dfb80"><param name="Name" value="rs_types.h"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#accabe2c55e43a4e2d10f2b07eff85531"><param name="Name" value="score"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#ac41b3a622163695ea6ea3dbad12fe911"><param name="Name" value="top_left_x"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#ac85095785c9448411e80b4cdf1b437bd"><param name="Name" value="top_left_y"></OBJECT>
+  </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae31cc6df5902a8bb0e09e0a1f55e8deb"><param name="Name" value="rs2_open"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#acc65e62141f424b339d12e07b05974a0"><param name="Name" value="rs2_open_multiple"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__option_8h.html#a71ca93df561800268a98d45a4f0292c2"><param name="Name" value="rs2_option"></OBJECT>
@@ -3298,6 +3385,8 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a1a0726bac17eb8e0dfab0993467d3ea1"><param name="Name" value="rs_internal.h"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__software__pose__frame.html#aa0dd19038d09763ced5b951345854dcf"><param name="Name" value="timestamp"></OBJECT>
   </UL>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a274bbfad1d75bed0943ff1b483de28c1"><param name="Name" value="rs2_software_sensor_add_inference_stream"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a99de97ed0d0b5591f8e46c81de28344c"><param name="Name" value="rs2_software_sensor_add_inference_stream_ex"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a331c7cc88318f764b42e155e34361ebf"><param name="Name" value="rs2_software_sensor_add_motion_stream"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a66f7a224a503fc69054c2561385ed93e"><param name="Name" value="rs2_software_sensor_add_motion_stream_ex"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a23171f4fe2a4b88713dd4feeaa8b91cb"><param name="Name" value="rs2_software_sensor_add_option"></OBJECT>
@@ -3363,6 +3452,7 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a8f552b0e5bdeb8a65237639118ef8f90"><param name="Name" value="RS2_STREAM_INFRARED"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a901a66592d2fb6b1caf5fc7af0e5c0fd"><param name="Name" value="RS2_STREAM_LABELED_POINT_CLOUD"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a9e201e9b86d863cd356989ceef41839c"><param name="Name" value="RS2_STREAM_MOTION"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93ab227c44ad4509acc8b88bd3d3d3b67bb"><param name="Name" value="RS2_STREAM_OBJECT_DETECTION"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a053761b37e48dbd15de9c6800e7bac38"><param name="Name" value="RS2_STREAM_OCCUPANCY"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93aca8232029db741f594390d2c091f17a5"><param name="Name" value="RS2_STREAM_POSE"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a338107a48471d20ecacac3e4c9e024e2"><param name="Name" value="rs2_stream_profile"></OBJECT>
@@ -3844,6 +3934,8 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#a41b37d688a49791700e1f92f09f03363"><param name="Name" value="rs2_get_frame_labels"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#a4144751389183deda852bb4d8545ea34"><param name="Name" value="rs2_get_frame_metadata"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#a252e706a5ad636fc18fe4b1df4dcca0f"><param name="Name" value="rs2_get_frame_number"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#ae8119142df1f679459f8f917877ef292"><param name="Name" value="rs2_get_frame_object_detection"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#ae7a35c7bba27b468607eabe21feba90f"><param name="Name" value="rs2_get_frame_object_detection_count"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#a1a87bb32e1cf696ea02864982e3bc758"><param name="Name" value="rs2_get_frame_points_count"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#ad71a8d90691f31870e48cc5d7948eab9"><param name="Name" value="rs2_get_frame_sensor"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__frame_8h.html#a934adc8566831a683872452fdf9c1b3e"><param name="Name" value="rs2_get_frame_stream_profile"></OBJECT>
@@ -3894,6 +3986,7 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#acd73443847f83f446ab0bf83814cb7a8"><param name="Name" value="rs2_get_fw_log_parsed_thread_name"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#adcb973106b49cf182e2d8f36468133ec"><param name="Name" value="rs2_get_fw_log_parsed_timestamp"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a3d62f1b9d701e8402485d8d427d444cf"><param name="Name" value="rs2_get_number_of_fw_logs"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#af8f0fe8308c656c3c43cd52f3c1a8297"><param name="Name" value="rs2_inference_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a965d893d71ae858df154e6fdc8d4d039"><param name="Name" value="rs2_init_fw_log_parser"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a2fb417faa4b03664b42ffd274caa4506"><param name="Name" value="rs2_motion_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a71db469a5d568dcc3fd22f79dc562cbe"><param name="Name" value="rs2_parse_firmware_log"></OBJECT>
@@ -3912,6 +4005,8 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#ab1f4b1446711d1c7084fec0a58e1594f"><param name="Name" value="rs2_software_motion_frame"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a54e171611d31753c90df1c89adcd972b"><param name="Name" value="rs2_software_notification"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a1a0726bac17eb8e0dfab0993467d3ea1"><param name="Name" value="rs2_software_pose_frame"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a274bbfad1d75bed0943ff1b483de28c1"><param name="Name" value="rs2_software_sensor_add_inference_stream"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a99de97ed0d0b5591f8e46c81de28344c"><param name="Name" value="rs2_software_sensor_add_inference_stream_ex"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a331c7cc88318f764b42e155e34361ebf"><param name="Name" value="rs2_software_sensor_add_motion_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a66f7a224a503fc69054c2561385ed93e"><param name="Name" value="rs2_software_sensor_add_motion_stream_ex"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__internal_8h.html#a23171f4fe2a4b88713dd4feeaa8b91cb"><param name="Name" value="rs2_software_sensor_add_option"></OBJECT>
@@ -4197,6 +4292,7 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing_8h.html#a1833db1f893d41eaca77c1aa3b21103e"><param name="Name" value="rs2_create_hole_filling_filter_block"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing_8h.html#ae2a413b273e6134503701e4fa51b3793"><param name="Name" value="rs2_create_huffman_depth_decompress_block"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing_8h.html#abca051972ea197c271d06135ff317483"><param name="Name" value="rs2_create_m420_decoder"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing_8h.html#afdb571f57c8f4e2011694d9dfa8ed00a"><param name="Name" value="rs2_create_nv12_decoder"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing_8h.html#a938d8bf686d1bd682a2bd325566984c9"><param name="Name" value="rs2_create_pointcloud"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing_8h.html#a16da095219047a23e417dfe130a064d8"><param name="Name" value="rs2_create_processing_block"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing_8h.html#ae9abaf88665e024caff89168f2fd0928"><param name="Name" value="rs2_create_processing_block_fptr"></OBJECT>
@@ -4248,6 +4344,7 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#a8dc2ab06bddd96498a3b6b37a1647f0d"><param name="Name" value="rs2_gl_create_camera_renderer"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#adb823136824390db59f3b62f719935cd"><param name="Name" value="rs2_gl_create_colorizer"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#aab8f66910dd882e2e40236b4acc44d3f"><param name="Name" value="rs2_gl_create_m420_decoder"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#a4b436bea672505e7c0a2e2be6d1ce4fb"><param name="Name" value="rs2_gl_create_nv12_decoder"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#a0667056f4022d504aa55f66b0fff64c1"><param name="Name" value="rs2_gl_create_pointcloud"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#a91b4b9ea764aaeaab5b9f8879f9127bb"><param name="Name" value="rs2_gl_create_pointcloud_renderer"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__processing__gl_8h.html#aefa6118c5e67861e595bcc12253d0e3f"><param name="Name" value="rs2_gl_create_uploader"></OBJECT>
@@ -4375,6 +4472,7 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7a04ecec4dbd0e34203d35e8051df8733d"><param name="Name" value="RS2_FORMAT_MJPEG"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7aad993ee37afdd24d0eacd296f0d379a8"><param name="Name" value="RS2_FORMAT_MOTION_RAW"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7a0ed023ec98b6b074a5dfd5421bc68a69"><param name="Name" value="RS2_FORMAT_MOTION_XYZ32F"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7af3ba78e2077e811510fa3953a3e6fdf7"><param name="Name" value="RS2_FORMAT_NV12"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7a5d862a212fe8cb46a7d096ad8067daad"><param name="Name" value="RS2_FORMAT_RAW10"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7ade5a2ef53896420d36fa99a2b05b114e"><param name="Name" value="RS2_FORMAT_RAW16"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#ae04b7887ce35d16dbd9d2d295d23aac7ad97669872df3615816013885ebf2cc43"><param name="Name" value="RS2_FORMAT_RAW8"></OBJECT>
@@ -4457,6 +4555,7 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a8f552b0e5bdeb8a65237639118ef8f90"><param name="Name" value="RS2_STREAM_INFRARED"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a901a66592d2fb6b1caf5fc7af0e5c0fd"><param name="Name" value="RS2_STREAM_LABELED_POINT_CLOUD"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a9e201e9b86d863cd356989ceef41839c"><param name="Name" value="RS2_STREAM_MOTION"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93ab227c44ad4509acc8b88bd3d3d3b67bb"><param name="Name" value="RS2_STREAM_OBJECT_DETECTION"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93a053761b37e48dbd15de9c6800e7bac38"><param name="Name" value="RS2_STREAM_OCCUPANCY"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a01b4027af33139de861408872dd11b93aca8232029db741f594390d2c091f17a5"><param name="Name" value="RS2_STREAM_POSE"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__sensor_8h.html#a3ae4ca1cc2a0dee0e248a537175cca47"><param name="Name" value="rs2_stream_profile_is"></OBJECT>
@@ -4544,6 +4643,9 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aad2814254defb10cb44b1c189e3eac211"><param name="Name" value="RS2_EXTENSION_GLOBAL_TIMER"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa08c5658e1c511432fc2abaa037b8372c"><param name="Name" value="RS2_EXTENSION_HDR_MERGE"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa101bf1e5d8dae9ea3e094f3f2431ef39"><param name="Name" value="RS2_EXTENSION_HOLE_FILLING_FILTER"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aadb1cf457414858731289907e2bba09d4"><param name="Name" value="RS2_EXTENSION_INFERENCE_FRAME"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa86b64b3e214b99dfaee1f517a72ec64e"><param name="Name" value="RS2_EXTENSION_INFERENCE_PROFILE"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa8cddfbce1a183915c493a0c124661a03"><param name="Name" value="RS2_EXTENSION_INFERENCE_SENSOR"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa040d8741d908b6a09b470e38368b5fc1"><param name="Name" value="RS2_EXTENSION_INFO"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa1d2bcd64e483ea14e0aba3a0cdaee12a"><param name="Name" value="RS2_EXTENSION_L500_DEPTH_SENSOR"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aaca65d216e15a20f5b6cf02bb3d991ed1"><param name="Name" value="RS2_EXTENSION_LABELED_POINTS"></OBJECT>
@@ -4552,6 +4654,8 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa0375b1103516c3bf8adc57799a280a2a"><param name="Name" value="RS2_EXTENSION_MOTION_FRAME"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa135eaf8c130b298d1c1a4f91fc5a122b"><param name="Name" value="RS2_EXTENSION_MOTION_PROFILE"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aaeef4e27f41b821bd00422c9a74cdb94c"><param name="Name" value="RS2_EXTENSION_MOTION_SENSOR"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aaafdd4bd2eb58da68c1b39b5c6398a948"><param name="Name" value="RS2_EXTENSION_OBJECT_DETECTION_FRAME"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa7e24d5e845ae43ee06a8685d76bf93b4"><param name="Name" value="RS2_EXTENSION_OBJECT_DETECTION_SENSOR"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aad0b471682a80b618915cd94ca1811f0d"><param name="Name" value="RS2_EXTENSION_OPTIONS"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aa50a39af1635929851fac646b3fe13e7c"><param name="Name" value="RS2_EXTENSION_PLAYBACK"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a7b6061f32e49fc7c6ff0e5734a380d8aaf18d10426a1efc4bef5c88ab3c84581c"><param name="Name" value="RS2_EXTENSION_POINTS"></OBJECT>
@@ -4638,6 +4742,7 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#ae5a5086c91241d2e1594ca45bf4bcbf7"><param name="Name" value="rs2_notification_category_to_string"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a5b8efd94f1165be36acea964bf3bdd8da95fd1a425f12f8350953853769873308"><param name="Name" value="RS2_NOTIFICATION_CATEGORY_UNKNOWN_ERROR"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#ac4cfaf43c30c37843a3ac1d27d1ac870"><param name="Name" value="rs2_notifications_callback"></OBJECT>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#ac7f2e949a8d4751dad7e4086bf8dfb80"><param name="Name" value="rs2_object_detection"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#ae51b2a412b632c6caef98bf91629f274"><param name="Name" value="rs2_options"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#adaa13efad6beab68a37bf0a38ee65243"><param name="Name" value="rs2_options_changed_callback"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="rs__types_8h.html#a8df858879d325a88c12d8caf06081c8b"><param name="Name" value="rs2_options_changed_callback_ptr"></OBJECT>
@@ -4714,6 +4819,7 @@
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1safety__sensor.html#a60780a418be54d76be567eaa0989de69"><param name="Name" value="safety_sensor"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1save__single__frameset.html#ab905a1e107b22906d1790d3e0b88b083"><param name="Name" value="save_single_frameset"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1save__to__ply.html#a1b184ed01b6d59cd3e36a7e4997653bf"><param name="Name" value="save_to_ply"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#accabe2c55e43a4e2d10f2b07eff85531"><param name="Name" value="score"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="struct_s_t_depth_control_group.html#a9eadcb155cc97c301972cabb5c9e01e7"><param name="Name" value="scoreThreshA"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="struct_s_t_depth_control_group.html#a4ff63b7cd8f58734c6d3fa6ac3240119"><param name="Name" value="scoreThreshB"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1playback.html#ae1ad770b827a5794a83b37826ffdcb2a"><param name="Name" value="seek"></OBJECT>
@@ -4965,6 +5071,8 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__software__video__frame.html#a461f477509f34bf3d011bf86369938e7"><param name="Name" value="rs2_software_video_frame"></OBJECT>
   </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs400_1_1advanced__mode.html#aefda0f29337a43f434485d4933e39f92"><param name="Name" value="toggle_advanced_mode"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#ac41b3a622163695ea6ea3dbad12fe911"><param name="Name" value="top_left_x"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__object__detection.html#ac85095785c9448411e80b4cdf1b437bd"><param name="Name" value="top_left_y"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__pose.html#ab135c3ab4a19dd74cdc38774712a8521"><param name="Name" value="tracker_confidence"></OBJECT>
   <UL>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__pose.html#ab135c3ab4a19dd74cdc38774712a8521"><param name="Name" value="rs2_pose"></OBJECT>
@@ -4983,8 +5091,9 @@
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1pipeline.html#ac26eb27ff433e3b0b3c144b814300a7a"><param name="Name" value="rs2::pipeline"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="classrs2_1_1syncer.html#a021ebf9270b3783d39bad864ee1ad499"><param name="Name" value="rs2::syncer"></OBJECT>
   </UL>
-  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__motion__stream.html#aeb24ee996f653c9ab49da33e1add6a43"><param name="Name" value="type"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#a494eadabd086d067631bf0bb525bb693"><param name="Name" value="type"></OBJECT>
   <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#a494eadabd086d067631bf0bb525bb693"><param name="Name" value="rs2_inference_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__motion__stream.html#aeb24ee996f653c9ab49da33e1add6a43"><param name="Name" value="rs2_motion_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__option__value.html#a08c0254b85058b60987d8235e02a51f3"><param name="Name" value="rs2_option_value"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__pose__stream.html#a100211b71973b494311b327613c29856"><param name="Name" value="rs2_pose_stream"></OBJECT>
@@ -4993,8 +5102,9 @@
   </UL>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2_1_1texture__coordinate.html#ad6925011ee9b5cfb22cbe0873c97a5ec"><param name="Name" value="u"></OBJECT>
   <LI><OBJECT type="text/sitemap"><param name="Local" value="struct_s_t_census_radius.html#af4eb42af68d68101de45d92ccdd7471f"><param name="Name" value="uDiameter"></OBJECT>
-  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__motion__stream.html#abf0a539bda7f0e7f26f0cefb21f07c20"><param name="Name" value="uid"></OBJECT>
+  <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#a98bf8496a9693911297a127f9f99b11e"><param name="Name" value="uid"></OBJECT>
   <UL>
+    <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__inference__stream.html#a98bf8496a9693911297a127f9f99b11e"><param name="Name" value="rs2_inference_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__motion__stream.html#abf0a539bda7f0e7f26f0cefb21f07c20"><param name="Name" value="rs2_motion_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__pose__stream.html#afdcc0fadd2d798231d59ed7a80a94446"><param name="Name" value="rs2_pose_stream"></OBJECT>
     <LI><OBJECT type="text/sitemap"><param name="Local" value="structrs2__video__stream.html#a6801eff643e1f710976154fa1b8a0dfd"><param name="Name" value="rs2_video_stream"></OBJECT>
