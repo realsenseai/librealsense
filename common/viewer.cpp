@@ -12,6 +12,10 @@
 
 #include "udev-rules.h"
 
+#ifdef ENABLED_STATS
+#include "rum-uploader/rum-uploader.h"
+#endif
+
 #include <opengl3.h>
 
 #include <imgui_internal.h>
@@ -30,6 +34,7 @@
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <regex>
 #include <algorithm>
+#include <fstream>
 
 namespace rs2
 {
@@ -2668,6 +2673,20 @@ namespace rs2
                 }
 
                 ImGui::PopStyleColor(2);
+
+#ifdef ENABLED_STATS
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_Text, tab != 4 ? light_grey : light_blue);
+                ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, tab != 4 ? light_grey : light_blue);
+                if (ImGui::Button("Privacy", { 110, 30 }))
+                {
+                    tab = 4;
+                    config_file::instance().set(configurations::viewer::settings_tab, tab);
+                    temp_cfg.set(configurations::viewer::settings_tab, tab);
+                }
+                ImGui::PopStyleColor(2);
+#endif
+
                 ImGui::PopFont();
                 ImGui::PopStyleColor(2); // button color
 
@@ -3107,6 +3126,77 @@ namespace rs2
                     }
 #endif
                 }
+
+#ifdef ENABLED_STATS
+                if (tab == 4)
+                {
+                    ImGui::Text("Real User Monitoring (RUM)");
+                    ImGui::Text("Anonymous usage statistics are collected locally. Cloud upload happens only with your consent.");
+                    ImGui::Separator();
+
+                    bool cloud_enabled = temp_cfg.get(configurations::privacy::rum_cloud_enabled);
+                    if (ImGui::Checkbox("Enable anonymous cloud upload", &cloud_enabled))
+                        temp_cfg.set(configurations::privacy::rum_cloud_enabled, cloud_enabled);
+
+                    int cadence_h = temp_cfg.get_or_default(configurations::privacy::rum_upload_cadence_hours, 24);
+                    ImGui::Text("Upload cadence (hours):");
+                    ImGui::SameLine();
+                    ImGui::PushItemWidth(120);
+                    if (ImGui::SliderInt("##rum_cadence_h", &cadence_h, 1, 168))
+                        temp_cfg.set(configurations::privacy::rum_upload_cadence_hours, cadence_h);
+                    ImGui::PopItemWidth();
+
+                    ImGui::Separator();
+                    if (ImGui::Button("Export RUM data..."))
+                    {
+                        if (auto ret = file_dialog_open(save_file, "JSON\0*.json\0", NULL, NULL))
+                        {
+                            try
+                            {
+                                std::ofstream(ret) << rs2::rum::get_report();
+                            }
+                            catch (const std::exception& e) { LOG_ERROR("RUM export failed: " << e.what()); }
+                        }
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Upload now"))
+                    {
+                        if (!rs2::rum::is_cloud_enabled())
+                            LOG_INFO("RUM upload skipped: cloud upload is not enabled");
+                        else if (_rum_uploading.exchange(true))
+                            LOG_INFO("RUM upload already in progress");
+                        else
+                        {
+                            // Upload off the UI thread so a slow/stalled endpoint can't freeze the render
+                            // loop. The _rum_uploading flag above prevents a second click from starting (or
+                            // blocking on) an in-flight upload; the prior thread is already finished here, so
+                            // this join is instant. The thread is also joined in the viewer_model dtor.
+                            if (_rum_upload_thread.joinable())
+                                _rum_upload_thread.join();
+                            _rum_upload_thread = std::thread([this]()
+                            {
+                                try
+                                {
+                                    if (rs2::rum_uploader::upload(rs2::rum::get_report(), rs2::rum_uploader::endpoint()))
+                                    {
+                                        // Manual upload bypasses the cadence window but still resets it.
+                                        auto now = std::chrono::duration_cast<std::chrono::seconds>(
+                                            std::chrono::system_clock::now().time_since_epoch()).count();
+                                        config_file::instance().set(configurations::privacy::rum_last_upload, (long long)now);
+                                        LOG_INFO("RUM report uploaded to " << rs2::rum_uploader::endpoint());
+                                    }
+                                    else
+                                        LOG_ERROR("RUM upload failed");
+                                }
+                                catch (const std::exception& e) { LOG_ERROR("RUM upload error: " << e.what()); }
+                                _rum_uploading = false;
+                            });
+                        }
+                    }
+                    if (ImGui::IsItemHovered())
+                        RsImGui::CustomTooltip("Send the current report now (only if cloud upload is enabled above and applied)");
+                }
+#endif
                 }
                 ImGui::EndChild();
 

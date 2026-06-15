@@ -175,6 +175,13 @@ namespace rs2
             static const char* show_skybox{ "performance.show_skybox" };
             static const char* occlusion_invalidation{ "performance.occlusion_invalidation" };
         }
+        namespace privacy
+        {
+            // Bare keys shared with the SDK's RUM config (src/rum/rum-config) in realsense-config.json.
+            static const char* rum_cloud_enabled{ "rum_cloud_enabled" };
+            static const char* rum_upload_cadence_hours{ "rum_upload_cadence_hours" };
+            static const char* rum_last_upload{ "rum_last_upload" };  // unix seconds of last successful upload
+        }
         namespace ply
         {
             static const char* mesh{ "ply.mesh" };
