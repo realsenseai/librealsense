@@ -15,6 +15,7 @@
 #include "hpp/rs_safety_sensor.hpp"
 #include "hpp/rs_pipeline.hpp"
 #include "hpp/rs_eth_config.hpp"
+#include "hpp/rs_rum.hpp"
 
 namespace rs2
 {

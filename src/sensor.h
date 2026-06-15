@@ -274,6 +274,11 @@ namespace librealsense
 
         std::mutex _synthetic_configure_lock;
 
+#ifdef ENABLED_STATS
+        std::chrono::steady_clock::time_point _rum_stream_start;  // RUM: streamed-duration timing
+        bool _rum_streaming = false;
+#endif
+
         rs2_frame_callback_sptr _post_process_callback;
         std::shared_ptr<raw_sensor_base> _raw_sensor;
         formats_converter _formats_converter;
