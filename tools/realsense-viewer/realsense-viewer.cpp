@@ -25,8 +25,15 @@
 
 #include <imgui_internal.h>
 
+#ifdef ENABLED_STATS
+#include "rum-uploader/rum-uploader.h"
+#include <rsutils/easylogging/easyloggingpp.h>
+#include <chrono>
+#endif
+
 using namespace rs2;
 using namespace rs400;
+
 
 
 void update_viewer_configuration(viewer_model& viewer_model)
@@ -394,6 +401,60 @@ int run_viewer( int argc, const char ** argv,
         refresh_devices(m, ctx, devices_connection_changes, connected_devs,
             device_names, *device_models, viewer_model, error_message);
 
+#ifdef ENABLED_STATS
+        // First-run RUM consent: shown once when no decision exists in the config
+        // (three-state: missing -> ask, true/false -> silent). Choice persists immediately.
+        {
+            static bool rum_startup_done = false;
+            if (!rum_startup_done)
+            {
+                rum_startup_done = true;
+                if (!config_file::instance().contains(configurations::privacy::rum_cloud_enabled))
+                    ImGui::OpenPopup("Help improve RealSense");
+                else
+                {
+                    // Background-upload the previous session's saved report (cadence-gated, off the UI thread).
+                    auto& cfg = config_file::instance();
+                    rs2::rum_uploader::start_saved_upload(
+                        cfg.get_or_default(configurations::privacy::rum_upload_cadence_hours, 24),
+                        cfg.get_or_default(configurations::privacy::rum_last_upload, 0ll),
+                        []( long long t ){ config_file::instance().set(configurations::privacy::rum_last_upload, t); } );
+                }
+            }
+
+            ImGui::SetNextWindowSize({ 460.f, 0.f });
+            if (ImGui::BeginPopupModal("Help improve RealSense", nullptr,
+                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove))
+            {
+                ImGui::PushFont(window.get_large_font());
+                ImGui::Text("Help improve RealSense");
+                ImGui::PopFont();
+                ImGui::Separator();
+                ImGui::Spacing();
+                ImGui::TextWrapped("Share anonymous usage statistics (devices, stream configs, options, "
+                                   "and errors) to help us prioritize fixes and features.");
+                ImGui::Spacing();
+                ImGui::TextWrapped("No personal data, serial numbers, or image content is ever collected. "
+                                   "You can change this any time in Settings > Privacy.");
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+                if (ImGui::Button("Yes, enable", ImVec2(150, 30)))
+                {
+                    config_file::instance().set(configurations::privacy::rum_cloud_enabled, true);
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("No thanks", ImVec2(150, 30)))
+                {
+                    config_file::instance().set(configurations::privacy::rum_cloud_enabled, false);
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+        }
+#endif
+
         auto output_height = viewer_model.get_output_height();
 
         rect viewer_rect = { viewer_model.panel_width,
@@ -674,6 +735,16 @@ int run_viewer( int argc, const char ** argv,
             if (sub->streaming)
                 sub->stop(viewer_model.not_model);
         }
+
+#ifdef ENABLED_STATS
+    // stop() runs asynchronously and is where streamed-duration is recorded, so join any pending
+    // stop here; the session is persisted automatically when the SDK context is destroyed.
+    for (auto&& device_model : *device_models)
+        for (auto&& sub : device_model->subdevices)
+            try { sub->wait_for_stop(); } catch (...) {}
+    // Join the boot-upload worker before teardown so it can't touch singletons during static destruction.
+    rs2::rum_uploader::join_saved_upload();
+#endif
 
     return EXIT_SUCCESS;
 }
