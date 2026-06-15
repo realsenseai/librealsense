@@ -106,7 +106,7 @@ namespace rs2
         bool show_metadata = false;
         bool show_safety_zones_2d = true;
 
-        bool show_grid     = false;
+        bool show_crosshair     = false;
         int  grid_h_lines  = 1;
         int  grid_v_lines  = 1;
         int  grid_line_width = 1;

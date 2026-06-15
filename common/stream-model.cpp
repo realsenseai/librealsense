@@ -31,7 +31,7 @@ namespace rs2
         show_safety_zones_2d = config_file::instance().get_or_default(
             configurations::viewer::show_safety_zones_2d, true);
         {
-            namespace cfg = configurations::viewer::viewport_grid;
+            namespace cfg = configurations::viewer::viewport_grid_overlay;
             auto& cf = config_file::instance();
 
             auto valid_lines = []( int v ) { return ( v >= 1 && v <= 5 ) ? v : 1; };
@@ -453,14 +453,13 @@ namespace rs2
     void stream_model::show_stream_header(ImFont* font, const rect &stream_rect, viewer_model& viewer)
     {
         const auto top_bar_height = 32.f;
-        auto num_of_buttons = 5;
+        auto num_of_buttons = 6; // Crosshair button is the latest addition
 
         if (!viewer.allow_stream_close) --num_of_buttons;
         if (viewer.streams.size() > 1) ++num_of_buttons;
         if (RS2_STREAM_DEPTH == profile.stream_type()) ++num_of_buttons; // Color map ruler button
         if (RS2_FORMAT_MOTION_XYZ32F == profile.format()) ++num_of_buttons; // Motion graph button
         if (RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1) ++num_of_buttons; // Safety zones button
-        ++num_of_buttons; // Grid overlay button
 
         RsImGui_ScopePushFont(font);
         ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
@@ -601,23 +600,23 @@ namespace rs2
         ImGui::SameLine();
 
         label = rsutils::string::from() << textual_icons::grid << "##Grid " << profile.unique_id();
-        if (show_grid)
+        if (show_crosshair)
         {
             ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
             ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue);
             if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
             {
-                show_grid = false;
+                show_crosshair = false;
             }
             if (ImGui::IsItemHovered())
-                RsImGui::CustomTooltip("Hide crosshair/grid overlay");
+                RsImGui::CustomTooltip("Hide crosshair overlay");
             ImGui::PopStyleColor(2);
         }
         else
         {
             if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
             {
-                show_grid = true;
+                show_crosshair = true;
             }
             if (ImGui::IsItemHovered())
                 RsImGui::CustomTooltip("Show crosshair/grid overlay");
@@ -2114,7 +2113,7 @@ namespace rs2
 
             update_ae_roi_rect(stream_rect, g, error_message);
 
-            if (show_grid)
+            if (show_crosshair)
                 draw_crosshair(stream_rect, grid_h_lines, grid_v_lines, grid_line_width,
                                grid_color_r, grid_color_g, grid_color_b);
 

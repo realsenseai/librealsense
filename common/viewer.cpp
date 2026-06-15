@@ -3287,7 +3287,7 @@ namespace rs2
                         reload_required = true;
                         temp_cfg = config_file();
                         {
-                            namespace cfg = configurations::viewer::viewport_grid;
+                            namespace cfg = configurations::viewer::viewport_grid_overlay;
                             temp_cfg.set_nested_default( cfg::horizontal_lines, 1   );
                             temp_cfg.set_nested_default( cfg::vertical_lines,   1   );
                             temp_cfg.set_nested_default( cfg::line_width,       1   );

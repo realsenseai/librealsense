@@ -89,7 +89,7 @@ namespace rs2
 
         if( config_file::instance().is_empty() )
         {
-            namespace cfg = configurations::viewer::viewport_grid;
+            namespace cfg = configurations::viewer::viewport_grid_overlay;
             auto& cf = config_file::instance();
             cf.set_nested_default( cfg::horizontal_lines, 1   );
             cf.set_nested_default( cfg::vertical_lines,   1   );
