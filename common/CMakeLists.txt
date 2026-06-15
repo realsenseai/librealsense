@@ -98,10 +98,16 @@ set(UTILITIES_FILES
     "${CMAKE_CURRENT_LIST_DIR}/utilities/imgui/wrap.cpp"
     )
 
+set(RUM_UPLOADER_FILES
+    "${CMAKE_CURRENT_LIST_DIR}/rum-uploader/rum-uploader.h"
+    "${CMAKE_CURRENT_LIST_DIR}/rum-uploader/rum-uploader.cpp"
+    )
+
 set(COMMON_SRC
     ${COMMON_SRC}
     ${SW_UPDATE_FILES}
     ${REFLECTIVITY_FILES}
     ${UTILITIES_FILES}
+    ${RUM_UPLOADER_FILES}
     )
 
