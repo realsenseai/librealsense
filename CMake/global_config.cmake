@@ -63,6 +63,10 @@ macro(global_set_flags)
         add_definitions(-DBUILD_SHARED_LIBS)
     endif()
 
+    if (ENABLED_STATS)
+        add_definitions(-DENABLED_STATS)
+    endif()
+
     if (BUILD_WITH_CUDA)
         include(CMake/cuda_config.cmake)
     endif()
