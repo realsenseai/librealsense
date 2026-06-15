@@ -68,7 +68,7 @@ jobs:
         cd ${{env.WIN_BUILD_DIR}}
         pwd
         ls        
-        cmake ${LRS_SRC_DIR} -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=true -DBUILD_TOOLS=true -DCHECK_FOR_UPDATES=true
+        cmake ${LRS_SRC_DIR} -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=true -DBUILD_TOOLS=true -DCHECK_FOR_UPDATES=true -DENABLED_STATS=ON
 
     - name: Build
       # Build your program with the given configuration
@@ -397,7 +397,7 @@ jobs:
       shell: bash
       run: |
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=true -DUNIT_TESTS_ARGS="--not-live --context=linux" -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3)
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=true -DUNIT_TESTS_ARGS="--not-live --context=linux" -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DENABLED_STATS=ON
         cmake --build . -- -j4  
 
     - name: LibCI
