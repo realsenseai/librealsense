@@ -13,6 +13,10 @@
 #include <librealsense2/hpp/rs_frame.hpp>
 #include <librealsense2/hpp/rs_processing.hpp>
 
+#ifdef ENABLED_STATS
+#include <atomic>
+#endif
+
 namespace librealsense
 {
 
@@ -66,6 +70,9 @@ namespace librealsense
         std::mutex _mutex;
         rs2_frame_processor_callback_sptr _callback;
         synthetic_source _source_wrapper;
+#ifdef ENABLED_STATS
+        std::atomic< bool > _rum_applied{ false };  // RUM: report first frame through this block once
+#endif
     };
 
     class LRS_EXTENSION_API generic_processing_block : public processing_block

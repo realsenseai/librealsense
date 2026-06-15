@@ -9,6 +9,7 @@
 #include "dds/rsdds-device-factory.h"
 #endif
 #include "rscore-pp-block-factory.h"
+#include "rum/rum-hooks.h"
 
 #include <librealsense2/hpp/rs_types.hpp>  // rs2_devices_changed_callback
 #include <librealsense2/rs.h>              // RS2_API_FULL_VERSION_STR
@@ -107,6 +108,7 @@ namespace librealsense {
 
     context::~context()
     {
+        rum::hooks::on_context_closed();   // persist the RUM report for this session (local file write)
     }
 
 

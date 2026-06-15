@@ -59,6 +59,9 @@
 #include "debug-stream-sensor.h"
 #include "max-usable-range-sensor.h"
 #include "fw-update/fw-update-device-interface.h"
+#include "rum/rum-config.h"
+#include "rum/rum-collector.h"
+#include "rum/rum-hooks.h"
 #include "core/frame-callback.h"
 #include "color-sensor.h"
 #include "inference-sensor.h"
@@ -288,6 +291,7 @@ NOEXCEPT_RETURN(nullptr, what, name, args, type)
 
 void notifications_processor::raise_notification(const notification n)
 {
+    librealsense::rum::hooks::on_notification(n.category);
     _dispatcher.invoke([this, n](dispatcher::cancellable_timer ct)
     {
         std::lock_guard<std::mutex> lock(_callback_mutex);
@@ -408,7 +412,10 @@ rs2_device* rs2_create_device(const rs2_device_list* info_list, int index, rs2_e
     VALIDATE_NOT_NULL(info_list);
     VALIDATE_RANGE(index, 0, (int)info_list->list.size() - 1);
 
-    return new rs2_device{ info_list->list[index]->create_device() };
+    auto dev = info_list->list[index]->create_device();
+    if( dev )
+        librealsense::rum::hooks::on_device( *dev );
+    return new rs2_device{ dev };
 }
 HANDLE_EXCEPTIONS_AND_RETURN(nullptr, info_list, index)
 
@@ -797,6 +804,25 @@ void rs2_delete_raw_data(const rs2_raw_data_buffer* buffer) BEGIN_API_CALL
 }
 NOEXCEPT_RETURN(, buffer)
 
+const rs2_raw_data_buffer* rs2_rum_get_report(rs2_error** error) BEGIN_API_CALL
+{
+    auto report = librealsense::rum::rum_collector::instance().get_report();
+    return new rs2_raw_data_buffer{ std::vector<uint8_t>( report.begin(), report.end() ) };
+}
+NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
+
+void rs2_rum_set_cloud_enabled(int enabled, rs2_error** error) BEGIN_API_CALL
+{
+    librealsense::rum::rum_config::instance().set_cloud_enabled( enabled != 0 );
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, enabled)
+
+int rs2_rum_is_cloud_enabled(rs2_error** error) BEGIN_API_CALL
+{
+    return librealsense::rum::rum_config::instance().is_cloud_enabled() ? 1 : 0;
+}
+NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(0)
+
 void rs2_open(rs2_sensor* sensor, const rs2_stream_profile* profile, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);
@@ -805,6 +831,7 @@ void rs2_open(rs2_sensor* sensor, const rs2_stream_profile* profile, rs2_error**
     std::vector<std::shared_ptr<stream_profile_interface>> request;
     request.push_back(std::dynamic_pointer_cast<stream_profile_interface>(profile->profile->shared_from_this()));
     sensor->sensor->open(request);
+    librealsense::rum::hooks::on_open(request);   // record only after a successful open
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, sensor, profile)
 
@@ -820,6 +847,7 @@ void rs2_open_multiple(rs2_sensor* sensor,
         request.push_back(std::dynamic_pointer_cast<stream_profile_interface>(profiles[i]->profile->shared_from_this()));
     }
     sensor->sensor->open(request);
+    librealsense::rum::hooks::on_open(request);   // record only after a successful open
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, sensor, profiles, count)
 
@@ -903,6 +931,7 @@ void rs2_set_option(const rs2_options* options, rs2_option option, float value, 
     VALIDATE_OPTION_ENABLED(options, option);
     auto& option_ref = options->options->get_option(option);
     auto range = option_ref.get_range();
+    float applied = value;   // value actually set (integer options are truncated); reported to RUM
     switch (option_ref.get_value_type())
     {
     case RS2_OPTION_TYPE_FLOAT:
@@ -917,7 +946,8 @@ void rs2_set_option(const rs2_options* options, rs2_option option, float value, 
         if ((int)value != value)
             LOG_WARNING("Float value " << value << " given to integer option " << rs2_get_option_name(options, option, error)
                 << ", truncating to " << std::trunc(value));
-        option_ref.set(std::trunc(value));
+        applied = std::trunc(value);
+        option_ref.set(applied);
         break;
 
     case RS2_OPTION_TYPE_BOOLEAN:
@@ -942,6 +972,7 @@ void rs2_set_option(const rs2_options* options, rs2_option option, float value, 
         }
         throw not_implemented_exception("use rs2_set_option_value to set string values");
     }
+    librealsense::rum::hooks::on_set_option( *options->options, option, applied, range.def );
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, options, option, value)
 

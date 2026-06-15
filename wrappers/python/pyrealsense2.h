@@ -244,3 +244,4 @@ void init_advanced_mode(py::module &m);
 void init_serializable_device(py::module& m);
 void init_util(py::module &m);
 void init_eth_config(py::module &m);
+void init_rum(py::module &m);
