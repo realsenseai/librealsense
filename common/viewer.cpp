@@ -3653,8 +3653,9 @@ namespace rs2
         if( ! objects )
             return;
 
-        // Require both color and depth; clear detections if either is absent
-        if( ! odf || ! cf || ! df || odf.get_detection_count() == 0 )
+        // OD boxes and distance are reported by the object detection stream. Depth is
+        // optional here and is only used to map boxes onto the depth preview.
+        if( ! odf || ! cf || odf.get_detection_count() == 0 )
         {
             std::lock_guard< std::mutex > lock( objects->mutex );
             objects->clear();
@@ -3664,18 +3665,36 @@ namespace rs2
         try
         {
             auto color_vsp = cf.get_profile().as< rs2::video_stream_profile >();
-            auto depth_vsp = df.get_profile().as< rs2::video_stream_profile >();
 
             rs2_intrinsics color_intrin = color_vsp.get_intrinsics();
-            rs2_intrinsics depth_intrin = depth_vsp.get_intrinsics();
-            rs2_extrinsics color_to_depth = color_vsp.get_extrinsics_to( depth_vsp );
-            rs2_extrinsics depth_to_color = depth_vsp.get_extrinsics_to( color_vsp );
-
             rs2::rect color_frame_rect{ 0.f, 0.f, float( color_intrin.width ), float( color_intrin.height ) };
-            rs2::rect depth_frame_rect{ 0.f, 0.f, float( depth_intrin.width ), float( depth_intrin.height ) };
 
-            uint16_t const * const depth_data  = reinterpret_cast< uint16_t const * >( df.get_data() );
-            float const            depth_scale = df.get_units();
+            bool has_depth = false;
+            rs2_intrinsics depth_intrin{};
+            rs2_extrinsics color_to_depth{};
+            rs2_extrinsics depth_to_color{};
+            rs2::rect depth_frame_rect = color_frame_rect;
+            uint16_t const * depth_data = nullptr;
+            float depth_scale = 0.f;
+
+            if( df )
+            {
+                try
+                {
+                    auto depth_vsp = df.get_profile().as< rs2::video_stream_profile >();
+                    depth_intrin = depth_vsp.get_intrinsics();
+                    color_to_depth = color_vsp.get_extrinsics_to( depth_vsp );
+                    depth_to_color = depth_vsp.get_extrinsics_to( color_vsp );
+                    depth_frame_rect = rs2::rect{ 0.f, 0.f, float( depth_intrin.width ), float( depth_intrin.height ) };
+                    depth_data = reinterpret_cast< uint16_t const * >( df.get_data() );
+                    depth_scale = df.get_units();
+                    has_depth = true;
+                }
+                catch( std::exception const & e )
+                {
+                    LOG_DEBUG( "Object detection depth projection unavailable: " << e.what() );
+                }
+            }
 
             objects_in_frame new_objects;
             unsigned int const count = odf.get_detection_count();
@@ -3691,13 +3710,16 @@ namespace rs2
                                       float( det.bottom_right_y - det.top_left_y ) };
                 rs2::rect normalized_color_bbox = color_bbox.normalize( color_frame_rect );
 
-                rs2::rect depth_bbox = project_color_bbox_to_depth( color_bbox, depth_data, depth_scale,
-                                                                    depth_intrin, color_intrin,
-                                                                    color_to_depth, depth_to_color, depth_frame_rect );
-                rs2::rect normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
+                rs2::rect normalized_depth_bbox = normalized_color_bbox;
+                float mean_depth = det.depth;
 
-                // Currently detection depth is not calculated in device, later we will use detection depth data.
-                float const mean_depth = sample_mean_depth( df, depth_bbox );
+                if( has_depth )
+                {
+                    rs2::rect depth_bbox = project_color_bbox_to_depth( color_bbox, depth_data, depth_scale,
+                                                                        depth_intrin, color_intrin,
+                                                                        color_to_depth, depth_to_color, depth_frame_rect );
+                    normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
+                }
 
                 std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
                 new_objects.emplace_back( size_t( i ), name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
