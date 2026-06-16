@@ -1802,6 +1802,15 @@ namespace librealsense
                     LOG_DEBUG_V4L("Select interrupted, val = " << val << ", error = " << errno);
             } while (val < 0 && errno == EINTR);
 
+            // patch for ENODEV(No such device) error, which is returned when the device is disconnected during streaming
+            // In this case, we want to break the streaming loop and close the device.
+            // the select call should return 0 at that time, because the device has been lost.
+            // just skip the loop, and wait wait_for_frames() timeout
+            if (errno == ENODEV) {
+                val = 0;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+
             LOG_DEBUG_V4L("Select done, val = " << val << " at " << time_in_HH_MM_SS_MMM());
             if(val < 0)
             {
