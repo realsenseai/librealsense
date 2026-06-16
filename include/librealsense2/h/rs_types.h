@@ -128,7 +128,7 @@ typedef struct rs2_object_detection
     int top_left_y;     /**< Top-left corner pixel Y coordinate */
     int bottom_right_x; /**< Bottom-right corner pixel X coordinate */
     int bottom_right_y; /**< Bottom-right corner pixel Y coordinate */
-    float depth;        /**< Mean depth in meters at detection location */
+    float depth;        /**< Object distance in meters; 0 when unavailable */
 } rs2_object_detection;
 
 /** \brief Severity of the librealsense logger. */

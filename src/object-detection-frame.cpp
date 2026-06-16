@@ -31,9 +31,9 @@ bool object_detection_frame::validate() const
     size_t expected_data_size_with_detections = expected_data_size_no_detections + detections_size;
     size_t expected_size_field = expected_data_size_with_detections - sizeof( object_detection_frame_header );
 
-    if( data.size() != expected_data_size_with_detections || payload->header.size != expected_size_field )
+    if( data.size() < expected_data_size_with_detections || payload->header.size != expected_size_field )
     {
-        LOG_WARNING( "Object Detection frame size mismatch: got " << data.size() << ", expected " << expected_data_size_with_detections <<
+        LOG_WARNING( "Object Detection frame size mismatch: got " << data.size() << ", expected at least " << expected_data_size_with_detections <<
                      ", header size field: " << payload->header.size << ", expected size field: " << expected_size_field );
         return false;
     }

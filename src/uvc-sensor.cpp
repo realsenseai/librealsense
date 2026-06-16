@@ -183,20 +183,28 @@ void uvc_sensor::open( const stream_profiles & requests )
                     int width = vsp ? vsp->get_width() : 0;
                     int height = vsp ? vsp->get_height() : 0;
 
-                    assert( ( width * height ) % 8 == 0 );
+                    const bool is_object_detection_stream =
+                        req_profile->get_stream_type() == RS2_STREAM_OBJECT_DETECTION;
+                    assert( is_object_detection_stream || ( width * height ) % 8 == 0 );
 
                     // TODO: remove when adding confidence format
                     if( req_profile->get_stream_type() == RS2_STREAM_CONFIDENCE )
                         bpp = 4;
 
                     if( ! msp )
-                        expected_size = compute_frame_expected_size( width, height, bpp );
+                    {
+                        expected_size = is_object_detection_stream
+                            ? f.frame_size
+                            : compute_frame_expected_size( width, height, bpp );
+                    }
 
                     // For compressed formats copy the raw data as is
                     if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG } ) )
                         expected_size = static_cast< int >( f.frame_size );
 
                     auto extension = frame_source::stream_to_frame_types( req_profile_base->get_stream_type() );
+                    if( is_object_detection_stream )
+                        fr->additional_data.raw_size = static_cast< uint32_t >( f.frame_size );
                     frame_holder fh = _source.alloc_frame(
                         { req_profile_base->get_stream_type(), req_profile_base->get_stream_index(), extension },
                         expected_size,
@@ -211,7 +219,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                         // method should be limited to use of MIPI - not for USB
                         // the aim is to grab the data from a bigger buffer, which is aligned to 64 bytes,
                         // when the resolution's width is not aligned to 64
-                        if( ( width * bpp >> 3 ) % 64 != 0 && f.frame_size > expected_size )
+                        if( ! is_object_detection_stream && ( width * bpp >> 3 ) % 64 != 0 && f.frame_size > expected_size )
                         {
                             std::vector< uint8_t > pixels = align_width_to_64( width, height, bpp, (uint8_t *)f.pixels );
                             assert( expected_size == sizeof( uint8_t ) * pixels.size() );

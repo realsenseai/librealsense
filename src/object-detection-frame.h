@@ -15,7 +15,7 @@ class object_detection_frame : public inference_frame
 public:
     // Frames received over the object detection stream are binary blobs with object_detection_payload layout.
 
-    static constexpr uint32_t MAGIC_NUMBER = 0x4F444554;  // "ODET"
+    static constexpr uint32_t MAGIC_NUMBER = 0x5445444F;  // "ODET", little endian
 
     enum class source : uint8_t
     {
@@ -26,7 +26,7 @@ public:
 #pragma pack( push, 1 )
     struct object_detection_frame_header
     {
-        uint32_t magic_number;  // Must equal OD_FRAME_MAGIC (0x4F444554, "ODET")
+        uint32_t magic_number;  // Must equal OD_FRAME_MAGIC (0x5445444F, "ODET")
         uint16_t version;       // major.minor SDK/HKR API version
         uint8_t data_type;      // 0 = object detection
         uint8_t flags;
@@ -37,7 +37,7 @@ public:
 
     struct object_detection_entry
     {
-        uint32_t detection_id;    // For detection/tracking traceability
+        uint16_t detection_id;    // For detection/tracking traceability
         uint8_t detection_type;   // 0 = person
         uint8_t confidence;       // 0-100
         uint16_t top_left_x;      // Bounding box top-left X [pixels]
@@ -58,6 +58,9 @@ public:
         object_detection_entry detections[1]; // `number_of_detections` entries of type `object_detection_entry`
     };
 #pragma pack( pop )
+
+    static_assert( sizeof( object_detection_frame_header ) == 20, "Unexpected OD header size" );
+    static_assert( sizeof( object_detection_entry ) == 16, "Unexpected OD detection entry size" );
 
     size_t get_detection_count() const;
     object_detection_entry get_detection( size_t index ) const;
