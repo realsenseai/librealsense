@@ -8,6 +8,7 @@
 #include <string>
 #include <atomic>
 #include <thread>
+#include <chrono>
 #include <functional>
 
 #ifdef _WIN32
@@ -69,7 +70,12 @@ bool atomic_write_file( const std::string & filename, const std::string & conten
         ok = MoveFileExA( temp_filename.c_str(), filename.c_str(),
                           MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH ) != 0;
         if( !ok && attempt < 4 )
-            Sleep( 20 );
+        {
+            DWORD err = GetLastError();
+            if( err != ERROR_SHARING_VIOLATION && err != ERROR_ACCESS_DENIED )
+                break;
+            std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
+        }
     }
 #else
     bool ok = std::rename( temp_filename.c_str(), filename.c_str() ) == 0;

@@ -9,6 +9,7 @@
 #include <rsutils/json.h>
 #include <rsutils/json-config.h>
 #include <sstream>
+#include <mutex>
 #include <rsutils/easylogging/easyloggingpp.h>
 
 using json = rsutils::json;
@@ -77,15 +78,23 @@ config_value config_file::get(const char* key) const
 
 void config_file::save(const char* filename)
 {
-    std::lock_guard< std::recursive_mutex > lk( _mutex );
-    if( ! filename )
+    std::string serialized;
     {
-        LOG_ERROR( "Config file name is null, cannot save config." );
-        return;
+        std::lock_guard< std::recursive_mutex > lk( _mutex );
+        if( ! filename )
+        {
+            LOG_ERROR( "Config file name is null, cannot save config." );
+            return;
+        }
+        std::ostringstream oss;
+        oss << std::setw( 2 ) << _j;
+        serialized = oss.str();
     }
-    std::ostringstream oss;
-    oss << std::setw( 2 ) << _j;
-    if( ! rsutils::os::atomic_write_file( filename, oss.str() ) )
+    // Serialize disk writes without holding _mutex so readers (get/set) are not
+    // blocked during I/O or retries.
+    static std::mutex s_write_mutex;
+    std::lock_guard< std::mutex > wlk( s_write_mutex );
+    if( ! rsutils::os::atomic_write_file( filename, serialized ) )
         LOG_ERROR( "Failed to save config file '" + std::string( filename ) + "'" );
 }
 
@@ -114,7 +123,10 @@ config_file::config_file( std::string const & filename )
 void config_file::save()
 {
     if( _filename.empty() )
+    {
+        LOG_DEBUG( "save() called on config_file with no filename -- skipping" );
         return;
+    }
     save( _filename.c_str() );
 }
 
