@@ -393,6 +393,16 @@ def enabled():
     return { device.serial_number for device in _device_by_sn.values() if device.enabled }
 
 
+def port_enabled():
+    """
+    :return: A set of device serial-numbers whose hub port is currently enabled, queried from the
+    hub (the source of truth for port state) -- as opposed to enabled(), which is device presence.
+    """
+    global _device_by_sn
+    active = hub.ports() if hub else []
+    return { device.serial_number for device in _device_by_sn.values() if device.port in active }
+
+
 def by_product_line( product_line, ignored_products ):
     """
     :param product_line: The product line we're interested in, as a string ("L500", etc.)
@@ -616,7 +626,8 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
         ports = [ get( sn ).port for sn in serial_numbers ]
         # DDS (and other non-hub) devices have port=None; filter them out of hub operations
         wanted_ports = sorted( p for p in ports if p is not None )
-        enabled_ports = [ get( sn ).port for sn in enabled() if get( sn ).port is not None ]
+        enabled_sns = port_enabled()
+        enabled_ports = [ get( sn ).port for sn in enabled_sns if get( sn ).port is not None ]
         #
         if recycle:
             #
@@ -625,7 +636,7 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
             elif enabled_ports:
                 log.d( 'enabling ports', wanted_ports,
                        'disabling currently enabled ports', enabled_ports )
-                sns_to_remove = { sn for sn in enabled() if get( sn ).port in enabled_ports }
+                sns_to_remove = { sn for sn in enabled_sns if get( sn ).port in enabled_ports }
                 hub.disable_ports( enabled_ports )
                 _wait_until_removed( sns_to_remove, timeout = timeout )
             #
