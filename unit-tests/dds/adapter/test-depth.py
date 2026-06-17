@@ -113,8 +113,8 @@ try:
     del context
 
 finally:
-    # Always ensure the adapter process is terminated, even if test fails
-    with test.closure( 'Stop rs-dds-adapter', on_fail=test.ABORT ):
+    # Kill directly, not via test.closure: an aborted test would make the closure throw and skip the kill.
+    if adapter_process:
         try:
             # Try graceful termination first (SIGTERM lets adapter release DDS resources on Linux)
             adapter_process.send_signal( signal.SIGTERM )
