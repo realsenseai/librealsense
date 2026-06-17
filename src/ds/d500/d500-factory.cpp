@@ -320,8 +320,9 @@ namespace librealsense
 
     class rs555_device
         : public d500_active
-        , public d500_color
+        //, public d500_color
         , public d500_motion
+        , public d500_dual_rgb
         , public d500_object_detection
         , public ds_advanced_mode_base
         , public extended_firmware_logger_device
@@ -333,8 +334,9 @@ namespace librealsense
             , backend_device( dev_info )
             , d500_device( dev_info )
             , d500_active( dev_info )
-            , d500_color( dev_info, RS2_FORMAT_YUYV )
+            //, d500_color( dev_info, RS2_FORMAT_YUYV )
             , d500_motion( dev_info )
+            , d500_dual_rgb( dev_info )
             , d500_object_detection( dev_info )
             , ds_advanced_mode_base()
             , extended_firmware_logger_device( dev_info, d500_device::_hw_monitor, get_firmware_logs_command() )
@@ -371,7 +373,9 @@ namespace librealsense
         std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override
         {
 
-            std::vector< std::shared_ptr< stream_interface > > streams = { _depth_stream, _left_ir_stream, _right_ir_stream, _color_stream,
+            std::vector< std::shared_ptr< stream_interface > > streams = { _depth_stream, _left_ir_stream, _right_ir_stream, //_color_stream,
+                                                                           _color_stream_1,
+                                                                           _color_stream_2,
                                                                            _ds_motion_common->get_accel_stream(),
                                                                            _ds_motion_common->get_gyro_stream(),
                                                                            _object_detection_stream };
@@ -382,7 +386,10 @@ namespace librealsense
         {
             std::vector< tagged_profile > tags;
 
-            tags.push_back( { RS2_STREAM_COLOR, -1, 896, 504, RS2_FORMAT_RGB8, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
+            //tags.push_back( { RS2_STREAM_COLOR, -1, 896, 504, RS2_FORMAT_RGB8, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
+            // Dual-RGB M420 color streams default to RGB8 @ 1280x720 (a resolution both color pins offer; the 896x504
+            // default above only covers a dedicated color sensor / the full-resolution color pin).
+            tags.push_back( { RS2_STREAM_COLOR, -1, 1280, 720, RS2_FORMAT_RGB8, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
             tags.push_back( { RS2_STREAM_DEPTH, -1, 896, 504, RS2_FORMAT_Z16, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
             tags.push_back( { RS2_STREAM_INFRARED, -1, 896, 504, RS2_FORMAT_Y8, 30, profile_tag::PROFILE_TAG_SUPERSET } );
             tags.push_back( { RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_200, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
