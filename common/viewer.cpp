@@ -25,9 +25,11 @@
 #include <rsutils/string/trim-newlines.h>
 #include <common/utilities/imgui/wrap.h>
 #include <common/labeled-point-cloud-utilities.h>
+#include "utilities/com/CenterOfMass.h"
 
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <regex>
+#include <algorithm>
 
 namespace rs2
 {
@@ -2064,6 +2066,19 @@ namespace rs2
                     // The rectangle itself is always drawn, in the same color as the text
                     glColor3f( a * frame_color.Value.x, a * frame_color.Value.y, a * frame_color.Value.z );
                     draw_rect( bbox, 2 );
+
+                    // Red dot at the center-of-mass point with confidence label
+                    ImVec2 const com_screen{ bbox.x + object.com_rel_u * bbox.w,
+                                             bbox.y + object.com_rel_v * bbox.h };
+                    ImGui::GetWindowDrawList()->AddCircleFilled( com_screen, 5.f, ImColor( 1.f, 0.f, 0.f, a ) );
+                    if( object.score > 0 )
+                    {
+                        std::string conf_str = rsutils::string::from() << object.score << "%";
+                        ImGui::GetWindowDrawList()->AddText(
+                            { com_screen.x + 8.f, com_screen.y - 7.f },
+                            ImColor( 1.f, 0.f, 0.f, a ),
+                            conf_str.c_str() );
+                    }
                 }
             }
 
@@ -3584,39 +3599,6 @@ namespace rs2
         return rs2::rect{ dst_tl[0], dst_tl[1], dst_br[0] - dst_tl[0], dst_br[1] - dst_tl[1] }.intersection( depth_frame_rect );
     }
 
-    float viewer_model::sample_mean_depth( const rs2::depth_frame & df, const rs2::rect & depth_bbox )
-    {
-        uint16_t const * const depth_data   = reinterpret_cast< uint16_t const * >( df.get_data() );
-        float const            depth_scale  = df.get_units();
-        int const              depth_width  = df.get_width();
-        int const              depth_height = df.get_height();
-        int const cx = int( depth_bbox.x + depth_bbox.w * 0.5f );
-        int const cy = int( depth_bbox.y + depth_bbox.h * 0.5f );
-        static const int offsets[][2] = { { -2, -2 }, {  0, -2 }, {  2, -2 },
-                                          { -2,  0 }, {  0,  0 }, {  2,  0 },
-                                          { -2,  2 }, {  0,  2 }, {  2,  2 } };
-        float total = 0.f;
-        int hits = 0;
-        for( auto const & off : offsets )
-        {
-            int const x = cx + off[0];
-            int const y = cy + off[1];
-            if( x < 0 || x >= depth_width || y < 0 || y >= depth_height )
-                continue;
-            uint16_t const d = depth_data[y * depth_width + x];
-            if( d != 0 )
-            {
-                total += d * depth_scale;
-                ++hits;
-            }
-        }
-
-        float val = hits > 0 ? total / hits : 0.f;
-        if( val > 5.0f ) // Above 5 meters not accurate, prefer to not show.
-            val = 0.f;
-        return val;
-    }
-
     void viewer_model::process_object_detection_frames( std::map< int, rs2::frame > & last_frames )
     {
         // Scan last_frames for an object detection frame, a color frame, and a depth frame.
@@ -3677,12 +3659,49 @@ namespace rs2
             uint16_t const * const depth_data  = reinterpret_cast< uint16_t const * >( df.get_data() );
             float const            depth_scale = df.get_units();
 
+            COM::DepthImage16 com_raw{ depth_data, depth_intrin.width, depth_intrin.height };
+            std::vector< uint8_t > depth8u_buf( depth_intrin.width * depth_intrin.height );
+            COM::DepthImage8 com_depth8u{ depth8u_buf.data(), depth_intrin.width, depth_intrin.height };
+            COM::CenterOfMassCalculator::CreateDepth8U( com_raw, com_depth8u );
+
             objects_in_frame new_objects;
             unsigned int const count = odf.get_detection_count();
 
+            // Non-maximum suppression: sort by score, suppress overlapping same-class boxes
+            static constexpr float NMS_IOU_THRESHOLD = 0.45f;
+            std::vector< rs2_object_detection > raw_dets( count );
             for( unsigned int i = 0; i < count; ++i )
+                raw_dets[i] = odf.get_detection( i );
+            std::sort( raw_dets.begin(), raw_dets.end(),
+                []( const rs2_object_detection & a, const rs2_object_detection & b ) { return a.score > b.score; } );
+            std::vector< bool > suppressed( count, false );
+            for( size_t i = 0; i < count; ++i )
+                if( raw_dets[i].score < 50 )
+                    suppressed[i] = true;
+            for( size_t i = 0; i < count; ++i )
             {
-                rs2_object_detection det = odf.get_detection( i );
+                if( suppressed[i] ) continue;
+                rs2::rect bi{ float( raw_dets[i].top_left_x ), float( raw_dets[i].top_left_y ),
+                              float( raw_dets[i].bottom_right_x - raw_dets[i].top_left_x ),
+                              float( raw_dets[i].bottom_right_y - raw_dets[i].top_left_y ) };
+                for( size_t j = i + 1; j < count; ++j )
+                {
+                    if( suppressed[j] || raw_dets[j].class_id != raw_dets[i].class_id ) continue;
+                    rs2::rect bj{ float( raw_dets[j].top_left_x ), float( raw_dets[j].top_left_y ),
+                                  float( raw_dets[j].bottom_right_x - raw_dets[j].top_left_x ),
+                                  float( raw_dets[j].bottom_right_y - raw_dets[j].top_left_y ) };
+                    float inter_area = bi.intersection( bj ).area();
+                    float union_area = bi.area() + bj.area() - inter_area;
+                    if( union_area > 0.f && inter_area / union_area > NMS_IOU_THRESHOLD )
+                        suppressed[j] = true;
+                }
+            }
+
+            size_t obj_id = 0;
+            for( size_t i = 0; i < count; ++i )
+            {
+                if( suppressed[i] ) continue;
+                rs2_object_detection const & det = raw_dets[i];
 
                 // Pixel-coordinate bounding box in the color frame
                 rs2::rect color_bbox{ float( det.top_left_x ),
@@ -3696,11 +3715,28 @@ namespace rs2
                                                                     color_to_depth, depth_to_color, depth_frame_rect );
                 rs2::rect normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
 
-                // Currently detection depth is not calculated in device, later we will use detection depth data.
-                float const mean_depth = sample_mean_depth( df, depth_bbox );
+                COM::Rect  com_bbox{ int( depth_bbox.x ), int( depth_bbox.y ),
+                                     int( depth_bbox.w ), int( depth_bbox.h ) };
+                COM::Vec2f com_center{ depth_bbox.x + depth_bbox.w * 0.5f,
+                                       depth_bbox.y + depth_bbox.h * 0.5f };
+                COM::CameraIntrinsics com_intrin{ depth_intrin.fx, depth_intrin.fy,
+                                                  depth_intrin.ppx, depth_intrin.ppy };
+                COM::PersonCenterOfMass com_result{};
+                COM::CenterOfMassCalculator::Calculate( com_raw, com_depth8u, com_bbox, com_center, &com_intrin, com_result );
+                float const mean_depth = com_result.meanBodyDepth > 0.f ? com_result.meanBodyDepth / 1000.f : 0.f;
+
+                // COM relative to the depth bbox ([0,1] in each axis); used for rendering the red dot
+                float com_rel_u = 0.5f, com_rel_v = 0.5f;
+                if( com_result.meanBodyDepth > 0.f && depth_bbox.w > 0.f && depth_bbox.h > 0.f )
+                {
+                    auto clamp01 = []( float v ) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; };
+                    com_rel_u = clamp01( ( com_result.imagePos.x - depth_bbox.x ) / depth_bbox.w );
+                    com_rel_v = clamp01( ( com_result.imagePos.y - depth_bbox.y ) / depth_bbox.h );
+                }
 
                 std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
-                new_objects.emplace_back( size_t( i ), name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
+                new_objects.emplace_back( obj_id++, name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
+                                          com_rel_u, com_rel_v, det.score,
                                           static_cast< object_type >( det.class_id ) );
             }
 

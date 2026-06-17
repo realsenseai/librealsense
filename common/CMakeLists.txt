@@ -44,6 +44,8 @@ set(COMMON_SRC
     "${CMAKE_CURRENT_LIST_DIR}/measurement.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/objects-in-frame.h"
     "${CMAKE_CURRENT_LIST_DIR}/objects-in-frame.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/utilities/com/CenterOfMass.h"
+    "${CMAKE_CURRENT_LIST_DIR}/utilities/com/CenterOfMass.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/on-chip-calib.h"
     "${CMAKE_CURRENT_LIST_DIR}/on-chip-calib.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/d500-on-chip-calib.h"
