@@ -2008,8 +2008,8 @@ namespace rs2
                     rect const & normalized_bbox = stream_mv.profile.stream_type() == RS2_STREAM_DEPTH
                         ? object.normalized_depth_bbox
                         : object.normalized_color_bbox;
-                    rect bbox = normalized_bbox.unnormalize( stream_rect );
-                    bbox.grow( 10, 5 );  // Allow more text, and easier identification of the face
+                    rect const unbbox = normalized_bbox.unnormalize( stream_rect );
+                    rect bbox = unbbox.grow( 10, 5 );  // Allow more text, and easier identification of the face
 
                     float a = 0.75f;
                     auto frame_color = colors[2].first; // Green by default, good contrast.
@@ -2067,17 +2067,31 @@ namespace rs2
                     glColor3f( a * frame_color.Value.x, a * frame_color.Value.y, a * frame_color.Value.z );
                     draw_rect( bbox, 2 );
 
-                    // Red dot at the center-of-mass point with confidence label
-                    ImVec2 const com_screen{ bbox.x + object.com_rel_u * bbox.w,
-                                             bbox.y + object.com_rel_v * bbox.h };
-                    ImGui::GetWindowDrawList()->AddCircleFilled( com_screen, 5.f, ImColor( 1.f, 0.f, 0.f, a ) );
-                    if( object.score > 0 )
+                    // Green COM dot + confidence label — only when depth is valid.
+                    // mean_depth == 0 means the depth frame had too many invalid pixels
+                    // in the bounding box; suppress the dot entirely in that case.
+                    if( object.mean_depth > 0.f )
                     {
-                        std::string conf_str = rsutils::string::from() << object.score << "%";
-                        ImGui::GetWindowDrawList()->AddText(
-                            { com_screen.x + 8.f, com_screen.y - 7.f },
-                            ImColor( 1.f, 0.f, 0.f, a ),
-                            conf_str.c_str() );
+                        ImVec2 const com_screen{ unbbox.x + object.com_rel_u * unbbox.w,
+                                                 unbbox.y + object.com_rel_v * unbbox.h };
+                        ImGui::GetWindowDrawList()->AddCircleFilled( com_screen, 5.f, ImColor( 0.f, 1.f, 0.f, a ) );
+                        if( object.score > 0 )
+                        {
+                            std::string conf_str = rsutils::string::from() << object.score << "%";
+                            ImGui::GetWindowDrawList()->AddText(
+                                { com_screen.x + 8.f, com_screen.y - 7.f },
+                                ImColor( 0.f, 1.f, 0.f, a ),
+                                conf_str.c_str() );
+                        }
+                        if( object.metadata_depth > 0.f )
+                        {
+                            std::string md_str = rsutils::string::from()
+                                << std::setprecision( 2 ) << object.metadata_depth << "m";
+                            ImGui::GetWindowDrawList()->AddText(
+                                { com_screen.x + 8.f, com_screen.y + 5.f },
+                                ImColor( 1.f, 0.f, 0.f, a ),
+                                md_str.c_str() );
+                        }
                     }
                 }
             }
@@ -3676,7 +3690,7 @@ namespace rs2
                 []( const rs2_object_detection & a, const rs2_object_detection & b ) { return a.score > b.score; } );
             std::vector< bool > suppressed( count, false );
             for( size_t i = 0; i < count; ++i )
-                if( raw_dets[i].score < 50 )
+                if( raw_dets[i].score < 45 )
                     suppressed[i] = true;
             for( size_t i = 0; i < count; ++i )
             {
@@ -3710,9 +3724,20 @@ namespace rs2
                                       float( det.bottom_right_y - det.top_left_y ) };
                 rs2::rect normalized_color_bbox = color_bbox.normalize( color_frame_rect );
 
-                rs2::rect depth_bbox = project_color_bbox_to_depth( color_bbox, depth_data, depth_scale,
-                                                                    depth_intrin, color_intrin,
-                                                                    color_to_depth, depth_to_color, depth_frame_rect );
+                // Depth is aligned to color, so color and depth pixels share the same coordinate
+                // frame (up to a resolution scale factor).  A depth-dependent reverse-projection
+                // (rs2_project_color_pixel_to_depth_pixel) is NOT needed and is harmful: the
+                // search result varies frame-to-frame with depth noise, making the ROI jitter and
+                // the COM jump.  Simple scaling gives a perfectly stable, deterministic depth bbox.
+                float const depth_scale_x = float( depth_intrin.width  ) / float( color_intrin.width  );
+                float const depth_scale_y = float( depth_intrin.height ) / float( color_intrin.height );
+                // depth_bbox_full: scaled from color bbox, before clamping to the depth frame boundary.
+                // Used to compute com_rel_u/v so they stay consistent with the color bbox at render time
+                // (the color bbox is also unclipped).  Clipping only affects the actual ROI sampled.
+                rs2::rect depth_bbox_full{
+                    color_bbox.x * depth_scale_x, color_bbox.y * depth_scale_y,
+                    color_bbox.w * depth_scale_x, color_bbox.h * depth_scale_y };
+                rs2::rect depth_bbox = depth_bbox_full.intersection( depth_frame_rect );
                 rs2::rect normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
 
                 COM::Rect  com_bbox{ int( depth_bbox.x ), int( depth_bbox.y ),
@@ -3725,18 +3750,20 @@ namespace rs2
                 COM::CenterOfMassCalculator::Calculate( com_raw, com_depth8u, com_bbox, com_center, &com_intrin, com_result );
                 float const mean_depth = com_result.meanBodyDepth > 0.f ? com_result.meanBodyDepth / 1000.f : 0.f;
 
-                // COM relative to the depth bbox ([0,1] in each axis); used for rendering the red dot
+                // COM relative position in [0,1] within the bbox — used for rendering the dot.
+                // Computed vs depth_bbox_full (unclipped) so it maps 1-to-1 onto the color bbox
+                // at render time; both are unclipped versions of the same physical region.
                 float com_rel_u = 0.5f, com_rel_v = 0.5f;
-                if( com_result.meanBodyDepth > 0.f && depth_bbox.w > 0.f && depth_bbox.h > 0.f )
+                if( com_result.meanBodyDepth > 0.f && depth_bbox_full.w > 0.f && depth_bbox_full.h > 0.f )
                 {
                     auto clamp01 = []( float v ) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; };
-                    com_rel_u = clamp01( ( com_result.imagePos.x - depth_bbox.x ) / depth_bbox.w );
-                    com_rel_v = clamp01( ( com_result.imagePos.y - depth_bbox.y ) / depth_bbox.h );
+                    com_rel_u = clamp01( ( com_result.imagePos.x - depth_bbox_full.x ) / depth_bbox_full.w );
+                    com_rel_v = clamp01( ( com_result.imagePos.y - depth_bbox_full.y ) / depth_bbox_full.h );
                 }
 
                 std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
                 new_objects.emplace_back( obj_id++, name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
-                                          com_rel_u, com_rel_v, det.score,
+                                          det.depth, com_rel_u, com_rel_v, det.score,
                                           static_cast< object_type >( det.class_id ) );
             }
 

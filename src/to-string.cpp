@@ -62,7 +62,7 @@ const char * get_string( rs2_stream value )
     CASE( SAFETY )
     CASE( OCCUPANCY )
     CASE( LABELED_POINT_CLOUD )
-    CASE( OBJECT_DETECTION )
+    case RS2_STREAM_OBJECT_DETECTION: return "Person Detection";
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;
@@ -88,7 +88,7 @@ char const * get_abbr_string( rs2_stream value)
     case RS2_STREAM_SAFETY: return "S";
     case RS2_STREAM_OCCUPANCY: return "O";
     case RS2_STREAM_LABELED_POINT_CLOUD: return "LPC";
-    case RS2_STREAM_OBJECT_DETECTION: return "OD";
+    case RS2_STREAM_OBJECT_DETECTION: return "PD";
     default:
         assert( !is_valid( value ) );
         return "?";
