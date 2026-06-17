@@ -63,8 +63,14 @@ bool atomic_write_file( const std::string & filename, const std::string & conten
     }
 
 #ifdef _WIN32
-    bool ok = MoveFileExA( temp_filename.c_str(), filename.c_str(),
-                           MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH ) != 0;
+    bool ok = false;
+    for( int attempt = 0; attempt < 5 && !ok; ++attempt )
+    {
+        ok = MoveFileExA( temp_filename.c_str(), filename.c_str(),
+                          MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH ) != 0;
+        if( !ok && attempt < 4 )
+            Sleep( 20 );
+    }
 #else
     bool ok = std::rename( temp_filename.c_str(), filename.c_str() ) == 0;
 #endif

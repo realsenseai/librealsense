@@ -77,19 +77,15 @@ config_value config_file::get(const char* key) const
 
 void config_file::save(const char* filename)
 {
-    std::string serialized;
+    std::lock_guard< std::recursive_mutex > lk( _mutex );
+    if( ! filename )
     {
-        std::lock_guard< std::recursive_mutex > lk( _mutex );
-        if( ! filename )
-        {
-            LOG_ERROR( "Config file name is null, cannot save config." );
-            return;
-        }
-        std::ostringstream oss;
-        oss << std::setw( 2 ) << _j;
-        serialized = oss.str();
+        LOG_ERROR( "Config file name is null, cannot save config." );
+        return;
     }
-    if( ! rsutils::os::atomic_write_file( filename, serialized ) )
+    std::ostringstream oss;
+    oss << std::setw( 2 ) << _j;
+    if( ! rsutils::os::atomic_write_file( filename, oss.str() ) )
         LOG_ERROR( "Failed to save config file '" + std::string( filename ) + "'" );
 }
 
@@ -117,6 +113,8 @@ config_file::config_file( std::string const & filename )
 
 void config_file::save()
 {
+    if( _filename.empty() )
+        return;
     save( _filename.c_str() );
 }
 
