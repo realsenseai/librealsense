@@ -339,12 +339,21 @@ public:
     std::vector< stream_profile > get_profiles() const override
     {
         std::vector< stream_profile > all_stream_profiles;
+        uint32_t dev_index = 0;
         for( auto & elem : _dev )
         {
             auto pin_stream_profiles = elem->get_profiles();
+            // When several sub-devices (pins) are combined, the same {w,h,fps,format} can appear on more than one
+            // pin (e.g. the two M420 RGB endpoints). Stamp the sub-device index so those stay distinct all the way
+            // up to the SDK and route back to the right pin. With a single sub-device, leave pin_index as the
+            // backend set it (e.g. the Windows MF stream index).
+            if( _dev.size() > 1 )
+                for( auto & p : pin_stream_profiles )
+                    p.pin_index = dev_index;
             all_stream_profiles.insert( all_stream_profiles.end(),
                                         pin_stream_profiles.begin(),
                                         pin_stream_profiles.end() );
+            ++dev_index;
         }
         return all_stream_profiles;
     }
@@ -396,10 +405,12 @@ private:
         for( auto & elem : _dev )
         {
             auto pin_stream_profiles = elem->get_profiles();
-            auto it = find( pin_stream_profiles.begin(), pin_stream_profiles.end(), profile );
-            if( it != pin_stream_profiles.end() )
+            for( auto & p : pin_stream_profiles )
             {
-                return dev_index;
+                if( _dev.size() > 1 )
+                    p.pin_index = dev_index;  // match the stamping applied in get_profiles()
+                if( p == profile )
+                    return dev_index;
             }
             ++dev_index;
         }

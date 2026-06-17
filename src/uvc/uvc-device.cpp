@@ -323,6 +323,9 @@ namespace librealsense
                 sp.height = f.height;
                 sp.fps = f.fps;
                 sp.format = f.fourcc;
+                // Preserve the VS interface (pin) so identical {w,h,fps,format} profiles coming from different
+                // streaming interfaces (e.g. the two M420 RGB endpoints) stay distinct and route to the right pin.
+                sp.pin_index = f.interfaceNumber;
                 results.push_back(sp);
             }
 
@@ -434,7 +437,8 @@ namespace librealsense
                 if ((profile.format == f.fourcc) &&
                     (profile.fps == f.fps) &&
                     (profile.height == f.height) &&
-                    (profile.width == f.width)) {
+                    (profile.width == f.width) &&
+                    (profile.pin_index == f.interfaceNumber)) {
                         foundFormat = true;
                         selected_format = f;
                         interface_number = f.interfaceNumber;

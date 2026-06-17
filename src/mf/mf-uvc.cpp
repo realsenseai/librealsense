@@ -955,6 +955,9 @@ namespace librealsense
                     sp.height = height;
                     sp.fps = currFps;
                     sp.format = device_fourcc;
+                    // Preserve the MF stream (pin) index so identical {w,h,fps,format} profiles coming from different
+                    // endpoints stay distinct all the way up to the SDK, and so play/close route to the right pin.
+                    sp.pin_index = sIndex;
 
                     mf_profile mfp;
                     mfp.index = sIndex;
@@ -999,6 +1002,11 @@ namespace librealsense
                 if (mfp.profile.format != profile.format &&
                     (fourcc_map.count(mfp.profile.format) == 0 ||
                         profile.format != fourcc_map.at(mfp.profile.format)))
+                    return;
+
+                // When the same {w,h,fps,format} is advertised on more than one pin, the requested profile carries the
+                // pin it was enumerated from - honor it so we select the intended endpoint and not just the first match.
+                if (mfp.profile.pin_index != profile.pin_index)
                     return;
 
                 if ((mfp.profile.width == profile.width) && (mfp.profile.height == profile.height))

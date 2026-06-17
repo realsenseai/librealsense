@@ -62,11 +62,13 @@ uvc_sensor::~uvc_sensor()
 void uvc_sensor::verify_supported_requests( const stream_profiles & requests ) const
 {
     // This method's aim is to send a relevant exception message when a user tries to stream
-    // twice the same stream (at least) with different configurations (fps, resolution)
-    std::map< rs2_stream, uint32_t > requests_map;
+    // twice the same stream (at least) with different configurations (fps, resolution).
+    // Key by stream type AND index: a sensor may expose several streams of the same type -
+    // those are distinct streams and must not be rejected.
+    std::map< std::pair< rs2_stream, int >, uint32_t > requests_map;
     for( auto && req : requests )
     {
-        requests_map[req->get_stream_type()] = req->get_framerate();
+        requests_map[{ req->get_stream_type(), req->get_stream_index() }] = req->get_framerate();
     }
 
     if( requests_map.size() < requests.size() )
@@ -79,9 +81,9 @@ void uvc_sensor::verify_supported_requests( const stream_profiles & requests ) c
     uint32_t accel_fps = -1;
     for( auto it = requests_map.begin(); it != requests_map.end(); ++it )
     {
-        if( it->first == RS2_STREAM_GYRO )
+        if( it->first.first == RS2_STREAM_GYRO )
             gyro_fps = it->second;
-        else if( it->first == RS2_STREAM_ACCEL )
+        else if( it->first.first == RS2_STREAM_ACCEL )
             accel_fps = it->second;
         if( gyro_fps != -1 && accel_fps != -1 )
             break;
@@ -494,8 +496,14 @@ stream_profiles uvc_sensor::init_stream_profiles()
                 throw librealsense::invalid_value_exception( "null pointer passed for argument \"profile\"." );
 
             profile->set_dims( p.width, p.height );
-            profile->set_stream_type( fourcc_to_rs2_stream( p.format ) );
-            profile->set_stream_index( 0 );
+            rs2_stream stream_type = fourcc_to_rs2_stream( p.format );
+            int stream_index = 0;
+            // Allow the device to remap type/index per pin (e.g. two identical M420 pins -> Color 1/2). Without this,
+            // pins sharing {w,h,fps,format} would collapse to a single SDK profile in the set below.
+            if( _stream_id_resolver )
+                _stream_id_resolver( uvc_profiles, p, stream_type, stream_index );
+            profile->set_stream_type( stream_type );
+            profile->set_stream_index( stream_index );
             profile->set_format( rs2_fmt );
             profile->set_framerate( p.fps );
             video_profiles.insert( profile );

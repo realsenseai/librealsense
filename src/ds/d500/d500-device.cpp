@@ -21,6 +21,7 @@
 
 #include "proc/color-formats-converter.h" 
 #include "proc/depth-formats-converter.h"
+#include "proc/color-formats-converter.h"
 #include "proc/y8i-to-y8y8.h"
 #include "proc/y16i-10msb-to-y16y16.h"
 
@@ -226,15 +227,25 @@ namespace librealsense
             {
                 assign_stream(_owner->_right_ir_stream, p);
             }
-            else if (p->get_stream_type() == RS2_STREAM_COLOR)
+            else
             {
-                throw invalid_value_exception( "Depth sensor does not have a color stream" );
+                // Streams contributed by feature mixins (e.g. dual-RGB color), matched by stream type + index.
+                for (auto&& extra : _extra_streams)
+                {
+                    if (extra->get_stream_type() == p->get_stream_type() &&
+                        extra->get_stream_index() == p->get_stream_index())
+                    {
+                        assign_stream(extra, p);
+                        break;
+                    }
+                }
             }
             auto&& vid_profile = dynamic_cast<video_stream_profile_interface*>(p.get());
 
             // Register intrinsics
             if (p->get_format() != RS2_FORMAT_Y16) // Y16 format indicate unrectified images, no intrinsics are available for these
             {
+                // TODO: once available, read the dual RGB intrinsics from the new dual-RGB calibration tables instead of reusing IR here.
                 const auto&& profile = to_profile(p.get());
                 std::weak_ptr<d500_depth_sensor> wp = std::dynamic_pointer_cast<d500_depth_sensor>(this->shared_from_this());
                 vid_profile->set_intrinsics([profile, wp]()
