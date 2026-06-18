@@ -636,21 +636,27 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
         #
         if recycle:
             #
-            if not wanted_ports and not enabled_ports:
-                log.d( 'no hub ports to recycle; leaving hub as-is' )
-            elif enabled_ports:
-                log.d( 'enabling ports', wanted_ports,
-                       'disabling currently enabled ports', enabled_ports )
-                sns_to_remove = { sn for sn in enabled_sns if get( sn ).port in enabled_ports }
-                hub.disable_ports( enabled_ports )
+            # Only toggle what differs: disable the enabled ports we don't want, enable the wanted
+            # ports that are off. A wanted port that's already enabled is left untouched -- recycling
+            # it would needlessly power-cycle the device (DDS/PoE like D555 re-enumerate slowly and
+            # would time out the wait below).
+            ports_to_disable = [ p for p in enabled_ports if p not in wanted_ports ]
+            ports_to_enable  = [ p for p in wanted_ports if p not in enabled_ports ]
+            #
+            if ports_to_disable:
+                log.d( 'disabling ports', ports_to_disable )
+                sns_to_remove = { sn for sn in enabled_sns if get( sn ).port in ports_to_disable }
+                hub.disable_ports( ports_to_disable )
                 for sn in sns_to_remove:
                     get( sn )._port_enabled = False
                 _wait_until_removed( sns_to_remove, timeout = timeout )
             #
-            if wanted_ports:
-                hub.enable_ports( wanted_ports )
+            if ports_to_enable:
+                log.d( 'enabling ports', ports_to_enable )
+                hub.enable_ports( ports_to_enable )
                 for sn in serial_numbers:
-                    get( sn )._port_enabled = True
+                    if get( sn ).port in ports_to_enable:
+                        get( sn )._port_enabled = True
             #
         else:
             #
