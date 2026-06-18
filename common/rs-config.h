@@ -198,6 +198,7 @@ namespace rs2
         // call sites like the processing-block checkbox handlers in device-model.cpp).
         // mutable so const accessors (get/contains/get_default) can lock it.
         mutable std::recursive_mutex _mutex;
+        std::mutex _write_mutex;
 
         std::map<std::string, std::string> _defaults;
         std::string _filename;

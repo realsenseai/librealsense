@@ -92,8 +92,7 @@ void config_file::save(const char* filename)
     }
     // Serialize disk writes without holding _mutex so readers (get/set) are not
     // blocked during I/O or retries.
-    static std::mutex s_write_mutex;
-    std::lock_guard< std::mutex > wlk( s_write_mutex );
+    std::lock_guard< std::mutex > wlk( _write_mutex );
     if( ! rsutils::os::atomic_write_file( filename, serialized ) )
         LOG_ERROR( "Failed to save config file '" + std::string( filename ) + "'" );
 }

@@ -2,6 +2,7 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 #include <rsutils/os/atomic-write-file.h>
+#include <rsutils/easylogging/easyloggingpp.h>
 
 #include <fstream>
 #include <cstdio>
@@ -38,7 +39,7 @@ static std::string make_temp_filename( const std::string & filename )
 }
 
 
-bool atomic_write_file( const std::string & filename, const std::string & content )
+bool atomic_write_file( const std::string & filename, const std::string & content, int max_retries, int retry_delay_ms )
 {
     const std::string temp_filename = make_temp_filename( filename );
 
@@ -65,18 +66,26 @@ bool atomic_write_file( const std::string & filename, const std::string & conten
 
 #ifdef _WIN32
     bool ok = false;
-    for( int attempt = 0; attempt < 5 && !ok; ++attempt )
+    DWORD last_err = 0;
+    for( int attempt = 0; attempt < max_retries && !ok; ++attempt )
     {
         ok = MoveFileExA( temp_filename.c_str(), filename.c_str(),
                           MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH ) != 0;
-        if( !ok && attempt < 4 )
+        if( !ok )
         {
-            DWORD err = GetLastError();
-            if( err != ERROR_SHARING_VIOLATION && err != ERROR_ACCESS_DENIED )
+            last_err = GetLastError();
+            if( last_err != ERROR_SHARING_VIOLATION && last_err != ERROR_ACCESS_DENIED )
                 break;
-            std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
+            if( attempt + 1 < max_retries )
+            {
+                LOG_WARNING( "MoveFileExA sharing conflict (err " << last_err << "), retry "
+                             << ( attempt + 1 ) << "/" << max_retries << " for '" << filename << "'" );
+                std::this_thread::sleep_for( std::chrono::milliseconds( retry_delay_ms ) );
+            }
         }
     }
+    if( !ok )
+        LOG_WARNING( "MoveFileExA failed for '" << filename << "', last error: " << last_err );
 #else
     bool ok = std::rename( temp_filename.c_str(), filename.c_str() ) == 0;
 #endif
