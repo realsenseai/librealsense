@@ -78,8 +78,6 @@ bool atomic_write_file( const std::string & filename, const std::string & conten
                 break;
             if( attempt + 1 < max_retries )
             {
-                LOG_WARNING( "MoveFileExA sharing conflict (err " << last_err << "), retry "
-                             << ( attempt + 1 ) << "/" << max_retries << " for '" << filename << "'" );
                 std::this_thread::sleep_for( std::chrono::milliseconds( retry_delay_ms ) );
             }
         }
