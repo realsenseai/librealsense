@@ -366,9 +366,12 @@ namespace librealsense
         depth_ep->register_processing_block({ {RS2_FORMAT_W10} }, { {RS2_FORMAT_RAW10, RS2_STREAM_INFRARED, 1} }, []() { return std::make_shared<w10_converter>(RS2_FORMAT_RAW10); });
         depth_ep->register_processing_block({ {RS2_FORMAT_W10} }, { {RS2_FORMAT_Y10BPACK, RS2_STREAM_INFRARED, 1} }, []() { return std::make_shared<w10_converter>(RS2_FORMAT_Y10BPACK); });
         
-        depth_ep->register_processing_block( processing_block_factory::create_pbf_vector< m420_converter >( RS2_FORMAT_M420,
-                                                                                                            map_supported_color_formats( RS2_FORMAT_M420 ),
-                                                                                                            RS2_STREAM_INFRARED ) );
+        // M420 -> RGB8 (etc.) for the left infrared (index 1) on dual-RGB devices. No-op on PIDs that never produce M420 IR frames.
+        std::vector< stream_profile > m420_ir_targets;
+        for( rs2_format fmt : map_supported_color_formats( RS2_FORMAT_M420 ) )
+            m420_ir_targets.push_back( { fmt, RS2_STREAM_INFRARED, 1 } );
+        depth_ep->register_processing_block(
+            processing_block_factory::create_pbf_vector< m420_converter >( RS2_FORMAT_M420, m420_ir_targets ) );
         return depth_ep;
     }
 
