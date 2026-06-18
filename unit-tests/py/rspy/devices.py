@@ -122,6 +122,7 @@ class Device:
                 log.d('    location is', self._location)
 
         self._removed = False
+        self._port_enabled = True
 
     @property
     def serial_number( self ):
@@ -192,6 +193,8 @@ def map_unknown_ports():
         # (e.g. loose cables) can't produce rogue devices mid-test.
         hub.disable_ports()
         wait_until_all_ports_disabled()
+        for device in _device_by_sn.values():
+            device._port_enabled = False
         return
     #
     ports = hub.ports()
@@ -252,6 +255,8 @@ def map_unknown_ports():
         # Disable all ports so tests start from a clean state
         hub.disable_ports()
         wait_until_all_ports_disabled()
+        for device in _device_by_sn.values():
+            device._port_enabled = False
         log.debug_unindent()
 
 
@@ -395,12 +400,12 @@ def enabled():
 
 def port_enabled():
     """
-    :return: A set of device serial-numbers whose hub port is currently enabled, queried from the
-    hub (the source of truth for port state) -- as opposed to enabled(), which is device presence.
+    :return: A set of device serial-numbers whose hub port devices.py has enabled. Cached state
+    (maintained by enable_only/enable_all), not queried from the hub, and not the device-changed
+    presence cache (enabled()) -- which is unreliable across hw-reset / fw-update.
     """
     global _device_by_sn
-    active = hub.ports() if hub else []
-    return { device.serial_number for device in _device_by_sn.values() if device.port in active }
+    return { device.serial_number for device in _device_by_sn.values() if device._port_enabled }
 
 
 def by_product_line( product_line, ignored_products ):
@@ -638,15 +643,22 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
                        'disabling currently enabled ports', enabled_ports )
                 sns_to_remove = { sn for sn in enabled_sns if get( sn ).port in enabled_ports }
                 hub.disable_ports( enabled_ports )
+                for sn in sns_to_remove:
+                    get( sn )._port_enabled = False
                 _wait_until_removed( sns_to_remove, timeout = timeout )
             #
             if wanted_ports:
                 hub.enable_ports( wanted_ports )
+                for sn in serial_numbers:
+                    get( sn )._port_enabled = True
             #
         else:
             #
             if wanted_ports:
                 hub.enable_ports( wanted_ports, disable_other_ports = True )
+                for device in _device_by_sn.values():
+                    if device.port is not None:
+                        device._port_enabled = device.serial_number in serial_numbers
             else:
                 log.d( 'no hub ports to enable; leaving hub as-is' )
         #
@@ -670,6 +682,8 @@ def enable_all():
     Enables all ports on the hub -- without a hub, this does nothing!
     """
     hub.enable_ports()
+    for device in _device_by_sn.values():
+        device._port_enabled = True
 
 
 def _wait_until_removed( serial_numbers, timeout = PORTS_DISABLED_TIMEOUT ):
