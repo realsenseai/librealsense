@@ -43,6 +43,11 @@ MAX_ENUMERATION_TIME = 20  # [sec]
 # latency in the device-changed callback. Observed on D555/PoE: ~8s after PoE cut.
 PORTS_DISABLED_TIMEOUT = 10  # [sec]
 
+# A DDS/PoE device (e.g. D555) bricks if its hub port is re-powered before it has fully shut down:
+# it re-powers mid-shutdown and never re-enumerates. Re-enabling ~22s after disabling was observed
+# to brick a D555; a multi-minute gap was fine. Keep a port off at least this long before re-enable.
+POE_SETTLE_TIME = 30  # [sec]
+
 # We need both pyrealsense2 and hub. We can work without hub, but
 # without pyrealsense2 no devices at all will be returned.
 from rspy import device_hub
@@ -637,17 +642,18 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
         if recycle:
             #
             # Only toggle what differs: disable the enabled ports we don't want, enable the wanted
-            # ports that are off. Never disable a DDS/PoE device (e.g. D555): cutting its PoE port
-            # and re-enabling it shortly after bricks its re-enumeration (it re-powers mid-shutdown
-            # and never comes back). Leaving it up is safe -- it doesn't interfere with USB tests.
-            dds_ports = { get( sn ).port for sn in enabled_sns if get( sn ).is_dds }
-            ports_to_disable = [ p for p in enabled_ports if p not in wanted_ports and p not in dds_ports ]
+            # ports that are off. A wanted port that's already enabled is left untouched.
+            ports_to_disable = [ p for p in enabled_ports if p not in wanted_ports ]
             ports_to_enable  = [ p for p in wanted_ports if p not in enabled_ports ]
             #
             if ports_to_disable:
                 log.d( 'disabling ports', ports_to_disable )
                 sns_to_remove = { sn for sn in enabled_sns if get( sn ).port in ports_to_disable }
-                hub.disable_ports( ports_to_disable )
+                # A DDS/PoE device (e.g. D555) bricks if its port is re-powered before it has fully
+                # shut down -- it never re-enumerates. Hold the port off long enough on disable so a
+                # later re-enable always starts from a fully-powered-down device.
+                settle = POE_SETTLE_TIME if any( get( sn ).is_dds for sn in sns_to_remove ) else 0
+                hub.disable_ports( ports_to_disable, sleep_on_change = settle )
                 for sn in sns_to_remove:
                     get( sn )._port_enabled = False
                 _wait_until_removed( sns_to_remove, timeout = timeout )
