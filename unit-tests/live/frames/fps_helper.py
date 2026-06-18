@@ -18,9 +18,16 @@ TIME_BETWEEN_PERMUTATIONS = 2
 ##########################################
 # ---------- Helper Functions ---------- #
 ##########################################
-def check_fps_pair(measured_fps, expected_fps):
+def check_fps_pair(measured_fps, expected_fps, floor_only=False):
     delta_Hz = expected_fps * 0.15
-    return (measured_fps <= (expected_fps + delta_Hz) and measured_fps >= (expected_fps - delta_Hz))
+    if measured_fps < expected_fps - delta_Hz:
+        return False
+    if floor_only:
+        # Lower bound only: the stream may legitimately run faster than the floor on a
+        # host/link that is not throttled (e.g. full 30 fps on Linux vs ~22 fps on the
+        # CrowdStrike-throttled Windows CI host). Only catastrophic frame loss should fail.
+        return True
+    return measured_fps <= expected_fps + delta_Hz
 
 
 def get_expected_fps_dict(sensor_profiles_dict):
@@ -59,13 +66,16 @@ def get_tested_profiles_string(sensor_profiles_dict):
 #############################################
 # ---------- Core Test Functions ---------- #
 #############################################
-def check_fps_dict(measured_fps, expected_fps):
+def check_fps_dict(measured_fps, expected_fps, floor_only_streams=None):
+    floor_only_streams = floor_only_streams or set()
     all_fps_ok = True
     for profile_name in expected_fps:
-        res = check_fps_pair(measured_fps[profile_name], expected_fps[profile_name])
+        floor_only = profile_name in floor_only_streams
+        res = check_fps_pair(measured_fps[profile_name], expected_fps[profile_name], floor_only=floor_only)
         if not res:
             all_fps_ok = False
-        log.debug(f"Expected {expected_fps[profile_name]} fps, received {measured_fps[profile_name]:.1f} fps in profile"
+        expected_str = (f">= {expected_fps[profile_name]}" if floor_only else f"{expected_fps[profile_name]}")
+        log.debug(f"Expected {expected_str} fps, received {measured_fps[profile_name]:.1f} fps in profile"
               f" {profile_name}"
               f" {'(Pass)' if res else '(Fail)'}")
     return all_fps_ok
@@ -178,10 +188,12 @@ def perform_fps_test(sensor_profiles_arr, streams_combinations, fps_kpi=None):
     :param sensor_profiles_arr: an array of length N of tuples (sensor, profile) to test on
     :param streams_combinations: an array of combinations to run
                                  each combination is an array with stream names to test
-    :param fps_kpi: optional dict mapping frozenset of stream names -> {stream_name: expected_fps}.
-                    Overrides the advertised fps for a specific combination. Used for combinations
-                    that cannot reach the advertised fps due to a known link bandwidth limit
-                    (e.g. Color + Depth at HD over GigE on DDS devices).
+    :param fps_kpi: optional dict mapping frozenset of stream names -> {stream_name: floor_fps}.
+                    Replaces the advertised fps with a one-sided floor (lower-bound only) for a
+                    specific combination. Used for combinations that may be throttled below the
+                    advertised fps on some hosts/links but run at full rate on others
+                    (e.g. Color + Depth at HD: ~22 fps on the CrowdStrike-throttled Windows CI
+                    host vs full 30 fps on Linux). Only catastrophic frame loss should fail.
     """
     fps_kpi = fps_kpi or {}
     log.debug(get_time_est_string(streams_combinations))
@@ -193,17 +205,19 @@ def perform_fps_test(sensor_profiles_arr, streams_combinations, fps_kpi=None):
         log.info(f"{partial_dict}")
         expected_fps_dict = get_expected_fps_dict(partial_dict)
         kpi_override = fps_kpi.get(frozenset(streams_to_test))
+        floor_only_streams = set()
         if kpi_override:
             for stream_name, kpi in kpi_override.items():
                 if stream_name in expected_fps_dict:
-                    log.info(f"Applying bandwidth KPI for {stream_name}: "
-                             f"{expected_fps_dict[stream_name]} -> {kpi} fps")
+                    log.info(f"Applying bandwidth KPI floor for {stream_name}: "
+                             f"{expected_fps_dict[stream_name]} -> >= {kpi} fps")
                     expected_fps_dict[stream_name] = kpi
+                    floor_only_streams.add(stream_name)
         log.debug(get_test_details_str(partial_dict))
         fps_dict = measure_fps(partial_dict)
         log.info(f"Expected: {expected_fps_dict}")
         log.info(f"Got: {fps_dict}")
-        if not check_fps_dict(fps_dict, expected_fps_dict):
+        if not check_fps_dict(fps_dict, expected_fps_dict, floor_only_streams=floor_only_streams):
             failures.append(f"{tested}: expected={expected_fps_dict}, got={fps_dict}")
         time.sleep(TIME_BETWEEN_PERMUTATIONS)  # allow device to settle between sensor open/close cycles
     assert not failures, "FPS check failed for:\n" + "\n".join(failures)

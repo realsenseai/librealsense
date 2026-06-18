@@ -21,9 +21,12 @@ HD_RESOLUTION = (1280, 720)
 # keep the original HD-only matrix (see test_fps_permutations).
 RES_TIERS = {"HD": HD_RESOLUTION, "VGA": VGA_RESOLUTION}
 
-# On DDS (GigE) devices, Color + Depth (Z16) at HD cannot reach the advertised 30 fps:
-# the combined stream saturates the 1GbE link and the firmware settles at a stable ~22 fps.
-# Assert against that characterized rate (with fps_helper's 15% tolerance) instead of 30.
+# On DDS (GigE) devices, Color + Depth (Z16) at HD reaches full 30 fps on an unburdened host
+# (e.g. Linux CI), but is throttled to a stable ~22 fps on the Windows CI host where
+# endpoint-security (CrowdStrike) overhead steals CPU from DDS frame reception. Since the same
+# pair legitimately runs at either rate depending on the host, assert a one-sided floor instead
+# of the advertised 30 fps: pass at >= KPI (with fps_helper's 15% tolerance, i.e. >= ~18.7 fps),
+# no upper bound. This tolerates the throttled host while still catching catastrophic frame loss.
 COLOR_DEPTH_HD_DDS_FPS_KPI = 22
 
 pytestmark = [
@@ -110,7 +113,8 @@ def test_fps_permutations(test_device, res_tier):
 
     fps_kpi = {}
     if is_dds and res_tier == "HD":
-        # Color + Depth at HD saturates the GigE link and settles at a stable ~22 fps.
+        # Color + Depth at HD may be throttled to ~22 fps on a CPU-burdened host (see KPI note);
+        # assert a floor instead of the advertised 30 so both throttled and full-rate hosts pass.
         fps_kpi[frozenset({"Color", "Depth"})] = {
             "Color": COLOR_DEPTH_HD_DDS_FPS_KPI,
             "Depth": COLOR_DEPTH_HD_DDS_FPS_KPI,
