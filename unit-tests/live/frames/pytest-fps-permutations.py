@@ -22,11 +22,11 @@ HD_RESOLUTION = (1280, 720)
 RES_TIERS = {"HD": HD_RESOLUTION, "VGA": VGA_RESOLUTION}
 
 # On DDS (GigE) devices, Color + Depth (Z16) at HD reaches full 30 fps on an unburdened host
-# (e.g. Linux CI), but is throttled to a stable ~22 fps on the Windows CI host where
-# endpoint-security (CrowdStrike) overhead steals CPU from DDS frame reception. Since the same
-# pair legitimately runs at either rate depending on the host, assert a one-sided floor instead
-# of the advertised 30 fps: pass at >= KPI (with fps_helper's 15% tolerance, i.e. >= ~18.7 fps),
-# no upper bound. This tolerates the throttled host while still catching catastrophic frame loss.
+# (e.g. Linux CI), but is throttled to a stable ~22 fps on a CPU-burdened Windows CI host where
+# background host processes steal CPU from DDS frame reception. Since the same pair legitimately
+# runs at either rate depending on the host, assert a one-sided floor instead of the advertised
+# 30 fps: pass at >= KPI (with fps_helper's 15% tolerance, i.e. >= ~18.7 fps), no upper bound.
+# This tolerates the throttled host while still catching catastrophic frame loss.
 COLOR_DEPTH_HD_DDS_FPS_KPI = 22
 
 pytestmark = [

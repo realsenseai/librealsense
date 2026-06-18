@@ -24,8 +24,8 @@ def check_fps_pair(measured_fps, expected_fps, floor_only=False):
         return False
     if floor_only:
         # Lower bound only: the stream may legitimately run faster than the floor on a
-        # host/link that is not throttled (e.g. full 30 fps on Linux vs ~22 fps on the
-        # CrowdStrike-throttled Windows CI host). Only catastrophic frame loss should fail.
+        # host that is not throttled (e.g. full 30 fps on Linux vs ~22 fps on a CPU-burdened
+        # Windows CI host). Only catastrophic frame loss should fail.
         return True
     return measured_fps <= expected_fps + delta_Hz
 
@@ -191,9 +191,9 @@ def perform_fps_test(sensor_profiles_arr, streams_combinations, fps_kpi=None):
     :param fps_kpi: optional dict mapping frozenset of stream names -> {stream_name: floor_fps}.
                     Replaces the advertised fps with a one-sided floor (lower-bound only) for a
                     specific combination. Used for combinations that may be throttled below the
-                    advertised fps on some hosts/links but run at full rate on others
-                    (e.g. Color + Depth at HD: ~22 fps on the CrowdStrike-throttled Windows CI
-                    host vs full 30 fps on Linux). Only catastrophic frame loss should fail.
+                    advertised fps on some hosts but run at full rate on others
+                    (e.g. Color + Depth at HD: ~22 fps on a CPU-burdened Windows CI host vs
+                    full 30 fps on Linux). Only catastrophic frame loss should fail.
     """
     fps_kpi = fps_kpi or {}
     log.debug(get_time_est_string(streams_combinations))
