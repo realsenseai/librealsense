@@ -159,15 +159,6 @@ namespace librealsense
             case ds::RS455_PID:
             case ds::RS457_PID:
             case ds::D555_PID:
-            case ds::D585_LEGACY_PID:
-            case ds::D535_2C_PID:
-            case ds::D585_2C_PID:
-            case ds::D585_2C_PROTO_PID:
-            case ds::D535_3C_PID:
-            case ds::D535F_PID:
-            case ds::D585_3C_PID:
-            case ds::D585F_PID:
-            case ds::D585_3C_PROTO_PID:
                 default_450_mid_low_res( p );
                 switch( res )
                 {
@@ -186,6 +177,15 @@ namespace librealsense
                 }
                 break;
             case ds::D585S_PID:
+            case ds::D585_LEGACY_PID:
+            case ds::D535_2C_PID:
+            case ds::D585_2C_PID:
+            case ds::D585_2C_PROTO_PID:
+            case ds::D535_3C_PID:
+            case ds::D535F_PID:
+            case ds::D585_3C_PID:
+            case ds::D585F_PID:
+            case ds::D585_3C_PROTO_PID:
                 default_585S( p );
                 break;
             case ds::RS405U_PID:
