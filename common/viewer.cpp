@@ -3610,7 +3610,11 @@ namespace rs2
                 ++hits;
             }
         }
-        return hits > 0 ? total / hits : 0.f;
+
+        float val = hits > 0 ? total / hits : 0.f;
+        if( val > 5.0f ) // Above 5 meters not accurate, prefer to not show.
+            val = 0.f;
+        return val;
     }
 
     void viewer_model::process_object_detection_frames( std::map< int, rs2::frame > & last_frames )

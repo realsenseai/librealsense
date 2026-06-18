@@ -137,6 +137,16 @@ When migrating a legacy `test-*.py` to `pytest-*.py`:
       ```
     - **Expected exceptions** (legacy `try/except RuntimeError: test.check_exception(...)`) → migrate to `with pytest.raises(RuntimeError, match="..."):` (see `unit-tests/syncer/pytest-ts-same-fps.py:63` for the pattern).
 
+15. **Write test-created files to pytest's `tmp_path`, never a bare `mkdtemp`**: Any file a test writes to disk — recordings (`.db3`/`.bag`), point clouds, PNGs, logs, XML — must go under the `tmp_path` fixture. pytest places it inside the OS temp dir but auto-prunes all but the last 3 runs, so there is **no teardown to write** and nothing accumulates. A bare `tempfile.mkdtemp()` / `mkstemp()` leaks its directory into the OS temp dir permanently (most visible on Windows, which never auto-cleans `%TEMP%`).
+
+    ```python
+    def test_record(test_device, tmp_path):       # add tmp_path to the signature
+        file_name = str(tmp_path / "recording.db3")
+        ...
+    ```
+
+    Legacy flat `test-*.py` scripts run outside pytest and have no fixtures, so `tmp_path` is unavailable. There, wrap the work in `tempfile.TemporaryDirectory()` (auto-cleans on context exit) or add `try/finally: shutil.rmtree(temp_dir, ignore_errors=True)` so the directory is removed even when the test fails. See `unit-tests/live/rec-play/pytest-record-and-stream.py` (tmp_path) and `test-record-software-device.py` (try/finally) for the two patterns.
+
 ## Handling `on_fail=test.ABORT`
 
 The legacy framework supported `with test.closure('Name', on_fail=test.ABORT):` — if that closure failed, all subsequent closures were skipped. In pytest, use a **module-level state dict** with `pytest.skip()`.
@@ -203,6 +213,8 @@ The `pytest-check` plugin is available for soft assertions (non-stopping checks)
 Import: `from pytest_check import check`
 
 ## Writing a New Pytest Test
+
+> **Files on disk → `tmp_path`.** If the test records, exports, or otherwise writes a file, take the `tmp_path` fixture and build paths under it (`str(tmp_path / "name.db3")`). pytest auto-cleans it — never `tempfile.mkdtemp()` without teardown. See migration-checklist item 15 for details and the legacy-script fallback.
 
 ### Fixture chain
 

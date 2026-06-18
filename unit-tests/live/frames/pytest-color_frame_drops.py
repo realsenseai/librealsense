@@ -50,6 +50,9 @@ def test_color_frame_drops(test_device):
         hw_ts.clear()
 
         cfg = rs.config()
+        # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+        # connected device; without enable_device(sn) the pipeline picks the first match.
+        cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
         cfg.enable_stream(rs.stream.color, WIDTH, HEIGHT, FORMAT, FPS)
         pipe.start(cfg, lrs_fq.lrs_queue)
         time.sleep(SLEEP_PER_ITERATION)

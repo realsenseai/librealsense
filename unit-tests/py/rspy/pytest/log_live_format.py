@@ -39,6 +39,12 @@ we materialize `msg` via `record.getMessage()` (which interpolates args into
 the format string) and then drop `args`. Downstream handlers see a record
 with a pre-formatted `msg` and `args = None`.
 
+A second case is also handled: when a non-string object is passed directly as
+the message (e.g. ``log.debug(frame)``), ``record.args`` is an empty tuple
+(falsy) so the args branch is skipped, but ``record.msg`` still holds the
+object reference.  The patch converts ``record.msg`` to ``str`` immediately
+in this case too.
+
 Safety audit
 ------------
 Grepped the repo for any code that reads `LogRecord.args` after emission:
@@ -78,6 +84,15 @@ def _live_handle( self, record ):
             # Format mismatch (e.g. log.debug("Got", f) with no %s placeholder).
             # Leave msg/args alone so the downstream handler's normal error
             # path (Handler.handleError) reports it -- don't crash the caller.
+            pass
+    elif not isinstance( record.msg, str ):
+        # msg is a non-string object passed directly (e.g. log.debug(frame)).
+        # record.args is () — falsy — so the branch above is skipped, but
+        # record.msg still holds an object reference that LogCaptureHandler
+        # would pin for the test duration.  Convert to str immediately.
+        try:
+            record.msg = str( record.msg )
+        except Exception:
             pass
     return _orig_handle( self, record )
 

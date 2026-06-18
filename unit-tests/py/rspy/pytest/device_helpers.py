@@ -356,3 +356,41 @@ def require_min_fw_version(dev, min_version, feature_name="", inclusive=True):
         feature_str = f" ({feature_name})" if feature_name else ""
         pytest.skip(f"FW version {fw_version} does not meet minimum {op} {min_version}{feature_str}, skipping test...")
     _fw_version_cache[key] = True
+
+
+def select_target_device(devices_list, module_device_setup):
+    """
+    Pick the right pyrealsense2 device from `devices_list` for the current test.
+
+    `module_device_setup` is whatever the `module_device_setup` fixture yielded:
+      - str  -- a single parametrized serial number; pick the device with that SN
+                or raise `pytest.fail` if it isn't visible in `devices_list`.
+      - list -- a multi-device marker was used; this caller should be using the
+                `test_devices` (plural) fixture instead. Log a warning and fall
+                back to `devices_list[0]` to preserve pre-existing behavior.
+      - None -- no device parametrization (test without a device() marker);
+                pick `devices_list[0]`.
+
+    On CI rigs without a hub -- e.g. Jetson with D457 on MIPI and D436 on USB --
+    every device stays enumerated regardless of which one was "enabled" for the
+    test, so the fixture must filter by SN rather than blindly pick index 0.
+    """
+    import pytest
+    import pyrealsense2 as rs
+
+    if isinstance(module_device_setup, list):
+        log.warning(
+            "test_device/function_scoped_device fixture invoked with a multi-device marker; "
+            "use test_devices instead. Falling back to devices_list[0]."
+        )
+        return devices_list[0]
+    target_sn = module_device_setup if isinstance(module_device_setup, str) else None
+    if target_sn:
+        for d in devices_list:
+            if d.supports(rs.camera_info.serial_number) \
+               and d.get_info(rs.camera_info.serial_number) == target_sn:
+                return d
+        visible = [d.get_info(rs.camera_info.serial_number)
+                   for d in devices_list if d.supports(rs.camera_info.serial_number)]
+        pytest.fail(f"Target device {target_sn} not visible in context (visible: {visible})")
+    return devices_list[0]

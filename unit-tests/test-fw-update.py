@@ -15,7 +15,8 @@ import re
 import platform
 import pyrealsense2 as rs
 import pyrsutils as rsutils
-from rspy import log, test, file, repo
+from rspy import log, test, file, repo, fw_compat
+from rspy.timer import Timer
 import time
 import argparse
 
@@ -23,6 +24,7 @@ import argparse
 parser = argparse.ArgumentParser(description="Test firmware update")
 parser.add_argument('--custom-fw-d400', type=str, help='Path to custom D400 firmware file')
 parser.add_argument('--custom-fw-d555', type=str, help='Path to custom D555 firmware file')
+parser.add_argument('--serial', type=str, default=None, help='Serial number of the device to update (for multi-device rigs)')
 args = parser.parse_args()
 
 
@@ -123,7 +125,7 @@ for tool in file.find( repo.build, fw_updater_exe_regex ):
 if not fw_updater_exe:
     log.f( "Could not find the update tool file (rs-fw-update.exe)" )
 
-device, ctx = test.find_first_device_or_exit()
+device, ctx = test.find_first_device_or_exit( args.serial )
 product_line = device.get_info( rs.camera_info.product_line )
 product_name = device.get_info( rs.camera_info.name )
 log.d( 'product line:', product_line )
@@ -155,36 +157,51 @@ recovered = False
 if device.is_in_recovery_mode():
     log.d( "recovering device ..." )
     try:
-        # always flash signed fw when device on recovery before flashing anything else
-        image_file = custom_fw_path
-        cmd = [fw_updater_exe, '-r', '-f', image_file]
+        # rs-fw-update -r requires a *signed* FW image. The caller's --custom-fw-d400
+        # is typically unsigned, so we fetch a gold signed FW from S3 to recover with.
+        gold_fw = fw_compat.download_gold_d400_fw()
+        if not gold_fw:
+            log.f( "Could not download gold signed FW; cannot recover DFU device" )
+        cmd = [fw_updater_exe, '-r', '-f', gold_fw, '-s', args.serial]
         del device, ctx
         log.d( 'running:', cmd )
         subprocess.run( cmd )
         recovered = True
-
-        if 'jetson' in test.context:
-            # Reload d4xx mipi driver on Jetson
-            log.d("Reloading d4xx driver on Jetson...")
-            try:
-                # Try to reload the driver, but don't fail if sudo requires a password
-                result = subprocess.run(['sudo', '-n', 'modprobe', '-r', 'd4xx'], 
-                                      capture_output=True, text=True)
-                if result.returncode != 0:
-                    log.e("Failed to remove d4xx module (may require passwordless sudo):", result.stderr)
-                else:
-                    load_result = subprocess.run(['sudo', '-n', 'modprobe', 'd4xx'], 
-                                              capture_output=True, text=True, check=False)
-                    if load_result.returncode != 0:
-                        log.e("Failed to load d4xx module (may require passwordless sudo):",
-                              f"returncode={load_result.returncode}, stderr={load_result.stderr}")
-            except Exception as driver_error:
-                log.w("Could not reload d4xx driver (passwordless sudo may not be configured):", driver_error)
+        fw_compat.reload_d4xx_driver_on_jetson( test.context )
     except Exception as e:
         test.unexpected_exception()
         log.f( "Unexpected error while trying to recover device:", e )
     else:
-        device, ctx = test.find_first_device_or_exit()
+        # The device's identity changed: in DFU it exposed firmware_update_id only,
+        # now in normal mode it exposes its real serial_number (optic_serial). The
+        # firmware_update_id (asic_serial) is still exposed and matches what the
+        # harness was tracking. Poll for the device to re-enumerate in normal mode
+        # (a fresh rs.context() needs time after rs-fw-update exits) -- up to 60s.
+        log.d( "waiting for recovered device to re-enumerate in normal mode..." )
+        recovered_device = None
+        timer = Timer( 60 )
+        timer.start()
+        while not timer.has_expired():
+            for d in rs.context().devices:
+                if d.supports( rs.camera_info.firmware_update_id ) \
+                   and d.get_info( rs.camera_info.firmware_update_id ) == args.serial \
+                   and not d.is_in_recovery_mode():
+                    recovered_device = d
+                    break
+            if recovered_device is not None:
+                break
+            time.sleep( 2 )
+        if recovered_device is None:
+            log.f( f"Recovered device with firmware_update_id '{args.serial}' did not "
+                   f"re-enumerate within {timer.get_timeout()}s after gold FW flash" )
+        # Re-pin args.serial to the device's normal-mode SN so downstream
+        # rs-fw-update -s <sn> finds the device (rs-fw-update.cpp:480 uses SN when supported).
+        if recovered_device.supports( rs.camera_info.serial_number ):
+            new_sn = recovered_device.get_info( rs.camera_info.serial_number )
+            if new_sn != args.serial:
+                log.d( f're-pinning args.serial: {args.serial} (FWID) -> {new_sn} (SN)' )
+                args.serial = new_sn
+        device, ctx = test.find_first_device_or_exit( args.serial )
         current_fw_version = rsutils.version(device.get_info(rs.camera_info.firmware_version))
         log.d("FW version after recovery:", current_fw_version)
 
@@ -217,6 +234,8 @@ elif downgrade_counter >= 19:
 image_file = custom_fw_path
 
 cmd = [fw_updater_exe, '-f', image_file]
+if args.serial:
+    cmd += ['-s', args.serial]
 # Add '-u' only if the path doesn't include 'signed'
 if ('signed' not in custom_fw_path.lower()
         and "d555" not in product_name.lower()): # currently -u is not supported for D555
@@ -228,8 +247,11 @@ log.d( 'running:', cmd )
 sys.stdout.flush()
 result = subprocess.run( cmd )   # may throw
 
-# Wait for the camera to finish rebooting before doing anything else;
-# the test exit flow may cut USB power (hub port disable) so we must not exit mid-reboot
+# Wait for the camera to finish rebooting before doing anything else, REGARDLESS of
+# rs-fw-update's exit code. A non-zero exit doesn't necessarily mean no flash started:
+# rs-fw-update may have begun a section flash before erroring out, leaving the device
+# mid-reboot. The test exit flow may cut USB power (hub port disable), so we must not
+# exit while the device is still rebooting.
 wait_for_reboot( same_version )
 
 if result.returncode != 0:
@@ -239,7 +261,7 @@ if result.returncode != 0:
     test.print_results_and_exit()
 
 # make sure update worked and check FW version and update counter
-device, ctx = test.find_first_device_or_exit()
+device, ctx = test.find_first_device_or_exit( args.serial )
 current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
 
 # camera_locked returns "YES" (locked) or "NO" (unlocked)

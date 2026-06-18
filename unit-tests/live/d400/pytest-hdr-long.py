@@ -105,6 +105,9 @@ def _hdr_streaming_default_config(dev, ctx):
     assert depth_sensor.get_option(rs.option.hdr_enabled) == 1
 
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     cfg.enable_stream(rs.stream.infrared, 1)
     pipe = rs.pipeline(ctx)
@@ -139,6 +142,9 @@ def test_hdr_streaming_default_config(function_scoped_device, test_context):
 def _hdr_running_restart_hdr_at_restream(dev, ctx):
     depth_sensor = dev.first_depth_sensor()
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     pipe = rs.pipeline(ctx)
     pipe.start(cfg)
@@ -231,6 +237,9 @@ def _hdr_running_hdr_merge_after_hdr_restart(dev, ctx):
     assert depth_sensor.get_option(rs.option.hdr_enabled) == 1
 
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     pipe = rs.pipeline(ctx)
     pipe.start(cfg)
@@ -324,6 +333,9 @@ def _check_sequence_id(pipe):
 def _hdr_streaming_checking_sequence_id(dev, ctx):
     depth_sensor = dev.first_depth_sensor()
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     cfg.enable_stream(rs.stream.infrared, 1)
     pipe = rs.pipeline(ctx)
@@ -352,6 +364,9 @@ def _emitter_on_off_check_sequence_id(dev, ctx):
     if not (depth_sensor and depth_sensor.supports(rs.option.emitter_on_off)):
         pytest.skip("Emitter on/off option not supported on this device")
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     cfg.enable_stream(rs.stream.infrared, 1)
     pipe = rs.pipeline(ctx)
@@ -380,6 +395,9 @@ def _hdr_merge_discard_merged_frame(dev, ctx):
     assert depth_sensor.get_option(rs.option.hdr_enabled) == 1
 
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     pipe = rs.pipeline(ctx)
 
@@ -454,6 +472,9 @@ def _hdr_start_stop_recover_manual_exposure_and_gain(dev, ctx):
     assert depth_sensor.get_option(rs.option.hdr_enabled) == 1
 
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     pipe = rs.pipeline(ctx)
     pipe.start(cfg)
@@ -554,6 +575,9 @@ def _hdr_streaming_set_locked_options(dev, ctx):
     assert depth_sensor.get_option(rs.option.hdr_enabled) == 1
 
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     pipe = rs.pipeline(ctx)
     pipe.start(cfg)
@@ -594,6 +618,9 @@ def _hdr_streaming_enable_runtime_exposure_update(dev, ctx):
     assert depth_sensor.get_option(rs.option.hdr_enabled) == 1
 
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth)
     cfg.enable_stream(rs.stream.infrared, 1)
     pipe = rs.pipeline(ctx)

@@ -119,8 +119,9 @@ def test_tare_calibration_with_host_assistance(test_device):
 
 
 def test_tare_calibration(test_device):
+    dev, _ = test_device
     # mipi devices do not support OCC calibration without host assistance
-    if is_mipi_device():
+    if is_mipi_device(dev):
         pytest.skip("MIPI/GMSL devices require host assistance for tare calibration")
     global _target_z
     try:
@@ -134,7 +135,7 @@ def test_tare_calibration(test_device):
 
         tare_json = tare_calibration_json(None, host_assistance)
         image_width, image_height, fps = 256, 144, 90
-        config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
+        config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps, dev=dev)
         if _target_z is None:
             baseline_m = measure_average_depth(config, pipeline, width=image_width, height=image_height, fps=fps, center_fraction=0.3)
             if baseline_m is not None:

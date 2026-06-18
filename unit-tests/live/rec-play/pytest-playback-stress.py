@@ -30,7 +30,7 @@ def test_playback_stress():
     global frames_count
     log.info("Playback stress test")
     # repo.build
-    file_name = os.path.join(repo.build, 'unit-tests', 'recordings', 'all_combinations_depth_color.bag' )
+    file_name = os.path.join(repo.build, 'unit-tests', 'recordings', 'all_combinations_depth_color.db3' )
     log.debug(f'recorded file: {file_name}')
 
     log.debug("Playing back: " + file_name )

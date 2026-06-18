@@ -1308,6 +1308,65 @@ namespace rs2
                     }
                 }
 
+                // PID toggle between Dual-RGB (2C) and Dedicated-RGB (3C) variants:
+                //   D535:       0x0C01 <-> 0x0C02
+                //   D585:       0x0C04 <-> 0x0C05
+                //   D585 Proto: 0x0C07 <-> 0x0C08
+                if (dev.supports(RS2_CAMERA_INFO_PRODUCT_ID) && dev.is<debug_protocol>())
+                {
+                    static constexpr uint32_t MWD_OPCODE          = 0x02U;
+                    static constexpr uint32_t MODE_REG_START_ADDR = 0x80000064U;
+                    static constexpr uint32_t MODE_REG_END_ADDR   = 0x80000068U;
+                    static constexpr uint32_t MODE_DEDICATED_RGB  = 0U;
+                    static constexpr uint32_t MODE_DUAL_RGB       = 1U;
+
+                    std::string current_pid = dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
+                    const bool is_dual_rgb      = (current_pid == "0C01") || (current_pid == "0C04") || (current_pid == "0C07");
+                    const bool is_dedicated_rgb = (current_pid == "0C02") || (current_pid == "0C05") || (current_pid == "0C08");
+                    if (is_dual_rgb || is_dedicated_rgb)
+                    {
+                        const std::string toggle_label = is_dual_rgb
+                            ? "Switch to Dedicated-RGB Mode"
+                            : "Switch to Dual-RGB Mode";
+                        const ImGuiSelectableFlags toggle_flags = is_streaming
+                            ? ImGuiSelectableFlags_Disabled : ImGuiSelectableFlags_None;
+                        if (ImGui::Selectable(toggle_label.c_str(), false, toggle_flags))
+                        {
+                            try
+                            {
+                                const uint32_t value = is_dual_rgb ? MODE_DEDICATED_RGB : MODE_DUAL_RGB;
+                                const std::vector<uint8_t> data = {
+                                    static_cast<uint8_t>( value         & 0xFF),
+                                    static_cast<uint8_t>((value >>  8 ) & 0xFF),
+                                    static_cast<uint8_t>((value >> 16 ) & 0xFF),
+                                    static_cast<uint8_t>((value >> 24 ) & 0xFF) };
+
+                                auto dp = dev.as<debug_protocol>();
+                                auto cmd = dp.build_command(MWD_OPCODE, MODE_REG_START_ADDR, MODE_REG_END_ADDR, 0, 0, data);
+
+                                dp.send_and_receive_raw_data(cmd);
+                                restarting_device_info = get_device_info(dev, false);
+                                dev.hardware_reset();
+                            }
+                            catch (const error& e)
+                            {
+                                error_message = error_to_string(e);
+                            }
+                            catch (const std::exception& e)
+                            {
+                                error_message = e.what();
+                            }
+                        }
+                        if (ImGui::IsItemHovered())
+                        {
+                            std::string tooltip = rsutils::string::from()
+                                << "Switch Dual-RGB / Dedicated Color Sensor Mode"
+                                << (is_streaming ? " (Disabled while streaming)" : "");
+                            RsImGui::CustomTooltip("%s", tooltip.c_str());
+                        }
+                    }
+                }
+
                 // fw update disabled when any sensor is streaming
                 ImGuiSelectableFlags updateFwFlags = (is_streaming) ? ImGuiSelectableFlags_Disabled : 0;
 
@@ -1973,7 +2032,7 @@ namespace rs2
                                             << "Setting " << opt_model.opt << " to " << new_val << " ("
                                             << labels[selected] << ")");
 
-                                        opt_model.set_option(opt_model.opt, static_cast<float>(new_val), error_message);
+                                        opt_model.set_option_async(opt_model.opt, static_cast<float>(new_val));
 
                                         // Only apply preset to GUI if set_option was succesful
                                         selected_file_preset = "";

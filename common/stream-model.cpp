@@ -133,6 +133,11 @@ namespace rs2
 
     bool stream_model::is_stream_visible() const
     {
+        // Inference streams carry binary data, not displayable video - no tile is shown for them
+        // (detections are overlaid on the color stream instead).
+        if (profile.stream_type() == RS2_STREAM_OBJECT_DETECTION)
+            return false;
+
         if (dev &&
             (dev->is_paused() ||
             (dev->streaming && dev->dev.is<playback>()) ||

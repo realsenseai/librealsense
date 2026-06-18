@@ -37,21 +37,28 @@ ds_d400_update_device::ds_d400_update_device(
                 rsutils::string::from() << "Unsupported firmware binary image provided - " << image.size() << " bytes" );
 
         std::string fw_version = ds::extract_firmware_version_string(image);
-        uint16_t pid;
-        if (_usb_device != nullptr )
-            pid = _usb_device->get_info().pid;
-        else if (_mipi_device != nullptr )
-            pid = _mipi_device->get_info().pid;
-            auto it = ds::d400_device_to_fw_min_version.find(pid);
-        if (it == ds::d400_device_to_fw_min_version.end())
-            throw librealsense::invalid_value_exception(
-                rsutils::string::from() << "Min and Max firmware versions have not been defined for this device: "
-                                        << std::hex << _pid );
-        bool result = (firmware_version(fw_version) >= firmware_version(it->second));
+        std::string const min_fw = get_firmware_min_version();
+        bool result = (firmware_version(fw_version) >= firmware_version(min_fw));
         if (!result)
             LOG_ERROR("Firmware version isn't compatible" << fw_version);
 
         return result;
+    }
+
+    std::string ds_d400_update_device::get_firmware_min_version() const
+    {
+        uint16_t pid = 0;
+        if( _usb_device != nullptr )
+            pid = _usb_device->get_info().pid;
+        else if( _mipi_device != nullptr )
+            pid = _mipi_device->get_info().pid;
+        auto it = ds::d400_device_to_fw_min_version.find( pid );
+        if( it == ds::d400_device_to_fw_min_version.end() )
+            throw librealsense::invalid_value_exception(
+                rsutils::string::from()
+                << "Minimum firmware version has not been defined for this device: "
+                << std::hex << pid );
+        return it->second;
     }
 
     std::string ds_d400_update_device::parse_serial_number(const std::vector<uint8_t>& buffer) const

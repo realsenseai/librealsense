@@ -19,6 +19,7 @@
 #include <src/ds/features/amplitude-factor-feature.h>
 #include <src/ds/features/auto-exposure-roi-feature.h>
 
+#include "proc/color-formats-converter.h" 
 #include "proc/depth-formats-converter.h"
 #include "proc/y8i-to-y8y8.h"
 #include "proc/y16i-10msb-to-y16y16.h"
@@ -55,7 +56,8 @@ namespace librealsense
         {rs_fourcc('Z','1','6',' '), RS2_FORMAT_Z16},
         {rs_fourcc('R','G','B','2'), RS2_FORMAT_BGR8},
         {rs_fourcc('M','J','P','G'), RS2_FORMAT_MJPEG},
-        {rs_fourcc('B','Y','R','2'), RS2_FORMAT_RAW16}
+        {rs_fourcc('B','Y','R','2'), RS2_FORMAT_RAW16},
+        {rs_fourcc('M','4','2','0'), RS2_FORMAT_M420}
 
     };
     std::map<uint32_t, rs2_stream> d500_depth_fourcc_to_rs2_stream = {
@@ -72,7 +74,8 @@ namespace librealsense
         {rs_fourcc('Z','1','6',' '), RS2_STREAM_DEPTH},
         {rs_fourcc('Z','1','6','H'), RS2_STREAM_DEPTH},
         {rs_fourcc('B','Y','R','2'), RS2_STREAM_COLOR},
-        {rs_fourcc('M','J','P','G'), RS2_STREAM_COLOR}
+        {rs_fourcc('M','J','P','G'), RS2_STREAM_COLOR},
+        {rs_fourcc('M','4','2','0'), RS2_STREAM_INFRARED}
     };
 
     std::vector<uint8_t> d500_device::send_receive_raw_data(const std::vector<uint8_t>& input)
@@ -102,7 +105,7 @@ namespace librealsense
     {
         // preparing HWM command
         command cmd(ds::DFU);
-        cmd.param1 = (_pid == ds::D585S_PID || _pid == ds::D585_PID) ? 0 : 1;
+        cmd.param1 = (_pid == ds::D585S_PID || _pid == ds::D585_LEGACY_PID) ? 0 : 1;
         cmd.require_response = false;
 
         _ds_device_common->enter_update_state(cmd);
@@ -122,6 +125,19 @@ namespace librealsense
     std::string d500_device::get_opcode_string(int opcode) const 
     {
         return _hw_monitor_response->hwmon_error2str(opcode);
+    }
+
+    bool d500_device::contradicts( const stream_profile_interface * a, const std::vector< stream_profile > & others ) const
+    {
+        if( auto vid_a = dynamic_cast< const video_stream_profile_interface * >( a ) )
+        {
+            for( auto request : others )
+            {
+                if( a->get_framerate() != 0 && request.fps != 0 && ( a->get_framerate() != request.fps ) )
+                    return true;
+            }
+        }
+        return false;
     }
 
     d500_depth_sensor::d500_depth_sensor( d500_device * owner,std::shared_ptr<uvc_sensor> uvc_sensor)
@@ -212,31 +228,15 @@ namespace librealsense
             }
             else if (p->get_stream_type() == RS2_STREAM_COLOR)
             {
-                assign_stream(_owner->_color_stream, p);
+                throw invalid_value_exception( "Depth sensor does not have a color stream" );
             }
             auto&& vid_profile = dynamic_cast<video_stream_profile_interface*>(p.get());
 
-            // used when color stream comes from depth sensor (as in D405)
-            if (p->get_stream_type() == RS2_STREAM_COLOR)
-            {
-                const auto&& profile = to_profile(p.get());
-                std::weak_ptr<d500_depth_sensor> wp =
-                    std::dynamic_pointer_cast<d500_depth_sensor>(this->shared_from_this());
-                vid_profile->set_intrinsics([profile, wp]()
-                    {
-                        auto sp = wp.lock();
-                        if (sp)
-                            return sp->get_color_intrinsics(profile);
-                        else
-                            return rs2_intrinsics{};
-                    });
-            }
             // Register intrinsics
-            else if (p->get_format() != RS2_FORMAT_Y16) // Y16 format indicate unrectified images, no intrinsics are available for these
+            if (p->get_format() != RS2_FORMAT_Y16) // Y16 format indicate unrectified images, no intrinsics are available for these
             {
                 const auto&& profile = to_profile(p.get());
-                std::weak_ptr<d500_depth_sensor> wp =
-                    std::dynamic_pointer_cast<d500_depth_sensor>(this->shared_from_this());
+                std::weak_ptr<d500_depth_sensor> wp = std::dynamic_pointer_cast<d500_depth_sensor>(this->shared_from_this());
                 vid_profile->set_intrinsics([profile, wp]()
                 {
                     auto sp = wp.lock();
@@ -365,7 +365,13 @@ namespace librealsense
 
         depth_ep->register_processing_block({ {RS2_FORMAT_W10} }, { {RS2_FORMAT_RAW10, RS2_STREAM_INFRARED, 1} }, []() { return std::make_shared<w10_converter>(RS2_FORMAT_RAW10); });
         depth_ep->register_processing_block({ {RS2_FORMAT_W10} }, { {RS2_FORMAT_Y10BPACK, RS2_STREAM_INFRARED, 1} }, []() { return std::make_shared<w10_converter>(RS2_FORMAT_Y10BPACK); });
-
+        
+        // M420 -> RGB8 (etc.) for the left infrared (index 1) on dual-RGB devices. No-op on PIDs that never produce M420 IR frames.
+        std::vector< stream_profile > m420_ir_targets;
+        for( rs2_format fmt : map_supported_color_formats( RS2_FORMAT_M420 ) )
+            m420_ir_targets.push_back( { fmt, RS2_STREAM_INFRARED, 1 } );
+        depth_ep->register_processing_block(
+            processing_block_factory::create_pbf_vector< m420_converter >( RS2_FORMAT_M420, m420_ir_targets ) );
         return depth_ep;
     }
 
@@ -376,7 +382,6 @@ namespace librealsense
           _depth_stream(new stream(RS2_STREAM_DEPTH)),
           _left_ir_stream(new stream(RS2_STREAM_INFRARED, 1)),
           _right_ir_stream(new stream(RS2_STREAM_INFRARED, 2)),
-          _color_stream(nullptr),
           _hw_monitor_response(std::make_shared<ds::d500_hwmon_response>())
     {
         _depth_device_idx

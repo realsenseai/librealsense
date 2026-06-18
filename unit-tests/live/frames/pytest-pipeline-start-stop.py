@@ -8,6 +8,8 @@ and verifies frames arrive each time.
 On D455 and other units with IMU it takes ~4 seconds per iteration.
 """
 
+import time
+
 import pytest
 import pyrealsense2 as rs
 from rspy.stopwatch import Stopwatch
@@ -43,6 +45,7 @@ def test_pipeline_start_stop(test_device):
         delay = start_call_stopwatch.get_elapsed()
         log.info(f"After {delay:.3f} [sec] got first frame of {f}")
         pipe.stop()
+        time.sleep(1) # allow some time for the streaming to actually stop
 
         iteration_time = iteration_stopwatch.get_elapsed()
         log.info(f"Iteration took {iteration_time:.3f} [sec]")

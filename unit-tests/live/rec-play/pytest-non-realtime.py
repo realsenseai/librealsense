@@ -24,7 +24,7 @@ pytestmark = [
 def test_non_realtime_stop(test_device):
     log.info("Playback with non realtime isn't stuck at stop")
 
-    filename = os.path.join( repo.build, 'unit-tests', 'recordings', 'recording_deadlock.bag' )
+    filename = os.path.join( repo.build, 'unit-tests', 'recordings', 'recording_deadlock.db3' )
     log.debug(f'deadlock file: {filename}')
 
     pipeline = rs2.pipeline()

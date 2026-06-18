@@ -8,7 +8,6 @@ Test FPS accuracy on D585S with various sensor permutations
 
 import pytest
 import pyrealsense2 as rs
-from rspy import tests_wrapper as tw
 import fps_helper
 import logging
 log = logging.getLogger(__name__)
@@ -19,6 +18,10 @@ HD_RESOLUTION = (1280, 720)
 pytestmark = [
     pytest.mark.device_each("D585S"),
     pytest.mark.context("nightly"),
+    # Disabled while D585S FW bug RSDEV-12174 is open: the 2nd open(D+C+S) cycle's
+    # streams produce zero frames and leave the device bricked until USB power-cycle.
+    # Restoration tracked by RSDEV-12175.
+    pytest.mark.skip(reason="RSDEV-12174: D585S FW set_xu / streaming fails on 2nd open(D+C+S) cycle"),
 ]
 
 
@@ -60,12 +63,8 @@ PERMUTATIONS = [
 ]
 
 
-def test_ah_configurations(test_device):
-    dev, ctx = test_device
+def test_ah_configurations(test_device_wrapped):
+    dev, ctx = test_device_wrapped
 
-    tw.start_wrapper(dev)
-    try:
-        sensor_profiles_array = get_sensors_and_profiles(dev)
-        fps_helper.perform_fps_test(sensor_profiles_array, PERMUTATIONS)
-    finally:
-        tw.stop_wrapper(dev)
+    sensor_profiles_array = get_sensors_and_profiles(dev)
+    fps_helper.perform_fps_test(sensor_profiles_array, PERMUTATIONS)

@@ -39,6 +39,7 @@
 #define USB_DT_CS_ENDPOINT (USB_TYPE_CLASS | USB_DT_ENDPOINT)
 
 const uint16_t VID_INTEL_CAMERA = 0x8086;
+const uint16_t VID_REALSENSE_CAMERA = 0x38E5;
 
 namespace librealsense
 {

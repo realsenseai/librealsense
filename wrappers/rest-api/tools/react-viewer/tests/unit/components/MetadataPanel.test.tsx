@@ -73,27 +73,31 @@ describe('MetadataOverlay', () => {
     render(<MetadataOverlay streamType="color" metadata={baseMetadata} fps={30} />)
     expect(screen.getByText(/Frame Metadata — COLOR/)).toBeInTheDocument()
   })
+
+  it('shows OS-level warning when clock_domain is system_time', () => {
+    const md: StreamMetadata = { ...baseMetadata, clock_domain: 'system_time' }
+    render(<MetadataOverlay streamType="depth" metadata={md} fps={30} />)
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('Per-frame metadata is not enabled at the OS level!')
+    expect(alert).toHaveTextContent('Please follow the installation guide for the details.')
+  })
+
+  it('does not show OS-level warning when clock_domain is global_time', () => {
+    render(<MetadataOverlay streamType="depth" metadata={baseMetadata} fps={30} />)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('does not show OS-level warning when clock_domain is hardware_clock', () => {
+    const md: StreamMetadata = { ...baseMetadata, clock_domain: 'hardware_clock' }
+    render(<MetadataOverlay streamType="depth" metadata={md} fps={30} />)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
 })
 
 describe('MetadataPanel', () => {
-  it('renders nothing when not streaming', () => {
-    const { container } = render(
-      <MetadataPanel
-        isStreaming={false}
-        metadata={baseMetadata}
-        streamType="depth"
-        fps={30}
-        show={false}
-        onToggle={() => {}}
-      />,
-    )
-    expect(container).toBeEmptyDOMElement()
-  })
-
   it('renders nothing when no metadata at all', () => {
     const { container } = render(
       <MetadataPanel
-        isStreaming={true}
         metadata={undefined}
         streamType="depth"
         fps={30}
@@ -114,7 +118,6 @@ describe('MetadataPanel', () => {
     }
     render(
       <MetadataPanel
-        isStreaming={true}
         metadata={md}
         streamType="depth"
         fps={30}
@@ -128,7 +131,6 @@ describe('MetadataPanel', () => {
   it('shows "Metadata" label when closed', () => {
     render(
       <MetadataPanel
-        isStreaming={true}
         metadata={baseMetadata}
         streamType="depth"
         fps={30}
@@ -142,7 +144,6 @@ describe('MetadataPanel', () => {
   it('shows "✕" label when open and renders overlay', () => {
     render(
       <MetadataPanel
-        isStreaming={true}
         metadata={baseMetadata}
         streamType="depth"
         fps={30}
@@ -158,7 +159,6 @@ describe('MetadataPanel', () => {
     const onToggle = vi.fn()
     render(
       <MetadataPanel
-        isStreaming={true}
         metadata={baseMetadata}
         streamType="depth"
         fps={30}

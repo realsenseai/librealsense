@@ -2,7 +2,7 @@
 yepkit-pykush==0.3.5; platform_machine != "aarch64"
 
 # Acroname hub (not used on Jetson/aarch64)
-brainstem==2.11.1; platform_machine != "aarch64"
+brainstem==2.12.4; platform_machine != "aarch64"
 
 # Unifi hub (not used on Jetson/aarch64)
 paramiko==3.5.1; platform_machine != "aarch64"

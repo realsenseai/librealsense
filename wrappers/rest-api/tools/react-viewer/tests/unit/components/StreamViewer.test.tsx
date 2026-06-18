@@ -5,27 +5,27 @@ import { StreamViewer } from '@/components/StreamViewer'
 
 describe('StreamViewer', () => {
   describe('Empty State', () => {
-    it('shows "No Streams Enabled" when no devices are active', () => {
+    it('shows "Nothing is streaming!" when no devices are active', () => {
       render(<StreamViewer />, {
         initialStoreState: {
           deviceStates: {},
         },
       })
-      
-      expect(screen.getByText('No Streams Enabled')).toBeInTheDocument()
+
+      expect(screen.getByText('Nothing is streaming!')).toBeInTheDocument()
     })
 
-    it('shows message to activate device when no devices are active', () => {
+    it('shows the "connect + enable" hint when no devices are active', () => {
       render(<StreamViewer />, {
         initialStoreState: {
           deviceStates: {},
         },
       })
-      
-      expect(screen.getByText(/Activate a device and enable streams/)).toBeInTheDocument()
+
+      expect(screen.getByText('Connect a device and enable any stream to start')).toBeInTheDocument()
     })
 
-    it('shows message to enable streams when device is active but no streams enabled', () => {
+    it('shows the same empty state when device is active but no streams enabled', () => {
       const device = createMockDevice()
       const deviceState = createMockDeviceState(device, {
         isActive: true,
@@ -34,29 +34,29 @@ describe('StreamViewer', () => {
         // the stream enabled and the empty-state branch never renders.
         streamConfigs: [createMockStreamConfig({ enable: false })],
       })
-      
+
       render(<StreamViewer />, {
         initialStoreState: {
           deviceStates: { [device.device_id]: deviceState },
         },
       })
-      
-      expect(screen.getByText(/Enable streams in the right panel/)).toBeInTheDocument()
+
+      expect(screen.getByText('Nothing is streaming!')).toBeInTheDocument()
     })
   })
 
   describe('Stream Rendering', () => {
-    it('renders stream tiles for enabled streams', () => {
+    it('renders a stream tile for an enabled depth stream that is actually streaming', () => {
       const device = createMockDevice()
       const depthConfig = createMockStreamConfig({
         stream_type: 'depth',
-        enabled: true,
         enable: true, // Component uses 'enable' property
       })
       const deviceState = createMockDeviceState(device, {
         isActive: true,
         streamConfigs: [depthConfig],
-        isStreaming: false,
+        isStreaming: true,
+        streamingMode: 'pipeline',
       })
       
       render(<StreamViewer />, {
@@ -65,27 +65,26 @@ describe('StreamViewer', () => {
         },
       })
       
-      // Should render a stream tile
-      expect(screen.queryByText('No Streams Enabled')).not.toBeInTheDocument()
+      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
+      expect(screen.getByText('DEPTH')).toBeInTheDocument()
     })
 
     it('shows multiple stream tiles for multiple enabled streams', () => {
       const device = createMockDevice()
       const depthConfig = createMockStreamConfig({
         stream_type: 'depth',
-        enabled: true,
         enable: true,
       })
       const colorConfig = createMockStreamConfig({
         stream_type: 'color',
-        enabled: true,
         enable: true,
         format: 'RGB8',
       })
       const deviceState = createMockDeviceState(device, {
         isActive: true,
         streamConfigs: [depthConfig, colorConfig],
-        isStreaming: false,
+        isStreaming: true,
+        streamingMode: 'pipeline',
       })
       
       render(<StreamViewer />, {
@@ -94,13 +93,14 @@ describe('StreamViewer', () => {
         },
       })
       
-      // Grid should be present with multiple children
-      expect(screen.queryByText('No Streams Enabled')).not.toBeInTheDocument()
+      expect(document.querySelectorAll('video.stream-video')).toHaveLength(2)
+      expect(screen.getByText('DEPTH')).toBeInTheDocument()
+      expect(screen.getByText('COLOR')).toBeInTheDocument()
     })
   })
 
   describe('Multi-device Support', () => {
-    it('shows streams from multiple active devices', () => {
+    it('shows streams from multiple active streaming devices', () => {
       const device1 = createMockDevice({ device_id: 'device-1', name: 'D435 Camera 1' })
       const device2 = createMockDevice({ device_id: 'device-2', name: 'D455 Camera 2' })
       
@@ -110,10 +110,14 @@ describe('StreamViewer', () => {
       const state1 = createMockDeviceState(device1, {
         isActive: true,
         streamConfigs: [config1],
+        isStreaming: true,
+        streamingMode: 'pipeline',
       })
       const state2 = createMockDeviceState(device2, {
         isActive: true,
         streamConfigs: [config2],
+        isStreaming: true,
+        streamingMode: 'pipeline',
       })
       
       render(<StreamViewer />, {
@@ -125,8 +129,7 @@ describe('StreamViewer', () => {
         },
       })
       
-      // Should show streams from both devices
-      expect(screen.queryByText('No Streams Enabled')).not.toBeInTheDocument()
+      expect(document.querySelectorAll('video.stream-video')).toHaveLength(2)
     })
 
     it('only shows streams from active devices, not inactive ones', () => {
@@ -136,10 +139,14 @@ describe('StreamViewer', () => {
       const activeState = createMockDeviceState(activeDevice, {
         isActive: true,
         streamConfigs: [createMockStreamConfig({ enable: true })],
+        isStreaming: true,
+        streamingMode: 'pipeline',
       })
       const inactiveState = createMockDeviceState(inactiveDevice, {
         isActive: false,
         streamConfigs: [createMockStreamConfig({ enable: true })],
+        isStreaming: true,
+        streamingMode: 'pipeline',
       })
       
       render(<StreamViewer />, {
@@ -151,32 +158,112 @@ describe('StreamViewer', () => {
         },
       })
       
-      // Only one stream should be shown (from active device)
-      expect(screen.queryByText('No Streams Enabled')).not.toBeInTheDocument()
+      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
     })
   })
 
   describe('Streaming Status', () => {
-    it('displays differently when streaming vs not streaming', () => {
+    it('hides the tile and shows the empty state when not streaming', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({ enable: true })
-      
-      // Not streaming
+
       const notStreamingState = createMockDeviceState(device, {
         isActive: true,
         isStreaming: false,
         streamingMode: 'idle',
         streamConfigs: [config],
       })
-      
-      const { rerender } = render(<StreamViewer />, {
+
+      render(<StreamViewer />, {
         initialStoreState: {
           deviceStates: { [device.device_id]: notStreamingState },
         },
       })
-      
-      // Stream tile should be present even when not actively streaming
-      expect(screen.queryByText('No Streams Enabled')).not.toBeInTheDocument()
+
+      expect(screen.getByText('Nothing is streaming!')).toBeInTheDocument()
+      expect(document.querySelector('video.stream-video')).toBeNull()
+    })
+  })
+
+  describe('Tile hiding until streaming', () => {
+    it('hides tile when stream is enabled but not actively streaming', () => {
+      const device = createMockDevice()
+      const config = createMockStreamConfig({ stream_type: 'depth', enable: true })
+      const deviceState = createMockDeviceState(device, {
+        isActive: true,
+        isStreaming: false,
+        streamingMode: 'pipeline',
+        streamConfigs: [config],
+      })
+
+      render(<StreamViewer />, {
+        initialStoreState: {
+          deviceStates: { [device.device_id]: deviceState },
+        },
+      })
+
+      expect(screen.getByText('Nothing is streaming!')).toBeInTheDocument()
+    })
+
+    it('sensor mode: renders tile when stream_type is in active list (case-insensitive)', () => {
+      const device = createMockDevice()
+      const config = createMockStreamConfig({
+        stream_type: 'INFRARED-1',
+        sensor_id: 'sensor-0',
+        enable: true,
+      })
+      const deviceState = createMockDeviceState(device, {
+        isActive: true,
+        streamingMode: 'sensor',
+        streamConfigs: [config],
+        sensorStreamingStatus: {
+          'sensor-0': {
+            sensor_id: 'sensor-0',
+            name: 'Stereo Module',
+            is_streaming: true,
+            stream_types: ['depth', 'infrared-1'],
+          },
+        },
+      })
+
+      render(<StreamViewer />, {
+        initialStoreState: {
+          deviceStates: { [device.device_id]: deviceState },
+        },
+      })
+
+      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
+    })
+
+    it('sensor mode: hides tile when stream_type is not in active list', () => {
+      const device = createMockDevice()
+      const config = createMockStreamConfig({
+        stream_type: 'color',
+        sensor_id: 'sensor-0',
+        enable: true,
+      })
+      const deviceState = createMockDeviceState(device, {
+        isActive: true,
+        streamingMode: 'sensor',
+        streamConfigs: [config],
+        sensorStreamingStatus: {
+          'sensor-0': {
+            sensor_id: 'sensor-0',
+            name: 'Stereo Module',
+            is_streaming: true,
+            stream_types: ['depth'],
+          },
+        },
+      })
+
+      render(<StreamViewer />, {
+        initialStoreState: {
+          deviceStates: { [device.device_id]: deviceState },
+        },
+      })
+
+      expect(screen.getByText('Nothing is streaming!')).toBeInTheDocument()
+      expect(document.querySelector('video.stream-video')).toBeNull()
     })
   })
 
@@ -187,6 +274,8 @@ describe('StreamViewer', () => {
       const deviceState = createMockDeviceState(device, {
         isActive: true,
         streamConfigs: [config],
+        isStreaming: true,
+        streamingMode: 'pipeline',
       })
       
       render(<StreamViewer />, {
@@ -195,7 +284,8 @@ describe('StreamViewer', () => {
         },
       })
       
-      expect(screen.queryByText('No Streams Enabled')).not.toBeInTheDocument()
+      expect(screen.getByText('DEPTH')).toBeInTheDocument()
+      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
     })
 
     it('handles color stream type', () => {
@@ -204,6 +294,8 @@ describe('StreamViewer', () => {
       const deviceState = createMockDeviceState(device, {
         isActive: true,
         streamConfigs: [config],
+        isStreaming: true,
+        streamingMode: 'pipeline',
       })
       
       render(<StreamViewer />, {
@@ -212,7 +304,8 @@ describe('StreamViewer', () => {
         },
       })
       
-      expect(screen.queryByText('No Streams Enabled')).not.toBeInTheDocument()
+      expect(screen.getByText('COLOR')).toBeInTheDocument()
+      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
     })
 
     it('handles infrared stream type', () => {
@@ -221,6 +314,8 @@ describe('StreamViewer', () => {
       const deviceState = createMockDeviceState(device, {
         isActive: true,
         streamConfigs: [config],
+        isStreaming: true,
+        streamingMode: 'pipeline',
       })
       
       render(<StreamViewer />, {
@@ -229,7 +324,8 @@ describe('StreamViewer', () => {
         },
       })
       
-      expect(screen.queryByText('No Streams Enabled')).not.toBeInTheDocument()
+      expect(screen.getByText('INFRARED')).toBeInTheDocument()
+      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
     })
   })
 })

@@ -54,7 +54,7 @@ namespace rs2
         // Optional predicate; null means always available.
         // When it returns false the toggle is grayed out in the UI.
         // Set by the owner after construction for filters with runtime constraints
-        // (e.g. in subdevice_model for MinZ: requires CUDA and specific stream config).
+        // (e.g. in subdevice_model for Improved Close Range Depth: requires CUDA and specific stream config).
         std::function<bool()> available;
         std::string unavailable_tooltip;
 

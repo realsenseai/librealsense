@@ -3,8 +3,9 @@
 
 #include "post-processing-filters-list.h"
 #include "post-processing-block-model.h"
-#ifdef BUILD_WITH_MINZ
-#include "minz-filter.h"
+#ifdef BUILD_WITH_CLOSE_RANGE_DEPTH
+#include "close-range-depth-filter.h"
+#include "rs-depth-range-loader.h"
 #endif
 #include <imgui_internal.h>
 #include <realsense_imgui.h>
@@ -15,6 +16,68 @@
 
 namespace rs2
 {
+    // --- subdevice_model::config_save_worker ---------------------------------------------------
+    // Defined out-of-line; the class is declared as a private nested type in subdevice-model.h.
+
+    subdevice_model::config_save_worker & subdevice_model::config_save_worker::instance()
+    {
+        static config_save_worker w;
+        return w;
+    }
+
+    subdevice_model::config_save_worker::config_save_worker()
+        : _worker( [this] { run(); } )
+    {
+    }
+
+    subdevice_model::config_save_worker::~config_save_worker()
+    {
+        {
+            std::lock_guard< std::mutex > lk( _mtx );
+            _stop = true;
+        }
+        _cv.notify_one();
+        if( _worker.joinable() ) _worker.join();
+    }
+
+    void subdevice_model::config_save_worker::post( void * key, std::function< void() > job )
+    {
+        {
+            std::lock_guard< std::mutex > lk( _mtx );
+            _pending[key] = std::move( job );
+        }
+        _cv.notify_one();
+    }
+
+    void subdevice_model::config_save_worker::cancel( void * key )
+    {
+        std::lock_guard< std::mutex > lk( _mtx );
+        _pending.erase( key );
+    }
+
+    void subdevice_model::config_save_worker::run()
+    {
+        for( ;; )
+        {
+            std::vector< std::function< void() > > jobs;
+            bool stopping = false;
+            {
+                std::unique_lock< std::mutex > lk( _mtx );
+                _cv.wait( lk, [this] { return _stop || ! _pending.empty(); } );
+                stopping = _stop;
+                for( auto & kv : _pending ) jobs.push_back( std::move( kv.second ) );
+                _pending.clear();
+            }
+            for( auto & job : jobs )
+            {
+                try { job(); } catch( ... ) {}
+            }
+            if( stopping ) return;
+        }
+    }
+
+    // -------------------------------------------------------------------------------------------
+
     std::vector<const char*> get_string_pointers(const std::vector<std::string>& vec)
     {
         std::vector<const char*> res;
@@ -81,8 +144,16 @@ namespace rs2
         y411(std::make_shared<rs2::gl::y411_decoder>()),
         viewer(viewer),
         detected_objects(device_detected_objects),
-        _destructing( false )
+        _destructing( false ),
+        // Queue capacity is generous: even rapid slider drags coalesce into at most one
+        // queued job per option (see option_model::set_option_async), so realistically
+        // depth ≪ 16.
+        _set_dispatcher( std::make_shared< dispatcher >( 64u ) )
     {
+        // dispatcher's worker thread starts in _was_stopped=true; invoke() is a
+        // silent no-op until start() is called. (The header comment claiming it
+        // "starts out 'started'" disagrees with the constructor in src/dispatcher.cpp.)
+        _set_dispatcher->start();
         supported_options = s->get_supported_options();
         restore_processing_block("colorizer", depth_colorizer);
         restore_processing_block("yuy2rgb", yuy2rgb);
@@ -118,22 +189,27 @@ namespace rs2
 
         bool const is_rgb_camera = s->is< color_sensor >();
 
-        // MinZ must run before get_recommended_filters() (decimation, spatial, temporal…).
+        // The close-range improver must run before get_recommended_filters() (decimation, spatial, temporal…).
         // Decimation halves depth resolution while leaving IR unchanged; the mismatch would
-        // trigger the resolution guard in min_z_depth_improver::apply() and silently skip MinZ.
-#ifdef BUILD_WITH_MINZ
+        // trigger the resolution guard in close_range_depth_improver::apply() and silently skip the improver.
+#ifdef BUILD_WITH_CLOSE_RANGE_DEPTH
         if( !is_rgb_camera && s->supports( RS2_OPTION_STEREO_BASELINE ) )
         {
-            auto block = std::make_shared< minz_filter >();
+            auto block = std::make_shared< close_range_depth_filter >();
             auto model = std::make_shared< processing_block_model >(
-                this, "Min-Z Improvement", block,
+                this, "Improved Close Range Depth", block,
                 [block]( rs2::frame f ) { return block->process( f ); },
                 error_message, false );
 
-            if( !rsutils::rs2_is_cuda_available() )
+            if( ! get_rs_depth_range_loader().is_loaded() )
             {
                 model->available = []() { return false; };
-                model->unavailable_tooltip = "MinZ requires CUDA (not detected on this system)";
+                model->unavailable_tooltip = "Improved Close Range Depth library not found; install librealsense2-enhanced-depth package";
+            }
+            else if( !rsutils::rs2_is_cuda_available() )
+            {
+                model->available = []() { return false; };
+                model->unavailable_tooltip = "Improved Close Range Depth requires CUDA (not detected on this system)";
             }
             else
             {
@@ -283,6 +359,18 @@ namespace rs2
         {
             auto option_value = depth_colorizer->get_option(RS2_OPTION_VISUAL_PRESET);
             depth_colorizer->set_option(RS2_OPTION_VISUAL_PRESET, option_value);
+        }
+
+        // Disable histogram equalization for D585 prototype variants (0C07, 0C08).
+        // Must be applied AFTER the VISUAL_PRESET restore block above: re-setting the Dynamic
+        // preset (default) re-enables histogram equalization via its on_set callback.
+        if (s->supports(RS2_CAMERA_INFO_PRODUCT_ID))
+        {
+            std::string device_pid = s->get_info(RS2_CAMERA_INFO_PRODUCT_ID);
+            if (device_pid == "0C07" || device_pid == "0C08")
+            {
+                depth_colorizer->set_option(RS2_OPTION_HISTOGRAM_EQUALIZATION_ENABLED, 0.f);
+            }
         }
 
         std::stringstream ss;
@@ -466,6 +554,13 @@ namespace rs2
 
     subdevice_model::~subdevice_model()
     {
+        // cancel() drops any not-yet-started save job for this subdevice. If the
+        // worker has already dequeued and is running our lambda, cancel is a no-op —
+        // but that's safe because the lambda intentionally captures only shared_ptrs
+        // to the processing blocks (by value), never `this`. So `subdevice_model`'s
+        // dtor doesn't need to wait for the worker; the in-flight save will finish on
+        // its own without dereferencing any member of *this.
+        config_save_worker::instance().cancel( this );
         _destructing = true;
         try
         {
@@ -1792,21 +1887,45 @@ namespace rs2
     }
     void subdevice_model::update(std::string& error_message, notifications_model& notifications)
     {
-        if (_options_invalidated)
+        // Two paths below are throttled while the user is actively writing options
+        // (last_user_set_stopwatch < 500 ms):
+        //   - the _options_invalidated branch posts a JSON-config save job, which is
+        //     fine to skip during a drag (the worker coalesces anyway).
+        //   - the per-frame get_option_value() polling shares the per-device USB bus
+        //     with our async option-write worker and with options_watcher's 1 s poll
+        //     cycle, so polling here would reintroduce the UI freeze the async dispatch
+        //     is meant to fix.
+        // The gate is scoped to just these two paths so that any other logic added to
+        // update() in the future (or below this point) is not silently throttled.
+        // `value` stays fresh during the gate via options_watcher -> on_options_changed.
+        const bool user_writing = last_user_set_stopwatch.get_elapsed_ms() < 500;
+
+        if (!user_writing && _options_invalidated)
         {
             next_option = 0;
             _options_invalidated = false;
 
-            save_processing_block_to_config_file("colorizer", depth_colorizer);
-            save_processing_block_to_config_file("yuy2rgb", yuy2rgb);
-            save_processing_block_to_config_file("m420_to_rgb", m420_to_rgb);
-            save_processing_block_to_config_file("nv12_to_rgb", nv12_to_rgb);
-            save_processing_block_to_config_file("y411", y411);
-
-            for (auto&& pbm : post_processing) pbm->save_to_config_file();
+            // Capture by value so the worker stays UAF-safe even if `this` dies mid-save.
+            // shared_ptrs keep the underlying processing blocks alive until the job runs.
+            auto colorizer = depth_colorizer;
+            auto yuy2      = yuy2rgb;
+            auto m420      = m420_to_rgb;
+            auto nv12      = nv12_to_rgb;
+            auto y411_ptr  = y411;
+            auto pp        = post_processing;
+            config_save_worker::instance().post( this,
+                [ colorizer, yuy2, m420, nv12, y411_ptr, pp ]
+                {
+                    save_processing_block_to_config_file( "colorizer",   colorizer );
+                    save_processing_block_to_config_file( "yuy2rgb",     yuy2 );
+                    save_processing_block_to_config_file( "m420_to_rgb", m420 );
+                    save_processing_block_to_config_file( "nv12_to_rgb", nv12 );
+                    save_processing_block_to_config_file( "y411",        y411_ptr );
+                    for( auto & pbm : pp ) pbm->save_to_config_file();
+                } );
         }
 
-        if (next_option < supported_options.size())
+        if (!user_writing && next_option < supported_options.size())
         {
             auto next = supported_options[next_option];
             if (options_metadata.find(static_cast<rs2_option>(next)) != options_metadata.end())

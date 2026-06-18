@@ -3,11 +3,11 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-"""Live MinZ (close-range depth) demo using rs_depth + pyrealsense2.
+"""Live Improved Close Range Depth demo using rs_depth + pyrealsense2.
 
 Streams from a RealSense D4xx, runs DepthRangeImprover on each frame, and
 prints a single live-updating status line showing how much of the close-range
-band MinZ recovered that the camera couldn't see on its own.
+band the improver recovered that the camera couldn't see on its own.
 
 Run:
     python3 range_depth.py        # Ctrl-C to stop
@@ -36,7 +36,7 @@ calib = Calibration.from_sdk(ir1.get_intrinsics(), ir1.get_extrinsics_to(ir2))
 
 # Meters per Z16 unit. Typical D4xx = 0.001 (raw Z16 == mm), but high-accuracy
 # presets and SR300 use other values — scale raw values to mm before comparing
-# against MinZ threshold (which is in mm).
+# against the min-Z threshold (which is in mm).
 try:
     depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
 except Exception:
@@ -46,7 +46,7 @@ except Exception:
 improver = DepthRangeImprover(calib)
 T = improver.min_z_threshold_mm
 N = 1280 * 720
-print(f"MinZ threshold: {T} mm  (pixels closer than this are improved)")
+print(f"Min-Z threshold: {T} mm  (pixels closer than this are improved)")
 print("Press Ctrl-C to stop\n")
 
 # ── 4. Stream + improve + live status line ──────────────────────────────
@@ -73,7 +73,7 @@ try:
         sys.stdout.write(
             f"\rframe {f.get_frame_number():>5} │ close-range: "
             f"HW {hw_pct:5.2f}% → improved {imp_pct:5.2f}% "
-            f"│ MinZ recovered {recovery_pct:5.1f}% │ +{rescued:>6} px"
+            f"│ recovered {recovery_pct:5.1f}% │ +{rescued:>6} px"
         )
         sys.stdout.flush()
 

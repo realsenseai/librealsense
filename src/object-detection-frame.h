@@ -15,7 +15,7 @@ class object_detection_frame : public inference_frame
 public:
     // Frames received over the object detection stream are binary blobs with object_detection_payload layout.
 
-    static constexpr uint32_t MAGIC_NUMBER = 0x4F444554;  // "ODET"
+    static constexpr uint32_t MAGIC_NUMBER = 0x5445444F;  // ASCII "ODET" as a little-endian uint32
 
     enum class source : uint8_t
     {
@@ -26,7 +26,7 @@ public:
 #pragma pack( push, 1 )
     struct object_detection_frame_header
     {
-        uint32_t magic_number;  // Must equal OD_FRAME_MAGIC (0x4F444554, "ODET")
+        uint32_t magic_number;  // Must equal MAGIC_NUMBER
         uint16_t version;       // major.minor SDK/HKR API version
         uint8_t data_type;      // 0 = object detection
         uint8_t flags;
@@ -37,7 +37,7 @@ public:
 
     struct object_detection_entry
     {
-        uint32_t detection_id;    // For detection/tracking traceability
+        uint16_t detection_id;    // For detection/tracking traceability
         uint8_t detection_type;   // 0 = person
         uint8_t confidence;       // 0-100
         uint16_t top_left_x;      // Bounding box top-left X [pixels]
@@ -50,7 +50,7 @@ public:
     struct object_detection_payload
     {
         object_detection_frame_header header;
-        double timestamp;          // Frame timestamp
+        double timestamp_ms;       // Frame timestamp [milliseconds]
         uint64_t frame_id;         // Frame counter
         uint16_t number_of_detections;
         uint8_t source;            // 0 = RGB, 1 = depth

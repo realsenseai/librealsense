@@ -60,7 +60,12 @@ from rspy.pytest.logging_setup import (
 )
 from rspy.pytest.log_live_format import install as install_live_log_format
 from rspy.pytest.cli import consume_legacy_flags, apply_pending_flags
-from rspy.pytest.device_helpers import resolve_device_each_serials, _MISSING_SENTINEL_PREFIX, _SKIP_SENTINEL_PREFIX
+from rspy.pytest.device_helpers import (
+    resolve_device_each_serials,
+    select_target_device,
+    _MISSING_SENTINEL_PREFIX,
+    _SKIP_SENTINEL_PREFIX,
+)
 from rspy.pytest.collection import filter_and_sort_items
 from rspy.pytest.plugins import check_required_plugins
 
@@ -192,10 +197,6 @@ def pytest_addoption(parser):
 # Shared context tags (e.g. "nightly", "weekly") — tests check this to adjust behavior
 context_list = []
 
-# Module-scoped retry: tracks which (module, repeat_step) passes had failures.
-# Used by --retries to skip retry passes when the previous pass was clean.
-_module_pass_had_failure = {}  # (module_file, step) -> True
-
 
 def pytest_configure(config):
     """Early setup: register markers, configure defaults, and query connected devices."""
@@ -218,24 +219,37 @@ def pytest_configure(config):
         config.option.count = repeat_val
         config.option.repeat_scope = 'module'
 
-    # --retries N → module-scoped retry.  Run all tests in a file; if any fail,
-    # recycle the device and rerun the *entire* module — up to N extra attempts.
-    # Implemented on top of pytest-repeat (count = N+1, module scope).
-    # pytest-retry's function-level retry is ALWAYS disabled when --retries is used.
-    retries_val = config.getoption('retries', default=0)
-    if retries_val:
-        config.option.retries = 0           # disable pytest-retry function-level retry
-        if config.getoption('count', default=1) <= 1:
-            # --retries without --repeat: add retry passes via pytest-repeat
-            config.option.count = retries_val + 1
-            config.option.repeat_scope = 'module'
-            config._module_retry_mode = True    # skip retry passes when previous pass was clean
+    # --retries N is handled natively by the pytest-retry plugin: failed tests rerun
+    # up to N times, and the plugin tears down + re-creates module/class-scoped
+    # fixtures between attempts (pytest-retry's "preliminary teardown trick" -
+    # see pytest_retry.retry_plugin in the version pinned by requirements.txt).
+    # This gives us free device recycling and precondition re-apply.
+    #
+    # By default pytest-retry's `should_handle_retry` skips setup/teardown phase
+    # failures.  We relax that to also retry setup-phase failures (call.when ==
+    # "setup"), since those are the common case for transient hub/USB glitches
+    # at fixture time — the retry loop already does the right thing (tears down
+    # then re-runs setup + call), it just refuses to enter for setup failures.
+    # Teardown still excluded — re-running teardown after a teardown failure
+    # is brittle and matches pytest-retry's upstream stance.
+    # Regression for Jenkins win #113344 (fixture-time ERRORs must trigger retry).
+    # Version pinned by requirements.txt so upstream renames give a deterministic
+    # ImportError rather than silent behaviour drift.
+    try:
+        from pytest_retry import retry_plugin
+        def _retry_setup_too(call):
+            if call.excinfo is None or call.excinfo.typename == "Skipped":
+                return False
+            return call.when in ("setup", "call")
+        retry_plugin.should_handle_retry = _retry_setup_too
+    except ImportError:
+        pass
 
     # We override pytest-repeat's `__pytest_repeat_step_number` to module scope so
     # module-scoped fixtures (e.g. module_device_setup) can depend on it and re-instantiate
     # per repeat pass.  That override only makes sense in module-scope repetition.  If a
     # user runs `--count N` *directly* with the default function-scope, force module scope
-    # to stay consistent with the override.  --repeat / --retries already set this above.
+    # to stay consistent with the override.  --repeat already sets this above.
     if config.getoption('count', default=1) > 1 and config.getoption('repeat_scope', default='function') == 'function':
         log.warning("--count > 1 with default function-scope conflicts with our module-scoped "
                     "__pytest_repeat_step_number override; forcing --repeat-scope=module. "
@@ -272,15 +286,9 @@ def pytest_configure(config):
 
     # Suppress verbose failure tracebacks — per-test log files have full details.
     # Keep short one-liners (-rfE) so Jenkins Groovy can parse them for log file links.
-    # pytest-retry's verbose report is also suppressed (details are in per-test log files).
     if config.getoption("--tb") == "auto":
         config.option.tbstyle = "no"
     config.option.reportchars = "fE"
-    try:
-        from pytest_retry.retry_plugin import retry_manager
-        retry_manager.build_retry_report = lambda *args, **kwargs: None
-    except ImportError:
-        pass
 
     # Suppress paramiko and cryptography deprecation warnings
     config.addinivalue_line("filterwarnings", "ignore::DeprecationWarning:cryptography")
@@ -312,6 +320,9 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers", "device_type_exclude(type): skip test if device connection type matches (e.g., GMSL, USB, DDS)"
+    )
+    config.addinivalue_line(
+        "markers", "dds: test requires a DDS-enabled build (selected by --tag dds / -m dds)"
     )
 
     # Configure standard logging with format matching legacy rspy.log output
@@ -387,7 +398,7 @@ def pytest_runtest_protocol(item, nextitem):
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Log test duration and any failures/errors.  Track per-module failures for --retries."""
+    """Log test duration and any failures/errors."""
     outcome = yield
     report = outcome.get_result()
 
@@ -401,30 +412,6 @@ def pytest_runtest_makereport(item, call):
     if call.when == "call":
         ensure_newline()
         log.debug(f"Test execution took {report.duration:.3f}s")
-
-    # Record module-level failure for --retries skip-if-clean logic.
-    # Track ANY phase (setup / call / teardown) — a setup-phase failure shows up as
-    # ERROR in Jenkins reports but is just as much a failure for retry purposes.
-    # Restricting to report.when == "call" was missing every fixture-time error and
-    # caused the retry pass to be wrongly skipped (see Jenkins #113344).
-    if report.failed and getattr(item.config, '_module_retry_mode', False):
-        callspec = getattr(item, 'callspec', None)
-        step = callspec.params.get('__pytest_repeat_step_number', 0) if callspec else 0
-        mod = item.module.__file__
-        _module_pass_had_failure[(mod, step)] = True
-
-
-@pytest.hookimpl(tryfirst=True)
-def pytest_runtest_setup(item):
-    """Skip retry passes whose previous pass had no failures (--retries optimisation)."""
-    if not getattr(item.config, '_module_retry_mode', False):
-        return
-    callspec = getattr(item, 'callspec', None)
-    step = callspec.params.get('__pytest_repeat_step_number', 0) if callspec else 0
-    if step > 0:
-        mod = item.module.__file__
-        if not _module_pass_had_failure.get((mod, step - 1), False):
-            pytest.skip("Module retry skipped — no failures in previous pass")
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
@@ -504,8 +491,12 @@ def __pytest_repeat_step_number(request):
     them on each repeat pass — driving the device recycle between passes.
 
     Assumes ``repeat_scope='module'`` (forced in ``pytest_configure`` whenever
-    ``--count`` / ``--repeat`` / ``--retries`` ask for >1 pass).  Without parametrize
+    ``--count`` / ``--repeat`` ask for >1 pass).  Without parametrize
     (--count==1) ``request.param`` is unset and we just return 0.
+
+    Note: with native pytest-retry handling --retries, retries don't go through
+    pytest-repeat — pytest-retry tears down module fixtures directly between
+    attempts. This fixture is only relevant for --repeat / --count.
     """
     return getattr(request, 'param', 0)
 
@@ -608,22 +599,22 @@ def test_context(module_device_setup):
 
 
 @pytest.fixture(scope="module")
-def test_device(test_context):
-    """Return (device, context) for the first visible device, or fail if none found."""
+def test_device(test_context, module_device_setup):
+    """Return (device, context) for the test's target device, or fail if none found."""
     devices_list = list(test_context.devices)
     if not devices_list:
         pytest.fail("No device available for test")
 
-    dev = devices_list[0]
+    dev = select_target_device(devices_list, module_device_setup)
     log.debug(f"Test using device: {dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else 'Unknown'}")
 
     return dev, test_context
 
 
 @pytest.fixture
-def function_scoped_device(test_context):
+def function_scoped_device(test_context, module_device_setup):
     """Function-scoped: re-query the module-scoped ``test_context`` and return a
-    *fresh* device wrapper for the first visible device.  Use this in tests that
+    *fresh* device wrapper for the test's target device.  Use this in tests that
     mutate persistent device state (e.g. HDR sequencer overrides in
     ``pytest-hdr-long.py``) and need each test to start from a new device object,
     even though the underlying ``rs.context()`` is shared across the module.
@@ -636,8 +627,8 @@ def function_scoped_device(test_context):
     if not devices_list:
         pytest.fail("No device available for test")
 
-    dev = devices_list[0]
-    log.debug(f"Test using fresh device handle: " f"{dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else 'Unknown'}")
+    dev = select_target_device(devices_list, module_device_setup)
+    log.debug(f"Test using fresh device handle: {dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else 'Unknown'}")
 
     return dev
 

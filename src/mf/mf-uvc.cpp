@@ -562,29 +562,15 @@ namespace librealsense
             }
             if (opt == RS2_OPTION_ENABLE_AUTO_EXPOSURE)
             {
-                if (value)
-                {
-                    auto hr = get_camera_control()->Set(CameraControl_Exposure, 0, CameraControl_Flags_Auto);
-                    if (hr == DEVICE_NOT_READY_ERROR)
-                        return false;
+                // The exposure value passed here is intentionally 0 - when switching to
+                // Manual, uvc_pu_auto_exposure_option re-applies the saved exposure right
+                // after this call, so the value written here is overwritten immediately.
+                auto flags = value ? CameraControl_Flags_Auto : CameraControl_Flags_Manual;
+                auto hr = get_camera_control()->Set(CameraControl_Exposure, 0, flags);
+                if (hr == DEVICE_NOT_READY_ERROR)
+                    return false;
 
-                    CHECK_HR(hr);
-                }
-                else
-                {
-                    long min, max, step, def, caps;
-                    auto hr = get_camera_control()->GetRange(CameraControl_Exposure, &min, &max, &step, &def, &caps);
-                    if (hr == DEVICE_NOT_READY_ERROR)
-                        return false;
-
-                    CHECK_HR(hr);
-
-                    hr = get_camera_control()->Set(CameraControl_Exposure, def, CameraControl_Flags_Manual);
-                    if (hr == DEVICE_NOT_READY_ERROR)
-                        return false;
-
-                    CHECK_HR(hr);
-                }
+                CHECK_HR(hr);
                 return true;
             }
 

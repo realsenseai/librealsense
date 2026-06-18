@@ -20,6 +20,9 @@ def test_depth_units_metadata(test_device):
 
     pipeline = rs.pipeline(ctx)
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
 
     try:
         pipeline_profile = pipeline.start(cfg)

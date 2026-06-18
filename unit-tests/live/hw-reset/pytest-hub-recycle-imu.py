@@ -15,10 +15,12 @@
 # Uses the existing rspy.devices.enable_only(recycle=True) flow so the hub
 # singleton and per-device port resolution are reused from the test fixtures.
 
+import logging
+
 import pytest
 import pyrealsense2 as rs
 from rspy import devices
-import logging
+
 log = logging.getLogger(__name__)
 
 
@@ -56,6 +58,10 @@ def test_hub_recycle_imu_presence( test_device, test_context_var ):
     if not any( "Motion" in n for n in _sensor_names( dev ) ):
         pytest.skip( f"{dev.get_info( rs.camera_info.name )} has no Motion Module - test does not apply" )
 
+    if devices.hub is None:
+        pytest.skip( "no hub configured - hub-recycle requires a real port power-cycle; "
+                     "enable_only(recycle=True) would fall back to an in-band hw_reset, "
+                     "which defeats the purpose of this test" )
     if devices.get( sn ).port is None:
         pytest.fail( f"Hub is present but could not resolve a port for serial {sn} - "
                      "refusing to recycle all ports to avoid disturbing other devices on the hub." )

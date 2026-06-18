@@ -148,7 +148,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                     auto & timestamp = fr->additional_data.timestamp;
 
                     // D457 development
-                    size_t expected_size;
+                    size_t expected_size = 0;
                     auto && msp = As< motion_stream_profile, stream_profile_interface >( req_profile );
                     if( msp )
                     {
@@ -183,20 +183,21 @@ void uvc_sensor::open( const stream_profiles & requests )
                     int width = vsp ? vsp->get_width() : 0;
                     int height = vsp ? vsp->get_height() : 0;
 
-                    assert( ( width * height ) % 8 == 0 );
+                    //assert( ( width * height ) % 8 == 0 ); //Not true for inference streams
 
                     // TODO: remove when adding confidence format
                     if( req_profile->get_stream_type() == RS2_STREAM_CONFIDENCE )
                         bpp = 4;
 
+                    auto extension = frame_source::stream_to_frame_types( req_profile_base->get_stream_type() );
+                    const bool is_inference = ( extension == RS2_EXTENSION_OBJECT_DETECTION_FRAME );
+
                     if( ! msp )
                         expected_size = compute_frame_expected_size( width, height, bpp );
 
-                    // For compressed formats copy the raw data as is
-                    if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG } ) )
-                        expected_size = static_cast< int >( f.frame_size );
-
-                    auto extension = frame_source::stream_to_frame_types( req_profile_base->get_stream_type() );
+                    // Compressed and inference streams carry variable-length payloads; copy the data as received.
+                    if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG } ) || is_inference )
+                        expected_size = f.frame_size;
                     frame_holder fh = _source.alloc_frame(
                         { req_profile_base->get_stream_type(), req_profile_base->get_stream_index(), extension },
                         expected_size,
@@ -227,7 +228,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                                 if( ( ( expected_size >> 2 ) * 3 ) == sizeof( uint8_t ) * f.frame_size )
                                     expected_size = sizeof( uint8_t ) * f.frame_size;
 
-                            assert( expected_size == sizeof( uint8_t ) * f.frame_size );
+                            assert( is_inference || expected_size == sizeof( uint8_t ) * f.frame_size );
                             memcpy( (void *)fh->get_frame_data(), f.pixels, expected_size );
                         }
 

@@ -47,6 +47,14 @@ namespace librealsense
         return nanoseconds(meta.duration.count());
     }
 
+    std::shared_ptr<rosbag2_storage_plugins::SqliteStorage> ros2_reader_base::as_sqlite_storage()
+    {
+        auto as_sqlite = std::dynamic_pointer_cast<rosbag2_storage_plugins::SqliteStorage>(_storage);
+        if (!as_sqlite)
+            throw std::runtime_error("expected a SqliteStorage backend");
+        return as_sqlite;
+    }
+
     void ros2_reader_base::reset()
     {
         _storage = std::make_shared< rosbag2_storage_plugins::SqliteStorage >();
@@ -74,15 +82,74 @@ namespace librealsense
 
     std::vector<std::shared_ptr<serialized_data>> ros2_reader_base::fetch_last_frames(const nanoseconds& seek_time)
     {
-        std::vector<std::shared_ptr<serialized_data>> frames;
-        for (auto&& kv : _last_frame_cache)
+        // Jump to a short window before seek_time, scan it raw (no decompress), remember the last
+        // frame (+ following metadata message) per stream - only those get decoded. Handed out as
+        // clones since the consumer moves the holder out.
+        // Window assumes every active stream emits >= 1 frame/sec.
+        static const nanoseconds lookback( std::chrono::seconds( 1 ) );
+        const auto from = seek_time > lookback ? seek_time - lookback : nanoseconds( 0 );
+        as_sqlite_storage()->seek( static_cast<rcutils_time_point_value_t>( from.count() + _first_timestamp_ns ) );
+        _cached_message = nullptr;
+        _cache_valid = false;
+
+        using msg_ptr = std::shared_ptr<rosbag2_storage::SerializedBagMessage>;
+        std::map<stream_identifier, std::pair<msg_ptr, msg_ptr>> last; // stream -> {frame, metadata}
+        stream_identifier last_sid{};
+        bool expect_metadata = false;
+        while (_storage->has_next())
         {
-            // Filter by enabled streams
-            if (_enabled_streams.empty() || _enabled_streams.count(kv.first))
+            auto msg = _storage->read_next(); // raw: no decompress
+            if (!msg)
+                continue;
+            if (expect_metadata)
             {
-                if (kv.second) frames.push_back(kv.second);
+                expect_metadata = false;
+                // metadata follows its frame; native streams have none, so verify the topic
+                if (msg->topic_name.find("/metadata") != std::string::npos)
+                {
+                    last[last_sid].second = msg;
+                    continue;
+                }
+            }
+            if (nanoseconds(static_cast<int64_t>(msg->time_stamp) - _first_timestamp_ns) > seek_time)
+                break;
+            stream_identifier sid;
+            if (is_stream_topic(msg->topic_name, sid)
+                && (_enabled_streams.empty() || _enabled_streams.count(sid)))
+            {
+                last[sid] = { msg, nullptr };
+                last_sid = sid;
+                expect_metadata = true;
             }
         }
+
+        std::vector<std::shared_ptr<serialized_data>> frames;
+        try
+        {
+            for (auto& kv : last)
+            {
+                auto frame_msg = kv.second.first;
+                auto meta_msg  = kv.second.second;
+                if (!frame_msg)
+                    continue;
+                decompress_if_needed(frame_msg);
+                if (meta_msg)
+                    decompress_if_needed(meta_msg);
+                _cached_message = meta_msg;            // primed for ros2_reader's read_frame_metadata
+                _cache_valid = (meta_msg != nullptr);
+                auto sf = create_frame(frame_msg);
+                if (sf && sf->frame)
+                    frames.push_back(std::make_shared<serialized_frame>(sf->get_timestamp(), sf->stream_id, sf->frame.clone()));
+            }
+        }
+        catch (...)
+        {
+            _cached_message = nullptr; // don't leak primed metadata if create_frame threw
+            _cache_valid = false;
+            throw;
+        }
+        _cached_message = nullptr; // don't leak the last primed metadata
+        _cache_valid = false;
         return frames;
     }
 
@@ -154,10 +221,6 @@ namespace librealsense
 
     void ros2_reader_base::seek_to_time(const nanoseconds& seek_time)
     {
-        // if rosbag2 API is being upgraded to a newer version, we can use a rosbag2 native API call
-        
-        // walk forward and stash the first message at/after seek_time in the cache;
-        // read_next_cached() will return it as the next frame.
         if (seek_time > m_total_duration)
         {
             throw invalid_value_exception( rsutils::string::from()
@@ -165,21 +228,10 @@ namespace librealsense
                                            << seek_time.count() << ", Duration = " << m_total_duration.count() << ")" );
         }
 
-        reset();
-
-        // not using the cached-based functions, to avoid decompressing every frame (when relevant) and making seek very slow
-        while (_storage->has_next())
-        {
-            auto msg = _storage->read_next();
-            if (!msg) continue;
-            if (nanoseconds(static_cast<int64_t>(msg->time_stamp) - _first_timestamp_ns) >= seek_time)
-            {
-                decompress_if_needed(msg);
-                _cached_message = msg;
-                _cache_valid = true;
-                return;
-            }
-        }
+        // Position the cursor at seek_time (indexed); paused frames are handled by fetch_last_frames.
+        as_sqlite_storage()->seek(static_cast<rcutils_time_point_value_t>(seek_time.count() + _first_timestamp_ns));
+        _cached_message = nullptr;   // lookahead stale after the jump
+        _cache_valid = false;
     }
 
     bool ros2_reader_base::has_next_cached() const

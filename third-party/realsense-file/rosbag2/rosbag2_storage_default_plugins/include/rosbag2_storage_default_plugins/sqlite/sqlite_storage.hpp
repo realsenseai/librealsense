@@ -83,6 +83,11 @@ public:
 
   void reset_filter() override;
 
+  // CUSTOM LIBREALSENSE2 FUNCTION - jump the read cursor to the first message at/after `timestamp`
+  // via the timestamp index, instead of reading everything before it. Safe to carry: upstream
+  // rosbag2 ships this as a native SqliteStorage::seek, so a future rosbag2 bump just replaces it.
+  void seek(const rcutils_time_point_value_t & timestamp);
+
 private:
   void initialize();
   void prepare_for_writing();

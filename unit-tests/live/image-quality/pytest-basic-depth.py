@@ -101,6 +101,9 @@ def run_test(dev, ctx, resolution, fps):
     profile = None
     try:
         cfg = rs.config()
+        # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+        # connected device; without enable_device(sn) the pipeline picks the first match.
+        cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
         cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, fps)
         cfg.enable_stream(rs.stream.infrared, 1, resolution[0], resolution[1], rs.format.y8,
                           fps)  # needed for finding the ArUco markers

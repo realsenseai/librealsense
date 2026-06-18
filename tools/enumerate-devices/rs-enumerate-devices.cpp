@@ -310,18 +310,16 @@ int main(int argc, char** argv) try
     cli::value<string> format_arg( "format", "raw/basic/FULL", "full", "Choose which 'format-conversion' to use" );
     cli::flag verbose_arg( 'v', "verbose", "Show extra information" );
     cli::value<string> show_playback_device_arg('p', "playback_device", "path", "", "Inspect and enumerate playback device (from file)" );
-    cli::flag no_dds("no-dds", "Do not query for DDS devices" );
 
     cmd.add(short_view_arg);
     cmd.add(compact_view_arg);
     cmd.add(show_options_arg);
     cmd.add(show_calibration_data_arg);
     cmd.add(only_sw_arg);
-    cmd.add( format_arg );
+    cmd.add(format_arg);
     cmd.add(verbose_arg);
     cmd.add(show_defaults);
     cmd.add(show_playback_device_arg);
-    cmd.add(no_dds);
 
     auto settings = cmd.process( argc, argv );
 
@@ -332,7 +330,7 @@ int main(int argc, char** argv) try
     bool show_modes = !(compact_view || short_view);
     auto playback_dev_file = show_playback_device_arg.getValue();
     bool verbose = verbose_arg.getValue();
-    bool show_dds = !no_dds.getValue();
+    bool show_dds = !cmd.no_eth_arg.getValue();
 
     if ((short_view || compact_view) && (show_options || show_calibration_data))
     {
@@ -349,7 +347,7 @@ int main(int argc, char** argv) try
     if( format_arg.isSet() )
         settings["format-conversion"] = format_arg.getValue();
 
-    settings["dds"] = { { "enabled", show_dds } };
+    settings["dds"]["enabled"] = show_dds;
 
     context ctx( settings.dump() );
     

@@ -97,6 +97,9 @@ def perform_manual_hdr_test(hdr_config, test_title, resolution=(640, 480)):
         expected_iterations[idx] = int(item["iterations"])
 
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(device.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, 30)
     seq_id_counts = {}
     pipe.start(cfg)
@@ -152,6 +155,9 @@ def perform_auto_hdr_test(hdr_config, test_title, resolution=(640, 480)):
 
     seq_id_counts = {}
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(device.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, 30)
     pipe.start(cfg)
     log.debug("Batch size: %s", batch_size)

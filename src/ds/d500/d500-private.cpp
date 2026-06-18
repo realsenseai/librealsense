@@ -17,13 +17,22 @@ namespace librealsense
             {
                 if (it->unique_id == info.unique_id)
                 {
+                    // Looking for the "vendor specific command interface" interface. Can be different for different devices.
                     bool found = false;
                     result = *it;
                     switch (info.pid)
                     {
                     case D555_PID:
-                    case D585_PID:
+                    case D585_LEGACY_PID:
                     case D585S_PID:
+                    case ds::D535_2C_PID:
+                    case ds::D585_2C_PID:
+                    case ds::D585_2C_PROTO_PID:
+                    case ds::D535_3C_PID:
+                    case ds::D535F_PID:
+                    case ds::D585_3C_PID:
+                    case ds::D585F_PID:
+                    case ds::D585_3C_PROTO_PID:
                         found = (result.mi == 6);
                         break;
                     default:

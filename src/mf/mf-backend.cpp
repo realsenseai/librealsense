@@ -234,7 +234,7 @@ namespace librealsense
             std::set< DEVINST > visited_composites;
             for( auto && uvc : curr.uvc_devices )
             {
-                std::wstring path( uvc.id.begin(), uvc.id.end() );
+                std::wstring path( uvc.device_path.begin(), uvc.device_path.end() );
                 cm_node iface = cm_node::from_device_path( path.c_str() );
                 if( ! iface.valid() )
                     continue;
@@ -376,7 +376,7 @@ namespace librealsense
                             // misbehaving HID driver (HID class advertised but
                             // never bound) doesn't make the device invisible
                             // forever.
-                            static constexpr auto MAX_DEFERRAL = std::chrono::milliseconds( 5000 );
+                            static constexpr auto MAX_DEFERRAL = std::chrono::milliseconds( 15000 );
                             auto since_first = std::chrono::steady_clock::now() - _data._first_event;
                             if( hid_binding_in_progress( curr ) && since_first < MAX_DEFERRAL )
                             {

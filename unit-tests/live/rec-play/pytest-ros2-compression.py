@@ -20,12 +20,12 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device("D400*"),
     pytest.mark.device_each("D500*"),
-    pytest.mark.device_exclude("D555"), # D555 (DDS) records an empty bag for compressed recording. Tracked in RSDEV-11513
 ]
 
 W, H, BPP = 640, 480, 2
 NUM_FRAMES = 5
-FRAME_DATA_TOPIC = "/device_0/sensor_0/Depth_0/image/data"
+# Depth is not always sensor_0: on DDS devices (e.g. D555) it is a later index.
+DEPTH_DATA_TOPIC_SUFFIX = "/Depth_0/image/data"
 LIVE_RECORD_SECONDS = 3
 
 
@@ -114,8 +114,8 @@ def _read_frame_blobs(filename):
     with sqlite3.connect(filename) as conn:
         rows = conn.execute(
             "SELECT m.data FROM messages m JOIN topics t ON m.topic_id = t.id "
-            "WHERE t.name = ? ORDER BY m.timestamp",
-            (FRAME_DATA_TOPIC,),
+            "WHERE t.name LIKE ? ORDER BY m.timestamp",
+            ("%" + DEPTH_DATA_TOPIC_SUFFIX,),
         ).fetchall()
     return [row[0] for row in rows]
 
@@ -131,7 +131,10 @@ def _deserialize_blob(blob):
 def _playback_depth_frames(filename):
     playback = rs.context().load_device(filename)
     playback.set_real_time(False)
-    sensor = playback.query_sensors()[0]
+    sensor = next((s for s in playback.query_sensors()
+                   if any(p.stream_type() == rs.stream.depth for p in s.get_stream_profiles())), None)
+    if sensor is None:
+        pytest.fail(f"no depth sensor found in playback of '{filename}'")
 
     sync = rs.syncer()
     sensor.open(sensor.get_stream_profiles())

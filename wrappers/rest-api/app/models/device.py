@@ -35,3 +35,4 @@ class DeviceInfo(BaseModel):
     product_id: Optional[str] = None
     sensors: List[str] = []
     is_streaming: bool = False
+    metadata_enabled: Optional[bool] = None  # None = N/A (non-Windows or unsupported product)

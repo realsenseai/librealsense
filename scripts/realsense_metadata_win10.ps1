@@ -82,7 +82,15 @@ $MultiPinDevices =
     "USB\VID_8086&PID_1155&MI_00",# D421
     "USB\VID_8086&PID_1156&MI_00", # D436
     "USB\VID_8086&PID_0B6A&MI_00",# D585
-    "USB\VID_8086&PID_0B6B&MI_00" # D585S
+    "USB\VID_8086&PID_0B6B&MI_00",# D585S
+    "USB\VID_38E5&PID_0C01&MI_00",# D535 Dual RGB
+    "USB\VID_38E5&PID_0C02&MI_00",# D535
+    "USB\VID_38E5&PID_0C03&MI_00",# D535F
+    "USB\VID_38E5&PID_0C04&MI_00",# D585 Dual RGB
+    "USB\VID_38E5&PID_0C05&MI_00",# D585
+    "USB\VID_38E5&PID_0C06&MI_00",# D585F
+    "USB\VID_38E5&PID_0C07&MI_00",# D585 Proto Dual RGB
+    "USB\VID_38E5&PID_0C08&MI_00" # D585 Prototype
 
 #Inhibit system warnings and erros, such as permissions or missing values
 $ErrorActionPreference = "silentlycontinue"
@@ -96,7 +104,7 @@ $DevInReg = Get-ChildItem hklm:\SYSTEM\CurrentControlSet\Services\usbvideo | For
 for ($i=0; $i -lt $DevInReg[0].Count; $i++) { $ConnectedDev +=$DevInReg[0].$i}
 
 #Filter Intel Realsense devices
-$ConnectedDev = $ConnectedDev -like "*VID_8086*"
+$ConnectedDev = $ConnectedDev -match "VID_8086|VID_38E5"
 
 #Progress notification
 $rs_count = $ConnectedDev.Count
@@ -111,7 +119,7 @@ foreach ($subtree in $SearchTrees)
 
     #Filter Intel RealSense devices
     "There are " + $Items.Count +" total devices listed"
-    $Items = $Items | Where { $_.DeviceInstance -like "*VID_8086*" }
+    $Items = $Items | Where { $_.DeviceInstance -match "VID_8086|VID_38E5" }
     "" + $Items.Count + " of them are Intel Realsense"
 
     $remove_keys = 0

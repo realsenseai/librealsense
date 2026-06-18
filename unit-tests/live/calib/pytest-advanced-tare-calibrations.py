@@ -249,9 +249,10 @@ def run_advanced_tare_calibration_test(host_assistance, config, pipeline, calib_
 
 
 def test_advanced_tare_calibration(test_device):
+    dev, _ = test_device
     # mipi devices do not support OCC calibration without host assistance; D555 excluded separately
     # (D555 needs different parsing of calibration tables, SRC and more).
-    if is_mipi_device() or is_d555():
+    if is_mipi_device(dev) or is_d555(dev):
         pytest.skip("Non-mipi non-D555 only")
 
     global _target_z
@@ -265,7 +266,7 @@ def test_advanced_tare_calibration(test_device):
             except Exception as e:
                 log.warning(f"calculate_target_z failed ({e}); will measure average depth as fallback baseline")
         image_width, image_height, fps = (256, 144, 90)
-        config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps)
+        config, pipeline, calib_dev = get_calibration_device(image_width, image_height, fps, dev=dev)
         restore_calibration_table(calib_dev, None)
         if _target_z is None:
             baseline_m = measure_average_depth(config, pipeline, width=image_width, height=image_height, fps=fps, center_fraction=0.3)

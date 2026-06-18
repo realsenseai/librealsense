@@ -36,6 +36,7 @@
 #include <dds/rs-dds-device-proxy.h>
 #include <dds/rs-dds-embedded-decimation-filter.h>
 #include <dds/rs-dds-embedded-temporal-filter.h>
+#include <dds/rs-dds-embedded-close-range-filter.h>
 
 #include <src/ds/ds-private.h>
 
@@ -557,7 +558,7 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
     auto * payload = reinterpret_cast< object_detection_frame::object_detection_payload * >( new_frame->data.data() );
 
     // Fill payload fields
-    payload->timestamp = new_frame->additional_data.timestamp * MILLISEC_TO_SECONDS;
+    payload->timestamp_ms = new_frame->additional_data.timestamp;
     payload->frame_id = new_frame->additional_data.frame_number;
     payload->number_of_detections = n_detections;
     payload->source = static_cast< uint8_t >( object_detection_frame::source::RGB ); // Currently only RGB is supported.
@@ -848,7 +849,11 @@ void dds_sensor_proxy::add_option( std::shared_ptr< realdds::dds_option > option
     }
 
     if( get_option_handler( option_id ) )
-        throw std::runtime_error( "option '" + option->get_name() + "' already exists in sensor" );
+    {
+        // Option might already be registered by another stream of this sensor, in that case, we just ignore it.
+        LOG_DEBUG( "option '" + option->get_name() + "' already exists in sensor '" + get_name() + "'" );
+        return;
+    }
 
     //LOG_DEBUG( "... option -> " << option->get_name() );
     auto opt = std::make_shared< rs_dds_option >(
@@ -1003,6 +1008,20 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
     else if (auto temporal_filter = std::dynamic_pointer_cast< dds_temporal_filter >(embedded_filter))
     {
         rs_embedded_filter = std::make_shared< rs_dds_embedded_temporal_filter >(
+            embedded_filter,
+            [=](json options_value)
+            {
+                // Send the new value to the remote device; the local value gets cached automatically as part of the reply
+                _dev->set_embedded_filter(embedded_filter, std::move(options_value));
+            },
+            [=]() -> json
+            {
+                return _dev->query_embedded_filter(embedded_filter);
+            });
+    }
+    else if (auto close_range_filter = std::dynamic_pointer_cast< dds_close_range_filter >(embedded_filter))
+    {
+        rs_embedded_filter = std::make_shared< rs_dds_embedded_close_range_filter >(
             embedded_filter,
             [=](json options_value)
             {

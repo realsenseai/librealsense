@@ -72,8 +72,20 @@ set(ROSBAG2_COMPILE_FLAGS "${ROSBAG2_COMPILE_FLAGS};RCPPUTILS_BUILDING_LIBRARY")
 
 # -- rcutils --
 if(UNIX AND NOT APPLE)
-    include(${CMAKE_CURRENT_LIST_DIR}/rcutils/cmake/check_c_compiler_uses_glibc.cmake)
-    check_c_compiler_uses_glibc(USES_GLIBC)
+    # Detect glibc to enable _GNU_SOURCE. rcutils' upstream probe passes &buffer
+    # (void*(*)[1]) to backtrace() which expects void**; gcc >= 14 errors on it,
+    # wrongly failing the check on glibc. Probe inline with the correct argument.
+    include(CheckCSourceCompiles)
+    unset(USES_GLIBC CACHE)  # force re-probe; old broken probe may have cached FALSE
+    check_c_source_compiles("
+        #include <execinfo.h>
+        int main() {
+          void * buffer[1];
+          int size = sizeof(buffer) / sizeof(void *);
+          backtrace(buffer, size);
+          return 0;
+        }
+    " USES_GLIBC)
     if(USES_GLIBC)
         set(ROSBAG2_COMPILE_FLAGS "${ROSBAG2_COMPILE_FLAGS};_GNU_SOURCE")
     endif()

@@ -158,7 +158,7 @@ namespace librealsense
         return std::make_shared<serialized_end_of_file>();
     }
 
-    std::shared_ptr< serialized_frame > ros2_reader::create_frame(const std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg)
+    std::shared_ptr< serialized_frame > ros2_reader::create_frame(const std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg)
     {
         nanoseconds timestamp(msg->time_stamp);
         stream_identifier stream_id = ros2_topic::get_stream_identifier(msg->topic_name);
@@ -192,7 +192,7 @@ namespace librealsense
             payload->number_of_detections = n_detections;
             payload->source               = static_cast< uint8_t >( object_detection_frame::source::RGB );
             payload->source_frame_id      = j.value( "source_frame_id", uint32_t(0) );
-            payload->timestamp            = j.value( "timestamp_us", 0.0 ) * 1e-6;  // us → seconds
+            payload->timestamp_ms         = j.value( "timestamp_us", 0.0 ) * MICROSEC_TO_MILLISEC;
 
             auto dets_j = j.find( "detections" );
             if( dets_j != j.end() && dets_j->is_array() )
@@ -275,9 +275,7 @@ namespace librealsense
             return std::make_shared<serialized_invalid_frame>(timestamp, stream_id);
         }
 
-        auto result = std::make_shared<serialized_frame>(timestamp, stream_id, std::move(frame));
-        _last_frame_cache[stream_id] = result;
-        return result;
+        return std::make_shared<serialized_frame>(timestamp, stream_id, std::move(frame));
     }
 
     std::shared_ptr<stream_profile_interface> ros2_reader::read_next_stream_profile()
@@ -524,6 +522,9 @@ namespace librealsense
     {
         for (auto& sensor_snap : m_initial_device_description.get_sensors_snapshots())
         {
+            if (sensor_snap.get_sensor_index() != sid.sensor_index)
+                continue;
+
             for (auto& stream_profile : sensor_snap.get_stream_profiles())
             {
                 if (stream_profile->get_stream_type() != sid.stream_type ||
@@ -549,6 +550,16 @@ namespace librealsense
                 int height = vsp->get_height();
                 int bpp = get_image_bpp(vsp->get_format());
                 int stride = width * bpp / 8;
+                // derive bpp/stride from the recorded payload,
+                // else use the values computed above
+                auto data_size = static_cast<librealsense::frame*>(frame_ptr)->data.size();
+                auto pixels = static_cast<size_t>(width) * height;
+                if (pixels > 0 && data_size % pixels == 0)
+                {
+                    int bpp_bytes = static_cast<int>(data_size / pixels);
+                    bpp = bpp_bytes * 8;
+                    stride = width * bpp_bytes;
+                }
                 video_frame_ptr->assign(width, height, stride, bpp);
                 return;
             }
@@ -849,7 +860,7 @@ namespace librealsense
 
     // Helpers ---------------------------------------------------------------------
 
-    bool ros2_reader::is_stream_topic(const std::string& topic, stream_identifier& id)
+    bool ros2_reader::is_stream_topic(const std::string& topic, stream_identifier& id) const
     {
         // Format: /device_N/sensor_N/StreamType_Idx/<ros_type>/data
         if (topic.find("/device_") != 0)

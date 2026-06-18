@@ -11,7 +11,7 @@ diff --git a/drivers/media/usb/uvc/uvc_driver.c b/drivers/media/usb/uvc/uvc_driv
 index 794e32126..c279d3cca 100644
 --- a/drivers/media/usb/uvc/uvc_driver.c
 +++ b/drivers/media/usb/uvc/uvc_driver.c
-@@ -3133,6 +3133,42 @@ static const struct usb_device_id uvc_ids[] = {
+@@ -3133,6 +3133,50 @@ static const struct usb_device_id uvc_ids[] = {
  	  .bInterfaceSubClass	= 1,
  	  .bInterfaceProtocol	= 0,
  	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
@@ -50,6 +50,14 @@ index 794e32126..c279d3cca 100644
 +	  .bInterfaceClass	= USB_CLASS_VIDEO,
 +	  .bInterfaceSubClass	= 1,
 +	  .bInterfaceProtocol	= UVC_PC_PROTOCOL_15,
++	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
++	/* All RealSense-VID cameras - UVC metadata (protocol-agnostic, covers all PIDs) */
++	{ .match_flags		= USB_DEVICE_ID_MATCH_VENDOR
++				| USB_DEVICE_ID_MATCH_INT_CLASS
++				| USB_DEVICE_ID_MATCH_INT_SUBCLASS,
++	  .idVendor			= 0x38E5,
++	  .bInterfaceClass	= USB_CLASS_VIDEO,
++	  .bInterfaceSubClass	= 1,
 +	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
  	/* Generic USB Video Class */
  	{ USB_INTERFACE_INFO(USB_CLASS_VIDEO, 1, UVC_PC_PROTOCOL_UNDEFINED) },

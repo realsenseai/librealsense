@@ -355,6 +355,8 @@ namespace rs2
                 log("Requesting to switch to recovery mode");
 
                 switch_device_to_recovery_mode(upd, serial, dfu, cleanup);
+                if (failed())
+                    return; // do not fall through to the unsigned update path
             }
         }
         else

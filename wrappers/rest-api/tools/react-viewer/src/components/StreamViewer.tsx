@@ -11,15 +11,14 @@ interface DeviceStream {
   deviceName: string
   serialNumber: string
   config: StreamConfig
-  isStreaming: boolean
   metadata?: StreamMetadata
 }
 
 export function StreamViewer() {
   const { deviceStates } = useAppStore()
   
-  // Collect all enabled streams from all active devices
-  const allEnabledStreams = useMemo(() => {
+  // Collect all enabled streams from all active devices; hide tiles until they actually stream.
+  const activeStreams = useMemo(() => {
     const streams: DeviceStream[] = []
     
     Object.values(deviceStates).forEach((ds: DeviceState) => {
@@ -40,12 +39,13 @@ export function StreamViewer() {
                           activeTypes.some(st => st.toLowerCase() === config.stream_type.toLowerCase())
         }
         
+        if (!streamIsActive) return
+
         streams.push({
           deviceId: ds.device.device_id,
           deviceName: ds.device.name,
           serialNumber: ds.device.serial_number,
           config,
-          isStreaming: streamIsActive,
           metadata: ds.streamMetadata[config.stream_type],
         })
       })
@@ -58,7 +58,7 @@ export function StreamViewer() {
 
   return (
     <div className="h-full">
-      {allEnabledStreams.length === 0 ? (
+      {activeStreams.length === 0 ? (
         <div className="h-full flex items-center justify-center text-gray-500">
           <div className="text-center">
             <svg
@@ -74,23 +74,19 @@ export function StreamViewer() {
                 d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
               />
             </svg>
-            <p className="text-lg">No Streams Enabled</p>
-            <p className="text-sm mt-1">
-              {activeDeviceCount === 0 
-                ? 'Activate a device and enable streams to start viewing'
-                : 'Enable streams in the right panel to start viewing'}
-            </p>
+            <p className="text-lg">Nothing is streaming!</p>
+            <p className="text-sm mt-1">Connect a device and enable any stream to start</p>
           </div>
         </div>
       ) : (
         <div
           className="h-full grid gap-2"
           style={{
-            gridTemplateColumns: `repeat(${Math.min(allEnabledStreams.length, 2)}, 1fr)`,
-            gridTemplateRows: `repeat(${Math.ceil(allEnabledStreams.length / 2)}, 1fr)`,
+            gridTemplateColumns: `repeat(${Math.min(activeStreams.length, 2)}, 1fr)`,
+            gridTemplateRows: `repeat(${Math.ceil(activeStreams.length / 2)}, 1fr)`,
           }}
         >
-          {allEnabledStreams.map((stream) => {
+          {activeStreams.map((stream) => {
             const isMotionStream = ['gyro', 'accel'].includes(stream.config.stream_type.toLowerCase())
             
             if (isMotionStream) {
@@ -98,7 +94,6 @@ export function StreamViewer() {
                 <IMUStreamTile
                   key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
                   streamType={stream.config.stream_type}
-                  isStreaming={stream.isStreaming}
                   showDeviceName={activeDeviceCount > 1}
                   deviceName={stream.deviceName}
                   serialNumber={stream.serialNumber}
@@ -114,7 +109,6 @@ export function StreamViewer() {
                 deviceName={stream.deviceName}
                 serialNumber={stream.serialNumber}
                 streamType={stream.config.stream_type}
-                isStreaming={stream.isStreaming}
                 metadata={stream.metadata}
                 showDeviceName={activeDeviceCount > 1}
               />
@@ -131,12 +125,11 @@ interface StreamTileProps {
   deviceName: string
   serialNumber: string
   streamType: string
-  isStreaming: boolean
   showDeviceName?: boolean
   metadata?: StreamMetadata
 }
 
-function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreaming, showDeviceName, metadata }: StreamTileProps) {
+function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDeviceName, metadata }: StreamTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const webrtcHandlerRef = useRef<WebRTCHandler | null>(null)
@@ -159,7 +152,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
 
   // Fetch dynamic depth range periodically for depth streams
   useEffect(() => {
-    if (!isDepthStream || !isStreaming) return
+    if (!isDepthStream) return
     let cancelled = false
     const fetchRange = async () => {
       try {
@@ -177,7 +170,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
       cancelled = true
       clearInterval(interval)
     }
-  }, [isDepthStream, isStreaming, deviceId])
+  }, [isDepthStream, deviceId])
 
   // Calculate FPS from metadata updates
   useEffect(() => {
@@ -209,7 +202,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!isDepthStream || !isStreaming || showMetadata || !containerRef.current || !metadata) return
+      if (!isDepthStream || showMetadata || !containerRef.current || !metadata) return
 
       const rect = containerRef.current.getBoundingClientRect()
       const mouseX = e.clientX - rect.left
@@ -262,7 +255,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
         console.error('Error getting depth at pixel:', error)
       })
     },
-    [isDepthStream, isStreaming, showMetadata, deviceId, metadata]
+    [isDepthStream, showMetadata, deviceId, metadata]
   )
 
   const handleMouseLeave = useCallback(() => {
@@ -274,7 +267,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
     let mounted = true
     
     const startWebRTC = async () => {
-      if (!isStreaming || !deviceId) return
+      if (!deviceId) return
       
       // Clean up existing handler
       if (webrtcHandlerRef.current) {
@@ -311,7 +304,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
       setConnectionState(null)
     }
 
-    if (isStreaming && deviceId) {
+    if (deviceId) {
       startWebRTC()
     } else {
       stopWebRTC()
@@ -321,7 +314,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
       mounted = false
       stopWebRTC()
     }
-  }, [isStreaming, deviceId, streamType, handleTrack, handleConnectionStateChange])
+  }, [deviceId, streamType, handleTrack, handleConnectionStateChange])
 
   const getStreamColor = (type: string) => {
     const colors: Record<string, string> = {
@@ -372,14 +365,13 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
       </div>
 
       {/* Connection Status */}
-      {isStreaming && connectionState && connectionState !== 'connected' && (
+      {connectionState && connectionState !== 'connected' && (
         <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 px-2 py-1 bg-yellow-600 rounded text-xs text-white`}>
           {connectionState}
         </div>
       )}
 
       <MetadataPanel
-        isStreaming={isStreaming}
         metadata={metadata}
         streamType={streamType}
         fps={fps}
@@ -388,36 +380,8 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
         buttonClassName={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 py-1`}
       />
 
-      {/* Placeholder when not streaming */}
-      {!isStreaming && (
-        <div className="absolute inset-0 flex items-center justify-center text-gray-500">
-          <div className="text-center">
-            <svg
-              className="w-12 h-12 mx-auto mb-2 opacity-50"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <p>Press Start to stream</p>
-          </div>
-        </div>
-      )}
-
       {/* Depth Legend (for depth streams) */}
-      {isDepthStream && isStreaming && (
+      {isDepthStream && (
         <div className="absolute top-12 right-2 bottom-12 w-16">
           <DepthLegend minDepth={depthRange.min} maxDepth={depthRange.max} colorScheme="jet" show={true} />
         </div>
@@ -442,14 +406,13 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, isStreamin
 // IMU Stream Tile - specialized visualization for gyro/accel streams
 interface IMUStreamTileProps {
   streamType: string
-  isStreaming: boolean
   showDeviceName?: boolean
   deviceName: string
   serialNumber: string
   metadata?: StreamMetadata
 }
 
-function IMUStreamTile({ streamType, isStreaming, showDeviceName, deviceName, serialNumber, metadata }: IMUStreamTileProps) {
+function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, metadata }: IMUStreamTileProps) {
   const { imuHistory } = useAppStore()
   const [fps, setFps] = useState(0)
   const [showMetadata, setShowMetadata] = useState(false)
@@ -503,14 +466,11 @@ function IMUStreamTile({ streamType, isStreaming, showDeviceName, deviceName, se
           <span className={`font-semibold ${colors.text}`}>
             {streamType.toUpperCase()}
           </span>
-          {isStreaming && (
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          )}
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">{unit}</span>
           <MetadataPanel
-            isStreaming={isStreaming}
             metadata={metadata}
             streamType={streamType}
             fps={fps}
@@ -528,11 +488,7 @@ function IMUStreamTile({ streamType, isStreaming, showDeviceName, deviceName, se
       
       {/* Content */}
       <div className="flex-1 flex flex-col justify-center p-4">
-        {!isStreaming ? (
-          <div className="text-center text-gray-500">
-            <p>Not streaming</p>
-          </div>
-        ) : !latest ? (
+        {!latest ? (
           <div className="text-center text-gray-500">
             <p>Waiting for data...</p>
           </div>
@@ -632,6 +588,9 @@ interface MetadataOverlayProps {
 export function MetadataOverlay({ streamType, metadata, fps }: MetadataOverlayProps) {
   const frameMd = metadata.frame_metadata ?? {}
   const isMotion = ['gyro', 'accel', 'motion'].includes(streamType.toLowerCase())
+  // Mirrors C++ viewer (common/stream-model.cpp): when SDK falls back to system_time,
+  // per-frame metadata is unavailable from the kernel UVC driver.
+  const metadataUnavailable = metadata.clock_domain === 'system_time'
   return (
     <div className="absolute inset-0 overflow-y-auto bg-black/60 text-white text-xs z-10">
       <div className="sticky top-0 px-3 py-2 bg-gray-800 font-semibold border-b border-gray-700">
@@ -650,6 +609,15 @@ export function MetadataOverlay({ streamType, metadata, fps }: MetadataOverlayPr
           <MetadataItem label="Viewer FPS" value={fps} />
         </div>
       </div>
+      {metadataUnavailable && (
+        <div
+          role="alert"
+          className="px-3 py-2 border-b border-red-900/60 bg-red-950/40 text-red-300 text-xs leading-tight"
+        >
+          <div>Per-frame metadata is not enabled at the OS level!</div>
+          <div>Please follow the installation guide for the details.</div>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 p-3 font-mono">
         {Object.entries(frameMd).map(([k, v]) => (
           <MetadataItem key={k} label={lessScreamy(k)} value={v} />
@@ -664,7 +632,6 @@ function resolutionFrom(w: number | undefined, h: number | undefined): string | 
 }
 
 interface MetadataPanelProps {
-  isStreaming: boolean
   metadata?: StreamMetadata
   streamType: string
   fps: number
@@ -673,9 +640,8 @@ interface MetadataPanelProps {
   buttonClassName?: string
 }
 
-export function MetadataPanel({ isStreaming, metadata, streamType, fps, show, onToggle, buttonClassName = '' }: MetadataPanelProps) {
-  useEffect(() => { if (!isStreaming) onToggle(false) }, [isStreaming, onToggle])
-  const hasMetadata = isStreaming && !!metadata && (
+export function MetadataPanel({ metadata, streamType, fps, show, onToggle, buttonClassName = '' }: MetadataPanelProps) {
+  const hasMetadata = !!metadata && (
     metadata.frame_number !== undefined ||
     metadata.timestamp !== undefined ||
     Object.keys(metadata.frame_metadata ?? {}).length > 0

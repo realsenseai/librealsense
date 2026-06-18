@@ -77,14 +77,18 @@ void init_sensor(py::module &m) {
                     return rs2::embedded_filter(self.get_embedded_filter<rs2::embedded_decimation_filter>());
                 case RS2_EMBEDDED_FILTER_TYPE_TEMPORAL:
                     return rs2::embedded_filter(self.get_embedded_filter<rs2::embedded_temporal_filter>());
+                case RS2_EMBEDDED_FILTER_TYPE_CLOSE_RANGE:
+                    return rs2::embedded_filter(self.get_embedded_filter<rs2::embedded_close_range_filter>());
                 default:
                     throw std::runtime_error("Unsupported embedded filter type");
             }
         }, "Return the embedded filter in the sensor by filter type.", "filter_type"_a)
-        .def("get_embedded_decimation_filter", &rs2::sensor::get_embedded_filter<rs2::embedded_decimation_filter>, 
+        .def("get_embedded_decimation_filter", &rs2::sensor::get_embedded_filter<rs2::embedded_decimation_filter>,
              "Return the embedded decimation filter in the sensor.")
-        .def("get_embedded_temporal_filter", &rs2::sensor::get_embedded_filter<rs2::embedded_temporal_filter>, 
+        .def("get_embedded_temporal_filter", &rs2::sensor::get_embedded_filter<rs2::embedded_temporal_filter>,
              "Return the embedded temporal filter in the sensor.")
+        .def("get_embedded_close_range_filter", &rs2::sensor::get_embedded_filter<rs2::embedded_close_range_filter>,
+             "Return the embedded Improved Close Range Depth filter in the sensor.")
         .def(py::init<>())
         .def("__nonzero__", &rs2::sensor::operator bool) // Called to implement truth value testing in Python 2
         .def("__bool__", &rs2::sensor::operator bool)    // Called to implement truth value testing in Python 3

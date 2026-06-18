@@ -20,6 +20,8 @@
 
 #include <rsutils/lazy.h>
 
+#include <src/embedded-filter-interface.h>
+
 
 namespace librealsense
 {
@@ -46,10 +48,16 @@ namespace librealsense
         float get_stereo_baseline_mm() const override;
         float get_preset_max_value() const override;
 
+        embedded_filters get_supported_embedded_filters() const override { return _embedded_filters; }
+        void add_embedded_filter( std::shared_ptr< embedded_filter_interface > filter ) { _embedded_filters.push_back( filter ); }
+
     protected:
         const d500_device * _owner;
         mutable std::atomic< float > _depth_units;
         float _stereo_baseline_mm;
+
+    private:
+        embedded_filters _embedded_filters;
     };
 
     class ds_thermal_monitor;
@@ -107,6 +115,8 @@ namespace librealsense
         void update_flash(const std::vector<uint8_t>& image, rs2_update_progress_callback_sptr callback, int update_mode) override;
         bool check_fw_compatibility( const std::vector<uint8_t>& image ) const override { return true; };
         std::string get_opcode_string(int opcode) const override;
+        bool contradicts( const stream_profile_interface * a, const std::vector< stream_profile > & others ) const override;
+
     protected:
         std::shared_ptr<ds_device_common> _ds_device_common;
 
@@ -136,7 +146,6 @@ namespace librealsense
         std::shared_ptr<stream_interface> _depth_stream;
         std::shared_ptr<stream_interface> _left_ir_stream;
         std::shared_ptr<stream_interface> _right_ir_stream;
-        std::shared_ptr<stream_interface> _color_stream;
 
         uint8_t _depth_device_idx;
 

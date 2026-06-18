@@ -4,7 +4,7 @@
 #The test flow is a result of a fixed bug - viewer crashed when starting stream after finishing record session
 
 import pytest
-import pyrealsense2 as rs, os, time, tempfile
+import pyrealsense2 as rs, time
 from pytest_check import check
 import logging
 
@@ -73,11 +73,10 @@ def play_recording(file_name, default_profile):
 
     check.is_true(frame_queue.poll_for_frame())
 ################################################################################################
-def test_record_and_stream(test_device):
+def test_record_and_stream(test_device, tmp_path):
     global dev, ctx, depth_sensor
     log.info("Record, stream and playback using sensor interface with frame queue")
-    temp_dir = tempfile.mkdtemp()
-    file_name = os.path.join(temp_dir, "recording.db3")
+    file_name = str(tmp_path / "recording.db3")
 
     dev, ctx = test_device
     depth_sensor = dev.first_depth_sensor()

@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
-import { io, Socket } from 'socket.io-client'
+import { socketService } from './socket'
 import type {
   DeviceInfo,
   SensorInfo,
@@ -31,9 +31,12 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase()
 
+type FirmwareProgressCallback = (progress: number) => void
+type FirmwareErrorCallback = (error: string) => void
+type FirmwareSuccessCallback = (firmwareVersion: string | null) => void
+
 class ApiClient {
   private client: AxiosInstance
-  private socket: Socket | null = null
 
   constructor() {
     this.client = axios.create({
@@ -42,56 +45,31 @@ class ApiClient {
         'Content-Type': 'application/json',
       },
     })
-    this.initializeSocket()
   }
 
-  private initializeSocket() {
-    // Determine Socket.IO origin based on environment
-    let socketOrigin: string
-    
-    if (isDesktopApp) {
-      // Desktop app: connect to localhost:8000
-      socketOrigin = 'http://localhost:8000'
-      console.log('🖥️ Desktop app detected. Connecting to FastAPI backend at:', socketOrigin)
-    } else {
-      // Browser: use environment variable or current origin
-      socketOrigin = (import.meta as any).env?.VITE_SOCKET_ORIGIN || window.location.origin
-      console.log('🌐 Browser mode. Connecting to:', socketOrigin)
-    }
+  // ============ Firmware Socket.IO events ============
+  // These piggyback on the shared socketService connection (see api/socket.ts).
 
-    this.socket = io(socketOrigin, {
-      path: '/socket',
-      reconnectionDelay: 1000,
-      reconnection: true,
-      reconnectionAttempts: 5,
-    })
+  onFirmwareProgress(deviceId: string, callback: FirmwareProgressCallback): () => void {
+    const eventName = `firmware_progress_${deviceId}`
+    const handler = (data: unknown) => callback((data as { progress: number }).progress)
+    socketService.on(eventName, handler as (...args: unknown[]) => void)
+    return () => socketService.off(eventName, handler as (...args: unknown[]) => void)
+  }
 
-    this.socket.on('connect', () => {
-      console.log('✅ Socket.IO connected successfully', { 
-        origin: socketOrigin, 
-        id: this.socket?.id, 
-        desktop: isDesktopApp 
-      })
-    })
+  onFirmwareError(deviceId: string, callback: FirmwareErrorCallback): () => void {
+    const eventName = `firmware_update_failed_${deviceId}`
+    const handler = (data: unknown) => callback((data as { error: string }).error)
+    socketService.on(eventName, handler as (...args: unknown[]) => void)
+    return () => socketService.off(eventName, handler as (...args: unknown[]) => void)
+  }
 
-    this.socket.on('connect_error', (err: any) => {
-      console.error('❌ Socket.IO connection error', { 
-        origin: socketOrigin,
-        message: err?.message || 'Unknown error',
-        type: err?.type,
-        err,
-        desktop: isDesktopApp,
-        hint: isDesktopApp ? 'Make sure FastAPI backend is running and accessible' : 'Check if API proxy is configured'
-      })
-    })
-
-    this.socket.on('disconnect', (reason: string) => {
-      console.warn('⚠️ Socket.IO disconnected. Reason:', reason)
-    })
-
-    this.socket.on('error', (error: any) => {
-      console.error('❌ Socket.IO error:', error)
-    })
+  onFirmwareSuccess(deviceId: string, callback: FirmwareSuccessCallback): () => void {
+    const eventName = `firmware_update_success_${deviceId}`
+    const handler = (data: unknown) =>
+      callback((data as { firmware_version: string | null }).firmware_version)
+    socketService.on(eventName, handler as (...args: unknown[]) => void)
+    return () => socketService.off(eventName, handler as (...args: unknown[]) => void)
   }
 
   // ============ Health ============
@@ -130,6 +108,24 @@ class ApiClient {
 
   async resetDevice(deviceId: string): Promise<void> {
     await this.client.post(`/devices/${deviceId}/reset/`)
+  }
+
+  async updateFirmwareFromFile(
+    deviceId: string,
+    file: File
+  ): Promise<{ status: string; firmware_version?: string | null; progress?: number }> {
+    const form = new FormData()
+    form.append('file', file)
+    // Clear the per-client default Content-Type (`application/json`) so the
+    // browser sets `multipart/form-data; boundary=...` itself when posting
+    // FormData. Hard-coding `multipart/form-data` here would strip the boundary
+    // and break FastAPI parsing (422).
+    const response = await this.client.post(
+      `/devices/${deviceId}/firmware/update_from_file`,
+      form,
+      { headers: { 'Content-Type': undefined as unknown as string } },
+    )
+    return response.data
   }
 
   // ============ Sensors ============
@@ -324,6 +320,13 @@ class ApiClient {
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
     await this.client.delete(`/webrtc/sessions/${sessionId}/`)
+  }
+
+  // ============ System ============
+
+  async enableMetadata(): Promise<{ status: string; note?: string }> {
+    const response = await this.client.post<{ status: string; note?: string }>('/system/enable-metadata')
+    return response.data
   }
 }
 

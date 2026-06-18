@@ -118,6 +118,27 @@ describe('Toast', () => {
       expect(onClose).toHaveBeenCalledWith('test-id')
     })
   })
+
+  describe('Action button', () => {
+    it('does not auto-dismiss when action is provided', async () => {
+      const onClose = vi.fn()
+      const action = { label: 'Enable', onClick: vi.fn() }
+      render(<Toast id="1" type="info" message="x" onClose={onClose} action={action} />)
+      await act(async () => { vi.advanceTimersByTime(10000) })
+      expect(onClose).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Enable' })).toBeInTheDocument()
+    })
+
+    it('calls action.onClick with the toast id when clicked (and does not auto-close)', async () => {
+      vi.useRealTimers()
+      const onClose = vi.fn()
+      const action = { label: 'Enable', onClick: vi.fn() }
+      render(<Toast id="abc" type="info" message="x" onClose={onClose} action={action} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Enable' }))
+      expect(action.onClick).toHaveBeenCalledWith('abc')
+      expect(onClose).not.toHaveBeenCalled()
+    })
+  })
 })
 
 describe('ToastContainer', () => {
@@ -155,13 +176,21 @@ describe('ToastContainer', () => {
     expect(onClose).toHaveBeenCalledWith('toast-1')
   })
 
-  it('is positioned at bottom-right of screen', () => {
+  it('is positioned at top-right of screen', () => {
     const toasts = [{ id: '1', type: 'info' as const, message: 'Test' }]
     const { container } = render(<ToastContainer toasts={toasts} onClose={vi.fn()} />)
     
     const containerEl = container.firstChild as HTMLElement
     expect(containerEl.className).toContain('fixed')
-    expect(containerEl.className).toContain('bottom-4')
+    expect(containerEl.className).toContain('top-4')
     expect(containerEl.className).toContain('right-4')
+  })
+
+  it('forwards action prop to the rendered Toast', async () => {
+    const action = { label: 'Enable', onClick: vi.fn() }
+    const toasts = [{ id: '1', type: 'info' as const, message: 'Test', action }]
+    render(<ToastContainer toasts={toasts} onClose={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Enable' }))
+    expect(action.onClick).toHaveBeenCalledWith('1')
   })
 })

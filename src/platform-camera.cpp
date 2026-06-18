@@ -197,7 +197,7 @@ platform_camera_info::pick_uvc_devices( const std::shared_ptr< context > & ctx,
 
     for( auto && g : groups )
     {
-        if( g.front().vid != VID_INTEL_CAMERA )
+        if( g.front().vid != VID_INTEL_CAMERA && g.front().vid != VID_REALSENSE_CAMERA )
             list.push_back( std::make_shared< platform_camera_info >( ctx, std::move( g ) ) );
     }
     return list;

@@ -42,6 +42,16 @@ SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b6b", MODE:="066
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="1155", MODE:="0666", GROUP:="plugdev"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="1156", MODE:="0666", GROUP:="plugdev"
 
+# RealSense VID (0x38E5) D500-family devices
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c01", MODE:="0666", GROUP:="plugdev"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c02", MODE:="0666", GROUP:="plugdev"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c03", MODE:="0666", GROUP:="plugdev"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c04", MODE:="0666", GROUP:="plugdev"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c05", MODE:="0666", GROUP:="plugdev"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c06", MODE:="0666", GROUP:="plugdev"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c07", MODE:="0666", GROUP:="plugdev"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c08", MODE:="0666", GROUP:="plugdev"
+
 # Intel RealSense recovery devices (DFU)
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0ab3", MODE:="0666", GROUP:="plugdev"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0adb", MODE:="0666", GROUP:="plugdev"
@@ -49,6 +59,8 @@ SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0adc", MODE:="066
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0ade", MODE:="0666", GROUP:="plugdev"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b55", MODE:="0666", GROUP:="plugdev"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0add", MODE:="0666", GROUP:="plugdev"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0cfd", MODE:="0666", GROUP:="plugdev"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0cfe", MODE:="0666", GROUP:="plugdev"
 
 # Intel RealSense devices (Movidius, T265)
 SUBSYSTEMS=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0af3", MODE="0666", GROUP="plugdev"
@@ -91,6 +103,22 @@ KERNEL=="iio*", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b6b", MODE:="0777",
 DRIVER=="hid_sensor*", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b6b", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
 KERNEL=="iio*", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="1156", MODE:="0777", GROUP:="plugdev", RUN+="/bin/sh -c 'chmod -R 0777 /sys/%p'"
 DRIVER=="hid_sensor*", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="1156", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
+KERNEL=="iio*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c01", MODE:="0777", GROUP:="plugdev", RUN+="/bin/sh -c 'chmod -R 0777 /sys/%p'"
+DRIVER=="hid_sensor*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c01", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
+KERNEL=="iio*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c02", MODE:="0777", GROUP:="plugdev", RUN+="/bin/sh -c 'chmod -R 0777 /sys/%p'"
+DRIVER=="hid_sensor*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c02", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
+KERNEL=="iio*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c03", MODE:="0777", GROUP:="plugdev", RUN+="/bin/sh -c 'chmod -R 0777 /sys/%p'"
+DRIVER=="hid_sensor*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c03", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
+KERNEL=="iio*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c04", MODE:="0777", GROUP:="plugdev", RUN+="/bin/sh -c 'chmod -R 0777 /sys/%p'"
+DRIVER=="hid_sensor*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c04", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
+KERNEL=="iio*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c05", MODE:="0777", GROUP:="plugdev", RUN+="/bin/sh -c 'chmod -R 0777 /sys/%p'"
+DRIVER=="hid_sensor*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c05", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
+KERNEL=="iio*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c06", MODE:="0777", GROUP:="plugdev", RUN+="/bin/sh -c 'chmod -R 0777 /sys/%p'"
+DRIVER=="hid_sensor*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c06", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
+KERNEL=="iio*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c07", MODE:="0777", GROUP:="plugdev", RUN+="/bin/sh -c 'chmod -R 0777 /sys/%p'"
+DRIVER=="hid_sensor*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c07", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
+KERNEL=="iio*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c08", MODE:="0777", GROUP:="plugdev", RUN+="/bin/sh -c 'chmod -R 0777 /sys/%p'"
+DRIVER=="hid_sensor*", ATTRS{idVendor}=="38e5", ATTRS{idProduct}=="0c08", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
 
 # For products with motion_module, if (kernels is 4.15 and up) and (device name is "accel_3d") wait, in another process, until (enable flag is set to 1 or 200 mSec passed) and then set it to 0.
-KERNEL=="iio*", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0ad5|0afe|0aff|0b00|0b01|0b3a|0b3d|0b56|0b5c|0b64|0b68|0b6a|0b6b|1156", RUN+="/bin/sh -c '(major=`uname -r | cut -d \".\" -f1` && minor=`uname -r | cut -d \".\" -f2` && (([ $$major -eq 4 ] && [ $$minor -ge 15 ]) || [ $$major -ge 5 ])) && (enamefile=/sys/%p/name && [ `cat $$enamefile` = \"accel_3d\" ]) && enfile=/sys/%p/buffer/enable && echo \"COUNTER=0; while [ \$$COUNTER -lt 20 ] && grep -q 0 $$enfile; do sleep 0.01; COUNTER=\$$((COUNTER+1)); done && echo 0 > $$enfile\" | at now'"
+KERNEL=="iio*", ATTRS{idVendor}=="8086|38e5", ATTRS{idProduct}=="0ad5|0afe|0aff|0b00|0b01|0b3a|0b3d|0b56|0b5c|0b64|0b68|0b6a|0b6b|1156|0c01|0c02|0c03|0c04|0c05|0c06|0c07|0c08", RUN+="/bin/sh -c '(major=`uname -r | cut -d \".\" -f1` && minor=`uname -r | cut -d \".\" -f2` && (([ $$major -eq 4 ] && [ $$minor -ge 15 ]) || [ $$major -ge 5 ])) && (enamefile=/sys/%p/name && [ `cat $$enamefile` = \"accel_3d\" ]) && enfile=/sys/%p/buffer/enable && echo \"COUNTER=0; while [ \$$COUNTER -lt 20 ] && grep -q 0 $$enfile; do sleep 0.01; COUNTER=\$$((COUNTER+1)); done && echo 0 > $$enfile\" | at now'"

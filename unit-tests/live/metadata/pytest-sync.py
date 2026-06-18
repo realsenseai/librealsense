@@ -18,7 +18,8 @@ pytestmark = [
 # Test parameters
 TS_TOLERANCE_MS = 1.5  # Tolerance for timestamp differences in ms
 TS_TOLERANCE_MICROSEC = TS_TOLERANCE_MS * 1000
-SKIP_FRAMES_AFTER_DROP = 10  # Frames to skip after detecting drops
+SKIP_FRAMES_AFTER_DROP = 10  # min frames to settle after a drop before re-checking
+MAX_RECOVERY_FRAMES = 120  # fail only if streams never re-sync within this many frames
 
 CONFIGURATIONS = [
     ((640, 480), 15),
@@ -54,10 +55,21 @@ def detect_frame_drops(frames_dict, prev_frame_counters):
     return frame_drop_detected, current_frame_counters
 
 
+def is_frameset_synced(frames_dict):
+    """Depth/IR global timestamps mutually within tolerance. Color is excluded: it is
+    timestamp-matched (own jitter); depth/IR are the frame-number-matched streams that
+    phase-shift by ~one frame period after a drop (RSDEV-11482)."""
+    ts = [frames_dict[s].timestamp for s in ('depth', 'ir1', 'ir2')]
+    return max(ts) - min(ts) <= TS_TOLERANCE_MS
+
+
 def run_test(device, ctx, resolution, fps):
     """Run timestamp synchronization test for a specific resolution and FPS"""
     pipeline = rs.pipeline(ctx)
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(device.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, fps)
     cfg.enable_stream(rs.stream.infrared, 1, resolution[0], resolution[1], rs.format.y8, fps)
     cfg.enable_stream(rs.stream.infrared, 2, resolution[0], resolution[1], rs.format.y8, fps)
@@ -77,12 +89,12 @@ def run_test(device, ctx, resolution, fps):
             pytest.fail(f"Sensor {sensor.name} does not support global time option")
 
     pipeline.start(cfg)
-    time.sleep(5)  # Longer stabilization to prevent initial frame drop issues
+    pipeline.wait_for_frames()  # first full set (aggregator waits for all streams) before settling
+    time.sleep(2)
 
     prev_frame_counters = {'depth': None, 'ir1': None, 'ir2': None, 'color': None}
-    frames_to_skip = 0
-    consecutive_drops = 0
-    unskipped_frames = 0
+    recovering = True  # gate the first frameset too -- streams may come up phase-shifted
+    recovery_frames = drops_in_window = unskipped_frames = 0
 
     try:
         while unskipped_frames < 100:
@@ -96,31 +108,28 @@ def run_test(device, ctx, resolution, fps):
                 log.error("One or more frames are missing")
                 continue
 
-            # Skip frames during recovery
-            if frames_to_skip > 0:
-                frames_to_skip -= 1
-                if frames_to_skip == 0:
-                    prev_frame_counters = {'depth': None, 'ir1': None, 'ir2': None, 'color': None}
-                continue
-
             # Check for frame drops
             frames_dict = {'depth': depth_frame, 'ir1': ir1_frame, 'ir2': ir2_frame, 'color': color_frame}
             frame_drop_detected, current_frame_counters = detect_frame_drops(frames_dict, prev_frame_counters)
-            unskipped_frames += 1
-
-            # Handle frame drops
-            if frame_drop_detected and not frames_to_skip:
-                consecutive_drops += 1
-                assert consecutive_drops <= 20, \
-                    f"Continuous frame drops detected ({consecutive_drops} consecutive). Hardware issue."
-
-                frames_to_skip = SKIP_FRAMES_AFTER_DROP
-                log.warning(f"Frame drop at frame {unskipped_frames}, skipping next {frames_to_skip} frames")
-                prev_frame_counters = current_frame_counters
-                continue
-
             prev_frame_counters = current_frame_counters
-            consecutive_drops = 0
+
+            # After a drop the syncer emits phase-shifted sets; recover until depth/IR re-sync.
+            # Report the drops, but only fail if they never re-sync within MAX_RECOVERY_FRAMES.
+            if frame_drop_detected and not recovering:
+                recovering, recovery_frames, drops_in_window = True, 0, 0
+            if recovering:
+                recovery_frames += 1
+                if frame_drop_detected:
+                    drops_in_window += 1
+                    log.warning(f"Frame drop while recovering: {drops_in_window} drops / {recovery_frames} frames")
+                if frame_drop_detected or recovery_frames < SKIP_FRAMES_AFTER_DROP or not is_frameset_synced(frames_dict):
+                    assert recovery_frames <= MAX_RECOVERY_FRAMES, \
+                        f"Streams never synchronized ({drops_in_window} drops in {MAX_RECOVERY_FRAMES} frames)"
+                    continue
+                log.info(f"Synchronized after {recovery_frames} frames ({drops_in_window} drops)")
+                recovering = False
+
+            unskipped_frames += 1
 
             # Test timestamp synchronization
             log.debug(f"Global TS - Depth:#{current_frame_counters['depth']} {depth_frame.timestamp}, IR1:#{current_frame_counters['ir1']} {ir1_frame.timestamp}, "

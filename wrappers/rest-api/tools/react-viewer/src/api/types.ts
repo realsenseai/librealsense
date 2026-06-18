@@ -13,6 +13,7 @@ export interface DeviceInfo {
   product_id?: string
   sensors: string[]
   is_streaming: boolean
+  metadata_enabled?: boolean | null
 }
 
 export type FirmwareStatus = 'up_to_date' | 'outdated' | 'missing_file' | 'unknown'

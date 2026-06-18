@@ -175,6 +175,12 @@ namespace librealsense
     {
         auto& color_ep = get_color_sensor();
 
+        // MIPI RGB controls require FW >= 5.17.3.15 and d4xx kernel driver >= 1.0.3.15.
+        const bool mipi_rgb_controls_supported = _is_mipi_device
+            && _fw_version >= firmware_version("5.17.3.15")
+            && supports_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION)
+            && rsutils::version(get_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION)) >= rsutils::version("1.0.3.15");
+
         if (!_is_mipi_device)
         {
             _ds_color_common->register_color_options();
@@ -188,11 +194,36 @@ namespace librealsense
                     { 2.f, "60Hz" },
                     { 3.f, "Auto" }, }));
         }
+        else if (mipi_rgb_controls_supported)
+        {
+            // RGB controls registered for USB but not yet for MIPI (no FW/kernel support):
+            //   RS2_OPTION_BRIGHTNESS, RS2_OPTION_CONTRAST, RS2_OPTION_GAMMA,
+            //   RS2_OPTION_BACKLIGHT_COMPENSATION, RS2_OPTION_HUE
+            auto raw_color_ep = get_raw_color_sensor();
+
+            color_ep.register_pu(RS2_OPTION_SATURATION);
+            color_ep.register_pu(RS2_OPTION_SHARPNESS);
+
+            auto white_balance_option = std::make_shared<uvc_pu_option>(raw_color_ep, RS2_OPTION_WHITE_BALANCE);
+            auto auto_white_balance_option = std::make_shared<uvc_pu_option>(raw_color_ep, RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE);
+            color_ep.register_option(RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE, auto_white_balance_option);
+            color_ep.register_option(RS2_OPTION_WHITE_BALANCE,
+                std::make_shared<auto_disabling_control>(
+                    white_balance_option,
+                    auto_white_balance_option));
+
+            color_ep.register_option(RS2_OPTION_POWER_LINE_FREQUENCY,
+                std::make_shared<uvc_pu_option>(raw_color_ep, RS2_OPTION_POWER_LINE_FREQUENCY,
+                    std::map<float, std::string>{ { 0.f, "Disabled"},
+                    { 1.f, "50Hz" },
+                    { 2.f, "60Hz" },
+                    { 3.f, "Auto" }, }));
+        }
 
         if (_separate_color)
         {
-            // Currently disabled for certain sensors
-            if (!_is_mipi_device)
+            // Auto exposure priority is supported on all RGB sensors except D401/GMSL
+            if (!_is_mipi_device || (mipi_rgb_controls_supported && _pid != ds::RS401_GMSL_PID))
             {
                 color_ep.register_pu(RS2_OPTION_AUTO_EXPOSURE_PRIORITY);
             }

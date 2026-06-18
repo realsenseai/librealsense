@@ -7,6 +7,7 @@ from pytest_check import check
 import numpy as np
 import cv2
 import logging
+import re
 from iq_helper import find_roi_location, get_roi_from_frame, is_color_close, save_failure_snapshot, WIDTH, HEIGHT
 
 log = logging.getLogger(__name__)
@@ -79,12 +80,15 @@ def draw_debug(frame_bgr, a4_page_bgr):
     return np.hstack([left, right])
 
 
-def run_test(ctx, resolution, fps):
+def run_test(dev, ctx, resolution, fps):
     log.info(f"Basic Color Image Quality Test: {resolution[0]}x{resolution[1]} @ {fps}fps")
     color_match_count = {color: 0 for color in expected_colors.keys()}
     color_sums = {color: np.zeros(3, dtype=int) for color in expected_colors.keys()}
     pipeline = rs.pipeline(ctx)
     cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
     cfg.enable_stream(rs.stream.color, resolution[0], resolution[1], rs.format.bgr8, fps)
     if not cfg.can_resolve(pipeline):
         log.info(f"Configuration {resolution[0]}x{resolution[1]}@{fps}fps is not supported by the device")
@@ -169,5 +173,15 @@ def test_basic_color(test_device, test_context_var):
             ((1280,720), 15),
         ]
 
+    # D436 color stream returns near-black frames at >30 fps with Auto-Exposure ON
+    # (reproduced on FW 5.17.3.10 and 5.17.3.21, and in realsense-viewer).
+    # Restrict to <=30 fps until the FW issue is fixed.
+    product_name = dev.get_info(rs.camera_info.name)
+    if re.search(r'\bD436\b', product_name):
+        skipped = [c for c in configurations if c[1] > 30]
+        if skipped:
+            log.warning(f"D436 FW color-stream bug: skipping color configs fps>30: {skipped}")
+        configurations = [c for c in configurations if c[1] <= 30]
+
     for resolution, fps in configurations:
-        run_test(ctx, resolution, fps)
+        run_test(dev, ctx, resolution, fps)

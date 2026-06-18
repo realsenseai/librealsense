@@ -55,9 +55,8 @@ def filter_and_sort_items(config, items):
     # Group parametrized tests by device within each module, so all tests run on one
     # device before switching to the next (matching run-unit-tests.py behavior).
     # Within a (module, device) bucket, also sort by pytest-repeat step so pass 0
-    # completes before pass 1 — this is what the --retries skip-if-clean logic
-    # depends on (see conftest.py:pytest_runtest_setup). Without this, pytest is
-    # free to schedule step 1 before step 0 and the retry gets wrongly skipped.
+    # completes before pass 1 — preserves --repeat N module-scoped ordering so
+    # module-scoped fixtures see one pass at a time.
     def get_device_group_key(item):
         module = item.module.__name__
         params = item.callspec.params if hasattr(item, 'callspec') else {}

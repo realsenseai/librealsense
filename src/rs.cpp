@@ -40,6 +40,7 @@
 #include "proc/sequence-id-filter.h"
 #include "proc/decimation-embedded-filter.h"
 #include "proc/temporal-embedded-filter.h"
+#include "proc/close-range-embedded-filter.h"
 #include "media/playback/playback_device.h"
 #include "stream.h"
 #include <librealsense2/h/rs_types.h>
@@ -2070,6 +2071,7 @@ int rs2_is_embedded_filter_extendable_to(const rs2_embedded_filter* embedded_fil
     {
     case RS2_EXTENSION_DECIMATION_EMBEDDED_FILTER: return VALIDATE_INTERFACE_NO_THROW((embedded_filter_interface*)(embedded_filter->_embedded_filter.get()), librealsense::decimation_embedded_filter) != nullptr;
     case RS2_EXTENSION_TEMPORAL_EMBEDDED_FILTER: return VALIDATE_INTERFACE_NO_THROW((embedded_filter_interface*)(embedded_filter->_embedded_filter.get()), librealsense::temporal_embedded_filter) != nullptr;
+    case RS2_EXTENSION_CLOSE_RANGE_EMBEDDED_FILTER: return VALIDATE_INTERFACE_NO_THROW((embedded_filter_interface*)(embedded_filter->_embedded_filter.get()), librealsense::close_range_embedded_filter) != nullptr;
     default:
         return false;
     }
@@ -3823,6 +3825,20 @@ int rs2_check_firmware_compatibility(const rs2_device* device, const void* fw_im
     return res ? 1 : 0;
 }
 HANDLE_EXCEPTIONS_AND_RETURN(0, fw_image, device)
+
+const char* rs2_get_firmware_min_version(const rs2_device* device, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+
+    auto fwud = std::dynamic_pointer_cast< firmware_check_interface >( device->device );
+    if( ! fwud )
+        throw std::runtime_error("This device does not support update protocol!");
+
+    thread_local std::string min_version;
+    min_version = fwud->get_firmware_min_version();
+    return min_version.c_str();
+}
+HANDLE_EXCEPTIONS_AND_RETURN(nullptr, device)
 
 void rs2_enter_update_state(const rs2_device* device, rs2_error** error) BEGIN_API_CALL
 {

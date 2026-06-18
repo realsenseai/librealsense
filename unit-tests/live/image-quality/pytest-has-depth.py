@@ -8,7 +8,6 @@ Test depth frame quality. Streams depth, checks that fill rate is above threshol
 
 import pytest
 import pyrealsense2 as rs
-from rspy import tests_wrapper as tw
 import numpy as np
 import time
 import logging
@@ -63,43 +62,42 @@ def is_depth_fill_rate_enough(pipeline):
     return fill_rate > (1 - BLACK_PIXEL_THRESHOLD) * 100.0, num_blank_pixels
 
 
-def test_depth_laser_on(test_device):
-    dev, ctx = test_device
+def test_depth_laser_on(test_device_wrapped):
+    dev, ctx = test_device_wrapped
     product_name = dev.get_info(rs.camera_info.name)
-    
-    tw.start_wrapper(dev)
+
+    cfg = rs.config()
+    # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
+    # connected device; without enable_device(sn) the pipeline picks the first match.
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
+    cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
+
+    pipeline = rs.pipeline(ctx)
+    pipeline.start(cfg)
     try:
-        cfg = rs.config()
-        cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
+        pipeline.wait_for_frames()
+        time.sleep(2)
 
-        pipeline = rs.pipeline(ctx)
-        pipeline.start(cfg)
-        try:
-            pipeline.wait_for_frames()
-            time.sleep(2)
+        # Enable laser when supported; otherwise continue with current emitter state.
+        sensor = pipeline.get_active_profile().get_device().first_depth_sensor()
+        if sensor.supports(rs.option.laser_power):
+            sensor.set_option(rs.option.laser_power, sensor.get_option_range(rs.option.laser_power).max)
+        else:
+            log.info(f"Device {product_name} does not support laser power; running depth fill test without forcing laser power")
 
-            # Enable laser when supported; otherwise continue with current emitter state.
-            sensor = pipeline.get_active_profile().get_device().first_depth_sensor()
-            if sensor.supports(rs.option.laser_power):
-                sensor.set_option(rs.option.laser_power, sensor.get_option_range(rs.option.laser_power).max)
-            else:
-                log.info(f"Device {product_name} does not support laser power; running depth fill test without forcing laser power")
+        if sensor.supports(rs.option.emitter_enabled):
+            sensor.set_option(rs.option.emitter_enabled, 1)
+        else:
+            log.info(f"Device {product_name} does not support emitter control; running with default emitter state")
 
-            if sensor.supports(rs.option.emitter_enabled):
-                sensor.set_option(rs.option.emitter_enabled, 1)
-            else:
-                log.info(f"Device {product_name} does not support emitter control; running with default emitter state")
+        log.info(f"Testing depth frame - laser ON - {product_name}")
 
-            log.info(f"Testing depth frame - laser ON - {product_name}")
-
-            has_depth = False
-            for frame_num in range(FRAMES_TO_CHECK):
-                has_depth, blank_pixels = is_depth_fill_rate_enough(pipeline)
-                if has_depth:
-                    break
-        finally:
-            pipeline.stop()
-
-        assert has_depth, f"Depth fill rate too low on {product_name} after {FRAMES_TO_CHECK} frames"
+        has_depth = False
+        for frame_num in range(FRAMES_TO_CHECK):
+            has_depth, blank_pixels = is_depth_fill_rate_enough(pipeline)
+            if has_depth:
+                break
     finally:
-        tw.stop_wrapper(dev)
+        pipeline.stop()
+
+    assert has_depth, f"Depth fill rate too low on {product_name} after {FRAMES_TO_CHECK} frames"
