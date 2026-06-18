@@ -637,10 +637,11 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
         if recycle:
             #
             # Only toggle what differs: disable the enabled ports we don't want, enable the wanted
-            # ports that are off. A wanted port that's already enabled is left untouched -- recycling
-            # it would needlessly power-cycle the device (DDS/PoE like D555 re-enumerate slowly and
-            # would time out the wait below).
-            ports_to_disable = [ p for p in enabled_ports if p not in wanted_ports ]
+            # ports that are off. Never disable a DDS/PoE device (e.g. D555): cutting its PoE port
+            # and re-enabling it shortly after bricks its re-enumeration (it re-powers mid-shutdown
+            # and never comes back). Leaving it up is safe -- it doesn't interfere with USB tests.
+            dds_ports = { get( sn ).port for sn in enabled_sns if get( sn ).is_dds }
+            ports_to_disable = [ p for p in enabled_ports if p not in wanted_ports and p not in dds_ports ]
             ports_to_enable  = [ p for p in wanted_ports if p not in enabled_ports ]
             #
             if ports_to_disable:
