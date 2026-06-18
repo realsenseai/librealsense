@@ -31,9 +31,11 @@ jobs:
           - docker_image: ubuntu:noble
             ros_distribution: kilted
 
-          # Rolling Ridley
+          # Rolling Ridley — ros-rolling-* for resolute is still only in
+          # ros2-testing until the next stable sync, so pull from there.
           - docker_image: ubuntu:resolute
             ros_distribution: rolling
+            use_ros2_testing: true
 
           # Jazzy Jalisco
           - docker_image: ubuntu:noble
@@ -56,6 +58,8 @@ jobs:
         # redirect, which is not subject to the API rate limit.
         # Remove once fixed upstream (ros-tooling/setup-ros).
         shell: bash
+        env:
+          USE_ROS2_TESTING: ${{ matrix.use_ros2_testing || false }}
         run: |
           set -euo pipefail
           apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
@@ -63,14 +67,25 @@ jobs:
             https://github.com/ros-infrastructure/ros-apt-source/releases/latest | sed 's|.*/||')
           [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)+$ ]] || { echo "ERROR: could not resolve ros-apt-source version (got: '${VERSION}')"; exit 1; }
           codename=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+          # Restore this line (and drop USE_ROS2_TESTING + the conditional below)
+          # when ros-rolling-desktop is published in the stable resolute apt index
+          # (packages.ros.org/ros2/dists/resolute).
+          # curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/ros2-apt-source.deb \
+          #   "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${VERSION}/ros2-apt-source_${VERSION}.${codename}_all.deb"
+          if [[ "${USE_ROS2_TESTING}" == "true" ]]; then
+            pkg=ros2-testing-apt-source
+          else
+            pkg=ros2-apt-source
+          fi
           curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/ros2-apt-source.deb \
-            "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${VERSION}/ros2-apt-source_${VERSION}.${codename}_all.deb"
+            "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${VERSION}/${pkg}_${VERSION}.${codename}_all.deb"
           dpkg -i /tmp/ros2-apt-source.deb
 
       - name: setup ROS environment
         uses: ros-tooling/setup-ros@77bcad67a6cb15f6192d61464d99bbab658e4ca9 #v0.7.18
         with:
           required-ros-distributions: ${{ matrix.ros_distribution }}
+          use-ros2-testing: ${{ matrix.use_ros2_testing || false }}
 
       - name: build librealsense ROS 2
         uses: ros-tooling/action-ros-ci@3a640b10f09b756dabe556dac5413aba369f71b0 #v0.4.8
