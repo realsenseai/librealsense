@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
+      # Lyrical/Rolling can hit transient upstream availability issues during
+      # the platform transition; don't cancel siblings if one row fails.
+      fail-fast: false
       matrix:
         ros_distribution:
           - humble
@@ -54,31 +57,49 @@ jobs:
         # unauthenticated GitHub API call (60 req/hour per IP, shared across
         # hosted runners), which intermittently gets rate-limited and fails the
         # job with a 404. Pre-installing the package here makes setup-ros skip
-        # that step. The version is resolved from the releases/latest web
-        # redirect, which is not subject to the API rate limit.
+        # that step.
         # Remove once fixed upstream (ros-tooling/setup-ros).
         shell: bash
         env:
           USE_ROS2_TESTING: ${{ matrix.use_ros2_testing || false }}
+          # Pin ros-apt-source to a known release; the .deb is verified against
+          # a per-(pkg,codename) SHA-256 below so a tampered CDN can't be
+          # silently installed. When bumping ROS_APT_SOURCE_VERSION, also
+          # update the hashes from the new release assets:
+          #   https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/tags/<VERSION>
+          # (each asset has a `digest: sha256:...` field).
+          ROS_APT_SOURCE_VERSION: "1.2.0"
         run: |
           set -euo pipefail
           apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
-          VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' --retry 5 --retry-delay 5 --retry-all-errors \
-            https://github.com/ros-infrastructure/ros-apt-source/releases/latest | sed 's|.*/||')
-          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)+$ ]] || { echo "ERROR: could not resolve ros-apt-source version (got: '${VERSION}')"; exit 1; }
           codename=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
           # Restore this line (and drop USE_ROS2_TESTING + the conditional below)
           # when ros-rolling-desktop is published in the stable resolute apt index
           # (packages.ros.org/ros2/dists/resolute).
-          # curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/ros2-apt-source.deb \
-          #   "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${VERSION}/ros2-apt-source_${VERSION}.${codename}_all.deb"
+          # pkg=ros2-apt-source
           if [[ "${USE_ROS2_TESTING}" == "true" ]]; then
             pkg=ros2-testing-apt-source
           else
             pkg=ros2-apt-source
           fi
+          # Pinned SHA-256 per (pkg, codename) for ROS_APT_SOURCE_VERSION above.
+          case "${pkg}_${codename}" in
+            ros2-apt-source_jammy)            expected=767884cf4ed03116b9d64438930a832ed854147ae435279a7924dfdf60f94433 ;;
+            ros2-apt-source_noble)            expected=0804d9b13db770eb87019be414cd78378835228ad5fa801fc88758596dd8f7e5 ;;
+            ros2-apt-source_resolute)         expected=a275b9b819874e745a928e83e39c429fa4d607159285c4ef3ebcf75afa732ee3 ;;
+            ros2-testing-apt-source_resolute) expected=da9261ca7c06244da1528e0ede44018f7bb2e24a8a077eb0202f70706b578546 ;;
+            *) echo "ERROR: no pinned SHA-256 for ${pkg}_${codename} at v${ROS_APT_SOURCE_VERSION}"; exit 1 ;;
+          esac
+          deb="${pkg}_${ROS_APT_SOURCE_VERSION}.${codename}_all.deb"
           curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/ros2-apt-source.deb \
-            "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${VERSION}/${pkg}_${VERSION}.${codename}_all.deb"
+            "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/${deb}"
+          actual=$(sha256sum /tmp/ros2-apt-source.deb | awk '{print $1}')
+          if [ "${actual}" != "${expected}" ]; then
+            echo "ERROR: SHA-256 mismatch for ${deb}"
+            echo "  expected: ${expected}"
+            echo "  actual:   ${actual}"
+            exit 1
+          fi
           dpkg -i /tmp/ros2-apt-source.deb
 
       - name: setup ROS environment
