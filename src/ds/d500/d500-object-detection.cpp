@@ -100,7 +100,7 @@ namespace librealsense
         od_ep->register_processing_block( od_pbf );
     }
 
-    void d500_object_detection::on_depth_sensor_starting()
+    void d500_object_detection::on_depth_sensor_starting() noexcept
     {
         // Firmware requires the Align_Depth XU (selector 0x10) to be set before depth
         // streaming starts; it is silently ignored if sent after streaming begins.

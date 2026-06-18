@@ -184,7 +184,8 @@ namespace librealsense
 
     void d500_depth_sensor::start( rs2_frame_callback_sptr callback )
     {
-        _owner->on_depth_sensor_starting();
+        if( _owner )
+            _owner->on_depth_sensor_starting();
         synthetic_sensor::start( callback );
     }
 

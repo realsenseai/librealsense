@@ -108,7 +108,7 @@ namespace librealsense
 
         void hardware_reset() override;
 
-        virtual void on_depth_sensor_starting() {}
+        virtual void on_depth_sensor_starting() noexcept {}
 
         platform::usb_spec get_usb_spec() const;
         virtual double get_device_time_ms() override;

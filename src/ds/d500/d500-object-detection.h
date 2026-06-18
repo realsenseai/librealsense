@@ -22,7 +22,7 @@ namespace librealsense
         std::shared_ptr< synthetic_sensor > create_object_detection_device( std::shared_ptr< context > ctx,
                                                                             const std::vector< platform::uvc_device_info > & od_devices_info );
 
-        void on_depth_sensor_starting() override;
+        void on_depth_sensor_starting() noexcept override;
 
     private:
         friend class d500_object_detection_sensor;
