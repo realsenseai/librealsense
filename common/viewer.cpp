@@ -3748,7 +3748,9 @@ namespace rs2
                                                   depth_intrin.ppx, depth_intrin.ppy };
                 COM::PersonCenterOfMass com_result{};
                 COM::CenterOfMassCalculator::Calculate( com_raw, com_depth8u, com_bbox, com_center, &com_intrin, com_result );
-                float const mean_depth = com_result.meanBodyDepth > 0.f ? com_result.meanBodyDepth / 1000.f : 0.f;
+                float const viewer_depth_m = com_result.meanBodyDepth > 0.f ? com_result.meanBodyDepth / 1000.f : 0.f;
+                float const hkr_depth_m = det.depth;
+                float const mean_depth = hkr_depth_m > 0.f ? hkr_depth_m : viewer_depth_m;
 
                 // COM relative position in [0,1] within the bbox — used for rendering the dot.
                 // Computed vs depth_bbox_full (unclipped) so it maps 1-to-1 onto the color bbox
@@ -3763,7 +3765,7 @@ namespace rs2
 
                 std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
                 new_objects.emplace_back( obj_id++, name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
-                                          det.depth, com_rel_u, com_rel_v, det.score,
+                                          hkr_depth_m, com_rel_u, com_rel_v, det.score,
                                           static_cast< object_type >( det.class_id ) );
             }
 

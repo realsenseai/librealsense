@@ -40,6 +40,7 @@ namespace librealsense
         rs2_intrinsics get_intrinsics( const stream_profile & profile ) const override;
         void set_frame_metadata_modifier( on_frame_md callback ) override;
         void open( const stream_profiles & requests ) override;
+        void start( rs2_frame_callback_sptr callback ) override;
         void close() override;
         rs2_intrinsics get_color_intrinsics( const stream_profile & profile ) const;
         stream_profiles init_stream_profiles() override;
@@ -52,7 +53,7 @@ namespace librealsense
         void add_embedded_filter( std::shared_ptr< embedded_filter_interface > filter ) { _embedded_filters.push_back( filter ); }
 
     protected:
-        const d500_device * _owner;
+        d500_device * _owner;
         mutable std::atomic< float > _depth_units;
         float _stereo_baseline_mm;
 
@@ -106,6 +107,8 @@ namespace librealsense
             size_t dataLength = 0) const override;
 
         void hardware_reset() override;
+
+        virtual void on_depth_sensor_starting() {}
 
         platform::usb_spec get_usb_spec() const;
         virtual double get_device_time_ms() override;

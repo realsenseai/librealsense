@@ -33,9 +33,11 @@ namespace librealsense
         const uint16_t D585_3C_PROTO_PID      = 0x0C08;
         
         // DS500 depth XU identifiers
-        const uint8_t DS5_HKR_PVT_TEMPERATURE = 0x15;
+        // Note: selector values differ from the D400-family depth_xu selectors in ds-private.h.
+        const uint8_t DS5_ALIGN_DEPTH              = 0x10;  // Enable depth-to-RGB alignment for OD distance; must be sent before depth streaming starts
+        const uint8_t DS5_HKR_PVT_TEMPERATURE      = 0x15;
         const uint8_t DS5_HKR_PROJECTOR_TEMPERATURE = 0x16;
-        const uint8_t DS5_HKR_OHM_TEMPERATURE = 0x17;
+        const uint8_t DS5_HKR_OHM_TEMPERATURE      = 0x17;
 
         // d500 Devices supported by the current version
         static const std::set<std::uint16_t> rs500_sku_pid = {
