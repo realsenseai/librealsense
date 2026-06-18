@@ -182,6 +182,12 @@ namespace librealsense
         }); //group_multiple_fw_calls
     }
 
+    void d500_depth_sensor::start( rs2_frame_callback_sptr callback )
+    {
+        _owner->on_depth_sensor_starting();
+        synthetic_sensor::start( callback );
+    }
+
     void d500_depth_sensor::close()
     {
         if( _owner && _owner->_thermal_monitor )

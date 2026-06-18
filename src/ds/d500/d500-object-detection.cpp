@@ -3,6 +3,7 @@
 
 #include "d500-object-detection.h"
 
+#include "ds/ds-private.h"
 #include "d500-info.h"
 #include "ds/ds-timestamp.h"
 #include <src/global_timestamp_reader.h>
@@ -97,6 +98,33 @@ namespace librealsense
                                             { { RS2_FORMAT_Y8, RS2_STREAM_OBJECT_DETECTION } },
                                             []() { return std::make_shared< identity_processing_block >(); } };
         od_ep->register_processing_block( od_pbf );
+    }
+
+    void d500_object_detection::on_depth_sensor_starting()
+    {
+        // Firmware requires the Align_Depth XU (selector 0x10) to be set before depth
+        // streaming starts; it is silently ignored if sent after streaming begins.
+        auto raw_depth = get_raw_depth_sensor();
+        if( !raw_depth )
+            return;
+
+        try
+        {
+            raw_depth->invoke_powered( []( platform::uvc_device & dev )
+            {
+                uint8_t enable = 1;
+                if( !dev.set_xu( ds::depth_xu, ds::DS5_ALIGN_DEPTH, &enable, sizeof( enable ) ) )
+                    LOG_WARNING( "Failed to enable Align_Depth XU on depth sensor" );
+            } );
+        }
+        catch( std::exception const & e )
+        {
+            LOG_WARNING( "Align_Depth XU exception: " << e.what() );
+        }
+        catch( ... )
+        {
+            LOG_WARNING( "Align_Depth XU: unknown exception" );
+        }
     }
 
     stream_profiles d500_object_detection_sensor::init_stream_profiles()

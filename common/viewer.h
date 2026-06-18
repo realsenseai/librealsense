@@ -228,7 +228,6 @@ namespace rs2
                                                const rs2_extrinsics & color_to_depth,
                                                const rs2_extrinsics & depth_to_color,
                                                const rs2::rect &    depth_frame_rect );
-        static float sample_mean_depth( const rs2::depth_frame & df, const rs2::rect & depth_bbox );
         void process_object_detection_frames( std::map< int, rs2::frame > & last_frames );
 
         void check_permissions();

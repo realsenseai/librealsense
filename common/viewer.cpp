@@ -3584,39 +3584,6 @@ namespace rs2
         return rs2::rect{ dst_tl[0], dst_tl[1], dst_br[0] - dst_tl[0], dst_br[1] - dst_tl[1] }.intersection( depth_frame_rect );
     }
 
-    float viewer_model::sample_mean_depth( const rs2::depth_frame & df, const rs2::rect & depth_bbox )
-    {
-        uint16_t const * const depth_data   = reinterpret_cast< uint16_t const * >( df.get_data() );
-        float const            depth_scale  = df.get_units();
-        int const              depth_width  = df.get_width();
-        int const              depth_height = df.get_height();
-        int const cx = int( depth_bbox.x + depth_bbox.w * 0.5f );
-        int const cy = int( depth_bbox.y + depth_bbox.h * 0.5f );
-        static const int offsets[][2] = { { -2, -2 }, {  0, -2 }, {  2, -2 },
-                                          { -2,  0 }, {  0,  0 }, {  2,  0 },
-                                          { -2,  2 }, {  0,  2 }, {  2,  2 } };
-        float total = 0.f;
-        int hits = 0;
-        for( auto const & off : offsets )
-        {
-            int const x = cx + off[0];
-            int const y = cy + off[1];
-            if( x < 0 || x >= depth_width || y < 0 || y >= depth_height )
-                continue;
-            uint16_t const d = depth_data[y * depth_width + x];
-            if( d != 0 )
-            {
-                total += d * depth_scale;
-                ++hits;
-            }
-        }
-
-        float val = hits > 0 ? total / hits : 0.f;
-        if( val > 5.0f ) // Above 5 meters not accurate, prefer to not show.
-            val = 0.f;
-        return val;
-    }
-
     void viewer_model::process_object_detection_frames( std::map< int, rs2::frame > & last_frames )
     {
         // Scan last_frames for an object detection frame, a color frame, and a depth frame.
@@ -3696,11 +3663,8 @@ namespace rs2
                                                                     color_to_depth, depth_to_color, depth_frame_rect );
                 rs2::rect normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
 
-                // Currently detection depth is not calculated in device, later we will use detection depth data.
-                float const mean_depth = sample_mean_depth( df, depth_bbox );
-
                 std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
-                new_objects.emplace_back( size_t( i ), name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
+                new_objects.emplace_back( size_t( i ), name, normalized_color_bbox, normalized_depth_bbox, det.depth,
                                           static_cast< object_type >( det.class_id ) );
             }
 
