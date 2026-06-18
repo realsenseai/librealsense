@@ -24,6 +24,11 @@ namespace librealsense
         auto & depth_sensor = get_depth_sensor();
         auto raw_depth_sensor = get_raw_depth_sensor();
 
+        auto & raw_fourcc_to_rs2_format_map = raw_depth_sensor->get_fourcc_to_rs2_format_map();
+        raw_fourcc_to_rs2_format_map->insert( { rs_fourcc( 'M', '4', '2', '0' ), RS2_FORMAT_M420 } );
+        auto & raw_fourcc_to_rs2_stream_map = raw_depth_sensor->get_fourcc_to_rs2_stream_map();
+        raw_fourcc_to_rs2_stream_map->insert( { rs_fourcc( 'M', '4', '2', '0' ), RS2_STREAM_INFRARED } );
+
         // The two M420 RGB cameras arrive on separate pins (USB endpoints), each also advertising identical
         // {w,h,fps,format} M420. Distinguish the color pins from the stereo-imager pin (whose M420 is colored infrared
         // and must not become a color stream) by the YUY2 companion: color pins pair M420 with YUY2, while the
@@ -43,8 +48,11 @@ namespace librealsense
                     {
                         if( q.pin_index != pin )
                             continue;
-                        if( q.format == rs_fourcc( 'M', '4', '2', '0' ) ) m420 = true;
-                        if( q.format == rs_fourcc( 'Y', 'U', 'Y', '2' ) ) yuy2 = true;
+                        if( q.format == rs_fourcc( 'M', '4', '2', '0' ) )
+                            m420 = true;
+                        // For same format Windows exposes YUY2, linux exposes identical YUYV
+                        if( q.format == rs_fourcc( 'Y', 'U', 'Y', '2' ) || q.format == rs_fourcc( 'Y', 'U', 'Y', 'V' ) )
+                            yuy2 = true;
                     }
                     return m420 && yuy2;
                 };

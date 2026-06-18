@@ -19,9 +19,7 @@
 #include <src/ds/features/amplitude-factor-feature.h>
 #include <src/ds/features/auto-exposure-roi-feature.h>
 
-#include "proc/color-formats-converter.h" 
 #include "proc/depth-formats-converter.h"
-#include "proc/color-formats-converter.h"
 #include "proc/y8i-to-y8y8.h"
 #include "proc/y16i-10msb-to-y16y16.h"
 
@@ -57,10 +55,9 @@ namespace librealsense
         {rs_fourcc('Z','1','6',' '), RS2_FORMAT_Z16},
         {rs_fourcc('R','G','B','2'), RS2_FORMAT_BGR8},
         {rs_fourcc('M','J','P','G'), RS2_FORMAT_MJPEG},
-        {rs_fourcc('B','Y','R','2'), RS2_FORMAT_RAW16},
-        {rs_fourcc('M','4','2','0'), RS2_FORMAT_M420}
-
+        {rs_fourcc('B','Y','R','2'), RS2_FORMAT_RAW16}
     };
+
     std::map<uint32_t, rs2_stream> d500_depth_fourcc_to_rs2_stream = {
         {rs_fourcc('Y','U','Y','2'), RS2_STREAM_COLOR},
         {rs_fourcc('Y','U','Y','V'), RS2_STREAM_COLOR},
@@ -75,8 +72,7 @@ namespace librealsense
         {rs_fourcc('Z','1','6',' '), RS2_STREAM_DEPTH},
         {rs_fourcc('Z','1','6','H'), RS2_STREAM_DEPTH},
         {rs_fourcc('B','Y','R','2'), RS2_STREAM_COLOR},
-        {rs_fourcc('M','J','P','G'), RS2_STREAM_COLOR},
-        {rs_fourcc('M','4','2','0'), RS2_STREAM_INFRARED}
+        {rs_fourcc('M','J','P','G'), RS2_STREAM_COLOR}
     };
 
     std::vector<uint8_t> d500_device::send_receive_raw_data(const std::vector<uint8_t>& input)
@@ -377,12 +373,6 @@ namespace librealsense
         depth_ep->register_processing_block({ {RS2_FORMAT_W10} }, { {RS2_FORMAT_RAW10, RS2_STREAM_INFRARED, 1} }, []() { return std::make_shared<w10_converter>(RS2_FORMAT_RAW10); });
         depth_ep->register_processing_block({ {RS2_FORMAT_W10} }, { {RS2_FORMAT_Y10BPACK, RS2_STREAM_INFRARED, 1} }, []() { return std::make_shared<w10_converter>(RS2_FORMAT_Y10BPACK); });
         
-        // M420 -> RGB8 (etc.) for the left infrared (index 1) on dual-RGB devices. No-op on PIDs that never produce M420 IR frames.
-        std::vector< stream_profile > m420_ir_targets;
-        for( rs2_format fmt : map_supported_color_formats( RS2_FORMAT_M420 ) )
-            m420_ir_targets.push_back( { fmt, RS2_STREAM_INFRARED, 1 } );
-        depth_ep->register_processing_block(
-            processing_block_factory::create_pbf_vector< m420_converter >( RS2_FORMAT_M420, m420_ir_targets ) );
         return depth_ep;
     }
 
