@@ -10,12 +10,13 @@
 #
 # Everything here is a no-op off macOS. Ad-hoc signing ("--sign -") is used so no
 # developer identity is required; codesign always succeeds, but AMFI only honors the
-# restricted entitlement at launch when BOTH of the following are set:
-#   1. SIP disabled:          csrutil disable        (from macOS Recovery)
-#   2. AMFI bypass boot-arg:  sudo nvram boot-args="amfi_get_out_of_my_way=1"
-#                              (then reboot)
-# Without step 2, AMFI rejects the ad-hoc signature on the restricted entitlement
-# even with SIP off, killing the process at launch with EXC_CRASH / code-sig error.
+# restricted entitlement at launch when SIP is disabled:
+#   csrutil disable   (from macOS Recovery, then reboot)
+#
+# WARNING: do NOT set amfi_get_out_of_my_way=1. On Apple Silicon (M1+) the USB
+# controller is driven by DriverKit system extensions that require AMFI validation
+# to load. Setting that boot-arg prevents those extensions from loading, which
+# breaks USB enumeration entirely — no USB devices will appear on the system.
 
 # Resolve the entitlements path relative to THIS module at include time. Example/tool
 # subdirectories each call project(), which resets PROJECT_SOURCE_DIR, so we cannot
