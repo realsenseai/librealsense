@@ -116,3 +116,10 @@ include(CMake/embedd_udev_rules.cmake)
 if( BUILD_RS2_ALL )
     include( src/realsense2-all.cmake )
 endif()
+
+# macOS: sign every built executable with the com.apple.vm.device-access entitlement
+# so the libusb backend can capture RealSense UVC interfaces from the system
+# UVCAssistant instead of racing it. No-op on other platforms. Must run last, after
+# all targets are defined. See CMake/macos_codesign.cmake and src/libusb/handle-libusb.h.
+include(CMake/macos_codesign.cmake)
+lrs_codesign_all_executables("${CMAKE_CURRENT_SOURCE_DIR}")

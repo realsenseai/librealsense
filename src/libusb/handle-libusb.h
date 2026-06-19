@@ -7,6 +7,7 @@
 #include "context-libusb.h"
 
 #include <chrono>
+#include <thread>
 
 #include "libusb.h"
 
@@ -45,6 +46,18 @@ namespace librealsense
                     _first_interface(interface), _context(context), _handle(nullptr)
             {
                 auto sts = libusb_open(device, &_handle);
+                if (sts == LIBUSB_ERROR_BUSY || sts == LIBUSB_ERROR_ACCESS)
+                {
+                    auto retry_counter = 20;
+                    do
+                    {
+                        LOG_WARNING("failed to open usb device, error: " << sts << " - retrying...");
+                        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                        sts = libusb_open(device, &_handle);
+                    }
+                    while ((sts == LIBUSB_ERROR_BUSY || sts == LIBUSB_ERROR_ACCESS) && --retry_counter > 0);
+                }
+
                 if(sts != LIBUSB_SUCCESS)
                 {
                     auto rs_sts =  libusb_status_to_rs(sts);
@@ -61,12 +74,77 @@ namespace librealsense
                     std::stringstream msg;
                     msg << "failed to set kernel driver auto detach: " << (int)interface->get_number() << ", error: " << usb_status_to_string.at(rs_sts);
                     LOG_ERROR(msg.str());
+                    libusb_close(_handle);
+                    _handle = nullptr;
                     throw std::runtime_error(msg.str());
                 }
 
-                claim_interface_or_throw(interface->get_number());
-                for(auto&& i : interface->get_associated_interfaces())
-                    claim_interface_or_throw(i->get_number());
+#ifdef __APPLE__
+                // WHY this exists: the camera exposes standard UVC interfaces (VideoControl +
+                // VideoStreaming for depth, IR and color). On macOS those are auto-claimed by
+                // UVCAssistant - the CoreMediaIO USB-video system extension
+                // (com.apple.cmio.uvcassistantextension) that publishes every UVC camera to
+                // AVFoundation/Photo Booth/FaceTime/etc. With no app open it STILL holds the
+                // streaming interfaces exclusively; you can see it in IORegistry as
+                // 'UsbExclusiveOwner = pid <n>, UVCAssistant' on interface 1 (depth stream) and
+                // interface 2. That exclusive owner is why libusb_claim_interface returns
+                // ACCESS, and which interface fails alternates run-to-run purely on who-claimed-
+                // -first timing.
+                //
+                // WHY relying on libusb's auto-detach (set above) is not enough: that path only
+                // acts when a driver is detected bound at claim time, and it can only evict a
+                // *kernel* driver. UVCAssistant is a *userspace* process, so the auto-detach
+                // check races the enumeration window and frequently no-ops.
+                //
+                // WHY we force a detach here: calling libusb_detach_kernel_driver explicitly
+                // (rather than depending on the lazy auto-detach) forces libusb's capture-mode
+                // re-enumeration (USBDeviceReEnumerate + kUSBReEnumerateCaptureDeviceMask) up
+                // front. That captures the WHOLE device and is the strongest lever libusb gives
+                // us to take the interfaces back before claiming. Needs root or the
+                // com.apple.vm.device-access entitlement; NOT_SUPPORTED / NOT_FOUND just mean
+                // "nothing to capture", so those are not failures.
+                //
+                // CAVEAT: because UVCAssistant lives in userspace and re-grabs UVC devices as
+                // they appear, even capture-mode re-enumeration does not always evict it - a
+                // physical replug or a fresh boot can come up with UVCAssistant already owning
+                // the interfaces, in which case capture loses the race and the claim below still
+                // fails with ACCESS. The fully reliable fixes are out-of-process: knock
+                // UVCAssistant off the device right before launch ('sudo killall UVCAssistant'
+                // then start streaming in the respawn window so we claim first), sign the binary
+                // with the com.apple.vm.device-access capture entitlement, or disable the camera
+                // assistant entirely. This detach maximizes our chances; it is not a guarantee.
+                {
+                    auto detach_sts = libusb_detach_kernel_driver(_handle, interface->get_number());
+                    if (detach_sts != LIBUSB_SUCCESS &&
+                        detach_sts != LIBUSB_ERROR_NOT_SUPPORTED &&
+                        detach_sts != LIBUSB_ERROR_NOT_FOUND)
+                    {
+                        LOG_WARNING("failed to capture usb device for interface "
+                                    << (int)interface->get_number() << ", error: " << detach_sts
+                                    << " - continuing, claim may still succeed");
+                    }
+                }
+#endif
+
+                try
+                {
+                    claim_interface_or_throw(interface->get_number());
+                    for(auto&& i : interface->get_associated_interfaces())
+                        claim_interface_or_throw(i->get_number());
+                }
+                catch(...)
+                {
+                    // The constructor threw after libusb_open succeeded, so the destructor
+                    // will NOT run. Release whatever we managed to claim and close the device
+                    // here; otherwise the leaked open handle keeps the device busy and defeats
+                    // the higher-level open retry in usb_device_libusb::get_handle.
+                    for(auto&& i : interface->get_associated_interfaces())
+                        libusb_release_interface(_handle, i->get_number());
+                    libusb_release_interface(_handle, interface->get_number());
+                    libusb_close(_handle);
+                    _handle = nullptr;
+                    throw;
+                }
 
                 _context->start_event_handler();
             }
@@ -100,16 +178,21 @@ namespace librealsense
 
                 if (sts != LIBUSB_SUCCESS)
                 {
-                    // If we try to claim the USB device and get 'USB_STATUS_BUSY' error we will
-                    // retry 2 times more with some short delay between each try
+                    // Retry only on transient BUSY here. We deliberately do NOT tight-loop on
+                    // ACCESS: on macOS every claim attempt forces libusb to reset and
+                    // re-enumerate the device to detach the system UVC driver (UVCAssistant),
+                    // so hammering claim keeps the device in perpetual reset and never lets it
+                    // settle. ACCESS is instead recovered one level up (usb_device_libusb::
+                    // get_handle), which rebuilds the handle from scratch after a backoff so
+                    // the bus can settle between attempts.
                     if( sts == LIBUSB_ERROR_BUSY )
                     {
-                        auto retry_counter = 2;
+                        auto retry_counter = 5;
                         do
                         {
                             LOG_WARNING( "failed to claim usb interface, interface "
-                                         << (int)interface << ", is busy - retrying..." );
-                            std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+                                          << (int)interface << ", is busy - retrying..." );
+                            std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 
                             sts = libusb_claim_interface( _handle, interface );
                             if( sts == LIBUSB_SUCCESS )
