@@ -10,9 +10,13 @@
     the RealSense UVC interfaces. See src/libusb/handle-libusb.h for the full why.
 
     This is a RESTRICTED entitlement: AMFI only honors it on a self-signed binary
-    when SIP is disabled (csrutil disable), optionally with the amfi_get_out_of_my_way=1
-    boot-arg. With SIP enabled the binary still signs fine but the entitlement is
-    ignored at launch.
+    when BOTH conditions are met:
+      1. SIP disabled:          csrutil disable        (from macOS Recovery)
+      2. AMFI bypass boot-arg:  sudo nvram boot-args="amfi_get_out_of_my_way=1"
+                                 (then reboot)
+    Without the boot-arg, AMFI rejects the ad-hoc signature even with SIP off,
+    killing the process at launch with EXC_CRASH / code-sig error. With SIP enabled
+    the binary still signs fine but the entitlement is silently ignored at launch.
 -->
 <plist version="1.0">
 <dict>
