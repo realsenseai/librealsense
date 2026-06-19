@@ -96,7 +96,7 @@ void playback_sensor::open(const stream_profiles& requests)
 
         m_dispatchers.emplace( std::make_pair(
             profile->get_unique_id(),
-            std::make_shared< dispatcher >( _default_queue_size, on_drop_callback ) ) );
+            std::make_shared< dispatcher >( _default_queue_size, "playback-sensor", on_drop_callback ) ) );
 
         m_dispatchers[profile->get_unique_id()]->start();
 

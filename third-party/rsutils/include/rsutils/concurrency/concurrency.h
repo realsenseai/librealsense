@@ -9,6 +9,7 @@
 #include <atomic>
 #include <functional>
 #include <cassert>
+#include <string>
 
 const int QUEUE_MAX_SIZE = 10;
 // Simplest implementation of a blocking concurrent queue for thread messaging
@@ -315,6 +316,7 @@ public:
     // want...
     //
     dispatcher( unsigned int queue_capacity,
+                std::string name,
                 std::function< void( action ) > on_drop_callback = nullptr );
 
     ~dispatcher();
@@ -400,14 +402,15 @@ private:
     std::mutex _blocking_invoke_mutex;
 
     std::atomic<bool> _is_alive;
+    std::string _name;
 };
 
 template<class T = std::function<void(dispatcher::cancellable_timer)>>
 class active_object
 {
 public:
-    active_object(T operation)
-        : _operation(std::move(operation)), _dispatcher(1), _stopped(true)
+    active_object(T operation, std::string name)
+        : _operation(std::move(operation)), _dispatcher(1, std::move(name)), _stopped(true)
     {
     }
 
@@ -469,7 +472,7 @@ public:
                 std::lock_guard<std::mutex> lk(_m);
                 _kicked = false;
             }
-        });
+        }, "watchdog");
     }
 
     ~watchdog()

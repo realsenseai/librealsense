@@ -16,7 +16,7 @@ namespace librealsense
     namespace platform
     {
         uvc_streamer::uvc_streamer(uvc_streamer_context context) :
-            _context(context), _action_dispatcher(10)
+            _context(context), _action_dispatcher(10, "uvc-streamer")
         {
             auto inf = context.usb_device->get_interface(context.control->bInterfaceNumber);
             if (inf == nullptr)
@@ -93,7 +93,7 @@ namespace librealsense
                     if(_publish_frames && running())
                         _context.user_cb(_context.profile, fp->fo, []() mutable {});
                 }
-            });
+            }, "uvc-publish");
 
             _watchdog = std::make_shared<watchdog>([this]()
              {

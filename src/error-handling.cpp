@@ -20,7 +20,7 @@ namespace librealsense
         _decoder(decoder)
     {
         _active_object = std::make_shared<active_object<>>([this](dispatcher::cancellable_timer cancellable_timer)
-            {  polling(cancellable_timer);  });
+            {  polling(cancellable_timer);  }, "error-handler");
     }
 
     polling_error_handler::~polling_error_handler()
