@@ -177,7 +177,7 @@ namespace librealsense
         _active_object([this](dispatcher::cancellable_timer cancellable_timer)
             {
                 polling(cancellable_timer);
-            })
+            }, "global-timestamp")
     {
         //LOG_DEBUG("start new time_diff_keeper ");
     }

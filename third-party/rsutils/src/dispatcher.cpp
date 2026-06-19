@@ -5,11 +5,13 @@
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <rsutils/time/waiting-on.h>
 
-dispatcher::dispatcher( unsigned int cap, std::function< void( action ) > on_drop_callback )
+dispatcher::dispatcher( unsigned int cap, std::string name, std::function< void( action ) > on_drop_callback )
     : _queue( cap, on_drop_callback )
     , _was_stopped( true )
     , _is_alive( true )
+    , _name( std::move( name ) )
 {
+    LOG_DEBUG( "Dispatcher [" << this << "] (" << _name << ") constructed" );
     // We keep a running thread that takes stuff off our queue and dispatches them
     _thread = std::thread([&]()
     {
@@ -26,16 +28,32 @@ dispatcher::dispatcher( unsigned int cap, std::function< void( action ) > on_dro
                     try
                     {
                         // While we're dispatching the item, we cannot stop!
-                        std::lock_guard< std::mutex > lock(_dispatch_mutex);
-                        item(time);
+                        try
+                        {
+                            std::lock_guard< std::mutex > lock(_dispatch_mutex);
+                            try
+                            {
+                                item(time);
+                            }
+                            catch (const std::exception& e)
+                            {
+                                LOG_ERROR("Dispatcher [" << this << "] (" << _name << ") exception caught in action body: " << e.what());
+                                throw;
+                            }
+                        }
+                        catch (const std::exception& e)
+                        {
+                            LOG_ERROR("Dispatcher [" << this << "] (" << _name << ") exception caught locking _dispatch_mutex: " << e.what());
+                            throw;
+                        }
                     }
                     catch (const std::exception& e)
                     {
-                        LOG_ERROR("Dispatcher [" << this << "] exception caught: " << e.what());
+                        // Already logged above
                     }
                     catch (...)
                     {
-                        LOG_ERROR("Dispatcher [" << this << "] unknown exception caught!");
+                        LOG_ERROR("Dispatcher [" << this << "] (" << _name << ") unknown exception caught!");
                     }
                 }
             }
@@ -46,6 +64,7 @@ dispatcher::dispatcher( unsigned int cap, std::function< void( action ) > on_dro
 
 dispatcher::~dispatcher()
 {
+    LOG_DEBUG( "Dispatcher [" << this << "] (" << _name << ") destructed" );
     // Don't get into any more dispatches
     _is_alive = false;
 

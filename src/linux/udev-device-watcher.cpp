@@ -145,7 +145,7 @@ udev_device_watcher::udev_device_watcher( const platform::backend * backend )
             }
             _changed = false;
         }
-    } )
+    }, "udev-device-watcher" )
 {
     _udev_ctx = udev_new();
     if( ! _udev_ctx )
