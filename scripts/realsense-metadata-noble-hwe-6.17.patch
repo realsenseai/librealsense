@@ -56,7 +56,7 @@ index 7080f634d..e0e92ffc4 100644
 +	{ .match_flags		= USB_DEVICE_ID_MATCH_VENDOR
 +				| USB_DEVICE_ID_MATCH_INT_CLASS
 +				| USB_DEVICE_ID_MATCH_INT_SUBCLASS,
-+	  .idVendor			= 0x38E5,
++	  .idVendor		= 0x38E5,
 +	  .bInterfaceClass	= USB_CLASS_VIDEO,
 +	  .bInterfaceSubClass	= 1,
 +	  .driver_info		= UVC_INFO_META(V4L2_META_FMT_D4XX) },
