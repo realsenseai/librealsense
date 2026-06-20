@@ -1,3 +1,6 @@
+// License: Apache 2.0. See LICENSE file in root directory.
+// Copyright(c) 2024 Intel Corporation. All Rights Reserved.
+
 #include "CenterOfMass.h"
 #include <cmath>
 #include <algorithm>
@@ -43,6 +46,7 @@ static Vec3f PixelToCamera(Vec2i pixel, float depth_mm, const CameraIntrinsics& 
 void CenterOfMassCalculator::CreateDepth8U(const DepthImage16& depth, DepthImage8& result)
 {
     int len = depth.width * depth.height;
+    if (!depth.data || len == 0) return;
     if (!result.data || result.width * result.height < len) return;
     constexpr float factor = 1.0f / SCALE_DEPTH;
     for (int i = 0; i < len; ++i) {
@@ -63,6 +67,7 @@ int CenterOfMassCalculator::getMeanSurroundingDepth(
     float fractionNonZero, int maxRangeSurrounding)
 {
     if (depth.width == 0 || depth.height == 0) return 0;
+    if (interval > 5) interval = 5;  // MAX_WINDOW sized for interval <= 5 (11×11 = 121)
 
     int minX = std::max(pt.x - interval, 2);
     int maxX = std::min(pt.x + interval, depth.width  - 2);
@@ -278,7 +283,6 @@ bool CenterOfMassCalculator::CalculateComWithDepthRange(
     if ((histRangeEnd - histRangeStart) >= (MaxDepth8U - 1)) return false;
 
     float meanDepth8U = CalcHistRangeMean(hist, histRangeStart, histRangeEnd);
-    depthMean = std::floor(meanDepth8U * SCALE_DEPTH + SUBTRACT_FROM_DEPTH);
 
     // Optionally extend toward a nearby head cluster (closer to camera, within 100 mm)
     for (auto const& r : allRanges) {
@@ -287,6 +291,10 @@ bool CenterOfMassCalculator::CalculateComWithDepthRange(
             if ((meanDepth8U - meanRange) <= 5) { histRangeStart = r.start; break; }
         }
     }
+
+    // Recompute mean over the final range (possibly extended to include head cluster)
+    meanDepth8U = CalcHistRangeMean(hist, histRangeStart, histRangeEnd);
+    depthMean = std::floor(meanDepth8U * SCALE_DEPTH + SUBTRACT_FROM_DEPTH);
 
     // Build mask and find 2D center-of-mass
     std::vector<uint8_t> mask(roiW * roiH, 0);
@@ -323,7 +331,8 @@ bool CenterOfMassCalculator::RunNonRangeComCalculationFlow(
 
     for (int i = 0; i < count; ++i) {
         if (i >= NUM_DEPTH_SAMPLES - 1 && chosenDepth >= MIN_DEPTH) break;
-        float sampleY   = colorRect.y + (i + 1) * yProgression;
+        float sampleY = std::min( colorRect.y + (i + 1) * yProgression,
+                                   float( colorRect.y + colorRect.height - 1 ) );
         depthSamples[i] = (float)GetDepthAtColorPixel(depth, {personCenter.x, sampleY});
         if (chosenDepth <= MAX_DEPTH) {
             if ((std::abs(chosenDepth - depthSamples[i]) < MAX_DEPTH_FOR_SAMPLES

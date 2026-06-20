@@ -2067,10 +2067,9 @@ namespace rs2
                     glColor3f( a * frame_color.Value.x, a * frame_color.Value.y, a * frame_color.Value.z );
                     draw_rect( bbox, 2 );
 
-                    // Green COM dot + confidence label — only when depth is valid.
-                    // mean_depth == 0 means the depth frame had too many invalid pixels
-                    // in the bounding box; suppress the dot entirely in that case.
-                    if( object.mean_depth > 0.f )
+                    // COM dot — only when viewer COM was activated (HKR returned 0).
+                    // metadata_depth == 0 and mean_depth > 0 means viewer COM is the source.
+                    if( object.mean_depth > 0.f && object.metadata_depth == 0.f )
                     {
                         ImVec2 const com_screen{ unbbox.x + object.com_rel_u * unbbox.w,
                                                  unbbox.y + object.com_rel_v * unbbox.h };
@@ -2083,15 +2082,12 @@ namespace rs2
                                 ImColor( 0.f, 1.f, 0.f, a ),
                                 conf_str.c_str() );
                         }
-                        if( object.metadata_depth > 0.f )
-                        {
-                            std::string md_str = rsutils::string::from()
-                                << std::setprecision( 2 ) << object.metadata_depth << "m";
-                            ImGui::GetWindowDrawList()->AddText(
-                                { com_screen.x + 8.f, com_screen.y + 5.f },
-                                ImColor( 1.f, 0.f, 0.f, a ),
-                                md_str.c_str() );
-                        }
+                        std::string dist_str = rsutils::string::from()
+                            << std::setprecision( 2 ) << object.mean_depth << "m";
+                        ImGui::GetWindowDrawList()->AddText(
+                            { com_screen.x + 8.f, com_screen.y + 5.f },
+                            ImColor( 0.f, 1.f, 0.f, a ),
+                            dist_str.c_str() );
                     }
                 }
             }
@@ -3651,7 +3647,7 @@ namespace rs2
 
         // No OD frame this tick. When OD fps < render fps this is normal (e.g. OD@15fps, RGB@30fps).
         // Keep last known detections to avoid flicker, but clear if absent for too long (OD sensor stopped).
-        static constexpr int MAX_STALE_OD_TICKS = 10;
+        static constexpr int MAX_STALE_OD_TICKS = 3;
         if( ! odf )
         {
             if( ++objects->ticks_without_od_frame > MAX_STALE_OD_TICKS )
@@ -3688,19 +3684,19 @@ namespace rs2
             rs2::rect color_frame_rect{ 0.f, 0.f, float( color_intrin.width ), float( color_intrin.height ) };
             rs2::rect depth_frame_rect{ 0.f, 0.f, float( depth_intrin.width ), float( depth_intrin.height ) };
 
-            uint16_t const * const depth_data  = reinterpret_cast< uint16_t const * >( df.get_data() );
-            float const            depth_scale = df.get_units();
+            uint16_t const * const depth_data = reinterpret_cast< uint16_t const * >( df.get_data() );
 
             COM::DepthImage16 com_raw{ depth_data, depth_intrin.width, depth_intrin.height };
             std::vector< uint8_t > depth8u_buf( depth_intrin.width * depth_intrin.height );
             COM::DepthImage8 com_depth8u{ depth8u_buf.data(), depth_intrin.width, depth_intrin.height };
-            COM::CenterOfMassCalculator::CreateDepth8U( com_raw, com_depth8u );
+            bool depth8u_ready = false;
 
             objects_in_frame new_objects;
             unsigned int const count = odf.get_detection_count();
 
             // Non-maximum suppression: sort by score, suppress overlapping same-class boxes
-            static constexpr float NMS_IOU_THRESHOLD = 0.45f;
+            static constexpr float NMS_IOU_THRESHOLD   = 0.45f;
+            static constexpr int   NMS_SCORE_THRESHOLD = 45;
             std::vector< rs2_object_detection > raw_dets( count );
             for( unsigned int i = 0; i < count; ++i )
                 raw_dets[i] = odf.get_detection( i );
@@ -3708,7 +3704,7 @@ namespace rs2
                 []( const rs2_object_detection & a, const rs2_object_detection & b ) { return a.score > b.score; } );
             std::vector< bool > suppressed( count, false );
             for( size_t i = 0; i < count; ++i )
-                if( raw_dets[i].score < 45 )
+                if( raw_dets[i].score < NMS_SCORE_THRESHOLD )
                     suppressed[i] = true;
             for( size_t i = 0; i < count; ++i )
             {
@@ -3724,7 +3720,9 @@ namespace rs2
                                   float( raw_dets[j].bottom_right_y - raw_dets[j].top_left_y ) };
                     float inter_area = bi.intersection( bj ).area();
                     float union_area = bi.area() + bj.area() - inter_area;
-                    if( union_area > 0.f && inter_area / union_area > NMS_IOU_THRESHOLD )
+                    float smaller_area = std::min( bi.area(), bj.area() );
+                    if( ( union_area > 0.f && inter_area / union_area > NMS_IOU_THRESHOLD ) ||
+                        ( smaller_area > 0.f && inter_area / smaller_area > NMS_IOU_THRESHOLD ) )
                         suppressed[j] = true;
                 }
             }
@@ -3758,28 +3756,41 @@ namespace rs2
                 rs2::rect depth_bbox = depth_bbox_full.intersection( depth_frame_rect );
                 rs2::rect normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
 
-                COM::Rect  com_bbox{ int( depth_bbox.x ), int( depth_bbox.y ),
-                                     int( depth_bbox.w ), int( depth_bbox.h ) };
-                COM::Vec2f com_center{ depth_bbox.x + depth_bbox.w * 0.5f,
-                                       depth_bbox.y + depth_bbox.h * 0.5f };
-                COM::CameraIntrinsics com_intrin{ depth_intrin.fx, depth_intrin.fy,
-                                                  depth_intrin.ppx, depth_intrin.ppy };
-                COM::PersonCenterOfMass com_result{};
-                COM::CenterOfMassCalculator::Calculate( com_raw, com_depth8u, com_bbox, com_center, &com_intrin, com_result );
-                float const viewer_depth_m = com_result.meanBodyDepth > 0.f ? com_result.meanBodyDepth / 1000.f : 0.f;
                 float const hkr_depth_m = det.depth;
-                float const mean_depth = hkr_depth_m > 0.f ? hkr_depth_m : viewer_depth_m;
-
-                // COM relative position in [0,1] within the bbox — used for rendering the dot.
-                // Computed vs depth_bbox_full (unclipped) so it maps 1-to-1 onto the color bbox
-                // at render time; both are unclipped versions of the same physical region.
+                float viewer_depth_m = 0.f;
                 float com_rel_u = 0.5f, com_rel_v = 0.5f;
-                if( com_result.meanBodyDepth > 0.f && depth_bbox_full.w > 0.f && depth_bbox_full.h > 0.f )
+
+                // TODO: temporary fallback — viewer-side COM runs only when HKR firmware
+                // returns 0 (XU command not supported or device not ready).
+                // Remove once HKR COM is fully implemented and reliable on all devices.
+                if( hkr_depth_m == 0.f )
                 {
-                    auto clamp01 = []( float v ) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; };
-                    com_rel_u = clamp01( ( com_result.imagePos.x - depth_bbox_full.x ) / depth_bbox_full.w );
-                    com_rel_v = clamp01( ( com_result.imagePos.y - depth_bbox_full.y ) / depth_bbox_full.h );
+                    if( !depth8u_ready )
+                    {
+                        COM::CenterOfMassCalculator::CreateDepth8U( com_raw, com_depth8u );
+                        depth8u_ready = true;
+                    }
+                    COM::Rect  com_bbox{ int( depth_bbox.x ), int( depth_bbox.y ),
+                                         int( depth_bbox.w ), int( depth_bbox.h ) };
+                    COM::Vec2f com_center{ depth_bbox.x + depth_bbox.w * 0.5f,
+                                           depth_bbox.y + depth_bbox.h * 0.5f };
+                    COM::CameraIntrinsics com_intrin{ depth_intrin.fx, depth_intrin.fy,
+                                                      depth_intrin.ppx, depth_intrin.ppy };
+                    COM::PersonCenterOfMass com_result{};
+                    COM::CenterOfMassCalculator::Calculate( com_raw, com_depth8u, com_bbox, com_center, &com_intrin, com_result );
+                    if( com_result.meanBodyDepth > 0.f )
+                    {
+                        viewer_depth_m = com_result.meanBodyDepth / 1000.f;
+                        if( depth_bbox_full.w > 0.f && depth_bbox_full.h > 0.f )
+                        {
+                            auto clamp01 = []( float v ) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; };
+                            com_rel_u = clamp01( ( com_result.imagePos.x - depth_bbox_full.x ) / depth_bbox_full.w );
+                            com_rel_v = clamp01( ( com_result.imagePos.y - depth_bbox_full.y ) / depth_bbox_full.h );
+                        }
+                    }
                 }
+
+                float const mean_depth = hkr_depth_m > 0.f ? hkr_depth_m : viewer_depth_m;
 
                 std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
                 new_objects.emplace_back( obj_id++, name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
