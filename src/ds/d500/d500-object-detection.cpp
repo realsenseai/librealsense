@@ -119,14 +119,16 @@ namespace librealsense
 
     void d500_object_detection_sensor::start( rs2_frame_callback_sptr callback )
     {
-        set_align_depth_xu( _owner->get_raw_depth_sensor(), true );
+        // TODO: FW does not yet support the Align_Depth XU — re-enable once FW is ready.
+        // set_align_depth_xu( _owner->get_raw_depth_sensor(), true );
         synthetic_sensor::start( callback );
     }
 
     void d500_object_detection_sensor::stop()
     {
         synthetic_sensor::stop();
-        set_align_depth_xu( _owner->get_raw_depth_sensor(), false );
+        // TODO: FW does not yet support the Align_Depth XU — re-enable once FW is ready.
+        // set_align_depth_xu( _owner->get_raw_depth_sensor(), false );
     }
 
     stream_profiles d500_object_detection_sensor::init_stream_profiles()
