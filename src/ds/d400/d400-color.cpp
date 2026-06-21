@@ -171,15 +171,24 @@ namespace librealsense
         auto_calibrated::add_color_write_observer( [this]() {  _color_calib_table_raw.reset(); } );
     }
 
-    void d400_color::register_options()
+    bool d400_color::mipi_rgb_controls_supported() const
     {
-        auto& color_ep = get_color_sensor();
-
-        // MIPI RGB controls require FW >= 5.17.3.15 and d4xx kernel driver >= 1.0.3.15.
-        const bool mipi_rgb_controls_supported = _is_mipi_device
+        // MIPI RGB ISP controls require FW >= 5.17.3.15 and d4xx kernel driver >= 1.0.3.15.
+        // D401/GMSL has no actual RGB sensor and is not _separate_color, so its color
+        // endpoint collapses onto the depth V4L2 node - registering RGB ISP controls there
+        // would issue G_EXT_CTRLS on the depth node and fail with EINVAL (e.g. applying a
+        // visual preset queries Enable Auto White Balance), and the matching RGB metadata
+        // would report garbage. Exclude it here so every caller stays consistent.
+        return _is_mipi_device
+            && _pid != ds::RS401_GMSL_PID
             && _fw_version >= firmware_version("5.17.3.15")
             && supports_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION)
             && rsutils::version(get_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION)) >= rsutils::version("1.0.3.15");
+    }
+
+    void d400_color::register_options()
+    {
+        auto& color_ep = get_color_sensor();
 
         if (!_is_mipi_device)
         {
@@ -194,11 +203,7 @@ namespace librealsense
                     { 2.f, "60Hz" },
                     { 3.f, "Auto" }, }));
         }
-        // D401/GMSL has no actual RGB sensor and is not _separate_color, so its color
-        // endpoint collapses onto the depth node - any RGB ISP control registered here
-        // would issue G_EXT_CTRLS on the depth node and fail with EINVAL (e.g. applying a
-        // visual preset queries Enable Auto White Balance). Exclude it like AE Priority below.
-        else if (mipi_rgb_controls_supported && _pid != ds::RS401_GMSL_PID)
+        else if (mipi_rgb_controls_supported())
         {
             // RGB controls registered for USB but not yet for MIPI (no FW/kernel support):
             //   RS2_OPTION_BRIGHTNESS, RS2_OPTION_CONTRAST, RS2_OPTION_GAMMA,
@@ -227,7 +232,7 @@ namespace librealsense
         if (_separate_color)
         {
             // Auto exposure priority is supported on all RGB sensors except D401/GMSL
-            if (!_is_mipi_device || (mipi_rgb_controls_supported && _pid != ds::RS401_GMSL_PID))
+            if (!_is_mipi_device || mipi_rgb_controls_supported())
             {
                 color_ep.register_pu(RS2_OPTION_AUTO_EXPOSURE_PRIORITY);
             }
@@ -337,51 +342,56 @@ namespace librealsense
         // attributes of md_mipi_rgb_control structure
         color_ep.register_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP,
             create_color_md_mipi_parser(&md_mipi_rgb_mode::hw_timestamp, md_mipi_rgb_control_attributes::hw_timestamp_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_BRIGHTNESS,
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::brightness, md_mipi_rgb_control_attributes::brightness_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_CONTRAST, 
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::contrast, md_mipi_rgb_control_attributes::contrast_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_SATURATION,
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::saturation, md_mipi_rgb_control_attributes::saturation_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_SHARPNESS, 
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::sharpness, md_mipi_rgb_control_attributes::sharpness_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_AUTO_WHITE_BALANCE_TEMPERATURE,
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::auto_white_balance_temp, md_mipi_rgb_control_attributes::auto_white_balance_temp_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_GAMMA,
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::gamma, md_mipi_rgb_control_attributes::gamma_attribute));
-        
+
         color_ep.register_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE,
             create_color_md_mipi_parser(&md_mipi_rgb_mode::manual_exposure, md_mipi_rgb_control_attributes::manual_exposure_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_MANUAL_WHITE_BALANCE,
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::manual_white_balance, md_mipi_rgb_control_attributes::manual_white_balance_attribute));
-        
+
         color_ep.register_metadata(RS2_FRAME_METADATA_AUTO_EXPOSURE,
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::auto_exposure_mode, 
+            create_color_md_mipi_parser(&md_mipi_rgb_mode::auto_exposure_mode,
                 md_mipi_rgb_control_attributes::auto_exposure_mode_attribute,
                 [](rs2_metadata_type param) { return (param != 1); })); // OFF value via UVC is 1 (ON is 8)
-        
+
         color_ep.register_metadata(RS2_FRAME_METADATA_GAIN_LEVEL,
             create_color_md_mipi_parser(&md_mipi_rgb_mode::gain, md_mipi_rgb_control_attributes::gain_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_BACKLIGHT_COMPENSATION,
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::backlight_compensation, md_mipi_rgb_control_attributes::backlight_compensation_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_HUE,
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::hue, md_mipi_rgb_control_attributes::hue_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_POWER_LINE_FREQUENCY,
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::power_line_frequency, md_mipi_rgb_control_attributes::power_line_frequency_attribute));
-        
-        color_ep.register_metadata(RS2_FRAME_METADATA_LOW_LIGHT_COMPENSATION,
-            create_color_md_mipi_parser(&md_mipi_rgb_mode::low_light_compensation, md_mipi_rgb_control_attributes::low_light_compensation_attribute));
-        
+
+        // RGB ISP metadata - only meaningful on SKUs that actually expose the RGB ISP
+        // controls. On D401/GMSL (no RGB sensor) these would report garbage, so skip them.
+        if (mipi_rgb_controls_supported())
+        {
+            color_ep.register_metadata(RS2_FRAME_METADATA_BRIGHTNESS,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::brightness, md_mipi_rgb_control_attributes::brightness_attribute));
+
+            color_ep.register_metadata(RS2_FRAME_METADATA_CONTRAST,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::contrast, md_mipi_rgb_control_attributes::contrast_attribute));
+
+            color_ep.register_metadata(RS2_FRAME_METADATA_SATURATION,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::saturation, md_mipi_rgb_control_attributes::saturation_attribute));
+
+            color_ep.register_metadata(RS2_FRAME_METADATA_SHARPNESS,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::sharpness, md_mipi_rgb_control_attributes::sharpness_attribute));
+
+            color_ep.register_metadata(RS2_FRAME_METADATA_AUTO_WHITE_BALANCE_TEMPERATURE,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::auto_white_balance_temp, md_mipi_rgb_control_attributes::auto_white_balance_temp_attribute));
+
+            color_ep.register_metadata(RS2_FRAME_METADATA_GAMMA,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::gamma, md_mipi_rgb_control_attributes::gamma_attribute));
+
+            color_ep.register_metadata(RS2_FRAME_METADATA_MANUAL_WHITE_BALANCE,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::manual_white_balance, md_mipi_rgb_control_attributes::manual_white_balance_attribute));
+
+            color_ep.register_metadata(RS2_FRAME_METADATA_BACKLIGHT_COMPENSATION,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::backlight_compensation, md_mipi_rgb_control_attributes::backlight_compensation_attribute));
+
+            color_ep.register_metadata(RS2_FRAME_METADATA_HUE,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::hue, md_mipi_rgb_control_attributes::hue_attribute));
+
+            color_ep.register_metadata(RS2_FRAME_METADATA_POWER_LINE_FREQUENCY,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::power_line_frequency, md_mipi_rgb_control_attributes::power_line_frequency_attribute));
+
+            color_ep.register_metadata(RS2_FRAME_METADATA_LOW_LIGHT_COMPENSATION,
+                create_color_md_mipi_parser(&md_mipi_rgb_mode::low_light_compensation, md_mipi_rgb_control_attributes::low_light_compensation_attribute));
+        }
+
         color_ep.register_metadata(RS2_FRAME_METADATA_INPUT_WIDTH,
             create_color_md_mipi_parser(&md_mipi_rgb_mode::input_width, md_mipi_rgb_control_attributes::input_width_attribute));
         
