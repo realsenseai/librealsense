@@ -318,7 +318,7 @@ namespace rs2
         {
             std::string name = dev.get_info(RS2_CAMERA_INFO_NAME);
             std::smatch match;
-            if( ! std::regex_search( name, match, std::regex( "^Intel RealSense (\\S+)" ) ) )
+            if( ! std::regex_search( name, match, std::regex( "^(?:Intel )?RealSense (\\S+)" ) ) )
                 throw std::runtime_error( "cannot parse device name from '" + name + "'" );
 
             glob(

@@ -55,6 +55,8 @@ void init_device(py::module &m) {
             auto name = self.get_info( RS2_CAMERA_INFO_NAME );
             if( 0 == strncmp( name, "Intel RealSense ", 16 ) )
                 name += 16;
+            else if( 0 == strncmp( name, "RealSense ", 10 ) )
+                name += 10;
             ss << "<" SNAME ".device: " << name;
             if (self.supports(RS2_CAMERA_INFO_SERIAL_NUMBER))
                 ss << " (S/N: " << self.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);

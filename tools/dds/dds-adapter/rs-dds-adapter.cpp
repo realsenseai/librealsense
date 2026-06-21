@@ -41,14 +41,16 @@ std::string build_node_name( std::string const & rs2_camera_name, std::string co
     // Build the ROS2 node name, without a namespace
     // example: D435_11223344
     // NOTE: the serial number here may be the device update ID or the actual device serial number
-    constexpr char const * DEVICE_NAME_PREFIX = "Intel RealSense ";
-    constexpr size_t DEVICE_NAME_PREFIX_CCH = 16;
-    // We don't need the prefix in the path
+    // We don't need the prefix in the path; some devices report "Intel RealSense " and some just "RealSense "
     std::string model_name = rs2_camera_name;
-    if( model_name.length() > DEVICE_NAME_PREFIX_CCH
-        && 0 == strncmp( model_name.data(), DEVICE_NAME_PREFIX, DEVICE_NAME_PREFIX_CCH ) )
+    for( auto const & prefix : { "Intel RealSense ", "RealSense " } )
     {
-        model_name.erase( 0, DEVICE_NAME_PREFIX_CCH );
+        auto const cch = strlen( prefix );
+        if( model_name.length() > cch && 0 == strncmp( model_name.data(), prefix, cch ) )
+        {
+            model_name.erase( 0, cch );
+            break;
+        }
     }
     for( auto it = model_name.begin(); it != model_name.end(); ++it )
         if( *it == ' ' )
