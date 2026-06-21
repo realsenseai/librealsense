@@ -57,6 +57,19 @@ struct person_center_of_mass {
     vec2f image_pos;        // Center of Mass (COM) pixel in color/depth image; zero if intrinsics not provided
 };
 
+// Debug snapshot filled by calculate() — pass a non-null pointer to collect it.
+struct com_debug_info {
+    bool  histogram_ok   = false; // true = histogram path used; false = fallback
+    int   center_d8u     = 0;     // patch-mean depth_8u at ROI center (0 = no valid pixels)
+    int   center_d8u_cnt = 0;     // valid pixels in the 5×5 anchor patch
+    int   n_clusters     = 0;     // depth clusters found in ROI histogram
+    int   cluster_start  = 0;     // selected cluster: depth_8u range start
+    int   cluster_end    = 0;     // selected cluster: depth_8u range end
+    float cluster_fract  = 0.f;   // selected cluster: fraction of valid ROI pixels
+    float image_pos_x    = 0.f;   // raw COM pixel X before EMA
+    float image_pos_y    = 0.f;   // raw COM pixel Y before EMA
+};
+
 // ---------------------------------------------------------------------------
 // center_of_mass_calculator
 // ---------------------------------------------------------------------------
@@ -127,7 +140,8 @@ public:
                           const rect&                 color_bbox,
                           const vec2f&                person_center_color,
                           const camera_intrinsics*    intrinsics,
-                          person_center_of_mass&      result);
+                          person_center_of_mass&      result,
+                          com_debug_info*             dbg = nullptr);
 
 private:
     static int  get_depth_at_color_pixel(const depth_image_16& depth, vec2f color_pt);
@@ -145,14 +159,16 @@ private:
     static bool calculate_com_with_depth_range(const depth_image_8& depth_8u,
                                                const rect& roi,
                                                float& depth_mean,
-                                               vec2i& center_mass_point);
+                                               vec2i& center_mass_point,
+                                               com_debug_info* dbg = nullptr);
 
     static float calc_hist_range_mean(const std::vector<float>& hist,
                                       int range_start, int range_end);
 
     static bool calc_center_of_mask(const std::vector<uint8_t>& mask,
                                     int mask_width, int mask_height,
-                                    vec2i& com);
+                                    vec2i& com,
+                                    int max_y = 0);  // 0 = use full height
 
     static bool run_non_range_com_calculation_flow(const rect&                 color_rect,
                                                    const depth_image_16&       depth,
