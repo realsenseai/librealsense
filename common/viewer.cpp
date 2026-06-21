@@ -3681,7 +3681,7 @@ namespace rs2
             unsigned int const count = odf.get_detection_count();
 
             // Non-maximum suppression: sort by score, suppress overlapping same-class boxes
-            static constexpr float NMS_IOU_THRESHOLD   = 0.45f;
+            static constexpr float NMS_IOU_THRESHOLD   = 0.55f;
             static constexpr int   NMS_SCORE_THRESHOLD = 45;
             std::vector< rs2_object_detection > raw_dets( count );
             for( unsigned int i = 0; i < count; ++i )
