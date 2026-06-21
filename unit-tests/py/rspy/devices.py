@@ -73,6 +73,29 @@ import time
 _device_by_sn = dict()
 _context = None
 
+# Ports we have powered on, tracked from our own enable/disable actions rather than from
+# enabled() (which reflects SDK device presence and lags a device rebooting on a live port).
+_enabled_ports = set()
+
+
+def _enable_hub_ports( ports = None, disable_other_ports = False, sleep_on_change = 0 ):
+    global _enabled_ports
+    ok = hub.enable_ports( ports, disable_other_ports = disable_other_ports, sleep_on_change = sleep_on_change )
+    if ports is None:
+        _enabled_ports = set( hub.all_ports() )
+    elif disable_other_ports:
+        _enabled_ports = set( ports )
+    else:
+        _enabled_ports |= set( ports )
+    return ok
+
+
+def _disable_hub_ports( ports = None, sleep_on_change = 0 ):
+    global _enabled_ports
+    ok = hub.disable_ports( ports, sleep_on_change = sleep_on_change )
+    _enabled_ports = set() if ports is None else _enabled_ports - set( ports )
+    return ok
+
 
 class Device:
     def __init__( self, sn, dev ):
@@ -190,7 +213,7 @@ def map_unknown_ports():
     if not devices_with_unknown_ports:
         # All ports are known, but still enabled from query(). Disable all so unmapped ports
         # (e.g. loose cables) can't produce rogue devices mid-test.
-        hub.disable_ports()
+        _disable_hub_ports()
         wait_until_all_ports_disabled()
         return
     #
@@ -214,7 +237,7 @@ def map_unknown_ports():
             device._port = unknown_ports[0]
             return
         #
-        hub.disable_ports( ports )
+        _disable_hub_ports( ports )
         wait_until_all_ports_disabled()
         #
         # Enable one port at a time to try and find what device is connected to it
@@ -222,7 +245,7 @@ def map_unknown_ports():
         for port in unknown_ports:
             #
             log.d( 'enabling port', port )
-            hub.enable_ports( [port], disable_other_ports=True )
+            _enable_hub_ports( [port], disable_other_ports=True )
             sn = None
             port_enable_time = timestamp()
             for retry in range( MAX_ENUMERATION_TIME ):
@@ -246,11 +269,11 @@ def map_unknown_ports():
                 else:
                     log.w( "Device with serial number", sn, "was found in port", port,
                             "but was not in context" )
-            hub.disable_ports( [port] )
+            _disable_hub_ports( [port] )
             wait_until_all_ports_disabled()
     finally:
         # Disable all ports so tests start from a clean state
-        hub.disable_ports()
+        _disable_hub_ports()
         wait_until_all_ports_disabled()
         log.debug_unindent()
 
@@ -275,8 +298,12 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
         if not hub.is_connected():
             hub.connect(hub_reset)
         if recycle_ports:
-            hub.disable_ports( sleep_on_change = 5 )
-            hub.enable_ports()  # Enable without sleeping - we'll poll ourselves
+            _disable_hub_ports( sleep_on_change = 5 )
+            _enable_hub_ports()  # Enable without sleeping - we'll poll ourselves
+        else:
+            # didn't recycle: seed our record from the hub's actual port state
+            global _enabled_ports
+            _enabled_ports = set( hub.ports() )
     #
     # Get all devices, and store by serial-number
     global _device_by_sn, _context, _port_to_sn
@@ -616,7 +643,8 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
         ports = [ get( sn ).port for sn in serial_numbers ]
         # DDS (and other non-hub) devices have port=None; filter them out of hub operations
         wanted_ports = sorted( p for p in ports if p is not None )
-        enabled_ports = [ get( sn ).port for sn in enabled() if get( sn ).port is not None ]
+        # ports we powered on -- not enabled(), which misses a device rebooting on a live port
+        enabled_ports = sorted( _enabled_ports )
         #
         if recycle:
             #
@@ -626,16 +654,16 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
                 log.d( 'enabling ports', wanted_ports,
                        'disabling currently enabled ports', enabled_ports )
                 sns_to_remove = { sn for sn in enabled() if get( sn ).port in enabled_ports }
-                hub.disable_ports( enabled_ports )
+                _disable_hub_ports( enabled_ports )
                 _wait_until_removed( sns_to_remove, timeout = timeout )
             #
             if wanted_ports:
-                hub.enable_ports( wanted_ports )
+                _enable_hub_ports( wanted_ports )
             #
         else:
             #
             if wanted_ports:
-                hub.enable_ports( wanted_ports, disable_other_ports = True )
+                _enable_hub_ports( wanted_ports, disable_other_ports = True )
             else:
                 log.d( 'no hub ports to enable; leaving hub as-is' )
         #
@@ -658,7 +686,7 @@ def enable_all():
     """
     Enables all ports on the hub -- without a hub, this does nothing!
     """
-    hub.enable_ports()
+    _enable_hub_ports()
 
 
 def _wait_until_removed( serial_numbers, timeout = PORTS_DISABLED_TIMEOUT ):
