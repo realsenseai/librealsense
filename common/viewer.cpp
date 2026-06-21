@@ -2067,14 +2067,6 @@ namespace rs2
                     glColor3f( a * frame_color.Value.x, a * frame_color.Value.y, a * frame_color.Value.z );
                     draw_rect( bbox, 2 );
 
-                    // COM dot — only when viewer COM was activated (HKR returned 0).
-                    // metadata_depth == 0 and mean_depth > 0 means viewer COM is the source.
-                    if( object.mean_depth > 0.f && object.metadata_depth == 0.f )
-                    {
-                        ImVec2 const com_screen{ unbbox.x + object.com_rel_u * unbbox.w,
-                                                 unbbox.y + object.com_rel_v * unbbox.h };
-                        ImGui::GetWindowDrawList()->AddCircleFilled( com_screen, 5.f, ImColor( 0.f, 1.f, 0.f, a ) );
-                    }
                 }
             }
 
@@ -3706,9 +3698,7 @@ namespace rs2
                                   float( raw_dets[j].bottom_right_y - raw_dets[j].top_left_y ) };
                     float inter_area = bi.intersection( bj ).area();
                     float union_area = bi.area() + bj.area() - inter_area;
-                    float smaller_area = std::min( bi.area(), bj.area() );
-                    if( ( union_area > 0.f && inter_area / union_area > NMS_IOU_THRESHOLD ) ||
-                        ( smaller_area > 0.f && inter_area / smaller_area > NMS_IOU_THRESHOLD ) )
+                    if( union_area > 0.f && inter_area / union_area > NMS_IOU_THRESHOLD )
                         suppressed[j] = true;
                 }
             }
