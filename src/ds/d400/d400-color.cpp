@@ -194,7 +194,11 @@ namespace librealsense
                     { 2.f, "60Hz" },
                     { 3.f, "Auto" }, }));
         }
-        else if (mipi_rgb_controls_supported)
+        // D401/GMSL has no actual RGB sensor and is not _separate_color, so its color
+        // endpoint collapses onto the depth node - any RGB ISP control registered here
+        // would issue G_EXT_CTRLS on the depth node and fail with EINVAL (e.g. applying a
+        // visual preset queries Enable Auto White Balance). Exclude it like AE Priority below.
+        else if (mipi_rgb_controls_supported && _pid != ds::RS401_GMSL_PID)
         {
             // RGB controls registered for USB but not yet for MIPI (no FW/kernel support):
             //   RS2_OPTION_BRIGHTNESS, RS2_OPTION_CONTRAST, RS2_OPTION_GAMMA,
