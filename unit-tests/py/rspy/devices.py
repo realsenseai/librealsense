@@ -79,6 +79,9 @@ _enabled_ports = set()
 
 
 def _enable_hub_ports( ports = None, disable_other_ports = False, sleep_on_change = 0 ):
+    """Enable hub ports and record them in _enabled_ports. ports=None means all ports.
+    The record is updated even if the hub call reports failure: a port that did power on must
+    not be left untracked, or a later recycle would skip disabling it. Returns the hub result."""
     global _enabled_ports
     ok = hub.enable_ports( ports, disable_other_ports = disable_other_ports, sleep_on_change = sleep_on_change )
     if ports is None:
@@ -91,9 +94,13 @@ def _enable_hub_ports( ports = None, disable_other_ports = False, sleep_on_chang
 
 
 def _disable_hub_ports( ports = None, sleep_on_change = 0 ):
+    """Disable hub ports and drop them from _enabled_ports. ports=None means all ports.
+    Only updates the record if the hub call succeeded: a failed disable may leave the port
+    powered, so keep tracking it (a later recycle must retry). Returns the hub result."""
     global _enabled_ports
     ok = hub.disable_ports( ports, sleep_on_change = sleep_on_change )
-    _enabled_ports = set() if ports is None else _enabled_ports - set( ports )
+    if ok:
+        _enabled_ports = set() if ports is None else _enabled_ports - set( ports )
     return ok
 
 
@@ -287,7 +294,7 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
         recycle the ports in certain cases that leave the ports in a bad state
     :param disable_dds: Whether we want to see dds devices or not
     """
-    global rs
+    global rs, _enabled_ports
     if not rs:
         return
     init_hub()
@@ -302,7 +309,6 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
             _enable_hub_ports()  # Enable without sleeping - we'll poll ourselves
         else:
             # didn't recycle: seed our record from the hub's actual port state
-            global _enabled_ports
             _enabled_ports = set( hub.ports() )
     #
     # Get all devices, and store by serial-number
