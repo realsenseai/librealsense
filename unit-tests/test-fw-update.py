@@ -53,16 +53,24 @@ def wait_for_reboot( serial, timeout = 30 ):
     timer = Timer( timeout )
     timer.start()
     while not timer.has_expired():
-        for d in rs.context().devices:
-            if d.is_in_recovery_mode():
+        devices = rs.context().devices
+        for d in devices:
+            try:
+                if d.is_in_recovery_mode():
+                    continue
+                sn = d.get_info( rs.camera_info.serial_number ) if d.supports( rs.camera_info.serial_number ) else None
+                fwid = d.get_info( rs.camera_info.firmware_update_id ) if d.supports( rs.camera_info.firmware_update_id ) else None
+            except Exception:
+                # device dropped off the bus between enumeration and query (still rebooting) -- keep polling
                 continue
-            sn = d.get_info( rs.camera_info.serial_number ) if d.supports( rs.camera_info.serial_number ) else None
-            fwid = d.get_info( rs.camera_info.firmware_update_id ) if d.supports( rs.camera_info.firmware_update_id ) else None
             if serial is None or serial == sn or serial == fwid:
+                if serial is None and len( devices ) > 1:
+                    log.w( "no --serial given and multiple devices present; matched the first non-recovery",
+                           "device, which may be wrong on a multi-device rig" )
                 log.d( "device re-enumerated after", round( timer.get_elapsed(), 1 ), "seconds" )
                 return
         time.sleep( 2 )
-    log.w( "device did not re-enumerate in normal mode within", timeout, "seconds after FW update" )
+    log.e( "device did not re-enumerate in normal mode within", timeout, "seconds after FW update" )
 
 
 def send_hardware_monitor_command(device, command):
