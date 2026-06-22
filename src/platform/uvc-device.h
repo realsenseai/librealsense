@@ -306,8 +306,11 @@ public:
         // same endpoint it opened.
         stream_profile native_profile;
         uint32_t dev_index = get_dev_index_by_profiles( profile, native_profile );
-        _dev[dev_index]->close( native_profile );
+        // Erase first: set::erase won't throw, and close() doesn't read _configured_indexes - so if the
+        // backend close throws, the index is already gone and stream_on/start_callbacks won't touch a
+        // device whose close failed.
         _configured_indexes.erase( dev_index );
+        _dev[dev_index]->close( native_profile );
     }
 
     void set_power_state( power_state state ) override
