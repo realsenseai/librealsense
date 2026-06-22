@@ -178,6 +178,22 @@ def _log_key(item):
     return (str(item.fspath), device_id)
 
 
+def _close_current_handler():
+    """Detach + close the active per-test FileHandler and reset state. No-op if none open."""
+    global _current_log_key, _current_file_handler
+    if _current_file_handler is not None:
+        logging.getLogger().removeHandler(_current_file_handler)
+        _current_file_handler.close()
+        _current_file_handler = None
+        _current_log_key = None
+
+
+def close_test_log():
+    """Detach + close any active per-test FileHandler (e.g. at session teardown, so
+    end-of-session output goes to the console, not tailing whichever test ran last)."""
+    _close_current_handler()
+
+
 def start_test_log(item):
     """Open a per-module+device FileHandler. Reuses the existing handler when the key
     (file + device param) hasn't changed, so all tests for the same module+device
@@ -199,11 +215,7 @@ def start_test_log(item):
         return None  # reuse existing handler
 
     # Key changed — close previous handler if any
-    if _current_file_handler is not None:
-        logging.getLogger().removeHandler(_current_file_handler)
-        _current_file_handler.close()
-        _current_file_handler = None
-        _current_log_key = None
+    _close_current_handler()
 
     log_name = test_log_name(item)
     log_path = os.path.join(logdir, log_name)
@@ -235,10 +247,7 @@ def stop_test_log(handler, nextitem):
     if next_key == _current_log_key:
         return  # next test shares the same log file
 
-    logging.getLogger().removeHandler(_current_file_handler)
-    _current_file_handler.close()
-    _current_file_handler = None
-    _current_log_key = None
+    _close_current_handler()
 
 
 def print_terminal_summary(terminalreporter):
