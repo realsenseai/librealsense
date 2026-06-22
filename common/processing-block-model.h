@@ -56,7 +56,9 @@ namespace rs2
         // Set by the owner after construction for filters with runtime constraints
         // (e.g. in subdevice_model for Improved Close Range Depth: requires CUDA and specific stream config).
         std::function<bool()> available;
-        std::string unavailable_tooltip;
+        // Optional; returns the message explaining why the toggle is unavailable.
+        // May depend on runtime state, so the reason can differ between calls.
+        std::function<std::string()> unavailable_tooltip;
 
         bool is_available() const { return !available || available(); }
 
