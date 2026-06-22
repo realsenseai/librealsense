@@ -123,6 +123,10 @@ namespace librealsense
             , extended_firmware_logger_device( dev_info, d500_device::_hw_monitor, get_firmware_logs_command() )
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
+
+            // Improved Close Range Depth - USB toggle
+            register_feature( std::make_shared< close_range_filter_feature >(
+                    dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
         }
 
         std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override
