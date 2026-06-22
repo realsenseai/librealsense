@@ -266,9 +266,13 @@ public:
 
     void probe_and_commit( stream_profile profile, frame_callback callback, int buffers ) override
     {
-        auto dev_index = get_dev_index_by_profiles( profile );
+        // get_profiles() advertises pin_index as the sub-device index for SDK-level distinctness, but each
+        // sub-device expects its own native backend pin index (e.g. the Windows MF stream index) when probing.
+        // Forward the matched sub-device's native profile so the backend selects the correct endpoint.
+        stream_profile native_profile;
+        uint32_t dev_index = get_dev_index_by_profiles( profile, native_profile );
         _configured_indexes.insert( dev_index );
-        _dev[dev_index]->probe_and_commit( profile, callback, buffers );
+        _dev[dev_index]->probe_and_commit( native_profile, callback, buffers );
     }
 
 
@@ -298,8 +302,11 @@ public:
 
     void close( stream_profile profile ) override
     {
-        auto dev_index = get_dev_index_by_profiles( profile );
-        _dev[dev_index]->close( profile );
+        // Forward the matched sub-device's native profile (see probe_and_commit) so the backend closes the
+        // same endpoint it opened.
+        stream_profile native_profile;
+        uint32_t dev_index = get_dev_index_by_profiles( profile, native_profile );
+        _dev[dev_index]->close( native_profile );
         _configured_indexes.erase( dev_index );
     }
 
@@ -399,7 +406,11 @@ public:
     }
 
 private:
-    uint32_t get_dev_index_by_profiles( const stream_profile & profile ) const
+    // Returns the sub-device index matching 'profile' (as advertised to the SDK by get_profiles()), and outputs the
+    // sub-device's native profile - which keeps the backend pin index (e.g. the Windows MF stream index) needed to
+    // probe/play the right endpoint. get_profiles() overwrites pin_index with the sub-device index when _dev.size()
+    // > 1, so we compare on a stamped copy but hand back the unstamped native profile.
+    uint32_t get_dev_index_by_profiles( const stream_profile & profile, stream_profile & native_profile ) const
     {
         uint32_t dev_index = 0;
         for( auto & elem : _dev )
@@ -407,10 +418,14 @@ private:
             auto pin_stream_profiles = elem->get_profiles();
             for( auto & p : pin_stream_profiles )
             {
+                stream_profile stamped = p;
                 if( _dev.size() > 1 )
-                    p.pin_index = dev_index;  // match the stamping applied in get_profiles()
-                if( p == profile )
+                    stamped.pin_index = dev_index;  // match the stamping applied in get_profiles()
+                if( stamped == profile )
+                {
+                    native_profile = p;
                     return dev_index;
+                }
             }
             ++dev_index;
         }
