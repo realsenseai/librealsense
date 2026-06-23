@@ -4,6 +4,7 @@
 #pragma once
 
 #include <librealsense2/rs.hpp>
+#include <functional>
 #include <string>
 
 
@@ -45,6 +46,16 @@ namespace rs2
         bool is_enabled() const { return _enabled; }
 
         bool _is_visible = true;
+
+        // Optional predicate; null means always available.
+        // When it returns false the enable toggle is grayed out in the UI.
+        // Set by the owner after construction for filters with runtime constraints
+        // (e.g. close range, which works on depth only and must be off while RGB streams).
+        std::function<bool()> available;
+        // Optional; returns the message explaining why the toggle is unavailable.
+        std::function<std::string()> unavailable_tooltip;
+
+        bool is_available() const { return !available || available(); }
 
         void embedded_filter_enable_disable(bool actual);
 

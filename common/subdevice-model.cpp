@@ -204,37 +204,19 @@ namespace rs2
             if( ! get_rs_depth_range_loader().is_loaded() )
             {
                 model->available = []() { return false; };
-                model->unavailable_tooltip = []() -> std::string { return "Improved Close Range Depth library not found; install librealsense2-enhanced-depth package"; };
+                model->unavailable_tooltip = "Improved Close Range Depth library not found; install librealsense2-enhanced-depth package";
             }
             else if( !rsutils::rs2_is_cuda_available() )
             {
                 model->available = []() { return false; };
-                model->unavailable_tooltip = []() -> std::string { return "Improved Close Range Depth requires CUDA (not detected on this system)"; };
+                model->unavailable_tooltip = "Improved Close Range Depth requires CUDA (not detected on this system)";
             }
             else
             {
-                // Safe to capture this: the lambdas live in model which lives in post_processing,
-                // a member of this subdevice_model — so they cannot outlive their owner.
-
-                // On dual-RGB devices the depth sensor also exposes RGB/color streams; the improver
-                // operates on depth only, so it must be disabled while any RGB stream is enabled.
-                auto is_color_enabled = [this]()
+                // Safe to capture this: the lambda lives in model which lives in post_processing,
+                // a member of this subdevice_model — so the lambda cannot outlive its owner.
+                model->available = [this]()
                 {
-                    for( auto& p : profiles )
-                    {
-                        auto it = stream_enabled.find( p.unique_id() );
-                        if( it == stream_enabled.end() || !it->second ) continue;
-                        if( p.stream_type() == RS2_STREAM_COLOR )
-                            return true;
-                    }
-                    return false;
-                };
-
-                model->available = [this, is_color_enabled]()
-                {
-                    if( is_color_enabled() )
-                        return false;
-
                     // Resolution check — VGA (640x480) minimum
                     if( ui.is_multiple_resolutions )
                     {
@@ -267,12 +249,7 @@ namespace rs2
                     }
                     return depth && ir1 && ir2;
                 };
-                model->unavailable_tooltip = [is_color_enabled]() -> std::string
-                {
-                    if( is_color_enabled() )
-                        return "Improved Close Range Depth works on depth only; please disable the RGB stream";
-                    return "Depth, IR Left/Right streams have to be enabled at VGA or higher resolution";
-                };
+                model->unavailable_tooltip = "Depth, IR Left/Right streams have to be enabled at VGA or higher resolution";
             }
 
             post_processing.push_back( model );
@@ -333,6 +310,30 @@ namespace rs2
 
             auto model = std::make_shared<embedded_filter_model>(
                 this, shared_filter->get_type(), shared_filter, viewer, error_message);
+
+            // The close-range filter works on depth only. On dual-RGB devices the depth sensor
+            // also exposes RGB/color streams, so disable the toggle while any RGB stream is enabled.
+            if( shared_filter->get_type() == RS2_EMBEDDED_FILTER_TYPE_CLOSE_RANGE )
+            {
+                // Safe to capture this: the lambda lives in model which lives in embedded_filters,
+                // a member of this subdevice_model — so it cannot outlive its owner.
+                auto is_color_enabled = [this]()
+                {
+                    for( auto& p : profiles )
+                    {
+                        auto it = stream_enabled.find( p.unique_id() );
+                        if( it == stream_enabled.end() || !it->second ) continue;
+                        if( p.stream_type() == RS2_STREAM_COLOR )
+                            return true;
+                    }
+                    return false;
+                };
+                model->available = [is_color_enabled]() { return !is_color_enabled(); };
+                model->unavailable_tooltip = []() -> std::string
+                {
+                    return "Improved Close Range Depth works on depth only; please disable the RGB stream";
+                };
+            }
 
             embedded_filters.push_back(model);
         }
