@@ -311,9 +311,12 @@ namespace rs2
             auto model = std::make_shared<embedded_filter_model>(
                 this, shared_filter->get_type(), shared_filter, viewer, error_message);
 
-            // The close-range filter works on depth only. On dual-RGB devices the depth sensor
-            // also exposes RGB/color streams, so disable the toggle while any RGB stream is enabled.
-            if( shared_filter->get_type() == RS2_EMBEDDED_FILTER_TYPE_CLOSE_RANGE )
+            // The close-range filter works on depth only. On the 0C07 dual-RGB variant the depth
+            // sensor also exposes RGB/color streams, so disable the toggle while any RGB stream is
+            // enabled. The 0C08 dedicated-color variant does not have this limitation.
+            std::string device_pid = s->supports( RS2_CAMERA_INFO_PRODUCT_ID )
+                                   ? s->get_info( RS2_CAMERA_INFO_PRODUCT_ID ) : "";
+            if( shared_filter->get_type() == RS2_EMBEDDED_FILTER_TYPE_CLOSE_RANGE && device_pid == "0C07" )
             {
                 // Safe to capture this: the lambda lives in model which lives in embedded_filters,
                 // a member of this subdevice_model — so it cannot outlive its owner.
