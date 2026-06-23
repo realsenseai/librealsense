@@ -15,20 +15,33 @@ log = logging.getLogger(__name__)
 # Add retries as occasionally HKR FW fails during this initialization
 pytestmark = [
     pytest.mark.device_each("D585S"),
-    pytest.mark.priority(10),
     pytest.mark.context("nightly"),
-    pytest.mark.flaky(retries=3),
 ]
 
 #############################################################################################
 # Helpers
 #############################################################################################
 
-def create_safety_preset(shift_y):
-    """Build a safety preset JSON with its danger/warning zones shifted by shift_y (meters).
+# Zone geometry (meters). x = forward distance from the camera; y = lateral half-width.
+# The obstacle is the lab WALL (a bit beyond 0.8 m). The discriminator between the two
+# presets is the danger zone's FORWARD extent, not lateral:
+#   - preset 0 danger ends at DANGER_FAR_BEFORE_WALL (before the wall) -> wall NOT in zone,
+#     danger_collision=0
+#   - preset 1 danger ends at DANGER_FAR_PAST_WALL (past the wall)   -> wall IN zone,
+#     danger_collision=1
+# The warning zone and the lateral half-width are identical for both presets.
+WARNING_X_NEAR         = 0.3   # warning zone starts here (near edge)
+ZONE_X_MID             = 0.5   # warning ends / danger starts (shared boundary)
+DANGER_FAR_BEFORE_WALL = 0.8   # preset 0: danger ends BEFORE the wall
+DANGER_FAR_PAST_WALL   = 1.5   # preset 1: danger ends PAST the wall (wall inside danger)
+ZONE_Y_HALF            = 0.1   # lateral half-width (same for both presets)
+
+
+def create_safety_preset(danger_x_far):
+    """Build a safety preset JSON whose danger zone extends forward to danger_x_far (meters).
 
     The schema/values mirror the known-good preset round-tripped in pytest-preset-get-set.py;
-    only the zone y-coordinates are offset by shift_y so the two presets differ.
+    only the danger zone's far (forward) edge changes so the two presets differ.
     """
     return json.dumps({
         "safety_preset": {
@@ -46,26 +59,26 @@ def create_safety_preset(shift_y):
             },
             "safety_zones": {
                 # Two adjacent rectangular zones along x (forward distance), sharing the
-                # boundary at x=0.8. warning is the nearer zone starting at min-z (0.3 m);
-                # danger is farther (0.8-1.2 m). Points are ordered clockwise (near+y ->
-                # far+y -> far-y -> near-y). shift_y translates the whole zone laterally so
-                # preset 1 differs from preset 0.
+                # boundary at ZONE_X_MID. warning is the nearer zone (WARNING_X_NEAR ->
+                # ZONE_X_MID); danger is farther (ZONE_X_MID -> danger_x_far). Points are
+                # ordered clockwise (near+y -> far+y -> far-y -> near-y). danger_x_far sets
+                # how far forward the danger zone reaches, so preset 1 differs from preset 0.
                 "warning_zone": {
                     "zone_polygon": {
-                        "p0": {"x": 0.3, "y": 0.1 + shift_y},
-                        "p1": {"x": 0.8, "y": 0.1 + shift_y},
-                        "p2": {"x": 0.8, "y": -0.1 - shift_y},
-                        "p3": {"x": 0.3, "y": -0.1 - shift_y}
+                        "p0": {"x": WARNING_X_NEAR, "y": ZONE_Y_HALF},
+                        "p1": {"x": ZONE_X_MID, "y": ZONE_Y_HALF},
+                        "p2": {"x": ZONE_X_MID, "y": -ZONE_Y_HALF},
+                        "p3": {"x": WARNING_X_NEAR, "y": -ZONE_Y_HALF}
                     },
                     "safety_trigger_confidence": 3,
                     "reserved": [0] * 7
                 },
                 "danger_zone": {
                     "zone_polygon": {
-                        "p0": {"x": 0.8, "y": 0.1 + shift_y},
-                        "p1": {"x": 1.2, "y": 0.1 + shift_y},
-                        "p2": {"x": 1.2, "y": -0.1 - shift_y},
-                        "p3": {"x": 0.8, "y": -0.1 - shift_y}
+                        "p0": {"x": ZONE_X_MID, "y": ZONE_Y_HALF},
+                        "p1": {"x": danger_x_far, "y": ZONE_Y_HALF},
+                        "p2": {"x": danger_x_far, "y": -ZONE_Y_HALF},
+                        "p3": {"x": ZONE_X_MID, "y": -ZONE_Y_HALF}
                     },
                     "safety_trigger_confidence": 3,
                     "reserved": [0] * 7
@@ -148,10 +161,6 @@ def read_safety_signal(pipe, prefix, settle_frames=10):
         return None if value is None else (value >> n) & 1
 
     signal = {
-        "safety_level1": md(rs.frame_metadata_value.safety_level1),
-        "safety_level2": md(rs.frame_metadata_value.safety_level2),
-        "safety_level1_verdict": md(rs.frame_metadata_value.safety_level1_verdict),
-        "safety_level2_verdict": md(rs.frame_metadata_value.safety_level2_verdict),
         "safety_vision_verdict": vision_verdict,
         # Occlusion detection: is the obstacle inside a zone? Take only the collision bits of
         # vision_verdict (bit1=danger, bit2=warning), ignoring bit0 (aggregate not-safe, which
@@ -165,33 +174,10 @@ def read_safety_signal(pipe, prefix, settle_frames=10):
         "safety_preset_id_used": md(rs.frame_metadata_value.safety_preset_id_used)
     }
 
-    # Diagnostics: explain *why* a zone is High (e.g. low depth/floor fill rate, posture
-    # deviation, preset error) rather than an actual obstacle. Bitmasks shown in hex.
-    diagnostics = {
-        "safety_vision_verdict": signal["safety_vision_verdict"],
-        "safety_hara_events": md(rs.frame_metadata_value.safety_hara_events),
-        "safety_preset_integrity": md(rs.frame_metadata_value.safety_preset_integrity),
-        "depth_fill_rate": md(rs.frame_metadata_value.depth_fill_rate),
-        # Safety subsystem state: is the SC actually in RUN, and is the safety MCU healthy?
-        "safety_operational_mode": md(rs.frame_metadata_value.safety_operational_mode),
-        "safety_mb_status": md(rs.frame_metadata_value.safety_mb_status),
-        "safety_mb_fusa_event": md(rs.frame_metadata_value.safety_mb_fusa_event),
-        "safety_mb_fusa_action": md(rs.frame_metadata_value.safety_mb_fusa_action),
-        # SIP generic metrics: up to 8 AICV-defined Vision-HaRa metrics. 'activate'=enable mask,
-        # 'state'=signalled on/off mask; value/threshold are the "X-out-of-Y" count vs trigger.
-        # Which bit is "holes" is AICV-defined, not in the SDK - induce holes and watch 'state'.
-        "sip_metrics_activate": sip_activate,
-        "sip_metrics_state": sip_state,
-        "sip_metrics_value1": md(rs.frame_metadata_value.safety_sip_generic_metrics_value1),
-        "sip_metrics_value2": md(rs.frame_metadata_value.safety_sip_generic_metrics_value2),
-        "sip_metrics_threshold1": md(rs.frame_metadata_value.safety_sip_generic_metrics_threshold1),
-        "sip_metrics_threshold2": md(rs.frame_metadata_value.safety_sip_generic_metrics_threshold2),
-    }
-
     # This test checks ONLY occlusion detection: whether the obstacle is reported inside a
     # safety zone. We compare the COLLISION BITS of vision_verdict (bit1=danger, bit2=warning),
     # NOT the raw vision_verdict value (its bit0=not-safe can be tripped by a depth-fill
-    # fail-safe with no obstacle). Everything on the "context" line is debug only - not checked.
+    # fail-safe with no obstacle).
     log.info("")  # blank line to separate consecutive presets
     log.info(f"{prefix} CHECKED: occlusion = vision_verdict collision bits "
              f"[danger(bit1)={signal['danger_collision']}, warning(bit2)={signal['warning_collision']}] "
@@ -199,18 +185,6 @@ def read_safety_signal(pipe, prefix, settle_frames=10):
     log.info(f"{prefix} CHECKED: holes = SIP metric bit4 "
              f"[enabled(activate.4)={signal['holes_enabled']}, signalled(state.4)={signal['holes_signalled']}] "
              f"(activate={_hex(sip_activate)}, state={_hex(sip_state)}; signalled=0 means SAFE)")
-    log.info(f"{prefix} context  (NOT checked): "
-             f"level2_verdict={signal['safety_level2_verdict']} "
-             f"hara_events={_hex(diagnostics['safety_hara_events'])} "
-             f"preset_integrity={_hex(diagnostics['safety_preset_integrity'])} "
-             f"depth_fill_rate={diagnostics['depth_fill_rate']} "
-             f"operational_mode={diagnostics['safety_operational_mode']} "
-             f"mb_status={_hex(diagnostics['safety_mb_status'])}")
-    log.info(f"{prefix} context  (SIP metrics, AICV-defined - holes enable/status candidate): "
-             f"activate={_hex(diagnostics['sip_metrics_activate'])} "
-             f"state={_hex(diagnostics['sip_metrics_state'])} "
-             f"value1={diagnostics['sip_metrics_value1']}/thr1={diagnostics['sip_metrics_threshold1']} "
-             f"value2={diagnostics['sip_metrics_value2']}/thr2={diagnostics['sip_metrics_threshold2']}")
 
     return signal
 
@@ -250,19 +224,21 @@ def stream_and_verify(safety_sensor, active_index, prefix, expected):
         check_against_expected(prefix, result, expected)
     finally:
         pipe.stop()
-    return result
 
 
-# Two presets with differently-placed safety zones, written to indexes 0 and 1.
-preset_json_0 = create_safety_preset(0.0)
-preset_json_1 = create_safety_preset(0.2)
+# Two presets that differ only in how far forward the danger zone reaches, written to
+# indexes 0 and 1.
+preset_json_0 = create_safety_preset(DANGER_FAR_BEFORE_WALL)
+preset_json_1 = create_safety_preset(DANGER_FAR_PAST_WALL)
 
 # Compare occlusion detection only: is the obstacle inside a safety zone? Controlled scene:
-# a fixed obstacle at ~y=0.2 m, x=0.8-1.2 m, inside preset 1's wider danger zone but outside
-# preset 0's narrow one. Asserting the danger/warning collision bits (vision_verdict bits 1/2),
-# NOT bit0 (not-safe), so the result is independent of the depth-fill fail-safe.
+# the lab WALL a bit beyond 0.8 m is the obstacle. preset 0's danger zone ends before the
+# wall (DANGER_FAR_BEFORE_WALL) so the wall is outside it; preset 1's danger zone reaches past
+# the wall (DANGER_FAR_PAST_WALL) so the wall falls inside it. Asserting the danger/warning
+# collision bits (vision_verdict bits 1/2), NOT bit0 (not-safe), so the result is independent
+# of the depth-fill fail-safe.
 expected_signal_0 = {
-    "danger_collision": 0,    # obstacle outside preset 0's zones
+    "danger_collision": 0,    # wall beyond preset 0's danger zone (ends before the wall)
     "warning_collision": 0,
     "holes_enabled": 1,       # holes metric active
     "holes_signalled": 0,     # holes safe
@@ -270,7 +246,7 @@ expected_signal_0 = {
 }
 
 expected_signal_1 = {
-    "danger_collision": 1,    # obstacle inside preset 1's danger zone
+    "danger_collision": 1,    # wall inside preset 1's danger zone (reaches past the wall)
     "warning_collision": 0,
     "holes_enabled": 1,       # holes metric active
     "holes_signalled": 0,     # holes safe
@@ -310,6 +286,6 @@ def test_active_index_changes_safety_verdict(safety_sensor):
     # Restore original safety presets: put indexes 0 and 1 back to whatever they held
     # before the test ran.
     tw.start_wrapper(dev)
-    #sensor.set_safety_preset(0, original_preset_0)
-    #sensor.set_safety_preset(1, original_preset_1)
+    sensor.set_safety_preset(0, original_preset_0)
+    sensor.set_safety_preset(1, original_preset_1)
     tw.stop_wrapper(dev)
