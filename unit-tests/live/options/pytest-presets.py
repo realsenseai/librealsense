@@ -7,9 +7,7 @@ import time
 import logging
 log = logging.getLogger(__name__)
 
-# D555 (DDS) firmware may ACK a set-option before the new value is actually applied,
-# so a get_option immediately after a set_option can read back the stale/previous value.
-# Give the camera time to settle between a set and the following read. See Jenkins win #114673.
+# Give the camera time to settle between a set and the following read.
 SET_GET_SETTLE_SEC = 0.5
 
 pytestmark = [
@@ -17,7 +15,7 @@ pytestmark = [
     pytest.mark.device_exclude("D401"),
     pytest.mark.device_each("D500*"),
     pytest.mark.context("nightly"),
-    pytest.mark.flaky(retries=2),  # See FW stability issue RSDSO-18908
+    pytest.mark.flaky(retries=2),  # See D400 FW stability issue RSDSO-18908
 ]
 
 
