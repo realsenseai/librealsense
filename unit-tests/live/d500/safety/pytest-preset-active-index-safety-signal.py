@@ -195,8 +195,10 @@ def check_against_expected(prefix, result, expected):
         if expected_value is None:
             continue
         actual = result[key]
-        status = "OK" if actual == expected_value else "MISMATCH"
-        log.info(f"{prefix}   verify {key}: got={actual} expected={expected_value} -> {status}")
+        ok = actual == expected_value
+        status = "OK" if ok else "MISMATCH"
+        log_fn = log.info if ok else log.error
+        log_fn(f"{prefix}   verify {key}: got={actual} expected={expected_value} -> {status}")
         check.equal(actual, expected_value)
 
 
