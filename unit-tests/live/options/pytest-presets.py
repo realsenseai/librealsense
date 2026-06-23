@@ -7,6 +7,11 @@ import time
 import logging
 log = logging.getLogger(__name__)
 
+# D555 (DDS) firmware may ACK a set-option before the new value is actually applied,
+# so a get_option immediately after a set_option can read back the stale/previous value.
+# Give the camera time to settle between a set and the following read. See Jenkins win #114673.
+SET_GET_SETTLE_SEC = 0.5
+
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_exclude("D401"),
@@ -33,8 +38,10 @@ def test_set_presets(test_device_wrapped):
     dev, ctx = test_device_wrapped
     depth_sensor = dev.first_depth_sensor()
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.high_accuracy))
+    time.sleep(SET_GET_SETTLE_SEC)  # Give camera time to handle the command
     assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.high_accuracy
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.default))
+    time.sleep(SET_GET_SETTLE_SEC)  # Give camera time to handle the command
     assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.default
 
 
@@ -48,7 +55,7 @@ def test_save_load_preset(test_device_wrapped):
     depth_control_group = am_dev.get_depth_control()
     depth_control_group.textureCountThreshold = 250
     am_dev.set_depth_control(depth_control_group)
-    time.sleep(0.1)  # Give camera time to handle the command
+    time.sleep(SET_GET_SETTLE_SEC)  # Give camera time to handle the command
     assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.custom
 
     am_dev.load_json(saved_values)
@@ -79,9 +86,11 @@ def test_setting_color_options(test_device_wrapped):
         pytest.skip("Color sensor does not support hue option")
 
     color_sensor.set_option(rs.option.hue, 123)
+    time.sleep(SET_GET_SETTLE_SEC)  # Give camera time to handle the command
     assert color_sensor.get_option(rs.option.hue) == 123
 
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.default))
+    time.sleep(SET_GET_SETTLE_SEC)  # Give camera time to handle the command
     if product_line == "D400":
         # D400 devices set color options as part of preset setting
         assert color_sensor.get_option(rs.option.hue) != 123
