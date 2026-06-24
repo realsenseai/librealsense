@@ -3,6 +3,7 @@
 
 # Not frequently changing, no need to test for each commit
 
+import sys
 import time
 import json
 import pyrealsense2 as rs
@@ -12,10 +13,10 @@ from rspy import tests_wrapper as tw
 import logging
 log = logging.getLogger(__name__)
 
-# Add retries as occasionally HKR FW fails during this initialization
 pytestmark = [
     pytest.mark.device_each("D585S"),
     pytest.mark.context("nightly"),
+    pytest.mark.skipif(sys.platform != "linux", reason="Linux only"),
 ]
 
 #############################################################################################
@@ -147,12 +148,6 @@ def read_safety_signal(pipe, prefix, settle_frames=10):
             safety_frame = candidate
     assert safety_frame is not None
 
-    # DEBUG: list which safety-frame metadata fields this device actually populates, so we can
-    # see whether the sip_generic_metrics_* group is present (drives holes_*) or missing.
-    supported = [m.name for m in rs.frame_metadata_value.__members__.values()
-                 if safety_frame.supports_frame_metadata(m)]
-    log.info(f"{prefix} supported safety metadata ({len(supported)}): {supported}")
-
     def md(value):
         # Some diagnostic fields may not be present on every frame; guard to avoid throwing.
         if safety_frame.supports_frame_metadata(value):
@@ -205,7 +200,7 @@ def check_against_expected(prefix, result, expected):
         status = "OK" if ok else "MISMATCH"
         log_fn = log.info if ok else log.error
         log_fn(f"{prefix}   verify {key}: got={actual} expected={expected_value} -> {status}")
-        check.equal(actual, expected_value)
+        check.equal(actual, expected_value, f"{prefix} {key}: got={actual} expected={expected_value}")
 
 
 # safety_trigger_duration in the preset is 1.0s, so a danger/warning signal is held for
