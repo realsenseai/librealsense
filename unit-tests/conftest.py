@@ -584,6 +584,12 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
             devices.enable_only(serial_number, recycle=recycle, disable_other_ports=disable_other_ports)
             log.debug(f"All {len(serial_number)} devices enabled and ready")
         except Exception as e:
+            # Setup failed after possibly powering the port(s): teardown won't run (no yield),
+            # so power off what we tried to enable here, lest it linger into the next module.
+            try:
+                devices.disable(serial_number)
+            except Exception as cleanup_err:
+                log.warning(f"Cleanup after failed enable raised: {cleanup_err}")
             pytest.fail(f"Failed to enable devices: {e}")
         yield serial_number
         _teardown(serial_number)
@@ -607,6 +613,12 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         devices.enable_only([serial_number], recycle=recycle, disable_other_ports=disable_other_ports)
         log.debug(f"Device enabled and ready")
     except Exception as e:
+        # Setup failed after possibly powering the port: teardown won't run (no yield), so power
+        # off what we tried to enable here, lest it linger into the next module.
+        try:
+            devices.disable([serial_number])
+        except Exception as cleanup_err:
+            log.warning(f"Cleanup after failed enable raised: {cleanup_err}")
         pytest.fail(f"Failed to enable device {serial_number}: {e}")
 
     yield serial_number
