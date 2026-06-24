@@ -579,6 +579,7 @@ std::string const & get_string_( rs2_option value )
         CASE( DISPARITY_SHIFT )
         CASE( THRESHOLD )
         CASE( DOWNSCALE_RATIO )
+        CASE( ALIGN_DEPTH )
 #undef CASE
         return arr;
     }();

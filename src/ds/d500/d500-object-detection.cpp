@@ -28,14 +28,28 @@ namespace librealsense
         { rs_fourcc( 'G', 'R', 'E', 'Y' ), RS2_STREAM_OBJECT_DETECTION },
     };
 
+    static std::vector< platform::uvc_device_info >
+    find_object_detection_devices( const std::vector< platform::uvc_device_info > & uvc_devices )
+    {
+        // Newer D585 firmware exposes EP12 after CDC interfaces. Older D555/D585
+        // firmware used MI 9 for the OD stream.
+        static const uint32_t od_stream_mis[] = { 11, 9 };
+        for( auto mi : od_stream_mis )
+        {
+            auto od_devs_info = filter_by_mi( uvc_devices, mi );
+            if( ! od_devs_info.empty() )
+                return od_devs_info;
+        }
+        return {};
+    }
+
 
     d500_object_detection::d500_object_detection( std::shared_ptr< const d500_info > const & dev_info )
         : device( dev_info )
         , d500_device( dev_info )
         , _object_detection_stream( new stream( RS2_STREAM_OBJECT_DETECTION ) )
     {
-        static const uint32_t od_stream_mi = 9; // UVC interface index of the object-detection stream.
-        auto od_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, od_stream_mi );
+        auto od_devs_info = find_object_detection_devices( dev_info->get_group().uvc_devices );
 
         // Skip if the device does not expose the stream; the rest of the device enumerates normally.
         if( od_devs_info.empty() )
@@ -100,35 +114,14 @@ namespace librealsense
         od_ep->register_processing_block( od_pbf );
     }
 
-    static void set_align_depth_xu( std::shared_ptr< uvc_sensor > raw_depth, bool enable )
-    {
-        if( !raw_depth )
-            return;
-        try
-        {
-            raw_depth->invoke_powered( [enable]( platform::uvc_device & dev )
-            {
-                uint8_t val = enable ? 1 : 0;
-                if( !dev.set_xu( ds::depth_xu, ds::DS5_ALIGN_DEPTH, &val, sizeof( val ) ) )
-                    LOG_WARNING( "Failed to " << ( enable ? "enable" : "disable" ) << " Align_Depth XU" );
-            } );
-        }
-        catch( std::exception const & e ) { LOG_WARNING( "Align_Depth XU exception: " << e.what() ); }
-        catch( ... )                       { LOG_WARNING( "Align_Depth XU: unknown exception" ); }
-    }
-
     void d500_object_detection_sensor::start( rs2_frame_callback_sptr callback )
     {
-        // TODO: FW does not yet support the Align_Depth XU — re-enable once FW is ready.
-        // set_align_depth_xu( _owner->get_raw_depth_sensor(), true );
         synthetic_sensor::start( callback );
     }
 
     void d500_object_detection_sensor::stop()
     {
         synthetic_sensor::stop();
-        // TODO: FW does not yet support the Align_Depth XU — re-enable once FW is ready.
-        // set_align_depth_xu( _owner->get_raw_depth_sensor(), false );
     }
 
     stream_profiles d500_object_detection_sensor::init_stream_profiles()

@@ -38,6 +38,14 @@ namespace librealsense
         std::shared_ptr<hw_monitor> _hwm;
         std::weak_ptr< sensor_base > _sensor;
     };
+
+    class d500_align_depth_option : public uvc_xu_option< uint8_t >
+    {
+    public:
+        explicit d500_align_depth_option( const std::weak_ptr< uvc_sensor > & ep );
+
+        option_range get_range() const override;
+    };
     
     class temperature_option : public readonly_option
     {

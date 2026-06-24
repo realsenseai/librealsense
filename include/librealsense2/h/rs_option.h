@@ -138,6 +138,7 @@ extern "C" {
         RS2_OPTION_DISPARITY_SHIFT, /**< Embedded filter: stereo disparity shift (pre-stream only) */
         RS2_OPTION_THRESHOLD, /**< Embedded filter: merge threshold in mm (pre-stream only) */
         RS2_OPTION_DOWNSCALE_RATIO, /**< Embedded filter: secondary-frame downscale ratio (pre-stream only) */
+        RS2_OPTION_ALIGN_DEPTH, /**< Enable firmware depth-to-color alignment for object detection distance (pre-stream only) */
         RS2_OPTION_COUNT /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
     } rs2_option;
 

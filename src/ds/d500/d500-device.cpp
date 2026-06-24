@@ -42,6 +42,23 @@ constexpr bool hw_mon_over_xu = false;
 
 namespace librealsense
 {
+    static bool supports_person_distance_align_depth( uint16_t pid )
+    {
+        switch( pid )
+        {
+        case ds::D555_PID:
+        case ds::D585_LEGACY_PID:
+        case ds::D585_2C_PID:
+        case ds::D585_3C_PID:
+        case ds::D585F_PID:
+        case ds::D585_2C_PROTO_PID:
+        case ds::D585_3C_PROTO_PID:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     std::map<uint32_t, rs2_format> d500_depth_fourcc_to_rs2_format = {
         {rs_fourcc('Y','U','Y','2'), RS2_FORMAT_YUYV},
         {rs_fourcc('Y','U','Y','V'), RS2_FORMAT_YUYV},
@@ -568,6 +585,12 @@ namespace librealsense
                 });
 
                 depth_sensor->register_option(RS2_OPTION_DEPTH_UNITS, depth_scale);
+            }
+
+            if( supports_person_distance_align_depth( _pid ) )
+            {
+                depth_sensor.register_option( RS2_OPTION_ALIGN_DEPTH,
+                                              std::make_shared< d500_align_depth_option >( raw_depth_sensor ) );
             }
 
             // defining the temperature options

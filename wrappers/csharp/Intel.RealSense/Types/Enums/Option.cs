@@ -285,6 +285,9 @@ namespace Intel.RealSense
         vertical_binning = 89,
 
         /// <summary>Control the receiver sensitivity to incoming light, both projected and ambient</summary>
-        receiver_sensitivity = 90
+        receiver_sensitivity = 90,
+
+        /// <summary>Enable firmware depth-to-color alignment for object detection distance</summary>
+        AlignDepth = 109
     }
 }

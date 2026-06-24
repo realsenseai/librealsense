@@ -25,7 +25,6 @@
 #include <rsutils/string/trim-newlines.h>
 #include <common/utilities/imgui/wrap.h>
 #include <common/labeled-point-cloud-utilities.h>
-#include <common/utilities/com/center-of-mass.h>
 
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <regex>
@@ -3566,29 +3565,9 @@ namespace rs2
             objects = it->second.dev->detected_objects;
     }
 
-    rs2::rect viewer_model::project_color_bbox_to_depth( const rs2::rect &     color_bbox,
-                                                         const uint16_t *      depth_data,
-                                                         float                 depth_scale,
-                                                         const rs2_intrinsics & depth_intrin,
-                                                         const rs2_intrinsics & color_intrin,
-                                                         const rs2_extrinsics & color_to_depth,
-                                                         const rs2_extrinsics & depth_to_color,
-                                                         const rs2::rect &     depth_frame_rect )
-    {
-        // Project both corners of the color bbox into depth-frame coordinates
-        float src_tl[2] = { color_bbox.x, color_bbox.y };
-        float src_br[2] = { color_bbox.x + color_bbox.w, color_bbox.y + color_bbox.h };
-        float dst_tl[2], dst_br[2];
-        rs2_project_color_pixel_to_depth_pixel( dst_tl, depth_data, depth_scale, 0.1f, 10.f,
-                                                &depth_intrin, &color_intrin, &color_to_depth, &depth_to_color, src_tl );
-        rs2_project_color_pixel_to_depth_pixel( dst_br, depth_data, depth_scale, 0.1f, 10.f,
-                                                &depth_intrin, &color_intrin, &color_to_depth, &depth_to_color, src_br );
-        return rs2::rect{ dst_tl[0], dst_tl[1], dst_br[0] - dst_tl[0], dst_br[1] - dst_tl[1] }.intersection( depth_frame_rect );
-    }
-
     void viewer_model::process_object_detection_frames( std::map< int, rs2::frame > & last_frames )
     {
-        // Scan last_frames for an object detection frame, a color frame, and a depth frame.
+        // Scan last_frames for an object detection frame, a color frame, and an optional depth frame.
         // These types have no default constructor; initialise from an empty rs2::frame.
         rs2::object_detection_frame odf{ rs2::frame{} };
         rs2::video_frame cf{ rs2::frame{} };
@@ -3636,10 +3615,6 @@ namespace rs2
         }
         objects->ticks_without_od_frame = 0;
 
-        // OD frame arrived but depth not yet available — skip without clearing
-        if( ! df )
-            return;
-
         // Fresh OD frame with no detections — clear
         if( odf.get_detection_count() == 0 )
         {
@@ -3651,22 +3626,19 @@ namespace rs2
         try
         {
             auto color_vsp = cf.get_profile().as< rs2::video_stream_profile >();
-            auto depth_vsp = df.get_profile().as< rs2::video_stream_profile >();
-
             rs2_intrinsics color_intrin = color_vsp.get_intrinsics();
-            rs2_intrinsics depth_intrin = depth_vsp.get_intrinsics();
-            rs2_extrinsics color_to_depth = color_vsp.get_extrinsics_to( depth_vsp );
-            rs2_extrinsics depth_to_color = depth_vsp.get_extrinsics_to( color_vsp );
-
             rs2::rect color_frame_rect{ 0.f, 0.f, float( color_intrin.width ), float( color_intrin.height ) };
-            rs2::rect depth_frame_rect{ 0.f, 0.f, float( depth_intrin.width ), float( depth_intrin.height ) };
 
-            uint16_t const * const depth_data = reinterpret_cast< uint16_t const * >( df.get_data() );
-
-            com::depth_image_16 com_raw{ depth_data, depth_intrin.width, depth_intrin.height };
-            std::vector< uint8_t > depth8u_buf( depth_intrin.width * depth_intrin.height );
-            com::depth_image_8 com_depth8u{ depth8u_buf.data(), depth_intrin.width, depth_intrin.height };
-            bool depth8u_ready = false;
+            bool has_depth_profile = false;
+            rs2_intrinsics depth_intrin{};
+            rs2::rect depth_frame_rect{};
+            if( df )
+            {
+                auto depth_vsp = df.get_profile().as< rs2::video_stream_profile >();
+                depth_intrin = depth_vsp.get_intrinsics();
+                depth_frame_rect = rs2::rect{ 0.f, 0.f, float( depth_intrin.width ), float( depth_intrin.height ) };
+                has_depth_profile = depth_intrin.width > 0 && depth_intrin.height > 0;
+            }
 
             objects_in_frame new_objects;
             unsigned int const count = odf.get_detection_count();
@@ -3715,65 +3687,22 @@ namespace rs2
                                       float( det.bottom_right_y - det.top_left_y ) };
                 rs2::rect normalized_color_bbox = color_bbox.normalize( color_frame_rect );
 
-                // Depth is aligned to color, so color and depth pixels share the same coordinate
-                // frame (up to a resolution scale factor).  A depth-dependent reverse-projection
-                // (rs2_project_color_pixel_to_depth_pixel) is NOT needed and is harmful: the
-                // search result varies frame-to-frame with depth noise, making the ROI jitter and
-                // the COM jump.  Simple scaling gives a perfectly stable, deterministic depth bbox.
-                float const depth_scale_x = float( depth_intrin.width  ) / float( color_intrin.width  );
-                float const depth_scale_y = float( depth_intrin.height ) / float( color_intrin.height );
-                // depth_bbox_full: scaled from color bbox, before clamping to the depth frame boundary.
-                // Used to compute com_rel_u/v so they stay consistent with the color bbox at render time
-                // (the color bbox is also unclipped).  Clipping only affects the actual ROI sampled.
-                rs2::rect depth_bbox_full{
-                    color_bbox.x * depth_scale_x, color_bbox.y * depth_scale_y,
-                    color_bbox.w * depth_scale_x, color_bbox.h * depth_scale_y };
-                rs2::rect depth_bbox = depth_bbox_full.intersection( depth_frame_rect );
-                rs2::rect normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
-
-                float const hkr_depth_m = det.depth;
-                float viewer_depth_m = 0.f;
-                float com_rel_u = 0.5f, com_rel_v = 0.5f;
-
-                // TODO: temporary fallback — viewer-side COM runs only when HKR firmware
-                // returns 0 (XU command not supported or device not ready).
-                // Checked per-detection intentionally: firmware could return 0 for individual
-                // detections (e.g. out-of-range) even when HKR COM is otherwise working.
-                // Remove once HKR COM is fully implemented and reliable on all devices.
-                if( hkr_depth_m == 0.f )
+                rs2::rect normalized_depth_bbox = normalized_color_bbox;
+                if( has_depth_profile )
                 {
-                    if( !depth8u_ready )
-                    {
-                        com::center_of_mass_calculator::create_depth_8u( com_raw, com_depth8u );
-                        depth8u_ready = true;
-                    }
-                    int const com_x = int( depth_bbox.x );
-                    int const com_y = int( depth_bbox.y );
-                    com::rect  com_bbox{ com_x, com_y,
-                                         int( depth_bbox.x + depth_bbox.w + 0.5f ) - com_x,
-                                         int( depth_bbox.y + depth_bbox.h + 0.5f ) - com_y };
-                    com::vec2f com_center{ depth_bbox.x + depth_bbox.w * 0.5f,
-                                           depth_bbox.y + depth_bbox.h * 0.5f };
-                    com::camera_intrinsics com_intrin{ depth_intrin.fx, depth_intrin.fy,
-                                                       depth_intrin.ppx, depth_intrin.ppy };
-                    com::person_center_of_mass com_result{};
-                    com::center_of_mass_calculator::calculate( com_raw, com_depth8u, com_bbox, com_center, &com_intrin, com_result );
-                    if( com_result.mean_body_depth > 0.f )
-                    {
-                        viewer_depth_m = com_result.mean_body_depth / 1000.f;
-                        if( depth_bbox_full.w > 0.f && depth_bbox_full.h > 0.f )
-                        {
-                            auto clamp01 = []( float v ) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; };
-                            com_rel_u = clamp01( ( com_result.image_pos.x - depth_bbox_full.x ) / depth_bbox_full.w );
-                            com_rel_v = clamp01( ( com_result.image_pos.y - depth_bbox_full.y ) / depth_bbox_full.h );
-                        }
-                    }
+                    float const depth_scale_x = float( depth_intrin.width  ) / float( color_intrin.width  );
+                    float const depth_scale_y = float( depth_intrin.height ) / float( color_intrin.height );
+                    rs2::rect depth_bbox{
+                        color_bbox.x * depth_scale_x, color_bbox.y * depth_scale_y,
+                        color_bbox.w * depth_scale_x, color_bbox.h * depth_scale_y };
+                    normalized_depth_bbox = depth_bbox.intersection( depth_frame_rect ).normalize( depth_frame_rect );
                 }
 
-                float const mean_depth = hkr_depth_m > 0.f ? hkr_depth_m : viewer_depth_m;
+                float const hkr_depth_m = det.depth;
+                float com_rel_u = 0.5f, com_rel_v = 0.5f;
 
                 std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
-                new_objects.emplace_back( obj_id++, name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
+                new_objects.emplace_back( obj_id++, name, normalized_color_bbox, normalized_depth_bbox, hkr_depth_m,
                                           hkr_depth_m, com_rel_u, com_rel_v, det.score,
                                           static_cast< object_type >( det.class_id ) );
             }

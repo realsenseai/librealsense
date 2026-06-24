@@ -3,6 +3,7 @@
 
 
 #include "d500-options.h"
+#include "d500-private.h"
 
 namespace librealsense
 {
@@ -47,6 +48,21 @@ namespace librealsense
     option_range rgb_tnr_option::get_range() const
     {
         return *_range;
+    }
+
+    d500_align_depth_option::d500_align_depth_option( const std::weak_ptr< uvc_sensor > & ep )
+        : uvc_xu_option< uint8_t >( ep,
+                                    ds::depth_xu,
+                                    ds::DS5_ALIGN_DEPTH,
+                                    "Enable firmware depth-to-color alignment for object detection distance. Can only be set before depth streaming",
+                                    { { 0.f, "Disabled" }, { 1.f, "Enabled" } },
+                                    false )
+    {
+    }
+
+    option_range d500_align_depth_option::get_range() const
+    {
+        return option_range{ 0, 1, 1, 0 };
     }
 
     temperature_option::temperature_option( std::shared_ptr< hw_monitor > hwm,

@@ -150,6 +150,7 @@ enum class ERealSenseOptionType : uint8
     SAFETY_PRESET_ACTIVE_INDEX                 , /**< Set / Get current active safety preset index**/
     SAFETY_MODE                                , /**< Safety camera operation mode see rs2_safety_mode for values. */
     RGB_TNR_ENABLED                            , /**< RGB Temporal Noise Reduction enabling ON (1) / OFF (0)*/
+    ALIGN_DEPTH = 109                          , /**< Enable firmware depth-to-color alignment for object detection distance */
 };
 
 UENUM(Blueprintable)
