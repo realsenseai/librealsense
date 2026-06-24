@@ -332,7 +332,16 @@ class Acroname(device_hub.device_hub):
                     # We don't know how to get the port from these yet!
                     return None  # int(match.group(2))
                 else:
-                    split_location = [int(x) for x in usb_location.split('.')]
+                    # Windows LocationInformation fields are hex (e.g. "0000.000d.0000.003.002...").
+                    # Parse base-16 so fields like "000d" don't raise; only the last two non-zero
+                    # indices (acroname sub-hub port + device port) are used and those are small
+                    # (<=4), so hex vs decimal is identical for them. Unparseable -> defer to
+                    # map_unknown_ports() enumeration.
+                    try:
+                        split_location = [int(x, 16) for x in usb_location.split('.')]
+                    except ValueError:
+                        log.d(f'could not parse usb location {usb_location!r}; deferring to port mapping')
+                        return None
                     # lambda helper to return the last 2 non-zero numbers, used when connecting using an additional hub
                     # ex: laptop -> hub -> acroname
                     get_last_two_digits = lambda array: tuple(
@@ -414,7 +423,8 @@ def get_port_from_usb(first_usb_index, second_usb_index ):
                              (3, 2): 6,
                              (3, 1): 7,
                              }
-    return acroname_port_usb_map[(first_usb_index, second_usb_index)]
+    # .get() -> None for an unmapped topology so the caller falls back to map_unknown_ports()
+    return acroname_port_usb_map.get( (first_usb_index, second_usb_index) )
 
 
 
