@@ -146,7 +146,8 @@ def read_safety_signal(pipe, prefix, settle_frames=10):
         candidate = frames.first_or_default(rs.stream.safety)
         if candidate:
             safety_frame = candidate
-    assert safety_frame is not None
+    if safety_frame is None:
+        pytest.fail(f"{prefix}: no safety frame received in {settle_frames} frames")
 
     def md(value):
         # Some diagnostic fields may not be present on every frame; guard to avoid throwing.
@@ -209,7 +210,7 @@ def check_against_expected(prefix, result, expected):
 PRESET_SETTLE_SEC = 2.0
 
 
-def stream_and_verify(safety_sensor, active_index, prefix, expected):
+def stream_and_verify(safety_sensor, ctx, active_index, prefix, expected):
     """Activate a preset, let it settle, stream safety+depth, read the signal and check it."""
     safety_sensor.set_option(rs.option.safety_preset_active_index, active_index)
 
@@ -217,7 +218,9 @@ def stream_and_verify(safety_sensor, active_index, prefix, expected):
     cfg.enable_stream(rs.stream.safety, rs.format.y8, 30)
     # Co-enable depth so the vision-safety algo receives depth frames.
     cfg.enable_stream(rs.stream.depth)
-    pipe = rs.pipeline()
+    # Bind the pipeline to the harness context so it attaches to the device the test selected,
+    # not the default global context (which could pick a different device on multi-device racks).
+    pipe = rs.pipeline(ctx)
     pipe.start(cfg)
     try:
         # Settle while depth streams, so the previous preset's trigger hold expires and
@@ -227,6 +230,7 @@ def stream_and_verify(safety_sensor, active_index, prefix, expected):
         check_against_expected(prefix, result, expected)
     finally:
         pipe.stop()
+        time.sleep(1)  # allow the device to fully release before the next pipeline start
 
 
 # Two presets that differ only in how far forward the danger zone reaches, written to
@@ -261,33 +265,44 @@ expected_signal_1 = {
 #############################################################################################
 
 @pytest.fixture
-def safety_sensor(test_device):
-    dev, _ = test_device
-    return dev, dev.first_safety_sensor()
+def safety_presets(test_device):
+    """Provide (dev, sensor, ctx) with the two test presets written to indexes 0 and 1.
 
-
-def test_active_index_changes_safety_verdict(safety_sensor):
-    dev, sensor = safety_sensor
-
+    Setup and teardown both toggle safety service mode (preset writes are only allowed there).
+    The originals are saved before the test and restored at teardown - which pytest runs even
+    if the test fails - so the device is always left in a known state. Each service-mode
+    section is wrapped in try/finally so stop_wrapper always runs and the device is never left
+    stuck in service mode.
+    """
+    dev, ctx = test_device
+    sensor = dev.first_safety_sensor()
     assert sensor.supports(rs.option.safety_preset_active_index)
 
-    # Write the safety presets to indexes 0 and 1. These writes are only allowed in safety
-    # service mode; switch back to run mode afterwards so the safety algorithm computes the
-    # signal while streaming.
+    # Save the existing presets, then write the two test presets to indexes 0 and 1. Return to
+    # run mode afterwards so the safety algorithm computes the signal while streaming.
     tw.start_wrapper(dev)
-    # Save the existing presets so they can be restored at the end.
-    original_preset_0 = sensor.get_safety_preset(0)
-    original_preset_1 = sensor.get_safety_preset(1)
-    sensor.set_safety_preset(0, preset_json_0)
-    sensor.set_safety_preset(1, preset_json_1)
-    tw.stop_wrapper(dev)
+    try:
+        original_preset_0 = sensor.get_safety_preset(0)
+        original_preset_1 = sensor.get_safety_preset(1)
+        sensor.set_safety_preset(0, preset_json_0)
+        sensor.set_safety_preset(1, preset_json_1)
+    finally:
+        tw.stop_wrapper(dev)
+
+    yield dev, sensor, ctx
+
+    # Restore the original presets to whatever they held before the test ran.
+    tw.start_wrapper(dev)
+    try:
+        sensor.set_safety_preset(0, original_preset_0)
+        sensor.set_safety_preset(1, original_preset_1)
+    finally:
+        tw.stop_wrapper(dev)
+
+
+def test_active_index_changes_safety_verdict(safety_presets):
+    dev, sensor, ctx = safety_presets
 
     # Verify active preset index changes the safety verdict.
-    stream_and_verify(sensor, 0, "Preset 0", expected_signal_0)
-    stream_and_verify(sensor, 1, "Preset 1", expected_signal_1)
-
-    # Restore original safety presets to whatever they held before the test ran.
-    tw.start_wrapper(dev)
-    sensor.set_safety_preset(0, original_preset_0)
-    sensor.set_safety_preset(1, original_preset_1)
-    tw.stop_wrapper(dev)
+    stream_and_verify(sensor, ctx, 0, "Preset 0", expected_signal_0)
+    stream_and_verify(sensor, ctx, 1, "Preset 1", expected_signal_1)
