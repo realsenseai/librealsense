@@ -103,6 +103,11 @@ public:
             { _callbacks.raise( old, curr ); } );
     }
 
+    ~device_watcher_singleton()
+    {
+        _device_watcher->stop();
+    }
+
     rsutils::subscription subscribe( platform::device_changed_callback && cb )
     {
         return _callbacks.subscribe( std::move( cb ) );

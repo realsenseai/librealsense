@@ -13,7 +13,7 @@ using namespace librealsense;
 
 librealsense::record_device::record_device(std::shared_ptr<librealsense::device_interface> device,
                                       std::shared_ptr<librealsense::device_serializer::writer> serializer):
-    m_write_thread([](){return std::make_shared<dispatcher>(std::numeric_limits<unsigned int>::max());}),
+    m_write_thread([](){return std::make_shared<dispatcher>(std::numeric_limits<unsigned int>::max(), "record-device");}),
     m_is_recording(true),
     m_record_total_pause_duration(0)
 {
