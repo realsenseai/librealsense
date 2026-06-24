@@ -256,128 +256,6 @@ expected_signal_1 = {
     "safety_preset_id_used": 1
 }
 
-# Known-good config dumped from a D585S that DOES emit the holes (SIP Vision-HaRa) metadata.
-# Written before the test and restored at teardown, to reproduce that camera's behavior on
-# units that otherwise report holes_* as None. Note the app config's sip block is all-default
-# (temporal_safety_features_selection=0) on that working unit, so the differentiator is most
-# likely the safety_interface_config (custom occupancy_grid_params / smcu_arbitration_params).
-WORKING_APP_CONFIG_JSON = """
-{
-    "application_config":
-    {
-        "sip":
-        {
-            "immediate_mode_safety_features_selection": 0,
-            "temporal_safety_features_selection": 0,
-            "mechanisms_thresholds": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            "mechanisms_sampling_interval": [0, 0, 0, 0, 0, 0, 0, 0],
-            "tc_consecutives_failures_threshold": 3
-        },
-        "dev_rules_selection": 65,
-        "depth_pipe_safety_checks_override": 0,
-        "triggered_calib_safety_checks_override": 0,
-        "smcu_bypass_directly_to_maintenance_mode": 0,
-        "smcu_skip_spi_error": 0,
-        "temp_thresholds":
-        {
-            "ir_right": [100, 120, -40, -50],
-            "ir_left": [100, 120, -40, -50],
-            "apm_left": [100, 120, -40, -50],
-            "apm_right": [100, 120, -40, -50],
-            "hkr_core": [100, 120, -40, -50],
-            "smcu_right": [100, 120, -40, -50],
-            "sht4x": [100, 120, -40, -50],
-            "imu": [100, 120, -40, -50]
-        },
-        "sht4x_humidity_threshold": 80,
-        "voltage_thresholds":
-        {
-            "vdd3v3": 15,
-            "vdd1v8": 15,
-            "vdd1v2": 15,
-            "vdd1v1": 15,
-            "vdd0v8": 15,
-            "vdd0v6": 15,
-            "vdd5vo_u": 15,
-            "vdd5vo_l": 15,
-            "vdd0v8_ddr": 15
-        },
-        "developer_mode":
-        {
-            "hkr": 0,
-            "smcu": 0,
-            "hkr_simulated_lock_state": 0,
-            "sc": 0
-        },
-        "depth_pipeline_config": 0,
-        "depth_roi": 0,
-        "ir_for_sip": 0,
-        "peripherals_sensors_disable_mask": 0,
-        "hw_configuration_setup": 0,
-        "digital_signature": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    }
-}
-"""
-
-WORKING_INTERFACE_CONFIG_JSON = """
-{
-    "safety_interface_config":
-    {
-        "m12_safety_pins_configuration":
-        {
-            "power":     { "direction": "In",  "functionality": "p24VDC" },
-            "ossd1_b":   { "direction": "Out", "functionality": "pOSSD1_B" },
-            "ossd1_a":   { "direction": "Out", "functionality": "pOSSD1_A" },
-            "preset3_a": { "direction": "In",  "functionality": "pPresetSelect3_A" },
-            "preset3_b": { "direction": "In",  "functionality": "pPresetSelect3_B" },
-            "preset4_a": { "direction": "In",  "functionality": "pPresetSelect4_A" },
-            "preset1_b": { "direction": "In",  "functionality": "pPresetSelect1_B" },
-            "preset1_a": { "direction": "In",  "functionality": "pPresetSelect1_A" },
-            "gpio_0":    { "direction": "In",  "functionality": "pPresetSelect5_A" },
-            "gpio_1":    { "direction": "In",  "functionality": "pPresetSelect5_B" },
-            "gpio_3":    { "direction": "In",  "functionality": "pPresetSelect6_B" },
-            "gpio_2":    { "direction": "In",  "functionality": "pPresetSelect6_A" },
-            "preset2_b": { "direction": "In",  "functionality": "pPresetSelect2_B" },
-            "gpio_4":    { "direction": "Out", "functionality": "pDeviceReady" },
-            "preset2_a": { "direction": "In",  "functionality": "pPresetSelect2_A" },
-            "preset4_b": { "direction": "In",  "functionality": "pPresetSelect4_B" },
-            "ground":    { "direction": "In",  "functionality": "pGND" }
-        },
-        "gpio_stabilization_interval": 150,
-        "camera_position":
-        {
-            "rotation":
-            [
-                [ 0.0,  0.0,  1.0],
-                [-1.0,  0.0,  0.0],
-                [ 0.0, -1.0,  0.0]
-            ],
-            "translation": [0.0, 0.0, 0.27]
-        },
-        "occupancy_grid_params":
-        {
-            "grid_cell_size": 70,
-            "cell_threshold_factor": 0.02,
-            "polynomial_bias": 4.0,
-            "surface_height": 0.05
-        },
-        "smcu_arbitration_params":
-        {
-            "l_0_total_threshold": 100,
-            "l_0_sustained_rate_threshold": 20,
-            "l_1_total_threshold": 100,
-            "l_1_sustained_rate_threshold": 20,
-            "l_2_total_threshold": 10,
-            "hkr_stl_timeout": 15,
-            "mcu_stl_timeout": 10,
-            "sustained_aicv_frame_drops": 90,
-            "ossd_self_test_pulse_width": 23
-        },
-        "crypto_signature": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    }
-}
-"""
-
 #############################################################################################
 # Tests
 #############################################################################################
@@ -393,18 +271,13 @@ def test_active_index_changes_safety_verdict(safety_sensor):
 
     assert sensor.supports(rs.option.safety_preset_active_index)
 
-    # Write the known-good config (app + interface) and safety presets to indexes 0 and 1.
-    # These writes are only allowed in safety service mode; switch back to run mode
-    # afterwards so the safety algorithm computes the signal while streaming.
+    # Write the safety presets to indexes 0 and 1. These writes are only allowed in safety
+    # service mode; switch back to run mode afterwards so the safety algorithm computes the
+    # signal while streaming.
     tw.start_wrapper(dev)
-    # Save the existing config and presets so they can be restored at the end.
-    original_app_config = sensor.get_application_config()
-    original_interface_config = sensor.get_safety_interface_config()
+    # Save the existing presets so they can be restored at the end.
     original_preset_0 = sensor.get_safety_preset(0)
     original_preset_1 = sensor.get_safety_preset(1)
-    # Apply the working-camera config so the holes (SIP) metadata is emitted.
-    sensor.set_application_config(WORKING_APP_CONFIG_JSON)
-    sensor.set_safety_interface_config(WORKING_INTERFACE_CONFIG_JSON)
     sensor.set_safety_preset(0, preset_json_0)
     sensor.set_safety_preset(1, preset_json_1)
     tw.stop_wrapper(dev)
@@ -413,10 +286,8 @@ def test_active_index_changes_safety_verdict(safety_sensor):
     stream_and_verify(sensor, 0, "Preset 0", expected_signal_0)
     stream_and_verify(sensor, 1, "Preset 1", expected_signal_1)
 
-    # Restore original config and safety presets to whatever they held before the test ran.
+    # Restore original safety presets to whatever they held before the test ran.
     tw.start_wrapper(dev)
-    sensor.set_application_config(original_app_config)
-    sensor.set_safety_interface_config(original_interface_config)
     sensor.set_safety_preset(0, original_preset_0)
     sensor.set_safety_preset(1, original_preset_1)
     tw.stop_wrapper(dev)
