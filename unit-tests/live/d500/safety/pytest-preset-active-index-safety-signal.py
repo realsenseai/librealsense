@@ -147,6 +147,12 @@ def read_safety_signal(pipe, prefix, settle_frames=10):
             safety_frame = candidate
     assert safety_frame is not None
 
+    # DEBUG: list which safety-frame metadata fields this device actually populates, so we can
+    # see whether the sip_generic_metrics_* group is present (drives holes_*) or missing.
+    supported = [m.name for m in rs.frame_metadata_value.__members__.values()
+                 if safety_frame.supports_frame_metadata(m)]
+    log.info(f"{prefix} supported safety metadata ({len(supported)}): {supported}")
+
     def md(value):
         # Some diagnostic fields may not be present on every frame; guard to avoid throwing.
         if safety_frame.supports_frame_metadata(value):
