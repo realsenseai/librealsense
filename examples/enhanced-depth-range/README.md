@@ -50,7 +50,7 @@ Latency measured at 640x480 on Jetson AGX Orin.
 
 ## Installation
 
-Register and download corresponding JP debian from https://www.realsenseai.com/perception-studio/improved-close-range-depth/
+Register and download the `.deb` package matching your JetPack (JP) version from https://realsenseai.com/perception-studio/improved-close-range-depth/.
 
 ```bash
 sudo dpkg -i librealsense2-enhanced-depth-*.deb
