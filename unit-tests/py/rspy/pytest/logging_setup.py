@@ -107,6 +107,32 @@ def setup_test_logging(config):
     config._test_logdir = logdir
 
 
+def configure_junit_logging(config):
+    """Embed every test's captured log into its JUnit <system-out> so the Jenkins Test
+    Result page shows the log inline (for passing tests too), without the JUnit
+    Attachments plugin.
+
+    Must run after the junitxml plugin has created its LogXML (we set xmlpath in
+    setup_test_logging, which runs earlier in pytest_configure), so call from
+    pytest_sessionstart.
+    """
+    if not getattr(config.option, 'xmlpath', None):
+        return
+    try:
+        from _pytest.junitxml import LogXML
+    except ImportError as e:
+        log.debug(f'Could not import LogXML to configure JUnit logging: {e}')
+        return
+    for plugin in config.pluginmanager.get_plugins():
+        if isinstance(plugin, LogXML):
+            plugin.logging = 'all'           # capture stdout/stderr + log records into the XML
+            plugin.log_passing_tests = True  # ...for every test, including passing ones
+            log.debug('JUnit: tests will embed their log in <system-out>')
+            return
+    log.warning('JUnit: xmlpath is set but no LogXML plugin instance was found -- '
+                'test logs will NOT be embedded in the XML.')
+
+
 def configure_logging(config, debug_requested):
     """Configure root logger level, live logging, and suppress noisy loggers.
 
