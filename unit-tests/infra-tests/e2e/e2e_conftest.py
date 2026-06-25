@@ -76,7 +76,12 @@ def _mock_get(sn):
 _dev.by_spec = _mock_by_spec
 _dev.get = _mock_get
 _dev._device_by_sn = {sn: FakeDevice(sn, n) for sn, n in _sn_map.items()}
-_dev.hub = None
+# Truthy sentinel: the port-management e2e tests model a hub-equipped bench, so the conftest's
+# recycle decision (recycle iff no hub) resolves to "don't recycle on setup". Port ops are mocked
+# above, so the object is never actually used. init_hub is stubbed so the real one doesn't probe
+# (absent) hardware and reset this back to None.
+_dev.hub = object()
+_dev.init_hub = lambda: None
 _dev._context = None
 def _mock_query(**kw):
     _tracking["query_kwargs"].append(kw)

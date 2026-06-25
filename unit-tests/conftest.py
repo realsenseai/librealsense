@@ -557,13 +557,16 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         return
 
     no_reset = request.config.getoption("--no-reset", default=False)
-    # We don't recycle on setup: the device is already off (the previous module's teardown
-    # disabled it, or query()'s initial disable-all did), so enabling it here IS the power-on
-    # -- teardown-off + setup-on is the power cycle. A setup recycle would just re-disable an
-    # already-off port (extra hub traffic + wait + settle) for no benefit.
-    # Default: enable, then disable on teardown (isolation comes from the previous teardown).
-    # --no-reset: also isolate statelessly here and leave the device on (no teardown-disable).
-    recycle = False
+    # With a hub, we don't recycle on setup: the device is already off (the previous module's
+    # teardown disabled it, or query()'s initial disable-all did), so enabling it here IS the
+    # power-on -- teardown-off + setup-on is the power cycle. A setup recycle would just re-disable
+    # an already-off port (extra hub traffic + wait + settle) for no benefit.
+    # Without a hub (e.g. Jetson/MIPI), teardown-disable is a no-op (no port to power off), so the
+    # setup MUST recycle -- enable_only(recycle=True) falls back to hardware_reset() -- to clear any
+    # state a previous module left behind; otherwise the device is never reset between modules.
+    # Default: enable (recycle iff no hub), then disable on teardown (isolation from prev teardown).
+    # --no-reset: isolate statelessly here and leave the device on (no recycle, no teardown-disable).
+    recycle = (not no_reset) and devices.hub is None
     disable_other_ports = no_reset
     teardown_disable = not no_reset
 
@@ -612,7 +615,7 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     log.info(f"Configuration: {device_name} [{serial_number}]")
 
     try:
-        log.debug(f"{'Enabling' if no_reset else 'Recycling'} device via hub...")
+        log.debug(f"{'Recycling' if recycle else 'Enabling'} device...")
         devices.enable_only([serial_number], recycle=recycle, disable_other_ports=disable_other_ports)
         log.debug(f"Device enabled and ready")
     except Exception as e:
