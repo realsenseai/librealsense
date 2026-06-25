@@ -557,10 +557,13 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         return
 
     no_reset = request.config.getoption("--no-reset", default=False)
-    # Default: power-cycle the device and disable it on teardown (isolation comes from the
-    # previous module's teardown). --no-reset: isolate statelessly without a power-cycle and
-    # leave the device on (no teardown-disable), matching the legacy fast path.
-    recycle = not no_reset
+    # We don't recycle on setup: the device is already off (the previous module's teardown
+    # disabled it, or query()'s initial disable-all did), so enabling it here IS the power-on
+    # -- teardown-off + setup-on is the power cycle. A setup recycle would just re-disable an
+    # already-off port (extra hub traffic + wait + settle) for no benefit.
+    # Default: enable, then disable on teardown (isolation comes from the previous teardown).
+    # --no-reset: also isolate statelessly here and leave the device on (no teardown-disable).
+    recycle = False
     disable_other_ports = no_reset
     teardown_disable = not no_reset
 

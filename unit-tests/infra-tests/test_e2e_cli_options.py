@@ -79,7 +79,9 @@ class TestCliOptionsRegistered:
         calls = tracking["enable_only_calls"]
         # Two enable_only calls: initial module-fixture creation + post-retry-teardown re-creation.
         assert len(calls) == 2
-        assert all(c['recycle'] is True for c in calls)
+        assert all(c['recycle'] is False for c in calls)
+        # the device recycle now comes from the teardown-disable between attempts, not recycle=True
+        assert len(tracking["disable_calls"]) >= 1
 
     def test_retries_recreate_module_fixture(self):
         """Module-scoped fixtures must be torn down and re-instantiated between
@@ -101,13 +103,15 @@ class TestCliOptionsRegistered:
         assert rc == 0
 
     def test_repeat(self):
-        """--repeat 3 should repeat the test 3 times, recycling the device each time."""
+        """--repeat 3 repeats the test 3 times; each pass power-cycles the device via
+        teardown-disable + setup-enable (setup itself uses recycle=False)."""
         rc, out, tracking = run_e2e("pytest-device-setup.py", "-k", "test_d455 and not excluded",
                                      "--repeat", "3")
         assert_outcomes(out, passed=3)
         calls = tracking["enable_only_calls"]
         assert len(calls) == 3
-        assert all(c['recycle'] is True for c in calls)
+        assert all(c['recycle'] is False for c in calls)
+        assert len(tracking["disable_calls"]) >= 1  # teardown disables each pass -> the cycle
 
     def test_repeat_no_reset(self):
         """--repeat 3 --no-reset should repeat without recycling."""
@@ -115,10 +119,11 @@ class TestCliOptionsRegistered:
                                      "--repeat", "3", "--no-reset")
         assert_outcomes(out, passed=3)
         calls = tracking["enable_only_calls"]
-        # The module fixture re-instantiates per repeat pass and enables (without power-cycling)
-        # each time; --no-reset only suppresses the recycle, not the (idempotent) enable.
+        # --no-reset re-enables each pass but never disables on teardown, so the device is
+        # NOT power-cycled (left on) -- the distinguishing behavior vs the default path.
         assert len(calls) == 3
         assert all(c['recycle'] is False for c in calls)
+        assert tracking["disable_calls"] == []
 
     def test_device_nonexistent(self):
         """--device D999 with no matching device should produce 0 parametrized instances."""

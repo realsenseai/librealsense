@@ -17,21 +17,22 @@ from helpers import run_e2e, assert_outcomes
 class TestDevicePortManagement:
 
     def test_device_marker_enables_correct_port(self):
-        """@device('D455') should call enable_only(['111'], recycle=True)."""
+        """@device('D455') enables the device (recycle=False -- the power cycle is
+        teardown-disable + setup-enable, so setup itself doesn't recycle)."""
         rc, out, tracking = run_e2e("pytest-device-setup.py", "-k", "test_d455 and not excluded")
         assert_outcomes(out, passed=1)
         assert len(tracking["enable_only_calls"]) == 1
         assert tracking["enable_only_calls"][0]['serials'] == ['111']
-        assert tracking["enable_only_calls"][0]['recycle'] is True
+        assert tracking["enable_only_calls"][0]['recycle'] is False
 
     def test_device_each_enables_one_port_per_test(self):
-        """@device_each('D400*') should call enable_only once per device, each with recycle=True."""
+        """@device_each('D400*') should call enable_only once per device (recycle=False)."""
         rc, out, tracking = run_e2e("pytest-each-setup.py", "-k", "test_d400 and not d999")
         assert_outcomes(out, passed=3)
         assert len(tracking["enable_only_calls"]) == 3
         serials_enabled = [c['serials'][0] for c in tracking["enable_only_calls"]]
         assert set(serials_enabled) == {'111', '222', '777'}
-        assert all(c['recycle'] is True for c in tracking["enable_only_calls"])
+        assert all(c['recycle'] is False for c in tracking["enable_only_calls"])
         assert all(len(c['serials']) == 1 for c in tracking["enable_only_calls"])
 
     def test_second_test_same_device_no_recycle(self):
