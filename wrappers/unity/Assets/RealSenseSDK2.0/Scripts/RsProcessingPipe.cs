@@ -50,7 +50,7 @@ public class RsProcessingPipe : RsFrameProvider
         if (ActiveProfile != null)
         {
             string devName = ActiveProfile.Device.Info.GetInfo(CameraInfo.Name);
-            if (!string.IsNullOrEmpty(devName) && devName.StartsWith("Intel RealSense L5", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(devName) && devName.IndexOf("L5", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 GameObject pbPanel = GameObject.Find("ProcessingBlocks/ScrollRect/Viewport/Content");
                 if (pbPanel != null)
