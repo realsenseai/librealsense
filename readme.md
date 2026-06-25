@@ -10,7 +10,7 @@
 <p align="center">RealSense SDK 2.0 is a cross-platform library for RealSense depth cameras.
 The SDK allows depth and color streaming, and provides intrinsic and extrinsic calibration information.</p>
 
-
+ 
 <p align="center">
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/github/license/realsenseai/librealsense.svg" alt="License"></a>
   <a href="https://github.com/realsenseai/librealsense/releases/latest"><img src="https://img.shields.io/github/v/release/realsenseai/librealsense?sort=semver" alt="Latest release"></a>
