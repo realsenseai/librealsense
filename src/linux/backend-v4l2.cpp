@@ -19,6 +19,10 @@
 
 #include <rsutils/string/from.h>
 
+#ifdef RS2_USE_CUDA_ZEROCOPY
+#include "../cuda/cuda-frame-memory.h"  // Layer B: register V4L2 buffers with CUDA for zero-copy GPU access
+#endif
+
 #include <cassert>
 #include <cstdlib>
 #include <cstdio>
@@ -352,6 +356,13 @@ namespace librealsense
                                                     fd, _offset));
                 if(_start == MAP_FAILED)
                     throw linux_backend_exception("mmap failed");
+#ifdef RS2_USE_CUDA_ZEROCOPY
+                // Layer B: pin+map this V4L2 buffer into CUDA's address space once, so frames
+                // that point at it (Layer A) can be read by GPU kernels with no H2D copy. No-op
+                // off integrated GPUs; on failure the GPU path simply falls back to copying.
+                if( rs_v4l2_zc_register( _start, _original_length ) )
+                    _zc_registered = true;
+#endif
             }
             else
             {
@@ -388,6 +399,10 @@ namespace librealsense
         {
             if (_use_memory_map)
             {
+#ifdef RS2_USE_CUDA_ZEROCOPY
+               if( _zc_registered )
+                   rs_v4l2_zc_unregister( _start );
+#endif
                if(munmap(_start, _original_length) < 0)
                    LOG_DEBUG_V4L("munmap failed on buffer Dtor");
             }

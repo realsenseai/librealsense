@@ -404,7 +404,7 @@ void dds_sensor_proxy::handle_video_data( std::vector< uint8_t > && buffer,
         return;
 
     auto new_frame = static_cast< frame * >( new_frame_interface );
-    new_frame->data = std::move( buffer );
+    librealsense::assign_frame_data( new_frame->data, std::move( buffer ) );
 
     if( _md_enabled )
     {

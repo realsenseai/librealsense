@@ -295,8 +295,9 @@ namespace librealsense
         }
 
         // Move the deserialized data directly — avoids a full memcpy of image data
+        // (under zero-copy builds frame::data uses a pinned allocator, so this copies).
         auto base_frame = static_cast<librealsense::frame*>(frame);
-        base_frame->data = std::move(data);
+        librealsense::assign_frame_data(base_frame->data, std::move(data));
 
         setup_frame(frame, stream_id);
 

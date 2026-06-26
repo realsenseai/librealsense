@@ -32,6 +32,7 @@ file(GLOB IMGUI_SOURCES "../third-party/imgui/*.cpp")
 list(APPEND DEPENDENCIES tclap)
 
 add_subdirectory(hello-realsense)
+add_subdirectory(gpu-frame)
 add_subdirectory(software-device)
 add_subdirectory(capture)
 add_subdirectory(callback)

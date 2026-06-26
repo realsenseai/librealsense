@@ -14,4 +14,13 @@ namespace rsutils {
     // on Windows which acquires the loader lock.
     bool rs2_is_cuda_available();
 
+    // Returns true if the (first) CUDA device is an integrated GPU sharing physical
+    // memory with the CPU (Jetson / Tegra). On such parts, mapped/zero-copy memory is a
+    // win because no data physically moves; on discrete GPUs it is a loss (per-element
+    // PCIe access), so the zero-copy path must be gated on this. Always false when no
+    // CUDA device is present. Probed via the CUDA Driver API attribute
+    // CU_DEVICE_ATTRIBUTE_INTEGRATED, cached for the process lifetime. Same threading /
+    // DllMain caveats as rs2_is_cuda_available().
+    bool rs2_is_cuda_integrated();
+
 }  // namespace rsutils

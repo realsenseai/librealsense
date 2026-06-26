@@ -107,4 +107,74 @@ namespace rsutils {
         return cached;
     }
 
+    // Probe whether the first CUDA device is an integrated GPU (unified memory / Tegra).
+    //
+    // Uses the CUDA Driver API attribute CU_DEVICE_ATTRIBUTE_INTEGRATED (value 18 - we
+    // hard-code it to avoid a compile-time dependency on cuda.h, matching the dlopen
+    // approach of probe_cuda_driver()). cuDeviceGet(0) returns the first device's handle
+    // (CUdevice is a plain int); cuDeviceGetAttribute fills 1 for integrated, 0 for
+    // discrete. Any failure (no driver, no device, missing symbol) yields false, so the
+    // zero-copy path stays off unless we positively confirm an integrated GPU.
+    static bool probe_cuda_integrated()
+    {
+        // Cheap short-circuit: no usable device -> definitely not integrated.
+        if( ! rs2_is_cuda_available() )
+            return false;
+
+        // CU_DEVICE_ATTRIBUTE_INTEGRATED from cuda.h's CUdevice_attribute enum.
+        constexpr int CU_DEVICE_ATTRIBUTE_INTEGRATED = 18;
+
+#ifdef _WIN32
+        using cu_init_t       = int ( __stdcall * )( unsigned int );
+        using cu_device_get_t = int ( __stdcall * )( int *, int );
+        using cu_device_attr_t = int ( __stdcall * )( int *, int, int );
+        HMODULE handle = LoadLibraryA( "nvcuda.dll" );
+        if( ! handle )
+            return false;
+        auto cu_init    = reinterpret_cast< cu_init_t        >( GetProcAddress( handle, "cuInit" ) );
+        auto cu_dev_get = reinterpret_cast< cu_device_get_t  >( GetProcAddress( handle, "cuDeviceGet" ) );
+        auto cu_dev_attr = reinterpret_cast< cu_device_attr_t >( GetProcAddress( handle, "cuDeviceGetAttribute" ) );
+#else
+        using cu_init_t        = int ( * )( unsigned int );
+        using cu_device_get_t  = int ( * )( int *, int );
+        using cu_device_attr_t = int ( * )( int *, int, int );
+        void * handle = dlopen( "libcuda.so.1", RTLD_LAZY );
+        if( ! handle )
+            return false;
+        auto cu_init     = reinterpret_cast< cu_init_t        >( dlsym( handle, "cuInit" ) );
+        auto cu_dev_get  = reinterpret_cast< cu_device_get_t  >( dlsym( handle, "cuDeviceGet" ) );
+        auto cu_dev_attr = reinterpret_cast< cu_device_attr_t >( dlsym( handle, "cuDeviceGetAttribute" ) );
+#endif
+
+        bool integrated = false;
+        if( cu_init && cu_dev_get && cu_dev_attr && cu_init( 0 ) == 0 )
+        {
+            int dev = 0;
+            int value = 0;
+            if( cu_dev_get( &dev, 0 ) == 0
+                && cu_dev_attr( &value, CU_DEVICE_ATTRIBUTE_INTEGRATED, dev ) == 0 )
+            {
+                integrated = ( value != 0 );
+            }
+        }
+
+#ifdef _WIN32
+        FreeLibrary( handle );
+#else
+        dlclose( handle );
+#endif
+
+        if( integrated )
+            LOG_INFO( "CUDA device is integrated (unified memory) - zero-copy GPU path eligible." );
+        else
+            LOG_INFO( "CUDA device is discrete - zero-copy GPU path disabled (would be a loss over PCIe)." );
+        return integrated;
+    }
+
+    bool rs2_is_cuda_integrated()
+    {
+        static bool const cached = probe_cuda_integrated();
+        return cached;
+    }
+
 } // namespace rsutils
