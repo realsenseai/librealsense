@@ -16,12 +16,14 @@
 
 namespace librealsense {
 
+#if defined( RS2_USE_CUDA ) && defined( RS2_USE_CUDA_ZEROCOPY )
 // Trailing slack added to every zero-copy frame buffer. Vectorized CPU consumers (notably
 // pointcloud_neon::get_texture_map_neon) process in fixed-width blocks and over-read/write
 // a partial tail past the logical end. malloc'd buffers had incidental slack that absorbed
 // it; exactly-sized, page-aligned CUDA allocations do not, which faulted at 720p.
 // 256 bytes comfortably covers a few float2/float3 NEON blocks (< 128 B).
 static constexpr std::size_t RS_ZC_TAIL_PAD = 256;
+#endif
 
 bool rs_frame_zc_enabled()
 {
