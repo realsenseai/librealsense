@@ -55,13 +55,15 @@ function App() {
         <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
           {hasActiveDevices ? (
             <>
-              {/* Stream/PointCloud View */}
-              <div className="flex-1 p-4 min-h-0 overflow-hidden">
-                {viewMode === '2d' ? (
+              {/* Stream/PointCloud View — keep both mounted so WebRTC stays alive
+                  when switching 3D → 2D (otherwise StreamViewer remount renegotiates). */}
+              <div className="flex-1 p-4 min-h-0 overflow-hidden relative">
+                <div className={`absolute inset-4 ${viewMode === '2d' ? '' : 'invisible pointer-events-none'}`}>
                   <StreamViewer />
-                ) : (
+                </div>
+                <div className={`absolute inset-4 ${viewMode === '3d' ? '' : 'invisible pointer-events-none'}`}>
                   <PointCloudViewer />
-                )}
+                </div>
               </div>
 
               {/* IMU Viewer (collapsible) */}

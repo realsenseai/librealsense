@@ -16,7 +16,6 @@ describe('AppStore', () => {
       expect(state.isConnected).toBe(false)
       expect(state.devices).toEqual([])
       expect(state.deviceStates).toEqual({})
-      expect(state.selectedDevice).toBeNull()
       expect(state.isLoadingDevices).toBe(false)
       expect(state.error).toBeNull()
     })
@@ -55,43 +54,18 @@ describe('AppStore', () => {
     })
   })
 
-  describe('Device Selection', () => {
-    it('selects a device', () => {
-      const device = createMockDevice()
-      
-      useAppStore.getState().selectDevice(device)
-      
-      expect(useAppStore.getState().selectedDevice).toEqual(device)
-    })
-
-    it('clears device selection', () => {
-      const device = createMockDevice()
-      useAppStore.getState().selectDevice(device)
-      
-      useAppStore.getState().selectDevice(null)
-      
-      expect(useAppStore.getState().selectedDevice).toBeNull()
-    })
-  })
-
   describe('View Mode', () => {
-    it('sets view mode to single', () => {
-      useAppStore.getState().setViewMode('single')
-      
-      expect(useAppStore.getState().viewMode).toBe('single')
+    it('switches to 3d', async () => {
+      await useAppStore.getState().setViewMode('3d')
+
+      expect(useAppStore.getState().viewMode).toBe('3d')
     })
 
-    it('sets view mode to pointcloud', () => {
-      useAppStore.getState().setViewMode('pointcloud')
-      
-      expect(useAppStore.getState().viewMode).toBe('pointcloud')
-    })
+    it('switches back to 2d', async () => {
+      await useAppStore.getState().setViewMode('3d')
+      await useAppStore.getState().setViewMode('2d')
 
-    it('sets view mode to grid', () => {
-      useAppStore.getState().setViewMode('single')
-      useAppStore.getState().setViewMode('grid')
-      
-      expect(useAppStore.getState().viewMode).toBe('grid')
+      expect(useAppStore.getState().viewMode).toBe('2d')
     })
   })
 
@@ -261,34 +235,6 @@ describe('AppStore', () => {
       )
     }
 
-    it('clears selectedDevice on forceRefresh when its device disappeared', async () => {
-      useAppStore.setState({ selectedDevice: goneDevice, hasUserInteracted: true })
-      mockDevicesEndpoint([presentDevice])
-
-      await useAppStore.getState().fetchDevices(true)
-
-      expect(useAppStore.getState().selectedDevice).toBeNull()
-    })
-
-    it('keeps selectedDevice on forceRefresh when its device is still present', async () => {
-      useAppStore.setState({ selectedDevice: presentDevice, hasUserInteracted: true })
-      mockDevicesEndpoint([presentDevice])
-
-      await useAppStore.getState().fetchDevices(true)
-
-      expect(useAppStore.getState().selectedDevice?.device_id).toBe(presentDevice.device_id)
-    })
-
-    it('does NOT clear selectedDevice on the polling path even if the cached list omits it', async () => {
-      // Simulates a transient cache hiccup: poll returns a list missing the selected device.
-      useAppStore.setState({ selectedDevice: goneDevice, hasUserInteracted: true })
-      mockDevicesEndpoint([presentDevice])
-
-      await useAppStore.getState().fetchDevices(/* default false */)
-
-      expect(useAppStore.getState().selectedDevice?.device_id).toBe(goneDevice.device_id)
-    })
-
     it('guards against concurrent fetches', async () => {
       let calls = 0
       server.use(
@@ -336,46 +282,7 @@ describe('AppStore', () => {
     })
   })
 
-  describe('Legacy Compatibility Getters', () => {
-    it('sensors getter returns selected device sensors when set directly', () => {
-      const device = createMockDevice()
-      const sensor = createMockSensor()
-      const deviceState = createMockDeviceState(device, {
-        isActive: true,
-        sensors: [sensor],
-      })
-      
-      // Set the full state atomically
-      useAppStore.setState({
-        devices: [device],
-        deviceStates: { [device.device_id]: deviceState },
-        selectedDevice: device,
-      })
-      
-      const state = useAppStore.getState()
-      // Verify selectedDevice is set correctly
-      expect(state.selectedDevice?.device_id).toBe(device.device_id)
-      // Check sensors through the deviceStates directly since getter may have edge cases
-      expect(state.deviceStates[device.device_id].sensors).toContainEqual(sensor)
-    })
-
-    it('sensors getter returns empty array when no selected device', () => {
-      const device = createMockDevice()
-      const sensor = createMockSensor()
-      const deviceState = createMockDeviceState(device, {
-        isActive: true,
-        sensors: [sensor],
-      })
-      
-      useAppStore.setState({
-        devices: [device],
-        deviceStates: { [device.device_id]: deviceState },
-        selectedDevice: null,
-      })
-      
-      expect(useAppStore.getState().sensors).toEqual([])
-    })
-
+  describe('Aggregate Getters', () => {
     it('isStreaming reflects device streaming state', () => {
       const device = createMockDevice()
       const deviceState = createMockDeviceState(device, {

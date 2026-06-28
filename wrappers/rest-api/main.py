@@ -1,9 +1,48 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
+import sys
+from pathlib import Path
+
+
+def _prefer_local_pyrealsense2() -> None:
+    # Prefer locally-built pyrealsense2 (e.g. build/Release/) over any PyPI
+    # wheel — newer devices (e.g. D585 Prototype, PID 0x0C08) may not be
+    # recognized by the published wheel and only show up when loading the
+    # module built from this branch.
+    import os
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    build_dir = repo_root / "build"
+    if not build_dir.is_dir():
+        return
+    candidates = []
+    for pattern in ("pyrealsense2*.pyd", "pyrealsense2*.so"):
+        candidates.extend(build_dir.rglob(pattern))
+    candidates.extend(build_dir.rglob("pyrealsense2/__init__.py"))
+    if not candidates:
+        return
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    seen, target_dirs = set(), []
+    for path in candidates:
+        target_dir = path.parent.parent if path.name == "__init__.py" else path.parent
+        key = str(target_dir)
+        if key in seen:
+            continue
+        seen.add(key)
+        target_dirs.append(key)
+    sys.path[0:0] = target_dirs
+    if hasattr(os, "add_dll_directory"):
+        for key in target_dirs:
+            try:
+                os.add_dll_directory(key)
+            except (OSError, FileNotFoundError):
+                pass
+
+
+_prefer_local_pyrealsense2()
+
 import asyncio
 import uvicorn
-import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

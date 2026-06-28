@@ -32,8 +32,8 @@ export const handlers = [
   }),
 
   // Reset device
-  http.post(`${API_BASE}/devices/:deviceId/reset`, () => {
-    return HttpResponse.json({ success: true })
+  http.post(`${API_BASE}/devices/:deviceId/hw_reset/`, () => {
+    return HttpResponse.json(true)
   }),
 
   // Get sensors

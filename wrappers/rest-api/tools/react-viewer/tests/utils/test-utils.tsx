@@ -11,7 +11,6 @@ export function resetStore() {
     isConnected: false,
     devices: [],
     deviceStates: {},
-    selectedDevice: null,
     isLoadingDevices: false,
     hasUserInteracted: false,
     error: null,

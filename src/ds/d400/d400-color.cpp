@@ -298,7 +298,7 @@ namespace librealsense
         // attributes of md_rgb_control
         auto raw_color_ep = get_raw_color_sensor();
 
-        if (!_is_mipi_device)
+        if ( !_is_mipi_device || platform::get_jetson_driver_version() >= rsutils::version("1.0.4.9"))
         {
             color_ep.register_processing_block(processing_block_factory::create_pbf_vector<yuy2_converter>(RS2_FORMAT_YUYV, map_supported_color_formats(RS2_FORMAT_YUYV), RS2_STREAM_COLOR));
             color_ep.register_processing_block(processing_block_factory::create_id_pbf(RS2_FORMAT_RAW16, RS2_STREAM_COLOR));
@@ -319,6 +319,7 @@ namespace librealsense
             }
             else
             {
+                // MIPI on x86 (ADL-P)
                 color_ep.register_processing_block(processing_block_factory::create_pbf_vector<yuy2_converter>(RS2_FORMAT_YUYV, map_supported_color_formats(RS2_FORMAT_YUYV), RS2_STREAM_COLOR));
             }
         }        

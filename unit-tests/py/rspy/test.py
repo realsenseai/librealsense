@@ -764,6 +764,7 @@ class remote:
         self._on_finish = None  # callback
         self._exception = None
         self._stdout = None
+        self._sentinel = '___ready\n'  # rewritten per-run() with a fresh nonce
 
     def __enter__( self ):
         """
@@ -813,7 +814,7 @@ class remote:
             # NOTE: line will include the terminating \n EOL
             # NOTE: so readline will return '' (with no EOL) when EOF is reached - the "sentinel"
             #       2nd argument to iter() - and we'll break out of the loop
-            if line == '___ready\n':
+            if line == self._sentinel:
                 self._output_ready()
                 continue
             if nested_prefix:
@@ -839,8 +840,8 @@ class remote:
                 else:
                     print( nested_prefix + line, end='', flush=True )
             else:
-                if x > 0 and line[:x] == '___ready\n'[:x]:
-                    missing_ready = '___ready\n'[x:]
+                if x > 0 and line[:x] == self._sentinel[:x]:
+                    missing_ready = self._sentinel[x:]
                 print( line, end='', flush=True )
         #
         log.d( self._name, 'stdout is finished' )
@@ -904,9 +905,13 @@ class remote:
         """
         log.d( self._name, 'running:', command )
         assert self._interactive
+        # fresh nonce so a stray '___ready' can't fake readiness
+        import uuid
+        self._sentinel = f'___ready_{uuid.uuid4().hex}\n'
         self._events.append( self._ready )
         self._ready.clear()
-        self._process.stdin.write( command + '\n' )
+        # one REPL line -> one sentinel; a stray one would wedge the next run()
+        self._process.stdin.write( f"__import__('sys').ps1={self._sentinel!r}; {command}\n" )
         self._process.stdin.flush()
         if timeout:
             self.wait_until_ready( timeout=timeout, on_fail=on_fail )
@@ -965,14 +970,16 @@ class remote:
         if self._process is not None:
             process = self._process
             self._process = None
+            # process (and its DDS participant) must be dead before the next test runs
             process.terminate()
             try:
                 process.wait( timeout=0.2 )
-                self._status = process.returncode
-                log.d( self._name, 'exited with status', self._status )
             except subprocess.TimeoutExpired:
-                log.d( self._name, 'process terminate timed out; no status' )
+                log.d( self._name, 'did not exit on terminate; killing' )
+                process.kill()
+                process.wait()
             finally:
+                self._status = process.returncode
                 # Unexpected, but known to happen (process terminated while we're waiting for it to be ready)
                 self._ready.set()
 

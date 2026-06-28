@@ -107,7 +107,7 @@ class ApiClient {
   }
 
   async resetDevice(deviceId: string): Promise<void> {
-    await this.client.post(`/devices/${deviceId}/reset/`)
+    await this.client.post(`/devices/${deviceId}/hw_reset/`)
   }
 
   async updateFirmwareFromFile(

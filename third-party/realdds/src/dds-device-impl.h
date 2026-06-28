@@ -27,7 +27,7 @@ class dds_topic_writer;
 class dds_subscriber;
 
 
-class dds_device::impl
+class dds_device::impl : public std::enable_shared_from_this< dds_device::impl >
 {
 public:
     enum class state_t

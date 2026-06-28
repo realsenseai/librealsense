@@ -194,6 +194,7 @@ try
     cli::value< uint16_t > udp_ttl_arg( "ttl", "1-255", 1, "UDP only. Value to use in UDP packet TTL field" );
     cli::value< int > domain_id_arg( "domain-id", "0-232", 0, "DDS Domain to use in the camera (default is 0)" );
     cli::value< int > sdk_domain_id_arg( "sdk-domain-id", "0-232", 0, "DDS Domain the SDK should use (default is 0). Saved in configuration file as default for future SDK use" );
+    cli::value< int > transient_sdk_domain_id_arg( "transient-sdk-domain-id", "0-232", 0, "DDS Domain the SDK should use for THIS run only; NOT saved to the configuration file. Use to reach a device on a non-default domain (e.g. a camera that reverted to its golden DDS domain 0) without persisting a change. Mutually exclusive with --sdk-domain-id" );
     cli::flag usb_first_arg( "usb-first", "Prioritize USB and fall back to Ethernet after link timeout" );
     cli::flag eth_first_arg( "eth-first", "Prioritize Ethernet and fall back to USB after link timeout" );
     cli::flag dynamic_priority_arg( "dynamic-priority", "Dynamically prioritize the last-working connection method (the default)" );
@@ -219,6 +220,7 @@ try
                         .arg( gateway_arg )
                         .arg( domain_id_arg )
                         .arg( sdk_domain_id_arg )
+                        .arg( transient_sdk_domain_id_arg )
                         .arg( no_reset_arg )
                         .process( argc, argv );
 
@@ -231,6 +233,13 @@ try
     if( ! config )
         config = json::object();
 
+    // --transient-sdk-domain-id and --sdk-domain-id are mutually exclusive (one is this-run-only,
+    // the other persists). Check this BEFORE either acts, so a rejected combo never persists.
+    bool const transient = transient_sdk_domain_id_arg.isSet();
+    if( transient && sdk_domain_id_arg.isSet() )
+        throw std::invalid_argument( "--transient-sdk-domain-id and --sdk-domain-id are mutually exclusive" );
+
+    // --sdk-domain-id persists the SDK domain to the config file for future runs.
     if( sdk_domain_id_arg.isSet() )
     {
         if( sdk_domain_id_arg.getValue() < 0 || sdk_domain_id_arg.getValue() > 232 )
@@ -249,6 +258,17 @@ try
         }
     }
 
+    // --transient-sdk-domain-id applies the SDK domain to THIS run's context only; it is NEVER
+    // written to the config file, so an aborted run can't leave a bad domain persisted.
+    if( transient )
+    {
+        if( transient_sdk_domain_id_arg.getValue() < 0 || transient_sdk_domain_id_arg.getValue() > 232 )
+            throw std::invalid_argument( "--transient-sdk-domain-id must be 0-232" );
+        settings["dds"]["enabled"] = true;
+        settings["dds"]["domain"] = transient_sdk_domain_id_arg.getValue();
+        INFO( "Using SDK domain " << transient_sdk_domain_id_arg.getValue() << " for this run only (not saved)" );
+    }
+
     if( disable_arg.isSet() )
     {
         if( config.nested( "context", "dds", "enabled" ).default_value( false ) )
@@ -263,11 +283,16 @@ try
         {
             INFO( "DDS is already disabled; no changes made" );
         }
-        return EXIT_SUCCESS;
+        // --disable persists a disabled default. With --transient-sdk-domain-id also set, DDS
+        // stays enabled for THIS run's context (applied above), so fall through and operate on
+        // the device; otherwise there's nothing more to do this run.
+        if( ! transient )
+            return EXIT_SUCCESS;
     }
     
-    // Enable DDS in future runs
-    if( ! config.nested( "context", "dds", "enabled" ).default_value( false ) )
+    // Enable DDS in future runs (persisted). With --transient-sdk-domain-id it's already enabled
+    // for this run's context above, and we must not touch the config file.
+    if( ! transient && ! config.nested( "context", "dds", "enabled" ).default_value( false ) )
     {
         config["context"]["dds"]["enabled"] = true;
         try

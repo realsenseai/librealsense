@@ -19,6 +19,7 @@ class MetadataSocketServer:
         sio,  # Can be either socketio.Server or socketio.AsyncServer
         rs_manager,
         update_interval: float = 1.0/30.0,  # Default to 30 FPS
+        point_cloud_throttle: int = 3,  # Include point_cloud every Nth broadcast (30/3 = 10 FPS)
     ):
         self._sio = sio
         self._rs_manager = rs_manager
@@ -26,6 +27,7 @@ class MetadataSocketServer:
         self._threads: Dict[str, threading.Thread] = {}
         self._stop_events: Dict[str, threading.Event] = {}
         self._lock = threading.Lock()
+        self._point_cloud_throttle = max(1, point_cloud_throttle)
 
     def _emit_event(self, event_name, data):
         """Helper method to handle emit for both sync and async server types"""
@@ -42,6 +44,11 @@ class MetadataSocketServer:
     def _broadcast_metadata_loop(self, device_id, stop_event):
         """The core loop that fetches and broadcasts metadata."""
         print(f"[MetadataBroadcaster] Starting broadcast loop for {device_id}...")
+
+        # Per-loop counter so each device's throttle is independent — a shared
+        # instance counter would race across per-device broadcaster threads and
+        # make the point-cloud "every Nth tick" pattern non-deterministic.
+        broadcast_count = 0
 
         while not stop_event.is_set():
             start_time = time.monotonic()
@@ -60,6 +67,9 @@ class MetadataSocketServer:
                 )
                 active_streams = []
 
+            broadcast_count += 1
+            send_point_cloud = (broadcast_count % self._point_cloud_throttle) == 0
+
             all_metadata: Dict[str, Optional[Dict]] = {}
             if is_streaming and active_streams:
                 for stream_type in active_streams:
@@ -72,9 +82,24 @@ class MetadataSocketServer:
                             and "point_cloud" in metadata
                             and "vertices" in metadata["point_cloud"]
                         ):
-                            metadata["point_cloud"]["vertices"] = base64.b64encode(
-                                metadata["point_cloud"]["vertices"].tobytes()
-                            ).decode("utf-8")
+                            # get_latest_metadata returns the cached dict by reference;
+                            # copy before encoding/dropping to avoid corrupting it for the next read.
+                            metadata = {**metadata}
+                            if send_point_cloud:
+                                pc_src = metadata["point_cloud"]
+                                pc_encoded = {
+                                    **pc_src,
+                                    "vertices": base64.b64encode(
+                                        pc_src["vertices"].tobytes()
+                                    ).decode("utf-8"),
+                                }
+                                if "colors" in pc_src and pc_src["colors"] is not None:
+                                    pc_encoded["colors"] = base64.b64encode(
+                                        pc_src["colors"].tobytes()
+                                    ).decode("utf-8")
+                                metadata["point_cloud"] = pc_encoded
+                            else:
+                                del metadata["point_cloud"]
                         all_metadata[stream_type] = metadata
                     except Exception as e:
                         if hasattr(e, "status_code"):

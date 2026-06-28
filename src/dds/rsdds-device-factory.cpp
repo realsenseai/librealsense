@@ -40,7 +40,10 @@ class rsdds_watcher_singleton
 {
     std::shared_ptr< realdds::dds_device_watcher > const _device_watcher;
     using signal = rsutils::signal< std::shared_ptr< realdds::dds_device > const &, bool /*added*/ >;
-    signal _callbacks;
+    // Held by shared_ptr so the watcher's device-added/removed callbacks (which run on detached
+    // threads) keep the signal alive for their duration: a callback may still be in flight when this
+    // singleton is destroyed, and dereferencing it through a raw `this` would be a use-after-free.
+    std::shared_ptr< signal > const _callbacks = std::make_shared< signal >();
 
 public:
     rsdds_watcher_singleton( std::shared_ptr< realdds::dds_participant > const & participant,
@@ -51,7 +54,7 @@ public:
         assert( _device_watcher->is_stopped() );
 
         _device_watcher->on_device_added(
-            [this, initialization_timeout_ms, partial_device_allowed]( std::shared_ptr< realdds::dds_device > const & dev )
+            [callbacks = _callbacks, initialization_timeout_ms, partial_device_allowed]( std::shared_ptr< realdds::dds_device > const & dev )
             {
                 try
                 {
@@ -59,7 +62,7 @@ public:
                     if( ! dev->wait_until_ready( initialization_timeout_ms, partial_device_allowed ) )
                         LOG_ERROR( "Discovered DDS device " << dev->debug_name()
                                    << " failed to be ready within timeout, using partial capabilities." );
-                    _callbacks.raise( dev, true );
+                    callbacks->raise( dev, true );
                 }
                 catch (std::runtime_error e)
                 {
@@ -67,13 +70,13 @@ public:
                 }
             } );
 
-        _device_watcher->on_device_removed( [this]( std::shared_ptr< realdds::dds_device > const & dev )
-                                            { _callbacks.raise( dev, false ); } );
+        _device_watcher->on_device_removed( [callbacks = _callbacks]( std::shared_ptr< realdds::dds_device > const & dev )
+                                            { callbacks->raise( dev, false ); } );
 
         _device_watcher->start();
     }
 
-    rsutils::subscription subscribe( signal::callback && cb ) { return _callbacks.subscribe( std::move( cb ) ); }
+    rsutils::subscription subscribe( signal::callback && cb ) { return _callbacks->subscribe( std::move( cb ) ); }
 
     std::shared_ptr< realdds::dds_device_watcher > const get_device_watcher() const { return _device_watcher; }
 };

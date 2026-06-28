@@ -6,6 +6,82 @@
 import pytest
 
 
+# Module-scoped fixtures that are intentionally device-independent (not re-created per camera).
+_PER_CAMERA_FIXTURE_ALLOWLIST = {
+    "_test_device_serial",          # the per-camera anchor itself (parametrized per device)
+    # Local override of pytest-repeat's fixture (lives in conftest, so the site-packages
+    # bypass below doesn't filter it out); per-repeat pass, device-independent.
+    "__pytest_repeat_step_number",
+}
+
+
+def _fixture_reaches(fm, fixturedef, target, node, visited=None):
+    """True if fixturedef transitively depends on the fixture named `target`.
+
+    `visited` tracks already-explored fixturedefs so diamond dependencies aren't re-walked
+    and fixture-override cycles can't recurse forever.
+    """
+    if visited is None:
+        visited = set()
+    if id(fixturedef) in visited:
+        return False
+    visited.add(id(fixturedef))
+    return any(arg == target
+               or any(_fixture_reaches(fm, dep, target, node, visited)
+                      for dep in (fm.getfixturedefs(arg, node) or []))
+               for arg in fixturedef.argnames)
+
+
+def assert_module_fixtures_are_per_camera(session, items):
+    """Guard: in a module that runs across more than one camera, every module-scoped fixture
+    must be re-created per camera, i.e. (transitively) depend on _test_device_serial. One that
+    doesn't is created once and SHARED across all of the module's cameras, so its teardown runs
+    at module end instead of per camera — fail collection so that mistake can't slip in.
+
+    Only modules with >1 distinct camera are checked: with a single camera, module scope is
+    already per-camera, so a module-scoped fixture there is harmless (e.g. a device_each that
+    matches one device, or a no-device CI run that resolves to a single skip sentinel).
+    """
+    fm = session._fixturemanager
+    # Group device-parametrized items by module and collect each module's distinct cameras.
+    module_items = {}    # module path -> [items]
+    module_cameras = {}  # module path -> set of distinct _test_device_serial values
+    for item in items:
+        callspec = getattr(item, "callspec", None)
+        if not callspec or "_test_device_serial" not in callspec.params:
+            continue  # not bound to a camera (key absent != present-but-None)
+        mod = item.nodeid.split("::", 1)[0]
+        module_items.setdefault(mod, []).append(item)
+        module_cameras.setdefault(mod, set()).add(str(callspec.params.get("_test_device_serial")))
+
+    offenders = set()
+    for mod, mod_items in module_items.items():
+        if len(module_cameras[mod]) < 2:
+            continue  # single camera → module scope is already per-camera
+        for item in mod_items:
+            for name in item.fixturenames:
+                if name in _PER_CAMERA_FIXTURE_ALLOWLIST:
+                    continue
+                defs = fm.getfixturedefs(name, item)
+                if not defs:
+                    continue
+                fixturedef = defs[-1]
+                if fixturedef.scope != "module":
+                    continue
+                if "site-packages" in fixturedef.func.__code__.co_filename:
+                    continue  # don't police plugin fixtures (pytest-retry/repeat/etc.)
+                if not _fixture_reaches(fm, fixturedef, "_test_device_serial", item):
+                    offenders.add(name)
+    if offenders:
+        raise pytest.UsageError(
+            f"Module-scoped fixture(s) {sorted(offenders)} are used by a module that runs on more "
+            "than one camera but do not depend on _test_device_serial, so they are created once and "
+            "SHARED across the module's cameras — their teardown runs at module end, not per camera. "
+            "Depend on test_device (or _test_device_serial) for per-camera lifecycle, or add the "
+            "fixture to _PER_CAMERA_FIXTURE_ALLOWLIST if it is genuinely device-independent."
+        )
+
+
 def filter_and_sort_items(config, items):
     """Auto-skip nightly/dds tests unless opted in, filter --live/--not-live, and sort by priority.
 

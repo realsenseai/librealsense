@@ -19,6 +19,16 @@ log = logging.getLogger('librealsense')
 _LOG_FORMAT = '%(asctime)s.%(msecs)03.0f -%(levelname).1s- %(message)s'
 _LOG_DATEFMT = '%H:%M:%S'
 
+
+class _NestedFormatter( logging.Formatter ):
+    """Prepend a logger's `nested` tag (e.g. '[C  ] ') to each line, mirroring the legacy
+    rspy.log line prefix (rspy/log.py). A module sets `log.nested = 'C  '` on its own
+    logger to tag its (client) lines; read here per-record so it stays per-module."""
+    def format( self, record ):
+        line = super().format( record )
+        tag = getattr( logging.getLogger( record.name ), 'nested', None )
+        return f'[{tag}] {line}' if tag else line
+
 # unit-tests/ directory — used as fallback for log output
 _unit_tests_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Walk two levels up from rspy/pytest/ to get unit-tests/py/, then one more for unit-tests/
@@ -107,6 +117,32 @@ def setup_test_logging(config):
     config._test_logdir = logdir
 
 
+def configure_junit_logging(config):
+    """Embed every test's captured log into its JUnit <system-out> so the Jenkins Test
+    Result page shows the log inline (for passing tests too), without the JUnit
+    Attachments plugin.
+
+    Must run after the junitxml plugin has created its LogXML (we set xmlpath in
+    setup_test_logging, which runs earlier in pytest_configure), so call from
+    pytest_sessionstart.
+    """
+    if not getattr(config.option, 'xmlpath', None):
+        return
+    try:
+        from _pytest.junitxml import LogXML
+    except ImportError as e:
+        log.debug(f'Could not import LogXML to configure JUnit logging: {e}')
+        return
+    for plugin in config.pluginmanager.get_plugins():
+        if isinstance(plugin, LogXML):
+            plugin.logging = 'all'           # capture stdout/stderr + log records into the XML
+            plugin.log_passing_tests = True  # ...for every test, including passing ones
+            log.debug('JUnit: tests will embed their log in <system-out>')
+            return
+    log.warning('JUnit: xmlpath is set but no LogXML plugin instance was found -- '
+                'test logs will NOT be embedded in the XML.')
+
+
 def configure_logging(config, debug_requested):
     """Configure root logger level, live logging, and suppress noisy loggers.
 
@@ -176,7 +212,7 @@ def start_test_log(item):
         # pass's log so the Jenkins report links to the latest attempt.
         # Appending would interleave timestamps from different passes.
         file_handler = logging.FileHandler(log_path, mode='w')
-        file_handler.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT))
+        file_handler.setFormatter(_NestedFormatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT))
         file_handler.setLevel(logging.DEBUG)
         logging.getLogger().addHandler(file_handler)
         _current_log_key = key

@@ -15,7 +15,7 @@ import re
 import platform
 import pyrealsense2 as rs
 import pyrsutils as rsutils
-from rspy import log, test, file, repo, fw_compat
+from rspy import log, test, file, repo, fw_compat, config_file
 from rspy.timer import Timer
 import time
 import argparse
@@ -125,6 +125,79 @@ for tool in file.find( repo.build, fw_updater_exe_regex ):
 if not fw_updater_exe:
     log.f( "Could not find the update tool file (rs-fw-update.exe)" )
 
+
+def recover_dds_device_on_golden_domain( serial ):
+    """
+    A D555 bricked in DFU reverts to its golden DDS domain (0), so it does NOT appear on the
+    rig's configured domain -- our normal discovery below would miss it. The harness detects it
+    via a domain-0 fallback and passes its serial here. If a recovery device with `serial` is
+    present on domain 0: gold-flash it (on domain 0), then restore its configured DDS domain
+    with rs-dds-config using --transient-sdk-domain-id (so nothing is written to realsense-config.json
+    and an aborted run can't leave the config on domain 0). After this the device is back on the
+    configured domain and the normal flow proceeds. Returns True if a recovery was performed.
+    """
+    if 'dds' not in test.context:
+        return False
+    # Look for the recovery device on the golden domain 0. Guard the probe so a DDS hiccup can
+    # never disturb the normal discovery/recovery flow below (esp. the USB path on mixed rigs).
+    recovery_found = False
+    rec_name = None
+    try:
+        ctx0 = rs.context( { 'dds': { 'enabled': True, 'domain': 0 } } )
+        for d in ctx0.query_devices():
+            if not d.is_in_recovery_mode():
+                continue
+            d_id = d.get_info( rs.camera_info.firmware_update_id ) \
+                if d.supports( rs.camera_info.firmware_update_id ) else None
+            if d_id == serial:
+                recovery_found = True
+                rec_name = d.get_info( rs.camera_info.name ) if d.supports( rs.camera_info.name ) else None
+                break
+        del ctx0
+    except Exception as e:
+        log.d( f"domain-0 DDS recovery probe failed ({e}); proceeding with normal discovery" )
+        return False
+    if not recovery_found:
+        return False
+
+    log.d( f"found recovery device {serial} ({rec_name}) on golden DDS domain 0; recovering ..." )
+    gold_fw = fw_compat.download_gold_fw( "D500", "D555" )  # D555 is the only DDS DFU SKU today; revisit for D585 etc.
+    if not gold_fw:
+        log.f( f"Could not download gold recovery FW for {rec_name} ({serial}); cannot recover DFU device" )
+        return False  # defensive: log.f normally exits; never build a -f command with gold_fw=None
+    # 1) gold-flash on domain 0 (where a bricked DDS device lives)
+    cmd = [fw_updater_exe, '-r', '-f', gold_fw, '-s', serial, '--domain-id', '0']
+    log.d( 'running:', cmd )
+    result = subprocess.run( cmd )
+    if result.returncode != 0:
+        log.f( f"Gold-flash failed for {serial} (rc={result.returncode}); device may still be in DFU" )
+        return False  # defensive: log.f normally exits; don't report success on a failed flash
+    wait_for_reboot( same_version=False )
+    # 2) the recovered camera comes back on golden domain 0; restore its configured domain
+    #    WITHOUT persisting anything (so an aborted run can't leave the SDK config on domain 0).
+    config_domain = config_file.get_domain_from_config_file_or_default()
+    if config_domain and config_domain != 0:
+        # rs-dds-config is only needed here, to restore a recovered camera's DDS domain
+        dds_config_exe = repo.find_built_exe( 'tools/dds/dds-config', 'rs-dds-config' )
+        if not dds_config_exe:
+            log.f( "Recovered the camera but rs-dds-config was not found to restore its DDS domain" )
+            return False  # defensive: log.f normally exits
+        # Reach the camera on golden domain 0 (--transient-sdk-domain-id, not persisted) and set
+        # its DDS domain to the rig's configured value.
+        cmd = [dds_config_exe, '--serial-number', serial,
+               '--transient-sdk-domain-id', '0', '--domain-id', str( config_domain )]
+        log.d( 'running:', cmd )
+        result = subprocess.run( cmd )
+        if result.returncode != 0:
+            log.w( f"rs-dds-config returned rc={result.returncode}; camera may not be on DDS domain {config_domain}" )
+        wait_for_reboot( same_version=False )
+    return True
+
+
+# A bricked DDS camera reverts to golden domain 0 and won't show on the configured domain;
+# recover + restore it first so the normal discovery below succeeds.
+recovered = recover_dds_device_on_golden_domain( args.serial )
+
 device, ctx = test.find_first_device_or_exit( args.serial )
 product_line = device.get_info( rs.camera_info.product_line )
 product_name = device.get_info( rs.camera_info.name )
@@ -152,16 +225,18 @@ if not custom_fw_path:
 
 
 test.start( "Update FW" )
-# check if recovery. If so recover
-recovered = False
+# check if recovery on the configured domain (e.g. a D400 USB recovery device). If so recover.
+# (recovered may already be True from the domain-0 DDS recovery handled above.)
 if device.is_in_recovery_mode():
     log.d( "recovering device ..." )
     try:
-        # rs-fw-update -r requires a *signed* FW image. The caller's --custom-fw-d400
-        # is typically unsigned, so we fetch a gold signed FW from S3 to recover with.
-        gold_fw = fw_compat.download_gold_d400_fw()
+        # rs-fw-update -r needs a known-good image, which isn't always the caller's
+        # --custom-fw-<plat> path (e.g. D400 -r expects a *signed* FW, while the custom
+        # image is typically unsigned). Fetch the per-product-line gold FW to recover with.
+        gold_fw = fw_compat.download_gold_fw( product_line, product_name )
         if not gold_fw:
-            log.f( "Could not download gold signed FW; cannot recover DFU device" )
+            log.f( f"Could not download gold recovery FW for {product_name}; cannot recover DFU device" )
+            sys.exit( 1 )  # defensive: log.f normally exits; never build a -f command with gold_fw=None
         cmd = [fw_updater_exe, '-r', '-f', gold_fw, '-s', args.serial]
         del device, ctx
         log.d( 'running:', cmd )

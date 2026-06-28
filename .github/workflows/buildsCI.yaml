@@ -236,7 +236,7 @@ jobs:
       shell: bash
       run: |
         python3 -m pip install -r unit-tests/requirements.txt
-        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "dds windows"
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "dds windows" --tag dds
 
 #--------------------------------------------------------------------------------
   Win_SH_Py_DDS_SEC:  # Windows, Shared, Python, Tools, DDS, additional security checks

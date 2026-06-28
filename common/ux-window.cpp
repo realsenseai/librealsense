@@ -447,7 +447,7 @@ namespace rs2
         // Prepare the splash screen and do some initialization in the background
         int x, y, comp;
         auto r = stbi_load_from_memory(splash, (int)splash_size, &x, &y, &comp, false);
-        _splash_tex.upload_image(x, y, r);
+        _splash_tex->upload_image(x, y, r);
         stbi_image_free(r);
     }
 
@@ -504,11 +504,11 @@ namespace rs2
             shader->set_power(power);
             shader->set_ray_center(float2{ ox, oy });
             shader->end();
-            _2d_vis->draw_texture(_splash_tex.get_gl_handle(), opacity);
+            _2d_vis->draw_texture(_splash_tex->get_gl_handle(), opacity);
         }
         else
         {
-            _splash_tex.show({ 0.f,0.f,float(_width),float(_height) }, opacity);
+            _splash_tex->show({ 0.f,0.f,float(_width),float(_height) }, opacity);
         }
 
         std::string hourglass = std::string(rsutils::string::from() << textual_icons::hourglass);
@@ -681,6 +681,9 @@ namespace rs2
         ImGui::GetIO().Fonts->ClearFonts();  // To be refactored into Viewer theme object
         ImPlot::DestroyContext();
         RsImGui::PopNewFrame();
+        // Release the splash texture while the GL context is still current —
+        // member dtors below would otherwise run glDeleteTextures with no context.
+        _splash_tex.reset();
         glfwDestroyWindow(_win);
 
         glfwDestroyCursor(_hand_cursor);

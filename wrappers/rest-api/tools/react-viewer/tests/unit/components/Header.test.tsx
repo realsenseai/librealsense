@@ -26,7 +26,7 @@ describe('Header', () => {
     expect(screen.getByText(/3D View/i)).toBeInTheDocument()
   })
 
-  it('3D view button is disabled', () => {
+  it('3D view button is enabled', () => {
     render(<Header />, {
       initialStoreState: {
         deviceStates: {
@@ -39,23 +39,7 @@ describe('Header', () => {
     })
 
     const button = screen.getByText(/3D View/i).closest('button')
-    expect(button).toBeDisabled()
-  })
-
-  it('3D view button has "coming soon" tooltip', () => {
-    render(<Header />, {
-      initialStoreState: {
-        deviceStates: {
-          '123': {
-            isActive: true,
-            device: { device_id: '123', name: 'Test Device' },
-          } as any,
-        },
-      },
-    })
-
-    const button = screen.getByText(/3D View/i).closest('button')
-    expect(button).toHaveAttribute('title', '3D View feature coming soon')
+    expect(button).not.toBeDisabled()
   })
 
   it('does not show view toggle when no active devices', () => {

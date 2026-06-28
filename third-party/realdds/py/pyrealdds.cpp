@@ -1181,10 +1181,12 @@ PYBIND11_MODULE(NAME, m) {
     py::class_< dds_stream, std::shared_ptr< dds_stream > > stream_client_base( m, "stream", stream_base );
     stream_client_base  //
         .def( "open", &dds_stream::open )
-        .def( "close", &dds_stream::close )
+        // close joins the reader thread, so release the GIL or it deadlocks if the thread is mid Python-callback
+        .def( "close", &dds_stream::close, py::call_guard< py::gil_scoped_release >() )
         .def( "is_open", &dds_stream::is_open )
         .def( "start_streaming", &dds_stream::start_streaming )
-        .def( "stop_streaming", &dds_stream::stop_streaming )
+        // stop_streaming only sets a flag (no join); guard is for consistency with close
+        .def( "stop_streaming", &dds_stream::stop_streaming, py::call_guard< py::gil_scoped_release >() )
         .def( "__repr__", []( dds_stream const & self ) {
             std::ostringstream os;
             os << "<" SNAME "." << self.type_string() << "_stream \"" << self.name() << "\"";

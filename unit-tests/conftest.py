@@ -57,6 +57,7 @@ from rspy.signals import register_signal_handlers
 from rspy.pytest.logging_setup import (
     setup_test_logging, bridge_rspy_log, ensure_newline, configure_logging,
     start_test_log, stop_test_log, print_terminal_summary,
+    configure_junit_logging,
 )
 from rspy.pytest.log_live_format import install as install_live_log_format
 from rspy.pytest.cli import consume_legacy_flags, apply_pending_flags
@@ -66,7 +67,7 @@ from rspy.pytest.device_helpers import (
     _MISSING_SENTINEL_PREFIX,
     _SKIP_SENTINEL_PREFIX,
 )
-from rspy.pytest.collection import filter_and_sort_items
+from rspy.pytest.collection import filter_and_sort_items, assert_module_fixtures_are_per_camera
 from rspy.pytest.plugins import check_required_plugins
 
 log = logging.getLogger('librealsense')
@@ -86,6 +87,13 @@ pyrs_dir = repo.find_pyrs_dir()
 if pyrs_dir and pyrs_dir not in sys.path:
     sys.path.insert(1, pyrs_dir)
 
+# Forked children (rspy.test.remote) are a fresh interpreter that won't see our sys.path
+# edits; export PYTHONPATH so they can import rspy / pyrealsense2 (cf. run-unit-tests.py).
+existing = os.environ.get( "PYTHONPATH", "" )
+os.environ["PYTHONPATH"] = py_dir + ( os.pathsep + existing if existing else "" )
+if pyrs_dir:
+    os.environ["PYTHONPATH"] += os.pathsep + pyrs_dir
+
 try:
     import pyrealsense2 as rs
 except ImportError:
@@ -97,6 +105,11 @@ try:
 except ImportError:
     log.warning('No pyrsutils library available!')
     pyrsutils = None
+
+try:
+    import pyrealdds  # noqa: F401 — caches the module so unit-tests/dds/pytest-*.py find it after pytest reshuffles sys.path
+except ImportError:
+    pass
 
 
 # ============================================================================
@@ -354,14 +367,16 @@ def pytest_configure(config):
     if include_list:
         print(f"-D- including only devices: {' '.join(include_list)}")
 
-    # Query devices early for test parametrization
-    try:
-        hub_reset = config.getoption("--hub-reset", default=False)
-        enable_dds = 'dds' in context_list
-        devices.query(hub_reset=hub_reset, disable_dds=not enable_dds)
-        devices.map_unknown_ports()
-    except Exception as e:
-        log.warning(f"Failed to query devices during configuration: {e}")
+    # Skip under --not-live: nothing reads harness devices then, and the DDS context it
+    # creates would otherwise pollute discovery for the forked DDS servers.
+    if not config.getoption("--not-live", default=False):
+        try:
+            hub_reset = config.getoption("--hub-reset", default=False)
+            enable_dds = 'dds' in context_list
+            devices.query(hub_reset=hub_reset, disable_dds=not enable_dds)
+            devices.map_unknown_ports()
+        except Exception as e:
+            log.warning(f"Failed to query devices during configuration: {e}")
 
 
 def pytest_generate_tests(metafunc):
@@ -369,8 +384,9 @@ def pytest_generate_tests(metafunc):
     resolve_device_each_serials(metafunc)
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(session, config, items):
     """Auto-skip nightly/dds tests, filter --live, sort by priority."""
+    assert_module_fixtures_are_per_camera(session, items)
     test_dirs = config.getoption("--test-dir", default=[])
     if test_dirs:
         abs_dirs = [os.path.abspath(p) for p in test_dirs]
@@ -412,6 +428,44 @@ def pytest_runtest_makereport(item, call):
     if call.when == "call":
         ensure_newline()
         log.debug(f"Test execution took {report.duration:.3f}s")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item):
+    """Surface pytest-check soft-check failures in the call phase.
+
+    pytest-check defers its failures to pytest_runtest_makereport. But pytest-retry
+    reruns a test by invoking pytest_runtest_call directly and building the report
+    with TestReport.from_item_and_call, which never fires makereport. So on a retry
+    attempt the soft-check failures are invisible to the retry decision (the test
+    looks passed) and instead surface later against the teardown phase, which
+    pytest-retry refuses to retry. Net effect: a retried test is reported "passed"
+    yet still fails the run with a teardown error.
+
+    Flushing the failures here, in the call phase, makes them visible to pytest-retry
+    on every attempt (a genuinely flaky soft-check test passes on retry; a persistent
+    one stays failed) and keeps them off the teardown report. Scoped to fire only for
+    the buggy case; every other path is left to pytest-check unchanged.
+    """
+    outcome = yield
+    try:
+        from pytest_check import check_log
+    except ImportError:
+        return
+    failures = check_log.get_failures()
+    if not failures:
+        return
+    # Don't mask a real exception, and leave pytest-check's xfail handling to it.
+    if outcome.excinfo is not None or item.get_closest_marker("xfail"):
+        return
+    num_failures = check_log._num_failures
+    check_log.clear_failures()
+    raise AssertionError("\n".join(failures + ["-" * 60, f"Failed Checks: {num_failures}"]))
+
+
+def pytest_sessionstart(session):
+    """Configure the junitxml plugin once it exists (after pytest_configure)."""
+    configure_junit_logging(session.config)
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
@@ -664,45 +718,29 @@ def test_context_var():
 
 
 @pytest.fixture(scope="module")
-def _safety_mode_state():
-    """Module-scoped state holder for D585S service mode, keyed by device serial number.
+def test_device_wrapped(test_device):
+    """Like test_device, but puts a D585S into service mode for this device's tests and restores
+    run mode at teardown. No-op for other device families.
 
-    Each serial gets its own entry so that multiple D585S cameras in the same module
-    (e.g. via device_each) are each entered into service mode independently.
-    Teardown runs once at module end, restoring run mode for every camera that was entered.
-    """
-    state = {}  # serial_number -> {'sensor': ..., 'entered': False}
-    yield state
-    for sn, entry in state.items():
-        if entry['entered'] and entry['sensor'] is not None:
-            try:
-                entry['sensor'].set_option(rs.option.safety_mode, rs.safety_mode.run)
-            except Exception as e:
-                # Don't throw on cleanup failure, to not mask test failures and also after test device is usually reset.
-                log.error(f"safety_mode restore failed for {sn}: {e}")
-
-
-@pytest.fixture(scope="module")
-def test_device_wrapped(test_device, _safety_mode_state):
-    """Like test_device, but puts D585S into service mode once per module per device.
-
-    Many option-setting operations on D585S require service mode. No-op for all other
-    device families. Service mode is entered on the first test in the module that uses
-    this fixture for a given serial, and restored once at module teardown — not toggled
-    per test case. Multiple D585S cameras are each tracked independently by serial.
+    Parametrized per device (via test_device), so enter and restore both run while this camera is
+    the enabled one: service mode is restored at the device's own teardown, before the hub
+    switches to the next camera (not deferred to module end via shared state).
     """
     dev, ctx = test_device
+    # Read serial up front, while the device is still healthy: the restore path below runs in an
+    # except block where the device may be disconnected, so get_info() there could throw too.
+    sn = dev.get_info(rs.camera_info.serial_number) if dev.supports(rs.camera_info.serial_number) else "?"
     is_d585s = dev.supports(rs.camera_info.name) and "D585S" in dev.get_info(rs.camera_info.name)
+    safety_sensor = None
     if is_d585s:
-        sn = dev.get_info(rs.camera_info.serial_number)
-        if sn not in _safety_mode_state:
-            _safety_mode_state[sn] = {'sensor': None, 'entered': False}
-        entry = _safety_mode_state[sn]
-        if not entry['entered']:
-            safety_sensor = dev.first_safety_sensor()
-            if safety_sensor.get_option(rs.option.safety_mode) != rs.safety_mode.service:
-                # Will throw on failure — intentional so we fail the test rather than run without service mode.
-                safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.service)
-            entry['sensor'] = safety_sensor
-            entry['entered'] = True
+        safety_sensor = dev.first_safety_sensor()
+        if safety_sensor.get_option(rs.option.safety_mode) != rs.safety_mode.service:
+            # Will throw on failure — intentional so we fail the test rather than run without service mode.
+            safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.service)
     yield dev, ctx
+    if safety_sensor is not None:
+        try:
+            safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.run)
+        except Exception as e:
+            # Best-effort: don't mask test failures, and the device may already be reset by teardown time.
+            log.warning(f"safety_mode restore skipped for {sn}: {e}")

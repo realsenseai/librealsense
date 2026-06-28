@@ -1,20 +1,24 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
 
-#test:donotrun:!dds
+import pytest
+import re
+import logging
+import pyrealsense2 as rs
 
-from rspy import log, test
+log = logging.getLogger(__name__)
 log.nested = 'C  '
 
-import pyrealsense2 as rs
-if log.is_debug_on():
-    rs.log_to_console( rs.log_severity.debug )
+pytestmark = [
+    pytest.mark.dds,
+]
 
+if log.isEnabledFor(logging.DEBUG):
+    rs.log_to_console( rs.log_severity.debug )
 
 #############################################################################################
 #
-test.start( "Multiple participants on the same domain should fail" )
-try:
+def test_multiple_participants_on_same_domain_should_fail():
     contexts = []
     contexts.append( rs.context( { 'dds': { 'enabled': True, 'domain': 124, 'participant': 'context1' }} ))
     # another context, same domain and name -> OK
@@ -23,12 +27,8 @@ try:
     contexts.append( rs.context( { 'dds': { 'enabled': True, 'domain': 124 }} ))
     # same name, different domain -> different participant; should be OK:
     contexts.append( rs.context( { 'dds': { 'enabled': True, 'domain': 125, 'participant': 'context1' }} ))
-    test.check_throws( lambda: rs.context( { 'dds': { 'enabled': True, 'domain': 124, 'participant': 'context2' }} ),
-        RuntimeError, "A DDS participant 'context1' already exists in domain 124; cannot create 'context2'" )
-except:
-    test.unexpected_exception()
-del contexts
-test.finish()
+    with pytest.raises( RuntimeError, match=re.escape( "A DDS participant 'context1' already exists in domain 124; cannot create 'context2'" ) ):
+        rs.context( { 'dds': { 'enabled': True, 'domain': 124, 'participant': 'context2' }} )
+    del contexts
 #
 #############################################################################################
-test.print_results_and_exit()

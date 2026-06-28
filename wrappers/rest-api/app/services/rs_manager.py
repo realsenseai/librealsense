@@ -7,7 +7,8 @@ import struct
 import threading
 import time
 import logging
-from typing import Callable, Dict, List, Optional, Any, Tuple, Set
+from collections import deque
+from typing import Callable, Deque, Dict, List, Optional, Any, Tuple, Set
 import pyrealsense2 as rs
 import numpy as np
 import cv2
@@ -31,6 +32,12 @@ from app.services.metadata_socket_server import MetadataSocketServer
 _IS_WINDOWS = platform.system() == "Windows"
 
 FW_STATUS_UNKNOWN = "unknown"
+
+# Recent color frames retained per device for texturing the 3D point cloud.
+# Five frames at 30 fps covers the typical depth/color SDK-latency offset
+# (~one capture interval); the picker selects the entry whose timestamp is
+# closest to the depth frame being processed.
+COLOR_FRAME_HISTORY = 5
 
 
 class RealSenseManager:
@@ -60,7 +67,10 @@ class RealSenseManager:
         self.lock = threading.Lock()
         self.max_queue_size = 5
         self.is_pointcloud_enabled: Dict[str, bool] = {}
-        self.pc = rs.pointcloud()
+        # One rs.pointcloud() per device: pc.map_to(color) mutates internal
+        # state, and depth/color threads from different devices would race on
+        # a shared instance (texturing device A's cloud with device B's color).
+        self.point_clouds: Dict[str, "rs.pointcloud"] = {}
 
         # Caches for pipeline/config reuse to reduce startup cost
         self.config_cache: Dict[str, Dict[str, rs.config]] = {}  # device -> signature -> config
@@ -72,6 +82,18 @@ class RealSenseManager:
 
         # Store latest raw depth frames for pixel depth queries
         self.depth_frames: Dict[str, Any] = {}  # device_id -> rs.depth_frame
+
+        # Short history of recent color frames per device for texturing the
+        # 3D point cloud. Sensor-mode runs depth/color on independent threads
+        # so the depth thread looks up the closest-by-timestamp color frame
+        # here via ``_pick_color_for_depth``. Cross-sensor matching by
+        # ``frame.get_timestamp()`` only works because ``start_sensor`` sets
+        # ``global_time_enabled`` on the sensor — without that, different
+        # sensors can report timestamps in different clock domains (a fixed
+        # multi-second offset). A deque(maxlen=N) gives O(1) bounded append
+        # and atomic-under-GIL pop-on-overflow, which the previous
+        # list+pop(0) pattern did not.
+        self.color_frames: Dict[str, Deque[Any]] = {}  # device_id -> deque of rs.video_frame, oldest first
 
         # Cache of supported frame_metadata values keyed by device_id then profile uid.
         # Nested so a single device's profiles can be evicted without wiping others.
@@ -143,6 +165,12 @@ class RealSenseManager:
         self.frame_queues.pop(serial, None)
         self.metadata_queues.pop(serial, None)
         self.depth_frames.pop(serial, None)
+        self.color_frames.pop(serial, None)
+        self.point_clouds.pop(serial, None)
+        # Drop the point-cloud-enabled flag so a re-plug of the same serial
+        # doesn't silently resume emitting PC metadata that the UI thinks is
+        # off (frontend resets to off on disconnect).
+        self.is_pointcloud_enabled.pop(serial, None)
         self.devices.pop(serial, None)
         self.device_infos.pop(serial, None)
         self._supported_md_by_profile.pop(serial, None)
@@ -712,18 +740,27 @@ class RealSenseManager:
 
     def reset_device(self, device_id: str) -> bool:
         """Reset a specific device by ID"""
-        if device_id not in self.devices:
-            self.refresh_devices()
+        with self.lock:
             if device_id not in self.devices:
                 raise RealSenseError(
                     status_code=404, detail=f"Device {device_id} not found"
                 )
+            dev = self.devices[device_id]
+            self._remove_device(device_id)
 
-        dev = self.devices[device_id]
+        self._emit_socket_event("devices_changed", {"added": [], "removed": [device_id]})
+
         try:
             dev.hardware_reset()
             return True
-        except RuntimeError as e:
+        except Exception as e:
+            # Reset failed: handle still valid, device still plugged in.
+            # Restore cache + announce device back so FE stops showing it as gone.
+            with self.lock:
+                self._register_new_device(dev)
+            self._emit_socket_event(
+                "devices_changed", {"added": [device_id], "removed": []},
+            )
             raise RealSenseError(
                 status_code=500, detail=f"Failed to reset device: {str(e)}"
             )
@@ -1475,6 +1512,8 @@ class RealSenseManager:
                     self.pipeline_signatures.pop(device_id, None)
                     self.frame_queues.pop(device_id, None)
                     self.metadata_queues.pop(device_id, None)
+                    self.color_frames.pop(device_id, None)
+                    self.point_clouds.pop(device_id, None)
                     self._supported_md_by_profile.pop(device_id, None)
                     self.stopping.discard(device_id)
                     # Reset streaming mode to idle
@@ -1713,6 +1752,155 @@ class RealSenseManager:
                 continue
         return attrs
 
+    # Cap the number of vertices shipped per frame so payload/decode/render cost
+    # stays roughly constant regardless of stream resolution.
+    POINT_CLOUD_MAX_VERTICES = 60000
+
+    def _build_point_cloud_metadata(self, device_id: str, depth_frame, color_frame=None) -> Optional[Dict]:
+        """Compute decimated point-cloud vertices from a depth frame, ready for serialization.
+
+        When ``color_frame`` is supplied and it's an RGB8/BGR8 frame, this also
+        samples a per-vertex RGB triplet using the texture coordinates produced
+        by ``rs.pointcloud.map_to`` — mirrors the C++ realsense-viewer's textured
+        point cloud rendering. The client falls back to a depth colormap when
+        ``colors`` is absent.
+
+        Uses a per-device ``rs.pointcloud`` so map_to()/calculate() can't race
+        across devices.
+
+        Returns None if calculate() yields nothing. Used by both the pipeline-mode
+        frame collector and the sensor-mode frame processor.
+        """
+        pc = self.point_clouds.get(device_id)
+        if pc is None:
+            pc = rs.pointcloud()
+            self.point_clouds[device_id] = pc
+        if color_frame:
+            try:
+                pc.map_to(color_frame)
+            except Exception:
+                color_frame = None  # not all profiles support map_to; fall back silently
+        points = pc.calculate(depth_frame)
+        if not points:
+            return None
+        verts = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)
+
+        # Mask + decimate BEFORE sampling colors — at 1280x720 the full vertex
+        # buffer is ~921K entries, and sampling/copying 900K colors per depth
+        # frame was bottlenecking the depth thread down to ~1 Hz (the rotation
+        # desync the user reported: by the time depth_T was ready, color was
+        # already at color_T+1s). Sampling at the final ~60K decimated indices
+        # is ~15x less work.
+        mask = verts[:, 2] >= 0.03  # drop invalid near-camera points
+        verts = verts[mask]
+        count = len(verts)
+        step = 1
+        if count > self.POINT_CLOUD_MAX_VERTICES:
+            step = (count // self.POINT_CLOUD_MAX_VERTICES) + 1
+            verts = verts[::step]
+
+        colors_rgb: Optional[np.ndarray] = None
+        if color_frame:
+            tex = np.asanyarray(points.get_texture_coordinates()).view(np.float32).reshape(-1, 2)
+            tex = tex[mask]
+            if step > 1:
+                tex = tex[::step]
+            colors_rgb = self._sample_color_at_tex(tex, color_frame)
+
+        # Contiguous so .tobytes() in the socket server is a straight memcpy.
+        verts = np.ascontiguousarray(verts, dtype=np.float32)
+        result: Dict[str, Any] = {"vertices": verts, "texture_coordinates": []}
+        if colors_rgb is not None:
+            result["colors"] = np.ascontiguousarray(colors_rgb, dtype=np.uint8)
+        return result
+
+    def _pick_color_for_depth(self, device_id: str, depth_frame) -> Optional[Any]:
+        """Pick the cached color frame whose timestamp is closest to the depth
+        frame's. Both timestamps come from ``frame.get_timestamp()``, which —
+        with ``global_time_enabled`` set on the sensors at start time — are
+        translated by the SDK into a unified system-time domain regardless of
+        which sensor produced them. The short history covers the typical
+        depth/color SDK-latency offset (~one capture interval) so the picked
+        color reflects the same real-time moment as the depth.
+        """
+        # Snapshot the deque before iterating — the color sensor thread can
+        # append/evict concurrently and `for cf in deque` is not safe against
+        # that. tuple() captures the current frame refs atomically under GIL.
+        hist = self.color_frames.get(device_id)
+        if not hist:
+            return None
+        snapshot = tuple(hist)
+        if not snapshot:
+            return None
+        try:
+            depth_ts = depth_frame.get_timestamp()
+        except RuntimeError:
+            return snapshot[-1]
+        best = snapshot[-1]
+        best_dt = float("inf")
+        for cf in snapshot:
+            try:
+                dt = abs(cf.get_timestamp() - depth_ts)
+            except RuntimeError:
+                continue
+            if dt < best_dt:
+                best_dt = dt
+                best = cf
+        return best
+
+    def _is_color_streaming(self, device_id: str) -> bool:
+        """Whether 'color' is currently in this device's active stream set.
+
+        Used by the sensor-mode depth thread to decide whether the cached color
+        frame in ``self.color_frames`` is still fresh enough to texture-map the
+        cloud. Pipeline mode reads color straight from the frameset and doesn't
+        need this — the frameset already drops disabled streams.
+        """
+        mode = self.streaming_mode.get(device_id)
+        if mode == "pipeline":
+            return any(s.lower() == "color" for s in self.active_streams.get(device_id, set()))
+        if device_id in self.sensor_streams:
+            for sensor_info in self.sensor_streams[device_id].values():
+                if not sensor_info.get("is_streaming", False):
+                    continue
+                if any(st.lower() == "color" for st in sensor_info.get("stream_types", [])):
+                    return True
+        return False
+
+    @staticmethod
+    def _sample_color_at_tex(tex: np.ndarray, color_frame) -> Optional[np.ndarray]:
+        """Return Nx3 uint8 RGB sampled at the supplied texture coordinates.
+
+        ``tex`` is the already-masked, already-decimated tex-coord array (Nx2,
+        u/v in [0,1]) — sampling per-vertex on the full pre-decimation buffer
+        is too slow at 1280x720. Only handles RGB8 / BGR8 color frames; other
+        formats (YUYV, Y16, …) return None and the client falls back to the
+        depth colormap.
+        """
+        try:
+            color_format = color_frame.get_profile().format()
+        except Exception:
+            return None
+        if color_format not in (rs.format.rgb8, rs.format.bgr8):
+            return None
+        cim = np.asanyarray(color_frame.get_data())
+        if cim.ndim != 3 or cim.shape[2] < 3:
+            return None
+        H, W = cim.shape[:2]
+        u = tex[:, 0]
+        v = tex[:, 1]
+        # rs2 emits tex coords outside [0,1] for depth pixels that don't project
+        # into the color frame — mark those black instead of clamping (clamping
+        # would smear the frame borders across off-screen points).
+        valid = (u >= 0.0) & (u <= 1.0) & (v >= 0.0) & (v <= 1.0)
+        xi = np.clip((u * W).astype(np.int32), 0, W - 1)
+        yi = np.clip((v * H).astype(np.int32), 0, H - 1)
+        sampled = cim[yi, xi][:, :3].astype(np.uint8, copy=True)
+        sampled[~valid] = 0
+        if color_format == rs.format.bgr8:
+            sampled = sampled[:, ::-1]  # BGR -> RGB so the client doesn't need to swap
+        return sampled
+
     def _collect_frames(self, device_id: str, align_processor=None):
         """Thread function to collect frames from the pipeline"""
         logging.debug("[INFO] Frame collection thread started for device %s", device_id)
@@ -1754,8 +1942,7 @@ class RealSenseManager:
                         try:
                             frame = None
                             frame_data = None
-                            points = None
-                            
+
                             # Use the rs_stream enum directly for comparison
                             if rs_stream == rs.stream.depth:
                                 frame_data = frames.get_depth_frame()
@@ -1766,8 +1953,6 @@ class RealSenseManager:
                                     self.depth_frames[device_id] = frame_data
                                     colorized = colorizer.colorize(frame_data)
                                     frame = np.asanyarray(colorized.get_data())
-                                    if self.is_pointcloud_enabled.get(device_id, False):
-                                        points = self.pc.calculate(frame_data)
                             elif rs_stream == rs.stream.color:
                                 frame_data = frames.get_color_frame()
                                 if frame_data:
@@ -1816,11 +2001,20 @@ class RealSenseManager:
                                 if motion_json_data:
                                     metadata["motion_data"] = motion_json_data
 
-                            if points:
-                                v, t = points.get_vertices(), points.get_texture_coordinates()
-                                verts = np.asanyarray(v).view(np.float32).reshape(-1, 3)
-                                verts = verts[verts[:, 2] >= 0.03]  # Filter out z < 0.03
-                                metadata["point_cloud"] = {"vertices": verts, "texture_coordinates": []}
+                            if rs_stream == rs.stream.depth and self.is_pointcloud_enabled.get(device_id, False):
+                                # If color is also active in this frameset, use it
+                                # to texture-map the cloud (cpp realsense-viewer
+                                # parity). get_color_frame() returns an empty
+                                # falsy frame when no color stream is enabled.
+                                # Apply the same color filters as the 2D path
+                                # uses so the textured cloud and the color tile
+                                # never diverge if filters become non-trivial.
+                                color_for_texture = frames.get_color_frame() or None
+                                if color_for_texture:
+                                    color_for_texture = self._apply_color_filters(device_id, color_for_texture)
+                                pc_meta = self._build_point_cloud_metadata(device_id, frame_data, color_for_texture)
+                                if pc_meta:
+                                    metadata["point_cloud"] = pc_meta
 
                             # Store processed frame and metadata
                             processed_frames[active_stream] = frame
@@ -1871,6 +2065,8 @@ class RealSenseManager:
                             del self.metadata_queues[device_id]
                         if device_id in self.depth_frames:
                             del self.depth_frames[device_id]
+                        self.color_frames.pop(device_id, None)
+                        self.point_clouds.pop(device_id, None)
                         self._supported_md_by_profile.pop(device_id, None)
                         if device_id in self.device_infos:
                             self.device_infos[device_id].is_streaming = False
@@ -2123,9 +2319,33 @@ class RealSenseManager:
             processed_frame = np.asanyarray(colorized.get_data())
             info_source = depth_frame
 
+            if self.is_pointcloud_enabled.get(device_id, False):
+                # Sensor mode runs depth/color on separate threads so there is
+                # no frameset — pick the cached color frame whose timestamp is
+                # closest to this depth frame's, otherwise rotations show
+                # colors leading the geometry (color has lower SDK latency).
+                # Only do this if color is still streaming; without that check
+                # the depth thread would keep texturing with a stale frame
+                # after the user disables color.
+                color_for_texture = (
+                    self._pick_color_for_depth(device_id, depth_frame)
+                    if self._is_color_streaming(device_id)
+                    else None
+                )
+                pc_meta = self._build_point_cloud_metadata(device_id, depth_frame, color_for_texture)
+                if pc_meta:
+                    metadata["point_cloud"] = pc_meta
+
         elif "color" in frame_stream_name:
             color_frame = frame.as_video_frame()
             color_frame = self._apply_color_filters(device_id, color_frame)
+            # Append to bounded history so the depth thread can pick the color
+            # frame closest in time to the depth frame it's processing.
+            hist = self.color_frames.get(device_id)
+            if hist is None:
+                hist = deque(maxlen=COLOR_FRAME_HISTORY)
+                self.color_frames[device_id] = hist
+            hist.append(color_frame)
             processed_frame = np.asanyarray(color_frame.get_data())
             info_source = color_frame
 
@@ -2315,12 +2535,37 @@ class RealSenseManager:
             
             # Validate profile compatibility (same FPS required)
             self._validate_profile_compatibility(profiles)
-            
+
+            # Translate sensor timestamps to a unified system-time domain so
+            # depth/color frames from independent sensors on the same device
+            # are directly comparable. Without this, sensors can report
+            # timestamps in different clock domains with a fixed multi-second
+            # offset, defeating cross-sensor matching for the textured point
+            # cloud (observed: 1.635s offset on the D585 prototype).
+            # WARN — not debug — when set_option fails on a sensor that
+            # supports() said yes: a partial failure silently reintroduces
+            # the cross-sensor offset and the rotation desync.
+            if sensor.supports(rs.option.global_time_enabled):
+                try:
+                    sensor.set_option(rs.option.global_time_enabled, 1)
+                except RuntimeError as e:
+                    logging.warning(
+                        "[SENSOR] %s: global_time_enabled set failed (%s) — "
+                        "depth/color may stay in different clock domains and "
+                        "textured point cloud may show rotation desync.",
+                        sensor_id, e,
+                    )
+
             # Open sensor with ALL profiles
             sensor.open(profiles)
             
-            # Create frame queue
-            rs_queue = rs.frame_queue(50, keep_frames=True)
+            # Small queue so the collector always sees fresh frames. A larger
+            # capacity (the old value was 50) lets a 1.6s FIFO backlog build up
+            # at 30 fps and the depth thread ends up always processing
+            # 1.6s-stale frames — visible as the textured 3D cloud where the
+            # color (no PC math, no backlog) reacts to motion immediately and
+            # the depth geometry lags ~1.6s behind.
+            rs_queue = rs.frame_queue(2)
             
             # Start sensor
             sensor.start(rs_queue)
@@ -2456,6 +2701,15 @@ class RealSenseManager:
         # Clean up state
         last_sensor_stopped = False
         with self.lock:
+            # Capture the stopped sensor's stream types BEFORE removing its
+            # entry — needed below to know whether to evict cached color frames.
+            stopped_stream_types: List[str] = []
+            if (device_id in self.sensor_streams
+                    and sensor_id in self.sensor_streams[device_id]):
+                stopped_stream_types = list(
+                    self.sensor_streams[device_id][sensor_id].get("stream_types", [])
+                )
+
             if device_id in self.sensor_streams:
                 self.sensor_streams[device_id].pop(sensor_id, None)
                 if not self.sensor_streams[device_id]:
@@ -2477,6 +2731,16 @@ class RealSenseManager:
                 self.sensor_rs_queues[device_id].pop(sensor_id, None)
                 if not self.sensor_rs_queues[device_id]:
                     del self.sensor_rs_queues[device_id]
+
+            # Free the cached color frames if the stopped sensor was producing
+            # color — otherwise the 5 cached rs.video_frame refs stay pinned
+            # in the SDK pool while depth keeps streaming.
+            stopped_color = any(st.lower() == "color" for st in stopped_stream_types)
+            if stopped_color or last_sensor_stopped:
+                self.color_frames.pop(device_id, None)
+            if last_sensor_stopped:
+                # Per-device rs.pointcloud is only needed while depth runs.
+                self.point_clouds.pop(device_id, None)
 
         # Stop the per-device metadata broadcaster once the last sensor on this
         # device has stopped.

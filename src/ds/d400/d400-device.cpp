@@ -558,11 +558,19 @@ namespace librealsense
         const platform::backend_device_group& group)
     {
         using namespace ds;
+        using namespace platform;
 
         auto raw_sensor = get_raw_depth_sensor();
         _pid = group.uvc_devices.front().pid;
 
         _is_mipi_device = (ds::d400_mipi_device_pid.count(_pid) > 0);
+        
+        // Register MIPI driver version for GMSL devices
+        rsutils::version mipi_driver_version;
+        if (_is_mipi_device)
+        {
+            mipi_driver_version = platform::get_jetson_driver_version();
+        }
 
         _color_calib_table_raw = [this]()
         {
@@ -618,19 +626,6 @@ namespace librealsense
         auto& depth_sensor = get_depth_sensor();
         auto raw_depth_sensor = get_raw_depth_sensor();
 
-        using namespace platform;
-
-        rsutils::version mipi_driver_version;
-        // Register MIPI driver version for Jetson platform (GMSL devices only)
-        if (_is_mipi_device)
-        {
-            auto uvc_dev = raw_depth_sensor->get_uvc_device();
-            if (uvc_dev && uvc_dev->is_platform_jetson())
-            {
-                mipi_driver_version = platform::get_jetson_driver_version();
-            }
-        }
-
         // minimal firmware version in which hdr feature is supported
         firmware_version hdr_firmware_version("5.12.8.100");
 
@@ -664,19 +659,13 @@ namespace librealsense
                     usb_modality = false;
             }
 
-            if (!_is_mipi_device)
+            if ( !_is_mipi_device || mipi_driver_version >= rsutils::version("1.0.4.9") )
             {
                 depth_sensor.register_processing_block(
                     { {RS2_FORMAT_Y8I} },
                     { {RS2_FORMAT_Y8, RS2_STREAM_INFRARED, 1} , {RS2_FORMAT_Y8, RS2_STREAM_INFRARED, 2} },
                     []() { return std::make_shared<y8i_to_y8y8>(); }
                 ); // L+R
-
-                depth_sensor.register_processing_block(
-                    { RS2_FORMAT_Y12I },
-                    { {RS2_FORMAT_Y16, RS2_STREAM_INFRARED, 1}, {RS2_FORMAT_Y16, RS2_STREAM_INFRARED, 2} },
-                    []() {return std::make_shared<y12i_to_y16y16>(); }
-                );
             }
             else
             {
@@ -685,15 +674,26 @@ namespace librealsense
                     { {RS2_FORMAT_Y8, RS2_STREAM_INFRARED, 1} , {RS2_FORMAT_Y8, RS2_STREAM_INFRARED, 2} },
                     []() { return std::make_shared<y8i_to_y8y8_mipi>(); }
                 ); // L+R
+            }
 
+            if ( !_is_mipi_device )
+            {
+                depth_sensor.register_processing_block(
+                    { RS2_FORMAT_Y12I },
+                    { {RS2_FORMAT_Y16, RS2_STREAM_INFRARED, 1}, {RS2_FORMAT_Y16, RS2_STREAM_INFRARED, 2} },
+                    []() {return std::make_shared<y12i_to_y16y16>(); }
+                );
+            }
+            else
+            {
                  depth_sensor.register_processing_block(
                     { RS2_FORMAT_Y12I },
                     { {RS2_FORMAT_Y16, RS2_STREAM_INFRARED, 1}, {RS2_FORMAT_Y16, RS2_STREAM_INFRARED, 2} },
                     []() {return std::make_shared<y12i_to_y16y16_mipi>(); }
                 );
             }
-            
 
+            
             pid_hex_str = rsutils::string::from() << std::uppercase << rsutils::string::hexdump( _pid );
 
             if ((_pid == RS416_PID || _pid == RS416_RGB_PID) && _fw_version >= firmware_version("5.12.0.1"))

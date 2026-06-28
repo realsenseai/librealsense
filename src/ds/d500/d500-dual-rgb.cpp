@@ -60,8 +60,9 @@ namespace librealsense
     }
 
     // Stream-id resolver: the two M420 RGB cameras arrive on separate pins (USB endpoints), each also advertising
-    // identical {w,h,fps,format} M420. Route each color pin's M420 to Color 1 / Color 2 in ascending pin order;
-    // leave the stereo-imager M420 as infrared (not exposed as color).
+    // identical {w,h,fps,format} M420. Map the color pins to Color 1 / Color 2 in descending pin order, so the
+    // color indexes line up with the infrared 1 / 2 imagers (the lowest color pin is co-located with the right /
+    // infrared-2 imager).
     void d500_dual_rgb::resolve_color_stream( const std::vector< platform::stream_profile > & all,
                                               const platform::stream_profile & p, rs2_stream & type, int & index )
     {
@@ -71,7 +72,7 @@ namespace librealsense
         if( ! is_color_pin( all, p.pin_index ) )
             return;  // stereo-imager M420 stays infrared - no color converter, so it is not exposed
 
-        // Rank this pin among all color pins (ascending pin order) -> Color 1, Color 2, ...
+        // Rank this pin among all color pins by ascending pin order.
         std::set< uint32_t > pins, color_pins;
         for( auto & q : all )
             pins.insert( q.pin_index );
@@ -87,8 +88,9 @@ namespace librealsense
             ++rank;
         }
 
+        // Assign in descending order so the highest pin -> Color 1, matching infrared 1 / 2.
         type = RS2_STREAM_COLOR;
-        index = rank + 1;
+        index = static_cast< int >( color_pins.size() ) - rank;
     }
 
     // Identify a color pin: it advertises M420 paired with a YUY2/YUYV companion. The infrared pin also
