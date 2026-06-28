@@ -6,7 +6,7 @@ Intel RealSense SDK 2.0 pipeline. It improves minimum sensing distance (min-Z)
 to ~12 cm on NVIDIA Jetson platforms. It integrates transparently into
 existing RealSense-based applications and requires no modification to camera
 firmware and/or SDK.
-
+11
 <p align="center">
   <a href="https://realsenseai.com/case-studies/?capability_application=autonomous-mobile-robots"><img src="https://librealsense.realsenseai.com/readme-media/minz/minz_600.gif" width="720"/></a>
 </p>
