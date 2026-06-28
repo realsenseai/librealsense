@@ -13,7 +13,7 @@ The SDK allows depth and color streaming, and provides intrinsic and extrinsic c
 
 <p align="center">
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/github/license/realsenseai/librealsense.svg" alt="License"></a>
-  <a href="https://github.com/realsenseai/librealsense/releases/latest"><img src="https://img.shields.io/github/v/release/realsenseai/librealsense?sort=semver" alt="Latest release"></a>
+  <a href="https://github.com/realsenseai/librealsense/releases/latest"><img src="https://img.shields.io/github/v/release/realsenseai/librealsense?sort=semver" alt="Latest release"></a>test
   <a href="https://github.com/realsenseai/librealsense/compare/master...development"><img src="https://img.shields.io/github/commits-since/realsenseai/librealsense/master/development?label=commits%20since" alt="Commits since"></a>
   <a href="https://github.com/realsenseai/librealsense/issues"><img src="https://img.shields.io/github/issues/realsenseai/librealsense.svg" alt="Issues"></a>
   <a href="https://github.com/realsenseai/librealsense/actions/workflows/buildsCI.yaml?query=branch%3Adevelopment"><img src="https://github.com/realsenseai/librealsense/actions/workflows/buildsCI.yaml/badge.svg?branch=development" alt="GitHub CI"></a>
