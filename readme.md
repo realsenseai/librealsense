@@ -1,4 +1,4 @@
-<p align="center"> 
+<p align="center"> .
 <!-- Light mode -->
 <img src="doc/img/realsense-logo-light-mode.png#gh-light-mode-only" alt="Logo for light mode" width="30%"/>
 
