@@ -180,7 +180,7 @@ namespace rs2
         std::string search_line { "" };
         std::string command_line { "" };
         std::deque<std::string> commands_histroy;
-        int history_offset = 0;
+        int history_offset = -1;
         bool command_focus = true;
 
         std::vector<std::shared_ptr<stream_dashboard>> dashboards;
@@ -190,5 +190,6 @@ namespace rs2
         std::thread fw_logger;
 
         void thread_loop();
+        bool cycle_autocomplete(bool forward);
     };
 }

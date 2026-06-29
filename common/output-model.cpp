@@ -17,6 +17,47 @@
 using namespace rs2;
 using namespace rsutils::string;
 
+bool output_model::cycle_autocomplete(bool forward)
+{
+    if (command_line.empty())
+        return false;
+    if (autocomplete.empty() || !starts_with(to_lower(autocomplete.front()), to_lower(command_line)))
+    {
+        std::string commands_xml = config_file::instance().get(configurations::viewer::commands_xml);
+        std::ifstream f(commands_xml.c_str());
+        if (f.good())
+        {
+            std::string str((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+            autocomplete.clear();
+            std::regex exp("Command Name=\"(\\w+)\"");
+            std::smatch res;
+            std::string::const_iterator searchStart(str.cbegin());
+            while (regex_search(searchStart, str.cend(), res, exp))
+            {
+                if (starts_with(to_lower(res[1]), to_lower(command_line)))
+                    autocomplete.push_back(res[1]);
+                searchStart = res.suffix().first;
+            }
+        }
+    }
+    if (autocomplete.empty())
+        return false;
+    if (forward)
+    {
+        auto temp = autocomplete.front();
+        autocomplete.pop_front();
+        autocomplete.push_back(temp);
+    }
+    else
+    {
+        auto temp = autocomplete.back();
+        autocomplete.pop_back();
+        autocomplete.push_front(temp);
+    }
+    command_line = autocomplete.front();
+    return true;
+}
+
 void output_model::thread_loop()
 {
     while (!to_stop)
@@ -590,94 +631,75 @@ void output_model::draw(ux_window& win, rect view_rect, device_models_list & dev
         ImGui::SetCursorPos(ImVec2(30, h - ImGui::GetTextLineHeightWithSpacing() - 4));
 
 
+        const int MAX_HISTORY_SIZE = 100;
+
         ImGui::PushFont(win.get_monofont());
         ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, regular_blue);
         ImGui::PushItemWidth( w - get_dashboard_width() - 30 );
 
-        bool force_refresh = false;
-        if (ImGui::IsWindowFocused() && (ImGui::GetIO().KeysDown[ImGuiKey_UpArrow] || ImGui::GetIO().KeysDown[ImGuiKey_DownArrow]))
+        auto terminal_cb = [](ImGuiInputTextCallbackData* data) -> int
         {
-            if (commands_histroy.size())
-            {
-                if (ImGui::GetIO().KeysDown[ImGuiKey_UpArrow]) history_offset = (history_offset + 1) % commands_histroy.size();
-                if (ImGui::GetIO().KeysDown[ImGuiKey_DownArrow]) history_offset = (history_offset - 1 + (int)commands_histroy.size()) % commands_histroy.size();
-                command_line = commands_histroy[history_offset];
+            auto* self = static_cast<output_model*>(data->UserData);
+            self->command_line = std::string(data->Buf, data->BufTextLen);
 
-                force_refresh = true;
-            }
-        }
-
-        if (ImGui::IsWindowFocused() && ImGui::GetIO().KeysDown[GLFW_KEY_TAB])
-        {
-            if (!autocomplete.size() || !starts_with(to_lower(autocomplete.front()), to_lower(command_line)))
+            if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory)
             {
-                std::string commands_xml = config_file::instance().get(configurations::viewer::commands_xml);
-                std::ifstream f(commands_xml.c_str());
-                if (f.good())
+                if (!self->commands_histroy.empty())
                 {
-                    std::string str((std::istreambuf_iterator<char>(f)),
-                        std::istreambuf_iterator<char>());
-
-                    autocomplete.clear();
-                    std::regex exp("Command Name=\"(\\w+)\"");
-                    std::smatch res;
-                    std::string::const_iterator searchStart(str.cbegin());
-                    while (regex_search(searchStart, str.cend(), res, exp))
-                    {
-                        if (starts_with(to_lower(res[1]), to_lower(command_line)))
-                            autocomplete.push_back(res[1]);
-                        searchStart = res.suffix().first;
-                    }
+                    if (data->EventKey == ImGuiKey_UpArrow)
+                        self->history_offset = std::min(self->history_offset + 1, (int)self->commands_histroy.size() - 1);
+                    else if (data->EventKey == ImGuiKey_DownArrow && self->history_offset > -1)
+                        self->history_offset--;
+                    self->command_line = self->history_offset >= 0 ? self->commands_histroy[self->history_offset] : "";
                 }
             }
-            if (autocomplete.size())
+            else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
             {
-                auto temp = autocomplete.front();
-                autocomplete.pop_front();
-                autocomplete.push_back(temp);
-
-                if (starts_with(to_lower(temp), command_line))
-                    command_line = to_lower(autocomplete.front());
-                else
-                    command_line = autocomplete.front();
-                force_refresh = true;
+                self->cycle_autocomplete(true);
             }
-        }
+            else if (data->EventFlag == ImGuiInputTextFlags_CallbackAlways)
+            {
+                // Shift+Tab cycles autocomplete backwards (CallbackCompletion only fires on plain Tab)
+                if (!ImGui::IsKeyPressed(ImGuiKey_Tab) || !ImGui::GetIO().KeyShift)
+                    return 0;
+                self->cycle_autocomplete(false);
+            }
+
+            data->DeleteChars(0, data->BufTextLen);
+            data->InsertChars(0, self->command_line.c_str());
+            data->CursorPos = data->BufTextLen;
+            return 0;
+        };
 
         memcpy(buff, command_line.c_str(), command_line.size());
         buff[command_line.size()] = 0;
 
-        int flags = ImGuiInputTextFlags_EnterReturnsTrue;
-        if (force_refresh)
-        {
-            flags = ImGuiInputTextFlags_ReadOnly;
-        }
+        int flags = ImGuiInputTextFlags_EnterReturnsTrue
+                  | ImGuiInputTextFlags_CallbackCompletion
+                  | ImGuiInputTextFlags_CallbackHistory
+                  | ImGuiInputTextFlags_CallbackAlways;
 
         ImGui::PushStyleColor(ImGuiCol_FrameBg, scrollbar_bg);
-        if (ImGui::InputText("##TerminalCommand", buff, 1023, flags))
+        if (command_focus || new_log || (ImGui::IsWindowFocused() && !ImGui::IsAnyItemActive()))
+            ImGui::SetKeyboardFocusHere();
+        command_focus = false;
+        if (ImGui::InputText("##TerminalCommand", buff, sizeof(buff) - 1, flags, terminal_cb, this))
         {
-
-        }
-        if (!command_focus && !new_log) command_line = buff;
-        ImGui::PopStyleColor();
-        if (command_focus || new_log) ImGui::SetKeyboardFocusHere();
-        ImGui::PopFont();
-        ImGui::PopStyleColor();
-
-        if (ImGui::IsWindowFocused() && (ImGui::GetIO().KeysDown[GLFW_KEY_ENTER] || ImGui::GetIO().KeysDown[GLFW_KEY_KP_ENTER]))
-        {
-            if (commands_histroy.size() > 100) commands_histroy.pop_back();
-            commands_histroy.push_front(command_line);
+            if (!command_line.empty() && (commands_histroy.empty() || commands_histroy.front() != command_line))
+            {
+                if (commands_histroy.size() > MAX_HISTORY_SIZE) commands_histroy.pop_back();
+                commands_histroy.push_front(command_line);
+            }
             run_command(command_line, device_models);
             command_line = "";
+            history_offset = -1;
             command_focus = true;
         }
-        else command_focus = false;
-
-        if (ImGui::IsWindowFocused() && ImGui::GetIO().KeysDown[GLFW_KEY_ESCAPE])
-        {
+        if (!command_focus && !new_log) command_line = buff;
+        ImGui::PopStyleColor(2);
+        ImGui::PopFont();
+        if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape))
             command_line = "";
-        }
 
         float child_height = 0;
         for( auto && dash : dashboards )
