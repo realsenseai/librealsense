@@ -37,7 +37,6 @@ void glfw_error_callback(int error, const char* description)
     std::cerr << "GLFW Driver Error: " << description << "\n";
 }
 
-constexpr double window_settle_ms = 300.0;
 
 namespace rs2
 {
@@ -370,8 +369,8 @@ namespace rs2
             if (!self) return;
             self->_pending_pos_x = x;
             self->_pending_pos_y = y;
-            self->_pending_pos_dirty = true;
-            self->_window_moved_timer.reset();
+            self->_pending_window_state = true;
+            self->_window_state_timer.start();
         });
 
         glfwSetWindowSizeCallback(_win, [](GLFWwindow* w, int width, int height)
@@ -382,8 +381,8 @@ namespace rs2
             self->_pending_win_width = width;
             self->_pending_win_height = height;
             self->_pending_maximized = glfwGetWindowAttrib(w, GLFW_MAXIMIZED);
-            self->_pending_size_dirty = true;
-            self->_window_resized_timer.reset();
+            self->_pending_window_state = true;
+            self->_window_state_timer.start();
         });
 
         setup_icon();
@@ -696,20 +695,16 @@ namespace rs2
 
     void ux_window::flush_pending_window_state()
     {
-        if (_pending_pos_dirty && _window_moved_timer.get_elapsed_ms() > window_settle_ms)
+        if (_pending_window_state && _window_state_timer.has_expired())
         {
             config_file::instance().set(configurations::window::saved_pos, true);
             config_file::instance().set(configurations::window::position_x, _pending_pos_x);
             config_file::instance().set(configurations::window::position_y, _pending_pos_y);
-            _pending_pos_dirty = false;
-        }
-        if (_pending_size_dirty && _window_resized_timer.get_elapsed_ms() > window_settle_ms)
-        {
             config_file::instance().set(configurations::window::saved_size, true);
             config_file::instance().set(configurations::window::width, _pending_win_width);
             config_file::instance().set(configurations::window::height, _pending_win_height);
             config_file::instance().set(configurations::window::maximized, _pending_maximized);
-            _pending_size_dirty = false;
+            _pending_window_state = false;
         }
     }
 

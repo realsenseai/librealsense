@@ -14,6 +14,7 @@
 #include "rendering.h"
 #include <atomic>
 #include <memory>
+#include <rsutils/time/timer.h>
 
 namespace rs2
 {
@@ -148,13 +149,10 @@ namespace rs2
 
         int                      _pending_pos_x = 0;
         int                      _pending_pos_y = 0;
-        bool                     _pending_pos_dirty = false;
-        rsutils::time::stopwatch _window_moved_timer;
-
         int                      _pending_win_width = 0;
         int                      _pending_win_height = 0;
         bool                     _pending_maximized = false;
-        bool                     _pending_size_dirty = false;
-        rsutils::time::stopwatch _window_resized_timer;
+        bool                     _pending_window_state = false;
+        rsutils::time::timer     _window_state_timer{ std::chrono::milliseconds( 300 ) };
     };
 }
