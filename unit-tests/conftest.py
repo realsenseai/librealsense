@@ -557,16 +557,24 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         return
 
     no_reset = request.config.getoption("--no-reset", default=False)
-    # With a hub, we don't recycle on setup: the device is already off (the previous module's
-    # teardown disabled it, or query()'s initial disable-all did), so enabling it here IS the
-    # power-on -- teardown-off + setup-on is the power cycle. A setup recycle would just re-disable
-    # an already-off port (extra hub traffic + wait + settle) for no benefit.
-    # Without a hub (e.g. Jetson/MIPI), teardown-disable is a no-op (no port to power off), so the
-    # setup MUST recycle -- enable_only(recycle=True) falls back to hardware_reset() -- to clear any
-    # state a previous module left behind; otherwise the device is never reset between modules.
-    # Default: enable (recycle iff no hub), then disable on teardown (isolation from prev teardown).
-    # --no-reset: isolate statelessly here and leave the device on (no recycle, no teardown-disable).
-    recycle = (not no_reset) and devices.hub is None
+    # Decide whether setup power-cycles the device (vs just turning it on):
+    #  --no-reset            -> never recycle; isolate statelessly and leave the device on.
+    #  no hub (Jetson/MIPI)  -> recycle; teardown-disable is a no-op there, so enable_only(recycle=
+    #                           True) falls back to hardware_reset() to clear prior state.
+    #  hub, port already ON  -> recycle. The device should be OFF here (prev module's teardown
+    #                           disabled it, or query()'s initial disable-all did). A powered port
+    #                           means a teardown was skipped (crash/kill) and the device was left
+    #                           in an unknown state -> power-cycle it clean. Self-heals the
+    #                           within-session leak that the old recycle=True sweep used to catch.
+    #  hub, port OFF         -> don't recycle; enabling it here IS the power-on (teardown-off +
+    #                           setup-on = the cycle). Avoids re-disabling an already-off port.
+    serials = serial_number if isinstance(serial_number, list) else [serial_number]
+    if no_reset:
+        recycle = False
+    elif devices.hub is None:
+        recycle = True
+    else:
+        recycle = devices.any_port_powered(serials)
     disable_other_ports = no_reset
     teardown_disable = not no_reset
 

@@ -76,12 +76,12 @@ def _mock_get(sn):
 _dev.by_spec = _mock_by_spec
 _dev.get = _mock_get
 _dev._device_by_sn = {sn: FakeDevice(sn, n) for sn, n in _sn_map.items()}
-# Hub presence drives the conftest's recycle decision (recycle iff no hub). By default we model a
-# hub-equipped bench with a truthy sentinel -> "don't recycle on setup" (the teardown-disable does
-# the cycle). Set E2E_NO_HUB=1 to model a hub-less bench (e.g. Jetson) where teardown-disable is a
-# no-op and setup must recycle via hardware_reset. Port ops are mocked above, so the sentinel is
-# never actually used. init_hub is stubbed so the real one doesn't probe (absent) hardware.
-_dev.hub = None if os.environ.get('E2E_NO_HUB') else object()
+# Default: model a hub-equipped bench with a truthy sentinel. Port ops are mocked above, so the
+# object is never actually used. init_hub is stubbed so the real one doesn't probe (absent)
+# hardware and reset this back to None. A scenario test file can patch devices.hub /
+# devices.any_port_powered at import time (before fixtures run) to model a hub-less bench or a
+# port left powered -- see pytest-hubless-setup.py and pytest-port-already-on.py.
+_dev.hub = object()
 _dev.init_hub = lambda: None
 _dev._context = None
 def _mock_query(**kw):
@@ -90,6 +90,10 @@ def _mock_query(**kw):
 _dev.query = _mock_query
 _dev.map_unknown_ports = lambda: None
 _dev.wait_until_all_ports_disabled = lambda: None
+# Hub hardware port-state probe used by the conftest recycle decision. Default OFF (the previous
+# teardown powered the device down -> setup just enables). A scenario test file patches this to
+# True to model a port left powered by a skipped teardown -> setup recycles it clean.
+_dev.any_port_powered = lambda serials: False
 
 # Track enable_only / disable calls so tests can verify hub port behavior
 def _mock_enable_only(serials, recycle=True, timeout=None, disable_other_ports=False):

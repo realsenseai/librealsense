@@ -27,11 +27,18 @@ class TestDevicePortManagement:
 
     def test_hubless_recycles_via_hw_reset(self):
         """On a hub-less bench (e.g. Jetson) teardown-disable is a no-op, so setup MUST recycle --
-        enable_only(recycle=True) falls back to hardware_reset. With a hub it's recycle=False (the
-        teardown-disable does the cycle); E2E_NO_HUB=1 flips devices.hub to None to exercise the
-        hub-less branch of `recycle = (not no_reset) and devices.hub is None`."""
-        rc, out, tracking = run_e2e("pytest-device-setup.py", "-k", "test_d455 and not excluded",
-                                     env={"E2E_NO_HUB": "1"})
+        enable_only(recycle=True) falls back to hardware_reset. pytest-hubless-setup.py patches
+        devices.hub to None to exercise the no-hub branch of the conftest recycle decision."""
+        rc, out, tracking = run_e2e("pytest-hubless-setup.py")
+        assert_outcomes(out, passed=1)
+        assert len(tracking["enable_only_calls"]) == 1
+        assert tracking["enable_only_calls"][0]['recycle'] is True
+
+    def test_port_already_on_recycles(self):
+        """With a hub, setup expects the device OFF (prev teardown disabled it). If a required port
+        is still powered -- a skipped/crashed teardown -- setup recycles it clean instead of reusing
+        a stale state. pytest-port-already-on.py patches any_port_powered -> True for this branch."""
+        rc, out, tracking = run_e2e("pytest-port-already-on.py")
         assert_outcomes(out, passed=1)
         assert len(tracking["enable_only_calls"]) == 1
         assert tracking["enable_only_calls"][0]['recycle'] is True

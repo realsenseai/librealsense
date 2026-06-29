@@ -661,6 +661,29 @@ def enable_all():
     hub.enable_ports()
 
 
+def any_port_powered( serial_numbers ):
+    """
+    True if any of the given serials maps to a hub port that is currently powered on.
+
+    Uses the hub's hardware port state (hub.is_port_enabled), NOT the SDK enabled() -- so it is
+    reliable even when a device hasn't (re-)enumerated. Lets a setup detect a device left powered
+    by a skipped/crashed teardown so it can recycle it clean rather than reuse a stale state.
+    Returns False without a hub or for serials with no hub port (e.g. non-hub DDS devices).
+
+    A powered port here is unexpected (setup expects the device OFF -- prev teardown or query()'s
+    disable-all should have cleared it), so we log a warning naming the offender before returning.
+    """
+    if not hub:
+        return False
+    for sn in serial_numbers:
+        dev = get( sn )
+        if dev and dev.port is not None and hub.is_port_enabled( dev.port ):
+            log.w( f'{sn} port {dev.port} still powered at setup -- a prior teardown was likely '
+                   f'skipped (crash/kill); recycling to a clean state' )
+            return True
+    return False
+
+
 def disable( serial_numbers, wait = True ):
     """
     Disable the hub ports for the given serial-numbers and, by default, wait until the devices
