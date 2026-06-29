@@ -706,6 +706,9 @@ def disable( serial_numbers, wait = True ):
     ports = sorted( get( sn ).port for sn in sns )
     if not ports:
         return
+    # let the last command to the device/FW settle before we cut power, so we don't yank power
+    # mid-transaction (mirrors the pre-recycle settle in enable_only)
+    time.sleep( 1 )
     hub.disable_ports( ports )
     if wait:
         if not _wait_until_removed( set( sns ) ):
