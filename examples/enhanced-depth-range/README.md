@@ -51,6 +51,8 @@ Latency measured at 640x480 on Jetson AGX Orin.
 
 ## Installation
 
+Register and download the `.deb` package matching your JetPack (JP) version from https://realsenseai.com/perception-studio/improved-close-range-depth/.
+
 ```bash
 sudo dpkg -i librealsense2-enhanced-depth-*.deb
 ```
@@ -59,8 +61,6 @@ Everything installs to `/opt/librealsense2-enhanced-depth/`. No venv needed — 
 
 The deb depends on `librealsense2` (≥ matching version) — install both from the
 same Artifactory / apt source so the SONAMEs line up.
-
-> Stay tuned: Details about how to get the package will be shared soon.
 
 ---
 
