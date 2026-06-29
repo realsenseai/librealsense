@@ -631,8 +631,6 @@ void output_model::draw(ux_window& win, rect view_rect, device_models_list & dev
         ImGui::SetCursorPos(ImVec2(30, h - ImGui::GetTextLineHeightWithSpacing() - 4));
 
 
-        const int MAX_HISTORY_SIZE = 100;
-
         ImGui::PushFont(win.get_monofont());
         ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, regular_blue);
         ImGui::PushItemWidth( w - get_dashboard_width() - 30 );
@@ -647,10 +645,14 @@ void output_model::draw(ux_window& win, rect view_rect, device_models_list & dev
                 if (!self->commands_histroy.empty())
                 {
                     if (data->EventKey == ImGuiKey_UpArrow)
+                    {
+                        if (self->history_offset == -1)
+                            self->history_draft = self->command_line;
                         self->history_offset = std::min(self->history_offset + 1, (int)self->commands_histroy.size() - 1);
+                    }
                     else if (data->EventKey == ImGuiKey_DownArrow && self->history_offset > -1)
                         self->history_offset--;
-                    self->command_line = self->history_offset >= 0 ? self->commands_histroy[self->history_offset] : "";
+                    self->command_line = self->history_offset >= 0 ? self->commands_histroy[self->history_offset] : self->history_draft;
                 }
             }
             else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
@@ -659,6 +661,12 @@ void output_model::draw(ux_window& win, rect view_rect, device_models_list & dev
             }
             else if (data->EventFlag == ImGuiInputTextFlags_CallbackAlways)
             {
+                // Reset history navigation if the user edits the buffer mid-browse
+                if (self->history_offset >= 0 && self->command_line != self->commands_histroy[self->history_offset])
+                {
+                    self->history_offset = -1;
+                    self->history_draft = "";
+                }
                 // Shift+Tab cycles autocomplete backwards (CallbackCompletion only fires on plain Tab)
                 if (!ImGui::IsKeyPressed(ImGuiKey_Tab) || !ImGui::GetIO().KeyShift)
                     return 0;
@@ -693,13 +701,18 @@ void output_model::draw(ux_window& win, rect view_rect, device_models_list & dev
             run_command(command_line, device_models);
             command_line = "";
             history_offset = -1;
+            history_draft = "";
+            autocomplete.clear();
             command_focus = true;
         }
         if (!command_focus && !new_log) command_line = buff;
         ImGui::PopStyleColor(2);
         ImGui::PopFont();
         if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape))
+        {
             command_line = "";
+            autocomplete.clear();
+        }
 
         float child_height = 0;
         for( auto && dash : dashboards )

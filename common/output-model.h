@@ -177,8 +177,11 @@ namespace rs2
         std::mutex devices_mutex;
         std::vector<rs2::device> devices;
 
+        static constexpr int MAX_HISTORY_SIZE = 100;
+
         std::string search_line { "" };
         std::string command_line { "" };
+        std::string history_draft { "" };
         std::deque<std::string> commands_histroy;
         int history_offset = -1;
         bool command_focus = true;
