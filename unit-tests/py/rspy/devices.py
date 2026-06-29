@@ -604,6 +604,12 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
     the pytest harness disables its device on fixture teardown; the legacy harness passes
     disable_other_ports=True so each setup isolates statelessly.
 
+    Note: leak recovery is per-session -- query() disables all ports at session start, but a
+    within-session crash that skips a fixture teardown will leave that device powered until the
+    next session (the previous recycle=True path used to disable all enabled ports here, which
+    acted as a within-session net; that net is gone). Callers needing stronger isolation against
+    a leaked port should pass disable_other_ports=True.
+
     :param serial_numbers: serial-numbers to enable.
     :param recycle: If True, power-cycle the requested device(s) -- disable the port, wait for
                     removal, then re-enable -- to reset them to a clean state.
@@ -666,6 +672,10 @@ def disable( serial_numbers, wait = True ):
     it the removal can land during the *next* module's test and race its device discovery
     (observed as a flaky 'Advanced mode expects camera to have a depth sensor' at setup). This
     mirrors the _wait_until_removed() that enable_only(recycle=True) does on the enable path.
+
+    A timed-out wait is non-fatal BY DESIGN: failing a teardown mis-attributes the error to the
+    test that just passed, and a transient hub blip would redden an otherwise-green suite. We log
+    loudly instead so a downstream flake can be traced back here -- do not "fix" this by raising.
     """
     if not hub:
         return
@@ -676,9 +686,9 @@ def disable( serial_numbers, wait = True ):
     hub.disable_ports( ports )
     if wait:
         if not _wait_until_removed( set( sns ) ):
-            # don't fail teardown over this, but surface it: a port that didn't drop in time can
-            # linger into the next module and race its device discovery (the very thing wait guards)
-            log.w( f'disable: devices not removed within timeout: {sns}' )
+            # non-fatal by design (see docstring): surface loudly so a downstream flake is traceable
+            log.w( f'disable: {sns} still enumerated after {PORTS_DISABLED_TIMEOUT}s; '
+                   f'next module setup may race their removal' )
 
 
 def _wait_until_removed( serial_numbers, timeout = PORTS_DISABLED_TIMEOUT ):
