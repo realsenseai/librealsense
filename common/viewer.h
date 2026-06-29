@@ -97,6 +97,19 @@ namespace rs2
 
         std::map<int, rect> calc_layout(const rect& r);
 
+        // Order the active streams for display: default is by stream type then index
+        // (depth, color, ir1, ir2, motion...), unless the user manually re-arranged
+        // the tiles - see _streams_order and the per-serial saved arrangements.
+        std::vector<stream_model*> order_active_streams(const std::set<stream_model*>& active_streams,
+            const std::map<stream_model*, int>& stream_index);
+
+        // Handle drag-to-swap of stream tiles while in re-arrange mode
+        void handle_streams_reorder(const std::map<int, rect>& layout, const mouse_info& mouse);
+
+        // Per-camera (serial) tile arrangement persistence in the config file
+        std::vector<std::string> get_saved_arrangement(const std::string& serial);
+        void persist_stream_arrangements();
+
         void show_no_stream_overlay(ImFont* font, int min_x, int min_y, int max_x, int max_y);
         void show_no_device_overlay(ImFont* font, int min_x, int min_y);
         void show_rendering_not_supported(ImFont* font_18, int min_x, int min_y, int max_x, int max_y, rs2_format format);
@@ -138,6 +151,8 @@ namespace rs2
         std::map<int, int> streams_origin;
         bool fullscreen = false;
         stream_model* selected_stream = nullptr;
+        // When true, stream tiles can be re-arranged by dragging one onto another (toggled from the top bar)
+        bool allow_streams_reorder = false;
         std::shared_ptr<syncer_model> syncer;
         post_processing_filters ppf;
 
@@ -264,6 +279,18 @@ namespace rs2
         streams_layout _layout;
         streams_layout _old_layout;
         std::chrono::high_resolution_clock::time_point _transition_start_time;
+
+        // User-defined display order of the stream tiles (holds stream keys from 'streams').
+        // Reconciled against the active streams every frame in order_active_streams().
+        std::vector<int> _streams_order;
+        // Cached per-camera (serial) tile arrangement, mirrored to the config file. Each value
+        // is an ordered list of stream descriptors (see stream_descriptor()).
+        std::map<std::string, std::vector<std::string>> _stream_arrangement_by_serial;
+        // Drag-to-swap state (valid while allow_streams_reorder is on)
+        int _dragged_stream = -1;
+        bool _is_dragging_stream = false;
+        bool _prev_reorder_mouse_down = false;
+        float2 _drag_origin{ 0.f, 0.f };
 
         // 3D-Viewer state
         float3 pos = { 0.0f, 0.0f, -0.5f };

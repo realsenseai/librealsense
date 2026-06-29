@@ -19,20 +19,22 @@ static constexpr int      MIN_DEPTH            = 400;
 static constexpr int      MAX_DEPTH            = 8000;
 static constexpr int      NO_DEPTH             = 10000;
 static constexpr float    GOOD_DEPTH_RATIO     = 0.3f;
-// A cluster is treated as noise if a neighbour within NEARBY_REJECT_RANGE depth_8u
-// units (≈450 mm) has at least NEARBY_REJECT_RATIO times more pixels.
-// This rejects foreground dust/clutter that sits slightly in front of the real body
-// while still allowing a small person cluster (e.g. person off-centre in wide bbox)
-// to win over a distant background cluster that is far outside the rejection range.
-static constexpr float    MIN_CLUSTER_FRACT       = 0.03f;  // auto-pass — no neighbour check
-static constexpr float    NEARBY_REJECT_RATIO     = 1.5f;   // neighbour must be ≥1.5× larger
-static constexpr int      NEARBY_REJECT_RANGE_D8U = 15;     // ≈450 mm window
+// A cluster is treated as noise if a neighbour within NEARBY_REJECT_RANGE_D8U depth_8u
+// units (≈1050 mm) is at least NEARBY_REJECT_RATIO times larger.
+// The ratio threshold (3.0×) ensures only genuine clutter is rejected — real person
+// clusters are at most ~2× smaller than a background wall, while clutter is typically
+// 5–150× smaller than the person behind it.
+static constexpr float    MIN_CLUSTER_FRACT       = 0.15f;  // auto-pass — no neighbour check
+static constexpr float    NEARBY_REJECT_RATIO     = 3.0f;   // neighbour must be ≥3× larger
+static constexpr int      NEARBY_REJECT_RANGE_D8U = 35;     // ≈1050 mm window
+static constexpr float    NEARBY_REJECT_DEPTH_RATIO = 2.2f; // background >2.2× farther in mm also counts as "nearby"
 // Fraction of ROI height used for histogram — wide enough to sample the full torso.
 static constexpr float    COM_UPPER_FRACTION   = 0.65f;
 // Fraction of ROI height used for the 2D centroid (dot position) — restricts to the
-// upper body so the dot lands near the chest rather than the waist.  Falls back to
-// COM_UPPER_FRACTION if no cluster pixels exist in the narrower region.
-static constexpr float    COM_CENTROID_FRACTION = 0.55f;
+// upper chest/shoulder zone so the dot never lands below the upper torso.
+// Max dot position = 40% from top of bbox (chest area).  Falls back to
+// COM_UPPER_FRACTION if no cluster pixels exist in this narrower region.
+static constexpr float    COM_CENTROID_FRACTION = 0.40f;
 static constexpr int      NUM_DEPTH_SAMPLES    = 5;
 
 // depth_8u value for MAX_DEPTH: ceil((MAX_DEPTH-400)/SCALE_DEPTH) — fits in uint8 with SCALE_DEPTH=30
@@ -293,13 +295,19 @@ bool center_of_mass_calculator::calculate_com_with_depth_range(
         if (midD >= bestMidD) continue;  // not nearer than current best
 
         if (allRanges[i].fract < MIN_CLUSTER_FRACT) {
-            // Check whether a dominant neighbour within ≈1200 mm makes this noise.
+            // Check whether a dominant neighbour makes this cluster noise.
+            // "Nearby" means within NEARBY_REJECT_RANGE_D8U bins (~1050 mm), or the
+            // neighbour is a background layer >2.2× farther in mm — catches large d8u
+            // gaps that the bin-distance check would miss.
             bool dominated = false;
+            float const depth_i_mm = midD * SCALE_DEPTH + SUBTRACT_FROM_DEPTH;
             for (int j = 0; j < (int)allRanges.size(); ++j) {
                 if (j == i) continue;
                 int midJ = (allRanges[j].start + allRanges[j].end) / 2;
-                if (std::abs(midJ - midD) <= NEARBY_REJECT_RANGE_D8U &&
-                    allRanges[j].fract >= NEARBY_REJECT_RATIO * allRanges[i].fract) {
+                float const depth_j_mm = midJ * SCALE_DEPTH + SUBTRACT_FROM_DEPTH;
+                bool const nearby = (std::abs(midJ - midD) <= NEARBY_REJECT_RANGE_D8U)
+                                 || (depth_j_mm > NEARBY_REJECT_DEPTH_RATIO * depth_i_mm);
+                if (nearby && allRanges[j].fract >= NEARBY_REJECT_RATIO * allRanges[i].fract) {
                     dominated = true;
                     break;
                 }
@@ -340,13 +348,11 @@ bool center_of_mass_calculator::calculate_com_with_depth_range(
     vec2i com;
     if (!calc_center_of_mask(mask, roiW, roiH, com, centroidMaxY))
     {
-        // Cluster pixels are below the upper-body region; use horizontal centroid
-        // of the full upper histogram region for X, and the center of the upper
-        // body band for Y — still unambiguously "top body."
+        // Cluster pixels are below the upper-body region; fall back to the
+        // wider histogram zone for both X and Y centroid.
         int const histMaxY = std::max(1, (int)(roiH * COM_UPPER_FRACTION));
         if (!calc_center_of_mask(mask, roiW, roiH, com, histMaxY))
             return false;
-        com.y = centroidMaxY / 2;
     }
 
     center_mass_point = {com.x + roi.x, com.y + roi.y};

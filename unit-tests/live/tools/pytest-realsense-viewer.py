@@ -60,26 +60,32 @@ def test_realsense_viewer_gui(module_device_setup):
                           stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE,
                           env=env )
+    def emit_stdout( stdout_bytes ):
+        # Strip ANSI color codes + imgui test-engine frame-count prefix, then send each
+        # line through the logger so the per-test outcomes (e.g. "Test: 'streaming' ...",
+        # "Tests Result: OK (N/N tests passed)") appear in the CI log even on passing
+        # runs — pytest's default stdout capture would otherwise hide them.
+        cleaned = frame_prefix.sub( b'', ansi_escape.sub( b'', stdout_bytes ) )
+        for line in cleaned.decode( 'utf-8', errors='replace' ).splitlines():
+            log.info( line )
+
+    def emit_stderr( stderr_bytes ):
+        # Filter Mesa glCopyTexImage2D warnings that are irrelevant with software rendering.
+        for line in stderr_bytes.split( b'\n' ):
+            if line and b'glCopyTexImage2D' not in line:
+                log.warning( line.decode( 'utf-8', errors='replace' ) )
+
     try:
         stdout, stderr = p.communicate( timeout=child_timeout )
     except subprocess.TimeoutExpired:
         p.kill()
         stdout, stderr = p.communicate()
-        # Strip ANSI / frame prefix before logging so the failure message is readable
-        stdout = ansi_escape.sub( b'', stdout )
-        stdout = frame_prefix.sub( b'', stdout )
-        sys.stdout.buffer.write( stdout )
-        sys.stderr.buffer.write( stderr )
+        emit_stdout( stdout )
+        emit_stderr( stderr )
         pytest.fail( f'realsense-viewer-tests did not complete within {child_timeout}s' )
 
-    # Strip ANSI color codes and imgui test engine frame-count prefix
-    stdout = ansi_escape.sub( b'', stdout )
-    stdout = frame_prefix.sub( b'', stdout )
-    sys.stdout.buffer.write( stdout )
-    # Filter Mesa glCopyTexImage2D warnings that are irrelevant with software rendering
-    for line in stderr.split( b'\n' ):
-        if line and b'glCopyTexImage2D' not in line:
-            sys.stderr.buffer.write( line + b'\n' )
+    emit_stdout( stdout )
+    emit_stderr( stderr )
     if p.returncode != 0:
         log.error( 'realsense-viewer-tests exited with code %s', p.returncode )
     assert p.returncode == 0, f'realsense-viewer-tests exited with code {p.returncode}'

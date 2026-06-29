@@ -92,6 +92,14 @@ int main( int argc, const char ** argv ) try
         te_io.ConfigVerboseLevel  = ImGuiTestVerboseLevel_Info;
         te_io.ConfigLogToTTY      = true;
         te_io.ConfigSavedSettings = false;
+        // Default watchdog kills any test at 60s. The memory-leak soak test
+        // (`mem_leak_depth_start_stop`) needs ~5 min wall-clock by design, so
+        // the kill timeout is raised here. imgui_test_engine v1.90.8 has no
+        // per-test watchdog API, so this is global; if any *other* test is
+        // ever observed taking >60s, treat that as a regression and fix the
+        // test rather than bumping this further.
+        te_io.ConfigWatchdogWarning = 60.0f;
+        te_io.ConfigWatchdogKillTest = 1200.0f;
         if( auto_run_mode )
         {
             te_io.ConfigRunSpeed   = ImGuiTestRunSpeed_Fast;
