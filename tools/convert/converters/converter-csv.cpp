@@ -45,9 +45,6 @@ converter_csv::converter_csv(const std::string& filePath, rs2_stream streamType)
     : _filePath(filePath)
     , _streamType(streamType)
     , _imu_pose_collection()
-    , _sub_workers_joined(false)
-    , _m()
-    , _cv()
 {
 }
 
@@ -150,56 +147,42 @@ void converter_csv::convert_motion_pose(rs2::frame& f)
         return;
     }
 
-    start_worker(
-        [this, f] {
+	const auto stream_uid = std::make_pair(f.get_profile().stream_type(),
+        f.get_profile().stream_index());
 
-            add_sub_worker(
-                [this, f] {
-                    auto stream_uid = std::make_pair(f.get_profile().stream_type(),
-                        f.get_profile().stream_index());
+    long long frame_timestamp = 0LL;
+    if (f.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
+        frame_timestamp = f.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP);
 
-                    long long frame_timestamp = 0LL;
-                    if (f.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
-                        frame_timestamp = f.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP);
+    long long backend_timestamp = 0LL;
+    if (f.supports_frame_metadata(RS2_FRAME_METADATA_BACKEND_TIMESTAMP))
+        backend_timestamp = f.get_frame_metadata(RS2_FRAME_METADATA_BACKEND_TIMESTAMP);
 
-                    long long backend_timestamp = 0LL;
-                    if (f.supports_frame_metadata(RS2_FRAME_METADATA_BACKEND_TIMESTAMP))
-                        backend_timestamp = f.get_frame_metadata(RS2_FRAME_METADATA_BACKEND_TIMESTAMP);
+    long long time_of_arrival = 0LL;
+    if (f.supports_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL))
+        time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
+    
+    motion_pose_frame_record record{ f.get_profile().stream_type(),
+                                f.get_profile().stream_index(),
+                                f.get_frame_number(),
+                                frame_timestamp,
+                                backend_timestamp,
+                                time_of_arrival};
 
-                    long long time_of_arrival = 0LL;
-                    if (f.supports_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL))
-                        time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
-                    
-                    motion_pose_frame_record record{ f.get_profile().stream_type(),
-                                                f.get_profile().stream_index(),
-                                                f.get_frame_number(),
-                                                frame_timestamp,
-                                                backend_timestamp,
-                                                time_of_arrival};
+    if (auto motion = f.as<rs2::motion_frame>())
+    {
+        auto axes = motion.get_motion_data();
+        record._params = { axes.x, axes.y, axes.z };
+    }
 
-                    if (auto motion = f.as<rs2::motion_frame>())
-                    {
-                        auto axes = motion.get_motion_data();
-                        record._params = { axes.x, axes.y, axes.z };
-                    }
+    if (auto pf = f.as<rs2::pose_frame>())
+    {
+        auto pose = pf.get_pose_data();
+        record._params = { pose.translation.x, pose.translation.y, pose.translation.z,
+                pose.rotation.x,pose.rotation.y,pose.rotation.z,pose.rotation.w };
+    }
 
-                    if (auto pf = f.as<rs2::pose_frame>())
-                    {
-                        auto pose = pf.get_pose_data();
-                        record._params = { pose.translation.x, pose.translation.y, pose.translation.z,
-                                pose.rotation.x,pose.rotation.y,pose.rotation.z,pose.rotation.w };
-                    }
-
-                    _imu_pose_collection[stream_uid].emplace_back(record);
-                });
-            wait_sub_workers();
-            _sub_workers_joined = true;
-            _cv.notify_all();
-        });
-    std::unique_lock<std::mutex> lck(_m);
-    while (!_sub_workers_joined)
-        _cv.wait(lck);
-    save_motion_pose_data_to_file();
+    _imu_pose_collection[stream_uid].emplace_back(record);
 }
 
 void converter_csv::convert(rs2::frame& frame)
@@ -221,4 +204,9 @@ void converter_csv::convert(rs2::frame& frame)
         convert_motion_pose(frame);
         return;
     }
+}
+
+void converter_csv::flush()
+{
+    save_motion_pose_data_to_file();
 }

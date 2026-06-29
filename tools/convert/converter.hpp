@@ -48,7 +48,9 @@ namespace rs2 {
 
                 virtual std::string get_statistics();
 
-                void wait();
+                virtual void wait();
+
+                virtual void flush();
             };
 
         }
