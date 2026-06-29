@@ -4,10 +4,14 @@
 
 #include <rsutils/json.h>
 
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <map>
 #include <mutex>
 #include <string>
 #include <sstream>
+#include <thread>
 #include <vector>
 #include <functional>
 
@@ -44,6 +48,7 @@ namespace rs2
     public:
         config_file();
         config_file( std::string const & filename );
+        ~config_file();
 
         void set_default(const char* key, const char* calculate);
 
@@ -60,6 +65,16 @@ namespace rs2
         config_file& operator=(const config_file& other);
 
         void set(const char* key, const char* value);
+        void set_and_save(const char* key, const char* value);
+
+        template<class T>
+        void set_and_save(const char* key, T val)
+        {
+            std::stringstream ss;
+            ss << val;
+            set_and_save(key, ss.str().c_str());
+        }
+
         std::string get(const char* key, const char* def) const;
 
         config_value get(const char* key) const;
@@ -140,7 +155,7 @@ namespace rs2
             }
 
             ( *current )[keys.back()] = val;
-            save();
+            _dirty = true;
         }
 
         // Sets a default value to the config and default map
@@ -183,7 +198,7 @@ namespace rs2
                     current = &( *current )[keys[i]];
                 }
                 ( *current )[keys.back()] = default_val;
-                save();
+                _dirty = true;
             }
         }
 
@@ -191,6 +206,9 @@ namespace rs2
         std::string get_default(const char* key, const char* def) const;
 
         void save();
+        void save_loop();
+
+        static constexpr std::chrono::milliseconds SAVE_INTERVAL{ 1000 };
 
         // Serializes all reads/writes of `_j` and the on-disk file. Required because
         // viewer reads/writes config_file from multiple threads (UI thread, the
@@ -202,5 +220,10 @@ namespace rs2
         std::map<std::string, std::string> _defaults;
         std::string _filename;
         rsutils::json _j;
+        std::atomic<bool> _dirty;
+        std::condition_variable _save_cv;
+        std::mutex _save_cv_mutex;
+        bool _save_stop;
+        std::thread _save_thread;
     };
 }

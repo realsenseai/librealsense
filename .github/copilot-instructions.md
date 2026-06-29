@@ -77,6 +77,16 @@ These rules apply to all git operations.
 - Use the existing code style in surrounding files; the project does not enforce a formatter
 - Logging uses EasyLogging++ (controlled by `BUILD_EASYLOGGINGPP` option)
 
+## Code Change Discipline
+
+These rules apply to every code change.
+
+- **Keep changes minimal.** Every added line must earn its place. Prefer single-line expressions over multi-line blocks, reuse existing helpers and code paths instead of adding new ones, and use the shortest form that doesn't lose clarity.
+- **Comments are sparse.** Keep comments to 1–3 lines unless the code is large and genuinely complex. Don't restate what the code already says. Never reference Jenkins build numbers or Jira tickets in comments.
+- **Check before you add.** Before introducing a check, loop, or helper, verify the same logic doesn't already exist elsewhere in the call chain. If a function has a single caller, consider inlining it there. Never add a second copy of logic that can be merged with an existing one — consolidate first, don't layer.
+- **Clean up after removal.** When deleting a function, block, or feature, search the same patch for everything that only existed to serve it — defines, variables, struct fields, forward declarations, comments — and remove them too. Leave no dead code behind.
+- **Avoid environment variables.** Don't introduce new environment variables to gate or configure behavior; prefer existing options, parameters, and config mechanisms.
+
 ## Build System
 
 See `.github/skills/build.md` for full build instructions. The project uses **CMake**. Key build options are defined in `CMake/lrs_options.cmake`. Platform-specific configuration lives in:
