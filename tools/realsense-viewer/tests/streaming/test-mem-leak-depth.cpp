@@ -1,24 +1,23 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-// Drives the full viewer through 20 depth-only Start/Stop cycles and samples
-// the process's "private bytes" after each cycle. Exercises the real viewer
-// code path (ux-window loop, gc_streams, post-processing filters, syncer, etc.).
+// Drives the full viewer through 20 depth-only Start/Stop cycles and samples the
+// process's memory after each cycle. Exercises the real viewer code path
+// (ux-window loop, gc_streams, post-processing filters, syncer, etc.).
 //
-// Windows-only: the leak detector reads `PROCESS_MEMORY_COUNTERS_EX.PrivateUsage`
-// (= Task Manager's "Private Bytes" / "private commit"). `getrusage().ru_maxrss`
-// on Linux/macOS is the *peak* RSS — monotonically non-decreasing — and is
-// therefore useless for measuring per-cycle leak rate. A proper Linux metric
-// (/proc/self/status VmRSS) and macOS metric (task_info phys_footprint) is
-// follow-up work; until then the test only registers on Windows.
+// Per-platform memory metric (all measure *current* — not peak — process memory,
+// so the slope reflects per-cycle accumulation rather than monotonic high-water marks):
+//   Windows: PROCESS_MEMORY_COUNTERS_EX.PrivateUsage     (a.k.a. "Private Bytes")
+//   Linux:   VmRSS from /proc/self/status                (current resident set)
+//   macOS:   task_info(TASK_VM_INFO).phys_footprint      (unique resident memory)
+// `getrusage().ru_maxrss` is deliberately NOT used — it's the *peak* RSS,
+// monotonically non-decreasing, and useless for slope-based leak detection.
 //
 // Results are written to viewer_mem_leak_results.csv next to the executable.
 // Plot with plot_mem.py from the scratchpad.
 //
 // Run headlessly:
 //   realsense-viewer-tests --auto -r mem_leak_depth_start_stop
-
-#ifdef _WIN32
 
 #include "viewer-test-helpers.h"
 
@@ -27,20 +26,26 @@
 
 #include <librealsense2/rs.hpp>
 
+#include <cstdio>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
 
-#include <windows.h>
-#include <psapi.h>
-#pragma comment( lib, "psapi.lib" )
+#ifdef _WIN32
+#  include <windows.h>
+#  include <psapi.h>
+#  pragma comment( lib, "psapi.lib" )
+#elif defined( __APPLE__ )
+#  include <mach/mach.h>
+#endif
 
 
 namespace {
 
-size_t get_private_bytes()
+size_t get_process_memory_bytes()
 {
+#ifdef _WIN32
     PROCESS_MEMORY_COUNTERS_EX pmc{};
     if( !GetProcessMemoryInfo( GetCurrentProcess(),
                                reinterpret_cast< PROCESS_MEMORY_COUNTERS * >( &pmc ),
@@ -48,9 +53,41 @@ size_t get_private_bytes()
     {
         std::cerr << "[mem-leak] WARNING: GetProcessMemoryInfo failed, GLE="
                   << GetLastError() << std::endl;
-        return 0;  // caller asserts baseline > 0 and propagates the zero into the slope
+        return 0;
     }
     return static_cast< size_t >( pmc.PrivateUsage );
+
+#elif defined( __APPLE__ )
+    task_vm_info_data_t    info{};
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    if( task_info( mach_task_self(),
+                   TASK_VM_INFO,
+                   reinterpret_cast< task_info_t >( &info ),
+                   &count )
+        != KERN_SUCCESS )
+    {
+        std::cerr << "[mem-leak] WARNING: task_info TASK_VM_INFO failed" << std::endl;
+        return 0;
+    }
+    return static_cast< size_t >( info.phys_footprint );
+
+#else  // Linux
+    std::ifstream status( "/proc/self/status" );
+    std::string   line;
+    while( std::getline( status, line ) )
+    {
+        if( line.rfind( "VmRSS:", 0 ) == 0 )
+        {
+            size_t kb = 0;
+            if( std::sscanf( line.c_str(), "VmRSS: %zu kB", &kb ) == 1 )
+                return kb * 1024;
+            break;
+        }
+    }
+    std::cerr << "[mem-leak] WARNING: could not read VmRSS from /proc/self/status"
+              << std::endl;
+    return 0;
+#endif
 }
 
 double to_mb( size_t bytes ) { return bytes / ( 1024.0 * 1024.0 ); }
@@ -103,8 +140,8 @@ VIEWER_TEST( "streaming", "mem_leak_depth_start_stop" )
 
     out << "iteration,private_bytes_mb" << std::endl;
 
-    const auto baseline = get_private_bytes();
-    IM_CHECK( baseline > 0 );  // 0 means GetProcessMemoryInfo failed; would skew the slope
+    const auto baseline = get_process_memory_bytes();
+    IM_CHECK( baseline > 0 );  // 0 means the platform memory sampler failed; would skew the slope
     std::cout << "[mem-leak] Device: " << model.dev.get_info( RS2_CAMERA_INFO_NAME )
               << "  SN " << model.dev.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) << std::endl;
     std::cout << "[mem-leak] Sensor: " << depth->s->get_info( RS2_CAMERA_INFO_NAME ) << std::endl;
@@ -122,7 +159,7 @@ VIEWER_TEST( "streaming", "mem_leak_depth_start_stop" )
         test.click_stream_toggle_off( model, depth );
         test.sleep( IDLE_DURATION );
 
-        const auto used = get_private_bytes();
+        const auto used = get_process_memory_bytes();
         const auto mb   = to_mb( used );
         samples_mb.push_back( mb );
 
@@ -183,5 +220,3 @@ VIEWER_TEST( "streaming", "mem_leak_depth_start_stop" )
 
     IM_CHECK( slope <= LEAK_THRESHOLD_MB_PER_ITER );
 }
-
-#endif  // _WIN32
