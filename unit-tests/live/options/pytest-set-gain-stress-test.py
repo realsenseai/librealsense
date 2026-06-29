@@ -9,6 +9,7 @@ import pytest
 import pyrealsense2 as rs
 import time
 import logging
+from rspy.snippets import is_dds_dev
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -51,3 +52,7 @@ def test_set_gain_stress(test_device_wrapped):
             get_val = depth_ir_sensor.get_option(rs.option.gain)
             assert val == get_val, f"Gain mismatch at iteration {i}: set {val}, got {get_val}"
             log.debug(f"Gain Set To: {get_val}")
+            if is_dds_dev(dev):
+                # On DDS devices, after a set, the device may send a broadcast echoing the value change to all users.
+                # When immediately setting same option again we get a race between value in reply of second set and broadcast value.
+                time.sleep(0.02)
