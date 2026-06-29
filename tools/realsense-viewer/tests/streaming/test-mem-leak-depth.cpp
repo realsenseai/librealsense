@@ -123,8 +123,24 @@ VIEWER_TEST( "streaming", "mem_leak_depth_start_stop" )
     // Leak verdict (linear-regression slope on iters after warmup).
     // First few iterations include one-time allocations and steady-state pool
     // ramp-up that are not part of the per-cycle leak — skip them.
-    constexpr int   WARMUP_ITERS               = 3;
+    constexpr int WARMUP_ITERS = 3;
+
+    // Threshold is platform-dependent because the underlying metric is:
+    //   Windows: PrivateUsage   — private commit, clean signal, ~0.5 MB/iter post-fix.
+    //   macOS:   phys_footprint — similar to PrivateUsage, comparably clean.
+    //   Linux:   VmRSS          — includes file-backed mmaps that the kernel can
+    //                             evict under memory pressure, and Mesa softpipe
+    //                             (under xvfb-run on CI) commits internal buffers
+    //                             in 20-50 MB chunks. Observed slopes on a working
+    //                             build swing 1-3 MB/iter run-to-run from this
+    //                             chunking + eviction, not from a real leak. The
+    //                             threshold is raised so Linux flags only gross
+    //                             regressions; Windows is the tight regression guard.
+#ifdef __linux__
+    constexpr float LEAK_THRESHOLD_MB_PER_ITER = 5.0f;
+#else
     constexpr float LEAK_THRESHOLD_MB_PER_ITER = 1.0f;
+#endif
 
     auto & model = test.find_first_device_or_exit();
     auto depth = find_depth_subdevice( model );
