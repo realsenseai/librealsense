@@ -21,7 +21,8 @@ bool output_model::cycle_autocomplete(bool forward)
 {
     if (command_line.empty())
         return false;
-    if (autocomplete.empty() || !starts_with(to_lower(autocomplete.front()), to_lower(command_line)))
+    std::string lower_cmd = to_lower(command_line);
+    if (autocomplete.empty() || !starts_with(lower_cmd, autocomplete_prefix))
     {
         std::string commands_xml = config_file::instance().get(configurations::viewer::commands_xml);
         std::ifstream f(commands_xml.c_str());
@@ -29,12 +30,13 @@ bool output_model::cycle_autocomplete(bool forward)
         {
             std::string str((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
             autocomplete.clear();
+            autocomplete_prefix = lower_cmd;
             std::regex exp("Command Name=\"(\\w+)\"");
             std::smatch res;
             std::string::const_iterator searchStart(str.cbegin());
             while (regex_search(searchStart, str.cend(), res, exp))
             {
-                if (starts_with(to_lower(res[1]), to_lower(command_line)))
+                if (starts_with(to_lower(res[1]), lower_cmd))
                     autocomplete.push_back(res[1]);
                 searchStart = res.suffix().first;
             }
@@ -703,6 +705,7 @@ void output_model::draw(ux_window& win, rect view_rect, device_models_list & dev
             history_offset = -1;
             history_draft = "";
             autocomplete.clear();
+            autocomplete_prefix = "";
             command_focus = true;
         }
         if (!command_focus && !new_log) command_line = buff;
@@ -712,6 +715,7 @@ void output_model::draw(ux_window& win, rect view_rect, device_models_list & dev
         {
             command_line = "";
             autocomplete.clear();
+            autocomplete_prefix = "";
         }
 
         float child_height = 0;

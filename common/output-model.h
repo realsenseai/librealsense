@@ -173,6 +173,7 @@ namespace rs2
         size_t max_notifications_kept = 1000;
 
         std::deque<std::string> autocomplete;
+        std::string autocomplete_prefix;
 
         std::mutex devices_mutex;
         std::vector<rs2::device> devices;
