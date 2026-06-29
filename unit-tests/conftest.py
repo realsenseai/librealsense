@@ -56,7 +56,7 @@ from rspy import devices, repo
 from rspy.signals import register_signal_handlers
 from rspy.pytest.logging_setup import (
     setup_test_logging, bridge_rspy_log, ensure_newline, configure_logging,
-    start_test_log, stop_test_log, print_terminal_summary,
+    open_log, close_log, print_terminal_summary,
     configure_junit_logging,
 )
 from rspy.pytest.log_live_format import install as install_live_log_format
@@ -397,18 +397,17 @@ def pytest_collection_modifyitems(session, config, items):
     filter_and_sort_items(config, items)
 
 
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_protocol(item, nextitem):
-    """Wrap each test with log separators and write per-test log file."""
-    file_handler = start_test_log(item)
+@pytest.fixture(autouse=True)
+def _test_log_banner(request):
+    """Emit the per-test header into the log. Runs during test setup -- i.e. AFTER the
+    module-scoped log handler (module_log) is open and the device is enabled -- so the header
+    lands in the correct module+camera file. (Logging it from a per-test protocol hook instead
+    would race a parametrized module fixture's deferred teardown and land in the wrong file.)"""
     ensure_newline()
     log.info("-" * 80)
-    log.info(f"Test: {item.nodeid}")
+    log.info(f"Test: {request.node.nodeid}")
     log.info("-" * 80)
-
-    outcome = yield
-    stop_test_log(file_handler, nextitem)
-
+    yield
     ensure_newline()
 
 
@@ -523,7 +522,31 @@ def __pytest_repeat_step_number(request):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def module_device_setup(request, _test_device_serial, __pytest_repeat_step_number):
+def module_log(request, _test_device_serial):
+    """Own the per-(module, camera) log file for the whole module lifecycle.
+
+    Module-scoped so one file spans setup (device enable) -> every test -> teardown (device
+    disable). Depends on ``_test_device_serial`` so pytest re-instantiates it per camera (one file
+    per module+camera) and so it satisfies the cross-camera module-fixture guard. The filename's
+    device id is the test's parametrize id (e.g. ``D455-213522252012``), recovered from the
+    triggering item's callspec so it matches the legacy naming.
+
+    ``module_device_setup`` depends on this fixture, so the handler opens before the device is
+    enabled and closes after it is disabled -- keeping a parametrized module fixture's deferred
+    teardown (pytest runs the previous camera's teardown during the next camera's protocol) from
+    leaking the disable into the next camera's file.
+    """
+    item = getattr(request, '_pyfuncitem', None)
+    device_id = getattr(getattr(item, 'callspec', None), 'id', None)
+    handler = open_log(str(request.node.fspath), device_id, request.config)
+    try:
+        yield
+    finally:
+        close_log(handler)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def module_device_setup(request, _test_device_serial, __pytest_repeat_step_number, module_log):
     """Power the target device(s) on for the module and off again at teardown — once per
     (module, parametrized value).
 
