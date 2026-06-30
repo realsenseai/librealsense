@@ -12,10 +12,10 @@ import logging
 log = logging.getLogger(__name__)
 
 if is_jetson_platform():
-    pytestmark = [pytest.mark.context("weekly"), pytest.mark.device("D457")]
+    pytestmark = [pytest.mark.context("weekly"), pytest.mark.device_each("D457")]
 else:
     pytestmark = [pytest.mark.context("weekly"),
-                  pytest.mark.device("D455"),
+                  pytest.mark.device_each("D455"),
                   pytest.mark.device_each("D500*")]
 
 
