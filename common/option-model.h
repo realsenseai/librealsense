@@ -75,12 +75,10 @@ namespace rs2
         std::function<bool( option_model&, std::string&, notifications_model& )> custom_draw_method = nullptr;
         bool edit_mode = false;
         std::string edit_value;
-        // Write this option synchronously instead of via the async dispatcher. Set for software
-        // post-processing block options (processing_block_model): they run in-process with no FW
-        // round-trip, so a blocking write can't freeze the UI, and the synchronous set_option
-        // reads the value back — so the control reflects what was applied and never reverts to a
-        // stale value (RSDEV-12488, RSDEV-12502). FW/sensor options keep the async path, whose
-        // whole purpose is to avoid blocking the render loop on the ~200 ms UVC round-trip.
+        // Selects this option's write path; fixed at construction. Software post-processing block
+        // options set it true: they run in-process (no FW round-trip), so a synchronous set_option
+        // can't freeze the UI and it reads the value back, so the control reflects what was
+        // applied. FW/sensor options keep the async path that avoids blocking the render loop.
         bool write_synchronously = false;
         bool is_all_integers() const;
         bool is_enum() const;

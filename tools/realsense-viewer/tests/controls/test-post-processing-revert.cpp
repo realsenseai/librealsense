@@ -6,17 +6,10 @@
 #include <string>
 
 
-// Regression test for RSDEV-12488 / RSDEV-12502: a post-processing filter control set to a
-// non-default value must keep that value in the UI. PR #15029 made UI option writes
-// asynchronous; software filters (decimation, rotation, ...) emit no on_options_changed echo,
-// so the control model's cached value was never refreshed after the write. Once the ~2 s
-// user-request mask expired the control snapped back to its previous (config-restored) value
-// even though the effect was applied (e.g. decimation magnitude -> output decimated by 5 but
-// the slider showing 2).
-//
-// The cached value->as_float is exactly what the slider displays after the mask expires, and it
-// is independent of the mask timing — so we assert on it directly rather than racing the 2 s mask
-// (and we avoid re-reading through the UI, which would re-activate the slider and reset the mask).
+// Regression test: a post-processing filter control set to a non-default value must keep it.
+// Software-filter writes used to revert in the UI (the effect applied, but the control snapped
+// back) because the async write path never refreshed the cached value. We assert on the cached
+// value (what the slider shows after the user-request mask) without re-reading through the UI.
 VIEWER_TEST( "controls", "post_processing_value_persists" )
 {
     auto & model = test.find_first_device_or_exit();

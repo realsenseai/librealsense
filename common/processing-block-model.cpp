@@ -83,7 +83,7 @@ namespace rs2
                                                    model ? &model->_options_invalidated : nullptr,
                                                    error_message );
             // Software filter: write synchronously (no FW round-trip) so the value is read back
-            // and the control doesn't revert to a stale value (RSDEV-12488, RSDEV-12502).
+            // and the control doesn't revert to a stale value.
             om.write_synchronously = true;
             _options_id_to_model[option->id] = om;
         }

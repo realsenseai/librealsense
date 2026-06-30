@@ -799,7 +799,7 @@ void option_model::write_value( float new_value, std::string & error_message )
     {
         // Software post-processing filters run in-process (no FW round-trip), so a synchronous
         // write can't freeze the UI — and unlike the async path set_option reads the value back,
-        // so the control reflects what was applied and never reverts (RSDEV-12488, RSDEV-12502).
+        // so the control reflects what was applied and never reverts to a stale value.
         set_option( opt, new_value, error_message );
         if( invalidate_flag )
             *invalidate_flag = true;
