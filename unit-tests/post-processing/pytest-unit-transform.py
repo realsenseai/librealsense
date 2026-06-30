@@ -2,13 +2,10 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import pyrealsense2 as rs
-from threading import Thread
 import numpy as np
 
 ################################################################################################
 def test_unit_transform():
-    ctx = rs.context()
-
     W = 640
     H = 480
     BPP = 2
@@ -51,22 +48,17 @@ def test_unit_transform():
 
     pixels = np.array([(i % 10) for i in range(W*H)], dtype=np.uint16)
 
-    def helper_func(s, p, d, frame_expected):
-        for k in range(1, frame_expected + 1):
-            frame = rs.software_video_frame()
-            frame.pixels = p
-            frame.bpp = 2
-            frame.stride = frame.bpp * W
-            frame.timestamp = float(k * 100)
-            frame.domain = rs.timestamp_domain.hardware_clock
-            frame.frame_number = k
-            frame.profile = d
-            s.on_video_frame(frame)
-
-    t = Thread(target=helper_func, args=(software_sensor, pixels, depth, expected_frames))
-    t.start()
-
     for i in range(expected_frames):
+        frame = rs.software_video_frame()
+        frame.pixels = pixels
+        frame.bpp = 2
+        frame.stride = frame.bpp * W
+        frame.timestamp = float((i + 1) * 100)
+        frame.domain = rs.timestamp_domain.hardware_clock
+        frame.frame_number = i + 1
+        frame.profile = depth
+        software_sensor.on_video_frame(frame)
+
         synced_f = sync.wait_for_frames()
         f = synced_f.get_depth_frame()
 
@@ -83,5 +75,3 @@ def test_unit_transform():
 
         expected_units_frame = (origin_frame * depth_unit).astype(np.float32)
         assert np.array_equal(ut_frame, expected_units_frame)
-
-    t.join()
