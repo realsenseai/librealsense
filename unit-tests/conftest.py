@@ -52,7 +52,7 @@ _debug_requested = '--debug' in sys.argv
 from rspy import python_path
 python_path.block_user_site_for({'pyrealsense2', 'pyrealdds', 'pyrsutils'})
 
-from rspy import devices, repo
+from rspy import devices, repo, tests_wrapper
 from rspy.signals import register_signal_handlers
 from rspy.pytest.logging_setup import (
     setup_test_logging, bridge_rspy_log, ensure_newline, configure_logging,
@@ -736,7 +736,8 @@ def test_device_wrapped(test_device):
         safety_sensor = dev.first_safety_sensor()
         if safety_sensor.get_option(rs.option.safety_mode) != rs.safety_mode.service:
             # Will throw on failure — intentional so we fail the test rather than run without service mode.
-            safety_sensor.set_option(rs.option.safety_mode, rs.safety_mode.service)
+            # Retries internally: the FW needs a few seconds after enumeration before it accepts the switch.
+            tests_wrapper.set_safety_mode(safety_sensor, rs.safety_mode.service)
     yield dev, ctx
     if safety_sensor is not None:
         try:
