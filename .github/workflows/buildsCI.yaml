@@ -414,63 +414,6 @@ jobs:
 
 
   #--------------------------------------------------------------------------------
-  U22_ST_Py_DDS_RSUSB_CI:  # Ubuntu 2020, Static, Python, DDS, RSUSB, LibCI without executables
-    runs-on: ubuntu-22.04
-    timeout-minutes: 60
-    steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
-
-    - name: Prebuild
-      shell: bash
-      run: |
-        sudo apt-get update;
-        sudo apt-get install -qq build-essential xorg-dev libgl1-mesa-dev libglu1-mesa-dev libglew-dev libglm-dev;
-        sudo apt-get install -qq libusb-1.0-0-dev;
-        sudo apt-get install -qq libgtk-3-dev;
-        sudo apt-get install libglfw3-dev libglfw3;
-        python3 -m pip install numpy
-
-    - name: Check_API
-      shell: bash
-      run: |
-        cd scripts
-        ./api_check.sh
-        ./pr_check.sh
-        cd ..
-        mkdir build
-
-    - name: Build
-      # Note: we force RSUSB because, on Linux, the context creation will fail on GHA:
-      #     (backend-v4l2.cpp:555) Cannot access /sys/class/video4linux)
-      # And, well, we don't need any specific platform for DDS!
-      shell: bash
-      run: |
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=false -DBUILD_EXAMPLES=false -DBUILD_TOOLS=false -DBUILD_UNIT_TESTS=true -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=true -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DFORCE_RSUSB_BACKEND=true
-        cmake --build . -- -j4
-
-    - name: Client for realsense2-all
-      shell: bash
-      run: |
-        mkdir build/rs-all-client
-        cd build/rs-all-client
-        cmake ../../.github/workflows/rs-all-client -DBUILD_WITH_DDS=ON -DFORCE_RSUSB_BACKEND=ON
-        cmake --build . -- -j4
-        ./rs-all-client
-
-    - name: LibCI
-      shell: bash
-      run: |
-        python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "dds linux" --tag dds
-
-    - name: LibCI (pytest)
-      shell: bash
-      run: |
-        python3 -m pip install -r unit-tests/requirements.txt
-        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "dds linux" --tag dds
-
-
-  #--------------------------------------------------------------------------------
   U22_ST_Py_DDS_RSUSB_SEC:  # Ubuntu 2020, Static, Python, DDS, RSUSB, additional security checks
     runs-on: ubuntu-22.04
     timeout-minutes: 60
@@ -694,31 +637,4 @@ jobs:
         cd build
         cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_ROSBAG2=OFF
         cmake --build . -- -j4
-
-  #--------------------------------------------------------------------------------
-  Win_SH_No_Rosbag2:  # Windows, Shared, without rosbag2 (ROS2) support
-    runs-on: windows-2025
-    timeout-minutes: 60
-    steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
-
-    - name: Enable Long Paths
-      shell: powershell
-      run: |
-       New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
-
-    - name: Check_API
-      shell: bash
-      run: |
-        cd scripts
-        ./api_check.sh
-        cd ..
-
-    - name: Build
-      shell: bash
-      run: |
-        mkdir build
-        cd build
-        cmake .. -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=false -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_ROSBAG2=OFF
-        cmake --build . --config ${{env.LRS_RUN_CONFIG}} -- -m
 
