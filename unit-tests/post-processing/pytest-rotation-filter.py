@@ -1,10 +1,6 @@
 # License: Apache 2.0. See LICENSE file in root directory.
-# Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-#temporary fix to prevent the test from running on Win_SH_Py_DDS_CI
-#test:donotrun:dds
-
-from rspy import test, repo
 import pyrealsense2 as rs
 import numpy as np
 
@@ -85,11 +81,11 @@ def validate_rotation_results(filtered_frame, angle):
     expected_list = expected_data.flatten().tolist()
 
     # Compare the flattened lists
-    test.check_equal_lists(rotated_list, expected_list)
+    assert rotated_list == expected_list
 
 
 ################################################################################################
-with test.closure("Test rotation filter"):
+def test_rotation_filter():
     # Set up software device and depth sensor
     sw_dev = rs.software_device()
     depth_sensor = sw_dev.add_sensor("Depth")
@@ -126,6 +122,3 @@ with test.closure("Test rotation filter"):
         # Stop and close the sensor after each angle test
         depth_sensor.stop()
         depth_sensor.close()
-
-################################################################################################
-test.print_results_and_exit()
