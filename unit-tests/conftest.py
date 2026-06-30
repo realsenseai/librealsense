@@ -397,16 +397,24 @@ def pytest_collection_modifyitems(session, config, items):
     filter_and_sort_items(config, items)
 
 
+def _emit_test_header(nodeid):
+    """Write the ``Test: <nodeid>`` banner into the current module+camera log."""
+    ensure_newline()
+    log.info("-" * 80)
+    log.info(f"Test: {nodeid}")
+    log.info("-" * 80)
+
+
 @pytest.fixture(autouse=True)
 def _test_log_banner(request):
     """Emit the per-test header into the log. Runs during test setup -- i.e. AFTER the
     module-scoped log handler (module_log) is open and the device is enabled -- so the header
     lands in the correct module+camera file. (Logging it from a per-test protocol hook instead
-    would race a parametrized module fixture's deferred teardown and land in the wrong file.)"""
-    ensure_newline()
-    log.info("-" * 80)
-    log.info(f"Test: {request.node.nodeid}")
-    log.info("-" * 80)
+    would race a parametrized module fixture's deferred teardown and land in the wrong file.)
+
+    Setup-phase failures in module_device_setup happen BEFORE this fixture runs, so those paths
+    emit the header themselves (via _emit_test_header) to keep the error anchored to its item."""
+    _emit_test_header(request.node.nodeid)
     yield
     ensure_newline()
 
@@ -472,8 +480,7 @@ def session_setup_teardown(request):
     # (at the last module's teardown), so this output never tails a test's .log. Emit it with
     # pytest's output capture suspended and via print() so it reaches the console -- otherwise
     # fixture-teardown stdout is captured and discarded, and a logging.info would have no handler.
-    capmanager = request.config.pluginmanager.getplugin("capturemanager")
-    with capmanager.global_and_fixture_disabled():
+    def _emit_session_end():
         print(f"\n-I- {'=' * 80}")  # leading newline: pytest's last progress line has no EOL yet
         print("-I- Pytest Session Ending")
         print(f"-I- {'=' * 80}")
@@ -481,6 +488,15 @@ def session_setup_teardown(request):
             _cleanup_devices()
         except Exception as e:
             print(f"-W- Error during cleanup: {e}")
+
+    # getplugin returns None if capture is disabled (e.g. -p no:capture); guard so teardown
+    # (and _cleanup_devices) still runs instead of raising AttributeError.
+    capmanager = request.config.pluginmanager.getplugin("capturemanager")
+    if capmanager is not None:
+        with capmanager.global_and_fixture_disabled():
+            _emit_session_end()
+    else:
+        _emit_session_end()
 
     log.info("=" * 80)
 
@@ -523,23 +539,44 @@ def __pytest_repeat_step_number(request):
     return getattr(request, 'param', 0)
 
 
+def _device_log_id(serial):
+    """Device-portion id used for the per-(module, camera) log filename.
+
+    Mirrors the device parametrize ids built in ``resolve_device_each_serials`` (``<name>-<sn>``,
+    ``+``-joined for multi-device, ``MISSING-``/``SKIP-`` for sentinels) -- and deliberately omits
+    any extra ``@pytest.mark.parametrize`` dimensions (config/resolution). So every parametrize
+    case of one camera shares ONE file (``<module>_<name>-<sn>.log``), with the device enable at
+    the top and disable at the bottom, while each camera still gets its own file. ``None`` for a
+    test with no device markers.
+    """
+    if serial is None:
+        return None
+    if isinstance(serial, list):
+        return '+'.join(f"{devices.get(sn).name}-{sn}" if devices.get(sn) else sn for sn in serial)
+    if serial.startswith(_MISSING_SENTINEL_PREFIX):
+        return f"MISSING-{serial[len(_MISSING_SENTINEL_PREFIX):]}"
+    if serial.startswith(_SKIP_SENTINEL_PREFIX):
+        return f"SKIP-{serial[len(_SKIP_SENTINEL_PREFIX):]}"
+    dev = devices.get(serial)
+    return f"{dev.name}-{serial}" if dev else serial
+
+
 @pytest.fixture(scope="module", autouse=True)
 def module_log(request, _test_device_serial):
     """Own the per-(module, camera) log file for the whole module lifecycle.
 
     Module-scoped so one file spans setup (device enable) -> every test -> teardown (device
     disable). Depends on ``_test_device_serial`` so pytest re-instantiates it per camera (one file
-    per module+camera) and so it satisfies the cross-camera module-fixture guard. The filename's
-    device id is the test's parametrize id (e.g. ``D455-213522252012``), recovered from the
-    triggering item's callspec so it matches the legacy naming.
+    per module+camera) and so it satisfies the cross-camera module-fixture guard. The filename uses
+    the device-portion id only (``_device_log_id``), so all of a camera's ``@parametrize`` cases
+    collapse into that camera's single file.
 
     ``module_device_setup`` depends on this fixture, so the handler opens before the device is
     enabled and closes after it is disabled -- keeping a parametrized module fixture's deferred
     teardown (pytest runs the previous camera's teardown during the next camera's protocol) from
     leaking the disable into the next camera's file.
     """
-    item = getattr(request, '_pyfuncitem', None)
-    device_id = getattr(getattr(item, 'callspec', None), 'id', None)
+    device_id = _device_log_id(_test_device_serial)
     handler = open_log(str(request.node.fspath), device_id, request.config)
     try:
         yield
@@ -580,6 +617,10 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         log.debug(f"Module {request.node.name} has no device requirements")
         yield None
         return
+
+    # nodeid of the item that triggered this module fixture -- used to anchor setup-phase failures
+    # (which happen before _test_log_banner runs) to the failing test in the log.
+    item_id = getattr(getattr(request, '_pyfuncitem', None), 'nodeid', None) or request.node.nodeid
 
     no_reset = request.config.getoption("--no-reset", default=False)
     # Decide whether setup power-cycles the device (vs just turning it on):
@@ -625,6 +666,7 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         except Exception as e:
             # Setup failed after possibly powering the port(s): teardown won't run (no yield),
             # so power off what we tried to enable here, lest it linger into the next module.
+            _emit_test_header(item_id)
             try:
                 devices.disable(serial_number)
             except Exception as cleanup_err:
@@ -637,9 +679,11 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     # Single-device path (parametrized string value, including sentinels).
     if serial_number.startswith(_SKIP_SENTINEL_PREFIX):
         pattern = serial_number[len(_SKIP_SENTINEL_PREFIX):]
+        _emit_test_header(item_id)
         pytest.skip(f"No suitable devices for requirements: {pattern}")
     if serial_number.startswith(_MISSING_SENTINEL_PREFIX):
         pattern = serial_number[len(_MISSING_SENTINEL_PREFIX):]
+        _emit_test_header(item_id)
         pytest.fail(f"No devices found matching requirements: {pattern}")
     log.debug(f"Test using parametrized device: {serial_number}")
 
@@ -654,6 +698,7 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     except Exception as e:
         # Setup failed after possibly powering the port: teardown won't run (no yield), so power
         # off what we tried to enable here, lest it linger into the next module.
+        _emit_test_header(item_id)
         try:
             devices.disable([serial_number])
         except Exception as cleanup_err:
