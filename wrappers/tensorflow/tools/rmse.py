@@ -6,7 +6,7 @@ import math
 from matplotlib import pyplot as plt
 import os
 
-filename = "‪D:/dataset/gt-4622.png"
+filename = "D:/dataset/gt-4622.png"
 if (len(sys.argv) > 1):
     filename = str(sys.argv[1])
 
