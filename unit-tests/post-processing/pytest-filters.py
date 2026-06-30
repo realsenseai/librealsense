@@ -9,8 +9,6 @@ import urllib.request
 from urllib.error import URLError, HTTPError
 import platform
 
-pytestmark = [pytest.mark.context("nightly")]
-
 def download_file(url, subdir, filename):
     destination = os.path.join(subdir, filename)
     try:
