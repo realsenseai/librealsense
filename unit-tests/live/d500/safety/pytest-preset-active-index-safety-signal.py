@@ -265,39 +265,41 @@ expected_signal_1 = {
 #############################################################################################
 
 @pytest.fixture
-def safety_presets(test_device):
+def safety_presets(test_device, request):
     """Provide (dev, sensor, ctx) with the two test presets written to indexes 0 and 1.
 
-    Setup and teardown both toggle safety service mode (preset writes are only allowed there).
-    The originals are saved before the test and restored at teardown - which pytest runs even
-    if the test fails - so the device is always left in a known state. Each service-mode
-    section is wrapped in try/finally so stop_wrapper always runs and the device is never left
-    stuck in service mode.
+    For each index the original is saved and its restore is registered with
+    request.addfinalizer *before* that index is overwritten. pytest runs every registered
+    finalizer at teardown - even if setup later raises before reaching yield, and independently
+    of one another - so a write that fails mid-sequence (or a restore that itself fails) never
+    leaves an index holding the test preset. Preset writes are only allowed in safety service
+    mode, so each restore (and the setup writes) toggles the service-mode wrapper in its own
+    try/finally and is never left stuck in service mode.
     """
     dev, ctx = test_device
     sensor = dev.first_safety_sensor()
     assert sensor.supports(rs.option.safety_preset_active_index)
 
-    # Save the existing presets, then write the two test presets to indexes 0 and 1. Return to
-    # run mode afterwards so the safety algorithm computes the signal while streaming.
+    def restore(index, preset):
+        tw.start_wrapper(dev)
+        try:
+            sensor.set_safety_preset(index, preset)
+        finally:
+            tw.stop_wrapper(dev)
+
+    # Save each original and schedule its restore before overwriting it, then write the test
+    # preset. Return to run mode afterwards so the safety algorithm computes the signal while
+    # streaming.
     tw.start_wrapper(dev)
     try:
-        original_preset_0 = sensor.get_safety_preset(0)
-        original_preset_1 = sensor.get_safety_preset(1)
-        sensor.set_safety_preset(0, preset_json_0)
-        sensor.set_safety_preset(1, preset_json_1)
+        for index, preset_json in ((0, preset_json_0), (1, preset_json_1)):
+            original = sensor.get_safety_preset(index)
+            request.addfinalizer(lambda i=index, o=original: restore(i, o))
+            sensor.set_safety_preset(index, preset_json)
     finally:
         tw.stop_wrapper(dev)
 
     yield dev, sensor, ctx
-
-    # Restore the original presets to whatever they held before the test ran.
-    tw.start_wrapper(dev)
-    try:
-        sensor.set_safety_preset(0, original_preset_0)
-        sensor.set_safety_preset(1, original_preset_1)
-    finally:
-        tw.stop_wrapper(dev)
 
 
 def test_active_index_changes_safety_verdict(safety_presets):
