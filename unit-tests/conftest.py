@@ -56,7 +56,7 @@ from rspy import devices, repo
 from rspy.signals import register_signal_handlers
 from rspy.pytest.logging_setup import (
     setup_test_logging, bridge_rspy_log, ensure_newline, configure_logging,
-    start_test_log, stop_test_log, print_terminal_summary,
+    start_test_log, stop_test_log, close_test_log, print_terminal_summary,
     configure_junit_logging,
 )
 from rspy.pytest.log_live_format import install as install_live_log_format
@@ -69,6 +69,14 @@ from rspy.pytest.device_helpers import (
 )
 from rspy.pytest.collection import filter_and_sort_items, assert_module_fixtures_are_per_camera
 from rspy.pytest.plugins import check_required_plugins
+
+try:
+    # Internal but precise: pytest's own skip-mark evaluator. Lets us detect a true
+    # @skipif (or @skip) at protocol time, without suppressing logs for a *false* skipif
+    # (which still runs). pytest is version-pinned; try/except degrades if the symbol moves.
+    from _pytest.skipping import evaluate_skip_marks
+except ImportError:
+    evaluate_skip_marks = None
 
 log = logging.getLogger('librealsense')
 
@@ -397,9 +405,29 @@ def pytest_collection_modifyitems(session, config, items):
     filter_and_sort_items(config, items)
 
 
+def _will_skip(item):
+    """True if pytest will skip this item before it runs (``@skip`` or a true ``@skipif``).
+    Falls back to the plain skip-marker check if pytest's internal evaluator is unavailable."""
+    if evaluate_skip_marks is not None:
+        return evaluate_skip_marks(item) is not None
+    return item.get_closest_marker("skip") is not None
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_protocol(item, nextitem):
     """Wrap each test with log separators and write per-test log file."""
+    # Tests that won't really run get no separators and no per-test .log file:
+    #  - @skip / a true @skipif (pytest's own evaluator; a false skipif still runs);
+    #  - device-absent skips parametrize a __SKIP__ sentinel onto _test_device_serial
+    #    (skipped later in module_device_setup, so no marker exists yet here).
+    # __MISSING__ sentinels are NOT excluded — they fail the test, which wants a log.
+    cs = getattr(item, "callspec", None)
+    serial = cs.params.get("_test_device_serial") if cs is not None else None
+    skip_sentinel = isinstance(serial, str) and serial.startswith(_SKIP_SENTINEL_PREFIX)
+    if _will_skip(item) or skip_sentinel:
+        yield
+        return
+
     file_handler = start_test_log(item)
     ensure_newline()
     log.info("-" * 80)
@@ -414,20 +442,26 @@ def pytest_runtest_protocol(item, nextitem):
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Log test duration and any failures/errors."""
+    """Log test duration and setup/teardown failures. Call-phase failures are logged
+    per-attempt in pytest_runtest_call (makereport is bypassed on pytest-retry reruns).
+    Collection skips are silenced — they get neither a .log nor a skip-reason line."""
     outcome = yield
     report = outcome.get_result()
 
-    if report.skipped:
-        ensure_newline()
-        reason = report.longrepr[-1]
-        log.info(reason)
-    if report.failed and call.excinfo:
+    if report.failed and call.excinfo and call.when != "call":
         ensure_newline()
         log.error(f"{call.when} {report.outcome}: {call.excinfo.typename}: {call.excinfo.value}")
     if call.when == "call":
         ensure_newline()
         log.debug(f"Test execution took {report.duration:.3f}s")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_setup(item):
+    """Record whether setup succeeded — used in pytest_runtest_call to skip the spurious
+    fixture-injection error pytest-retry raises when it runs call after a failed setup."""
+    outcome = yield
+    item._rs_setup_ok = outcome.excinfo is None
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -444,10 +478,23 @@ def pytest_runtest_call(item):
 
     Flushing the failures here, in the call phase, makes them visible to pytest-retry
     on every attempt (a genuinely flaky soft-check test passes on retry; a persistent
-    one stays failed) and keeps them off the teardown report. Scoped to fire only for
-    the buggy case; every other path is left to pytest-check unchanged.
+    one stays failed) and keeps them off the teardown report.
+
+    This hook also logs each attempt's failure (real exception or surfaced soft-check):
+    makereport is bypassed on pytest-retry reruns, so per-attempt failures must be logged
+    here to reach the per-test log on every attempt.
     """
     outcome = yield
+    exc = outcome.excinfo
+
+    # Per-attempt failure logging (a real call exception). makereport is bypassed on pytest-retry
+    # reruns, so log here to reach the per-test log on every attempt. Skipped when setup failed:
+    # pytest-retry runs call anyway, raising only a spurious fixture-injection error.
+    setup_ok = getattr(item, "_rs_setup_ok", True)
+    if setup_ok and exc is not None and not issubclass(exc[0], pytest.skip.Exception):
+        ensure_newline()
+        log.error(f"call failed: {exc[0].__name__}: {exc[1]}")
+
     try:
         from pytest_check import check_log
     except ImportError:
@@ -460,7 +507,11 @@ def pytest_runtest_call(item):
         return
     num_failures = check_log._num_failures
     check_log.clear_failures()
-    raise AssertionError("\n".join(failures + ["-" * 60, f"Failed Checks: {num_failures}"]))
+    msg = "\n".join(failures + ["-" * 60, f"Failed Checks: {num_failures}"])
+    if setup_ok:  # also surface the soft-check failure in the per-test log
+        ensure_newline()
+        log.error(f"call failed: AssertionError: {msg}")
+    raise AssertionError(msg)
 
 
 def pytest_sessionstart(session):
@@ -495,26 +546,27 @@ def _cleanup_devices():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def session_setup_teardown():
+def session_setup_teardown(request):
     """Runs once per session: log startup info, yield, then clean up hub/devices on exit."""
     # Setup — runs once before the first test
     register_signal_handlers(_cleanup_devices)
 
     yield  # All tests run here
 
-    # Teardown — runs once after the last test
-    ensure_newline()
-    log.info("")
-    log.info("=" * 80)
-    log.info("Pytest Session Ending")
-    log.info("=" * 80)
-
-    try:
-        _cleanup_devices()
-    except Exception as e:
-        log.warning(f"Error during cleanup: {e}")
-
-    log.info("=" * 80)
+    # Teardown — after the last test, before the terminal summary (natural order:
+    # setup -> tests -> teardown -> summary). Detach the per-test log handler so teardown
+    # output doesn't tail the last test's .log, then emit it with fd-capture suspended so it
+    # reaches the console here (otherwise pytest captures and discards fixture-teardown stdout).
+    close_test_log()
+    capmanager = request.config.pluginmanager.getplugin("capturemanager")
+    with capmanager.global_and_fixture_disabled():
+        print(f"\n-I- {'=' * 80}")  # leading newline: pytest's last progress line has no EOL yet
+        print("-I- Pytest Session Ending")
+        print(f"-I- {'=' * 80}")
+        try:
+            _cleanup_devices()
+        except Exception as e:
+            print(f"-W- Error during cleanup: {e}")
 
 
 # ============================================================================
