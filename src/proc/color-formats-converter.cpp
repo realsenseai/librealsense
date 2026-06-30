@@ -61,7 +61,7 @@ namespace librealsense
         auto n = width * height;
         assert(n % 16 == 0); // All currently supported color resolutions are multiples of 16 pixels. Could easily extend support to other resolutions by copying final n<16 pixels into a zero-padded buffer and recursively calling self for final iteration.
 #ifdef RS2_USE_CUDA
-        if (rsutils::rs2_is_gpu_available())
+        if (rsutils::rs2_is_cuda_available())
         {
             rscuda::unpack_yuy2_cuda<FORMAT>(d, s, n);
             return;
@@ -229,7 +229,7 @@ namespace librealsense
             }
         }
 
-#elif defined(__ARM_NEON)  && ! defined ANDROID
+#elif defined(__ARM_NEON) && defined(BUILD_WITH_NEON) && !defined(ANDROID)
 
         if (FORMAT == RS2_FORMAT_Y8) unpack_yuy2_neon_y8(d, s, n);
         if (FORMAT == RS2_FORMAT_Y16) unpack_yuy2_neon_y16(d, s, n);
@@ -815,6 +815,159 @@ namespace librealsense
     }
 
     /////////////////////////////
+    // NV12 unpacking routines //
+    /////////////////////////////
+    // This templated function unpacks NV12 into Y8/Y16/RGB8/RGBA8/BGR8/BGRA8, depending on the compile-time parameter FORMAT.
+    // NV12 is a semi-planar YUV 4:2:0 format:
+    //   - Y plane: width*height bytes at offset 0 (one Y per pixel)
+    //   - UV plane: width*(height/2) bytes at offset width*height (interleaved U,V pairs at half resolution)
+    // Each pair of U,V values covers a 2x2 block of pixels.
+    // The per-line UV layout (UVUVUV...) is identical to M420, only the plane arrangement differs.
+    template<rs2_format FORMAT> void unpack_nv12( uint8_t * const d[], const uint8_t * s, int width, int height, int actual_size)
+    {
+        assert(width % 16 == 0);
+        assert(height % 2 == 0);
+
+#if defined __SSSE3__ && ! defined ANDROID
+        auto dst = reinterpret_cast<__m128i*>(d[0]);
+
+        // Y plane starts at offset 0, UV plane starts at offset width*height
+        auto y_plane = reinterpret_cast<const __m128i*>(s);
+        auto uv_plane = reinterpret_cast<const __m128i*>(s + width * height);
+
+#pragma omp parallel for
+        for (int j = 0; j < height / 2; ++j)
+        {
+            // Per-iteration buffers to avoid data races across threads
+            auto source_chunks_y = new __m128i[2 * width / 16];
+            auto source_chunks_uv = new __m128i[width / 16];
+
+            // Load 2 lines of Y from the Y plane
+            for (int i = 0; i < 2 * width / 16; ++i)
+            {
+                auto y_offset = (2 * j * width) / 16;
+                source_chunks_y[i] = _mm_loadu_si128(&y_plane[y_offset + i]);
+
+                if (FORMAT == RS2_FORMAT_Y8)
+                {
+                    auto dst_offset = (2 * width * j) / 16;
+                    _mm_storeu_si128(&dst[dst_offset + i], source_chunks_y[i]);
+                    continue;
+                }
+
+                if (FORMAT == RS2_FORMAT_Y16)
+                {
+                    auto bpp = 2;
+                    auto dst_offset = (2 * width * j) / 16 * bpp;
+                    const __m128i zero = _mm_set1_epi8(0);
+                    __m128i y16__0_7 = _mm_unpacklo_epi8(source_chunks_y[i], zero);
+                    __m128i y16__8_F = _mm_unpackhi_epi8(source_chunks_y[i], zero);
+                    __m128i y16_0_7_epi_16 = _mm_slli_epi16(y16__0_7, 8);
+                    __m128i y16_8_F_epi_16 = _mm_slli_epi16(y16__8_F, 8);
+                    _mm_storeu_si128(&dst[dst_offset + i * 2], y16_0_7_epi_16);
+                    _mm_storeu_si128(&dst[dst_offset + i * 2 + 1], y16_8_F_epi_16);
+                    continue;
+                }
+
+                // Load UV line from the UV plane (one UV row per pair of Y rows)
+                if ( i < width / 16)
+                {
+                    auto uv_offset = (j * width) / 16;
+                    source_chunks_uv[i] = _mm_loadu_si128(&uv_plane[uv_offset + i]);
+                }
+            }
+
+            if (FORMAT == RS2_FORMAT_RGB8 || FORMAT == RS2_FORMAT_RGBA8 || FORMAT == RS2_FORMAT_BGR8 || FORMAT == RS2_FORMAT_BGRA8)
+            {
+                int bpp = 3;
+                if (FORMAT == RS2_FORMAT_RGBA8 || FORMAT == RS2_FORMAT_BGRA8)
+                    bpp = 4;
+
+                auto offset_to_current_first_line_for_dst = (2 * width * j) / 16 * bpp;
+                auto offset_to_current_second_line_for_dst = offset_to_current_first_line_for_dst + width * bpp / 16;
+
+                auto line_length = width / 16;
+                auto first_line_y = source_chunks_y;
+                auto second_line_y = source_chunks_y + line_length;
+
+                m420_sse_parse_one_line<FORMAT>(first_line_y, source_chunks_uv, &dst[offset_to_current_first_line_for_dst], line_length);
+                m420_sse_parse_one_line<FORMAT>(second_line_y, source_chunks_uv, &dst[offset_to_current_second_line_for_dst], line_length);
+            }
+
+            delete[] source_chunks_y;
+            delete[] source_chunks_uv;
+        }
+
+#else
+        auto src = reinterpret_cast<const uint8_t*>(s);
+        auto dst = reinterpret_cast<uint8_t*>(d[0]);
+
+        // Y plane at offset 0, UV plane at offset width*height
+        auto y_start = src;
+        auto uv_start = src + width * height;
+
+        if (FORMAT == RS2_FORMAT_Y8)
+        {
+            // Just copy the entire Y plane
+            std::memcpy( dst, y_start, width * height );
+            return;
+        }
+        if (FORMAT == RS2_FORMAT_Y16)
+        {
+            for (int pix = 0; pix < width * height; pix += 16)
+            {
+                uint16_t y[16];
+                for (int i = 0; i < 16; ++i)
+                {
+                    y[i] = y_start[pix + i] << 8;
+                }
+                std::memcpy( dst, y, sizeof y );
+                dst += sizeof y;
+            }
+            return;
+        }
+        for (int j = 0; j < height; j += 2)
+        {
+            auto y_row0 = y_start + j * width;
+            auto y_row1 = y_start + (j + 1) * width;
+            auto uv_row = uv_start + (j / 2) * width;
+
+            m420_parse_one_line<FORMAT>(y_row0, uv_row, &dst, width);
+            m420_parse_one_line<FORMAT>(y_row1, uv_row, &dst, width);
+        }
+        return;
+#endif // __SSSE3__
+    }
+
+    void unpack_nv12(rs2_format dst_format, rs2_stream dst_stream, uint8_t * const d[], const uint8_t * s, int w, int h, int actual_size)
+    {
+        switch (dst_format)
+        {
+        case RS2_FORMAT_Y8:
+            unpack_nv12<RS2_FORMAT_Y8>(d, s, w, h, actual_size);
+            break;
+        case RS2_FORMAT_Y16:
+            unpack_nv12<RS2_FORMAT_Y16>(d, s, w, h, actual_size);
+            break;
+        case RS2_FORMAT_RGB8:
+            unpack_nv12<RS2_FORMAT_RGB8>(d, s, w, h, actual_size);
+            break;
+        case RS2_FORMAT_RGBA8:
+            unpack_nv12<RS2_FORMAT_RGBA8>(d, s, w, h, actual_size);
+            break;
+        case RS2_FORMAT_BGR8:
+            unpack_nv12<RS2_FORMAT_BGR8>(d, s, w, h, actual_size);
+            break;
+        case RS2_FORMAT_BGRA8:
+            unpack_nv12<RS2_FORMAT_BGRA8>(d, s, w, h, actual_size);
+            break;
+        default:
+            LOG_ERROR("Unsupported format for NV12 conversion.");
+            break;
+        }
+    }
+
+    /////////////////////////////
     // UYVY unpacking routines //
     /////////////////////////////
     // This templated function unpacks UYVY into RGB8/RGBA8/BGR8/BGRA8, depending on the compile-time parameter FORMAT.
@@ -1144,6 +1297,11 @@ namespace librealsense
         unpack_m420(_target_format, _target_stream, dest, source, width, height, actual_size);
     }
 
+    void nv12_converter::process_function( uint8_t * const dest[], const uint8_t * source, int width, int height, int actual_size, int input_size)
+    {
+        unpack_nv12(_target_format, _target_stream, dest, source, width, height, actual_size);
+    }
+
     void uyvy_to_yuyv::process_function( uint8_t * const dest[], const uint8_t * source, int width, int height, int actual_size, int input_size)
     {
         auto in = reinterpret_cast< const uint16_t * >( source );
@@ -1151,7 +1309,7 @@ namespace librealsense
 
         // Time measurments on Jetson yielded better results for the non-CUDA version
     //#ifdef RS2_USE_CUDA
-        //if( rsutils::rs2_is_gpu_available() )
+        //if( rsutils::rs2_is_cuda_available() )
         //    rscuda::uyvy_to_yuyv_cuda_helper( in, out, width * height );
     //#else
         for( size_t i = 0; i < width * height; ++i )

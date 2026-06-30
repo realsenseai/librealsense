@@ -23,12 +23,12 @@ For [ROS](#ros2), the IDLs are available in the `/opt/ros/<distro>/share/` insta
 A utility from FastDDS called [FastDDSGen](https://fast-dds.docs.eprosima.com/en/latest/fastddsgen/introduction/introduction.html#fastddsgen-intro) is required to convert the [IDL](https://fast-dds.docs.eprosima.com/en/latest/fastddsgen/dataTypes/dataTypes.html) files to the headers that're needed.
 Unfortunately, this utility requires a java installation and sometimes not even the latest.
 
-Instead, we found it easiest to download a Docker image for FastDDS (last used is version 2.9.1) and generate the files within.
+Instead, we found it easiest to download a Docker image for FastDDS (last used is version 2.10.6) and generate the files within.
 
-1. Download the Docker image from [here](https://www.eprosima.com/index.php?option=com_ars&view=browses&layout=normal) (link was valid at time of writing; if no longer, register with eProsima and update it)
+1. Download the Docker image from [here](https://www.eprosima.com/component/ars/releases/eprosima-fast-dds?Itemid=0) (link was valid at time of writing; if no longer, register with eProsima and update it)
 
     ```zsh
-    docker load -i /mnt/c/work/ubuntu-fastdds_v2.9.1.tar
+    docker load -i /mnt/c/work/ubuntu-fastdds-suite\ v2.10.6.tar
     ```
 
 2. In a `zsh` shell:
@@ -39,10 +39,10 @@ Instead, we found it easiest to download a Docker image for FastDDS (last used i
     for topic in flexible
     do
     cd include/realdds/topics/${topic}
-    cid=`docker run -itd --privileged ubuntu-fastdds:v2.9.1`
+    cid=`docker run -itd --privileged ubuntu-fastdds:v2.10.6`
     docker exec $cid mkdir /idl /idl/out
     docker cp *.idl $cid:idl/
-    docker exec -w /idl/out $cid fastddsgen -cs -typeros2 -typeobject /idl/`ls -1 *.idl`
+    docker exec -w /idl/out $cid fastddsgen -cs -typeobject /idl/`ls -1 *.idl`
     docker cp $cid:/idl/out .
     docker kill $cid
     cd out
@@ -69,5 +69,6 @@ The per-distro (including rolling) source message (`.msg`) files can be found in
 >https://github.com/ros2/common_interfaces
 
 The `.msg` files can be converted to `.idl` with [rosidl](https://docs.ros.org/en/rolling/Concepts/About-Internal-Interfaces.html#the-rosidl-repository) and then `fastddsgen` can be used to generate source code, similar to what was detailed above. This was all done offline and is not part of the build.
+Note - when generating ROS2 compatible topics using `fastddsgen` the flag `-typeros2` should be used to follow ROS2 topic naming convention.
 
-Because there is an interest in keeping our topics ROS-compatible (i.e., so that ROS applications can pick up on and read them), this requires specific topic naming conventions and formats. We try to use ROS-compatible formats, encodings, and names where possible. Right now this is only done one-way: ROS2 can read certain topics, but cannot otherwise control the camera.
+Because there is an interest in keeping our topics ROS-compatible (i.e., so that ROS applications can pick up on and read them), this requires specific topic naming conventions and formats. We try to use ROS-compatible formats, encodings, and names where possible. Right now this is done only partially: ROS2 can read certain topics, and control the camera, but advanced features like calibrations are not available through native ROS yet.

@@ -1,7 +1,11 @@
+# License: Apache 2.0. See LICENSE file in root directory.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
 import socketio
 
 # Create Socket.IO Server
-sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins='*')
+# max_http_buffer_size raised to 10 MB to fit point cloud frames (default 1 MB is too small).
+sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins='*', max_http_buffer_size=10_000_000)
 
 # Setup basic event handlers
 @sio.event

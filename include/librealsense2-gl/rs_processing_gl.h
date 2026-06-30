@@ -85,6 +85,14 @@ rs2_processing_block* rs2_gl_create_m420_decoder(int api_version, rs2_error** er
 
 
 /**
+* Creates a processing block that can efficiently convert NV12 image format to RGB variants
+* This is specifically useful for rendering the RGB frame to the screen (since the output is ready for rendering on the GPU)
+* \param[in] api_version Users are expected to pass their version of \c RS2_API_VERSION to make sure they are running the correct librealsense version.
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+rs2_processing_block* rs2_gl_create_nv12_decoder(int api_version, rs2_error** error);
+
+/**
 * Creates y411 decoder processing block. This block accepts raw y411 frames and outputs frames in RGB8.
 *     https://www.fourcc.org/pixel-format/yuv-y411/
 * Y411 is disguised as NV12 to allow Linux compatibility. Both are 12bpp encodings that allow high-resolution

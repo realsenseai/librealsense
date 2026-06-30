@@ -87,7 +87,7 @@ def compare_processed_frames_vs_recorded_frames(file):
     frames_data_map = {}
     pre_processed_frames_map = {}
     sensors = []
-    playback_file('all_combinations_depth_color.bag', lambda frame: (frame_processor.invoke(frame)))
+    playback_file('all_combinations_depth_color.db3', lambda frame: (frame_processor.invoke(frame)))
     processed_frames_data_list = []
     for sf in frames_data_map:
         processed_frames_data_list.append(frames_data_map[sf])
@@ -104,22 +104,24 @@ def compare_processed_frames_vs_recorded_frames(file):
         validate_ppf_results(processed_frames_data_list[i], ref_frame_data_list[i])
 
 ################################################################################################
-with test.closure("Test align depth to color from recording"):
-    align = rs.align(rs.stream.color)
-    process_frame_callback = lambda fs: align.process(fs).first_or_default(rs.stream.depth)
-
-    compare_processed_frames_vs_recorded_frames("[aligned_2c]_all_combinations_depth_color.bag")
+# below commented out until recordings are taken again (after algo improvement done in PR# 14608)
+# with test.closure("Test align depth to color from recording"):
+#     align = rs.align(rs.stream.color)
+#     process_frame_callback = lambda fs: align.process(fs).first_or_default(rs.stream.depth)
+#
+#     compare_processed_frames_vs_recorded_frames("[aligned_2c]_all_combinations_depth_color.db3")
 ################################################################################################
-with test.closure("Test align color to depth from recording"):
-    align = rs.align(rs.stream.depth)
-    process_frame_callback = lambda fs: align.process(fs).first_or_default(rs.stream.color)
-
-    compare_processed_frames_vs_recorded_frames("[aligned_2d]_all_combinations_depth_color.bag")
+# below commented out until recordings are taken again (after algo improvement done in PR# 14608)
+# with test.closure("Test align color to depth from recording"):
+#     align = rs.align(rs.stream.depth)
+#     process_frame_callback = lambda fs: align.process(fs).first_or_default(rs.stream.color)
+#
+#     compare_processed_frames_vs_recorded_frames("[aligned_2d]_all_combinations_depth_color.db3")
 ################################################################################################
 with test.closure("Test point cloud from recording"):
     pc = rs.pointcloud()
     process_frame_callback = lambda fs: pc.calculate(fs.get_depth_frame())
 
-    compare_processed_frames_vs_recorded_frames("[pointcloud]_all_combinations_depth_color.bag")
+    compare_processed_frames_vs_recorded_frames("[pointcloud]_all_combinations_depth_color.db3")
 ################################################################################################
 test.print_results_and_exit()

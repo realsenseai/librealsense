@@ -41,7 +41,7 @@ vector<uint8_t> build_raw_command_data(const command& command, const vector<stri
     return raw_data;
 }
 
-void xml_mode(const string& line, const commands_xml& cmd_xml, rs2::device& dev, map<string, xml_parser_function>& format_type_to_lambda)
+void xml_mode(const string& line, const commands_xml& cmd_xml, rs2::device& dev, map<string, xml_parser_function>& format_type_to_lambda, bool verbose = false)
 {
     vector<string> tokens;
     stringstream ss(line);
@@ -71,13 +71,27 @@ void xml_mode(const string& line, const commands_xml& cmd_xml, rs2::device& dev,
 
     auto raw_data = build_raw_command_data(command, params);
 
-    for (auto b : raw_data)
+    // Print raw command if verbose mode is enabled
+    if (verbose)
     {
-        cout << hex << fixed << setfill('0') << setw(2) << (int)b << " ";
+        cout << "RAW Command:  ";
+        for (auto b : raw_data)
+        {
+            cout << hex << fixed << setfill('0') << setw(2) << (int)b << " ";
+        }
+        cout << endl;
     }
-    cout << endl;
 
     auto result = dev.as<rs2::debug_protocol>().send_and_receive_raw_data(raw_data);
+
+    // Print raw response if verbose mode is enabled
+    if (verbose)
+    {
+        cout << "RAW Response: ";
+        for (auto& elem : result)
+            cout << setfill('0') << setw(2) << hex << static_cast<int>(elem) << " ";
+        cout << endl;
+    }
 
     unsigned returned_opcode = *result.data();
     // check returned opcode
@@ -173,6 +187,7 @@ int main(int argc, char** argv) try
     cli::value<string> hex_cmd_arg('s', "send", "hex-data", "", "Hexadecimal raw data");
     cli::value<string> hex_script_arg('r', "raw", "path", "", "Full file path of hexadecimal raw data script");
     cli::value<string> commands_script_arg('c', "cmd", "path", "", "Full file path of commands script");
+    cli::flag verbose_arg('v', "verbose", "Print raw data buffers");
     cmd.add(xml_arg);
     cmd.add(device_id_arg);
     cmd.add(specific_SN_arg);
@@ -180,6 +195,7 @@ int main(int argc, char** argv) try
     cmd.add(hex_cmd_arg);
     cmd.add(hex_script_arg);
     cmd.add(commands_script_arg);
+    cmd.add(verbose_arg);
     auto settings = cmd.process( argc, argv );
 
     // parse command.xml
@@ -361,7 +377,7 @@ int main(int argc, char** argv) try
                 try
                 {
                     for (auto& elem : script_lines)
-                        xml_mode(elem, cmd_xml, dev, format_type_to_lambda);
+                        xml_mode(elem, cmd_xml, dev, format_type_to_lambda, verbose_arg.isSet());
                 }
                 catch (const exception& ex)
                 {
@@ -406,7 +422,7 @@ int main(int argc, char** argv) try
                     }
                     else
                     {
-                        xml_mode(line, cmd_xml, dev, format_type_to_lambda);
+                        xml_mode(line, cmd_xml, dev, format_type_to_lambda, verbose_arg.isSet());
                     }
                     cout << endl;
                 }

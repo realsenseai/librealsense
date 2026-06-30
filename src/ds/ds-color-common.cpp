@@ -15,6 +15,40 @@ namespace librealsense
 {
     using namespace ds;
 
+    uvc_pu_auto_exposure_option::uvc_pu_auto_exposure_option(
+        const std::weak_ptr< uvc_sensor > & ep,
+        const std::weak_ptr< option > & exposure_option )
+        : uvc_pu_option( ep, RS2_OPTION_ENABLE_AUTO_EXPOSURE )
+        , _exposure_option( exposure_option )
+    {
+    }
+
+    void uvc_pu_auto_exposure_option::set( float value )
+    {
+        uvc_pu_option::set( value );
+
+        // When AE is turned off, the device may keep streaming with the last
+        // auto-computed exposure. Re-write the default exposure to force the
+        // device to apply a known manual value.
+        if( value != 0 )
+            return;
+
+        auto exposure = _exposure_option.lock();
+        if( ! exposure )
+            return;
+
+        try
+        {
+            float def_exposure = exposure->get_range().def;
+            LOG_DEBUG( "Applying default exposure " << def_exposure << " after AE disable" );
+            exposure->set( def_exposure );
+        }
+        catch( const std::exception & e )
+        {
+            LOG_WARNING( "Applying default exposure after AE disable failed: " << e.what() );
+        }
+    }
+
     ds_color_common::ds_color_common( const std::shared_ptr< uvc_sensor > & raw_color_ep,
                                       synthetic_sensor & color_ep,
                                       firmware_version fw_version,
@@ -37,7 +71,6 @@ namespace librealsense
         _color_ep.register_pu(RS2_OPTION_SHARPNESS);
 
         auto white_balance_option = std::make_shared<uvc_pu_option>(_raw_color_ep, RS2_OPTION_WHITE_BALANCE);
-        _color_ep.register_option(RS2_OPTION_WHITE_BALANCE, white_balance_option);
         auto auto_white_balance_option = std::make_shared<uvc_pu_option>(_raw_color_ep, RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE);
         _color_ep.register_option(RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE, auto_white_balance_option);
         _color_ep.register_option(RS2_OPTION_WHITE_BALANCE,
@@ -50,7 +83,7 @@ namespace librealsense
     {
         auto gain_option = std::make_shared<uvc_pu_option>(_raw_color_ep, RS2_OPTION_GAIN);
         auto exposure_option = std::make_shared<uvc_pu_option>(_raw_color_ep, RS2_OPTION_EXPOSURE);
-        auto auto_exposure_option = std::make_shared<uvc_pu_option>(_raw_color_ep, RS2_OPTION_ENABLE_AUTO_EXPOSURE);
+        auto auto_exposure_option = std::make_shared<uvc_pu_auto_exposure_option>(_raw_color_ep, exposure_option);
         _color_ep.register_option(RS2_OPTION_GAIN, gain_option);
         _color_ep.register_option(RS2_OPTION_EXPOSURE, exposure_option);
         _color_ep.register_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, auto_exposure_option);

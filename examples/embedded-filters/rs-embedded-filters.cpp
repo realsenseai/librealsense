@@ -106,7 +106,7 @@ try
     std::cout << "Decimation Filter" << std::endl;
     std::cout << "=========================================" << std::endl;
 
-    rs2::embedded_decimation_filter dec_filter = depth_sensor.get_embedded_filter< rs2::embedded_decimation_filter>(); //--> better - enum remain for now - for dds needs
+    rs2::embedded_decimation_filter dec_filter = depth_sensor.get_embedded_filter< rs2::embedded_decimation_filter>();
 
     auto dec_filter_options = dec_filter.get_supported_options();
     for (auto& option : dec_filter_options)

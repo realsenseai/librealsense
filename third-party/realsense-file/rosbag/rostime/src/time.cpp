@@ -45,7 +45,7 @@
 #include <stdexcept>
 #include <limits>
 #include <mutex>
-#include "math.h"
+#include <math.h>
 
 /*********************************************************************
  ** Preprocessor

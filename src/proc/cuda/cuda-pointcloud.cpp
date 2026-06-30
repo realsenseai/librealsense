@@ -8,7 +8,19 @@
 
 namespace librealsense
 {
-    pointcloud_cuda::pointcloud_cuda() : pointcloud("Pointcloud (CUDA)") {}
+    pointcloud_cuda::pointcloud_cuda()
+#if defined(__ARM_NEON) && defined(BUILD_WITH_NEON) && !defined(ANDROID)
+        // When NEON is available, inherit from pointcloud_neon which calls pointcloud("Pointcloud (NEON)")
+        // We keep the NEON name since this is a hybrid using CUDA for depth_to_points and NEON for get_texture_map
+        : pointcloud_neon()
+#else
+        : pointcloud("Pointcloud (CUDA)")
+#endif
+    {
+#ifdef RS2_USE_CUDA
+        _helper = std::make_shared<rscuda::pointcloud_cuda_helper>();
+#endif
+    }
 
     const float3 * pointcloud_cuda::depth_to_points(
         rs2::points output,
@@ -19,7 +31,7 @@ namespace librealsense
         auto depth_data = (uint16_t*)depth_frame.get_data();
         auto depth_scale = depth_frame.get_units();
 #ifdef RS2_USE_CUDA
-        rscuda::deproject_depth_cuda((float*)image, depth_intrinsics, depth_data, depth_scale);
+        _helper->deproject_depth_cuda( ( float * )image, depth_intrinsics, depth_data, depth_scale );
 #endif
         return (float3*)image;
     }

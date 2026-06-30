@@ -3,25 +3,16 @@
 
 #pragma once
 
-#include <src/embedded-filter-interface.h>
+#include "embedded-filter-base.h"
 #include "core/extension.h"
-#include <src/core/options-container.h>
-#include <src/core/options-watcher.h>
+
 
 namespace librealsense {
-class temporal_embedded_filter
-    : virtual public embedded_filter_interface
-    , public options_container
+
+class temporal_embedded_filter : public embedded_filter_base
 {
-public:
-    virtual ~temporal_embedded_filter() = default;
-
-    rsutils::subscription register_options_changed_callback(options_watcher::callback&&) override;
-
-protected:
-    options_watcher _options_watcher;
 };
 
-MAP_EXTENSION( RS2_EXTENSION_TEMPORAL_EMBEDDED_FILTER, librealsense::temporal_embedded_filter);
+MAP_EXTENSION( RS2_EXTENSION_TEMPORAL_EMBEDDED_FILTER, librealsense::temporal_embedded_filter );
 
 }  // namespace librealsense

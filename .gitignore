@@ -7,6 +7,8 @@ ubuntu-focal-master/
 
 .gitconfig
 
+BrainStemLog.txt
+
 
 # Docs
 doc/doxygen/html/
@@ -92,5 +94,16 @@ librealsense-log.txt
 *.ini
 *.cxx
 
+# React viewer config files (override the repo-wide *.json rule)
+!wrappers/rest-api/tools/react-viewer/**/*.json
+
+# Per-device FW fallback map consumed by rspy.fw_compat (override the *.json rule)
+!unit-tests/py/rspy/fw_fallback.json
+
 .vscode/*
 /unit-tests/.idea
+
+# agents
+.github/agents/
+
+unit-tests/logs/pytest-results.xml

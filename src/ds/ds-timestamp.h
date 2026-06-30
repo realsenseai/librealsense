@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <map>
+
 #include "ds-private.h"
 
 #include "algo.h"
@@ -87,8 +89,7 @@ namespace librealsense
 
     class ds_timestamp_reader : public frame_timestamp_reader
     {
-        static const int pins = 2;
-        mutable std::vector<int64_t> counter;
+        mutable std::map<int, int64_t> counter; // Per-stream software frame counter
         mutable std::recursive_mutex _mtx;
     public:
         ds_timestamp_reader();

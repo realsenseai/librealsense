@@ -26,7 +26,7 @@ class Device:
 
 def enumerate_connected_devices(context):
     """
-    Enumerate the connected Intel RealSense devices
+    Enumerate the connected RealSense devices
 
     Parameters:
     -----------
@@ -53,7 +53,7 @@ def enumerate_connected_devices(context):
 def post_process_depth_frame(depth_frame, decimation_magnitude=1.0, spatial_magnitude=2.0, spatial_smooth_alpha=0.5,
                              spatial_smooth_delta=20, temporal_smooth_alpha=0.4, temporal_smooth_delta=20):
     """
-    Filter the depth frame acquired using the Intel RealSense device
+    Filter the depth frame acquired using the RealSense device
 
     Parameters:
     -----------
@@ -119,7 +119,7 @@ def post_process_depth_frame(depth_frame, decimation_magnitude=1.0, spatial_magn
 class DeviceManager:
     def __init__(self, context, D400_pipeline_configuration):
         """
-        Class to manage the Intel RealSense devices
+        Class to manage the RealSense devices
 
         Parameters:
         -----------
@@ -139,7 +139,7 @@ class DeviceManager:
 
     def enable_device(self, device_info, enable_ir_emitter):
         """
-        Enable an Intel RealSense Device
+        Enable a RealSense Device
 
         Parameters:
         -----------
@@ -170,7 +170,7 @@ class DeviceManager:
 
     def enable_all_devices(self, enable_ir_emitter=False):
         """
-        Enable all the Intel RealSense Devices which are connected to the PC
+        Enable all the RealSense Devices which are connected to the PC
 
         """
         print(str(len(self._available_devices)) + " devices have been found")
@@ -211,7 +211,7 @@ class DeviceManager:
 
     def poll_frames(self):
         """
-        Poll for frames from the enabled Intel RealSense devices. This will return at least one frame from each device.
+        Poll for frames from the enabled RealSense devices. This will return at least one frame from each device.
         If temporal post processing is enabled, the depth stream is averaged over a certain amount of frames
 
         Parameters:
@@ -261,7 +261,7 @@ class DeviceManager:
         Parameters:
         -----------
         frames : rs::frame
-                 The frame grabbed from the imager inside the Intel RealSense for which the intrinsic is needed
+                 The frame grabbed from the imager inside the RealSense for which the intrinsic is needed
 
         Return:
         -----------
@@ -286,7 +286,7 @@ class DeviceManager:
         Parameters:
         -----------
         frames : rs::frame
-                 The frame grabbed from the imager inside the Intel RealSense for which the intrinsic is needed
+                 The frame grabbed from the imager inside the RealSense for which the intrinsic is needed
 
         Return:
         -----------

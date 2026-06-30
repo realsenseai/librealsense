@@ -1,7 +1,7 @@
 # rs-imshow Sample
 
 ## Overview
-This example is a "hello-world" code snippet for Intel RealSense cameras integration with OpenCV. The sample will open an OpenCV UI window and render colorized depth stream to it. 
+This example is a "hello-world" code snippet for RealSense cameras integration with OpenCV. The sample will open an OpenCV UI window and render colorized depth stream to it. 
 The following code snippet is used to create `cv::Mat` from `rs2::frame`:
 ```cpp
 // Query frame size (width and height)

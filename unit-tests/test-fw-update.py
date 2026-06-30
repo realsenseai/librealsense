@@ -1,12 +1,12 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2021 RealSense, Inc. All Rights Reserved.
 
-# we want this test to run first so that all tests run with updated FW versions, so we give it priority 0
-#test:priority 0
+#We want this test to run right after camera detection phase, so that all tests will run with updated FW versions, so we give it high priority
+#test:priority 1
 #test:timeout 500
 #test:donotrun:gha
 #test:device each(D400*)
-#test:device D555
+#test:device each(D555)
 
 import sys
 import os
@@ -15,7 +15,8 @@ import re
 import platform
 import pyrealsense2 as rs
 import pyrsutils as rsutils
-from rspy import log, test, file, repo
+from rspy import log, test, file, repo, fw_compat, config_file
+from rspy.timer import Timer
 import time
 import argparse
 
@@ -23,7 +24,20 @@ import argparse
 parser = argparse.ArgumentParser(description="Test firmware update")
 parser.add_argument('--custom-fw-d400', type=str, help='Path to custom D400 firmware file')
 parser.add_argument('--custom-fw-d555', type=str, help='Path to custom D555 firmware file')
+parser.add_argument('--serial', type=str, default=None, help='Serial number of the device to update (for multi-device rigs)')
 args = parser.parse_args()
+
+
+def wait_for_reboot( same_version ):
+    """
+    Wait for the camera to finish rebooting after a FW update.
+    The test exit flow may cut USB power (via hub port disable), so we must ensure
+    the device has had enough time to complete its reboot before we exit.
+    When updating to a different version, FW may need time to flash a new ISP FW.
+    """
+    sleep_time = 60 if not same_version else 3
+    log.d( "Waiting", sleep_time, "seconds for device to finish rebooting after FW update..." )
+    time.sleep( sleep_time )
 
 
 def send_hardware_monitor_command(device, command):
@@ -40,6 +54,7 @@ def extract_version_from_filename(file_path):
     Extracts the version string from a filename like:
     FlashGeneratedImage_Image5_16_7_0.bin -> 5.16.7
     FlashGeneratedImage_RELEASE_DS5_5_16_3_1.bin -> 5.16.3.1
+    rvp-flash-dfu-release-7.56.37749.4831.img -> 7.56.37749.4831
 
     Args:
         file_path (str): Full path to the file.
@@ -52,86 +67,52 @@ def extract_version_from_filename(file_path):
         return None
 
     filename = os.path.basename(file_path)
-    match = re.search(r'_(\d+)_(\d+)_(\d+)_(\d+).(bin|img)', filename)
-    if match:
-        groups = match.groups()[:-1] # exclude the file extension
-        if groups[3] == '0':
-            version_str = ".".join(groups[:3])
-        else:
-            version_str = ".".join(groups)
-        return rsutils.version(version_str)
+
+    # Match *last* 4 numeric groups before .img/.bin
+    # following matching patterns for cases:
+    # FlashGeneratedImage_Image5_16_7_0.bin -> 5.16.7
+    # FlashGeneratedImage_RELEASE_DS5_5_16_3_1.bin -> 5.16.3.1
+    match = re.search(r'(\d+)_(\d+)_(\d+)_(\d+)\.(bin|img)$', filename)
+    if not match:
+        # Match patterns like rvp-flash-dfu-release-7.56.37749.4831.img -> 7.56.37749.4831
+        match = re.search(r'-(\d+)\.(\d+)\.(\d+)\.(\d+)\.(bin|img)$', filename)
+        if not match:
+            log.i(f"Version not found in filename: {filename}")
+            return None
+
+    a, b, c, d, _ = match.groups()
+
+    # Drop the last part only if it equals "0"
+    if d == "0":
+        return rsutils.version(f"{a}.{b}.{c}")
     else:
-        log.i(f"Version not found in filename: {filename}")
-
-    return None
+        return rsutils.version(f"{a}.{b}.{c}.{d}")
 
 
-def get_update_counter(device):
+def get_downgrade_counter(device):
     product_line = device.get_info(rs.camera_info.product_line)
-    opcode = 0x09
-    start_index = 0x30
-    size = None
 
     if product_line == "D400":
-        size = 0x2
-    elif product_line == "D500":
-        return 0 # D500 do not have update counter
-    else:
-        log.f( "Incompatible product line:", product_line )
-
-    raw_cmd = rs.debug_protocol(device).build_command(opcode, start_index, size)
-    counter = send_hardware_monitor_command(device, raw_cmd)
-    return counter[0]
+        opcode = 0x93  # DFU_READ_CNT — reads the actual downgrade counter from flash payload header
+        raw_cmd = rs.debug_protocol(device).build_command(opcode)
+        counter = send_hardware_monitor_command(device, raw_cmd)
+        return counter[0] | (counter[1] << 8)  # uint16_t little-endian
+    if product_line == "D500":
+        return 0  # D500 do not have downgrade counter
+    log.f( "Incompatible product line:", product_line )  # calls sys.exit(1)
 
 
-def reset_update_counter( device ):
+def reset_downgrade_counter( device ):
     product_line = device.get_info( rs.camera_info.product_line )
 
     if product_line == "D400":
-        opcode = 0x86
+        opcode = 0x86  # DFU_RESET_CNT — resets the downgrade counter in flash payload header
         raw_cmd = rs.debug_protocol(device).build_command(opcode)
-    else:
-        log.f( "Incompatible product line:", product_line )
-
-    send_hardware_monitor_command( device, raw_cmd )
-
-def find_image_or_exit( product_name, fw_version_regex = r'(\d+\.){3}(\d+)' ):
-    """
-    Searches for a FW image file for the given camera name and optional version. If none are
-    found, exits with an error!
-
-    :param product_name: the name of the camera, from get_info(rs.camera_info.name)
-    :param fw_version_regex: optional regular expression specifying which FW version image to find
-
-    :return: the image file corresponding to product_name and fw_version if exist, otherwise exit
-    """
-    pattern = re.compile( r'^Intel RealSense (((\S+?)(\d+))(\S*))' )
-    match = pattern.search( product_name )
-    if not match:
-        raise RuntimeError( "Failed to parse product name '" + product_name + "'" )
-
-    # For a product 'PR567abc', we want to search, in order, these combinations:
-    #     PR567abc
-    #     PR306abX
-    #     PR306aXX
-    #     PR306
-    #     PR30X
-    #     PR3XX
-    # Each of the above, combined with the FW version, should yield an image name like:
-    #     PR567aXX_FW_Image-<fw-version>.bin
-    suffix = 5             # the suffix
-    for j in range(1, 3):  # with suffix, then without
-        start_index, end_index = match.span(j)
-        for i in range(0, len(match.group(suffix))):
-            pn = product_name[start_index:end_index-i]
-            image_name = '(^|/)' + pn + i*'X' + "_FW_Image-" + fw_version_regex + r'\.bin$'
-            for image in file.find(repo.root, image_name):
-                return os.path.join( repo.root, image )
-        suffix -= 1
-    #
-    # If we get here, we didn't find any image...
-    global product_line
-    log.f( "Could not find image file for", product_line )
+        send_hardware_monitor_command( device, raw_cmd )
+        return
+    if product_line == "D500":
+        return  # D500 do not have downgrade counter
+    log.f( "Incompatible product line:", product_line )  # calls sys.exit(1)
 
 # find the update tool exe
 fw_updater_exe = None
@@ -144,18 +125,93 @@ for tool in file.find( repo.build, fw_updater_exe_regex ):
 if not fw_updater_exe:
     log.f( "Could not find the update tool file (rs-fw-update.exe)" )
 
-device, ctx = test.find_first_device_or_exit()
+
+def recover_dds_device_on_golden_domain( serial ):
+    """
+    A D555 bricked in DFU reverts to its golden DDS domain (0), so it does NOT appear on the
+    rig's configured domain -- our normal discovery below would miss it. The harness detects it
+    via a domain-0 fallback and passes its serial here. If a recovery device with `serial` is
+    present on domain 0: gold-flash it (on domain 0), then restore its configured DDS domain
+    with rs-dds-config using --transient-sdk-domain-id (so nothing is written to realsense-config.json
+    and an aborted run can't leave the config on domain 0). After this the device is back on the
+    configured domain and the normal flow proceeds. Returns True if a recovery was performed.
+    """
+    if 'dds' not in test.context:
+        return False
+    # Look for the recovery device on the golden domain 0. Guard the probe so a DDS hiccup can
+    # never disturb the normal discovery/recovery flow below (esp. the USB path on mixed rigs).
+    recovery_found = False
+    rec_name = None
+    try:
+        ctx0 = rs.context( { 'dds': { 'enabled': True, 'domain': 0 } } )
+        for d in ctx0.query_devices():
+            if not d.is_in_recovery_mode():
+                continue
+            d_id = d.get_info( rs.camera_info.firmware_update_id ) \
+                if d.supports( rs.camera_info.firmware_update_id ) else None
+            if d_id == serial:
+                recovery_found = True
+                rec_name = d.get_info( rs.camera_info.name ) if d.supports( rs.camera_info.name ) else None
+                break
+        del ctx0
+    except Exception as e:
+        log.d( f"domain-0 DDS recovery probe failed ({e}); proceeding with normal discovery" )
+        return False
+    if not recovery_found:
+        return False
+
+    log.d( f"found recovery device {serial} ({rec_name}) on golden DDS domain 0; recovering ..." )
+    gold_fw = fw_compat.download_gold_fw( "D500", "D555" )  # D555 is the only DDS DFU SKU today; revisit for D585 etc.
+    if not gold_fw:
+        log.f( f"Could not download gold recovery FW for {rec_name} ({serial}); cannot recover DFU device" )
+        return False  # defensive: log.f normally exits; never build a -f command with gold_fw=None
+    # 1) gold-flash on domain 0 (where a bricked DDS device lives)
+    cmd = [fw_updater_exe, '-r', '-f', gold_fw, '-s', serial, '--domain-id', '0']
+    log.d( 'running:', cmd )
+    result = subprocess.run( cmd )
+    if result.returncode != 0:
+        log.f( f"Gold-flash failed for {serial} (rc={result.returncode}); device may still be in DFU" )
+        return False  # defensive: log.f normally exits; don't report success on a failed flash
+    wait_for_reboot( same_version=False )
+    # 2) the recovered camera comes back on golden domain 0; restore its configured domain
+    #    WITHOUT persisting anything (so an aborted run can't leave the SDK config on domain 0).
+    config_domain = config_file.get_domain_from_config_file_or_default()
+    if config_domain and config_domain != 0:
+        # rs-dds-config is only needed here, to restore a recovered camera's DDS domain
+        dds_config_exe = repo.find_built_exe( 'tools/dds/dds-config', 'rs-dds-config' )
+        if not dds_config_exe:
+            log.f( "Recovered the camera but rs-dds-config was not found to restore its DDS domain" )
+            return False  # defensive: log.f normally exits
+        # Reach the camera on golden domain 0 (--transient-sdk-domain-id, not persisted) and set
+        # its DDS domain to the rig's configured value.
+        cmd = [dds_config_exe, '--serial-number', serial,
+               '--transient-sdk-domain-id', '0', '--domain-id', str( config_domain )]
+        log.d( 'running:', cmd )
+        result = subprocess.run( cmd )
+        if result.returncode != 0:
+            log.w( f"rs-dds-config returned rc={result.returncode}; camera may not be on DDS domain {config_domain}" )
+        wait_for_reboot( same_version=False )
+    return True
+
+
+# A bricked DDS camera reverts to golden domain 0 and won't show on the configured domain;
+# recover + restore it first so the normal discovery below succeeds.
+recovered = recover_dds_device_on_golden_domain( args.serial )
+
+device, ctx = test.find_first_device_or_exit( args.serial )
 product_line = device.get_info( rs.camera_info.product_line )
 product_name = device.get_info( rs.camera_info.name )
 log.d( 'product line:', product_line )
 ###############################################################################
 #
+if device.supports(rs.camera_info.firmware_version):
+    current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
+    log.d( 'current FW version:', current_fw_version )
 
-current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
-log.d( 'current FW version:', current_fw_version )
-
-# Determine which firmware to use based on product
-bundled_fw_version = rsutils.version("")
+# Determine which firmware to use based on product.
+# The SDK no longer ships a bundled D400 FW, so a --custom-fw-<plat> path is required
+# for every product line; otherwise we cannot exercise the update flow.
+same_version = False
 custom_fw_path = None
 custom_fw_version = None
 if product_line == "D400" and args.custom_fw_d400:
@@ -163,93 +219,133 @@ if product_line == "D400" and args.custom_fw_d400:
 elif "D555" in product_name and args.custom_fw_d555:
     custom_fw_path = args.custom_fw_d555
 
+if not custom_fw_path:
+    log.w("No custom FW path provided (use --custom-fw-d400 / --custom-fw-d555); skipping FW update test")
+    exit(0)
+
 
 test.start( "Update FW" )
-# check if recovery. If so recover
-recovered = False
+# check if recovery on the configured domain (e.g. a D400 USB recovery device). If so recover.
+# (recovered may already be True from the domain-0 DDS recovery handled above.)
 if device.is_in_recovery_mode():
     log.d( "recovering device ..." )
     try:
-        # always flash signed fw when device on recovery before flashing anything else
-        # on D555 we currently do not have bundled FW
-        image_file = find_image_or_exit(product_name) if "D555" not in product_name else custom_fw_path
-        cmd = [fw_updater_exe, '-r', '-f', image_file]
+        # rs-fw-update -r needs a known-good image, which isn't always the caller's
+        # --custom-fw-<plat> path (e.g. D400 -r expects a *signed* FW, while the custom
+        # image is typically unsigned). Fetch the per-product-line gold FW to recover with.
+        gold_fw = fw_compat.download_gold_fw( product_line, product_name )
+        if not gold_fw:
+            log.f( f"Could not download gold recovery FW for {product_name}; cannot recover DFU device" )
+            sys.exit( 1 )  # defensive: log.f normally exits; never build a -f command with gold_fw=None
+        cmd = [fw_updater_exe, '-r', '-f', gold_fw, '-s', args.serial]
         del device, ctx
         log.d( 'running:', cmd )
         subprocess.run( cmd )
         recovered = True
-
-        if 'jetson' in test.context:
-            # Reload d4xx mipi driver on Jetson
-            log.d("Reloading d4xx driver on Jetson...")
-            subprocess.run(['sudo', 'modprobe', '-r', 'd4xx'], check=True) # force remove
-            subprocess.run(['sudo', 'modprobe', 'd4xx'], check=True) # load
+        fw_compat.reload_d4xx_driver_on_jetson( test.context )
     except Exception as e:
         test.unexpected_exception()
         log.f( "Unexpected error while trying to recover device:", e )
     else:
-        device, ctx = test.find_first_device_or_exit()
+        # The device's identity changed: in DFU it exposed firmware_update_id only,
+        # now in normal mode it exposes its real serial_number (optic_serial). The
+        # firmware_update_id (asic_serial) is still exposed and matches what the
+        # harness was tracking. Poll for the device to re-enumerate in normal mode
+        # (a fresh rs.context() needs time after rs-fw-update exits) -- up to 60s.
+        log.d( "waiting for recovered device to re-enumerate in normal mode..." )
+        recovered_device = None
+        timer = Timer( 60 )
+        timer.start()
+        while not timer.has_expired():
+            for d in rs.context().devices:
+                if d.supports( rs.camera_info.firmware_update_id ) \
+                   and d.get_info( rs.camera_info.firmware_update_id ) == args.serial \
+                   and not d.is_in_recovery_mode():
+                    recovered_device = d
+                    break
+            if recovered_device is not None:
+                break
+            time.sleep( 2 )
+        if recovered_device is None:
+            log.f( f"Recovered device with firmware_update_id '{args.serial}' did not "
+                   f"re-enumerate within {timer.get_timeout()}s after gold FW flash" )
+        # Re-pin args.serial to the device's normal-mode SN so downstream
+        # rs-fw-update -s <sn> finds the device (rs-fw-update.cpp:480 uses SN when supported).
+        if recovered_device.supports( rs.camera_info.serial_number ):
+            new_sn = recovered_device.get_info( rs.camera_info.serial_number )
+            if new_sn != args.serial:
+                log.d( f're-pinning args.serial: {args.serial} (FWID) -> {new_sn} (SN)' )
+                args.serial = new_sn
+        device, ctx = test.find_first_device_or_exit( args.serial )
         current_fw_version = rsutils.version(device.get_info(rs.camera_info.firmware_version))
         log.d("FW version after recovery:", current_fw_version)
 
 
-if custom_fw_path:
-    custom_fw_version = extract_version_from_filename(custom_fw_path)
-    log.d('Using custom FW version: ', custom_fw_version)
-elif device.supports(rs.camera_info.recommended_firmware_version):  # currently, D500 does not support recommended FW
-    log.i(f"No Custom firmware path provided. using bundled firmware")
-    bundled_fw_version = rsutils.version(device.get_info(rs.camera_info.recommended_firmware_version))
-    log.d('bundled FW version:', bundled_fw_version)
-else:
-    log.w("No custom FW provided and no bundled FW version available; skipping FW update test")
-    exit(0)
+custom_fw_version = extract_version_from_filename(custom_fw_path)
+log.d('Using custom FW version: ', custom_fw_version)
 
-if (current_fw_version == bundled_fw_version and not custom_fw_path) or \
-   (current_fw_version == custom_fw_version):
+if current_fw_version == custom_fw_version:
+    same_version = True
     if recovered or 'nightly' not in test.context:
         log.d('versions are same; skipping FW update')
         test.finish()
         test.print_results_and_exit()
 
-update_counter = get_update_counter( device )
-log.d( 'update counter:', update_counter )
-if update_counter >= 19:
-    log.d( 'resetting update counter' )
-    reset_update_counter( device )
-    update_counter = 0
+downgrade_counter = get_downgrade_counter( device )
+log.d( 'downgrade counter:', downgrade_counter )
+if downgrade_counter == 0xFFFF:
+    log.d( 'downgrade counter is uninitialized (0xFFFF), skipping reset' )
+    downgrade_counter = 0
+elif downgrade_counter >= 19:
+    log.d( 'resetting downgrade counter (was', str(downgrade_counter) + ')' )
+    reset_downgrade_counter( device )
+    log.d( 'sleeping for 3 sec...' )
+    time.sleep( 3 )
+    downgrade_counter = get_downgrade_counter( device )
+    log.d( 'downgrade counter after reset is:', str(downgrade_counter))
+    test.check_equal( downgrade_counter, 0 )
+    downgrade_counter = 0
 
-fw_version_regex = bundled_fw_version.to_string()
-if not bundled_fw_version.build():
-    fw_version_regex += ".0"  # version drops the build if 0
-fw_version_regex = re.escape( fw_version_regex )
-image_file = find_image_or_exit(product_name, fw_version_regex) if not custom_fw_path else custom_fw_path
-# finding file containing image for FW update
+image_file = custom_fw_path
 
 cmd = [fw_updater_exe, '-f', image_file]
-if custom_fw_path:
-    # Add '-u' only if the path doesn't include 'signed'
-    if ('signed' not in custom_fw_path.lower()
-            and "d555" not in product_name.lower()): # currently -u is not supported for D555
-        cmd.insert(1, '-u')
+if args.serial:
+    cmd += ['-s', args.serial]
+# Add '-u' only if the path doesn't include 'signed'
+if ('signed' not in custom_fw_path.lower()
+        and "d555" not in product_name.lower()): # currently -u is not supported for D555
+    cmd.insert(1, '-u')
 
 # for DDS devices we need to close device and context to detect it back after FW update
 del device, ctx
 log.d( 'running:', cmd )
 sys.stdout.flush()
-subprocess.run( cmd )   # may throw
+result = subprocess.run( cmd )   # may throw
 
-# make sure update worked
-time.sleep(3) # MIPI devices do not re-enumerate so we need to give them some time to restart
-device, ctx = test.find_first_device_or_exit()
+# Wait for the camera to finish rebooting before doing anything else, REGARDLESS of
+# rs-fw-update's exit code. A non-zero exit doesn't necessarily mean no flash started:
+# rs-fw-update may have begun a section flash before erroring out, leaving the device
+# mid-reboot. The test exit flow may cut USB power (hub port disable), so we must not
+# exit while the device is still rebooting.
+wait_for_reboot( same_version )
+
+if result.returncode != 0:
+    log.e( 'rs-fw-update returned exit code', result.returncode )
+    test.check( False, description='rs-fw-update should return exit code 0' )
+    test.finish()
+    test.print_results_and_exit()
+
+# make sure update worked and check FW version and update counter
+device, ctx = test.find_first_device_or_exit( args.serial )
 current_fw_version = rsutils.version( device.get_info( rs.camera_info.firmware_version ))
 
-expected_fw_version = custom_fw_version if custom_fw_path else bundled_fw_version
-test.check_equal(current_fw_version, expected_fw_version)
-new_update_counter = get_update_counter( device )
-# According to FW: "update counter zeros if you load newer FW than (ever) before"
-# TODO: check why update counter is 255 when installing cutom fw
-if new_update_counter > 0 and not custom_fw_version:
-    test.check_equal( new_update_counter, update_counter + 1 )
+# camera_locked returns "YES" (locked) or "NO" (unlocked)
+if device.supports( rs.camera_info.camera_locked ) and device.get_info( rs.camera_info.camera_locked ) == 'YES':
+    log.w( 'Device is flash-locked' )
+
+test.check_equal(current_fw_version, custom_fw_version)
+new_downgrade_counter = get_downgrade_counter( device )
+log.d( 'downgrade counter after update:', new_downgrade_counter )
 
 test.finish()
 #

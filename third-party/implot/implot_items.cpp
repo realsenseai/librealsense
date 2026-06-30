@@ -2317,7 +2317,7 @@ void PlotPieChartEx(const char* const label_ids[], const T* values, int count, I
 int PieChartFormatter(double value, char* buff, int size, void* data) {
     const char* fmt = (const char*)data;
     return snprintf(buff, size, fmt, value);
-};
+}
 
 template <typename T>
 void PlotPieChart(const char* const label_ids[], const T* values, int count, double x, double y, double radius, const char* fmt, double angle0, ImPlotPieChartFlags flags) {

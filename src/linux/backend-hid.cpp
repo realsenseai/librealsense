@@ -1237,7 +1237,7 @@ namespace librealsense
                 if (!get_hid_device_info(elem.c_str(), hid_dev_info))
                 {
 #ifdef RS2_USE_CUDA
-                    if (rsutils::rs2_is_gpu_available())
+                    if (rsutils::rs2_is_cuda_available())
                     {
                         /* On the Jetson TX, ina3221x is the power monitor (I2C bus)
                         This code is checking the IIA device directory, but tries to compare as USB HID device

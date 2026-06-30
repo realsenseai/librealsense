@@ -423,6 +423,24 @@ inline void update_format_type_to_lambda(std::map<std::string, xml_parser_functi
         tempStr << static_cast<int>(decByte->version);
     }));
 
+    format_type_to_lambda.insert(std::make_pair("Integer", [&](const uint8_t* data_offset, const section& sec, std::stringstream& tempStr) {
+        auto read_integer = [&](auto dummy) {
+            using T = decltype(dummy);
+            check_section_size(sec.size, sizeof(T), sec.name.c_str(), "Integer");
+            T val;
+            memcpy(&val, data_offset + sec.offset, sizeof(T));
+            return val;
+        };
+
+        switch (sec.size) {
+            case 1: tempStr << static_cast<int>(read_integer(uint8_t{})); break;
+            case 2: tempStr << read_integer(uint16_t{}); break;
+            case 4: tempStr << read_integer(uint32_t{}); break;
+            case 8: tempStr << read_integer(uint64_t{}); break;
+            default: throw std::runtime_error("Unsupported Integer size: " + std::to_string(sec.size) + " for section: " + sec.name);
+        }
+    }));
+
     format_type_to_lambda.insert(std::make_pair("HexNumber", [&](const uint8_t* data_offset, const section& sec, std::stringstream& tempStr) {
         check_section_size(sec.size, sizeof(HexNumber), sec.name.c_str(), "HexNumber");
         auto hexNumber = reinterpret_cast<const HexNumber*>(data_offset + sec.offset);

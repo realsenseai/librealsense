@@ -14,6 +14,7 @@ namespace librealsense {
 options_watcher::options_watcher( std::chrono::milliseconds update_interval )
     : _update_interval( update_interval )
     , _destructing( false )
+    , _paused( false )
 {
 }
 
@@ -94,17 +95,35 @@ void options_watcher::stop()
 
 void options_watcher::thread_loop()
 {
-    // Checking should_stop because subscriptions can be canceled without us knowing
-    while( ! should_stop() )
+    while( !should_stop() )
     {
         {
-            std::unique_lock< std::mutex > lock( _mutex );
-            _stopping.wait_for( lock, _update_interval );
-        }
+            std::unique_lock<std::mutex> lock( _mutex );
+            // 1. Block while paused
+            _stopping.wait( lock, [this]
+            {
+                return should_stop() || !_paused.load();
+            });
+            if (should_stop())
+                break;
 
-        // Checking for stop conditions after sleep.
-        if( should_stop() )
-            break;
+            // 2. Periodic wait
+            _stopping.wait_for( lock, _update_interval, [this]
+            {
+                return should_stop() || _paused.load();
+            });
+            // Checking for stop conditions after sleep.
+            if( should_stop() )
+                break;
+
+            // If still paused, go back to waiting
+            // this check is needed - do not remove because:
+            // 1. predicate may not be true even if wait_for woke up
+            // 2. spurious waking may happen (mostly in linux)
+            // 3. the paused flag may become true between the wait_for and here
+            if( _paused.load() )
+                continue;
+        }
 
         auto updated_options = update_options();
 
@@ -115,6 +134,7 @@ void options_watcher::thread_loop()
         notify( updated_options );
     }
 }
+
 
 options_watcher::options_and_values options_watcher::update_options()
 {

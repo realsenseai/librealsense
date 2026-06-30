@@ -119,6 +119,18 @@ typedef struct rs2_pose
     unsigned int    mapper_confidence;    /**< Pose map confidence 0x0 - Failed, 0x1 - Low, 0x2 - Medium, 0x3 - High                                      */
 } rs2_pose;
 
+/** \brief Object detection result from algorithm */
+typedef struct rs2_object_detection
+{
+    int class_id;       /**< Object class/category identifier */
+    int score;          /**< Detection confidence score 0-100 */
+    int top_left_x;     /**< Top-left corner pixel X coordinate */
+    int top_left_y;     /**< Top-left corner pixel Y coordinate */
+    int bottom_right_x; /**< Bottom-right corner pixel X coordinate */
+    int bottom_right_y; /**< Bottom-right corner pixel Y coordinate */
+    float depth;        /**< Distance to detected object in meters, as computed by firmware */
+} rs2_object_detection;
+
 /** \brief Severity of the librealsense logger. */
 typedef enum rs2_log_severity {
     RS2_LOG_SEVERITY_DEBUG, /**< Detailed information about ordinary operations */
@@ -200,6 +212,12 @@ typedef enum rs2_extension
     RS2_EXTENSION_SUPPORTED_EMBEDDED_FILTERS,
     RS2_EXTENSION_DECIMATION_EMBEDDED_FILTER,
     RS2_EXTENSION_TEMPORAL_EMBEDDED_FILTER,
+    RS2_EXTENSION_CLOSE_RANGE_EMBEDDED_FILTER,
+    RS2_EXTENSION_INFERENCE_FRAME,
+    RS2_EXTENSION_OBJECT_DETECTION_FRAME,
+    RS2_EXTENSION_INFERENCE_SENSOR,
+    RS2_EXTENSION_OBJECT_DETECTION_SENSOR,
+    RS2_EXTENSION_INFERENCE_PROFILE,
     RS2_EXTENSION_COUNT
 } rs2_extension;
 const char* rs2_extension_type_to_string(rs2_extension type);
@@ -267,6 +285,7 @@ typedef enum rs2_embedded_filter_type
     RS2_EMBEDDED_FILTER_TYPE_FIRST,
     RS2_EMBEDDED_FILTER_TYPE_DECIMATION = RS2_EMBEDDED_FILTER_TYPE_FIRST,
     RS2_EMBEDDED_FILTER_TYPE_TEMPORAL,
+    RS2_EMBEDDED_FILTER_TYPE_CLOSE_RANGE,
     RS2_EMBEDDED_FILTER_TYPE_COUNT
 } rs2_embedded_filter_type;
 const char* rs2_embedded_filter_type_to_string(rs2_embedded_filter_type embedded_filter);

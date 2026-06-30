@@ -1,5 +1,5 @@
 #  Build RealSense SDK for Android OS
-This document describes how to build the Intel® RealSense™ SDK 2.0 including headless tools and examples for Android devices.
+This document describes how to build the RealSense SDK 2.0 including headless tools and examples for Android devices.
 
 > Read about Android support [here](../../doc/android.md).
 

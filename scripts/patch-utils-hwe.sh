@@ -108,7 +108,7 @@ function try_unload_module {
 
 	if [ $op_failed -ne 0 ];
 	then
-		echo -e "\e[31mFailed to unload module $unload_module_name. error type $op_failed . Operation is aborted\e[0m" >&2
+		echo -e "\e[31mFailed to unload module $unload_module_name. Error type $op_failed. Try rebooting\e[0m" >&2
 		exit 1
 	fi
 }
@@ -125,7 +125,7 @@ function try_load_module {
 	
 	if [ $op_failed -ne 0 ];
 	then
-		echo -e "\e[31mFailed to reload module $load_module_name. error type $op_failed . Operation is aborted\e[0m"  >&2
+		echo -e "\e[31mFailed to reload module $load_module_name. Error type $op_failed. Operation is aborted\e[0m"  >&2
 		exit 1
 	fi
 }

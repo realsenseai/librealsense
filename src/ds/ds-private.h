@@ -23,6 +23,7 @@
 
 namespace librealsense
 {
+    class context;
     typedef float float_4[4];
 
     template<typename T>
@@ -60,6 +61,7 @@ namespace librealsense
         const uint8_t DS5_THERMAL_COMPENSATION              = 0xF;
         const uint8_t DS5_EMITTER_FREQUENCY                 = 0x10;
         const uint8_t DS5_DEPTH_AUTO_EXPOSURE_MODE          = 0x11;
+        const uint8_t DS5_EXTERNAL_SYNC                     = 0x12;
 
         // DS5 fisheye XU identifiers
         const uint8_t FISHEYE_EXPOSURE                      = 1;
@@ -210,6 +212,7 @@ namespace librealsense
             CAP_IP65 = (1u << 9),
             CAP_IR_FILTER = (1u << 10),
             CAP_BMI_088 = (1u << 11),
+            CAP_EXTERNAL_SYNC_XU = ( 1u << 12 ),  // Support external synchronization via XU
             CAP_MAX
         };
 
@@ -533,27 +536,7 @@ namespace librealsense
         }
 
 #pragma pack(pop)
-
-        enum gvd_fields
-        {
-            // Keep sorted
-            gvd_version_offset = 2,
-            camera_fw_version_offset = 12,
-            is_camera_locked_offset = 25,
-            module_serial_offset = 48,
-            module_asic_serial_offset = 64,
-            fisheye_sensor_lb = 112,
-            fisheye_sensor_hb = 113,
-            imu_acc_chip_id = 124,
-            ip65_sealed_offset = 161,
-            ir_filter_offset = 164,
-            depth_sensor_type = 166,
-            active_projector = 170,
-            rgb_sensor = 174,
-            imu_sensor = 178,
-            motion_module_fw_version_offset = 212
-        };
-
+        
         const uint8_t I2C_IMU_BMI055_ID_ACC = 0xfa;
         const uint8_t I2C_IMU_BMI085_ID_ACC = 0x1f;
         const uint8_t I2C_IMU_BMI088_ID_ACC = 0x1e;
@@ -597,5 +580,8 @@ namespace librealsense
         const std::vector<uint8_t> alternating_emitter_pattern{ 0x5, ALTERNATING_EMITTER_SUBPRESET_ID, 0, 0, 0x2,
             0x4, 0x1, 0, 0x1, 0, 0, 0, 0, 0,
             0x4, 0x1, 0, 0x1, 0, 0x1, 0, 0, 0 };
+
+        bool is_partial_device_allowed( const std::shared_ptr< context > & ctx );
+
     } // librealsense::ds
 } // namespace librealsense

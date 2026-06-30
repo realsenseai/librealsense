@@ -2,19 +2,29 @@
 #ifdef RS2_USE_CUDA
 
 #include <stdexcept>
+#include <string>
 #include <memory>
 #include <cassert>
 
 // CUDA headers
 #include <cuda_runtime.h>
 
-#ifdef _MSC_VER 
+#ifdef _MSC_VER
 // Add library dependencies if using VS
 #pragma comment(lib, "cudart_static")
 #endif
 
+// Throws std::runtime_error with a descriptive message if a CUDA call returns non-success.
+#define RS_CUDA_CHECK(expr) do {                                                                     \
+    cudaError_t _rs_cuda_err = (expr);                                                               \
+    if (_rs_cuda_err != cudaSuccess)                                                                 \
+        throw std::runtime_error(std::string(#expr " failed: ") + cudaGetErrorString(_rs_cuda_err)); \
+} while (0)
+
 namespace rscuda
 {
+    constexpr int THREADS_IN_WARP = 32; // CUDA warp size; constant across all current NVIDIA archs.
+
     template<typename  T>
     std::shared_ptr<T> alloc_dev(int elements)
     {

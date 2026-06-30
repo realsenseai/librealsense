@@ -5,10 +5,10 @@ build-backend = "hatchling.build"
 [project]
 name = "pyrealsense2"
 dynamic = ["version"]
-description = "Python Wrapper for Intel Realsense SDK 2.0."
+description = "Python Wrapper for Realsense SDK 2.0."
 readme = {file = "README.rst", content-type = "text/x-rst", charset = "utf-8"}
 authors = [
-    { name = "Intel(R) RealSense(TM)", email = "realsense@intel.com" },
+    { name = "RealSense", email = "rsswsdk@realsensecloud.onmicrosoft.com" },
 ]
 license = {text = "Apache License, Version 2.0"}
 requires-python = ">=3.9"
@@ -24,11 +24,11 @@ classifiers = [
     "Operating System :: Unix",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Multimedia :: Video",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Human Machine Interfaces",
@@ -46,8 +46,11 @@ homepage = "https://github.com/realsenseai/librealsense"
 [tool.hatch.build]
 artifacts = [
     "pyrealsense2/*.so",
+    "pyrealsense2/*.so.*",
     "pyrealsense2/*.pyd",
-    "pyrealsense2/*.dll"
+    "pyrealsense2/*.dll",
+    "pyrealsense2/*.dylib",
+    "pyrealsense2/*.dylib.*"
 ]
 packages = ["pyrealsense2"]
 

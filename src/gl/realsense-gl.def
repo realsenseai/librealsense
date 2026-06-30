@@ -7,6 +7,7 @@ EXPORTS
     rs2_gl_create_camera_renderer
     rs2_gl_create_yuy_decoder
     rs2_gl_create_m420_decoder
+    rs2_gl_create_nv12_decoder
     rs2_gl_create_y411_decoder
     rs2_gl_create_uploader
     rs2_gl_create_colorizer

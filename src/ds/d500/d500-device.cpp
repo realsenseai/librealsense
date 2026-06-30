@@ -56,8 +56,8 @@ namespace librealsense
         {rs_fourcc('R','G','B','2'), RS2_FORMAT_BGR8},
         {rs_fourcc('M','J','P','G'), RS2_FORMAT_MJPEG},
         {rs_fourcc('B','Y','R','2'), RS2_FORMAT_RAW16}
-
     };
+
     std::map<uint32_t, rs2_stream> d500_depth_fourcc_to_rs2_stream = {
         {rs_fourcc('Y','U','Y','2'), RS2_STREAM_COLOR},
         {rs_fourcc('Y','U','Y','V'), RS2_STREAM_COLOR},
@@ -102,7 +102,7 @@ namespace librealsense
     {
         // preparing HWM command
         command cmd(ds::DFU);
-        cmd.param1 = (_pid == ds::D585S_PID || _pid == ds::D585_PID) ? 0 : 1;
+        cmd.param1 = (_pid == ds::D585S_PID || _pid == ds::D585_LEGACY_PID) ? 0 : 1;
         cmd.require_response = false;
 
         _ds_device_common->enter_update_state(cmd);
@@ -122,6 +122,19 @@ namespace librealsense
     std::string d500_device::get_opcode_string(int opcode) const 
     {
         return _hw_monitor_response->hwmon_error2str(opcode);
+    }
+
+    bool d500_device::contradicts( const stream_profile_interface * a, const std::vector< stream_profile > & others ) const
+    {
+        if( auto vid_a = dynamic_cast< const video_stream_profile_interface * >( a ) )
+        {
+            for( auto request : others )
+            {
+                if( a->get_framerate() != 0 && request.fps != 0 && ( a->get_framerate() != request.fps ) )
+                    return true;
+            }
+        }
+        return false;
     }
 
     d500_depth_sensor::d500_depth_sensor( d500_device * owner,std::shared_ptr<uvc_sensor> uvc_sensor)
@@ -210,33 +223,33 @@ namespace librealsense
             {
                 assign_stream(_owner->_right_ir_stream, p);
             }
-            else if (p->get_stream_type() == RS2_STREAM_COLOR)
+            else
             {
-                assign_stream(_owner->_color_stream, p);
+                // Streams contributed by feature mixins (e.g. dual-RGB color), matched by stream type + index.
+                bool matched = false;
+                for (auto&& extra : _extra_streams)
+                {
+                    if (extra->get_stream_type() == p->get_stream_type() &&
+                        extra->get_stream_index() == p->get_stream_index())
+                    {
+                        assign_stream(extra, p);
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched)
+                    LOG_WARNING("d500_depth_sensor: no registered stream for profile type="
+                        << p->get_stream_type() << " index=" << p->get_stream_index()
+                        << " - profile left unassigned");
             }
             auto&& vid_profile = dynamic_cast<video_stream_profile_interface*>(p.get());
 
-            // used when color stream comes from depth sensor (as in D405)
-            if (p->get_stream_type() == RS2_STREAM_COLOR)
-            {
-                const auto&& profile = to_profile(p.get());
-                std::weak_ptr<d500_depth_sensor> wp =
-                    std::dynamic_pointer_cast<d500_depth_sensor>(this->shared_from_this());
-                vid_profile->set_intrinsics([profile, wp]()
-                    {
-                        auto sp = wp.lock();
-                        if (sp)
-                            return sp->get_color_intrinsics(profile);
-                        else
-                            return rs2_intrinsics{};
-                    });
-            }
             // Register intrinsics
-            else if (p->get_format() != RS2_FORMAT_Y16) // Y16 format indicate unrectified images, no intrinsics are available for these
+            if (p->get_format() != RS2_FORMAT_Y16) // Y16 format indicate unrectified images, no intrinsics are available for these
             {
+                // TODO: once available, read the dual RGB intrinsics from the new dual-RGB calibration tables instead of reusing IR here.
                 const auto&& profile = to_profile(p.get());
-                std::weak_ptr<d500_depth_sensor> wp =
-                    std::dynamic_pointer_cast<d500_depth_sensor>(this->shared_from_this());
+                std::weak_ptr<d500_depth_sensor> wp = std::dynamic_pointer_cast<d500_depth_sensor>(this->shared_from_this());
                 vid_profile->set_intrinsics([profile, wp]()
                 {
                     auto sp = wp.lock();
@@ -274,11 +287,6 @@ namespace librealsense
         return static_cast<float>(RS2_RS400_VISUAL_PRESET_MEDIUM_DENSITY);
     }
 
-    bool d500_device::is_camera_in_advanced_mode() const
-    {
-        return _ds_device_common->is_camera_in_advanced_mode();
-    }
-
     float d500_device::get_stereo_baseline_mm() const // to be d500 adapted
     {
         using namespace ds;
@@ -312,36 +320,20 @@ namespace librealsense
         return _hw_monitor->send(cmd);
     }
 
-    // The GVD structure is currently only partialy parsed
-    // Once all the fields are enabled in FW, other required fields will be parsed, as required
     ds::ds_caps d500_device::parse_device_capabilities( const std::vector<uint8_t> &gvd_buf ) const 
     {
         using namespace ds;
 
-        // Opaque retrieval
         ds_caps val{ds_caps::CAP_UNDEFINED};
-        if (gvd_buf[active_projector])  // DepthActiveMode
+        if( gvd_buf[d500_gvd_offsets::active_projector] )
             val |= ds_caps::CAP_ACTIVE_PROJECTOR;
-        if (gvd_buf[rgb_sensor])                           // WithRGB
+        if( gvd_buf[d500_gvd_offsets::rgb_sensor] )
             val |= ds_caps::CAP_RGB_SENSOR;
-        if (gvd_buf[imu_sensor])
-        {
+        if( gvd_buf[d500_gvd_offsets::imu_sensor] )
             val |= ds_caps::CAP_IMU_SENSOR;
-            if (gvd_buf[imu_acc_chip_id] == I2C_IMU_BMI055_ID_ACC)
-                val |= ds_caps::CAP_BMI_055;
-            else if (gvd_buf[imu_acc_chip_id] == I2C_IMU_BMI085_ID_ACC)
-                val |= ds_caps::CAP_BMI_085;
-            else if (d500_hid_bmi_085_pid.end() != d500_hid_bmi_085_pid.find(_pid))
-                val |= ds_caps::CAP_BMI_085;
-            else
-                LOG_WARNING("The IMU sensor is undefined for PID " << std::hex << _pid << " and imu_chip_id: " << gvd_buf[imu_acc_chip_id] << std::dec);
-        }
-        if (0xFF != (gvd_buf[fisheye_sensor_lb] & gvd_buf[fisheye_sensor_hb]))
-            val |= ds_caps::CAP_FISHEYE_SENSOR;
-        if (0x1 == gvd_buf[depth_sensor_type])
-            val |= ds_caps::CAP_ROLLING_SHUTTER;  // e.g. ASRC
-        if (0x2 == gvd_buf[depth_sensor_type])
-            val |= ds_caps::CAP_GLOBAL_SHUTTER;   // e.g. AWGC
+            
+        // assuming always true for d500 devices
+        val |= ds_caps::CAP_GLOBAL_SHUTTER;
         val |= ds_caps::CAP_INTERCAM_HW_SYNC;
 
         return val;
@@ -386,7 +378,7 @@ namespace librealsense
 
         depth_ep->register_processing_block({ {RS2_FORMAT_W10} }, { {RS2_FORMAT_RAW10, RS2_STREAM_INFRARED, 1} }, []() { return std::make_shared<w10_converter>(RS2_FORMAT_RAW10); });
         depth_ep->register_processing_block({ {RS2_FORMAT_W10} }, { {RS2_FORMAT_Y10BPACK, RS2_STREAM_INFRARED, 1} }, []() { return std::make_shared<w10_converter>(RS2_FORMAT_Y10BPACK); });
-
+        
         return depth_ep;
     }
 
@@ -397,12 +389,18 @@ namespace librealsense
           _depth_stream(new stream(RS2_STREAM_DEPTH)),
           _left_ir_stream(new stream(RS2_STREAM_INFRARED, 1)),
           _right_ir_stream(new stream(RS2_STREAM_INFRARED, 2)),
-          _color_stream(nullptr),
           _hw_monitor_response(std::make_shared<ds::d500_hwmon_response>())
     {
         _depth_device_idx
             = add_sensor( create_depth_device( dev_info->get_context(), dev_info->get_group().uvc_devices ) );
         init( dev_info->get_context(), dev_info->get_group() );
+    }
+
+    d500_device::~d500_device()
+    {
+        // Signal background loops (polling_error_handler) so they exit cleanly on the
+        // next tick instead of firing one more failing FW query before being joined.
+        _device_alive->store( false );
     }
 
     void d500_device::init(std::shared_ptr<context> ctx,
@@ -468,7 +466,6 @@ namespace librealsense
 
         std::string pid_hex_str, usb_type_str;
         d500_gvd_parsed_fields gvd_parsed_fields;
-        bool advanced_mode = false;
         bool usb_modality = true;
         group_multiple_fw_calls(depth_sensor, [&]() {
             
@@ -486,8 +483,7 @@ namespace librealsense
 
             get_gvd_details(gvd_buff, &gvd_parsed_fields);
             
-            _device_capabilities = ds_caps::CAP_ACTIVE_PROJECTOR | ds_caps::CAP_RGB_SENSOR | ds_caps::CAP_IMU_SENSOR |
-                ds_caps::CAP_BMI_085 | ds_caps::CAP_GLOBAL_SHUTTER | ds_caps::CAP_INTERCAM_HW_SYNC;
+            _device_capabilities = parse_device_capabilities( gvd_buff );
 
             _fw_version = rsutils::version(gvd_parsed_fields.fw_version);
 
@@ -498,6 +494,8 @@ namespace librealsense
                 usb_type_str = usb_spec_names.at(_usb_mode);
             else  // Backend fails to provide USB descriptor  - occurs with RS3 build. Requires further work
                 usb_modality = false;
+
+            set_imu_type( gvd_buff, &gvd_parsed_fields );
 
             _is_symmetrization_enabled = check_symmetrization_enabled();
 
@@ -515,7 +513,7 @@ namespace librealsense
                 
             pid_hex_str = rsutils::string::from() << std::uppercase << rsutils::string::hexdump( _pid );
 
-            _is_locked = _ds_device_common->is_locked( gvd_buff.data(), is_camera_locked_offset );
+            _is_locked = _ds_device_common->is_locked( gvd_buff.data(), d500_gvd_offsets::is_camera_locked_offset );
 
 
             //EXPOSURE AND GAIN - preparing uvc options
@@ -559,7 +557,6 @@ namespace librealsense
             depth_sensor.register_option(RS2_OPTION_STEREO_BASELINE, std::make_shared<const_value_option>("Distance in mm between the stereo imagers",
                     rsutils::lazy< float >( [this]() { return get_stereo_baseline_mm(); } ) ) );
 
-            if (advanced_mode)
             {
                 auto depth_scale = std::make_shared<depth_scale_option>(*_hw_monitor);
                 auto depth_sensor = As<d500_depth_sensor, synthetic_sensor>(&get_depth_sensor());
@@ -571,12 +568,6 @@ namespace librealsense
                 });
 
                 depth_sensor->register_option(RS2_OPTION_DEPTH_UNITS, depth_scale);
-            }
-            else
-            {
-                float default_depth_units = 0.001f; //meters
-                depth_sensor.register_option(RS2_OPTION_DEPTH_UNITS, std::make_shared<const_value_option>("Number of meters represented by a single depth unit",
-                        rsutils::lazy< float >( [default_depth_units]() { return default_depth_units; } ) ) );
             }
 
             // defining the temperature options
@@ -611,6 +602,7 @@ namespace librealsense
             _polling_error_handler = std::make_shared< polling_error_handler >(
                 1000,
                 error_control,
+                std::weak_ptr<std::atomic<bool>>( _device_alive ),
                 raw_depth_sensor->get_notifications_processor(),
                 std::make_shared< ds_notification_decoder >( d500_fw_error_report ) );
 
@@ -706,11 +698,8 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_FIRMWARE_VERSION, gvd_parsed_fields.fw_version);        
         register_info(RS2_CAMERA_INFO_PHYSICAL_PORT, group.uvc_devices.front().device_path);
         register_info(RS2_CAMERA_INFO_DEBUG_OP_CODE, std::to_string(static_cast<int>(fw_cmd::GET_FW_LOGS)));
-        register_info(RS2_CAMERA_INFO_ADVANCED_MODE, ((advanced_mode) ? "YES" : "NO"));
         register_info(RS2_CAMERA_INFO_PRODUCT_ID, pid_hex_str);
         register_info(RS2_CAMERA_INFO_PRODUCT_LINE, "D500");
-        // Uncomment once D500 recommended FW exist
-        //register_info(RS2_CAMERA_INFO_RECOMMENDED_FIRMWARE_VERSION, _recommended_fw_version);
         register_info(RS2_CAMERA_INFO_CAMERA_LOCKED, _is_locked ? "YES" : "NO");
 
         if (_pid == D585S_PID)
@@ -723,6 +712,7 @@ namespace librealsense
             register_info(RS2_CAMERA_INFO_CONNECTION_TYPE, "USB");
             register_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR, usb_type_str);
         }
+        register_info( RS2_CAMERA_INFO_IMU_TYPE, gvd_parsed_fields.imu_type );
 
         register_features();
 
@@ -774,7 +764,7 @@ namespace librealsense
             throw std::runtime_error("Not enough bytes returned from the firmware!");
         }
         uint32_t dt = *(uint32_t*)res.data();
-        double ts = dt * TIMESTAMP_USEC_TO_MSEC;
+        double ts = dt * MICROSEC_TO_MILLISEC;
         return ts;
     }
 
@@ -814,17 +804,18 @@ namespace librealsense
     
     void d500_device::get_gvd_details(const std::vector<uint8_t>& gvd_buff, ds::d500_gvd_parsed_fields* parsed_fields) const
     {
-        parsed_fields->gvd_version[0] = *reinterpret_cast<const uint8_t*>(gvd_buff.data() + ds::d500_gvd_offsets::version_offset);
-        parsed_fields->gvd_version[1] = *reinterpret_cast<const uint8_t*>(gvd_buff.data() + ds::d500_gvd_offsets::version_offset + sizeof(uint8_t));
-        
-        parsed_fields->payload_size = *reinterpret_cast<const uint32_t*>(gvd_buff.data() + ds::d500_gvd_offsets::payload_size_offset);
-        parsed_fields->crc32 = *reinterpret_cast<const uint32_t*>(gvd_buff.data() + ds::d500_gvd_offsets::crc32_offset);
-        parsed_fields->optical_module_sn = _hw_monitor->get_module_serial_string(gvd_buff, ds::d500_gvd_offsets::optical_module_serial_offset);
-        parsed_fields->mb_module_sn = _hw_monitor->get_module_serial_string(gvd_buff, ds::d500_gvd_offsets::mb_module_serial_offset);
-        parsed_fields->fw_version = _hw_monitor->get_firmware_version_string<uint16_t>(gvd_buff, ds::d500_gvd_offsets::fw_version_offset, 4, false);
+        using namespace ds::d500_gvd_offsets;
+        parsed_fields->gvd_version[0] = *reinterpret_cast<const uint8_t*>(gvd_buff.data() + version_offset);
+        parsed_fields->gvd_version[1] = *reinterpret_cast<const uint8_t*>(gvd_buff.data() + version_offset + sizeof(uint8_t));
+
+        parsed_fields->payload_size = *reinterpret_cast<const uint32_t*>(gvd_buff.data() + payload_size_offset);
+        parsed_fields->crc32 = *reinterpret_cast<const uint32_t*>(gvd_buff.data() + crc32_offset);
+        parsed_fields->optical_module_sn = _hw_monitor->get_module_serial_string(gvd_buff, optical_module_serial_offset);
+        parsed_fields->mb_module_sn = _hw_monitor->get_module_serial_string(gvd_buff, mb_module_serial_offset);
+        parsed_fields->fw_version = _hw_monitor->get_firmware_version_string<uint16_t>(gvd_buff, fw_version_offset, 4, false);
         if (_pid == ds::D585S_PID)
         {
-            parsed_fields->safety_sw_suite_version = _hw_monitor->get_firmware_version_string<uint8_t>(gvd_buff, ds::d500_gvd_offsets::safety_sw_suite_version_offset, 4, false);
+            parsed_fields->safety_sw_suite_version = _hw_monitor->get_firmware_version_string<uint8_t>(gvd_buff, safety_sw_suite_version_offset, 4, false);
         }
 
         constexpr size_t gvd_header_size = 8;
@@ -840,5 +831,25 @@ namespace librealsense
                 << parsed_fields->crc32 << ", computed CRC = " << computed_crc );
         }
 
+    }
+
+    void d500_device::set_imu_type( const std::vector< uint8_t > & gvd_buf, ds::d500_gvd_parsed_fields * parsed_fields )
+    {
+        // setting imu type in gvd parsed fields
+        if ((_device_capabilities & ds::ds_caps::CAP_IMU_SENSOR) == ds::ds_caps::CAP_IMU_SENSOR)
+        {
+            const char * imu_type_char = reinterpret_cast< const char * >( gvd_buf.data() + ds::d500_gvd_offsets::imu_type );
+            parsed_fields->imu_type.assign( imu_type_char, strnlen( imu_type_char, 8 ) );
+        }
+        else
+            parsed_fields->imu_type = "IMU_Unknown";
+
+        // updating device capabilities based on imu type
+        if(parsed_fields->imu_type == "BMI055")
+            _device_capabilities |= ds::ds_caps::CAP_BMI_055;
+        else if (parsed_fields->imu_type == "BMI085")
+            _device_capabilities |= ds::ds_caps::CAP_BMI_085;
+        else if( parsed_fields->imu_type == "BMI088" )
+            _device_capabilities |= ds::ds_caps::CAP_BMI_088;
     }
 }

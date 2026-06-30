@@ -18,6 +18,7 @@
 #include <pwd.h>
 
 #endif
+#include <stdexcept>
 
 
 namespace rsutils {

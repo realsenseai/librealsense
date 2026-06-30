@@ -1268,7 +1268,7 @@ namespace librealsense
         if (m_version == legacy_file_format::file_version())
         {
             //TODO: properly implement, currently assuming TM2 devices and Movidius PID
-            infos->register_info(RS2_CAMERA_INFO_NAME, "Intel RealSense TM2");
+            infos->register_info(RS2_CAMERA_INFO_NAME, "RealSense TM2");
             infos->register_info(RS2_CAMERA_INFO_PRODUCT_ID, "2150");
             infos->register_info(RS2_CAMERA_INFO_SERIAL_NUMBER, "N/A");
         }

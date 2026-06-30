@@ -127,15 +127,37 @@ def set_env_vars( env_vars ):
     sys.argv = sys.argv[:-1]  # Remove the rerun
 
 
-def find_first_device_or_exit():
+def find_first_device_or_exit( serial_number=None ):
     """
     :return: the first device that was found, if no device is found the test is skipped. That way we can still run
         the unit-tests when no device is connected and not fail the tests that check a connected device
+
+    If serial_number is provided, the device with the matching identifier is returned instead
+    of the positional "first" pick. The harness passes this for test-fw-update on multi-device
+    rigs (e.g. Jetson with a GMSL camera alongside the USB one being flashed).
+
+    The match is done against `camera_info.serial_number` when available, and falls back to
+    `camera_info.firmware_update_id` for devices in DFU/recovery mode (where serial_number
+    isn't exposed). This mirrors how rspy.devices registers devices on discovery, so a SN
+    that the harness derived from a recovery-mode device still resolves here.
     """
     import pyrealsense2 as rs
     c = rs.context()
     if not c.devices.size():  # if no device is connected we skip the test
         log.f("No device found")
+    if serial_number:
+        for d in c.devices:
+            if d.supports( rs.camera_info.serial_number ):
+                d_sn = d.get_info( rs.camera_info.serial_number )
+            elif d.supports( rs.camera_info.firmware_update_id ):
+                d_sn = d.get_info( rs.camera_info.firmware_update_id )
+            else:
+                continue
+            if d_sn == serial_number:
+                log.d( 'found', d )
+                log.d( 'in', rs )
+                return d, c
+        log.f( f"No device with serial number / firmware-update ID '{serial_number}' is visible" )
     dev = c.devices[0]
     log.d( 'found', dev )
     log.d( 'in', rs )
@@ -157,6 +179,33 @@ def find_devices_by_product_line_or_exit( product_line ):
     log.d( 'found', devices_list.size(), product_line, 'devices:', [dev for dev in devices_list] )
     log.d( 'in', rs )
     return devices_list
+
+
+def find_n_devices_or_exit( n, product_line = None ):
+    """
+    :param n: The minimum number of devices required
+    :param product_line: Optional product line filter for the devices
+    :return: A list of n devices and the context if at least n devices are found, otherwise the test is skipped.
+        That way multi-device tests can skip gracefully when the required number of devices is not connected.
+        If more than n devices are found, only the first n are returned.
+    """
+    import pyrealsense2 as rs
+    c = rs.context()
+    if product_line:
+        devices_list = c.query_devices(product_line)
+    else:
+        devices_list = c.query_devices()
+    
+    device_count = devices_list.size()
+    if device_count < n:
+        if product_line:
+            log.f( f"Test requires at least {n} device(s) of {product_line} product line, but found {device_count}" )
+        else:
+            log.f( f"Test requires at least {n} device(s), but found {device_count}" )
+    
+    log.d( f'found {device_count} device(s):', [dev for dev in devices_list] )
+    log.d( 'in', rs )
+    return [devices_list[i] for i in range(n)], c
 
 
 def print_stack():
@@ -297,56 +346,8 @@ def check_equal( result, expected, on_fail=LOG ):
 
 check_equal_lists = check_equal
 
-# Recursive function to compare two JSON objects with epsilon for floats
-def check_equal_jsons(json1, json2, epsilon=1e-6, path="root"):
-    """
-    Compares two JSON-like objects with support for float tolerance and ignoring field order.
-    :param json1: The actual JSON object.
-    :param json2: The expected JSON object.
-    :param epsilon: The tolerance for float comparison.
-    :param path: The current path in the JSON structure for logging mismatches.
-    :return: True if JSONs are equal within tolerance, False otherwise.
-    """
-    def log_difference(path, j1, j2):
-        print(f"Mismatch at {path}:")
-        print(f"        left  : {j1}")
-        print(f"        right : {j2}")
-
-    # Normalize dictionaries by sorting their keys, so order doesn't matter
-    if isinstance(json1, dict) and isinstance(json2, dict):
-        if set(json1.keys()) != set(json2.keys()):
-            log_difference(path, json1, json2)
-            return False
-        # Recursively compare each key-value pair
-        for key in json1:
-            if not check_equal_jsons(json1[key], json2[key], epsilon, path=f"{path}.{key}"):
-                return False
-
-    # Compare lists by their length and then by recursively comparing each item
-    elif isinstance(json1, list) and isinstance(json2, list):
-        if len(json1) != len(json2):
-            log_difference(path, json1, json2)
-            return False
-        # Sort lists of dictionaries by a normalized key structure to ensure order-independence
-        sorted_json1 = sorted(json1, key=lambda x: str(x) if isinstance(x, (dict, list)) else x)
-        sorted_json2 = sorted(json2, key=lambda x: str(x) if isinstance(x, (dict, list)) else x)
-        for i, (item1, item2) in enumerate(zip(sorted_json1, sorted_json2)):
-            if not check_equal_jsons(item1, item2, epsilon, path=f"{path}[{i}]"):
-                return False
-
-    # Compare floats with epsilon tolerance
-    elif isinstance(json1, float) and isinstance(json2, float):
-        if abs(json1 - json2) > epsilon:
-            log_difference(path, json1, json2)
-            return False
-
-    # Direct comparison for other types
-    else:
-        if json1 != json2:
-            log_difference(path, json1, json2)
-            return False
-
-    return True
+# Re-export from rspy.json_compare to keep a single source of truth.
+from rspy.json_compare import check_equal_jsons
 
 
 
@@ -763,6 +764,7 @@ class remote:
         self._on_finish = None  # callback
         self._exception = None
         self._stdout = None
+        self._sentinel = '___ready\n'  # rewritten per-run() with a fresh nonce
 
     def __enter__( self ):
         """
@@ -812,7 +814,7 @@ class remote:
             # NOTE: line will include the terminating \n EOL
             # NOTE: so readline will return '' (with no EOL) when EOF is reached - the "sentinel"
             #       2nd argument to iter() - and we'll break out of the loop
-            if line == '___ready\n':
+            if line == self._sentinel:
                 self._output_ready()
                 continue
             if nested_prefix:
@@ -838,8 +840,8 @@ class remote:
                 else:
                     print( nested_prefix + line, end='', flush=True )
             else:
-                if x > 0 and line[:x] == '___ready\n'[:x]:
-                    missing_ready = '___ready\n'[x:]
+                if x > 0 and line[:x] == self._sentinel[:x]:
+                    missing_ready = self._sentinel[x:]
                 print( line, end='', flush=True )
         #
         log.d( self._name, 'stdout is finished' )
@@ -903,9 +905,13 @@ class remote:
         """
         log.d( self._name, 'running:', command )
         assert self._interactive
+        # fresh nonce so a stray '___ready' can't fake readiness
+        import uuid
+        self._sentinel = f'___ready_{uuid.uuid4().hex}\n'
         self._events.append( self._ready )
         self._ready.clear()
-        self._process.stdin.write( command + '\n' )
+        # one REPL line -> one sentinel; a stray one would wedge the next run()
+        self._process.stdin.write( f"__import__('sys').ps1={self._sentinel!r}; {command}\n" )
         self._process.stdin.flush()
         if timeout:
             self.wait_until_ready( timeout=timeout, on_fail=on_fail )
@@ -964,14 +970,16 @@ class remote:
         if self._process is not None:
             process = self._process
             self._process = None
+            # process (and its DDS participant) must be dead before the next test runs
             process.terminate()
             try:
                 process.wait( timeout=0.2 )
-                self._status = process.returncode
-                log.d( self._name, 'exited with status', self._status )
             except subprocess.TimeoutExpired:
-                log.d( self._name, 'process terminate timed out; no status' )
+                log.d( self._name, 'did not exit on terminate; killing' )
+                process.kill()
+                process.wait()
             finally:
+                self._status = process.returncode
                 # Unexpected, but known to happen (process terminated while we're waiting for it to be ready)
                 self._ready.set()
 

@@ -432,6 +432,8 @@ class PyTest( Test ):
             run( cmd, stdout=log_path, append=self.ran, timeout=self.config.timeout )
         finally:
             self._ran = True
+            # Small delay to allow any async background commands to complete before port reset
+            time.sleep( 0.1 )
 
 
 class ExeTest( Test ):
@@ -493,3 +495,5 @@ class ExeTest( Test ):
             run( cmd, stdout=log_path, append=self.ran, timeout=self.config.timeout )
         finally:
             self._ran = True
+            # Small delay to allow any async background commands to complete before port reset
+            time.sleep( 0.1 )

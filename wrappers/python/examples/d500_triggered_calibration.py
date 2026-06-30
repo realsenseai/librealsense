@@ -23,7 +23,7 @@ def check_d500_camera_found(dev):
         print("Device is not D500 Product Line - please check")
         exit(1)
     device_name = dev.get_info(rs.camera_info.name)
-    if device_name == "Intel RealSense D585S":
+    if "D585S" in device_name:
         is_safety_camera = True
     print("D500 Product Line Camera found")
 

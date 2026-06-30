@@ -45,6 +45,7 @@ using namespace realdds;
 using tools::lrs_device_controller;
 using field = rsutils::ios::field;
 
+static constexpr const double MILLISEC_TO_SEC = 0.001;
 
 #define CREATE_SERVER_IF_NEEDED( X )                                                                                   \
     if( server )                                                                                                       \
@@ -716,7 +717,7 @@ lrs_device_controller::lrs_device_controller( rs2::device dev, std::shared_ptr< 
                         imu->message.gyro_data().y( xyz[1] );
                         imu->message.gyro_data().z( xyz[2] );
                         imu->message.timestamp(  // in sec.nsec
-                            static_cast< long double >( f.get_timestamp() ) / 1e3 );
+                            static_cast< long double >( f.get_timestamp() ) * MILLISEC_TO_SEC );
                         std::unique_lock< std::mutex > lock( imu->mutex );
                         motion->publish_motion( std::move( imu->message ) );
 
@@ -734,7 +735,7 @@ lrs_device_controller::lrs_device_controller( rs2::device dev, std::shared_ptr< 
                             return;
 
                         dds_time const timestamp  // in sec.nsec
-                            ( static_cast< long double >( f.get_timestamp() ) / 1e3 );
+                            ( static_cast< long double >( f.get_timestamp() ) * MILLISEC_TO_SEC );
 
                         realdds::topics::image_msg image;
                         image.set_height( video->get_image_header().height );
@@ -1046,16 +1047,17 @@ void lrs_device_controller::fill_ros2_node_entities( realdds::topics::ros2::node
 
 bool lrs_device_controller::on_open_streams( json const & control, json & reply )
 {
-    // Note that this function is called "start-streaming" but it's really a response to "open-streams" so does not
-    // actually start streaming. It simply sets and locks in which streams should be open when streaming starts.
+    // Note this function is a response to "open-streams" so does not actually start streaming.
+    // It simply sets and locks in which streams should be open when streaming starts.
     // This effectively lets one control _specifically_ which streams should be streamable, and nothing else: if left
     // out, a sensor is reset back to its default state using implicit stream selection.
     // (For example, the 'Stereo Module' sensor controls Depth, IR1, IR2: but turning on all 3 has performance
     // implications and may not be desirable. So you can open only Depth and IR1/2 will stay inactive...)
-    if( control.nested( topics::control::open_streams::key::reset ).default_value( true ) )
+    if( control.nested( topics::control::open_streams::key::reset ).default_value( false ) )
         _bridge.reset();
 
-    auto const & msg_profiles = control[topics::control::open_streams::key::stream_profiles];
+    json msg_profiles;
+    control.nested( topics::control::open_streams::key::stream_profiles ).get_ex( msg_profiles ); // Might be an empty list
     for( auto const & name2profile : msg_profiles.items() )
     {
         std::string const & stream_name = name2profile.key();

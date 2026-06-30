@@ -90,7 +90,7 @@ namespace librealsense
         }
 
         if (0 == temperature_data.*is_valid_field)
-            LOG_ERROR(strong_ep->get_option_name(_option) << " value is not valid!");
+            LOG_DEBUG(strong_ep->get_option_name(_option) << " value is not valid!");
 
         return temperature_data.*field;
     }

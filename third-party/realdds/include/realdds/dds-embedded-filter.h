@@ -79,6 +79,14 @@ public:
     virtual ~dds_temporal_filter() = default;
 };
 
+// Improved Close Range Depth filter implementation
+class dds_close_range_filter : public dds_embedded_filter
+{
+public:
+    dds_close_range_filter();
+    virtual ~dds_close_range_filter() = default;
+};
+
 typedef std::vector< std::shared_ptr< dds_embedded_filter > > dds_embedded_filters;
 
 // Factory function to create appropriate filter based on type

@@ -56,9 +56,7 @@ namespace rs2
 
     void prepare_config_file()
     {
-        config_file::instance().set_default(configurations::update::allow_rc_firmware, false);
         config_file::instance().set_default(configurations::update::recommend_calibration, true);
-        config_file::instance().set_default(configurations::update::recommend_updates, true);
         config_file::instance().set_default(configurations::update::sw_updates_url, server_versions_db_url);
         config_file::instance().set_default(configurations::update::sw_updates_official_server, true);
 
@@ -281,8 +279,8 @@ namespace rs2
 
         _fullscreen = config_file::instance().get(configurations::window::is_fullscreen);
 
-        rs2_error* e = nullptr;
-        _title_str = rsutils::string::from() << _title << " v" << api_version_to_string(rs2_get_api_version(&e));
+        // RS2_API_FULL_VERSION_STR is the compile-time version (incl. build #); a loaded-library mismatch is caught separately via rs2_get_api_version()
+        _title_str = rsutils::string::from() << _title << " v" << RS2_API_FULL_VERSION_STR;
         auto debug = is_debug();
         if (debug)
         {
@@ -449,7 +447,7 @@ namespace rs2
         // Prepare the splash screen and do some initialization in the background
         int x, y, comp;
         auto r = stbi_load_from_memory(splash, (int)splash_size, &x, &y, &comp, false);
-        _splash_tex.upload_image(x, y, r);
+        _splash_tex->upload_image(x, y, r);
         stbi_image_free(r);
     }
 
@@ -506,11 +504,11 @@ namespace rs2
             shader->set_power(power);
             shader->set_ray_center(float2{ ox, oy });
             shader->end();
-            _2d_vis->draw_texture(_splash_tex.get_gl_handle(), opacity);
+            _2d_vis->draw_texture(_splash_tex->get_gl_handle(), opacity);
         }
         else
         {
-            _splash_tex.show({ 0.f,0.f,float(_width),float(_height) }, opacity);
+            _splash_tex->show({ 0.f,0.f,float(_width),float(_height) }, opacity);
         }
 
         std::string hourglass = std::string(rsutils::string::from() << textual_icons::hourglass);
@@ -523,7 +521,7 @@ namespace rs2
 
             if (!_missing_device)
             {
-                std::string rs_dev_detected = std::string(rsutils::string::from() << textual_icons::usb
+                _dev_stat_message = std::string(rsutils::string::from() << textual_icons::usb
                     << " RealSense device detected.");
                 _query_devices = false;
             }
@@ -683,6 +681,9 @@ namespace rs2
         ImGui::GetIO().Fonts->ClearFonts();  // To be refactored into Viewer theme object
         ImPlot::DestroyContext();
         RsImGui::PopNewFrame();
+        // Release the splash texture while the GL context is still current —
+        // member dtors below would otherwise run glDeleteTextures with no context.
+        _splash_tex.reset();
         glfwDestroyWindow(_win);
 
         glfwDestroyCursor(_hand_cursor);

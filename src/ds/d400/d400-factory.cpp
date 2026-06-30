@@ -10,7 +10,6 @@
 #include "device.h"
 #include "image.h"
 #include "metadata-parser.h"
-#include "context.h"
 
 #include <src/core/matcher-factory.h>
 
@@ -35,11 +34,12 @@
 
 #include <src/ds/features/auto-exposure-limit-feature.h>
 #include <src/ds/features/gain-limit-feature.h>
-#include <src/ds/features/gyro-sensitivity-feature.h>
 
 namespace librealsense
 {
     // PSR
+    // default d400 device
+    // used as fallback for partial device creation when enabled by config
     class rs400_device : public d400_nonmonochrome,
                          public ds_advanced_mode_base,
                          public firmware_logger_device
@@ -78,8 +78,8 @@ namespace librealsense
         };
     };
 
-    class rs401_gmsl_device : //public d400_color,
-                              public d400_nonmonochrome,
+    class rs401_gmsl_device : public d400_color,
+                              //public d400_nonmonochrome,
                               public d400_mipi_device,
                               public firmware_logger_device
     {
@@ -88,8 +88,8 @@ namespace librealsense
             : device( dev_info, register_device_notifications )
             , backend_device( dev_info, register_device_notifications )
             , d400_device( dev_info )
-            //, d400_color( dev_info )
-            , d400_nonmonochrome( dev_info )
+            , d400_color( dev_info )
+            //, d400_nonmonochrome( dev_info )
             , d400_mipi_device()
             , firmware_logger_device( dev_info, d400_device::_hw_monitor, get_firmware_logs_command(), get_flash_logs_command() )
         {
@@ -101,7 +101,33 @@ namespace librealsense
         {
             std::vector<tagged_profile> tags;
 
-            tags.push_back({ RS2_STREAM_DEPTH, -1, 640, 480, RS2_FORMAT_Z16, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
+            int depth_width = 848;
+            int depth_height = 480;
+            int color_width = 848;
+            int color_height = 480;
+            int fps = 30;
+
+            tags.push_back( { RS2_STREAM_COLOR,
+                              -1,  // index
+                              color_width,
+                              color_height,
+                              get_color_format(),
+                              fps,
+                              profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
+            tags.push_back( { RS2_STREAM_DEPTH,
+                              -1,  // index
+                              depth_width,
+                              depth_height,
+                              RS2_FORMAT_Z16,
+                              fps,
+                              profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
+            tags.push_back( { RS2_STREAM_INFRARED,
+                              -1,  // index
+                              depth_width,
+                              depth_height,
+                              get_ir_format(),
+                              fps,
+                              profile_tag::PROFILE_TAG_SUPERSET } );
             return tags;
         };
     };
@@ -707,6 +733,7 @@ namespace librealsense
             , d400_mipi_device()
             , firmware_logger_device( dev_info, d400_device::_hw_monitor, get_firmware_logs_command(), get_flash_logs_command() )
         {
+            store_sensors_indices({_depth_device_idx,_color_device_idx, _motion_module_device_idx});
         }
 
         std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override;
@@ -717,9 +744,9 @@ namespace librealsense
 
             tags.push_back({ RS2_STREAM_COLOR, -1, 640, 480, get_color_format(), 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_DEPTH, -1, 640, 480, RS2_FORMAT_Z16, 30, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
-            tags.push_back({ RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_100, profile_tag::PROFILE_TAG_SUPERSET });
+            tags.push_back({ RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_100, profile_tag::PROFILE_TAG_SUPERSET  | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_63, profile_tag::PROFILE_TAG_SUPERSET });
-            tags.push_back({ RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_100, profile_tag::PROFILE_TAG_SUPERSET });
+            tags.push_back({ RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, (int)odr::IMU_FPS_100, profile_tag::PROFILE_TAG_SUPERSET  | profile_tag::PROFILE_TAG_DEFAULT });
 
             return tags;
         };
@@ -819,9 +846,9 @@ namespace librealsense
             , firmware_logger_device( dev_info, d400_device::_hw_monitor, get_firmware_logs_command(), get_flash_logs_command() )
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
-
-            if( _fw_version >= firmware_version( 5, 16, 0, 0 ) )
-                register_feature( std::make_shared< gyro_sensitivity_feature >( get_raw_motion_sensor(), get_motion_sensor() ) );
+#if !defined(__APPLE__) // Motion sensors not supported on macOS
+            register_gyro_sensitivity();
+#endif
         }
 
 
@@ -868,7 +895,7 @@ namespace librealsense
             , firmware_logger_device( dev_info, d400_device::_hw_monitor, get_firmware_logs_command(), get_flash_logs_command())
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
-            register_feature(std::make_shared< gyro_sensitivity_feature >(get_raw_motion_sensor(), get_motion_sensor()));
+            register_gyro_sensitivity();
         }
 
 
@@ -1030,9 +1057,9 @@ namespace librealsense
             , ds_thermal_tracking( d400_device::_thermal_monitor )
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
-
-            if( _fw_version >= firmware_version( 5, 16, 0, 0 ) )
-                register_feature( std::make_shared< gyro_sensitivity_feature >( get_raw_motion_sensor(), get_motion_sensor() ) );
+#if !defined(__APPLE__) // Motion sensors not supported on macOS
+            register_gyro_sensitivity();
+#endif
         }
 
         std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override;
@@ -1063,6 +1090,7 @@ namespace librealsense
 
     };
 
+
     std::shared_ptr< device_interface > d400_info::create_device()
     {
         using namespace ds;
@@ -1075,60 +1103,78 @@ namespace librealsense
 
         auto pid = _group.uvc_devices.front().pid;
 
-        switch(pid)
+        try
         {
-        case RS400_PID:
+            switch( pid )
+            {
+            case RS400_PID:
+                return std::make_shared< rs400_device >( dev_info, register_device_notifications );
+            case RS405U_PID:
+                return std::make_shared< rs405u_device >( dev_info, register_device_notifications );
+            case RS410_PID:
+            case RS460_PID:
+                return std::make_shared< rs410_device >( dev_info, register_device_notifications );
+            case RS415_PID:
+                return std::make_shared< rs415_device >( dev_info, register_device_notifications );
+            case RS416_PID:
+                return std::make_shared< rs416_device >( dev_info, register_device_notifications );
+            case RS416_RGB_PID:
+                return std::make_shared< rs416_rgb_device >( dev_info, register_device_notifications );
+            case RS420_PID:
+                return std::make_shared< rs420_device >( dev_info, register_device_notifications );
+            case RS421_PID:
+                return std::make_shared< rs421_device >( dev_info, register_device_notifications );
+            case RS420_MM_PID:
+                return std::make_shared< rs420_mm_device >( dev_info, register_device_notifications );
+            case RS430_PID:
+                return std::make_shared< rs430_device >( dev_info, register_device_notifications );
+            case RS430I_PID:
+                return std::make_shared< rs430i_device >( dev_info, register_device_notifications );
+            case RS430_MM_PID:
+                return std::make_shared< rs430_mm_device >( dev_info, register_device_notifications );
+            case RS430_MM_RGB_PID:
+                return std::make_shared< rs430_rgb_mm_device >( dev_info, register_device_notifications );
+            case RS435_RGB_PID:
+                return std::make_shared< rs435_device >( dev_info, register_device_notifications );
+            case RS435I_PID:
+                return std::make_shared< rs435i_device >( dev_info, register_device_notifications );
+            case RS436_PID:
+                return std::make_shared< rs436_device >( dev_info, register_device_notifications );
+            case RS_USB2_PID:
+                return std::make_shared< rs410_device >( dev_info, register_device_notifications );
+            case RS400_IMU_PID:
+                return std::make_shared< rs400_imu_device >( dev_info, register_device_notifications );
+            case RS405_PID:
+                return std::make_shared< rs405_device >( dev_info, register_device_notifications );
+            case RS455_PID:
+                return std::make_shared< rs455_device >( dev_info, register_device_notifications );
+            case RS457_PID:
+                return std::make_shared< rs457_device >( dev_info, register_device_notifications );
+            case RS430_GMSL_PID:
+                return std::make_shared< rs430_gmsl_device >( dev_info, register_device_notifications );
+            case RS415_GMSL_PID:
+                return std::make_shared< rs415_gmsl_device >( dev_info, register_device_notifications );
+            case RS401_GMSL_PID:
+                return std::make_shared< rs401_gmsl_device >( dev_info, register_device_notifications );
+            default:
+                throw std::runtime_error( rsutils::string::from()
+                                          << "Unsupported RS400 model! 0x" << std::hex << std::setw( 4 )
+                                          << std::setfill( '0' ) << (int)pid );
+            }
+        }
+        catch( const std::exception& e )
+        {
+            // Create a device with partial capabilities instead of failing,
+            // but only if the caller opted in via `partial-device-allowed`.
+            if( ! ds::is_partial_device_allowed( get_context() ) )
+            {
+                LOG_ERROR( rsutils::string::from() << "Failed to create device for PID 0x" << std::hex << std::setw( 4 )
+                                                   << std::setfill( '0' ) << (int)pid << "! (" << e.what() << ")" );
+                throw;
+            }
+            LOG_WARNING( "PID 0x" << std::hex << std::setw( 4 ) << std::setfill( '0' ) << (int)pid
+                                  << " - falling back to partial device (partial-device-allowed=true): " << e.what() );
             return std::make_shared< rs400_device >( dev_info, register_device_notifications );
-        case RS405U_PID:
-            return std::make_shared< rs405u_device >( dev_info, register_device_notifications );
-        case RS410_PID:
-        case RS460_PID:
-            return std::make_shared< rs410_device >( dev_info, register_device_notifications );
-        case RS415_PID:
-            return std::make_shared< rs415_device >( dev_info, register_device_notifications );
-        case RS416_PID:
-            return std::make_shared< rs416_device >( dev_info, register_device_notifications );
-        case RS416_RGB_PID:
-            return std::make_shared< rs416_rgb_device >( dev_info, register_device_notifications );
-        case RS420_PID:
-            return std::make_shared< rs420_device >( dev_info, register_device_notifications );
-        case RS421_PID:
-            return std::make_shared< rs421_device >( dev_info, register_device_notifications );
-        case RS420_MM_PID:
-            return std::make_shared< rs420_mm_device >( dev_info, register_device_notifications );
-        case RS430_PID:
-            return std::make_shared< rs430_device >( dev_info, register_device_notifications );
-        case RS430I_PID:
-            return std::make_shared< rs430i_device >( dev_info, register_device_notifications );
-        case RS430_MM_PID:
-            return std::make_shared< rs430_mm_device >( dev_info, register_device_notifications );
-        case RS430_MM_RGB_PID:
-            return std::make_shared< rs430_rgb_mm_device >( dev_info, register_device_notifications );
-        case RS435_RGB_PID:
-            return std::make_shared< rs435_device >( dev_info, register_device_notifications );
-        case RS435I_PID:
-            return std::make_shared< rs435i_device >( dev_info, register_device_notifications );
-        case RS436_PID:
-            return std::make_shared< rs436_device >(dev_info, register_device_notifications);
-        case RS_USB2_PID:
-            return std::make_shared< rs410_device >( dev_info, register_device_notifications );
-        case RS400_IMU_PID:
-            return std::make_shared< rs400_imu_device >( dev_info, register_device_notifications );
-        case RS405_PID:
-            return std::make_shared< rs405_device >( dev_info, register_device_notifications );
-        case RS455_PID:
-            return std::make_shared< rs455_device >( dev_info, register_device_notifications );
-        case RS457_PID:
-            return std::make_shared< rs457_device >( dev_info, register_device_notifications );
-        case RS430_GMSL_PID:
-            return std::make_shared< rs430_gmsl_device >( dev_info, register_device_notifications );
-        case RS415_GMSL_PID:
-            return std::make_shared< rs415_gmsl_device >(dev_info, register_device_notifications);
-        case RS401_GMSL_PID:
-            return std::make_shared< rs401_gmsl_device >( dev_info, register_device_notifications );
-        default:
-            throw std::runtime_error( rsutils::string::from() << "Unsupported RS400 model! 0x" << std::hex
-                                                              << std::setw( 4 ) << std::setfill( '0' ) << (int)pid );
         }
     }
 
@@ -1194,13 +1240,19 @@ namespace librealsense
 
     std::shared_ptr<matcher> rs400_device::create_matcher(const frame_holder& frame) const
     {
-        std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get()};
+        std::vector< stream_interface * > streams;
+        if( _depth_stream )
+            streams.push_back( _depth_stream.get() );
+        if( _left_ir_stream )
+            streams.push_back( _left_ir_stream.get() );
+        if( _right_ir_stream )
+            streams.push_back( _right_ir_stream.get() );
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 
     std::shared_ptr<matcher> rs401_gmsl_device::create_matcher(const frame_holder& frame) const
     {
-        std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get() };
+        std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get() };
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 
@@ -1317,9 +1369,12 @@ namespace librealsense
     {
         std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get() };
         // TODO - A proper matcher for High-FPS sensor is required
-        std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(), 
-                                                      _ds_motion_common->get_gyro_stream().get()};
-        streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        if (!_has_motion_module_failed)
+        {
+            std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
+                                                          _ds_motion_common->get_gyro_stream().get()};
+            streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        }
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 
@@ -1327,9 +1382,12 @@ namespace librealsense
     {
         std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get() };
         // TODO - A proper matcher for High-FPS sensor is required
-        std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
-                                                      _ds_motion_common->get_gyro_stream().get() };
-        streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        if (!_has_motion_module_failed)
+        {
+            std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
+                                                          _ds_motion_common->get_gyro_stream().get()};
+            streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        }
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 
@@ -1368,9 +1426,12 @@ namespace librealsense
     std::shared_ptr<matcher> rs455_device::create_matcher(const frame_holder& frame) const
     {
         std::vector<stream_interface*> streams = { _depth_stream.get() , _left_ir_stream.get() , _right_ir_stream.get(), _color_stream.get() };
-        std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
-                                                      _ds_motion_common->get_gyro_stream().get()};
-        streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        if (!_has_motion_module_failed)
+        {
+            std::vector<stream_interface*> mm_streams = { _ds_motion_common->get_accel_stream().get(),
+                                                          _ds_motion_common->get_gyro_stream().get()};
+            streams.insert(streams.end(), mm_streams.begin(), mm_streams.end());
+        }
         return matcher_factory::create(RS2_MATCHER_DEFAULT, streams);
     }
 }

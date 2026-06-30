@@ -1,5 +1,5 @@
-# PCL Samples for Intel® RealSense™ cameras
-Examples in this folder are designed to complement existing [SDK examples](../../examples) and demonstrate how Intel RealSense cameras can be used together with `PCL` (Point-Cloud Library). 
+# PCL Samples for RealSense cameras
+Examples in this folder are designed to complement existing [SDK examples](../../examples) and demonstrate how RealSense cameras can be used together with `PCL` (Point-Cloud Library). 
  
 ## List of Samples:
 1. [PCL](./pcl) - Minimal Point-cloud viewer that includes PCL processing

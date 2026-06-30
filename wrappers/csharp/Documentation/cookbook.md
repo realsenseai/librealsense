@@ -170,7 +170,7 @@ float[] fov = i.FOV; // float[2] - horizontal and vertical field of view in degr
 var pipe = new Pipeline();
 PipelineProfile selection = pipe.Start();
 
-Sensor sensor = selection.Device.Sensors[0];
+Sensor sensor = selection.Device.FirstDepthSensor();
 float scale = sensor.DepthScale;
 ```
 
@@ -180,7 +180,7 @@ float scale = sensor.DepthScale;
 var pipe = new Pipeline();
 PipelineProfile selection = pipe.Start();
 var selected_device = selection.Device;
-var depth_sensor = selected_device.Sensors[0];
+var depth_sensor = selected_device.FirstDepthSensor();
 
 if (depth_sensor.Options.Supports(Option.EmitterEnabled))
 {

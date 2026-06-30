@@ -133,12 +133,15 @@ namespace rs2
 
     void on_chip_calib_manager::set_laser_emitter_state( float value )
     {
-        // Use options_model::set_option to update GUI after change
-        std::string ignored_error_message{ "" };
+        // Route the write through option_model::set_option_sync so it goes via the
+        // subdevice dispatcher — that way the FW write can't interleave with concurrent
+        // UI option writes on the same USB bus. set_option_sync also refreshes the
+        // cached option_model::value before returning, so value_as_float() reads the
+        // post-write value here.
         auto it = _sub->options_metadata.find( RS2_OPTION_EMITTER_ENABLED );
-        if( it != _sub->options_metadata.end() )  // Option supported
+        if( it != _sub->options_metadata.end() )
         {
-            it->second.set_option( RS2_OPTION_EMITTER_ENABLED, value, ignored_error_message );
+            it->second.set_option_sync( value );
             if( it->second.value_as_float() != value )
                 throw std::runtime_error( rsutils::string::from()
                                           << "Failed to set laser " << ( value == off_value ? "off" : "on" ) );
@@ -147,12 +150,11 @@ namespace rs2
 
     void on_chip_calib_manager::set_thermal_loop_state( float value )
     {
-        // Use options_model::set_option to update GUI after change
-        std::string ignored_error_message{ "" };
+        // See set_laser_emitter_state for why we route through option_model::set_option_sync.
         auto it = _sub->options_metadata.find( RS2_OPTION_THERMAL_COMPENSATION );
-        if( it != _sub->options_metadata.end() )  // Option supported
+        if( it != _sub->options_metadata.end() )
         {
-            it->second.set_option( RS2_OPTION_THERMAL_COMPENSATION, value, ignored_error_message );
+            it->second.set_option_sync( value );
             if( it->second.value_as_float() != value )
                 throw std::runtime_error( rsutils::string::from()
                                           << "Failed to set thermal compensation " << ( value == off_value ? "off" : "on" ) );
@@ -168,8 +170,9 @@ namespace rs2
             invoke([&]()
                 {
                     // Stop viewer UI
-                    _sub->stop(_viewer.not_model);
-                    if (_sub_color.get())
+                    if (_sub->streaming)
+                        _sub->stop(_viewer.not_model);
+                    if (_sub_color.get() && _sub_color->streaming)
                         _sub_color->stop(_viewer.not_model);
                 });
 
@@ -1298,7 +1301,7 @@ namespace rs2
         // Emitter on by default, off for GT/FL calib and for D415 model
         float emitter_value = on_value;
         if( action == RS2_CALIB_ACTION_FL_CALIB || action == RS2_CALIB_ACTION_TARE_GROUND_TRUTH
-            || device_name_string == std::string( "Intel RealSense D415" ) )
+            || device_name_string.find( "D415" ) != std::string::npos )
             emitter_value = off_value;
         set_laser_emitter_state( emitter_value );
 

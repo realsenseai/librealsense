@@ -1,0 +1,562 @@
+# License: Apache 2.0. See LICENSE file in root directory.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
+import sys
+import time
+import copy
+import logging
+import pyrealsense2 as rs
+import struct
+import zlib
+import ctypes
+
+log = logging.getLogger(__name__)
+
+# Constants for calibration
+CALIBRATION_TIMEOUT_SECONDS = 30
+OCC_TIMEOUT_MS = 6000
+TARE_TIMEOUT_MS = 7000
+OCC_TIMEOUT_MS_HA = 9000
+TARE_TIMEOUT_MS_HA = 9000
+FRAME_PROCESSING_TIMEOUT_MS = 5000
+HARDWARE_RESET_DELAY_SECONDS = 3
+
+# Global variable to store original calibration table
+_global_original_calib_table = None
+
+def on_calib_cb(progress):
+    """Callback function for calibration progress reporting."""
+    pp = int(progress)
+    log.debug( f"Calibration at {progress}%" )
+
+def get_calibration_device(image_width, image_height, fps, dev=None):
+    """
+    Setup and configure the calibration device.
+
+    Args:
+        image_width (int): Image width
+        image_height (int): Image height
+        fps (int): Frames per second
+        dev: optional pyrealsense2 device handle. When provided, the pipeline is
+            bound to its serial number; required on hubless multi-device rigs
+            (e.g. Jetson with D457 + D436) where the context sees both devices.
+
+    Returns:
+        tuple: (pipeline, auto_calibrated_device)
+    """
+    config = rs.config()
+    pipeline = rs.pipeline()
+    pipeline_wrapper = rs.pipeline_wrapper(pipeline)
+    if dev is not None:
+        config.enable_device(dev.get_info(rs.camera_info.serial_number))
+    config.enable_stream(rs.stream.depth, image_width, image_height, rs.format.z16, fps)
+
+    pipeline_profile = config.resolve(pipeline_wrapper)
+    auto_calibrated_device = rs.auto_calibrated_device(pipeline_profile.get_device())
+    if not auto_calibrated_device:
+        raise RuntimeError("Failed to open auto_calibrated_device for calibration")
+    
+    return config, pipeline, auto_calibrated_device
+
+def calibration_main(config, pipeline, calib_dev, occ_calib, json_config, ground_truth, host_assistance=False, return_table=False):
+    """
+    Main calibration function for both OCC and Tare calibrations.
+    
+    Args:
+        config: Pipeline configuration
+        pipeline: RealSense pipeline
+        calib_dev: Auto calibrated device
+        occ_calib (bool): True for OCC calibration, False for Tare calibration
+        json_config (str): JSON configuration string
+        ground_truth (float): Ground truth value for Tare calibration (None for OCC)
+        host_assistance (bool): Whether to use host assistance mode
+        return_table (bool): Whether to return calibration table
+    
+    Returns:
+        float: Health factor from calibration (or tuple with calibration table if return_table=True)
+    """
+
+    conf = pipeline.start(config)
+    pipeline.wait_for_frames()  # Verify streaming started before calling calibration methods
+    camera_name = conf.get_device().get_info(rs.camera_info.name)
+    emitter_required = True
+    if "D415" in camera_name:
+        emitter_required = False
+    if emitter_required:
+        depth_sensor = conf.get_device().first_depth_sensor()
+        if depth_sensor.supports(rs.option.emitter_enabled):
+            depth_sensor.set_option(rs.option.emitter_enabled, 1)    
+    if depth_sensor.supports(rs.option.thermal_compensation):
+        depth_sensor.set_option(rs.option.thermal_compensation, 0)
+
+    new_calib_result = b''
+    # Execute calibration based on type
+    try:
+        if occ_calib:    
+            log.info("Starting on-chip calibration")
+            timeout = OCC_TIMEOUT_MS_HA if host_assistance else OCC_TIMEOUT_MS
+            new_calib, health = calib_dev.run_on_chip_calibration(json_config, on_calib_cb, timeout)
+        else:    
+            log.info("Starting tare calibration")
+            timeout = TARE_TIMEOUT_MS_HA if host_assistance else TARE_TIMEOUT_MS            
+            new_calib, health = calib_dev.run_tare_calibration(ground_truth, json_config, on_calib_cb, timeout)
+
+        calib_done = len(new_calib) > 0
+        timeout_end = time.time() + CALIBRATION_TIMEOUT_SECONDS
+        
+        while not calib_done:
+            if time.time() > timeout_end:
+                raise RuntimeError("Calibration timed out after {} seconds".format(CALIBRATION_TIMEOUT_SECONDS))
+            frame_set = pipeline.wait_for_frames()
+            depth_frame = frame_set.get_depth_frame()
+            new_calib, health = calib_dev.process_calibration_frame(depth_frame, on_calib_cb, FRAME_PROCESSING_TIMEOUT_MS)
+            calib_done = len(new_calib) > 0
+        # Preserve final table
+        if calib_done:
+            new_calib_result = bytes(new_calib)
+            
+        log.info("Calibration completed successfully")
+        log.info(f"Health factor = {health[0]}")
+        
+    except Exception as e:
+        log.error(f"Calibration failed: {e}")
+        raise
+    finally:
+        # Stop pipeline
+        pipeline.stop()
+
+    if return_table:
+        return health[0], new_calib_result
+    return health[0]
+
+
+def measure_average_depth(config, pipe, width=640, height=480, fps=30, frames=10, timeout_s=12, enable_emitter=True, center_fraction=1.0, depth_range_mm=None):
+    """Measure the average depth distance (in meters) across a series of frames.
+
+    Valid depth pixels are > 0 (raw units). Invalid (<=0) are ignored.
+
+    Args:
+        config (rs.config): Configuration associated with the depth stream used by ``pipe``.
+        pipe (rs.pipeline): Pipeline providing depth frames; expected to be configured/started elsewhere.
+        width, height, fps (int): Optional depth stream parameters, expected to match the active stream.
+        These parameters are not used by this function to configure the stream.
+        frames (int): Maximum number of frames to sample.
+        timeout_s (float): Overall timeout for the sampling loop.
+        enable_emitter (bool): Attempt to enable emitter for more reliable data.
+        center_fraction (float): Fraction of the frame (centered) to sample, in range (0, 1].
+                                 Use values like 0.3 to measure only the central region where
+                                 a calibration target is expected to be placed.
+        depth_range_mm (tuple|None): Optional (min_mm, max_mm) range. When provided, only pixels
+                                     whose depth (in mm) falls within this range are included.
+                                     Use this to isolate a target at a known distance from
+                                     background clutter.
+
+    Returns:
+        float | None: Mean depth in meters over all valid pixels from collected frames,
+                      or None if no valid data was obtained.
+    """
+    try:
+        import numpy as np
+
+        conf = pipe.start(config)
+        # Configure sensor options (best-effort)
+        try:
+            depth_sensor = conf.get_device().first_depth_sensor()
+            if enable_emitter and depth_sensor.supports(rs.option.emitter_enabled):
+                depth_sensor.set_option(rs.option.emitter_enabled, 1)
+            if depth_sensor.supports(rs.option.thermal_compensation):
+                depth_sensor.set_option(rs.option.thermal_compensation, 0)
+            depth_scale = depth_sensor.get_depth_scale()
+        except Exception:
+            # Fallback default RealSense depth scale (commonly 0.001) if retrieval fails
+            depth_scale = 0.001
+
+        start = time.time()
+        collected = 0
+        valid_sum_m = 0.0
+        valid_count = 0
+
+        while collected < frames and (time.time() - start) < timeout_s:
+            try:
+                fs = pipe.wait_for_frames(3000)
+            except Exception:
+                continue
+            depth = fs.get_depth_frame()
+            if not depth:
+                continue
+            data = np.asanyarray(depth.get_data())  # uint16
+            if data.size == 0:
+                continue
+            # Optionally restrict to the central region of the frame
+            if center_fraction < 1.0:
+                h, w = data.shape
+                y0 = int(h * (1.0 - center_fraction) / 2)
+                y1 = h - y0
+                x0 = int(w * (1.0 - center_fraction) / 2)
+                x1 = w - x0
+                data = data[y0:y1, x0:x1]
+            valid_mask = data > 0  # ignore zero / invalid
+            if depth_range_mm is not None:
+                min_raw = int(depth_range_mm[0] / (depth_scale * 1000.0))
+                max_raw = int(depth_range_mm[1] / (depth_scale * 1000.0))
+                valid_mask = valid_mask & (data >= min_raw) & (data <= max_raw)
+            count = valid_mask.sum()
+            if count == 0:
+                # No valid points in this frame; keep trying
+                collected += 1
+                continue
+            # Accumulate sums in meters (raw * scale)
+            valid_sum_m += float(data[valid_mask].sum()) * depth_scale
+            valid_count += int(count)
+            collected += 1
+            # Early break heuristic: if we already have plenty of samples and elapsed > 1.5s
+            if collected >= 5 and (time.time() - start) > 1.5:
+                break
+
+        pipe.stop()
+        if valid_count == 0:
+            return None
+        return valid_sum_m / valid_count
+    except Exception as e:
+        log.warning(f"measure_average_depth failed: {e}")
+        try:
+            if pipe:
+                pipe.stop()
+        except Exception:
+            pass
+        return None
+
+
+def measure_depth_fill_rate(config, pipe, width=640, height=480, fps=30, frames=10, timeout_s=12, enable_emitter=True, center_fraction=1.0, depth_range_mm=None):
+    """Measure the average depth fill rate (fraction of valid pixels) across a series of frames.
+
+    Valid depth pixels are > 0 (raw units). Fill rate per frame = valid_pixels / total_pixels.
+
+    Args: same as measure_average_depth.
+
+    Returns:
+        float | None: Mean fill rate in [0.0, 1.0] over collected frames, or None if no data.
+    """
+    try:
+        import numpy as np
+
+        conf = pipe.start(config)
+        try:
+            depth_sensor = conf.get_device().first_depth_sensor()
+            if enable_emitter and depth_sensor.supports(rs.option.emitter_enabled):
+                depth_sensor.set_option(rs.option.emitter_enabled, 1)
+            if depth_sensor.supports(rs.option.thermal_compensation):
+                depth_sensor.set_option(rs.option.thermal_compensation, 0)
+            depth_scale = depth_sensor.get_depth_scale()
+        except Exception:
+            depth_scale = 0.001
+
+        start = time.time()
+        collected = 0
+        fill_rate_sum = 0.0
+        fill_rate_count = 0
+
+        while collected < frames and (time.time() - start) < timeout_s:
+            try:
+                fs = pipe.wait_for_frames(3000)
+            except Exception:
+                continue
+            depth = fs.get_depth_frame()
+            if not depth:
+                continue
+            data = np.asanyarray(depth.get_data())
+            if data.size == 0:
+                continue
+            if center_fraction < 1.0:
+                h, w = data.shape
+                y0 = int(h * (1.0 - center_fraction) / 2)
+                y1 = h - y0
+                x0 = int(w * (1.0 - center_fraction) / 2)
+                x1 = w - x0
+                data = data[y0:y1, x0:x1]
+            valid_mask = data > 0
+            if depth_range_mm is not None:
+                min_raw = int(depth_range_mm[0] / (depth_scale * 1000.0))
+                max_raw = int(depth_range_mm[1] / (depth_scale * 1000.0))
+                valid_mask = valid_mask & (data >= min_raw) & (data <= max_raw)
+            fill_rate_sum += float(valid_mask.sum()) / float(data.size)
+            fill_rate_count += 1
+            collected += 1
+            if collected >= 5 and (time.time() - start) > 1.5:
+                break
+
+        pipe.stop()
+        if fill_rate_count == 0:
+            return None
+        return fill_rate_sum / fill_rate_count
+    except Exception as e:
+        log.warning(f"measure_depth_fill_rate failed: {e}")
+        try:
+            if pipe:
+                pipe.stop()
+        except Exception:
+            pass
+        return None
+
+
+def is_mipi_device(device=None):
+    """True if *device* is on a GMSL (MIPI) connection.
+
+    *device* should be the pyrealsense2 handle returned by the test_device fixture.
+    Without it, this function reads ctx.query_devices()[0] -- on hubless multi-device
+    rigs (e.g. Jetson with D457 + D436) that returns whichever device pyrealsense2
+    enumerated first, not the one the test is parametrized for. Always pass *device*
+    when called from a parametrized test.
+    """
+    if device is None:
+        ctx = rs.context()
+        device = ctx.query_devices()[0]
+    return device.supports(rs.camera_info.connection_type) and device.get_info(rs.camera_info.connection_type) == "GMSL"
+
+def is_d555(device=None):
+    """True if *device* is a D555. See is_mipi_device for why *device* should be passed."""
+    try:
+        if device is None:
+            ctx = rs.context()
+            device = ctx.query_devices()[0]
+        name = device.get_info(rs.camera_info.name) if device.supports(rs.camera_info.name) else ""
+        return ("D555" in name)
+    except Exception:
+        return False
+
+# for step 2 -  not in use for now
+
+def get_current_rect_params(auto_calib_device):
+    """
+    Return principal points (ppx, ppy) for left and right sensors derived from the device's calibration table
+
+    ""Return per-eye principal points (ppx, ppy) using intrinsic matrices; minimal logging."""
+    calib_table = auto_calib_device.get_calibration_table()
+    if calib_table is not None:
+        calib_table = bytes(calib_table)
+    if len(calib_table) < 280:
+        log.error("Calibration table is too small")
+        return None
+    try:
+        #  calibration table is 4 3x3 float matrices (each 9 * 4 bytes) — intrinsics/extrinsics left/right pairs
+        header_size = 16
+        intrinsic_left_offset = header_size
+        intrinsic_right_offset = header_size + 36
+        left_intrinsics_raw = struct.unpack('<9f', calib_table[intrinsic_left_offset:intrinsic_left_offset + 36])
+        right_intrinsics_raw = struct.unpack('<9f', calib_table[intrinsic_right_offset:intrinsic_right_offset + 36])
+        width = 1280.0
+        height = 800.0
+        left_ppx = left_intrinsics_raw[2] * width
+        right_ppx = right_intrinsics_raw[2] * width
+        left_ppy = left_intrinsics_raw[3] * height
+        right_ppy = right_intrinsics_raw[3] * height
+        offsets_dict = {
+            'intrinsic_left_offset': intrinsic_left_offset,
+            'intrinsic_right_offset': intrinsic_right_offset
+        }
+        return (left_ppx, left_ppy), (right_ppx, right_ppy), offsets_dict
+    except Exception as e:
+        log.error(f"Error reading principal points: {e}")
+        return None
+        
+def save_calibration_table(device):
+    """Save the current calibration table for later restoration.
+    
+    Args:
+        device: auto_calibrated_device or regular device
+        
+    Returns:
+        bytes: Calibration table as bytes, or None on failure
+    """
+    try:
+        # Handle both device types
+        if isinstance(device, rs.auto_calibrated_device):
+            auto_calib_device = device
+        else:
+            auto_calib_device = rs.auto_calibrated_device(device)
+            
+        if not auto_calib_device:
+            log.error("Device does not support auto calibration")
+            return None
+            
+        calib_table = auto_calib_device.get_calibration_table()
+        if calib_table is not None:
+            saved_table = bytes(calib_table)
+            log.debug(f"Saved calibration table ({len(saved_table)} bytes)")
+            return saved_table
+        else:
+            log.error("Failed to retrieve calibration table")
+            return None
+    except Exception as e:
+        log.error(f"Error saving calibration table: {e}")
+        return None
+
+
+def restore_calibration_table(device, saved_table=None):
+    """Restore calibration table from saved data or factory reset.
+    
+    Args:
+        device: auto_calibrated_device or regular device
+        saved_table (bytes): Previously saved calibration table. If None, uses factory reset.
+        
+    Returns:
+        bool: True if restoration successful, False otherwise
+    """
+    global _global_original_calib_table
+
+    try:
+        # Handle both device types
+        if isinstance(device, rs.auto_calibrated_device):
+            auto_calib_device = device
+        else:
+            auto_calib_device = rs.auto_calibrated_device(device)
+        if not auto_calib_device:
+            log.error("Device does not support auto calibration")
+            return False
+
+        # Option 1: Factory reset
+        if saved_table is None:
+            log.info("Restoring factory calibration")
+            auto_calib_device.reset_to_factory_calibration()
+            time.sleep(1)
+            return True
+
+        # Option 2: Restore from saved table
+        log.info(f"Restoring saved calibration table ({len(saved_table)} bytes)")
+        calib_list = list(saved_table)
+        auto_calib_device.set_calibration_table(calib_list)
+        auto_calib_device.write_calibration()
+        time.sleep(1)
+        # Verify restoration
+        current_table = auto_calib_device.get_calibration_table()
+        if current_table and bytes(current_table) == saved_table:
+            log.debug("Calibration table restored and verified successfully")
+            return True
+        else:
+            log.warning("Calibration table restored but verification failed")
+            return True  # Still return True as write succeeded
+    except Exception as e:
+        log.error(f"Error restoring calibration table: {e}")
+        return False
+
+def get_calibration_table(device):
+    """Get current calibration table from device"""
+    try:
+        # device is already an auto_calibrated_device
+        calib_table = device.get_calibration_table()
+        # Convert to bytes if it's a list
+        if calib_table is not None:
+            calib_table = bytes(calib_table)
+        return calib_table
+    except Exception as e:
+        log.error(f"-E- Failed to get calibration table: {e}")
+        return None
+    
+def write_calibration_table_with_crc(device, modified_data):
+    """Write modified calibration table with updated CRC"""
+    try:
+        # Calculate CRC32 for the data after the header (skip first 16 bytes)
+        actual_data = modified_data[16:]
+        new_crc32 = zlib.crc32(actual_data) & 0xffffffff
+        
+        # Get old CRC for comparison
+        old_crc32 = struct.unpack('<I', modified_data[12:16])[0]
+        
+        # Update CRC in the header
+        final_data = bytearray(modified_data)
+        final_data[12:16] = struct.pack('<I', new_crc32)
+                
+        # Convert to list of ints for the API
+        calib_list = list(final_data)
+        
+        # Write to device - device is already auto_calibrated_device
+        device.set_calibration_table(calib_list)
+        device.write_calibration()
+        
+        return True, bytes(final_data)
+        
+    except Exception as e:
+        log.error(f"-E- Error writing calibration table: {e}")
+        return False, str(e)
+
+def modify_intrinsic_calibration(device, pixel_correction, modify_ppy=True):
+    """Modify either raw right intrinsic ppx or ppy by pixel_correction (in pixels).
+
+    Args:
+        device: auto_calibrated_device (rs.auto_calibrated_device)
+        pixel_correction (float): delta in pixels to add
+        modify_ppy (bool): if True adjust ppy else adjust ppx
+    Returns:
+        tuple: (success(bool), modified_table_bytes(or error str), new_ppx, new_ppy)
+    """
+    try:
+        calib_table = get_calibration_table(device)
+        if not calib_table:
+            return False, "Failed to get calibration table", None, None
+        modified_data = bytearray(calib_table)
+        header_size = 16
+        right_intrinsics_offset = header_size + 36  # skip left 9 floats (left eye)
+        right_intrinsics = list(struct.unpack('<9f', modified_data[right_intrinsics_offset:right_intrinsics_offset+36]))
+        width = 1280.0
+        height = 800.0
+        original_raw_ppx = right_intrinsics[2] * width
+        original_raw_ppy = right_intrinsics[3] * height
+        if modify_ppy:
+            corrected_raw_ppy = original_raw_ppy + pixel_correction
+            right_intrinsics[3] = corrected_raw_ppy / height
+            log.info(f"  Raw Right ppy original={original_raw_ppy:.6f} modified={corrected_raw_ppy:.6f}")
+        else:
+            corrected_raw_ppx = original_raw_ppx + pixel_correction
+            right_intrinsics[2] = corrected_raw_ppx / width
+            log.info(f"  Raw Right ppx original={original_raw_ppx:.6f} modified={corrected_raw_ppx:.6f}")
+        modified_data[right_intrinsics_offset:right_intrinsics_offset+36] = struct.pack('<9f', *right_intrinsics)
+        write_ok, modified_table_or_err = write_calibration_table_with_crc(device, bytes(modified_data))
+        if not write_ok:
+            return False, modified_table_or_err, None, None
+        new_ppx = right_intrinsics[2] * width
+        new_ppy = right_intrinsics[3] * height
+        return True, modified_table_or_err, new_ppx, new_ppy
+    except Exception as e:
+        log.error(f"Error modifying calibration: {e}")
+        return False, str(e), None, None
+
+# ---------------------------------------------------------------------------
+# Advanced OCC calibration test helper (moved from test_occ_calibrations.py)
+# ---------------------------------------------------------------------------
+
+# Pixel correction constant for DSCalibrationModifier-style corrections
+PIXEL_CORRECTION = -1
+EPSILON = 0.001  # Small tolerance for floating point precision
+
+# Health factor thresholds
+HEALTH_FACTOR_THRESHOLD = 0.3
+HEALTH_FACTOR_THRESHOLD_AFTER_MODIFICATION = 0.75
+
+def on_chip_calibration_json(occ_json_file, host_assistance):
+    """Return OCC JSON string (default if file not provided)."""
+    occ_json = None
+    if occ_json_file is not None:
+        try:
+            occ_json = open(occ_json_file).read()
+        except Exception:
+            occ_json = None
+            log.error(f'Error reading occ_json_file: {occ_json_file}')
+    if occ_json is None:
+        log.info('Using default parameters for on-chip calibration.')
+        occ_json = '{\n  ' + \
+                   '"calib type": 0,\n' + \
+                   '"host assistance": ' + str(int(host_assistance)) + ',\n' + \
+                   '"keep new value after successful scan": 1,\n' + \
+                   '"fl data sampling": 0,\n' + \
+                   '"adjust both sides": 0,\n' + \
+                   '"fl scan location": 0,\n' + \
+                   '"fy scan direction": 0,\n' + \
+                   '"white wall mode": 0,\n' + \
+                   '"speed": 2,\n' + \
+                   '"scan parameter": 0,\n' + \
+                   '"apply preset": 0,\n' + \
+                   '"scan only": ' + str(int(host_assistance)) + ',\n' + \
+                   '"interactive scan": 0,\n' + \
+                   '"resize factor": 1\n' + \
+                   '}'
+    return occ_json

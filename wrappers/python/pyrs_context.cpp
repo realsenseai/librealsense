@@ -30,14 +30,18 @@ void init_context(py::module &m) {
         .def_property_readonly("sensors", &rs2::context::query_all_sensors, "A flat list of "
                                "all available sensors from all RealSense devices. Identical to calling query_all_sensors.")
         .def("get_sensor_parent", &rs2::context::get_sensor_parent, "s"_a) // no docstring in C++
-        .def("set_devices_changed_callback", [](rs2::context& self, std::function<void(rs2::event_information)> &callback) {
-            self.set_devices_changed_callback(callback);
-        }, "Register devices changed callback.", "callback"_a)
+        .def("set_devices_changed_callback", [](rs2::context& self, std::function<void(rs2::event_information)> callback) {
+            self.set_devices_changed_callback(std::move(callback));
+        }, "Register devices changed callback.", "callback"_a, py::call_guard<py::gil_scoped_release>())
         .def("load_device", &rs2::context::load_device, "Creates a devices from a RealSense file.\n"
              "On successful load, the device will be appended to the context and a devices_changed event triggered.",
              "filename"_a)
         .def("unload_device", &rs2::context::unload_device, "filename"_a) // No docstring in C++
-        .def("unload_tracking_module", &rs2::context::unload_tracking_module); // No docstring in C++
+        .def("unload_tracking_module", &rs2::context::unload_tracking_module) // No docstring in C++
+        .def("convert_bag_to_db3",
+             (void (rs2::context::*)(const std::string&, const std::string&)) &rs2::context::convert_bag_to_db3,
+             "Convert a legacy ROS1 .bag recording to a ROS2 .db3 file.",
+             "input"_a, "output"_a);
 
     // rs2::device_hub
     py::class_<rs2::device_hub>(m, "device_hub",
@@ -48,7 +52,8 @@ void init_context(py::module &m) {
             "Create a device_hub bound to the given context.")
         .def("wait_for_device",
             &rs2::device_hub::wait_for_device,
-            "If a device is connected return it, otherwise wait until one connects.")
+            "If a device is connected return it, otherwise wait until one connects.",
+            py::call_guard<py::gil_scoped_release>())
         .def("is_connected",
             &rs2::device_hub::is_connected,
             py::arg("device"),

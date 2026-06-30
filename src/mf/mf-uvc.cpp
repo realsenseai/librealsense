@@ -562,29 +562,15 @@ namespace librealsense
             }
             if (opt == RS2_OPTION_ENABLE_AUTO_EXPOSURE)
             {
-                if (value)
-                {
-                    auto hr = get_camera_control()->Set(CameraControl_Exposure, 0, CameraControl_Flags_Auto);
-                    if (hr == DEVICE_NOT_READY_ERROR)
-                        return false;
+                // The exposure value passed here is intentionally 0 - when switching to
+                // Manual, uvc_pu_auto_exposure_option re-applies the saved exposure right
+                // after this call, so the value written here is overwritten immediately.
+                auto flags = value ? CameraControl_Flags_Auto : CameraControl_Flags_Manual;
+                auto hr = get_camera_control()->Set(CameraControl_Exposure, 0, flags);
+                if (hr == DEVICE_NOT_READY_ERROR)
+                    return false;
 
-                    CHECK_HR(hr);
-                }
-                else
-                {
-                    long min, max, step, def, caps;
-                    auto hr = get_camera_control()->GetRange(CameraControl_Exposure, &min, &max, &step, &def, &caps);
-                    if (hr == DEVICE_NOT_READY_ERROR)
-                        return false;
-
-                    CHECK_HR(hr);
-
-                    hr = get_camera_control()->Set(CameraControl_Exposure, def, CameraControl_Flags_Manual);
-                    if (hr == DEVICE_NOT_READY_ERROR)
-                        return false;
-
-                    CHECK_HR(hr);
-                }
+                CHECK_HR(hr);
                 return true;
             }
 
@@ -871,6 +857,16 @@ namespace librealsense
                 _reader_attrs = create_reader_attrs();
             _streams.resize(_streamIndex);
 
+            // Release any stale COM pointers from a previously failed set_d0() or set_d3()
+            safe_release(_camera_control);
+            safe_release(_video_proc);
+            safe_release(_reader);
+            if (_source)
+            {
+                _source->Shutdown();
+                safe_release(_source);
+            }
+
             //enable source
             CHECK_HR(MFCreateDeviceSource(_device_attrs, &_source));
             LOG_HR(_source->QueryInterface(__uuidof(IAMCameraControl), reinterpret_cast<void **>(&_camera_control)));
@@ -892,8 +888,11 @@ namespace librealsense
             safe_release(_camera_control);
             safe_release(_video_proc);
             safe_release(_reader);
-            _source->Shutdown(); //Failure to call Shutdown can result in memory leak
-            safe_release(_source);
+            if (_source)
+            {
+                _source->Shutdown();
+                safe_release(_source);
+            }
             for (auto& elem : _streams)
                 elem.callback = nullptr;
             _power_state = D3;
@@ -941,9 +940,9 @@ namespace librealsense
                     uint32_t device_fourcc = reinterpret_cast<const big_endian<uint32_t> &>(subtype.Data1);
 
                     // On D585S, we need to distinguish the occupancy and the label point cloud streams.
-                    // The condition currently support 2 resolutions for LPC
+                    // The condition currently support 3 resolutions for LPC
                     // This needs to be refactored!
-                    if (this->_info.pid == 0x0b6b && width == 2880 && (height == 1040 || height == 260)) 
+                    if (this->_info.pid == 0x0b6b && width == 2880 && (height == 1040 || height == 260 || height == 32))
                     {
                         device_fourcc = 0x50414C38; // PAL8 used instead of FGREY in order to distinguish  between occupancy and point cloud streams
                     }
@@ -956,6 +955,9 @@ namespace librealsense
                     sp.height = height;
                     sp.fps = currFps;
                     sp.format = device_fourcc;
+                    // Preserve the MF stream (pin) index so identical {w,h,fps,format} profiles coming from different
+                    // endpoints stay distinct all the way up to the SDK, and so play/close route to the right pin.
+                    sp.pin_index = sIndex;
 
                     mf_profile mfp;
                     mfp.index = sIndex;
@@ -1000,6 +1002,11 @@ namespace librealsense
                 if (mfp.profile.format != profile.format &&
                     (fourcc_map.count(mfp.profile.format) == 0 ||
                         profile.format != fourcc_map.at(mfp.profile.format)))
+                    return;
+
+                // When the same {w,h,fps,format} is advertised on more than one pin, the requested profile carries the
+                // pin it was enumerated from - honor it so we select the intended endpoint and not just the first match.
+                if (mfp.profile.pin_index != profile.pin_index)
                     return;
 
                 if ((mfp.profile.width == profile.width) && (mfp.profile.height == profile.height))

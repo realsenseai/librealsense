@@ -162,11 +162,11 @@ namespace librealsense
 
             if (dev.supports_info(RS2_CAMERA_INFO_NAME))
             {
-                auto dev_name = dev.get_info(RS2_CAMERA_INFO_NAME);
-                if (starts_with(dev_name, "Intel RealSense D415")) index = 0;
-                if (starts_with(dev_name, "Intel RealSense D435") ||
-                    starts_with(dev_name, "Intel RealSense D436")) index = 1;
-                if (starts_with(dev_name, "Intel RealSense D45")) index = 2;
+                std::string dev_name = dev.get_info(RS2_CAMERA_INFO_NAME);
+                if (dev_name.find("D415") != std::string::npos) index = 0;
+                if (dev_name.find("D435") != std::string::npos ||
+                    dev_name.find("D436") != std::string::npos) index = 1;
+                if (dev_name.find("D45") != std::string::npos) index = 2;
             };
 
             auto opacity = clamp(_opacity_opt->query(), 0.0, 1.0);

@@ -18,7 +18,7 @@ namespace librealsense
     {
         auto count = width * height;
 #ifdef RS2_USE_CUDA
-        if (rsutils::rs2_is_gpu_available())
+        if (rsutils::rs2_is_cuda_available())
         {
             rscuda::split_frame_y8_y8_from_y8i_mipi_cuda(dest, count, reinterpret_cast<const y8i_pixel_mipi*>(source));
             return;

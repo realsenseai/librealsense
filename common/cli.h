@@ -197,17 +197,15 @@ class cli : public cli_no_dds
 public:
     cli( std::string const & tool_name, std::string const & version_string )
         : super( tool_name, version_string )
-        , eth_arg( "eth", "Detect DDS devices, even if disabled in the configuration" )
-        , eth_only_arg( "eth-only", "Use ONLY DDS devices; do not look for USB/MIPI devices" )
-        , no_eth_arg( "no-eth", "Do not detect DDS devices, even if enabled in the configuration" )
-        , domain_id_arg( "domain-id", "0-232", 0, "Domain ID to use with DDS devices" )
+        , eth_arg( "eth", "Detect DDS devices, even if disabled in the configuration.\nNOTE - ignored when not built with DDS support" )
+        , eth_only_arg( "eth-only", "Use ONLY DDS devices; do not look for USB/MIPI devices.\nNOTE - ignored when not built with DDS support" )
+        , no_eth_arg( "no-eth", "Do not detect DDS devices, even if enabled in the configuration.\nNOTE - no-op when not built with DDS support" )
+        , domain_id_arg( "domain-id", "0-232", 0, "Domain ID to use with DDS devices.\nNOTE - ignored when not built with DDS support" )
     {
-#ifdef BUILD_WITH_DDS
         add( eth_arg );
         add( eth_only_arg );
         add( no_eth_arg );
         add( domain_id_arg );
-#endif
     }
     cli( std::string const & tool_name )
         : cli( tool_name, RS2_API_FULL_VERSION_STR ) {}
@@ -243,7 +241,7 @@ public:
                 throw TCLAP::ArgParseException( "expecting [0, 232]", domain_id_arg.toString() );
             settings["dds"]["domain"] = domain_id_arg.getValue();
         }
-#endif
+#endif // BUILD_WITH_DDS
 
         return settings;
     }

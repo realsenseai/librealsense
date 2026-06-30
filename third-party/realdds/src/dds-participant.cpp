@@ -142,14 +142,14 @@ struct dds_participant::listener_impl : public eprosima::fastdds::dds::DomainPar
         {
         case eprosima::fastrtps::rtps::WriterDiscoveryInfo::DISCOVERED_WRITER:
             /* Process the case when a new publisher was found in the domain */
-            LOG_DEBUG( _owner.name() << ": +writer (" << _owner.print( info.info.guid() ) << ") publishing "
+            LOG_DEBUG( _owner.name() << ": +writer (" << _owner.print( info.info.guid(), true ) << ") publishing "
                                      << info.info );
             _owner.on_writer_added( info.info );
             break;
 
         case eprosima::fastrtps::rtps::WriterDiscoveryInfo::REMOVED_WRITER:
             /* Process the case when a publisher was removed from the domain */
-            LOG_DEBUG( _owner.name() << ": -writer (" << _owner.print( info.info.guid() ) << ") publishing '"
+            LOG_DEBUG( _owner.name() << ": -writer (" << _owner.print( info.info.guid(), true ) << ") publishing '"
                                      << info.info.topicName() << "'" );
             _owner.on_writer_removed( info.info.guid(), info.info.topicName().c_str() );
             break;
@@ -162,12 +162,12 @@ struct dds_participant::listener_impl : public eprosima::fastdds::dds::DomainPar
         switch( info.status )
         {
         case eprosima::fastrtps::rtps::ReaderDiscoveryInfo::DISCOVERED_READER:
-            LOG_DEBUG( _owner.name() << ": +reader (" << _owner.print( info.info.guid() ) << ") of " << info.info );
+            LOG_DEBUG( _owner.name() << ": +reader (" << _owner.print( info.info.guid(), true ) << ") of " << info.info );
             _owner.on_reader_added( info.info );
             break;
 
         case eprosima::fastrtps::rtps::ReaderDiscoveryInfo::REMOVED_READER:
-            LOG_DEBUG( _owner.name() << ": -reader (" << _owner.print( info.info.guid() ) << ") of '"
+            LOG_DEBUG( _owner.name() << ": -reader (" << _owner.print( info.info.guid(), true ) << ") of '"
                                      << info.info.topicName() << "'" );
             _owner.on_reader_removed( info.info.guid(), info.info.topicName().c_str() );
             break;
@@ -336,9 +336,9 @@ void dds_participant::refresh_qos()
 }
 
 
-std::string dds_participant::print( dds_guid const & guid_to_print ) const
+std::string dds_participant::print( dds_guid const & guid_to_print, bool print_entity ) const
 {
-    return rsutils::string::from( realdds::print_guid( guid_to_print, guid() ) );
+    return rsutils::string::from( realdds::print_guid( guid_to_print, guid(), print_entity ) );
 }
 
 

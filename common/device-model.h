@@ -104,8 +104,6 @@ namespace rs2
         }
         namespace update
         {
-            static const char* allow_rc_firmware{ "update.allow_rc_firmware" };
-            static const char* recommend_updates{ "update.recommend_updates" };
             static const char* recommend_calibration{ "update.recommend_calibration" };
             static const char* sw_updates_url{ "update.sw_update_url" };
             static const char* sw_updates_official_server{ "update.sw_update_official_server" };
@@ -307,12 +305,9 @@ namespace rs2
         void resume_record();
 
         void refresh_notifications(viewer_model& viewer);
-        bool check_for_bundled_fw_update( const rs2::context & ctx,
-                                          std::shared_ptr< notifications_model > not_model,
-                                          bool reset_delay = false );
 
         int draw_playback_panel(ux_window& window, ImFont* font, viewer_model& view);
-        bool draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message);
+        bool draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message, bool is_streaming = false);
         void draw_controls(float panel_width, float panel_height,
             ux_window& window,
             std::string& error_message,
@@ -365,6 +360,11 @@ namespace rs2
         // Needed as a member for reseting the window memory on device disconnection.
 
         bool show_advanced_mode_popup = false;
+        
+        bool subdevice_has_inference_stream_enabled( const subdevice_model & sub );
+        bool are_color_and_depth_streaming() const;
+        void stop_inference_if_video_stopped( viewer_model & viewer );
+
         void draw_info_icon(ux_window& window, ImFont* font, const ImVec2& size);
         int draw_seek_bar();
         int draw_playback_controls(ux_window& window, ImFont* font, viewer_model& view);
@@ -427,6 +427,8 @@ namespace rs2
         calibration_model _calib_model;
         dds_model _dds_model;
         hdr_model _hdr_model;
+
+        bool _is_d500_device;
     };
 
     std::pair<std::string, std::string> get_device_name(const device& dev);

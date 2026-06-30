@@ -21,47 +21,36 @@
 
 #include "synthetic-stream-gl.h"
 
+// M420 layout (uploaded as GL_R8, width x tex_height where tex_height = height * 1.5):
+//   For every pair of output rows, 3 texture rows:
+//     row group*3+0 : Y for first row  (width bytes)
+//     row group*3+1 : Y for second row (width bytes)
+//     row group*3+2 : interleaved UV   (U0 V0 U1 V1 ... width bytes)
+//   Each UV pair covers a 2x2 block of Y pixels.
 static const char* fragment_shader_text =
 "#version 110\n"
-"varying vec2 textCoords;\n"
 "uniform sampler2D textureSampler;\n"
 "uniform float opacity;\n"
 "uniform float width;\n"
 "uniform float height;\n"
 "void main(void) {\n"
-"    float pixel_width = 1.0 / width;\n"
-"    float pixel_height = 1.0 / height;\n"
-"    float y = 0.0;\n"
-"    float u = 0.0;\n"
-"    float v = 0.0;\n"
-"    float tex_y = 1.0 - textCoords.y;\n"
-"    if (mod(floor(gl_FragCoord.x), 2.0) == 0.0){\n"
-"        vec2 tx1 = vec2(textCoords.x, tex_y);\n"
-"        vec4 px1 = texture2D(textureSampler, tx1);\n"
-"        vec2 tx2 = vec2(textCoords.x + pixel_width, tex_y);\n"
-"        vec4 px2 = texture2D(textureSampler, tx2);\n"
-"        y = px1.x; u = px1.y; v = px2.y;\n"
-"    }\n"
-"    else\n"
-"    {\n"
-"        vec2 tx1 = vec2(textCoords.x - pixel_width, tex_y);\n"
-"        vec4 px1 = texture2D(textureSampler, tx1);\n"
-"        vec2 tx2 = vec2(textCoords.x, tex_y);\n"
-"        vec4 px2 = texture2D(textureSampler, tx2);\n"
-"        y = px2.x; u = px1.y; v = px2.y;\n"
-"    }\n"
-"    //y *= 256.0; u *= 256.0; v *= 256.0;\n"
-"    float c = y - (16.0 / 256.0);\n"
-"    float d = u - 0.5;\n"
-"    float e = v - 0.5;\n"
-"    vec3 color = vec3(0.0);\n"
-"    //color.x = clamp(((298.0 / 256.0) * c + (409.0 / 256.0) * e + 0.5), 0.0, 1.0);\n"
-"    //color.y = clamp(((298.0 / 256.0) * c - (100.0 / 256.0) * d - (208.0/256.0) * e + 0.5), 0.0, 1.0);\n"
-"    //color.z = clamp(((298.0 / 256.0) * c + (516.0 / 256.0) * d + 0.5), 0.0, 1.0);\n"
-"    color.x = clamp((y + 1.40200 * (v - 0.5)), 0.0, 1.0);\n"
-"    color.y = clamp((y - 0.34414 * (u - 0.5) - 0.71414 * (v - 0.5)), 0.0, 1.0);\n"
-"    color.z = clamp((y + 1.77200 * (u - 0.5)), 0.0, 1.0);\n"
-"    gl_FragColor = vec4(color.xyz, opacity);\n"
+"    float tex_h = height * 1.5;\n"
+"    float px = floor(gl_FragCoord.x);\n"
+"    float py = floor(gl_FragCoord.y);\n"
+"    float group = floor(py / 2.0);\n"
+"    float row_in_group = py - group * 2.0;\n"
+"    float y_row = group * 3.0 + row_in_group;\n"
+"    float uv_row = group * 3.0 + 2.0;\n"
+"    float y = texture2D(textureSampler, vec2((px + 0.5) / width, (y_row + 0.5) / tex_h)).r;\n"
+"    float u_col = floor(px / 2.0) * 2.0;\n"
+"    float v_col = u_col + 1.0;\n"
+"    float u = texture2D(textureSampler, vec2((u_col + 0.5) / width, (uv_row + 0.5) / tex_h)).r;\n"
+"    float v = texture2D(textureSampler, vec2((v_col + 0.5) / width, (uv_row + 0.5) / tex_h)).r;\n"
+"    vec3 color;\n"
+"    color.r = clamp(y + 1.40200 * (v - 0.5), 0.0, 1.0);\n"
+"    color.g = clamp(y - 0.34414 * (u - 0.5) - 0.71414 * (v - 0.5), 0.0, 1.0);\n"
+"    color.b = clamp(y + 1.77200 * (u - 0.5), 0.0, 1.0);\n"
+"    gl_FragColor = vec4(color, opacity);\n"
 "}";
 
 using namespace rs2;
@@ -131,14 +120,11 @@ m420_to_rgb::~m420_to_rgb()
 
 rs2::frame m420_to_rgb::process_frame(const rs2::frame_source& src, const rs2::frame& f)
 {
-    throw std::runtime_error("Format M420 cannot be rendered with GLSL yet");
-    //scoped_timer t("m4202rgb");
-
     if (f.get_profile().get() != _input_profile.get())
     {
         _input_profile = f.get_profile();
-        _output_profile = _input_profile.clone(_input_profile.stream_type(), 
-                                            _input_profile.stream_index(), 
+        _output_profile = _input_profile.clone(_input_profile.stream_type(),
+                                            _input_profile.stream_index(),
                                             RS2_FORMAT_RGB8);
         auto vp = _input_profile.as<rs2::video_stream_profile>();
         _width = vp.width(); _height = vp.height();
@@ -155,26 +141,26 @@ rs2::frame m420_to_rgb::process_frame(const rs2::frame_source& src, const rs2::f
 
     perform_gl_action([&]()
     {
-        //scoped_timer t("m4202rgb.gl");
-
         res = src.allocate_video_frame(_output_profile, f, 3, _width, _height, _width * 3, RS2_EXTENSION_VIDEO_FRAME_GL);
         if (!res) return;
-        
+
         auto gf = dynamic_cast<gpu_addon_interface*>((frame_interface*)res.get());
-        if (!gf) 
-            throw invalid_value_exception("null pointer recieved from dynamic pointer casting.");
-        
-        uint32_t yuy_texture;
-        
+        if (!gf)
+            throw invalid_value_exception("dynamic_cast to gpu_addon_interface returned null.");
+
+        // M420 is 12bpp: upload as single-channel R8 texture, width x (height * 3/2)
+        int tex_h = _height * 3 / 2;
+        uint32_t input_texture;
+
         if (auto input_frame = f.as<rs2::gl::gpu_frame>())
         {
-            yuy_texture = input_frame.get_texture_id(0);
+            input_texture = input_frame.get_texture_id(0);
         }
         else
         {
-            glGenTextures(1, &yuy_texture);
-            glBindTexture(GL_TEXTURE_2D, yuy_texture);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, _width, _height, 0, GL_RG, GL_UNSIGNED_BYTE, f.get_data());
+            glGenTextures(1, &input_texture);
+            glBindTexture(GL_TEXTURE_2D, input_texture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, _width, tex_h, 0, GL_RED, GL_UNSIGNED_BYTE, f.get_data());
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         }
@@ -203,7 +189,7 @@ rs2::frame m420_to_rgb::process_frame(const rs2::frame_source& src, const rs2::f
         shader.set_size(_width, _height);
         shader.end();
         
-        _viz->draw_texture(yuy_texture);
+        _viz->draw_texture(input_texture);
 
         _fbo->unbind();
 
@@ -211,7 +197,7 @@ rs2::frame m420_to_rgb::process_frame(const rs2::frame_source& src, const rs2::f
 
         if (!f.is<rs2::gl::gpu_frame>())
         {
-            glDeleteTextures(1, &yuy_texture);
+            glDeleteTextures(1, &input_texture);
         }
     }, 
     [this]{

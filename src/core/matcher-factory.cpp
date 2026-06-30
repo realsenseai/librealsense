@@ -39,14 +39,43 @@ std::shared_ptr< matcher > matcher_factory::create( rs2_matchers matcher,
 
 std::shared_ptr< matcher > matcher_factory::create_DLR_C_matcher( std::vector< stream_interface * > const & profiles )
 {
-    auto color = get_color_profiles( profiles );
+    auto infer = get_inference_profiles( profiles );
+
+    std::vector< stream_interface * > synchronized_profiles;
+    synchronized_profiles.reserve( profiles.size() );
+    for( auto & profile : profiles )
+    {
+        if( profile->get_stream_type() != RS2_STREAM_OBJECT_DETECTION )
+            synchronized_profiles.push_back( profile );
+    }
+
+    auto color = get_color_profiles( synchronized_profiles );
     if( color.empty() )
     {
         LOG_DEBUG( "Created default matcher" );
-        return create_timestamp_matcher( profiles );
+        auto sync_matcher = create_timestamp_matcher( synchronized_profiles );
+        if( infer.empty() )
+            return sync_matcher;
+
+        std::vector< std::shared_ptr< matcher > > matchers;
+        if( ! synchronized_profiles.empty() )
+            matchers.push_back( sync_matcher );
+        for( auto & profile : infer )
+            matchers.push_back( create_identity_matcher( profile ) );
+
+        return std::make_shared< composite_identity_matcher >( matchers );
     }
 
-    return create_timestamp_composite_matcher( { create_DLR_matcher( profiles ), create_color_composite_matcher( color ) } );
+    auto sync_matcher = create_timestamp_composite_matcher(
+        { create_DLR_matcher( synchronized_profiles ), create_color_composite_matcher( color ) } );
+    if( infer.empty() )
+        return sync_matcher;
+
+    std::vector< std::shared_ptr< matcher > > matchers = { sync_matcher };
+    for( auto & profile : infer )
+        matchers.push_back( create_identity_matcher( profile ) );
+
+    return std::make_shared< composite_identity_matcher >( matchers );
 }
 
 
@@ -177,6 +206,18 @@ matcher_factory::get_color_profiles( std::vector< stream_interface * > const & p
     std::vector< stream_interface * > ret;
     for( auto & profile : color_profiles )
         ret.push_back( profile.second );
+
+    return ret;
+}
+
+
+std::vector< stream_interface * >
+matcher_factory::get_inference_profiles( std::vector< stream_interface * > const & profiles )
+{
+    std::vector< stream_interface * > ret;
+    for( auto & profile : profiles )
+        if( profile->get_stream_type() == RS2_STREAM_OBJECT_DETECTION)
+            ret.push_back( profile );
 
     return ret;
 }

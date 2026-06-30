@@ -8,7 +8,10 @@
 
 #include <common/cli.h>
 
+#include "realsense-viewer.h"
+
 #include <cstdarg>
+#include <functional>
 #include <thread>
 #include <iostream>
 #include <algorithm>
@@ -21,12 +24,6 @@
 #include <regex>
 
 #include <imgui_internal.h>
-
-#ifdef INTERNAL_FW
-#include "common/fw/D4XX_FW_Image.h"
-#else
-#define FW_D4XX_FW_IMAGE_VERSION ""
-#endif // INTERNAL_FW
 
 using namespace rs2;
 using namespace rs400;
@@ -44,6 +41,10 @@ void add_playback_device( context & ctx,
                           viewer_model & viewer_model,
                           const std::string & file )
 {
+    // Legacy .bag files trigger a conversion dialog offering to convert to .db3
+    if (viewer_model.bag_converter->show_dialog_if_needed(file))
+        return;
+
     bool was_loaded = false;
     bool failed = false;
     try
@@ -288,7 +289,10 @@ void refresh_devices(std::mutex& m,
 }
 
 
-int main(int argc, const char** argv) try
+int run_viewer( int argc, const char ** argv,
+                std::function< void( rs2::device_models_list &, rs2::viewer_model & ) > on_setup,
+                std::function< bool() >                                                  keep_alive,
+                std::function< void() >                                                  on_teardown )
 {
     rs2::cli cmd( "realsense-viewer" );
     auto settings = cmd.process( argc, argv );
@@ -316,6 +320,17 @@ int main(int argc, const char** argv) try
     viewer_model viewer_model( ctx, disable_log_to_console );
 
     update_viewer_configuration(viewer_model);
+
+    // Check if UDEV is not enabled on Linux and show warning
+#if defined(__linux__) && !defined(USING_UDEV)
+    {
+        auto n = std::make_shared<udev_warning_model>();
+        if (!n->is_delayed())
+        {
+            viewer_model.not_model->add_notification(n);
+        }
+    }
+#endif
 
     std::vector<device> connected_devs;
     std::mutex m;
@@ -369,6 +384,9 @@ int main(int argc, const char** argv) try
             device_names, *device_models, viewer_model, error_message);
         return true;
     };
+
+    if( on_setup )
+        on_setup( *device_models, viewer_model );
 
     // Closing the window
     while (window)
@@ -496,7 +514,7 @@ int main(int argc, const char** argv) try
 
             if (ImGui::Selectable("Load Recorded Sequence", false, ImGuiSelectableFlags_SpanAllColumns))
             {
-                if (auto ret = file_dialog_open(open_file, "ROS-bag\0*.bag\0", NULL, NULL))
+                if (auto ret = file_dialog_open(open_file, "RealSense recordings\0*.db3\0*.bag\0", NULL, NULL))
                 {
                     add_playback_device(ctx, device_models, error_message, viewer_model, ret);
                 }
@@ -614,12 +632,37 @@ int main(int argc, const char** argv) try
         }
 
         ImGui::End();
-        ImGui::PopStyleVar();
         ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+
+        // Poll conversion completion (separate from drawing)
+        auto converted_file = viewer_model.bag_converter->poll_completion(error_message, viewer_model);
+        if (!converted_file.empty())
+            add_playback_device(ctx, device_models, error_message, viewer_model, converted_file);
+
+        // .bag-to-.db3 conversion UI
+        if (viewer_model.bag_converter->should_show_dialog())
+        {
+            if (viewer_model.bag_converter->is_converting())
+                viewer_model.bag_converter->draw_progress(window);
+            else
+            {
+                auto dialog_file = viewer_model.bag_converter->draw_prompt(ctx, window);
+                if (!dialog_file.empty())
+                    add_playback_device(ctx, device_models, error_message, viewer_model, dialog_file);
+            }
+        }
 
         // Fetch and process frames from queue
         viewer_model.handle_ready_frames(viewer_rect, window, static_cast<int>(device_models->size()), error_message);
+
+        // Check if we need to close the window
+        if( keep_alive && !keep_alive() )
+            glfwSetWindowShouldClose( window, GLFW_TRUE );
         }
+
+    if( on_teardown )
+        on_teardown();
 
     // Stopping post processing filter rendering thread
     viewer_model.ppf.stop();
@@ -633,14 +676,4 @@ int main(int argc, const char** argv) try
         }
 
     return EXIT_SUCCESS;
-}
-catch (const error & e)
-{
-    std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
-    return EXIT_FAILURE;
-}
-catch (const std::exception& e)
-{
-    std::cerr << e.what() << std::endl;
-    return EXIT_FAILURE;
 }

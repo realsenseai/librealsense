@@ -19,7 +19,6 @@ macro(os_set_flags)
 	
     if(FORCE_RSUSB_BACKEND)
         set(BACKEND RS2_USE_ANDROID_BACKEND)
-        set(IMPORT_DEPTH_CAM_FW OFF)
     else()
         set(BACKEND RS2_USE_V4L2_BACKEND)
     endif()

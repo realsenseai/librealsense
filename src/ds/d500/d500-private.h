@@ -14,65 +14,83 @@ namespace librealsense
 
     namespace ds
     {
-        const uint16_t D555_PID = 0x0B56;
-        const uint16_t D555_RECOVERY_PID = 0x0ADE;
+        // devices under Intel VID
+        const uint16_t D555_PID           = 0x0B56;
+        const uint16_t D555_RECOVERY_PID  = 0x0ADE;
         const uint16_t D585S_RECOVERY_PID = 0x0ADD;
-        const uint16_t D585_PID = 0x0B6A; // D585, D for depth
-        const uint16_t D585S_PID = 0x0B6B; // D585S, S for safety
+        const uint16_t D585_LEGACY_PID    = 0x0B6A; // D585S without the safety. Used to demo capabilities to customers.
+        const uint16_t D585S_PID          = 0x0B6B; // D585S, S for safety
+        // devices under RealSense VID
+        const uint16_t D500_RECOVERY_PID      = 0x0CFD; // Shared across the D500 family
+        const uint16_t D500_USB2_RECOVERY_PID = 0x0CFE; // Fallback for USB2 hosts
+        const uint16_t D535_2C_PID            = 0x0C01;
+        const uint16_t D535_3C_PID            = 0x0C02;
+        const uint16_t D535F_PID              = 0x0C03; // 3C with IR only L/R cover
+        const uint16_t D585_2C_PID            = 0x0C04;
+        const uint16_t D585_3C_PID            = 0x0C05;
+        const uint16_t D585F_PID              = 0x0C06; // 3C with IR only L/R cover
+        const uint16_t D585_2C_PROTO_PID      = 0x0C07;
+        const uint16_t D585_3C_PROTO_PID      = 0x0C08;
         
         // DS500 depth XU identifiers
-        const uint8_t DS5_HKR_PVT_TEMPERATURE = 0x15;
+        // Note: selector values differ from the D400-family depth_xu selectors in ds-private.h.
+        const uint8_t DS5_ALIGN_DEPTH              = 0x10;  // Enable depth-to-RGB alignment for OD distance; must be sent before depth streaming starts
+        const uint8_t DS5_HKR_PVT_TEMPERATURE      = 0x15;
         const uint8_t DS5_HKR_PROJECTOR_TEMPERATURE = 0x16;
-        const uint8_t DS5_HKR_OHM_TEMPERATURE = 0x17;
+        const uint8_t DS5_HKR_OHM_TEMPERATURE      = 0x17;
 
         // d500 Devices supported by the current version
         static const std::set<std::uint16_t> rs500_sku_pid = {
             D555_PID,
-            D585_PID,
-            D585S_PID
-        };
-
-        static const std::set<std::uint16_t> d500_multi_sensors_pid = {
-            D555_PID,
-            D585_PID,
-            D585S_PID
-        };
-
-        static const std::set<std::uint16_t> d500_hid_sensors_pid = {
-            D555_PID,
-            D585_PID,
-            D585S_PID
-        };
-
-        static const std::set<std::uint16_t> d500_hid_bmi_085_pid = {
-            D555_PID,
-            D585_PID,
-            D585S_PID
+            D585_LEGACY_PID,
+            D585S_PID,
+            D535_2C_PID,
+            D535_3C_PID,
+            D535F_PID,
+            D585_2C_PID,
+            D585_3C_PID,
+            D585F_PID,
+            D585_2C_PROTO_PID,
+            D585_3C_PROTO_PID
         };
 
         static const std::map< std::uint16_t, std::string > rs500_sku_names = {
-            { D555_PID,          "Intel RealSense D555" },
-            { D555_RECOVERY_PID, "Intel RealSense D555 Recovery" },
-            { D585_PID,             "Intel RealSense D585" },
-            { D585S_PID,            "Intel RealSense D585S" },
-            { D585S_RECOVERY_PID,   "Intel RealSense D585S Recovery"}
+            { D555_PID,               "RealSense D555" },
+            { D555_RECOVERY_PID,      "RealSense D555 Recovery" },
+            { D585_LEGACY_PID,        "RealSense D585" },
+            { D585S_PID,              "RealSense D585S" },
+            { D585S_RECOVERY_PID,     "RealSense D585S Recovery"},
+            { D500_RECOVERY_PID,      "RealSense D500 Recovery"},
+            { D500_USB2_RECOVERY_PID, "RealSense D500 Recovery"},
+            { D535_2C_PID,            "RealSense D535 Dual RGB" },
+            { D535_3C_PID,            "RealSense D535" },
+            { D535F_PID,              "RealSense D535F" },
+            { D585_2C_PID,            "RealSense D585 Dual RGB" },
+            { D585_3C_PID,            "RealSense D585" },
+            { D585F_PID,              "RealSense D585F" },
+            { D585_2C_PROTO_PID,      "RealSense D585 Proto Dual RGB" },
+            { D585_3C_PROTO_PID,      "RealSense D585 Prototype" }
         };
 
         //TODO
         //static std::map<uint16_t, std::string> d500_device_to_fw_min_version = {
-        //    {D585_PID, "0.0.0.0"},
+        //    {D585_LEGACY_PID, "0.0.0.0"},
         //    {D585S_PID, "0.0.0.0"},
         //    {D585S_RECOVERY_PID , "0.0.0.0"}
         //};
 
         bool d500_try_fetch_usb_device(std::vector<platform::usb_device_info>& devices,
             const platform::uvc_device_info& info, platform::usb_device_info& result);
-
-        namespace d500_gvd_offsets 
-        {
+        
+        namespace d500_gvd_offsets {
             constexpr size_t version_offset = 0;
             constexpr size_t payload_size_offset = 0x2;
             constexpr size_t crc32_offset = 0x4;
+            constexpr size_t rgb_sensor = 0x47;
+            constexpr size_t imu_sensor = 0x49;
+            constexpr size_t active_projector = 0x4a;
+            constexpr size_t is_camera_locked_offset = 0xc2;
+            constexpr size_t imu_type = 0x1e2;  // offset for start of string uint8_t[8]
             constexpr size_t optical_module_serial_offset = 0x54;
             constexpr size_t mb_module_serial_offset = 0x7a;
             constexpr size_t fw_version_offset = 0xba;
@@ -88,6 +106,7 @@ namespace librealsense
             std::string mb_module_sn;
             std::string fw_version;
             std::string safety_sw_suite_version;
+            std::string imu_type;
         };
 
         enum class d500_calibration_table_id
@@ -111,6 +130,8 @@ namespace librealsense
             safety_interface_cfg_id = 0xc0dc,
             calib_cfg_id = 0xc0dd,
             app_config_table_id = 0xc0de,
+            frame_sequence_id = 0xc0e0,
+            projector_laser_id = 0xc0e8,
             max_id = -1
         };
 

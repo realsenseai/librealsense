@@ -9,6 +9,7 @@
 #include <realdds/topics/compressed-image-msg.h>
 #include <realdds/topics/image-msg.h>
 #include <realdds/topics/imu-msg.h>
+#include <realdds/topics/string-msg.h>
 #include <realdds/topics/blob-msg.h>
 #include <realdds/topics/ros2/participant-entities-info-msg.h>
 #include <realdds/topics/blob/blobPubSubTypes.h>
@@ -180,9 +181,10 @@ PYBIND11_MODULE(NAME, m) {
                      []( std::string const & raw_guid ) { return realdds::guid_from_string( raw_guid ); } )
         .def( "__bool__", []( dds_guid const & self ) { return self != realdds::unknown_guid; } )
         .def( "__str__",
-              []( dds_guid const & self ) { return rsutils::string::from( realdds::print_guid( (self) ) ).str(); } )
+              []( dds_guid const & self )
+              { return rsutils::string::from( realdds::print_guid( self, realdds::unknown_guid, true ) ).str(); } )
         .def( "__repr__",
-              []( dds_guid const & self ) { return rsutils::string::from( realdds::print_raw_guid( ( self ) ) ).str(); } )
+              []( dds_guid const & self ) { return rsutils::string::from( realdds::print_raw_guid( self ) ).str(); } )
         // Following two (hash and ==) are needed if we want to be able to use guids as dictionary keys
         .def( "__hash__",
               []( dds_guid const & self )
@@ -562,7 +564,7 @@ PYBIND11_MODULE(NAME, m) {
               []( SampleIdentity const & self )
               {
                   std::ostringstream os;
-                  os << realdds::print_guid( self.writer_guid() );
+                  os << realdds::print_guid( self.writer_guid(), realdds::unknown_guid, true );
                   os << '.';
                   os << self.sequence_number();
                   return os.str();
@@ -580,7 +582,7 @@ PYBIND11_MODULE(NAME, m) {
                   std::ostringstream os;
                   os << "<sample #" << self.sample_identity.sequence_number();
                   os << " @ " << realdds::time_to_string( self.reception_timestamp );
-                  os << " from " << realdds::print_guid( self.sample_identity.writer_guid() );
+                  os << " from " << realdds::print_guid( self.sample_identity.writer_guid(), realdds::unknown_guid, true );
                   os << ">";
                   return os.str();
               } );
@@ -779,7 +781,7 @@ PYBIND11_MODULE(NAME, m) {
                   os << "<" SNAME ".message.participant_entities_info";
                   if( self.is_valid() )
                   {
-                      os << " " << realdds::print_guid( self.gid() );
+                      os << " " << realdds::print_guid( self.gid(), realdds::unknown_guid, true );
                       if( ! self.nodes().empty() )
                           os << " ";
                       for( auto & node : self.nodes() )
@@ -862,7 +864,23 @@ PYBIND11_MODULE(NAME, m) {
             py::arg( "reader" ),
             py::arg( "sample" ) = nullptr,
             py::call_guard< py::gil_scoped_release >() )
-        .def( "write_to", &blob_msg::write_to, py::call_guard< py::gil_scoped_release >() );
+        .def( "write_to",
+              []( blob_msg const & self, realdds::dds_topic_writer & writer )
+              {
+                  return self.write_to( writer );
+              },
+              py::call_guard< py::gil_scoped_release >() )
+        .def( "write_to",
+              []( blob_msg const & self, realdds::dds_topic_writer & writer, double timeout, py::function should_stop )
+              {
+                  return self.write_to( writer, timeout,
+                                        [should_stop]() -> bool
+                                        {
+                                            py::gil_scoped_acquire gil;
+                                            return should_stop().cast< bool >();
+                                        } );
+              },
+              py::call_guard< py::gil_scoped_release >() );
 
 
     using imu_msg = realdds::topics::imu_msg;
@@ -1024,6 +1042,10 @@ PYBIND11_MODULE(NAME, m) {
     py::class_< dds_motion_stream_profile, std::shared_ptr< dds_motion_stream_profile > >( m, "motion_stream_profile", stream_profile_base )
         .def( py::init< int16_t >() );
 
+    using realdds::dds_inference_stream_profile;
+    py::class_< dds_inference_stream_profile, std::shared_ptr< dds_inference_stream_profile > >( m, "inference_stream_profile", stream_profile_base )
+        .def( py::init< int16_t >() );
+
     using realdds::dds_stream_base;
     py::class_< dds_stream_base, std::shared_ptr< dds_stream_base > > stream_base( m, "stream_base" );
     stream_base
@@ -1093,6 +1115,27 @@ PYBIND11_MODULE(NAME, m) {
         .def( "set_accel_intrinsics", &dds_motion_stream_server::set_accel_intrinsics )
         .def( "start_streaming", &dds_motion_stream_server::start_streaming );
 
+    using realdds::dds_inference_stream_server;
+    py::class_< dds_inference_stream_server, std::shared_ptr< dds_inference_stream_server > >
+        inference_stream_server_base( m, "inference_stream_server", stream_server_base );
+    inference_stream_server_base
+        .def( py::init< std::string const &, std::string const & >(), "stream_name"_a, "sensor_name"_a )
+        .def( "start_streaming", &dds_inference_stream_server::start_streaming )
+        .def( "publish_inference",
+              []( dds_inference_stream_server & self, std::string const & data )
+              {
+                  realdds::topics::string_msg msg;
+                  msg.set_data( data );
+                  self.publish_inference( msg );
+              },
+              py::call_guard< py::gil_scoped_release >(),
+              "data"_a );
+
+    using realdds::dds_object_detection_stream_server;
+    py::class_< dds_object_detection_stream_server, std::shared_ptr< dds_object_detection_stream_server > >(
+        m, "object_detection_stream_server", inference_stream_server_base )
+        .def( py::init< std::string const &, std::string const & >(), "stream_name"_a, "sensor_name"_a );
+
     // To have the python code be able to modify json objects in callbacks, we need to somehow refer to the original
     // json object as changes to translated dict will not automatically get picked up!
     // We do this thru the [] operator:
@@ -1138,10 +1181,12 @@ PYBIND11_MODULE(NAME, m) {
     py::class_< dds_stream, std::shared_ptr< dds_stream > > stream_client_base( m, "stream", stream_base );
     stream_client_base  //
         .def( "open", &dds_stream::open )
-        .def( "close", &dds_stream::close )
+        // close joins the reader thread, so release the GIL or it deadlocks if the thread is mid Python-callback
+        .def( "close", &dds_stream::close, py::call_guard< py::gil_scoped_release >() )
         .def( "is_open", &dds_stream::is_open )
         .def( "start_streaming", &dds_stream::start_streaming )
-        .def( "stop_streaming", &dds_stream::stop_streaming )
+        // stop_streaming only sets a flag (no join); guard is for consistency with close
+        .def( "stop_streaming", &dds_stream::stop_streaming, py::call_guard< py::gil_scoped_release >() )
         .def( "__repr__", []( dds_stream const & self ) {
             std::ostringstream os;
             os << "<" SNAME "." << self.type_string() << "_stream \"" << self.name() << "\"";
@@ -1190,6 +1235,21 @@ PYBIND11_MODULE(NAME, m) {
                       ( imu_msg && i, dds_sample && sample ),
                       callback( self, std::move( i ), std::move( sample ) ); ) );
 
+    using realdds::dds_inference_stream;
+    py::class_< dds_inference_stream, std::shared_ptr< dds_inference_stream > >
+        inference_stream_client_base( m, "inference_stream", stream_client_base );
+    inference_stream_client_base
+        .def( FN_FWD( dds_inference_stream,
+                      on_data_available,
+                      ( dds_inference_stream *, std::string, dds_sample && ),
+                      ( realdds::topics::string_msg && msg, dds_sample && sample ),
+                      callback( self, std::string( msg.data() ), std::move( sample ) ); ) );
+
+    using realdds::dds_object_detection_stream;
+    py::class_< dds_object_detection_stream, std::shared_ptr< dds_object_detection_stream > >(
+        m, "object_detection_stream", inference_stream_client_base )
+        .def( py::init< std::string const &, std::string const & >(), "stream_name"_a, "sensor_name"_a );
+
 
     using subscription = rsutils::subscription;
     py::class_< subscription,
@@ -1224,7 +1284,7 @@ PYBIND11_MODULE(NAME, m) {
         .def( "wait_until_ready",
               &dds_device::wait_until_ready,
               py::call_guard< py::gil_scoped_release >(),
-              "timeout-ms"_a = 5000 )
+              "timeout-ms"_a = 5000, py::arg_v( "allow_partial_capabilities", false, "False" ) )
         .def( "wait_until_online",
               &dds_device::wait_until_online,
               py::call_guard< py::gil_scoped_release >(),

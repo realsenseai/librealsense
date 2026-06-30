@@ -1,5 +1,5 @@
 // This example is derived from the ssd_mobilenet_object_detection opencv demo
-// and adapted to be used with Intel RealSense Cameras
+// and adapted to be used with RealSense Cameras
 // Please see https://github.com/opencv/opencv/blob/master/LICENSE
 
 #include <opencv2/dnn.hpp>
@@ -27,7 +27,7 @@ int main(int argc, char** argv) try
     Net net = readNetFromCaffe("MobileNetSSD_deploy.prototxt", 
                                "MobileNetSSD_deploy.caffemodel");
 
-    // Start streaming from Intel RealSense Camera
+    // Start streaming from RealSense Camera
     pipeline pipe;
     auto config = pipe.start();
     auto profile = config.get_stream(RS2_STREAM_COLOR)

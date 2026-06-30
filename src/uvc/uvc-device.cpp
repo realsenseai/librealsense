@@ -323,6 +323,9 @@ namespace librealsense
                 sp.height = f.height;
                 sp.fps = f.fps;
                 sp.format = f.fourcc;
+                // Preserve the VS interface (pin) so identical {w,h,fps,format} profiles coming from different
+                // streaming interfaces (e.g. the two M420 RGB endpoints) stay distinct and route to the right pin.
+                sp.pin_index = f.interfaceNumber;
                 results.push_back(sp);
             }
 
@@ -424,8 +427,8 @@ namespace librealsense
 
         void rs_uvc_device::play_profile(stream_profile profile, frame_callback callback) {
             bool foundFormat = false;
-
             uvc_format_t selected_format{};
+            uint8_t interface_number;
             // Return list of all available formats inside devices[0]
             auto formats = get_available_formats_all();
 
@@ -434,9 +437,11 @@ namespace librealsense
                 if ((profile.format == f.fourcc) &&
                     (profile.fps == f.fps) &&
                     (profile.height == f.height) &&
-                    (profile.width == f.width)) {
+                    (profile.width == f.width) &&
+                    (profile.pin_index == f.interfaceNumber)) {
                         foundFormat = true;
                         selected_format = f;
+                        interface_number = f.interfaceNumber;
                         break;
                 }
             }
@@ -444,6 +449,12 @@ namespace librealsense
             if (foundFormat == false) {
                 throw std::runtime_error("Failed to find supported format!");
             }
+
+            auto inf = _usb_device->get_interface(interface_number);
+            if (inf == nullptr)
+                throw std::runtime_error("can't find UVC streaming interface of device: " + _usb_device->get_info().id);
+            auto _read_endpoint = inf->first_endpoint(platform::RS2_USB_ENDPOINT_DIRECTION_READ);
+            _messenger->reset_endpoint(_read_endpoint, 5000);
 
             auto ctrl = std::make_shared<uvc_stream_ctrl_t>();
             auto ret = get_stream_ctrl_format_size(selected_format, ctrl);

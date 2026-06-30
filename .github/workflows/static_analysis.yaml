@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
       - name: Install 
         shell: bash
@@ -64,7 +64,7 @@ jobs:
             &&  echo "No diffs found in cppcheck_run.parsed.log"
 
       - name: Upload logs
-        uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392 #v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
         with: 
           name: cppcheck_log
           path: |
@@ -102,7 +102,7 @@ jobs:
     name: Valgrind Memory Leak Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
       
       - name: Install Valgrind
         run: |
@@ -142,7 +142,7 @@ jobs:
         continue-on-error: true
       
       - name: Upload Valgrind log
-        uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392 #v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
         with:
           name: valgrind-log
           path: build/valgrind-out.txt
@@ -159,7 +159,7 @@ jobs:
     name: ASAN Memory Leak Check
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
     
     - name: Install Dependencies
       run: |
@@ -198,7 +198,7 @@ jobs:
       continue-on-error: true
 
     - name: Upload ASAN log
-      uses: actions/upload-artifact@c7d193f32edcb7bfad88892161225aeda64e9392
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
       with:
           name: asan-log
           path: build/asan-out.txt*
@@ -224,7 +224,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
       - name: "Install Dependencies"
         run: |
@@ -320,7 +320,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
       - name: Build docs 
         run: |

@@ -131,6 +131,10 @@ void post_processing_filters::map_id_frameset_to_frameset(rs2::frameset first, r
         {
             second_f = second.get_infrared_frame(f.get_profile().stream_index());
         }
+        else if( f.get_profile().stream_type() == RS2_STREAM_COLOR )
+        {
+            second_f = second.get_color_frame( f.get_profile().stream_index() );
+        }
         else
         {
             second_f = second.first_or_default(f.get_profile().stream_type());

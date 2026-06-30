@@ -26,6 +26,12 @@ namespace librealsense
         friend class ds_motion_sensor;
 
         std::shared_ptr<ds_motion_common> _ds_motion_common;
+        // Set when HID motion-sensor construction failed and the partial device
+        // was allowed by the `partial-device-allowed` setting. Callers that
+        // access `_ds_motion_common` (e.g. derived create_matcher) must gate on
+        // this flag because `_ds_motion_common` remains null in the partial
+        // case. Mirrors the same flag in d400_motion_base.
+        bool _has_motion_module_failed = false;
 
     private:
         void register_stream_to_extrinsic_group(const stream_interface& stream, uint32_t group_index);

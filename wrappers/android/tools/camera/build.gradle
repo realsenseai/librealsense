@@ -26,29 +26,6 @@ android {
 
 }
 
-def getFwVersion(String productLine) {
-    try {
-        String versionsFile = new File("$projectDir/../../../../common/fw/firmware-version.h").text
-        def regex = productLine + " \"(.*)\""
-        def matcher = ( versionsFile =~ regex )
-        return matcher[0][1]
-    }catch(e){
-        println(e)
-        return "Unknown FW version"
-    }
-}
-
-task downloadFirmware() {
-    mkdir "$projectDir/src/main/res/raw"
-
-    def d4xxFwVersion = getFwVersion('D4XX_RECOMMENDED_FIRMWARE_VERSION')
-    def d4xxFile = new File("$projectDir/src/main/res/raw/fw_d4xx.bin")
-    if (!d4xxFile.exists()) {
-        println("downloading D4xx fw: " + d4xxFwVersion)
-        new URL('https://librealsense.realsenseai.com/Releases/RS4xx/FW/D4XX_FW_Image-' + d4xxFwVersion + '.bin').withInputStream{ i -> d4xxFile.withOutputStream{ it << i }}
-    }
-}
-
 dependencies {
     implementation project(':librealsense')
     implementation fileTree(include: ['*.jar'], dir: 'libs')

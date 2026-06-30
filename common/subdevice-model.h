@@ -17,6 +17,10 @@
 #include <array>
 #include <unordered_map>
 #include <fstream>
+#include <future>
+#include <thread>
+#include <condition_variable>
+#include <functional>
 
 #include "objects-in-frame.h"
 #include "processing-block-model.h"
@@ -27,7 +31,9 @@
 #include "updates-model.h"
 #include "calibration-model.h"
 #include <rsutils/time/periodic-timer.h>
+#include <rsutils/time/stopwatch.h>
 #include <rsutils/number/stabilized-value.h>
+#include <rsutils/concurrency/concurrency.h>
 #include "option-model.h"
 
 namespace rs2
@@ -100,13 +106,17 @@ namespace rs2
             std::string& error_message, notifications_model& model)
         {
             if (options_metadata.find(opt) != options_metadata.end())
-                return options_metadata[opt].draw_option(update_read_only_options, streaming, error_message, model);
+            {
+                auto & opt_model = options_metadata.at(opt);
+                return opt_model.draw_option(update_read_only_options, streaming, error_message, model);
+            }
             return false;
         }
 
         bool is_paused() const;
         void pause();
         void resume();
+        void wait_for_stop();
 
         void update_ui(std::vector<stream_profile> profiles_vec);
         void get_sorted_profiles(std::vector<stream_profile>& profiles);
@@ -142,6 +152,8 @@ namespace rs2
 
         bool is_depth_calibration_profile() const;
 
+        void repopulate_options();
+
         viewer_model& viewer;
         std::function<void()> on_frame = [] {};
 
@@ -175,6 +187,11 @@ namespace rs2
         std::mutex _queue_lock;
         bool _options_invalidated = false;
         int next_option = 0;
+        // Reset by option_model::set_option_async on every user-initiated option write.
+        // While this stopwatch is fresh, subdevice_model::update() skips its per-frame
+        // sync get_option_value() polling so the UI thread doesn't serialize on the
+        // per-device USB bus behind an in-flight worker write or options_watcher poll.
+        rsutils::time::stopwatch last_user_set_stopwatch;
         std::vector<rs2_option> supported_options;
         bool streaming = false;
         std::map<rs2_stream, bool> streaming_map; // used for depth and ir mixed resolutions
@@ -202,6 +219,7 @@ namespace rs2
         std::shared_ptr<rs2::colorizer> depth_colorizer;
         std::shared_ptr<rs2::yuy_decoder> yuy2rgb;
         std::shared_ptr<rs2::m420_decoder> m420_to_rgb;
+        std::shared_ptr<rs2::nv12_decoder> nv12_to_rgb;
         std::shared_ptr<rs2::y411_decoder> y411;
 
         std::vector<std::shared_ptr<processing_block_model>> post_processing;
@@ -213,8 +231,26 @@ namespace rs2
 
         bool uvmapping_calib_full = false;
         device_model* dev_model;
+        std::string _opt_base_label;
+
+        // Single per-subdevice worker that serializes every FW option write on this
+        // sensor. Replaces the per-option threads from earlier in this PR:
+        //   - Cross-option ordering is now FIFO (no races on the per-device USB bus).
+        //   - The dispatcher action runs try_sleep(200ms) after each set_option, which
+        //     enforces the protective FW-write floor uniformly (slider drag, checkbox,
+        //     calibration — all paths).
+        //   - on_chip_calib routes through this same dispatcher via invoke_and_wait so
+        //     calibration writes can't interleave with concurrent UI writes.
+        // shared_ptr so option_model copies (the map[id] = create_option_model(...)
+        // insertion) hold the same instance. Declared after options_metadata so it is
+        // destroyed first; ~dispatcher stops/joins the worker before option_models go
+        // away, keeping in-flight actions UAF-safe.
+        std::shared_ptr< dispatcher > _set_dispatcher;
+
+        std::shared_ptr< dispatcher > set_dispatcher() const { return _set_dispatcher; }
 
     private:
+        std::vector<int> get_common_fps() const;
         bool draw_resolutions(std::string& error_message, std::string& label, std::function<void()> streaming_tooltip, float col0, float col1);
         bool draw_fps(std::string& error_message, std::string& label, std::function<void()> streaming_tooltip, float col0, float col1);
         bool draw_streams_and_formats(std::string& error_message, std::string& label, std::function<void()> streaming_tooltip, float col0, float col1);
@@ -232,6 +268,7 @@ namespace rs2
         void set_extrinsics_from_depth_if_needed();
         bool is_post_processing_enabled_in_config_file() const;
         void avoid_streaming_on_embedded_filters_not_matching_configuration() const;
+        bool hide_resolutions(const stream_profile& profile) const;
         // used in method get_max_resolution per stream
         std::map<rs2_stream, std::vector<std::pair<int, int>>> resolutions_per_stream;
 
@@ -239,5 +276,36 @@ namespace rs2
         const float SHORT_RANGE_MAX_DISTANCE = 4.0f;  // 4 meters
         rs2_extrinsics _extrinsics_from_depth;
         std::atomic_bool _destructing;
+        std::mutex _stop_mutex;
+        std::future<void> _stop_future;
+
+        // Process-wide singleton background worker that drains the JSON config-save
+        // block off the UI thread. Coalescing: keyed by an opaque void* (subdevice
+        // identity) — if a save for the same subdevice is already pending, the newer
+        // lambda replaces it, so a slider drag posting many _options_invalidated events
+        // still produces at most one save pass per wake-up cycle. Nested + private so
+        // it stays an implementation detail of subdevice_model.
+        class config_save_worker
+        {
+        public:
+            static config_save_worker & instance();
+
+            config_save_worker( config_save_worker const & ) = delete;
+            config_save_worker & operator=( config_save_worker const & ) = delete;
+
+            void post( void * key, std::function< void() > job );
+            void cancel( void * key );
+
+        private:
+            config_save_worker();
+            ~config_save_worker();
+            void run();
+
+            std::mutex _mtx;
+            std::condition_variable _cv;
+            std::map< void *, std::function< void() > > _pending;
+            bool _stop = false;
+            std::thread _worker;  // declared last so other members are init'd before run() starts
+        };
     };
 }

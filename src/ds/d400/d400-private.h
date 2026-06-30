@@ -124,36 +124,36 @@ namespace librealsense
         };
 
         static const std::map<std::uint16_t, std::string> rs400_sku_names = {
-            { RS400_PID,            "Intel RealSense D400"},
-            { RS410_PID,            "Intel RealSense D410"},
-            { RS415_PID,            "Intel RealSense D415"},
-            { RS430_PID,            "Intel RealSense D430"},
-            { RS430_MM_PID,         "Intel RealSense D430 with Tracking Module"},
-            { RS_USB2_PID,          "Intel RealSense USB2" },
-            { RS_D400_RECOVERY_PID,      "Intel RealSense D4XX Recovery"},
-            { RS_D400_USB2_RECOVERY_PID, "Intel RealSense D4XX USB2 Recovery"},
-            { RS400_IMU_PID,        "Intel RealSense IMU" },
-            { RS420_PID,            "Intel RealSense D420"},
-            { RS421_PID,            "Intel RealSense D421"},
-            { RS420_MM_PID,         "Intel RealSense D420 with Tracking Module"},
-            { RS410_MM_PID,         "Intel RealSense D410 with Tracking Module"},
-            { RS400_MM_PID,         "Intel RealSense D400 with Tracking Module"},
-            { RS430_MM_RGB_PID,     "Intel RealSense D430 with Tracking and RGB Modules"},
-            { RS460_PID,            "Intel RealSense D460" },
-            { RS435_RGB_PID,        "Intel RealSense D435"},
-            { RS436_PID,            "Intel RealSense D436"},
-            { RS405U_PID,           "Intel RealSense DS5U" },
-            { RS435I_PID,           "Intel RealSense D435I" },
-            { RS416_PID,            "Intel RealSense F416"},
-            { RS430I_PID,           "Intel RealSense D430I"},
-            { RS416_RGB_PID,        "Intel RealSense F416 with RGB Module"},
-            { RS405_PID,            "Intel RealSense D405" },
-            { RS455_PID,            "Intel RealSense D455" },
-            { RS457_PID,            "Intel RealSense D457" },
-            { RS400_MIPI_RECOVERY_PID,   "Intel RealSense D4XX MIPI Recovery"},
-            { RS430_GMSL_PID,       "Intel RealSense D430" },
-            { RS415_GMSL_PID,       "Intel RealSense D415" },
-            { RS401_GMSL_PID,       "Intel RealSense D401" },
+            { RS400_PID,            "RealSense D400"},
+            { RS410_PID,            "RealSense D410"},
+            { RS415_PID,            "RealSense D415"},
+            { RS430_PID,            "RealSense D430"},
+            { RS430_MM_PID,         "RealSense D430 with Tracking Module"},
+            { RS_USB2_PID,          "RealSense USB2" },
+            { RS_D400_RECOVERY_PID,      "RealSense D4XX Recovery"},
+            { RS_D400_USB2_RECOVERY_PID, "RealSense D4XX USB2 Recovery"},
+            { RS400_IMU_PID,        "RealSense IMU" },
+            { RS420_PID,            "RealSense D420"},
+            { RS421_PID,            "RealSense D421"},
+            { RS420_MM_PID,         "RealSense D420 with Tracking Module"},
+            { RS410_MM_PID,         "RealSense D410 with Tracking Module"},
+            { RS400_MM_PID,         "RealSense D400 with Tracking Module"},
+            { RS430_MM_RGB_PID,     "RealSense D430 with Tracking and RGB Modules"},
+            { RS460_PID,            "RealSense D460" },
+            { RS435_RGB_PID,        "RealSense D435"},
+            { RS436_PID,            "RealSense D436"},
+            { RS405U_PID,           "RealSense DS5U" },
+            { RS435I_PID,           "RealSense D435I" },
+            { RS416_PID,            "RealSense F416"},
+            { RS430I_PID,           "RealSense D430I"},
+            { RS416_RGB_PID,        "RealSense F416 with RGB Module"},
+            { RS405_PID,            "RealSense D405" },
+            { RS455_PID,            "RealSense D455" },
+            { RS457_PID,            "RealSense D457" },
+            { RS400_MIPI_RECOVERY_PID,   "RealSense D4XX MIPI Recovery"},
+            { RS430_GMSL_PID,       "RealSense D430" },
+            { RS415_GMSL_PID,       "RealSense D415" },
+            { RS401_GMSL_PID,       "RealSense D401" },
         };
 
         static std::map<uint16_t, std::string> d400_device_to_fw_min_version = {
@@ -176,7 +176,7 @@ namespace librealsense
             {RS435_RGB_PID, "5.8.15.0" },
             {RS405U_PID, "5.8.15.0" },
             {RS435I_PID, "5.12.7.100" },
-            {RS436_PID, "5.17.0.100" },
+            {RS436_PID, "5.17.0.213" },
             {RS416_PID, "5.8.15.0" },
             {RS430I_PID, "5.8.15.0" },
             {RS416_RGB_PID, "5.8.15.0" },
@@ -186,7 +186,7 @@ namespace librealsense
             {RS400_MIPI_RECOVERY_PID, "5.16.0.1" },
             {RS430_GMSL_PID, "5.16.8.0" },
             {RS415_GMSL_PID, "5.17.1.1" },
-            {RS401_GMSL_PID, "5.17.2.100" } // TO BE UPDATED!!!
+            {RS401_GMSL_PID, "5.17.2.2" }
         };
 
         std::vector<platform::uvc_device_info> filter_d400_device_by_capability(
@@ -211,6 +211,27 @@ namespace librealsense
             uint8_t min_gvd_version = cap->second;
             return min_gvd_version <= cur_gvd_version;
         }
+
+        namespace d400_gvd_offsets 
+        {
+            constexpr size_t version_offset = 0;
+            constexpr size_t gvd_version_offset = 2;
+            constexpr size_t camera_fw_version_offset = 12;
+            constexpr size_t is_camera_locked_offset = 25;
+            constexpr size_t module_serial_offset = 48;
+            constexpr size_t module_asic_serial_offset = 64;
+            constexpr size_t fisheye_sensor_lb = 112;
+            constexpr size_t fisheye_sensor_hb = 113;
+            constexpr size_t imu_acc_chip_id = 124;
+            constexpr size_t hw_type_offset = 158;
+            constexpr size_t ip65_sealed_offset = 161;
+            constexpr size_t ir_filter_offset = 164;
+            constexpr size_t depth_sensor_type = 166;
+            constexpr size_t active_projector = 170;
+            constexpr size_t rgb_sensor = 174;
+            constexpr size_t imu_sensor = 178;
+            constexpr size_t motion_module_fw_version_offset = 212;
+        } 
 
         std::string extract_firmware_version_string( const std::vector< uint8_t > & fw_image );
 

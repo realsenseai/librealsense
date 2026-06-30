@@ -14,7 +14,6 @@ Device info:
     Name                          :     Intel RealSense D415
     Serial Number                 :     725112060411
     Firmware Version              :     05.12.02.100
-    Recommended Firmware Version  :     05.12.02.100
     Physical Port                 :     \\?\usb#vid_8086&pid_0ad3&mi_00#6&2a371216&0&0000#{e5323777-f976-4f5b-9b55-b94699c46e44}\global
     Debug Op Code                 :     15
     Advanced Mode                 :     YES

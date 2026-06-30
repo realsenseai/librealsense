@@ -51,19 +51,8 @@ Note that a lower version may not work due to non compatible CUDA versions limit
 <u>Installation steps:</u>
 
 1. Register the server's public key:
-
-    ```sh
-    sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE || sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-key F6E65AC044F831AC80A06380C8B3A55A6F3EFCDE
-    ```
-
-  > In case the public key cannot be retrieved, check and specify proxy settings: `export http_proxy="http://<proxy>:<port>"`, and rerun the command. See additional methods in the following [link](https://unix.stackexchange.com/questions/361213/unable-to-add-gpg-key-with-apt-key-behind-a-proxy).  
-
-
-2. Add the server to the list of repositories:
-
-    ```sh
-    sudo add-apt-repository "deb https://librealsense.realsenseai.com/Debian/apt-repo $(lsb_release -cs) main" -u
-    ```
+   See instructions [here](../doc/distribution_linux.md#installing-the-packages)
+    
 
 3. Install the SDK:
 
@@ -97,7 +86,7 @@ See [building-from-source-using-native-backend](https://github.com/realsenseai/l
 
 The method was verified with **Jetson AGX Thor™** with JetPack 7.0 (beta level), **Jetson AGX Orin™** with JetPack 6.0, **Jetson AGX Xavier™** boards with JetPack **5.0.2**[L4T 35.1.0].
 
-For **Jetson Nano™** setup, please see the following user instructions [NVIDIA Jetson Nano with RealSense Depth Camera Using ROS2 Humble | by Kabilankb | May, 2024 | Medium](https://medium.com/@kabilankb2003/nvidia-jetson-nano-with-intel-realsense-depth-camera-using-ros2-humble-c5926566a4d9)
+For **Jetson Nano™** setup, please see the following user instructions [NVIDIA Jetson Nano with RealSense Depth Camera Using ROS2 Humble | by Kabilankb | May, 2024 | Medium](https://medium.com/@kabilankb2003/nvidia-jetson-nano-with-intel-realsense-depth-camera-using-ros2-humble-c5926566a4d8)
 
 
 * **Prerequisite**

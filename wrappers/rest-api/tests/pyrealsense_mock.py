@@ -1,3 +1,6 @@
+# License: Apache 2.0. See LICENSE file in root directory.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
 """
 Mock implementation of pyrealsense2 for testing purposes.
 This mock implements all the classes and functions used in rs_manager.py.
@@ -124,6 +127,18 @@ class device:
     def add_sensor(self, sensor):
         self.sensors.append(sensor)
 
+    def is_debug_protocol(self):
+        """Return True if this device exposes the RS2_EXTENSION_DEBUG extension."""
+        return isinstance(self, debug_protocol)
+
+    def as_debug_protocol(self):
+        """Return self when the device supports the debug_protocol extension.
+
+        Mirrors the SDK model where debug_protocol IS-A device — callers must
+        check is_debug_protocol() first.
+        """
+        return self if isinstance(self, debug_protocol) else None
+
 # Mock for sensor base class
 class sensor:
     def __init__(self, name="Generic Sensor"):
@@ -194,6 +209,9 @@ class sensor:
 
     def is_depth_sensor(self):
         return False
+
+    def get_recommended_filters(self):
+        return []
 
     def is_color_sensor(self):
         return False
@@ -602,6 +620,46 @@ class disparity_transform:
         # Return the same frame, pretending we've transformed it
         return frame
 
+# Mock for debug_protocol (hardware monitor)
+class debug_protocol(device):
+    """Mock for the pyrealsense2 debug_protocol extension.
+
+    Inherits from device so it can be injected directly into rs_manager.devices
+    and is_debug_protocol() returns True via isinstance check, mirroring the SDK
+    extension model where debug_protocol IS-A device.
+
+    build_command packs the opcode + 4 params into a little-endian header and
+    appends any caller-supplied data bytes.
+
+    send_and_receive_raw_data mirrors the real SDK raw path: on success it echoes
+    the sent opcode back in the first 4 bytes of the response (little-endian
+    uint32).  Pass fw_error_code to simulate a firmware error (the response opcode
+    will differ from the sent opcode), or short_hwm_response=True to simulate a
+    truncated response.
+    """
+
+    def __init__(self, serial_number="1234", name="Test Device",
+                 fw_error_code=None, short_hwm_response=False):
+        super().__init__(serial_number=serial_number, name=name)
+        self._fw_error_code = fw_error_code
+        self._short_response = short_hwm_response
+
+    def build_command(self, opcode, param1=0, param2=0, param3=0, param4=0, data=None):
+        import struct
+        header = struct.pack("<IIIII", opcode, param1, param2, param3, param4)
+        return list(header) + list(data or [])
+
+    def send_and_receive_raw_data(self, input_data):
+        import struct
+        if self._short_response:
+            return [0x00]
+        if self._fw_error_code is not None:
+            return list(struct.pack("<I", self._fw_error_code))
+        # Success: echo back the opcode from bytes [0-3] of the command buffer.
+        opcode = int.from_bytes(bytes(input_data[:4]), "little")
+        return list(struct.pack("<I", opcode))
+
+
 # Mock exception types
 class error(Exception):
     pass
@@ -623,7 +681,7 @@ def create_mock_device(serial_number, name, with_depth=True, with_color=True, wi
     """
     Create a mock device with the specified sensors
     """
-    mock_device = device(serial_number, name)
+    mock_device = debug_protocol(serial_number, name)
 
     if with_depth:
         depth_sensor_obj = depth_sensor("Depth Sensor")

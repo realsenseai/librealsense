@@ -66,7 +66,7 @@
   #include <sys/time.h>
 #endif
 
-#include "math.h"
+#include <math.h>
 
 namespace rs2rosinternal
 {

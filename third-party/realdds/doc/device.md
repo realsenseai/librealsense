@@ -42,6 +42,24 @@ On the client, device behavior with librealsense can be fine-tuned with JSON set
 
 The above overrides the default reply timeout to 2 seconds and makes the metadata topic use reliable QoS rather than the default `best-effort`.
 
+#### Device creation and discovery settings
+
+```JSON
+{
+  "dds": {
+    "device-initialization-timeout-ms": 5000,
+    "query-devices-max": 5,
+    "query-devices-min": 3
+  }
+}
+```
+
+When a device-info sample is received, announcing a device is available on the network, an appropriate `dds-device` object is created in the SDK.
+`dds-device` needs some handshaking with the device to determine the device's capabilities. The `device-initialization-timeout-ms` setting determines how long the SDK will wait for this handshake to complete. This initialization usually takes less than 2 seconds, but for a multi-camera multi-host scenario the network might be congested and this might take more time.
+
+When the user queries for devices we want to return as quickly as possible. However for a scenario in which a context is created and immediately `query_devices` is called, DDS devices don't have enough time to complete initialization.
+The first `query_devices` call will block to give DDS devices a chance to be initialized. It will wait for `query-devices-min` seconds and if a remote participant is discovered during that time, the wait time will increase to let the device initialize, up to a maximum of `query-devices-max` seconds.
+
 #### Standard topic QoS settings
 
 `control`, `notification`, and `metadata` topics all can have their own objects to override default QoS and other settings. See the above for an example. They all share common settings:

@@ -10,6 +10,7 @@
 #include "environment.h"
 #include "align.h"
 #include "stream.h"
+#include <rsutils/easylogging/easyloggingpp.h>
 
 #if defined(RS2_USE_CUDA)
 #include "proc/cuda/cuda-align.h"
@@ -27,16 +28,20 @@ namespace librealsense
     std::shared_ptr<align> align::create_align(rs2_stream align_to)
     {
         #if defined(RS2_USE_CUDA)
-        if (rsutils::rs2_is_gpu_available())
+        if (rsutils::rs2_is_cuda_available())
         {
+            LOG_INFO("Using CUDA-optimized align implementation");
             return std::make_shared<librealsense::align_cuda>(align_to);
         }
         #endif
         #if defined(__SSSE3__)
+            LOG_INFO("Using SSE-optimized align implementation");
             return std::make_shared<librealsense::align_sse>(align_to);
-        #elif defined(__ARM_NEON) && ! defined(ANDROID)
+        #elif defined(__ARM_NEON) && defined(BUILD_WITH_NEON) && !defined(ANDROID)
+            LOG_INFO("Using NEON-optimized align implementation");
             return std::make_shared<librealsense::align_neon>(align_to);
         #else
+            LOG_INFO("Using generic (non-SIMD) align implementation");
             return std::make_shared<librealsense::align>(align_to);
         #endif
     }

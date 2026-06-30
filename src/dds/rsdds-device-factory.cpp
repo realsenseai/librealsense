@@ -40,21 +40,29 @@ class rsdds_watcher_singleton
 {
     std::shared_ptr< realdds::dds_device_watcher > const _device_watcher;
     using signal = rsutils::signal< std::shared_ptr< realdds::dds_device > const &, bool /*added*/ >;
-    signal _callbacks;
+    // Held by shared_ptr so the watcher's device-added/removed callbacks (which run on detached
+    // threads) keep the signal alive for their duration: a callback may still be in flight when this
+    // singleton is destroyed, and dereferencing it through a raw `this` would be a use-after-free.
+    std::shared_ptr< signal > const _callbacks = std::make_shared< signal >();
 
 public:
-    rsdds_watcher_singleton( std::shared_ptr< realdds::dds_participant > const & participant )
+    rsdds_watcher_singleton( std::shared_ptr< realdds::dds_participant > const & participant,
+                             size_t initialization_timeout_ms = 5000,
+                             bool partial_device_allowed = false )
         : _device_watcher( std::make_shared< realdds::dds_device_watcher >( participant ) )
     {
         assert( _device_watcher->is_stopped() );
 
         _device_watcher->on_device_added(
-            [this]( std::shared_ptr< realdds::dds_device > const & dev )
+            [callbacks = _callbacks, initialization_timeout_ms, partial_device_allowed]( std::shared_ptr< realdds::dds_device > const & dev )
             {
                 try
                 {
-                    dev->wait_until_ready();  // make sure handshake is complete, might throw
-                    _callbacks.raise( dev, true );
+                    // Make sure handshake was (even partially) performed, might throw
+                    if( ! dev->wait_until_ready( initialization_timeout_ms, partial_device_allowed ) )
+                        LOG_ERROR( "Discovered DDS device " << dev->debug_name()
+                                   << " failed to be ready within timeout, using partial capabilities." );
+                    callbacks->raise( dev, true );
                 }
                 catch (std::runtime_error e)
                 {
@@ -62,13 +70,13 @@ public:
                 }
             } );
 
-        _device_watcher->on_device_removed( [this]( std::shared_ptr< realdds::dds_device > const & dev )
-                                            { _callbacks.raise( dev, false ); } );
+        _device_watcher->on_device_removed( [callbacks = _callbacks]( std::shared_ptr< realdds::dds_device > const & dev )
+                                            { callbacks->raise( dev, false ); } );
 
         _device_watcher->start();
     }
 
-    rsutils::subscription subscribe( signal::callback && cb ) { return _callbacks.subscribe( std::move( cb ) ); }
+    rsutils::subscription subscribe( signal::callback && cb ) { return _callbacks->subscribe( std::move( cb ) ); }
 
     std::shared_ptr< realdds::dds_device_watcher > const get_device_watcher() const { return _device_watcher; }
 };
@@ -151,7 +159,9 @@ rsdds_device_factory::rsdds_device_factory( std::shared_ptr< context > const & c
                                       << "A DDS participant '" << _participant->name() << "' already exists in domain "
                                       << domain_id << "; cannot create '" << participant_name << "'" );
         }
-        _watcher_singleton = domain.device_watcher.instance( _participant );
+        size_t device_initialization_timeout = dds_settings.nested( "device-initialization-timeout-ms" ).default_value< size_t >( 5000 );
+        bool partial_capabilities_allowed = ctx->get_settings().nested( "partial-device-allowed" ).default_value< bool >( true );
+        _watcher_singleton = domain.device_watcher.instance( _participant, device_initialization_timeout, partial_capabilities_allowed );
         _subscription = _watcher_singleton->subscribe(
             [liveliness = std::weak_ptr< context >( ctx ),
              cb = std::move( cb )]( std::shared_ptr< realdds::dds_device > const & dev, bool added )

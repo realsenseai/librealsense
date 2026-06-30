@@ -22,6 +22,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <poll.h>
+#include <thread>
+#include <cstring>
 
 #endif
 #endif  // ! __APPLE__ && ! __ANDROID__

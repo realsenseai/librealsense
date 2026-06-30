@@ -203,6 +203,22 @@ unsigned int rs2_get_transmission_delay( const rs2_device * device, rs2_error **
 void rs2_set_transmission_delay( const rs2_device * device, unsigned int delay, rs2_error ** error );
 
 /**
+ * Get UDP packet "time to live" (TTL)
+ * \param[in] device    RealSense device
+ * \param[out] error    If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+ * \return              Current UDP TTL value
+ */
+unsigned int rs2_get_udp_ttl( const rs2_device * device, rs2_error ** error );
+
+/**
+ * Set UDP packet "time to live" (TTL)
+ * \param[in] device    RealSense device
+ * \param[in] ttl       UDP TTL value (1-255)
+ * \param[out] error    If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+ */
+void rs2_set_udp_ttl( const rs2_device * device, unsigned int ttl, rs2_error ** error );
+
+/**
  * Restores configuration to factory settings
  * \param[in] device    RealSense device
  * \param[out] error    If non-null, receives any error that occurs during this call, otherwise, errors are ignored

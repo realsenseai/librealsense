@@ -6,7 +6,7 @@ from rspy import log, test
 
 
 device_info = dds.message.device_info.from_json( {
-    "name": "Intel RealSense D405",
+    "name": "RealSense D405",
     "serial": "123622270732",
     "product-line": "D400",
     "topic-root": "realdds/D405/123622270732"

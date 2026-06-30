@@ -1,5 +1,5 @@
 // License: Apache 2.0. See LICENSE file in root directory.
-// Copyright(c) 2022 RealSense, Inc. All Rights Reserved.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 /*!
  * @file flexible.h
@@ -33,16 +33,16 @@
 
 #if defined(_WIN32)
 #if defined(EPROSIMA_USER_DLL_EXPORT)
-#if defined(flexible_SOURCE)
-#define flexible_DllAPI __declspec( dllexport )
+#if defined(FLEXIBLE_SOURCE)
+#define FLEXIBLE_DllAPI __declspec( dllexport )
 #else
-#define flexible_DllAPI __declspec( dllimport )
-#endif // flexible_SOURCE
+#define FLEXIBLE_DllAPI __declspec( dllimport )
+#endif // FLEXIBLE_SOURCE
 #else
-#define flexible_DllAPI
+#define FLEXIBLE_DllAPI
 #endif  // EPROSIMA_USER_DLL_EXPORT
 #else
-#define flexible_DllAPI
+#define FLEXIBLE_DllAPI
 #endif // _WIN32
 
 namespace eprosima {
@@ -57,7 +57,7 @@ namespace realdds {
         namespace raw {
             /*!
              * @brief This class represents the enumeration flexible_data_format defined by the user in the IDL file.
-             * @ingroup FLEXIBLE
+             * @ingroup flexible
              */
             enum flexible_data_format : uint32_t
             {
@@ -67,7 +67,7 @@ namespace realdds {
             };
             /*!
              * @brief This class represents the structure flexible defined by the user in the IDL file.
-             * @ingroup FLEXIBLE
+             * @ingroup flexible
              */
             class flexible
             {
@@ -95,7 +95,7 @@ namespace realdds {
                  * @param x Reference to the object realdds::topics::raw::flexible that will be copied.
                  */
                 eProsima_user_DllExport flexible(
-                        flexible&& x);
+                        flexible&& x) noexcept;
 
                 /*!
                  * @brief Copy assignment.
@@ -109,7 +109,7 @@ namespace realdds {
                  * @param x Reference to the object realdds::topics::raw::flexible that will be copied.
                  */
                 eProsima_user_DllExport flexible& operator =(
-                        flexible&& x);
+                        flexible&& x) noexcept;
 
                 /*!
                  * @brief Comparison operator.
@@ -196,11 +196,11 @@ namespace realdds {
                 eProsima_user_DllExport std::vector<uint8_t>& data();
 
                 /*!
-                 * @brief This function returns the maximum serialized size of an object
-                 * depending on the buffer alignment.
-                 * @param current_alignment Buffer alignment.
-                 * @return Maximum serialized size.
-                 */
+                * @brief This function returns the maximum serialized size of an object
+                * depending on the buffer alignment.
+                * @param current_alignment Buffer alignment.
+                * @return Maximum serialized size.
+                */
                 eProsima_user_DllExport static size_t getMaxCdrSerializedSize(
                         size_t current_alignment = 0);
 
@@ -257,9 +257,11 @@ namespace realdds {
                 realdds::topics::raw::flexible_data_format m_data_format;
                 std::array<uint8_t, 4> m_version;
                 std::vector<uint8_t> m_data;
+
             };
         } // namespace raw
     } // namespace topics
 } // namespace realdds
 
 #endif // _FAST_DDS_GENERATED_REALDDS_TOPICS_RAW_FLEXIBLE_H_
+

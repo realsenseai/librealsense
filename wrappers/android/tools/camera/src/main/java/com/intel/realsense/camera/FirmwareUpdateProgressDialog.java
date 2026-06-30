@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.DialogFragment;
-import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -14,11 +13,9 @@ import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
-import com.intel.realsense.librealsense.CameraInfo;
 import com.intel.realsense.librealsense.Device;
 import com.intel.realsense.librealsense.DeviceList;
 import com.intel.realsense.librealsense.Extension;
-import com.intel.realsense.librealsense.ProductLine;
 import com.intel.realsense.librealsense.ProgressListener;
 import com.intel.realsense.librealsense.RsContext;
 import com.intel.realsense.librealsense.Updatable;
@@ -56,16 +53,6 @@ public class FirmwareUpdateProgressDialog extends DialogFragment {
         return rv;
     }
 
-    private int getFwImageId(Device device){
-        if(device.supportsInfo(CameraInfo.PRODUCT_LINE)){
-            ProductLine pl = ProductLine.valueOf(device.getInfo(CameraInfo.PRODUCT_LINE));
-            switch (pl){
-                case D400: return R.raw.fw_d4xx;
-            }
-        }
-        throw new RuntimeException("FW update is not supported for the connected device");
-    }
-
     private static byte[] readFwFile(InputStream in) throws IOException {
         int length = in.available();
         byte[] rv = new byte[length];
@@ -79,10 +66,6 @@ public class FirmwareUpdateProgressDialog extends DialogFragment {
         return new FileInputStream(fwFile);
     }
 
-    private static InputStream getInputStream(Context context, int fwResId) throws IOException {
-        return context.getResources().openRawResource(fwResId);
-    }
-
     private Runnable mFirmwareUpdate = new Runnable() {
         @Override
         public void run() {
@@ -93,14 +76,16 @@ public class FirmwareUpdateProgressDialog extends DialogFragment {
                 if(dl.getDeviceCount() == 0)
                     return;
                 try(Device d = dl.createDevice(0)){
+                    if(mFirmwareFilePath.equals("")){
+                        throw new RuntimeException("Firmware update requires a .bin file. Download one from https://dev.realsenseai.com/docs/firmware-updates");
+                    }
+                    final byte[] bytes = readFwFile(getInputStream(mFirmwareFilePath));
                     if(d.is(Extension.UPDATE_DEVICE)) {
                         UpdateDevice fwud = d.as(Extension.UPDATE_DEVICE);
-                        final byte[] bytes = readFwFile(getInputStream(getActivity(), getFwImageId(d)));
                         updateFirmware(fwud, bytes);
                         done = true;
                         notify = true;
-                    } else if(d.is(Extension.UPDATABLE) && !mFirmwareFilePath.equals("")){
-                        final byte[] bytes = readFwFile(getInputStream(mFirmwareFilePath));
+                    } else if(d.is(Extension.UPDATABLE)){
                         Updatable fwud = d.as(Extension.UPDATABLE);
                         updateFirmware(fwud, bytes);//TODO: make it work
                     }

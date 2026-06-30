@@ -45,4 +45,6 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/features/gain-limit-feature.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/features/gyro-sensitivity-feature.h"
         "${CMAKE_CURRENT_LIST_DIR}/features/gyro-sensitivity-feature.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/features/close-range-filter-feature.h"
+        "${CMAKE_CURRENT_LIST_DIR}/features/close-range-filter-feature.cpp"
 )

@@ -287,10 +287,14 @@ private:
                 }
                 objects.emplace_back(
                     face->get_id(),
-                    rsutils::string::from(),
+                    object_type_to_string( object_type::face ),
                     normalized_color_bbox,
                     normalized_depth_bbox,
-                    face->get_depth()
+                    face->get_depth(),
+                    0.f,           // metadata_depth — not provided by face detection
+                    0.5f, 0.5f,    // com_rel_u/v — not computed for faces
+                    0,             // score — not provided by face detection
+                    object_type::face
                 );
             }
 

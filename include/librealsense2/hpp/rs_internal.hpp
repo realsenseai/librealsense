@@ -94,6 +94,22 @@ namespace rs2
         }
 
         /**
+        * Add inference stream to software sensor
+        *
+        * \param[in] inference_stream   all the parameters that required to define an inference stream
+        */
+        stream_profile add_inference_stream(rs2_inference_stream inference_stream, bool is_default=false)
+        {
+            rs2_error* e = nullptr;
+
+            auto profile = rs2_software_sensor_add_inference_stream_ex(_sensor.get(), inference_stream, is_default, &e);
+            error::handle(e);
+
+            stream_profile stream(profile);
+            return stream;
+        }
+
+        /**
         * Inject video frame into the sensor
         *
         * \param[in] frame   all the parameters that required to define video frame

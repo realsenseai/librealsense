@@ -62,9 +62,8 @@ namespace Intel.RealSense
                     Console.WriteLine("    Serial number: {0}", dev.Info[CameraInfo.SerialNumber]);
                     Console.WriteLine("    Firmware version: {0}", dev.Info[CameraInfo.FirmwareVersion]);
 
-                    var sensors = dev.QuerySensors();
-                    var depthSensor = sensors[0];
-                    var colorSensor = sensors[1];
+                    var depthSensor = dev.FirstDepthSensor();
+                    var colorSensor = dev.FirstColorSensor();
 
                     var depthProfile = depthSensor.StreamProfiles
                                         .Where(p => p.Stream == Stream.Depth)

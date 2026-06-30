@@ -94,11 +94,10 @@ void report_error(std::string error)
     if (button == IDCANCEL)
     {
         std::stringstream ss;
-        rs2_error* e = nullptr;
 
         ss << "| | |\n";
         ss << "|---|---|\n";
-        ss << "|**librealsense**|" << rs2::api_version_to_string(rs2_get_api_version(&e)) << (rs2::is_debug() ? " DEBUG" : " RELEASE") << "|\n";
+        ss << "|**librealsense**|" << RS2_API_FULL_VERSION_STR << (rs2::is_debug() ? " DEBUG" : " RELEASE") << "|\n";
         ss << "|**OS**|" << rsutils::os::get_os_name() << "|\n\n";
         ss << "RealSense Viewer / Depth Quality Tool has crashed with the following error message:\n";
         ss << "```\n";

@@ -1,0 +1,3 @@
+[build]
+# Use the project's build directory instead of src-tauri/target
+target-dir = "../../../../../build/tauri-target"

@@ -1,0 +1,261 @@
+import { useMemo } from 'react'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts'
+import { useAppStore } from '../store'
+
+export function IMUViewer() {
+  const { isIMUViewerExpanded, toggleIMUViewer, imuHistory, clearIMUHistory, isStreaming } =
+    useAppStore()
+
+  const hasIMUData = imuHistory.accel.length > 0 || imuHistory.gyro.length > 0
+
+  // Format data for charts
+  const accelData = useMemo(() => {
+    return imuHistory.accel.map((d, i) => ({
+      index: i,
+      x: d.x,
+      y: d.y,
+      z: d.z,
+    }))
+  }, [imuHistory.accel])
+
+  const gyroData = useMemo(() => {
+    return imuHistory.gyro.map((d, i) => ({
+      index: i,
+      x: d.x,
+      y: d.y,
+      z: d.z,
+    }))
+  }, [imuHistory.gyro])
+
+  // Get latest values
+  const latestAccel = imuHistory.accel[imuHistory.accel.length - 1]
+  const latestGyro = imuHistory.gyro[imuHistory.gyro.length - 1]
+  
+  // Calculate magnitude (norm) for latest values
+  const accelNorm = latestAccel 
+    ? Math.sqrt(latestAccel.x ** 2 + latestAccel.y ** 2 + latestAccel.z ** 2)
+    : null
+  const gyroNorm = latestGyro
+    ? Math.sqrt(latestGyro.x ** 2 + latestGyro.y ** 2 + latestGyro.z ** 2)
+    : null
+
+  return (
+    <div className="border-t border-gray-700 bg-rs-dark">
+      {/* Header */}
+      <button
+        onClick={toggleIMUViewer}
+        className="w-full flex items-center justify-between p-3 hover:bg-gray-800 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <svg
+            className="w-5 h-5 text-orange-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+            />
+          </svg>
+          <span className="font-semibold">IMU Data</span>
+          {hasIMUData && (
+            <span className="text-xs text-gray-500">
+              ({imuHistory.accel.length} accel, {imuHistory.gyro.length} gyro samples)
+            </span>
+          )}
+        </div>
+        <svg
+          className={`w-5 h-5 transition-transform ${isIMUViewerExpanded ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        </svg>
+      </button>
+
+      {/* Expanded Content */}
+      {isIMUViewerExpanded && (
+        <div className="p-4 border-t border-gray-700">
+          {!isStreaming ? (
+            <div className="text-center text-gray-500 py-8">
+              <p>Start streaming with IMU sensors enabled to see data</p>
+            </div>
+          ) : !hasIMUData ? (
+            <div className="text-center text-gray-500 py-8">
+              <p>No IMU data received</p>
+              <p className="text-sm mt-1">Make sure accelerometer and gyroscope streams are enabled</p>
+            </div>
+          ) : (
+            <>
+              {/* Current Values Display */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* Accelerometer */}
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-orange-400">Accelerometer</h3>
+                    <span className="text-xs text-gray-500">m/s²</span>
+                  </div>
+                  {latestAccel ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div>
+                          <span className="text-red-400">X:</span>{' '}
+                          <span className="font-mono">{latestAccel.x.toFixed(3)}</span>
+                        </div>
+                        <div>
+                          <span className="text-green-400">Y:</span>{' '}
+                          <span className="font-mono">{latestAccel.y.toFixed(3)}</span>
+                        </div>
+                        <div>
+                          <span className="text-blue-400">Z:</span>{' '}
+                          <span className="font-mono">{latestAccel.z.toFixed(3)}</span>
+                        </div>
+                      </div>
+                      {accelNorm !== null && (
+                        <div className="mt-2 pt-2 border-t border-gray-700 text-sm">
+                          <span className="text-purple-400">‖a‖:</span>{' '}
+                          <span className="font-mono font-semibold">{accelNorm.toFixed(3)}</span>
+                          <span className="text-xs text-gray-500 ml-1">
+                            {Math.abs(accelNorm - 9.81) < 0.5 ? '(≈1g)' : ''}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-gray-500 text-sm">No data</p>
+                  )}
+                </div>
+
+                {/* Gyroscope */}
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-red-400">Gyroscope</h3>
+                    <span className="text-xs text-gray-500">rad/s</span>
+                  </div>
+                  {latestGyro ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div>
+                          <span className="text-red-400">X:</span>{' '}
+                          <span className="font-mono">{latestGyro.x.toFixed(3)}</span>
+                        </div>
+                        <div>
+                          <span className="text-green-400">Y:</span>{' '}
+                          <span className="font-mono">{latestGyro.y.toFixed(3)}</span>
+                        </div>
+                        <div>
+                          <span className="text-blue-400">Z:</span>{' '}
+                          <span className="font-mono">{latestGyro.z.toFixed(3)}</span>
+                        </div>
+                      </div>
+                      {gyroNorm !== null && (
+                        <div className="mt-2 pt-2 border-t border-gray-700 text-sm">
+                          <span className="text-purple-400">‖ω‖:</span>{' '}
+                          <span className="font-mono font-semibold">{gyroNorm.toFixed(3)}</span>
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({(gyroNorm * 180 / Math.PI).toFixed(1)}°/s)
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-gray-500 text-sm">No data</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Charts */}
+              <div className="grid grid-cols-2 gap-4">
+                <IMUChart data={accelData} title="Accelerometer History" titleColor="text-orange-400" />
+                <IMUChart data={gyroData} title="Gyroscope History" titleColor="text-red-400" />
+              </div>
+
+              {/* Actions */}
+              <div className="mt-4 flex gap-2">
+                <button onClick={clearIMUHistory} className="control-button-secondary text-sm">
+                  Clear History
+                </button>
+                <button
+                  onClick={() => exportIMUData(imuHistory)}
+                  className="control-button-secondary text-sm"
+                >
+                  Export CSV
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface IMUChartProps {
+  data: { index: number; x: number; y: number; z: number }[]
+  title: string
+  titleColor: string
+}
+
+function IMUChart({ data, title, titleColor }: IMUChartProps) {
+  if (data.length === 0) return null
+  return (
+    <div className="bg-gray-800 rounded-lg p-3">
+      <h4 className={`text-sm font-semibold mb-2 ${titleColor}`}>{title}</h4>
+      <div className="h-40">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+            <XAxis dataKey="index" tick={false} stroke="#666" />
+            <YAxis stroke="#666" fontSize={10} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1a1a2e', border: 'none' }}
+              labelStyle={{ color: '#888' }}
+            />
+            <Legend wrapperStyle={{ fontSize: '10px' }} />
+            <Line type="monotone" dataKey="x" stroke="#ef4444" dot={false} strokeWidth={1} />
+            <Line type="monotone" dataKey="y" stroke="#22c55e" dot={false} strokeWidth={1} />
+            <Line type="monotone" dataKey="z" stroke="#3b82f6" dot={false} strokeWidth={1} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+function exportIMUData(history: {
+  accel: { timestamp: number; x: number; y: number; z: number }[]
+  gyro: { timestamp: number; x: number; y: number; z: number }[]
+}) {
+  let csvContent = 'type,timestamp,x,y,z\n'
+
+  for (const data of history.accel) {
+    csvContent += `accel,${data.timestamp},${data.x},${data.y},${data.z}\n`
+  }
+
+  for (const data of history.gyro) {
+    csvContent += `gyro,${data.timestamp},${data.x},${data.y},${data.z}\n`
+  }
+
+  const blob = new Blob([csvContent], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `imu_data_${Date.now()}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}

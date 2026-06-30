@@ -11,7 +11,7 @@
         "values."
     ],
     "device": {
-        "name": "Intel RealSense D435I",
+        "name": "RealSense D435I",
         "product line": "D400"
     },
     "parameters": {

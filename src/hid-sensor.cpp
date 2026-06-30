@@ -422,7 +422,7 @@ rs2_time_t iio_hid_timestamp_reader::get_frame_timestamp( const std::shared_ptr<
                 reinterpret_cast< const hid_header * >( f->additional_data.metadata_blob.data() )->timestamp );
 
         // HID timestamps are aligned to FW Default - usec units
-        return static_cast< rs2_time_t >( timestamp * TIMESTAMP_USEC_TO_MSEC );
+        return static_cast< rs2_time_t >( timestamp * MICROSEC_TO_MILLISEC );
     }
 
     if( ! started )

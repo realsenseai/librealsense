@@ -20,16 +20,21 @@ The steps are described in [Linux manual installation guide](./installation.md)
 ## Installing the packages:
 - Register the server's public key:
 ```
+# Ensure the directory exists
 sudo mkdir -p /etc/apt/keyrings
-curl -sSf https://librealsense.realsenseai.com/Debian/librealsense.pgp | sudo tee /etc/apt/keyrings/librealsense.pgp > /dev/null
+
+# Download and dearmor
+curl -sSf https://librealsense.realsenseai.com/Debian/librealsenseai.asc | \
+gpg --dearmor | sudo tee /etc/apt/keyrings/librealsenseai.gpg > /dev/null
 ```
+Note: The keyring contains both the new RS public key and the Intel public key for old repos, ensuring compatibility with both new and existing packages.
 
 - Make sure apt HTTPS support is installed:
 `sudo apt-get install apt-transport-https`
 
 - Add the server to the list of repositories:
 ```
-echo "deb [signed-by=/etc/apt/keyrings/librealsense.pgp] https://librealsense.realsenseai.com/Debian/apt-repo `lsb_release -cs` main" | \
+echo "deb [signed-by=/etc/apt/keyrings/librealsenseai.gpg] https://librealsense.realsenseai.com/Debian/apt-repo `lsb_release -cs` main" | \
 sudo tee /etc/apt/sources.list.d/librealsense.list
 sudo apt-get update
 ```

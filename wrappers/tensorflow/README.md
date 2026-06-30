@@ -1,8 +1,8 @@
-# TensorFlow with Intel RealSense Cameras
+# TensorFlow with RealSense Cameras
 
 ## Introduction
 
-TensorFlow is extremely popular open source platform for machine learning. This tutorial series will highlight different ways TensorFlow-based machine learning can be applied with Intel RealSense Depth Cameras. We'll be using python as language of choice, but same concepts can be easily ported to other languages.
+TensorFlow is extremely popular open source platform for machine learning. This tutorial series will highlight different ways TensorFlow-based machine learning can be applied with RealSense Depth Cameras. We'll be using python as language of choice, but same concepts can be easily ported to other languages.
 
 ## Installation
 
@@ -16,10 +16,10 @@ We'll need the following components:
 
 > **Note on GPU Support**: In order to run TensorFlow with GPU acceleration on NVidia GPUs you need to install `tensorflow-gpu` python package and compatible versions of CUDA and cuDNN libraries. [List of compatible combinations](https://www.tensorflow.org/install/source_windows#gpu)
 
-We assume you are already familiar with the basics of operating Intel RealSense devices in python. Please see [official documentation](https://github.com/realsenseai/librealsense/tree/development/wrappers/python#python-wrapper) for more information and code samples. 
+We assume you are already familiar with the basics of operating RealSense devices in python. Please see [official documentation](https://github.com/realsenseai/librealsense/tree/development/wrappers/python#python-wrapper) for more information and code samples. 
 
 ## Part 1 - Object Detection and Classification
-Intel RealSense Camera can be used for object detection and classification with TensorFlow like any other video source. [Example 1](example1%20-%20object%20detection.py) is showing standard object detection using TensorFlow and data from the RGB sensor. 
+RealSense Camera can be used for object detection and classification with TensorFlow like any other video source. [Example 1](example1%20-%20object%20detection.py) is showing standard object detection using TensorFlow and data from the RGB sensor. 
 
 In order to run this example, you will need model file. Please download and extract one of the models from [TensorFlow-Object-Detection-API](https://github.com/opencv/opencv/wiki/TensorFlow-Object-Detection-API#use-existing-config-file-for-your-model) page. We are using [Faster-RCNN Inception v2](https://arxiv.org/pdf/1611.10012.pdf) for this example, but other networks can be easily swapped-in. Extracted `frozen_inference_graph.pb` is expected to be in the working directory when running the script. 
 
@@ -108,7 +108,7 @@ Expected output:
 
 ## Part 2 - Augmenting output using Depth data
 
-Since Intel RealSense Cameras also offer per-pixel depth information, we can use this extra data to solve additional problems related to our detection and classification example. In [Example 2](example2%20-%20person%20height.py) we'll use color data to detect people and depth data to quickly estimate the height of each person.
+Since RealSense Cameras also offer per-pixel depth information, we can use this extra data to solve additional problems related to our detection and classification example. In [Example 2](example2%20-%20person%20height.py) we'll use color data to detect people and depth data to quickly estimate the height of each person.
 
 In this example we will configure depth stream in addition to color:
 ```py
@@ -212,5 +212,5 @@ The output is a BAG file that could be opened by RealSense viewer.
 
 ## Conclusions
 
-This article is showing small number of examples for using deep learning together with Intel RealSense hardware. It is intended to be further extended and you are welcomed to propose enhancements and new code samples. You are also free to use provided sample code, dataset and model for research or commercial use, in compliance with Intel RealSense SDK 2.0 [License](https://github.com/realsenseai/librealsense/blob/master/LICENSE)
+This article is showing small number of examples for using deep learning together with RealSense hardware. It is intended to be further extended and you are welcomed to propose enhancements and new code samples. You are also free to use provided sample code, dataset and model for research or commercial use, in compliance with RealSense SDK 2.0 [License](https://github.com/realsenseai/librealsense/blob/master/LICENSE)
 

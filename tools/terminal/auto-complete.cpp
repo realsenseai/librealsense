@@ -65,8 +65,6 @@ void auto_complete::backspace(const int num_of_backspaces)
             break;
 
         cout << '\b';
-        cout << BACKSLASH_ZERO;
-        cout << '\b';
 
         if (_num_of_chars2_in_line != 0)
             --_num_of_chars2_in_line;
@@ -76,6 +74,8 @@ void auto_complete::backspace(const int num_of_backspaces)
             _chars2_queue.pop_back();
         }
     }
+    // Clear from cursor to end of line (removes leftover characters)
+    cout << "\033[K";
 }
 
 void auto_complete::handle_special_key(const vector<uint8_t>& chars)
@@ -234,7 +234,7 @@ string auto_complete::get_line(std::function <bool()> to_stop)
 
             cout << ch;
         }
-        else if (ch == BACKSPACE)
+        else if( ch == BACKSPACE || ch == BACKSPACE_ALT )
         {
             _finds_vec.clear();
             _tab_index = 0;

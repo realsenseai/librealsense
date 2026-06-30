@@ -168,6 +168,13 @@ dds_temporal_filter::dds_temporal_filter()
     _name = "Temporal Filter";
 }
 
+// Improved Close Range Depth filter implementation
+dds_close_range_filter::dds_close_range_filter()
+    : dds_embedded_filter()
+{
+    _name = "Improved Close Range Depth";
+}
+
 // Factory and utility functions
 std::shared_ptr<dds_embedded_filter> create_embedded_filter(const std::string& filter_name)
 {
@@ -175,6 +182,8 @@ std::shared_ptr<dds_embedded_filter> create_embedded_filter(const std::string& f
         return std::make_shared<dds_decimation_filter>();
     else if ( filter_name == "Temporal Filter")
         return std::make_shared<dds_temporal_filter>();
+    else if ( filter_name == "Improved Close Range Depth")
+        return std::make_shared<dds_close_range_filter>();
     else
         DDS_THROW(runtime_error, "Unknown embedded filter name: " + filter_name);
 }

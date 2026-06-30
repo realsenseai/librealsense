@@ -75,6 +75,7 @@ The message format is a [flexible message](../include/realdds/topics/flexible/) 
 All are optional except `name` and `topic-root`. Any fields not shown above will be ignored.
 
 The fields above are constants and not expected to change between device restarts! They should likewise remain the same in recovery mode.
+The `topic-root` is the device identity and is how a client matches a re-discovered device to one it already knows, so it cannot change for a given device.
 
 Besides the fields above, certain configurable settings may be needed before proper initialization of the device is possible (via the notifications topic). These may change between device initializations:
 

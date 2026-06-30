@@ -38,6 +38,7 @@ namespace librealsense
 
         uint16_t _pid;    // product PID
         optional_value<uint8_t> _motion_module_device_idx;
+        bool _has_motion_module_failed = false;
     };
 
     class d400_motion : public d400_motion_base
@@ -56,6 +57,7 @@ namespace librealsense
         friend class ds_fisheye_sensor;
         friend class ds_motion_sensor;
 
+        void register_gyro_sensitivity();
 
     private:
         void register_fisheye_options();

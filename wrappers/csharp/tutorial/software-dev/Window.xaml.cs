@@ -66,9 +66,8 @@ namespace Intel.RealSense
                     Console.WriteLine("    Serial number: {0}", dev.Info[CameraInfo.SerialNumber]);
                     Console.WriteLine("    Firmware version: {0}", dev.Info[CameraInfo.FirmwareVersion]);
 
-                    var sensors = dev.QuerySensors();
-                    var depthSensor = sensors[0];
-                    var colorSensor = sensors[1];
+                    var depthSensor = dev.FirstDepthSensor();
+                    var colorSensor = dev.FirstColorSensor();
                    
                     var depthProfiles = depthSensor.StreamProfiles
                                         .Where(p => p.Stream == Stream.Depth)
@@ -161,7 +160,7 @@ namespace Intel.RealSense
                 var sync = new Syncer();
 
                 // The raw depth->metric units translation scale is required for Colorizer to work
-                var realDepthSensor = profile.Device.QuerySensors().First(s => s.Is(Extension.DepthSensor));
+                var realDepthSensor = profile.Device.FirstDepthSensor();
                 depth_sensor.AddReadOnlyOption(Option.DepthUnits, realDepthSensor.DepthScale);
 
                 depth_sensor.Open(depth_profile);

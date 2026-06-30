@@ -3,9 +3,9 @@
 ## Overview
 
 This example demonstrates usage of the recorder and playback devices. We'll show how to use `rs2::recorder` with `rs2::pipeline` to
-record frames from the camera to a .bag file ('a.bag' in the example), with an option to pause and resume the recording. 
+record frames from the camera to a .db3 file ('a.db3' in the example), with an option to pause and resume the recording. 
 
-After the file is ready, we'll demonstrate how to play, pause, seek and stop a .bag file using `rs2::playback`.
+After the file is ready, we'll demonstrate how to play, pause, seek and stop a .db3 file using `rs2::playback`.
 
 Throughout the example, frames from the active device (default, recorder or playback) will be rendered.
 
@@ -46,7 +46,7 @@ Also, we include header files used for measuring time in the playback and for co
 We'll use 2 helper functions for rendering the GUI, to allow us to make the main code less verbose.
 
 ```cpp
-// Helper function for dispaying time conveniently
+// Helper function for displaying time conveniently
 std::string pretty_time(std::chrono::nanoseconds duration);
 // Helper function for rendering a seek bar
 void draw_seek_bar(rs2::playback& playback, int* seek_pos, float2& location, float width);
@@ -58,8 +58,10 @@ We first define some variables that will be used to show the window and GUI.
 
 ```cpp
 // Create a simple OpenGL window for rendering:
-window app(1280, 720, "RealSense Post Processing Example");
-ImGui_ImplGlfw_Init(app, false);
+window app(1280, 720, "RealSense Record and Playback Example");
+ImGui::CreateContext();
+ImGui_ImplGlfw_InitForOpenGL(app, false);
+ImGui_ImplOpenGL3_Init();
 
 // Create booleans to control GUI (recorded - allow play button, recording - show 'recording to file' text)
 bool recorded = false;
@@ -118,7 +120,7 @@ because we might run out of frames.
 if (!device.as<rs2::playback>())
 {
     frames = pipe->wait_for_frames(); // wait for next set of frames from the camera
-    depth = color_map(frames.get_depth_frame()); // Find and colorize the depth data
+    depth = color_map.process(frames.get_depth_frame()); // Find and colorize the depth data
 }	
 ```
 
@@ -129,7 +131,7 @@ First, we allow recording only if playback is not currently running.
 if (!device.as<rs2::playback>()) 
 ```
 
-There are two cases where the 'record' button would be clicked: begin a recodring, or resume a recorder that has already started.
+There are two cases where the 'record' button would be clicked: begin a recording, or resume a recorder that has already started.
 We check whether `device` is a already recorder to indicate which of the cases it is.
 
 ```cpp
@@ -144,34 +146,34 @@ In the first case, we stop the pipeline and initiate the shared pointer with a n
 pipe->stop(); // Stop the pipeline with the default configuration
 pipe = std::make_shared<rs2::pipeline>();
 ```
-Then we initiate a new configuration, allowing recording to the file 'a.bag' using the function `enable_record_to_file`, and start the
+Then we initiate a new configuration, allowing recording to the file 'a.db3' using the function `enable_record_to_file`, and start the
 pipeline with the new configuration. Also, we update the `device` variable to hold the current device.
 
 ```cpp
 rs2::config cfg; // Declare a new configuration
-cfg.enable_record_to_file("a.bag");
+cfg.enable_record_to_file("a.db3");
 pipe->start(cfg); //File will be opened at this point
 device = pipe->get_active_profile().get_device();
 ```
 
 
-In the second case, the device is already a recorder, so we can just use it's `resume` function. In order to acces function of `rs2::recorder`,
+In the second case, the device is already a recorder, so we can just use its `resume` function. In order to access functions of `rs2::recorder`,
 we use `as<rs2::recorder>()` .
 
 ```cpp
 else { // If the recording is resumed after a pause, there's no need to reset the shared pointers
-    device->as<rs2::recorder>().resume(); // rs2::recorder allows access to 'resume' function
+    device.as<rs2::recorder>().resume(); // rs2::recorder allows access to 'resume' function
 }
 ```
 
 We can pause the recording using the 'pause' function of the `rs2::recorder`.
 
 ```cpp
-device->as<rs2::recorder>().pause();
+device.as<rs2::recorder>().pause();
 ```
 
 To stop recording, we need to stop the pipeline and release any resources that the pipeline holds,
-including the 'a.bag' file. Therefore, we initiate the shared pointer with a new pipeline.
+including the 'a.db3' file. Therefore, we initiate the shared pointer with a new pipeline.
 
 ```cpp
 pipe->stop(); // Stop the pipeline that holds the file and the recorder
@@ -192,18 +194,18 @@ Now that we have a recorded file, we can play it using the 'playback' device. Th
 we use `enable_device_from_file` function on the configuration:
 
 ```cpp
-if (!device.as<rs2::playback>()) {
-    rs2::playback playback = device.as<rs2::playback>();
+if (!device.as<rs2::playback>())
+{
     pipe->stop(); // Stop streaming with default configuration
     pipe = std::make_shared<rs2::pipeline>();
     rs2::config cfg;
-    cfg.enable_device_from_file("a.bag");
+    cfg.enable_device_from_file("a.db3");
     pipe->start(cfg); //File will be opened in read mode at this point
-    device = pipe->get_active_profile().get_device();  
+    device = pipe->get_active_profile().get_device();
 }
 else
 {
-    playback.resume();
+    device.as<rs2::playback>().resume();
 }
 ```
 
@@ -224,7 +226,7 @@ In order to render frames from the playback, we check if there are ready frames 
 ```cpp
 if (pipe->poll_for_frames(&frames)) // Check if new frames are ready
 {
-    depth = color_map(frames.get_depth_frame()); // Find and colorize the depth data for rendering
+    depth = color_map.process(frames.get_depth_frame()); // Find and colorize the depth data for rendering
 }
 ```
 
@@ -232,12 +234,12 @@ Also, we call `draw_seek_bar` function which allows the user to control the play
 
 ```cpp
 // Render a seek bar for the player
-float2 location = { app.width() / 4, 4 * app.height() / 5 + 100 };
-draw_seek_bar(device->as<rs2::playback>(), &seek_pos, location, app.width() / 2);
+float2 location = { app.width() / 4, 4 * app.height() / 5 + 110 };
+draw_seek_bar(playback, &seek_pos, location, app.width() / 2);
 ```
 
 Finally, depth rendering is implemented by the `texture` class from [example.hpp](../example.hpp)
 ```cpp
 // Render depth frames from the default configuration, the recorder or the playback
-depth_image.render(depth, { app.width() / 4, 0, 3 * app.width() / 5, 3 * app.height() / 5 + 50 });
+depth_image.render(depth, { app.width() * 0.25f, app.height() * 0.25f, app.width() * 0.5f, app.height() * 0.75f });
 ```

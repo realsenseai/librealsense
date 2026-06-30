@@ -5,6 +5,8 @@
 
 #include "d400-private.h"
 
+#include <atomic>
+
 #include "algo.h"
 #include "error-handling.h"
 #include "core/debug.h"
@@ -82,6 +84,7 @@ namespace librealsense
         }
 
         d400_device( std::shared_ptr< const d400_info > const & );
+        ~d400_device() override;
 
         std::vector<uint8_t> send_receive_raw_data(const std::vector<uint8_t>& input) override;
 
@@ -102,6 +105,7 @@ namespace librealsense
         std::vector<uint8_t> backup_flash( rs2_update_progress_callback_sptr callback) override;
         void update_flash(const std::vector<uint8_t>& image, rs2_update_progress_callback_sptr callback, int update_mode) override;
         bool check_fw_compatibility(const std::vector<uint8_t>& image) const override;
+        std::string get_firmware_min_version() const override;
         std::string get_opcode_string(int opcode) const override;
 
     protected:
@@ -127,12 +131,16 @@ namespace librealsense
 
         void init(std::shared_ptr<context> ctx, const platform::backend_device_group& group);
         void register_features();
+        void set_imu_type();
+        void get_fw_details( const std::vector< uint8_t > & gvd_buff, std::string & optic_serial,
+                             std::string & asic_serial, std::string & fwv ) const;
+        bool is_d401_usb_device( uint8_t gvd_hw_type ) const;
 
         friend class d400_depth_sensor;
+        friend class ds_advanced_mode_base;
 
         std::shared_ptr<hw_monitor> _hw_monitor;
         firmware_version            _fw_version;
-        firmware_version            _recommended_fw_version;
         ds::ds_caps               _device_capabilities;
 
         std::shared_ptr<stream_interface> _depth_stream;
@@ -145,6 +153,12 @@ namespace librealsense
         rsutils::lazy< std::vector< uint8_t > > _coefficients_table_raw;
         rsutils::lazy< std::vector< uint8_t > > _new_calib_table_raw;
 
+        // MUST be declared before _polling_error_handler — destruction order matters:
+        // members destruct in reverse declaration order, so _polling_error_handler's
+        // worker thread joins (and dereferences this weak_ptr) while _device_alive is
+        // still alive.
+        std::shared_ptr<std::atomic<bool>> _device_alive
+            = std::make_shared<std::atomic<bool>>(true);
         std::shared_ptr<polling_error_handler> _polling_error_handler;
         std::shared_ptr<ds_thermal_monitor> _thermal_monitor;
         std::shared_ptr< rsutils::lazy< rs2_extrinsics > > _left_right_extrinsics;
@@ -155,6 +169,9 @@ namespace librealsense
         std::shared_ptr<auto_gain_limit_option> _gain_limit_value_control;
         std::shared_ptr<auto_exposure_limit_option> _ae_limit_value_control;
         bool _is_mipi_device;
+        std::string _imu_type;
+
+        std::function<void()> _depth_units_register_action;
     };
 
     class ds5u_device : public d400_device
@@ -171,5 +188,6 @@ namespace librealsense
 
     // Update device name according capability in it.
     void update_device_name(std::string& device_name, const ds::ds_caps cap);
+    void update_d405_device_name( std::string & device_name );
 
  }

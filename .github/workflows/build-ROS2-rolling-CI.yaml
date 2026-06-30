@@ -1,0 +1,92 @@
+name: build_lrs_ROS2_package_rolling
+
+# Rolling Ridley CI (Ubuntu 26.04 Resolute) — split from the main ROS 2
+# workflow because Rolling currently needs transitional workarounds that
+# don't apply to the stable distros (Humble/Kilted/Jazzy/Lyrical):
+#
+#   - ros-rolling-* debs for `resolute` are still only in the `ros2-testing`
+#     apt index; the stable `ros2` index has not synced yet.
+#   - We use `ros2-testing-apt-source` (and `use-ros2-testing: true` for
+#     setup-ros) until the sync lands on packages.ros.org/ros2.
+#
+# Fold back into build-ROS2-package-CI.yaml (and delete this file) once
+# ros-rolling-desktop is published in the stable resolute apt index
+# (packages.ros.org/ros2/dists/resolute).
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+jobs:
+
+  build_lrs_ros2_package_rolling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: ubuntu:resolute
+    steps:
+
+      - name: install ROS 2 apt source (ros2-testing)
+        # Workaround: setup-ros resolves the ros-apt-source version via an
+        # unauthenticated GitHub API call (60 req/hour per IP, shared across
+        # hosted runners), which intermittently gets rate-limited and fails the
+        # job with a 404. Pre-installing the package here makes setup-ros skip
+        # that step.
+        # Remove once fixed upstream (ros-tooling/setup-ros).
+        shell: bash
+        env:
+          # Pin ros-apt-source to a known release; the .deb is verified against
+          # the SHA-256 below so a tampered CDN can't be silently installed.
+          # When bumping ROS_APT_SOURCE_VERSION, refresh the hash from:
+          #   https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/tags/<VERSION>
+          # (each asset has a `digest: sha256:...` field).
+          ROS_APT_SOURCE_VERSION: "1.2.0"
+        run: |
+          set -euo pipefail
+          apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
+          # Restore this line (and drop the ros2-testing-apt-source line below)
+          # when ros-rolling-desktop is published in the stable resolute apt
+          # index (packages.ros.org/ros2/dists/resolute).
+          # pkg=ros2-apt-source
+          pkg=ros2-testing-apt-source
+          codename=resolute
+          expected=da9261ca7c06244da1528e0ede44018f7bb2e24a8a077eb0202f70706b578546
+          deb="${pkg}_${ROS_APT_SOURCE_VERSION}.${codename}_all.deb"
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o /tmp/ros2-apt-source.deb \
+            "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/${deb}"
+          actual=$(sha256sum /tmp/ros2-apt-source.deb | awk '{print $1}')
+          if [ "${actual}" != "${expected}" ]; then
+            echo "ERROR: SHA-256 mismatch for ${deb}"
+            echo "  expected: ${expected}"
+            echo "  actual:   ${actual}"
+            exit 1
+          fi
+          dpkg -i /tmp/ros2-apt-source.deb
+
+      - name: setup ROS environment
+        uses: ros-tooling/setup-ros@77bcad67a6cb15f6192d61464d99bbab658e4ca9 #v0.7.18
+        with:
+          required-ros-distributions: rolling
+          # Restore to false (or remove) once rolling debs for resolute ship
+          # in the stable ros2 apt index.
+          use-ros2-testing: true
+
+      - name: build librealsense ROS 2
+        uses: ros-tooling/action-ros-ci@3a640b10f09b756dabe556dac5413aba369f71b0 #v0.4.8
+        with:
+          target-ros2-distro: rolling
+          skip-tests: true
+          colcon-defaults: |  # We align the build flags to the librealsense2 ROS2 release build.
+            {
+              "build": {
+                "cmake-args": [
+                    "-DBUILD_GRAPHICAL_EXAMPLES=OFF",
+                    "-DBUILD_EXAMPLES=OFF"
+                ]
+              }
+            }

@@ -100,7 +100,7 @@ int main(int argc, char * argv[]) try
                     pipe->stop(); // Stop the pipeline with the default configuration
                     pipe = std::make_shared<rs2::pipeline>();
                     rs2::config cfg; // Declare a new configuration
-                    cfg.enable_record_to_file("a.bag");
+                    cfg.enable_record_to_file("a.db3");
                     pipe->start(cfg); //File will be opened at this point
                     device = pipe->get_active_profile().get_device();
                 }
@@ -119,7 +119,7 @@ int main(int argc, char * argv[]) try
                 if (recording)
                 {
                     ImGui::SetCursorPos({ app.width() / 2 - 100, 3 * app.height() / 5 + 60 });
-                    ImGui::TextColored({ 255 / 255.f, 64 / 255.f, 54 / 255.f, 1 }, "Recording to file 'a.bag'");
+                    ImGui::TextColored({ 255 / 255.f, 64 / 255.f, 54 / 255.f, 1 }, "Recording to file 'a.db3'");
                 }
 
                 // Pause the playback if button is clicked
@@ -155,7 +155,7 @@ int main(int argc, char * argv[]) try
                     pipe->stop(); // Stop streaming with default configuration
                     pipe = std::make_shared<rs2::pipeline>();
                     rs2::config cfg;
-                    cfg.enable_device_from_file("a.bag");
+                    cfg.enable_device_from_file("a.db3");
                     pipe->start(cfg); //File will be opened in read mode at this point
                     device = pipe->get_active_profile().get_device();
                 }

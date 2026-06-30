@@ -188,6 +188,15 @@ namespace Intel.RealSense
             NativeMethods.rs2_context_remove_device(handle, file, out error);
         }
 
+        /// <summary>Converts a legacy ROS1 .bag recording to a ROS2 .db3 file</summary>
+        /// <param name="inputBagPath">Path to the input .bag file</param>
+        /// <param name="outputDb3Path">Path for the output .db3 file</param>
+        public void ConvertBagToDb3(string inputBagPath, string outputDb3Path)
+        {
+            object error;
+            NativeMethods.rs2_convert_bag_to_db3(inputBagPath, outputDb3Path, handle, IntPtr.Zero, IntPtr.Zero, out error);
+        }
+
         private void OnDevicesChangedInternal(IntPtr removedList, IntPtr addedList, IntPtr userData)
         {
             var e = OnDevicesChangedEvent;

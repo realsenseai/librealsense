@@ -67,7 +67,10 @@ enum rs2_format  // copy from rs2_sensor.h
     RS2_FORMAT_Z16H,  /**< DEPRECATED! - Variable-length Huffman-compressed 16-bit depth values. */
     RS2_FORMAT_FG,    /**< 16-bit per-pixel frame grabber format. */
     RS2_FORMAT_Y411,  /**< 12-bit per-pixel. */
-    RS2_FORMAT_COMBINED_MOTION,
+    RS2_FORMAT_Y16I,  /**< 12-bit per pixel interleaved. 12-bit left, 12-bit right. */
+    RS2_FORMAT_M420,  /**< YUV 4:2:0: y for each pixel, and u,v for every four pixels - packed as 2 lines of y, 1 line of u,v. 12 bits per pixel on average. */
+    RS2_FORMAT_COMBINED_MOTION, /**< Combined motion data, as in the combined_motion structure */
+    RS2_FORMAT_NV12,  /**< Semi-planar YUV 4:2:0: full-resolution Y plane followed by interleaved half-resolution U,V plane. 12 bits per pixel. */
     RS2_FORMAT_COUNT  /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
 };
 
@@ -93,6 +96,8 @@ int dds_video_encoding::to_rs2() const
         { "BYR2", RS2_FORMAT_RAW16 },
         { "R10", RS2_FORMAT_RAW10 },
         { "Y10B", RS2_FORMAT_Y10BPACK },
+        { "M420", RS2_FORMAT_M420 },  // Used by D500 color streams
+        { "NV12", RS2_FORMAT_NV12 },
     };
 
     std::string s = to_string();
@@ -126,6 +131,8 @@ dds_video_encoding dds_video_encoding::from_rs2( int rs2_format )
     case RS2_FORMAT_RAW10: encoding = "R10"; break;
     case RS2_FORMAT_UYVY: encoding = "uyvy"; break;
     case RS2_FORMAT_Y10BPACK: encoding = "Y10B"; break;
+    case RS2_FORMAT_M420: encoding = "M420"; break;  // Used by D500 color streams
+    case RS2_FORMAT_NV12: encoding = "NV12"; break;
     default:
         DDS_THROW( runtime_error, "cannot translate rs2_format " + std::to_string( rs2_format ) + " to any known dds_video_encoding" );
     };

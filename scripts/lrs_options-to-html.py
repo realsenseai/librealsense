@@ -142,7 +142,7 @@ html = f'''<!DOCTYPE html>
 </head>
 <body>
   <div class="container">
-    <h1>Intel RealSense™ SDK Build Customization Flags</h1>
+    <h1>RealSense SDK Build Customization Flags</h1>
     <h2>{get_sdk_version()}</h2>
     <table>
       <tr>

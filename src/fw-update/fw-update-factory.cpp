@@ -27,6 +27,10 @@ namespace librealsense
             return RS2_PRODUCT_LINE_D500;
         if( ds::D585S_RECOVERY_PID == usb_info.pid )
             return RS2_PRODUCT_LINE_D500;
+        if( ds::D500_RECOVERY_PID == usb_info.pid )
+            return RS2_PRODUCT_LINE_D500;
+        if( ds::D500_USB2_RECOVERY_PID == usb_info.pid )
+            return RS2_PRODUCT_LINE_D500;
         return 0;
     }
 
@@ -78,6 +82,8 @@ namespace librealsense
                             return std::make_shared< ds_d400_update_device >(shared_from_this(), usb);
                         case ds::D555_RECOVERY_PID:
                         case ds::D585S_RECOVERY_PID:
+                        case ds::D500_RECOVERY_PID:
+                        case ds::D500_USB2_RECOVERY_PID:
                             return std::make_shared< ds_d500_update_device >(shared_from_this(), usb);
                         default:
                             // Do nothing

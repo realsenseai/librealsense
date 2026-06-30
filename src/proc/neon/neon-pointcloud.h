@@ -6,7 +6,7 @@
 
 namespace librealsense
 {
-#if defined(__ARM_NEON)  && ! defined ANDROID
+#if defined(__ARM_NEON) && defined(BUILD_WITH_NEON) && !defined(ANDROID)
     class pointcloud_neon : public pointcloud
     {
     public:

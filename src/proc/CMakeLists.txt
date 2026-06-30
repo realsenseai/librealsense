@@ -44,8 +44,6 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/auto-exposure-processor.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/y411-converter.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/formats-converter.cpp"
-        "${CMAKE_CURRENT_LIST_DIR}/decimation-embedded-filter.cpp"
-        "${CMAKE_CURRENT_LIST_DIR}/temporal-embedded-filter.cpp"
 
         "${CMAKE_CURRENT_LIST_DIR}/processing-blocks-factory.h"
         "${CMAKE_CURRENT_LIST_DIR}/align.h"
@@ -79,6 +77,8 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/auto-exposure-processor.h"
         "${CMAKE_CURRENT_LIST_DIR}/y411-converter.h"
         "${CMAKE_CURRENT_LIST_DIR}/formats-converter.h"
+        "${CMAKE_CURRENT_LIST_DIR}/embedded-filter-base.h"
         "${CMAKE_CURRENT_LIST_DIR}/decimation-embedded-filter.h"
         "${CMAKE_CURRENT_LIST_DIR}/temporal-embedded-filter.h"
+        "${CMAKE_CURRENT_LIST_DIR}/close-range-embedded-filter.h"
 )

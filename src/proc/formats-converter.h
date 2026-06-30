@@ -50,7 +50,8 @@ namespace librealsense
         void update_target_profiles_data( const stream_profiles & from_profiles );
         void cache_from_profiles( const stream_profiles & from_profiles );
 
-        std::shared_ptr< stream_profile_interface > clone_profile( const std::shared_ptr< stream_profile_interface > & from_profile ) const;
+        std::shared_ptr< stream_profile_interface > clone_profile( const std::shared_ptr< stream_profile_interface > & from_profile,
+                                                                   rs2_stream target_stream = RS2_STREAM_ANY ) const;
         bool is_profile_in_list( const std::shared_ptr< stream_profile_interface > & profile, const stream_profiles & profiles ) const;
 
         std::pair< std::shared_ptr< processing_block_factory >, stream_profiles >

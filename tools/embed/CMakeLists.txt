@@ -10,14 +10,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 add_executable(rs-embed
    rs-embed.cpp
-   ${LZ4_DIR}/lz4.h
-   ${LZ4_DIR}/lz4.c
 )
 
 set_property(TARGET rs-embed PROPERTY CXX_STANDARD 11)
 
-include_directories(rs-embed ${LZ4_DIR} ../../third-party)
-target_link_libraries( rs-embed PRIVATE tclap )
+target_include_directories(rs-embed PRIVATE ../../third-party)
+target_link_libraries( rs-embed PRIVATE tclap rs_lz4 )
 set_target_properties (rs-embed PROPERTIES FOLDER Tools)
 
 

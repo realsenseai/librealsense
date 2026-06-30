@@ -12,7 +12,11 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 
 void init_device(py::module &m) {
     /** rs_device.hpp **/
-    py::class_<rs2::device> device(m, "device"); // No docstring in C++
+    // rs2::device destructor calls functions that might wait for Python callbacks to finish (e.g. dispatcher::stop)
+    // Those callbacks need to hold the GIL so the py_holder releases our hold of the GIL to let them run.
+    // Not releasing the GIL might lead to a deadlock (in certain scenario/timing).
+    // Note - device inheritors need to use py_holder as well.
+    py::class_<rs2::device, py_holder<rs2::device>> device(m, "device"); // No docstring in C++
     device.def("query_sensors", &rs2::device::query_sensors, "Returns the list of adjacent devices, "
                "sharing the same physical parent composite device.")
         .def_property_readonly("sensors", &rs2::device::query_sensors, "List of adjacent devices, "
@@ -27,12 +31,16 @@ void init_device(py::module &m) {
         .def("supports", &rs2::device::supports, "Check if specific camera info is supported.", "info"_a)
         .def("get_info", &rs2::device::get_info, "Retrieve camera specific information, "
              "like versions of various internal components", "info"_a)
-        .def("hardware_reset", &rs2::device::hardware_reset, "Send hardware reset request to the device")
+        .def("hardware_reset", &rs2::device::hardware_reset, "Send hardware reset request to the device",
+             py::call_guard<py::gil_scoped_release>())
         .def(py::init<>())
         .def("__nonzero__", &rs2::device::operator bool) // Called to implement truth value testing in Python 2
         .def("__bool__", &rs2::device::operator bool) // Called to implement truth value testing in Python 3
         .def( "is_connected", &rs2::device::is_connected )
         .def("is_in_recovery_mode", &rs2::device::is_in_recovery_mode)
+        .def("get_firmware_min_version", &rs2::device::get_firmware_min_version,
+             "Get the minimum firmware version supported by this device's SKU (e.g. \"5.10.0.17\"). "
+             "Throws if the device does not implement the FW-update protocol or has no defined minimum.")
         .def(BIND_DOWNCAST(device, debug_protocol))
         .def(BIND_DOWNCAST(device, playback))
         .def(BIND_DOWNCAST(device, recorder))
@@ -45,24 +53,26 @@ void init_device(py::module &m) {
         .def("__repr__", [](const rs2::device &self) {
             std::ostringstream ss;
             auto name = self.get_info( RS2_CAMERA_INFO_NAME );
-            if( 0 == strncmp( name, "Intel RealSense ", 16 ) )
-                name += 16;
+            if( 0 == strncmp( name, "RealSense ", 10 ) )
+                name += 10;
             ss << "<" SNAME ".device: " << name;
             if (self.supports(RS2_CAMERA_INFO_SERIAL_NUMBER))
                 ss << " (S/N: " << self.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
             else
                 ss << " (FW update id: " << self.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
             if (self.supports(RS2_CAMERA_INFO_FIRMWARE_VERSION))
-                ss << "  FW: " << self.get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION);
+                ss << " FW: " << self.get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION);
             if (self.supports(RS2_CAMERA_INFO_SMCU_FW_VERSION))
-                ss << "  SMCU: " << self.get_info(RS2_CAMERA_INFO_SMCU_FW_VERSION);
+                ss << " SMCU: " << self.get_info(RS2_CAMERA_INFO_SMCU_FW_VERSION);
+            if (self.supports(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION))
+                ss << " MIPI DRIVER: " << self.get_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION);
             if( self.supports( RS2_CAMERA_INFO_CAMERA_LOCKED )
                 && strcmp( "YES", self.get_info( RS2_CAMERA_INFO_CAMERA_LOCKED ) ) )
-                ss << "  UNLOCKED";
+                ss << " UNLOCKED";
             if (self.supports(RS2_CAMERA_INFO_CONNECTION_TYPE))
             {
                 auto connection_type = self.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE);
-                ss << "  on ";
+                ss << " on ";
                 ss << connection_type;
                 if (strcmp(connection_type, "USB") == 0)
                     if (self.supports(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR))
@@ -86,36 +96,43 @@ void init_device(py::module &m) {
             return rs2::metadata_helper::instance().is_enabled(id);
         });
 
+    m.def("enable_metadata", []() {
+        rs2::metadata_helper::instance().enable_metadata();
+    }, "Enable per-frame metadata at OS level for connected D400/D500 devices. "
+       "Windows: writes HKLM UVC registry keys; must be called from an admin process. "
+       "Throws RuntimeError on failure.",
+       py::call_guard<py::gil_scoped_release>());
+
     // not binding update_progress_callback, templated
 
-    py::class_<rs2::updatable, rs2::device> updatable(m, "updatable"); // No docstring in C++
+    py::class_<rs2::updatable, rs2::device, py_holder<rs2::updatable>> updatable(m, "updatable"); // No docstring in C++
     updatable.def(py::init<rs2::device>())
         .def("enter_update_state", &rs2::updatable::enter_update_state, "Move the device to update state, this will cause the updatable device to disconnect and reconnect as an update device.", py::call_guard<py::gil_scoped_release>())
         .def("create_flash_backup", (std::vector<uint8_t>(rs2::updatable::*)() const) &rs2::updatable::create_flash_backup,
              "Create backup of camera flash memory. Such backup does not constitute valid firmware image, and cannot be "
              "loaded back to the device, but it does contain all calibration and device information.", py::call_guard<py::gil_scoped_release>())
-        .def("create_flash_backup", [](rs2::updatable& self, std::function<void(float)> f) { return self.create_flash_backup(f); },
+        .def("create_flash_backup", [](rs2::updatable& self, std::function<void(float)> f) { return self.create_flash_backup(std::move(f)); },
              "Create backup of camera flash memory. Such backup does not constitute valid firmware image, and cannot be "
              "loaded back to the device, but it does contain all calibration and device information.",
              "callback"_a, py::call_guard<py::gil_scoped_release>())
         .def("update_unsigned", (void(rs2::updatable::*)(const std::vector<uint8_t>&, int) const) &rs2::updatable::update_unsigned,
              "Update an updatable device to the provided unsigned firmware. This call is executed on the caller's thread.", "fw_image"_a,
              "update_mode"_a = RS2_UNSIGNED_UPDATE_MODE_UPDATE, py::call_guard<py::gil_scoped_release>())
-        .def("update_unsigned", [](rs2::updatable& self, const std::vector<uint8_t>& fw_image, std::function<void(float)> f, int update_mode) { return self.update_unsigned(fw_image, f, update_mode); },
+        .def("update_unsigned", [](rs2::updatable& self, const std::vector<uint8_t>& fw_image, std::function<void(float)> f, int update_mode) { return self.update_unsigned(fw_image, std::move(f), update_mode); },
              "Update an updatable device to the provided unsigned firmware. This call is executed on the caller's thread and provides progress notifications via the callback.",
              "fw_image"_a, "callback"_a, "update_mode"_a = RS2_UNSIGNED_UPDATE_MODE_UPDATE, py::call_guard<py::gil_scoped_release>())
         .def("check_firmware_compatibility", &rs2::updatable::check_firmware_compatibility, "Check firmware compatibility with device. "
             "This method should be called before burning a signed firmware.", "image"_a);
 
-    py::class_<rs2::update_device, rs2::device> update_device(m, "update_device");
+    py::class_<rs2::update_device, rs2::device, py_holder<rs2::update_device>> update_device(m, "update_device");
     update_device.def(py::init<rs2::device>())
         .def("update", [](rs2::update_device& self, const std::vector<uint8_t>& fw_image) { return self.update(fw_image); },
              "Update an updatable device to the provided firmware. This call is executed on the caller's thread.", "fw_image"_a, py::call_guard<py::gil_scoped_release>())
-        .def("update", [](rs2::update_device& self, const std::vector<uint8_t>& fw_image, std::function<void(float)> f) { return self.update(fw_image, f); },
+        .def("update", [](rs2::update_device& self, const std::vector<uint8_t>& fw_image, std::function<void(float)> f) { return self.update(fw_image, std::move(f)); },
              "Update an updatable device to the provided firmware. This call is executed on the caller's thread and provides progress notifications via the callback.",
              "fw_image"_a, "callback"_a, py::call_guard<py::gil_scoped_release>());
 
-    py::class_<rs2::auto_calibrated_device, rs2::device> auto_calibrated_device(m, "auto_calibrated_device");
+    py::class_<rs2::auto_calibrated_device, rs2::device, py_holder<rs2::auto_calibrated_device>> auto_calibrated_device(m, "auto_calibrated_device");
     auto_calibrated_device.def(py::init<rs2::device>(), "device"_a)
         .def("write_calibration", &rs2::auto_calibrated_device::write_calibration, "Write calibration that was set by set_calibration_table to device's EEPROM.", py::call_guard<py::gil_scoped_release>())
         .def("run_on_chip_calibration", [](rs2::auto_calibrated_device& self, std::string json_content, int timeout_ms)
@@ -127,7 +144,7 @@ void init_device(py::module &m) {
         .def("run_on_chip_calibration", [](rs2::auto_calibrated_device& self, std::string json_content, std::function<void(float)> f, int timeout_ms)
         {
             float health;
-            rs2::calibration_table table = self.run_on_chip_calibration(json_content, &health, f, timeout_ms);
+            rs2::calibration_table table = self.run_on_chip_calibration(json_content, &health, std::move(f), timeout_ms);
             return std::make_tuple(table, std::make_tuple(health, 0.0));
         },"This will improve the depth noise (plane fit RMS). This call is executed on the caller's thread and provides progress notifications via the callback.", "json_content"_a, "callback"_a, "timeout_ms"_a, py::call_guard<py::gil_scoped_release>())
         .def("run_tare_calibration", [](const rs2::auto_calibrated_device& self, float ground_truth_mm, std::string json_content, int timeout_ms)
@@ -139,7 +156,7 @@ void init_device(py::module &m) {
         .def("run_tare_calibration", [](const rs2::auto_calibrated_device& self, float ground_truth_mm, std::string json_content, std::function<void(float)> callback, int timeout_ms)
         {
             float health[] = { 0,0 };
-            rs2::calibration_table table = self.run_tare_calibration(ground_truth_mm, json_content, health, callback, timeout_ms);
+            rs2::calibration_table table = self.run_tare_calibration(ground_truth_mm, json_content, health, std::move(callback), timeout_ms);
             return std::make_tuple(table, std::make_tuple(health[0], health[1]));
         }, "This will adjust camera absolute distance to flat target. This call is executed on the caller's thread and it supports progress notifications via the callback.", "ground_truth_mm"_a, "json_content"_a, "callback"_a, "timeout_ms"_a, py::call_guard<py::gil_scoped_release>())
         .def("process_calibration_frame", [](const rs2::auto_calibrated_device& self, rs2::frame frame, int timeout_ms)
@@ -151,7 +168,7 @@ void init_device(py::module &m) {
         .def("process_calibration_frame", [](const rs2::auto_calibrated_device& self, rs2::frame frame, std::function<void(float)> callback, int timeout_ms)
             {
             float health[] = { 0,0 };
-            rs2::calibration_table table = self.process_calibration_frame(frame, health, callback, timeout_ms);
+            rs2::calibration_table table = self.process_calibration_frame(frame, health, std::move(callback), timeout_ms);
             return std::make_tuple(table, std::make_tuple(health[0], health[1]));
             }, "This will add a frame to the calibration process initiated by run_tare_calibration or run_on_chip_calibration as host assistant process. This call is executed on the caller's thread and it supports progress notifications via the callback.", "frame"_a, "callback"_a, "timeout_ms"_a, py::call_guard<py::gil_scoped_release>())
         .def("run_focal_length_calibration", [](const rs2::auto_calibrated_device& self, rs2::frame_queue left_queue, rs2::frame_queue right_queue,
@@ -170,7 +187,7 @@ void init_device(py::module &m) {
                 float ratio = 0.f;
                 float angle = 0.f;
             return std::make_tuple(self.run_focal_length_calibration(left_queue, right_queue, target_width_mm, target_heigth_mm, adjust_both_sides,
-                &ratio, &angle, callback), ratio, angle);
+                &ratio, &angle, std::move(callback)), ratio, angle);
         }, "Run target-based focal length calibration. This call is executed on the caller's thread and provides progress notifications via the callback.",
             "left_queue"_a, "right_queue"_a, "target_width_mm"_a, "target_heigth_mm"_a, "adjust_both_sides"_a, "callback"_a, py::call_guard<py::gil_scoped_release>())
         .def("run_uv_map_calibration", [](const rs2::auto_calibrated_device& self, rs2::frame_queue left, rs2::frame_queue color, rs2::frame_queue depth,
@@ -186,7 +203,7 @@ void init_device(py::module &m) {
             {
                 constexpr int health_check_params = 4; // px, py, fx, fy for the calibration
                 float health[health_check_params];
-                return std::make_tuple(self.run_uv_map_calibration(left, color, depth, py_px_only, health, health_check_params, callback), health);
+                return std::make_tuple(self.run_uv_map_calibration(left, color, depth, py_px_only, health, health_check_params, std::move(callback)), health);
             }, "Run target-based Depth-RGB UV-map calibraion. This call is executed on the caller's thread and provides progress notifications via the callback.",
             "left"_a, "color"_a, "depth"_a, "py_px_only"_a, "callback"_a, py::call_guard<py::gil_scoped_release>())
         .def("calculate_target_z", [](const rs2::auto_calibrated_device& self, rs2::frame_queue queue1, rs2::frame_queue queue2, rs2::frame_queue queue3,
@@ -198,7 +215,7 @@ void init_device(py::module &m) {
         .def("calculate_target_z", [](const rs2::auto_calibrated_device& self, rs2::frame_queue queue1, rs2::frame_queue queue2, rs2::frame_queue queue3,
             float target_width_mm, float target_height_mm, std::function<void(float)> callback)
             {
-                return self.calculate_target_z(queue1, queue2, queue3, target_width_mm, target_height_mm, callback);
+                return self.calculate_target_z(queue1, queue2, queue3, target_width_mm, target_height_mm, std::move(callback));
             }, "Calculate Z for calibration target - distance to the target's plane. This call is executed on the caller's thread and provides progress notifications via the callback.",
             "queue1"_a, "queue2"_a, "queue3"_a, "target_width_mm"_a, "target_height_mm"_a, "callback"_a, py::call_guard<py::gil_scoped_release>())
         .def("get_calibration_table", &rs2::auto_calibrated_device::get_calibration_table, "Read current calibration table from flash.")
@@ -207,7 +224,7 @@ void init_device(py::module &m) {
         .def("get_calibration_config", &rs2::auto_calibrated_device::get_calibration_config, "Get Calibration Config Table", py::call_guard<py::gil_scoped_release>())
         .def("set_calibration_config", &rs2::auto_calibrated_device::set_calibration_config, "Set Calibration Config Table", "calibration_config_json_str"_a, py::call_guard<py::gil_scoped_release>());
 
-    py::class_<rs2::device_calibration, rs2::device> device_calibration( m, "device_calibration" );
+    py::class_<rs2::device_calibration, rs2::device, py_holder<rs2::device_calibration>> device_calibration( m, "device_calibration" );
     device_calibration.def( py::init<rs2::device>(), "device"_a )
         .def( "trigger_device_calibration",
             []( rs2::device_calibration & self, rs2_calibration_type type )
@@ -219,8 +236,8 @@ void init_device(py::module &m) {
         .def( "register_calibration_change_callback",
             []( rs2::device_calibration& self, std::function<void( rs2_calibration_status )> callback )
             {
-                self.register_calibration_change_callback( 
-                    [callback]( rs2_calibration_status status )
+                self.register_calibration_change_callback(
+                    [callback = std::move(callback)]( rs2_calibration_status status )
                     {
                         try
                         {
@@ -239,13 +256,13 @@ void init_device(py::module &m) {
             "Register (only once!) a callback that gets called for each change in calibration", "callback"_a );
 
 
-    py::class_<rs2::calibration_change_device, rs2::device> calibration_change_device(m, "calibration_change_device");
+    py::class_<rs2::calibration_change_device, rs2::device, py_holder<rs2::calibration_change_device>> calibration_change_device(m, "calibration_change_device");
     calibration_change_device.def(py::init<rs2::device>(), "device"_a)
         .def("register_calibration_change_callback",
             [](rs2::calibration_change_device& self, std::function<void(rs2_calibration_status)> callback)
             {
                 self.register_calibration_change_callback(
-                    [callback](rs2_calibration_status status)
+                    [callback = std::move(callback)](rs2_calibration_status status)
                     {
                         try
                         {
@@ -263,7 +280,7 @@ void init_device(py::module &m) {
             },
             "Register (only once!) a callback that gets called for each change in calibration", "callback"_a);
 
-    py::class_<rs2::debug_protocol> debug_protocol(m, "debug_protocol"); // No docstring in C++
+    py::class_<rs2::debug_protocol, py_holder<rs2::debug_protocol>> debug_protocol(m, "debug_protocol"); // No docstring in C++
     debug_protocol.def(py::init<rs2::device>())
         .def("build_command", &rs2::debug_protocol::build_command, "opcode"_a, "param1"_a = 0, 
             "param2"_a = 0, "param3"_a = 0, "param4"_a = 0, "data"_a = std::vector<uint8_t>()) 

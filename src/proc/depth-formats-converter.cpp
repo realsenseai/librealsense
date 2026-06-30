@@ -18,7 +18,7 @@ namespace librealsense
         auto in = reinterpret_cast<const uint16_t*>(source);
         auto out_ir = reinterpret_cast<uint8_t *>(dest[1]);
 #ifdef RS2_USE_CUDA
-        if (rsutils::rs2_is_gpu_available())
+        if (rsutils::rs2_is_cuda_available())
         {
             rscuda::unpack_z16_y8_from_sr300_inzi_cuda(out_ir, in, count);
             in += count;
@@ -35,7 +35,7 @@ namespace librealsense
         auto in = reinterpret_cast<const uint16_t*>(source);
         auto out_ir = reinterpret_cast<uint16_t*>(dest[1]);
 #ifdef RS2_USE_CUDA
-        if (rsutils::rs2_is_gpu_available())
+        if (rsutils::rs2_is_cuda_available())
         {
             rscuda::unpack_z16_y16_from_sr300_inzi_cuda(out_ir, in, count);
             in += count;

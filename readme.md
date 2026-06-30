@@ -20,6 +20,23 @@ The SDK allows depth and color streaming, and provides intrinsic and extrinsic c
   <a href="https://github.com/realsenseai/librealsense/network/members"><img src="https://img.shields.io/github/forks/realsenseai/librealsense.svg" alt="Forks"></a>
 </p>
 
+## Important Notice
+
+We are happy to announce that the RealSense GitHub repositories have been successfully migrated to the RealSenseAI organization.
+Please make sure to update your links to the new RealSenseAI organization for both cloning the repositories and accessing specific files within them.
+
+[https://github.com/**IntelRealSense**/librealsense](https://github.com/IntelRealSense/librealsense) --> [https://github.com/**realsenseai**/librealsense](https://github.com/realsenseai/librealsense)
+
+>Note 1: A redirection from the previous name IntelRealSense is currently in place, but we cannot guarantee how long it will remain active. We recommend that all users update their references to point to the new GitHub location.
+
+>Note 2: Users who install the SDK via APT are required to update the APT key as explained in the following [guide](https://github.com/realsenseai/librealsense/blob/development/doc/distribution_linux.md#installing-the-packages)
+
+#### Branch Policy
+We have updated our branch policy:
+From now on, we will also push beta releases to the master branch, so users can access up-to-date code and features.
+In the near future, beta binaries will also be pushed to public distribution servers (e.g., APT).
+The last validated official release can be found on our Releases page on GitHub.
+
 ## Use Cases
 
 Below are some of the many real-world applications powered by RealSense technology:

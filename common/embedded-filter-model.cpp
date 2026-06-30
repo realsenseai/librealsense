@@ -90,7 +90,15 @@ namespace rs2
                         {
                             it->second.update_value(changed_option, *_viewer.not_model);
                             if (it->first == RS2_OPTION_EMBEDDED_FILTER_ENABLED)
-                                _enabled = (changed_option->as_integer != 0);
+                            {
+                                // rs2_option_value is a union over as_float/as_integer. For a FLOAT
+                                // option, only as_float is initialized - reading as_integer would
+                                // pick up the uninitialized upper 4 bytes (int64_t vs float).
+                                if (changed_option->is_valid)
+                                    _enabled = (changed_option->type == RS2_OPTION_TYPE_FLOAT)
+                                             ? (changed_option->as_float != 0.0f)
+                                             : (changed_option->as_integer != 0);
+                            }
                         }
                     }
                 });

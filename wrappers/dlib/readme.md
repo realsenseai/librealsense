@@ -1,5 +1,5 @@
-# Dlib Samples for Intel® RealSense™ cameras
-Examples in this folder are designed to complement existing [SDK examples](../../examples) and demonstrate how Intel RealSense cameras can be used together with `dlib` in domain of computer-vision.
+# Dlib Samples for RealSense cameras
+Examples in this folder are designed to complement existing [SDK examples](../../examples) and demonstrate how RealSense cameras can be used together with `dlib` in domain of computer-vision.
 
 > RealSense examples have been designed and tested with dlib version 19.17,
 > Working with newer version may require code changes.

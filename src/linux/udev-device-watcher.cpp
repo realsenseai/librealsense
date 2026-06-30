@@ -38,10 +38,17 @@ namespace {
         {
             char const * sysname = udev_device_get_sysname( dev );
             char const * model = udev_device_get_property_value( dev, "ID_MODEL" );
-            if( ! model  ||  strncmp( model, "Intel", 5 ))
+            
+            // For bind/unbind events, ID_MODEL and sysname may be null
+            if( ! model  ||  strncmp( model, "RealSense", 5 ))
                 model = sysname;
-            os << model;
-            if( model != sysname )
+            
+            if( model )
+                os << model;
+            else
+                os << "<unknown>";
+            
+            if( sysname && model != sysname )
                 os << " [" << sysname << ']';
             //os << udev_device_get_syspath( dev );
 
@@ -106,12 +113,13 @@ udev_device_watcher::udev_device_watcher( const platform::backend * backend )
             }
 
             const string udev_action = udev_device_get_action( udev_dev );
-            if( udev_action == "add" || udev_action == "remove" )
+            if( udev_action == "add" || udev_action == "remove" || udev_action == "bind" || udev_action == "unbind" )
             {
                 LOG_DEBUG( "[udev] " << udev_action << " " << udev_string( udev_dev ) );
                 // On remove events, we get all the device interfaces first, and lastly we get the device.
                 // On add events, we get the device first and only then the device interfaces.
-                // In any case, we get lots of adds/removes for each device. And we only want to do one enumeration --
+                // Hardware reset triggers unbind/bind events instead of remove/add.
+                // In any case, we get lots of events for each device. And we only want to do one enumeration --
                 // so we wait for things to calm down and just remember that enumeration is needed...
                 _changed = true;
             }
