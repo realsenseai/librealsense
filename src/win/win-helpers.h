@@ -20,16 +20,6 @@ namespace librealsense
 {
     namespace platform
     {
-        template <class T>
-        static void safe_release(T& ppT)
-        {
-            if (ppT)
-            {
-                ppT.Release();
-                ppT = NULL;
-            }
-        }
-
         bool is_win10_redstone2();
 
         std::vector<std::string> tokenize(std::string string, char separator);
