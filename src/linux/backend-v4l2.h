@@ -330,7 +330,8 @@ namespace librealsense
             static bool is_device_depth_node(const std::string& dev_name);
             static uint16_t get_mipi_device_pid(const std::string& dev_name);
             static void get_mipi_device_info(const std::string& dev_name,
-                                             std::string& bus_info, std::string& card);
+                                             std::string& bus_info, std::string& card,
+                                             v4l2_capability* out_cap = nullptr);
 
             v4l_uvc_device(const uvc_device_info& info, bool use_memory_map = false);
 
@@ -535,7 +536,8 @@ namespace librealsense
                     const std::string& video_path, const std::string& name);
 
             static void get_mipi_device_info(const std::string& dev_name,
-                                             std::string& bus_info, std::string& card);
+                                             std::string& bus_info, std::string& card,
+                                             v4l2_capability* out_cap = nullptr);
 
             virtual ~v4l_mipi_device();
 

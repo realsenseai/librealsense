@@ -94,6 +94,12 @@ constexpr uint32_t RS_CAMERA_CID_PRESET                     = (RS_CAMERA_CID_BAS
 constexpr uint32_t RS_CAMERA_CID_EMITTER_FREQUENCY          = (RS_CAMERA_CID_BASE+22); // [MIPI - Select projector frequency values: 0->57[KHZ], 1->91[KHZ]
 constexpr uint32_t RS_CAMERA_CID_HWMC                       = (RS_CAMERA_CID_BASE+32);
 
+// USB/MIPI Multiple Interface (MI) index values
+// These values identify different functional units within composite devices
+constexpr uint16_t MI_VIDEO_STREAM = 0;  // Video capture nodes (depth, color, IR)
+constexpr uint16_t MI_METADATA     = 3;  // Metadata nodes
+constexpr uint16_t MI_IMU          = 4;  // IMU (Inertial Measurement Unit) nodes
+
 /* refe4rence for kernel 4.9 to be removed
 #define UVC_CID_GENERIC_XU          (V4L2_CID_PRIVATE_BASE+15)
 #define UVC_CID_LASER_POWER_MODE    (V4L2_CID_PRIVATE_BASE+16)
@@ -1083,9 +1089,10 @@ namespace librealsense
         }
 
         void v4l_uvc_device::get_mipi_device_info(const std::string& dev_name,
-                                                  std::string& bus_info, std::string& card)
+                                                  std::string& bus_info, std::string& card,
+                                                  v4l2_capability* out_cap)
         {
-            struct v4l2_capability vcap;
+            struct v4l2_capability vcap = {};
             int fd = open(dev_name.c_str(), O_RDWR);
             if (fd < 0)
                 throw linux_backend_exception("Mipi device capability could not be grabbed");
@@ -1114,6 +1121,10 @@ namespace librealsense
                 card = reinterpret_cast<const char *>(vcap.card);
             }
 
+            // Return the full capability structure if requested
+            if (out_cap)
+                *out_cap = vcap;
+
             ::close(fd);
         }
 
@@ -1122,10 +1133,12 @@ namespace librealsense
             uint16_t vid{}, pid{}, mi{};
             usb_spec usb_specification(usb_undefined);
             std::string bus_info, card;
+            v4l2_capability cap{};
 
             auto dev_name = "/dev/" + name;
 
-            get_mipi_device_info(dev_name, bus_info, card);
+            // Query device info and capabilities in a single call to avoid duplicate VIDIOC_QUERYCAP
+            get_mipi_device_info(dev_name, bus_info, card, &cap);
 
             // find device PID from depth video node
             static uint16_t device_pid = 0;
@@ -1169,20 +1182,33 @@ namespace librealsense
             // further development is needed to permit use of several mipi devices
             static int  first_video_index = ind;
 
-            // Use camera_video_nodes as number of /dev/video[%d] for each camera sensor subset
+            // Calculate camera ID for multi-camera setups
+            // D457 typically has 7 video nodes per camera (depth, color, IR + metadata + IMU)
+            // This is only used for unique_id generation to distinguish between multiple cameras
             const int camera_video_nodes = 7;
             int cam_id = ind / camera_video_nodes;
-            ind = (ind - first_video_index) % camera_video_nodes; // offset from first mipi video node and assume 6 nodes per mipi camera
-            if (ind == 0 || ind == 2 || ind == 4)
-                mi = 0; // video node indicator
-            else if (ind == 1 || ind == 3 || ind == 5)
-                mi = 3; // metadata node indicator
-            else if (ind == 6)
-                mi = 4; // IMU node indicator
+            
+            // Assign MI (Multiple Interface) value based on device capabilities (already queried above)
+            // - Metadata nodes have V4L2_CAP_META_CAPTURE capability → MI_METADATA
+            // - IMU nodes are identified by card name containing "imu" → MI_IMU
+            // - Video capture nodes have V4L2_CAP_VIDEO_CAPTURE capability → MI_VIDEO_STREAM
+            if (cap.device_caps & V4L2_CAP_META_CAPTURE)
+            {
+                mi = MI_METADATA;
+            }
+            else if (std::string(reinterpret_cast<const char*>(cap.card)).find("imu") != std::string::npos)
+            {
+                mi = MI_IMU;
+            }
+            else if ((cap.device_caps & V4L2_CAP_VIDEO_CAPTURE) || (cap.device_caps & V4L2_CAP_VIDEO_CAPTURE_MPLANE))
+            {
+                mi = MI_VIDEO_STREAM;
+            }
             else
             {
-                LOG_WARNING("Unresolved Video4Linux device mi, device is skipped");
-                throw linux_backend_exception("Unresolved Video4Linux device, device is skipped");
+                LOG_WARNING("Unresolved Video4Linux device type for " << dev_name << ", device caps: 0x" 
+                            << std::hex << cap.device_caps << std::dec);
+                throw linux_backend_exception("Unresolved Video4Linux device type, device is skipped");
             }
 
             uvc_device_info info{};
@@ -1211,7 +1237,7 @@ namespace librealsense
                 }
             }
             info.conn_spec = usb_specification;
-            info.uvc_capabilities = get_dev_capabilities(dev_name).device_caps;
+            info.uvc_capabilities = cap.device_caps; // Reuse capabilities already queried above
 
             return info;
         }
@@ -1318,9 +1344,9 @@ namespace librealsense
                         info.dfu_device_path = dfu_device_path;
                     }
 
-                    info.mi = vs.compare("imu") ? 0 : 4;
+                    info.mi = vs.compare("imu") ? MI_VIDEO_STREAM : MI_IMU;
                     info.unique_id += "-" + std::to_string(i);
-                    info.uvc_capabilities &= ~(V4L2_CAP_META_CAPTURE); // clean caps
+                    info.uvc_capabilities &= ~(V4L2_CAP_META_CAPTURE); // Clear metadata cap for video nodes
                     mipi_rs_enum_nodes.emplace_back(info, video_path);
                     // Get metadata node
                     // Check if file on video_md_path is exists
@@ -1340,7 +1366,7 @@ namespace librealsense
                         LOG_WARNING("MIPI video metadata device issue: " << e.what());
                         continue;
                     }
-                    info.mi = 3;
+                    info.mi = MI_METADATA;
                     info.unique_id += "-" + std::to_string(i);
                     mipi_rs_enum_nodes.emplace_back(info, video_md_path);
                 }
