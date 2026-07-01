@@ -25,6 +25,10 @@
 #include <rsutils/string/from.h>
 #include <rsutils/json.h>
 
+#ifdef ENABLED_STATS
+#include "rum/rum-hooks.h"
+#endif
+
 #include <array>
 #include <set>
 #include <unordered_set>
@@ -661,11 +665,26 @@ void log_callback_end( uint32_t fps,
         // Call the processing block on the frame
         _raw_sensor->start(
             make_frame_callback( [&, this]( frame_holder f ) { _formats_converter.convert_frame( f ); } ) );
+
+#ifdef ENABLED_STATS
+        _rum_stream_start = std::chrono::steady_clock::now();
+        _rum_streaming = true;
+#endif
     }
 
     void synthetic_sensor::stop()
     {
         std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
+
+#ifdef ENABLED_STATS
+        if( _rum_streaming )
+        {
+            _rum_streaming = false;
+            auto seconds = std::chrono::duration< double >( std::chrono::steady_clock::now() - _rum_stream_start ).count();
+            rum::hooks::on_stream_duration( get_active_streams(), seconds );
+        }
+#endif
+
         _raw_sensor->stop();
     }
 

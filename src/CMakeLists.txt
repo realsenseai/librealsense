@@ -11,6 +11,8 @@ include(${_rel_path}/usb/CMakeLists.txt)
 include(${_rel_path}/fw-logs/CMakeLists.txt)
 include(${_rel_path}/fw-update/CMakeLists.txt)
 
+include(${_rel_path}/rum/CMakeLists.txt)
+
 message(STATUS "using ${BACKEND}")
 
 if(UNIX OR (ANDROID_NDK_TOOLCHAIN_INCLUDED AND (${BACKEND} STREQUAL RS2_USE_V4L2_BACKEND)))

@@ -123,6 +123,10 @@ EXPORTS
     rs2_delete_raw_data
     rs2_get_raw_data
 
+    rs2_rum_get_report
+    rs2_rum_set_cloud_enabled
+    rs2_rum_is_cloud_enabled
+
     rs2_get_device_info
     rs2_supports_device_info
     rs2_get_sensor_info

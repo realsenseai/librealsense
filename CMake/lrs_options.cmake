@@ -62,4 +62,5 @@ option(ENABLE_SECURITY_FLAGS "Enable additional compiler security flags to enhan
 option(USE_EXTERNAL_LZ4 "Use externally build LZ4 library instead of building and using the in this repo provided version" OFF)
 option(BUILD_ASAN "Enable AddressSanitizer" OFF)
 option(BUILD_ROSBAG2 "Build and use rosbag2 recording system" ON) # temporary flag, should be removed when deprecated ROSBAG1 recording system is removed
+option(ENABLED_STATS "Enable RUM (Real User Monitoring) usage-statistics collection" OFF)
 mark_as_advanced(BUILD_ASAN)
