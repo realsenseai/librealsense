@@ -39,6 +39,10 @@ def test_visual_preset_support(test_device_wrapped):
     _module_state['preset_ok'] = True
 
 
+# NOTE: applying a preset reads back the full advanced-mode state, including
+# Enable Auto White Balance. On D401/GMSL (no RGB sensor, color endpoint shares the
+# depth node) that option must NOT be registered, otherwise this query EINVALs - this
+# test is the live regression guard for that (see d400_color::mipi_rgb_controls_supported).
 def test_set_default_visual_preset(test_device_wrapped):
     if not _module_state.get('preset_ok'):
         pytest.skip("prerequisite test_visual_preset_support failed")

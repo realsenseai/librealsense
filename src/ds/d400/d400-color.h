@@ -41,6 +41,10 @@ namespace librealsense
         uint8_t _color_device_idx = -1;
 
     private:
+        // True only for MIPI SKUs that actually expose the RGB ISP control set.
+        // Folds in the D401/GMSL exclusion so the predicate lives in one place.
+        bool mipi_rgb_controls_supported() const;
+
         void register_options();
         void register_processing_blocks();
 
