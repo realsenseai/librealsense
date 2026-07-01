@@ -9,7 +9,6 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
-    pytest.mark.device_exclude("D401"),
     pytest.mark.device_each("D500*"),
     pytest.mark.context("nightly"),
     pytest.mark.flaky(retries=2),  # See FW stability issue RSDSO-18908
@@ -68,12 +67,18 @@ def test_setting_color_options(test_device_wrapped):
     product_name = dev.get_info(rs.camera_info.name)
     depth_sensor = dev.first_depth_sensor()
 
+    # D401 GMSL exposes color through the depth sensor (no separate color sensor).
     try:
         color_sensor = dev.first_color_sensor()
     except RuntimeError:
-        if 'D421' in product_name or 'D405' in product_name:
+        if 'D401' in product_name:
+            color_sensor = dev.first_depth_sensor()
+        elif 'D405' in product_name:
+            pytest.skip("D405 default preset does not reset hue (see default_405 in presets.cpp)")
+        elif 'D421' in product_name:
             pytest.skip("No color sensor")
-        raise
+        else:
+            raise
 
     if not color_sensor.supports(rs.option.hue):
         pytest.skip("Color sensor does not support hue option")

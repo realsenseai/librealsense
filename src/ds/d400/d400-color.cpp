@@ -127,6 +127,24 @@ namespace librealsense
                 _color_device_idx = _depth_device_idx;
                 d400_device::_color_stream = _color_stream;
                 _separate_color = false;
+
+                // D401 GMSL exposes color through the depth sensor, but color streams from a dedicated
+                // v4l2 node (video-rs-color) that also owns the RGB controls (saturation, white balance,
+                // sharpness, ...) - the depth/front node does not. The depth sensor wraps all mi0 nodes in
+                // a multi_pins_uvc_device that routes every control to the front (depth) node, so RGB
+                // controls never reach the color node. Bind a raw endpoint to the color node for them.
+                if (_is_mipi_device && _pid == ds::RS401_GMSL_PID)
+                {
+                    auto color_node = std::find_if(color_devs_info_mi0.begin(), color_devs_info_mi0.end(),
+                        [](const platform::uvc_device_info& info) { return info.device_path.find("color") != std::string::npos; });
+                    if (color_node != color_devs_info_mi0.end())
+                    {
+                        auto color_uvc_node = get_backend()->create_uvc_device(*color_node);
+                        if (color_uvc_node)
+                            _raw_color_ep = std::make_shared<uvc_sensor>("Raw RGB Camera", color_uvc_node,
+                                std::unique_ptr<frame_timestamp_reader>(new ds_timestamp_reader()), this);
+                    }
+                }
             }
             else
                 throw invalid_value_exception( rsutils::string::from() << "RS4XX: RGB modules inconsistency - "
@@ -201,10 +219,12 @@ namespace librealsense
             // RGB controls registered for USB but not yet for MIPI (no FW/kernel support):
             //   RS2_OPTION_BRIGHTNESS, RS2_OPTION_CONTRAST, RS2_OPTION_GAMMA,
             //   RS2_OPTION_BACKLIGHT_COMPENSATION, RS2_OPTION_HUE
-            auto raw_color_ep = get_raw_color_sensor();
+            // For D401 GMSL the color node differs from the depth (front) node, so route the RGB
+            // controls to the dedicated color endpoint; other devices use the shared raw color sensor.
+            auto raw_color_ep = _raw_color_ep ? _raw_color_ep : get_raw_color_sensor();
 
-            color_ep.register_pu(RS2_OPTION_SATURATION);
-            color_ep.register_pu(RS2_OPTION_SHARPNESS);
+            color_ep.register_option(RS2_OPTION_SATURATION, std::make_shared<uvc_pu_option>(raw_color_ep, RS2_OPTION_SATURATION));
+            color_ep.register_option(RS2_OPTION_SHARPNESS, std::make_shared<uvc_pu_option>(raw_color_ep, RS2_OPTION_SHARPNESS));
 
             auto white_balance_option = std::make_shared<uvc_pu_option>(raw_color_ep, RS2_OPTION_WHITE_BALANCE);
             auto auto_white_balance_option = std::make_shared<uvc_pu_option>(raw_color_ep, RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE);

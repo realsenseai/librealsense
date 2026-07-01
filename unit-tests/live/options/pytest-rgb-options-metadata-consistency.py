@@ -9,9 +9,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
-    pytest.mark.device_exclude("D421"),
-    pytest.mark.device_exclude("D405"),
-    pytest.mark.device_exclude("D401"),
+    pytest.mark.device_exclude("D421"),  # no color sensor and no color options registered
     pytest.mark.device_each("D500*"),
     pytest.mark.context("nightly"),
 ]
@@ -55,7 +53,16 @@ def test_rgb_options_metadata_consistency(test_device):
     """For each color option, set min/max/default and verify get_option and frame metadata agree."""
     dev, ctx = test_device
 
-    color_sensor = dev.first_color_sensor()
+    # D405 and D401 GMSL expose color through the depth sensor (no separate color sensor),
+    # but the color options (saturation, sharpness, white_balance, ...) are registered there.
+    try:
+        color_sensor = dev.first_color_sensor()
+    except RuntimeError:
+        product_name = dev.get_info(rs.camera_info.name)
+        if 'D405' in product_name or 'D401' in product_name:
+            color_sensor = dev.first_depth_sensor()
+        else:
+            raise
 
     color_profile = next(
         (p for p in color_sensor.profiles
