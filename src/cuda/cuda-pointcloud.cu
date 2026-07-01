@@ -83,8 +83,23 @@ void rscuda::pointcloud_cuda_helper::deproject_depth_cuda( float * points, const
 {
     const int count = intrin.width * intrin.height;
 
-    // (Re)allocate persistent device buffers only when the frame size changes.
-    // On a steady stream this branch runs once, then every frame reuses the buffers.
+    // Zero-copy fast path: when the frame buffers are CUDA pinned+mapped (integrated GPU),
+    // the kernel reads depth and writes points directly in the frame memory -- no H2D/D2H.
+    // try_device_ptr returns nullptr otherwise, and we fall back to the staging buffers.
+    // Gated to zero-copy builds so a plain CUDA build keeps the original staging path
+    // verbatim (no per-frame cudaPointerGetAttributes probing).
+#ifdef RS2_USE_CUDA_ZEROCOPY
+    uint16_t * depth_dev  = rscuda::try_device_ptr<uint16_t>( depth );
+    float *    points_dev = rscuda::try_device_ptr<float>( points );
+#else
+    uint16_t * depth_dev  = nullptr;
+    float *    points_dev = nullptr;
+#endif
+    const bool depth_mapped  = ( depth_dev  != nullptr );
+    const bool points_mapped = ( points_dev != nullptr );
+
+    // (Re)allocate persistent staging buffers only when the frame size changes (and only
+    // for the side(s) that are not mapped). On a steady stream this branch runs once.
     if( count != _count )
     {
         _d_points.reset();
@@ -92,8 +107,16 @@ void rscuda::pointcloud_cuda_helper::deproject_depth_cuda( float * points, const
         _d_intrin.reset();
         _count = count;
     }
-    if( !_d_points ) _d_points = rscuda::alloc_dev<float>( count * 3 );
-    if( !_d_depth )  _d_depth  = rscuda::alloc_dev<uint16_t>( count );
+    if( ! points_mapped )
+    {
+        if( ! _d_points ) _d_points = rscuda::alloc_dev<float>( count * 3 );
+        points_dev = _d_points.get();
+    }
+    if( ! depth_mapped )
+    {
+        if( ! _d_depth ) _d_depth = rscuda::alloc_dev<uint16_t>( count );
+        depth_dev = _d_depth.get();
+    }
 
     // Upload intrinsics once; refresh only if they actually change (e.g. recalibration).
     if( !_d_intrin || std::memcmp( &_intrin_cached, &intrin, sizeof( rs2_intrinsics ) ) != 0 )
@@ -102,7 +125,8 @@ void rscuda::pointcloud_cuda_helper::deproject_depth_cuda( float * points, const
         _intrin_cached = intrin;
     }
 
-    RS_CUDA_CHECK( cudaMemcpy( _d_depth.get(), depth, count * sizeof( uint16_t ), cudaMemcpyHostToDevice ) );
+    if( ! depth_mapped )
+        RS_CUDA_CHECK( cudaMemcpy( depth_dev, depth, count * sizeof( uint16_t ), cudaMemcpyHostToDevice ) );
 
     // 2D launch: warp-sized x dimension keeps a warp's lanes aligned with consecutive pixels,
     // so depth reads stay coalesced. y dimension is sized to hit the threads-per-block target.
@@ -111,10 +135,15 @@ void rscuda::pointcloud_cuda_helper::deproject_depth_cuda( float * points, const
     const dim3 block( rscuda::THREADS_IN_WARP, THREADS_PER_BLOCK / rscuda::THREADS_IN_WARP );
     const dim3 grid( ( intrin.width  + block.x - 1 ) / block.x,
                      ( intrin.height + block.y - 1 ) / block.y );
-    kernel_deproject_depth_cuda<<< grid, block >>>( _d_points.get(), _d_intrin.get(), _d_depth.get(), depth_scale );
+    kernel_deproject_depth_cuda<<< grid, block >>>( points_dev, _d_intrin.get(), depth_dev, depth_scale );
     RS_CUDA_CHECK( cudaGetLastError() );
 
-    RS_CUDA_CHECK( cudaMemcpy( points, _d_points.get(), count * sizeof( float ) * 3, cudaMemcpyDeviceToHost ) );
+    if( points_mapped )
+        // Mapped output: no D2H copy, but the CPU consumer downstream must see the kernel's
+        // writes, so block until the kernel completes.
+        RS_CUDA_CHECK( cudaStreamSynchronize( 0 ) );
+    else
+        RS_CUDA_CHECK( cudaMemcpy( points, _d_points.get(), count * sizeof( float ) * 3, cudaMemcpyDeviceToHost ) );
 }
 
 #endif

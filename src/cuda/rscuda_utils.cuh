@@ -35,6 +35,37 @@ namespace rscuda
         return std::shared_ptr<T>(d_data, [](T* p) { cudaFree(p); });
     }
 
+    // Zero-copy probe: if `host` is CUDA pinned+mapped memory (frame buffers on an
+    // integrated GPU), return the aliasing device pointer so a kernel can read/write it
+    // in place with no cudaMemcpy. Returns nullptr otherwise (plain malloc / discrete /
+    // non-zero-copy build), signalling the caller to use the cudaMalloc + copy path.
+    // Clears the CUDA error state on the not-mapped path so it doesn't leak to RS_CUDA_CHECK.
+    template<typename T>
+    T* try_device_ptr(const void* host)
+    {
+#ifdef RS2_USE_CUDA_ZEROCOPY
+        // Only probe in zero-copy builds. In a plain CUDA build this compiles to
+        // `return nullptr;`, so the existing cudaMalloc + cudaMemcpy path is taken
+        // unchanged (no extra per-frame probe, byte-for-byte identical behavior).
+        //
+        // Handles both memory kinds the zero-copy path produces:
+        //   - managed (frame pool, cudaMallocManaged) -> same ptr is device-usable
+        //   - host-registered mapped (V4L2 capture buffers) -> attr.devicePointer
+        // Unregistered (plain malloc / discrete GPU) -> nullptr -> caller copies.
+        cudaPointerAttributes attr{};
+        if (host && cudaPointerGetAttributes(&attr, host) == cudaSuccess)
+        {
+            if (attr.type == cudaMemoryTypeManaged)
+                return static_cast<T*>(const_cast<void*>(host));
+            if (attr.devicePointer)
+                return static_cast<T*>(attr.devicePointer);
+        }
+        cudaGetLastError();
+#endif
+        (void)host;
+        return nullptr;
+    }
+
     template<typename  T>
     std::shared_ptr<T> make_device_copy(T obj)
     {

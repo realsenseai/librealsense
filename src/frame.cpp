@@ -7,6 +7,9 @@
 
 #include "metadata-parser.h"
 #include "core/enum-helpers.h"
+#ifdef RS2_USE_CUDA
+#include "cuda/cuda-frame-memory.h"
+#endif
 
 #include <rsutils/string/from.h>
 
@@ -137,6 +140,29 @@ const uint8_t * frame::get_frame_data() const
     }
 
     return frame_data;
+}
+
+const void * frame::get_gpu_data_or_upload( bool * copied )
+{
+#ifdef RS2_USE_CUDA
+  #ifdef RS2_USE_CUDA_ZEROCOPY
+    // True zero-copy: the frame is already GPU-mapped, no copy needed.
+    if( void * z = rs_frame_zc_device_ptr( get_frame_data() ) )
+    {
+        if( copied ) *copied = false;
+        return z;
+    }
+  #endif
+    // Otherwise upload to the frame's cached device buffer (a real, SDK-managed copy).
+    if( void * dev = rs_frame_gpu_upload( &_gpu_upload_buffer, &_gpu_upload_capacity,
+                                          get_frame_data(), static_cast< size_t >( get_frame_data_size() ) ) )
+    {
+        if( copied ) *copied = true;
+        return dev;
+    }
+#endif
+    if( copied ) *copied = false;
+    return nullptr;
 }
 
 rs2_timestamp_domain frame::get_frame_timestamp_domain() const
