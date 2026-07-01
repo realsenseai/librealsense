@@ -1,103 +1,14 @@
 # License: Apache 2.0. See LICENSE file in root directory.
-# Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
-
-#temporary fix to prevent the test from running on Win_SH_Py_DDS_CI
-#test:donotrun:dds
-#test:donotrun:!nightly
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import pyrealsense2 as rs, os, random, csv
-from rspy import test, repo
-import urllib.request
-from urllib.error import URLError, HTTPError
-import platform
+from pytest_check import check
+from rspy import repo
 
-def download_file(url, subdir, filename):
-    destination = os.path.join(subdir, filename)
-    try:
-        if not os.path.exists(subdir):
-            os.makedirs(subdir, exist_ok=True)
-            print(f"Created directory: {subdir}")
-
-        if not os.path.exists(destination):
-            print(f"Downloading {url}/{filename} to {destination}")
-            try:
-                req = urllib.request.Request(url)
-                with urllib.request.urlopen(req) as response, open(destination, 'wb') as out_file:
-                    out_file.write(response.read())
-                print(f"Downloaded {filename} successfully.")
-            except (URLError, HTTPError) as e:
-                print(f"Failed to download {url}/{filename}: {e.reason}")
-                return False
-    except OSError as e:
-        print(f"Failed to create directory {subdir}: {e.strerror}")
-        return False
-
-    return True
-
-RECORDINGS_FOLDER = os.path.join(repo.build, 'unit-tests', 'recordings')
-
-if platform.system() == 'Windows':
-    Deployment_Location = os.getenv('TESTDATA_LOCATION', os.getenv('TEMP', 'C:\\Temp'))
-else:
-    Deployment_Location = os.getenv('TESTDATA_LOCATION', '/tmp/')
-
-PP_Tests_List = [
-    "1551257764229", "1551257812956", "1551257880762", "1551257882796",
-    "1551257884097", "1551257987255", "1551259481873", "1551261946511",
-    "1551262153516", "1551262256875", "1551262841203", "1551262772964",
-    "1551262971309", "1551263177558"
-]
-
-# Extensions for post-processing test files
-PP_Test_extensions_List = [".Input.raw", ".Input.csv", ".Output.raw", ".Output.csv"]
-
-PP_TESTS_URL = "https://librealsense.realsenseai.com/rs-tests/post_processing_tests_2018_ww18/"
-
-def get_sequence_length(contents):
-    sequence_length = 1
-    for line in contents.split('\n'):
-        if "Frames sequence length" in line:
-            parts = line.split(',')
-            if len(parts) > 1 and parts[1].isdigit():
-                sequence_length = int(parts[1])
-                break
-    return sequence_length
-
-def produce_sequence_extensions(source, target):
-    if not os.path.exists(target):
-        download_file(PP_TESTS_URL + source, RECORDINGS_FOLDER, source)
-    with open(target, 'r') as f:
-        contents = f.read()
-    sequence_length = get_sequence_length(contents)
-    return [f".{i}" for i in range(sequence_length)]
-
-print(f"Preparing to download Post-processing tests dataset...\nRemote server: {PP_TESTS_URL}\nTarget Location: {Deployment_Location}")
-
-for test_pattern in PP_Tests_List:
-    sequence_meta_file = f"{test_pattern}.0.Output.csv"
-    source = sequence_meta_file
-    destination = os.path.join(RECORDINGS_FOLDER, sequence_meta_file)
-    sequence_extensions = produce_sequence_extensions(source, destination)
-
-    for ext in PP_Test_extensions_List:
-        for idx in sequence_extensions:
-            test_file_name = f"{test_pattern}{idx}{ext}"
-            source = test_file_name
-            destination = os.path.join(RECORDINGS_FOLDER, test_file_name)
-            download_file(PP_TESTS_URL + test_file_name, RECORDINGS_FOLDER, test_file_name)
-
-for test_pattern in PP_Tests_List:
-    sequence_meta_file = f"{test_pattern}.0.Output.csv"
-    source = sequence_meta_file
-    destination = os.path.join(RECORDINGS_FOLDER, sequence_meta_file)
-    sequence_extensions = produce_sequence_extensions(source, destination)
-
-    for ext in PP_Test_extensions_List:
-        for idx in sequence_extensions:
-            test_file_name = f"{test_pattern}{idx}{ext}"
-            source = test_file_name
-            destination = os.path.join(RECORDINGS_FOLDER, test_file_name)
-            download_file(PP_TESTS_URL + test_file_name, RECORDINGS_FOLDER, test_file_name)
+# The post-processing reference dataset (the 1551*.Input/.Output .raw/.csv files) is
+# provisioned at build time by CMake (unit-tests/live/CMakeLists.txt downloads
+# post_processing_tests_2018_ww18.zip and extracts it into the recordings dir), so the
+# test just reads it from repo.build like the other recording-based tests.
 
 ################################################################################################
 frame_metadata_count = 43
@@ -262,52 +173,52 @@ def attrib_from_csv(file_path):
 
 
 def check_load_test_configuration(test_config):
-    test.check(test_config.name)
-    test.check(test_config.input_res_x)
-    test.check(test_config.input_res_y)
+    check.is_true(test_config.name)
+    check.is_true(test_config.input_res_x)
+    check.is_true(test_config.input_res_y)
 
     for i in range(test_config.frames_sequence_size):
-        test.check(len(test_config._input_frames[i]))
-        test.check(len(test_config._output_frames[i]))
+        check.is_true(len(test_config._input_frames[i]))
+        check.is_true(len(test_config._output_frames[i]))
 
     _padded_width = int((test_config.input_res_x // test_config.downsample_scale) + 3) // 4 * 4
     _padded_height = int((test_config.input_res_y // test_config.downsample_scale) + 3) // 4 * 4
 
-    test.check_equal(test_config.output_res_x, _padded_width)
-    test.check_equal(test_config.output_res_y, _padded_height)
-    test.check(test_config.input_res_x > 0)
-    test.check(test_config.input_res_y > 0)
-    test.check(test_config.output_res_x > 0)
-    test.check(test_config.output_res_y > 0)
-    test.check(abs(test_config.stereo_baseline_mm) > 0)
-    test.check(test_config.depth_units > 0)
-    test.check(test_config.focal_length > 0)
-    test.check(test_config.frames_sequence_size > 0)
+    check.equal(test_config.output_res_x, _padded_width)
+    check.equal(test_config.output_res_y, _padded_height)
+    check.is_true(test_config.input_res_x > 0)
+    check.is_true(test_config.input_res_y > 0)
+    check.is_true(test_config.output_res_x > 0)
+    check.is_true(test_config.output_res_y > 0)
+    check.is_true(abs(test_config.stereo_baseline_mm) > 0)
+    check.is_true(test_config.depth_units > 0)
+    check.is_true(test_config.focal_length > 0)
+    check.is_true(test_config.frames_sequence_size > 0)
 
     for i in range(test_config.frames_sequence_size):
-        test.check_equal(test_config.input_res_x * test_config.input_res_y * 2, len(test_config._input_frames[i]))
-        test.check_equal(test_config.output_res_x * test_config.output_res_y * 2,len(test_config._output_frames[i]))
+        check.equal(test_config.input_res_x * test_config.input_res_y * 2, len(test_config._input_frames[i]))
+        check.equal(test_config.output_res_x * test_config.output_res_y * 2,len(test_config._output_frames[i]))
 
     # The following tests use assumption about the filters intrinsic
     # Note that the specific parameter threshold are verified as of April 2018
     if test_config.spatial_filter:
-        test.check(test_config.spatial_alpha >= 0.25)
-        test.check(test_config.spatial_alpha <= 1.0)
-        test.check(test_config.spatial_delta >= 1)
-        test.check(test_config.spatial_delta <= 50)
-        test.check(test_config.spatial_iterations >= 1)
-        test.check(test_config.spatial_iterations <= 5)
+        check.is_true(test_config.spatial_alpha >= 0.25)
+        check.is_true(test_config.spatial_alpha <= 1.0)
+        check.is_true(test_config.spatial_delta >= 1)
+        check.is_true(test_config.spatial_delta <= 50)
+        check.is_true(test_config.spatial_iterations >= 1)
+        check.is_true(test_config.spatial_iterations <= 5)
 
     if test_config.temporal_filter:
-        test.check(test_config.temporal_alpha >= 0)
-        test.check(test_config.temporal_alpha <= 1.0)
-        test.check(test_config.temporal_delta >= 1)
-        test.check(test_config.temporal_delta <= 100)
-        test.check(test_config.temporal_persistence >= 0)
+        check.is_true(test_config.temporal_alpha >= 0)
+        check.is_true(test_config.temporal_alpha <= 1.0)
+        check.is_true(test_config.temporal_delta >= 1)
+        check.is_true(test_config.temporal_delta <= 100)
+        check.is_true(test_config.temporal_persistence >= 0)
 
     if test_config.holes_filter:
-        test.check(test_config.holes_filling_mode >= 0)
-        test.check(test_config.holes_filling_mode <= 2)
+        check.is_true(test_config.holes_filling_mode >= 0)
+        check.is_true(test_config.holes_filling_mode <= 2)
 
     return True
 
@@ -323,7 +234,7 @@ def load_test_configuration(test_name, test_config):
 
     #checking all the files are present
     for test_name in test_file_names.values():
-        test.check(os.path.exists(base_name+test_name))
+        assert os.path.exists(base_name+test_name)
 
     #Prepare the configuration data set
     test_config.reset()
@@ -366,7 +277,7 @@ def profile_diffs(distances, max_allowed_std, outlier):
         return
 
     max_value = max(distances)
-    test.check_equal(max_value, 0)
+    check.equal(max_value, 0)
 
     e = 0
     inverse = 1/len(distances)
@@ -374,8 +285,8 @@ def profile_diffs(distances, max_allowed_std, outlier):
         e += (distance - mean) ** 2
     standard_deviation = (inverse * e) ** 0.5
 
-    test.check(standard_deviation <= max_allowed_std)
-    test.check(abs(max_value) <= outlier)
+    check.is_true(standard_deviation <= max_allowed_std)
+    check.is_true(abs(max_value) <= outlier)
 
     return (abs(max_value) <= outlier) and (standard_deviation <= max_allowed_std)
 
@@ -384,13 +295,13 @@ def validate_ppf_results(result_depth, reference_data, frame_idx):
 
     domain_transform_only = (reference_data.downsample_scale == 1) and (not reference_data.spatial_filter) and (not reference_data.temporal_filter)
     result_profile = result_depth.get_profile().as_video_stream_profile()
-    test.check_equal(result_profile.width(), reference_data.output_res_x)
-    test.check_equal(result_profile.height(), reference_data.output_res_y)
+    check.equal(result_profile.width(), reference_data.output_res_x)
+    check.equal(result_profile.height(), reference_data.output_res_y)
 
     #Pixel-by-pixel comparison of the resulted filtered depth vs data encoded with external tool
     v1 = bytearray(result_depth.get_data())
     v2 = (reference_data._output_frames[frame_idx])
-    test.check_equal(len(v1), len(v2))
+    check.equal(len(v1), len(v2))
     diff2ref = [abs(byte1 - byte2) for byte1, byte2 in zip(v1, v2)]
 
     #Validate the filters
@@ -401,7 +312,7 @@ def compare_frame_md(origin_depth, result_depth):
     for i in range(frame_metadata_count):
         origin_supported = origin_depth.supports_frame_metadata(rs.frame_metadata_value(i))
         result_supported = result_depth.supports_frame_metadata(rs.frame_metadata_value(i))
-        test.check_equal(origin_supported, result_supported)
+        check.equal(origin_supported, result_supported)
         if origin_supported and result_supported:
             #FRAME_TIMESTAMP and SENSOR_TIMESTAMP metadatas are not included in post proccesing frames,
             #TIME_OF_ARRIVAL continues to increase  after post proccesing
@@ -410,7 +321,7 @@ def compare_frame_md(origin_depth, result_depth):
 
             origin_val = origin_depth.get_frame_metadata(rs.frame_metadata_value(i))
             result_val = result_depth.get_frame_metadata(rs.frame_metadata_value(i))
-            test.check_equal(origin_val, result_val)
+            check.equal(origin_val, result_val)
 
 def create_depth_intrinsics(test_cfg):
     depth_intrinsics = rs.intrinsics()
@@ -451,7 +362,7 @@ def create_frame(test_cfg, depth_stream_profile, index):
 
 
 ################################################################################################
-with test.closure("Post-Processing Filters sequence validation"):
+def test_filters_sequence_validation():
     test_cfg = ppf_test_config()
     for first_element, second_element in ppf_test_cases:
         # Load the data from configuration and raw frame files
@@ -491,8 +402,10 @@ with test.closure("Post-Processing Filters sequence validation"):
 
         depth_sensor.stop()
         depth_sensor.close()
+
+
 ################################################################################################
-with test.closure("Post-Processing Filters metadata validation"):
+def test_filters_metadata_validation():
     test_cfg = ppf_test_config()
     for first_element, second_element in ppf_test_cases:
         # Load the data from configuration and raw frame files
@@ -536,5 +449,3 @@ with test.closure("Post-Processing Filters metadata validation"):
 
         depth_sensor.stop()
         depth_sensor.close()
-################################################################################################
-test.print_results_and_exit()
