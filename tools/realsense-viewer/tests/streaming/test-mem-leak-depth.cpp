@@ -131,14 +131,18 @@ VIEWER_TEST( "streaming", "mem_leak_depth_start_stop" )
     //   Linux:   VmRSS          — includes file-backed mmaps that the kernel can
     //                             evict under memory pressure, and Mesa softpipe
     //                             (under xvfb-run on CI) commits internal buffers
-    //                             in 20-50 MB chunks. Observed slopes on a working
-    //                             build swing 1-10 MB/iter run-to-run from this
-    //                             chunking + eviction (Jetson under softpipe is
-    //                             worst-case), not from a real leak. The threshold
-    //                             is raised so Linux flags only gross regressions;
-    //                             Windows is the tight regression guard.
+    //                             in 20-50 MB chunks. On x86_64 Linux CI observed
+    //                             slopes swing 1-3 MB/iter run-to-run; on Jetson
+    //                             (aarch64 + softpipe) they can reach ~10 MB/iter.
+    //                             Threshold split by arch: aarch64 loose (Jetson
+    //                             noise floor); x86_64 tight (regression guard).
+    //                             Windows/macOS: tight regression guard.
 #ifdef __linux__
-    constexpr float LEAK_THRESHOLD_MB_PER_ITER = 8.0f;
+#  ifdef __aarch64__
+    constexpr float LEAK_THRESHOLD_MB_PER_ITER = 12.0f;
+#  else
+    constexpr float LEAK_THRESHOLD_MB_PER_ITER = 5.0f;
+#  endif
 #else
     constexpr float LEAK_THRESHOLD_MB_PER_ITER = 1.0f;
 #endif
