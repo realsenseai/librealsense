@@ -1,10 +1,6 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2015 RealSense, Inc. All Rights Reserved.
 
-#if (_MSC_FULL_VER < 180031101)
-#error At least Visual Studio 2013 Update 4 is required to compile this backend
-#endif
-
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -22,8 +18,9 @@
 #include <SensAPI.h>
 #include <initguid.h>
 #include <propkeydef.h>
-#include <comutil.h>
+#include <wrl/implements.h>
 #include <rsutils/string/from.h>
+#include <rsutils/string/windows.h>
 
 #pragma comment(lib, "Sensorsapi.lib")
 #pragma comment(lib, "PortableDeviceGuids.lib")
@@ -36,69 +33,29 @@ namespace librealsense
 {
     namespace platform
     {
-        class sensor_events : public ISensorEvents
+        class sensor_events : public Microsoft::WRL::RuntimeClass<
+            Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+            ISensorEvents>
         {
         public:
-            virtual ~sensor_events() = default;
+            ~sensor_events() override = default;
 
-            explicit sensor_events(hid_callback callback, double gyro_scale_factor = 10.0) : m_cRef(0), _callback(callback), _gyro_scale_factor(gyro_scale_factor) {}
-
-            STDMETHODIMP QueryInterface(REFIID iid, void** ppv)
-            {
-                if (ppv == NULL)
-                {
-                    return E_POINTER;
-                }
-                if (iid == __uuidof(IUnknown))
-                {
-                    *ppv = static_cast<IUnknown*>(this);
-                }
-                else if (iid == __uuidof(ISensorEvents))
-                {
-                    *ppv = static_cast<ISensorEvents*>(this);
-                }
-                else
-                {
-                    *ppv = NULL;
-                    return E_NOINTERFACE;
-                }
-                AddRef();
-                return S_OK;
-            }
-
-            STDMETHODIMP_(ULONG) AddRef()
-            {
-                return InterlockedIncrement(&m_cRef);
-            }
-
-            STDMETHODIMP_(ULONG) Release()
-            {
-                ULONG count = InterlockedDecrement(&m_cRef);
-                if (count == 0)
-                {
-                    delete this;
-                    return 0;
-                }
-                return count;
-            }
+            explicit sensor_events(hid_callback callback, double gyro_scale_factor = 10.0)
+                : _callback(callback), _gyro_scale_factor(gyro_scale_factor) {}
 
             //
             // ISensorEvents methods.
             //
 
-            STDMETHODIMP OnEvent(
-                ISensor *pSensor,
-                REFGUID eventID,
-                IPortableDeviceValues *pEventData)
+            IFACEMETHODIMP OnEvent(
+                ISensor * /*pSensor*/,
+                REFGUID /*eventID*/,
+                IPortableDeviceValues * /*pEventData*/) override
             {
-                HRESULT hr = S_OK;
-
-                // Handle custom events here.
-
-                return hr;
+                return S_OK;
             }
 
-            STDMETHODIMP OnDataUpdated(ISensor *pSensor, ISensorDataReport *report)
+            IFACEMETHODIMP OnDataUpdated(ISensor *pSensor, ISensorDataReport *report) override
             {
                 if (NULL == report ||
                     NULL == pSensor)
@@ -185,14 +142,14 @@ namespace librealsense
                 metadata_hid_raw meta_data{};
                 meta_data.header.report_type = md_hid_report_type::hid_report_imu;
                 meta_data.header.length = hid_header_size + metadata_imu_report_size;
-                meta_data.header.timestamp = customTimestampLow | (customTimestampHigh < 32);
+                meta_data.header.timestamp = customTimestampLow | (uint64_t(customTimestampHigh) << 32);
                 // Payload:
                 meta_data.report_type.imu_report.header.md_type_id = md_type::META_DATA_HID_IMU_REPORT_ID;
                 meta_data.report_type.imu_report.header.md_size = metadata_imu_report_size;
                 meta_data.report_type.imu_report.flags = static_cast<uint8_t>( md_hid_imu_attributes::custom_timestamp_attirbute |
                                                                                 md_hid_imu_attributes::imu_counter_attribute |
                                                                                 md_hid_imu_attributes::usb_counter_attribute);
-                meta_data.report_type.imu_report.custom_timestamp = customTimestampLow | (customTimestampHigh < 32);
+                meta_data.report_type.imu_report.custom_timestamp = customTimestampLow | (uint64_t(customTimestampHigh) << 32);
                 meta_data.report_type.imu_report.imu_counter = imu_count;
                 meta_data.report_type.imu_report.usb_counter = usb_count;
 
@@ -202,9 +159,11 @@ namespace librealsense
                 data.ts_low = customTimestampLow;
                 data.ts_high = customTimestampHigh;
 
-                pSensor->GetFriendlyName(&fName);
-                d.sensor.name = CW2A(fName);
-                SysFreeString(fName); // free string after it was copied to sensor data
+                if (SUCCEEDED(pSensor->GetFriendlyName(&fName)) && fName)
+                {
+                    d.sensor.name = rsutils::string::windows::win_to_utf(fName);
+                    SysFreeString(fName); // free string after it was copied to sensor data
+                }
 
                 d.fo.pixels = &data;
                 d.fo.metadata = &meta_data;
@@ -222,46 +181,25 @@ namespace librealsense
                 return S_OK;
             }
 
-            STDMETHODIMP OnLeave(
-                REFSENSOR_ID sensorID)
+            IFACEMETHODIMP OnLeave(REFSENSOR_ID /*sensorID*/) override
             {
-                HRESULT hr = S_OK;
-
-                // Perform any housekeeping tasks for the sensor that is leaving.
-                // For example, if you have maintained a reference to the sensor,
-                // release it now and set the pointer to NULL.
-
-                return hr;
+                return S_OK;
             }
 
-            STDMETHODIMP OnStateChanged(
-                ISensor* pSensor,
-                SensorState state)
+            IFACEMETHODIMP OnStateChanged(ISensor* pSensor, SensorState state) override
             {
-                HRESULT hr = S_OK;
-
-                if (NULL == pSensor)
-                {
+                if (nullptr == pSensor)
                     return E_INVALIDARG;
-                }
-
 
                 if (state == SENSOR_STATE_READY)
-                {
-                    wprintf_s(L"\nTime sensor is now ready.");
-                }
+                    LOG_DEBUG("HID sensor is now ready");
                 else if (state == SENSOR_STATE_ACCESS_DENIED)
-                {
-                    wprintf_s(L"\nNo permission for the time sensor.\n");
-                    wprintf_s(L"Enable the sensor in the control panel.\n");
-                }
+                    LOG_WARNING("No permission for the HID sensor; enable it in the control panel");
 
-
-                return hr;
+                return S_OK;
             }
 
         private:
-            long m_cRef;
             hid_callback _callback;
             double _gyro_scale_factor = 10.0;
         };
@@ -277,42 +215,38 @@ namespace librealsense
                         if (profile_to_open.sensor_name == connected_sensor->get_sensor_name())
                         {
                             /* Set SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL sensor property to profile */
-                            HRESULT hr = S_OK;
-                            IPortableDeviceValues* pPropsToSet = NULL; // Input
-                            IPortableDeviceValues* pPropsReturn = NULL; // Output
+                            Microsoft::WRL::ComPtr<IPortableDeviceValues> pPropsToSet;
+                            Microsoft::WRL::ComPtr<IPortableDeviceValues> pPropsReturn;
 
                             /* Create the input object */
-                            CHECK_HR(CoCreateInstance(__uuidof(PortableDeviceValues), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pPropsToSet)));
+                            CHECK_HR(CoCreateInstance(__uuidof(PortableDeviceValues), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pPropsToSet)));
 
                             /* Add the current report interval property */
-                            hr = pPropsToSet->SetUnsignedIntegerValue(SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL, profile_to_open.frequency);
+                            HRESULT hr = pPropsToSet->SetUnsignedIntegerValue(SENSOR_PROPERTY_CURRENT_REPORT_INTERVAL, profile_to_open.frequency);
                             if (SUCCEEDED(hr))
                             {
                                 // Setting a single property
-                                hr = connected_sensor->get_sensor()->SetProperties(pPropsToSet, &pPropsReturn);
+                                hr = connected_sensor->get_sensor()->SetProperties(pPropsToSet.Get(), &pPropsReturn);
                                 if (SUCCEEDED(hr))
                                 {
                                     _opened_sensors.push_back(connected_sensor);
-                                    pPropsReturn->Release();
                                 }
                             }
-
-                            pPropsToSet->Release();
 
                             //currently implemented only for Gyro sensitivity
                             if( profile_to_open.sensor_name == "HID Sensor Class Device: Gyroscope" )
                             {
                                 // creating IPortableDeviceValues container for <Data Field, Sensitivity> tuples
-                                IPortableDeviceValues * pInSensitivityValues;
+                                Microsoft::WRL::ComPtr<IPortableDeviceValues> pInSensitivityValues;
                                 CHECK_HR( CoCreateInstance( CLSID_PortableDeviceValues,
-                                                         NULL,
+                                                         nullptr,
                                                          CLSCTX_INPROC_SERVER,
                                                          IID_PPV_ARGS( &pInSensitivityValues ) ));
 
                                 PROPVARIANT pv;
                                 PropVariantInit( &pv );
                                 // COM type for double
-                                pv.vt = VT_R8;  
+                                pv.vt = VT_R8;
                                 pv.dblVal = (double)profile_to_open.sensitivity;
                                 pInSensitivityValues->SetValue(
                                     SENSOR_DATA_TYPE_ANGULAR_VELOCITY_X_DEGREES_PER_SECOND,
@@ -324,25 +258,22 @@ namespace librealsense
                                     SENSOR_DATA_TYPE_ANGULAR_VELOCITY_Z_DEGREES_PER_SECOND,
                                     &pv );
                                 // creating IPortableDeviceValues container holding <SENSOR_PROPERTY_CHANGE_SENSITIVITY,pInSensitivityValues> tuple
-                                IPortableDeviceValues * pInValues = NULL; //Input
+                                Microsoft::WRL::ComPtr<IPortableDeviceValues> pInValues;
                                 CHECK_HR(CoCreateInstance( CLSID_PortableDeviceValues,
-                                                            NULL,
+                                                            nullptr,
                                                             CLSCTX_INPROC_SERVER,
                                                             IID_PPV_ARGS( &pInValues ) ));
 
                                 pInValues->SetIPortableDeviceValuesValue( SENSOR_PROPERTY_CHANGE_SENSITIVITY,
-                                                                            pInSensitivityValues );
-                                
-                                IPortableDeviceValues * pOutValues = NULL; //Output
+                                                                            pInSensitivityValues.Get() );
+
+                                Microsoft::WRL::ComPtr<IPortableDeviceValues> pOutValues;
                                 // set sensitivity
-                                hr = connected_sensor->get_sensor()->SetProperties( pInValues, &pOutValues );
+                                hr = connected_sensor->get_sensor()->SetProperties( pInValues.Get(), &pOutValues );
                                 if( SUCCEEDED( hr ) )
                                     PropVariantClear( &pv );
-
-                                pInValues->Release();
-
                             }
-                            
+
                         }
                     }
                 }
@@ -371,13 +302,11 @@ namespace librealsense
         void wmf_hid_device::start_capture(hid_callback callback)
         {
             // Hack, start default profile
-            _cb = new sensor_events(callback, _gyro_scale_factor);
-            ISensorEvents* sensorEvents = nullptr;
-            CHECK_HR(_cb->QueryInterface(IID_PPV_ARGS(&sensorEvents)));
+            _cb = Microsoft::WRL::Make<sensor_events>(callback, _gyro_scale_factor);
 
             for (auto& sensor : _opened_sensors)
             {
-                CHECK_HR(sensor->start_capture(sensorEvents));
+                CHECK_HR(sensor->start_capture(_cb.Get()));
             }
         }
 
@@ -410,18 +339,17 @@ namespace librealsense
             _gyro_scale_factor = scale_factor;
         }
 
-        void wmf_hid_device::foreach_hid_device(std::function<void(hid_device_info, CComPtr<ISensor>)> action)
+        void wmf_hid_device::foreach_hid_device(std::function<void(hid_device_info, Microsoft::WRL::ComPtr<ISensor>)> action)
         {
             /* Enumerate all HID devices and run action function on each device */
             try
             {
-                CComPtr<ISensorManager> pSensorManager = nullptr;
-                CComPtr<ISensorCollection> pSensorCollection = nullptr;
-                CComPtr<ISensor> pSensor = nullptr;
+                Microsoft::WRL::ComPtr<ISensorManager> pSensorManager;
+                Microsoft::WRL::ComPtr<ISensorCollection> pSensorCollection;
                 ULONG sensorCount = 0;
                 HRESULT res{};
 
-                CHECK_HR(CoCreateInstance(CLSID_SensorManager, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pSensorManager)));
+                CHECK_HR(CoCreateInstance(CLSID_SensorManager, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pSensorManager)));
 
                 /* Retrieves a collection containing all sensors associated with category SENSOR_CATEGORY_ALL */
                 res=pSensorManager->GetSensorsByCategory(SENSOR_CATEGORY_ALL, &pSensorCollection);
@@ -432,8 +360,9 @@ namespace librealsense
 
                     for (ULONG i = 0; i < sensorCount; i++)
                     {
+                        Microsoft::WRL::ComPtr<ISensor> pSensor;
                         /* Retrieves the sensor at the specified index in the collection */
-                        if (SUCCEEDED(pSensorCollection->GetAt(i, &pSensor.p)))
+                        if (SUCCEEDED(pSensorCollection->GetAt(i, &pSensor)))
                         {
                             /* Retrieve SENSOR_PROPERTY_FRIENDLY_NAME which is the sensor name that is intended to be seen by the user */
                             std::string sensor_id;
@@ -457,7 +386,7 @@ namespace librealsense
                             SENSOR_TYPE_ID type{};
                             CHECK_HR(pSensor->GetType(&type));
 
-                            CComPtr<IPortableDeviceValues> pValues = nullptr;  // Output
+                            Microsoft::WRL::ComPtr<IPortableDeviceValues> pValues = nullptr;  // Output
                             hid_device_info info{};
 
                             /* Retrieves multiple sensor properties */
@@ -530,8 +459,6 @@ namespace librealsense
 
                             action(info, pSensor);
                         }
-                        //Releasing resources
-                        safe_release(pSensor);
                     }
                 }
                 // ERROR_NOT_FOUND is normal if no sensors are available
