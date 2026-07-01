@@ -28,16 +28,49 @@ parser.add_argument('--serial', type=str, default=None, help='Serial number of t
 args = parser.parse_args()
 
 
-def wait_for_reboot( same_version ):
+def wait_for_reboot( serial, timeout = 30 ):
     """
-    Wait for the camera to finish rebooting after a FW update.
-    The test exit flow may cut USB power (via hub port disable), so we must ensure
-    the device has had enough time to complete its reboot before we exit.
-    When updating to a different version, FW may need time to flash a new ISP FW.
+    Wait for the camera to finish rebooting after a FW update and re-enumerate in normal
+    (non-recovery) mode, returning as soon as it is back -- up to `timeout` seconds.
+
+    The test exit flow may cut USB power (via hub port disable), so we must not return
+    while the device is still rebooting, REGARDLESS of rs-fw-update's exit code.
+
+    A same-version reflash comes back quickly, so we return early; a version change may
+    reflash a new ISP FW and takes longer to enumerate -- we must give it the full window
+    and not interfere with it. Polling handles both without guessing a fixed duration.
+
+    If the flash failed and left the device stuck in recovery, it never re-enumerates in
+    normal mode, so we wait the full timeout before letting the caller exit.
+
+    After a flash the device may expose its firmware_update_id (asic serial) and/or its
+    normal serial_number, so we match on either.
     """
-    sleep_time = 60 if not same_version else 3
-    log.d( "Waiting", sleep_time, "seconds for device to finish rebooting after FW update..." )
-    time.sleep( sleep_time )
+    # Give the device a moment to drop off the bus and begin rebooting, so we don't match
+    # the stale pre-reboot enumeration before it has even started to reset.
+    time.sleep( 3 )
+    log.d( "waiting up to", timeout, "seconds for device to re-enumerate after FW update..." )
+    timer = Timer( timeout )
+    timer.start()
+    while not timer.has_expired():
+        devices = rs.context().devices
+        for d in devices:
+            try:
+                if d.is_in_recovery_mode():
+                    continue
+                sn = d.get_info( rs.camera_info.serial_number ) if d.supports( rs.camera_info.serial_number ) else None
+                fwid = d.get_info( rs.camera_info.firmware_update_id ) if d.supports( rs.camera_info.firmware_update_id ) else None
+            except Exception:
+                # device dropped off the bus between enumeration and query (still rebooting) -- keep polling
+                continue
+            if serial is None or serial == sn or serial == fwid:
+                if serial is None and len( devices ) > 1:
+                    log.w( "no --serial given and multiple devices present; matched the first non-recovery",
+                           "device, which may be wrong on a multi-device rig" )
+                log.d( "device re-enumerated after", round( timer.get_elapsed(), 1 ), "seconds" )
+                return
+        time.sleep( 2 )
+    log.e( "device did not re-enumerate in normal mode within", timeout, "seconds after FW update" )
 
 
 def send_hardware_monitor_command(device, command):
@@ -211,7 +244,6 @@ if device.supports(rs.camera_info.firmware_version):
 # Determine which firmware to use based on product.
 # The SDK no longer ships a bundled D400 FW, so a --custom-fw-<plat> path is required
 # for every product line; otherwise we cannot exercise the update flow.
-same_version = False
 custom_fw_path = None
 custom_fw_version = None
 if product_line == "D400" and args.custom_fw_d400:
@@ -285,11 +317,11 @@ custom_fw_version = extract_version_from_filename(custom_fw_path)
 log.d('Using custom FW version: ', custom_fw_version)
 
 if current_fw_version == custom_fw_version:
-    same_version = True
     if recovered or 'nightly' not in test.context:
         log.d('versions are same; skipping FW update')
         test.finish()
         test.print_results_and_exit()
+    # else: nightly re-flashes the same version on purpose, to exercise the update flow
 
 downgrade_counter = get_downgrade_counter( device )
 log.d( 'downgrade counter:', downgrade_counter )
@@ -327,7 +359,7 @@ result = subprocess.run( cmd )   # may throw
 # rs-fw-update may have begun a section flash before erroring out, leaving the device
 # mid-reboot. The test exit flow may cut USB power (hub port disable), so we must not
 # exit while the device is still rebooting.
-wait_for_reboot( same_version )
+wait_for_reboot( args.serial )
 
 if result.returncode != 0:
     log.e( 'rs-fw-update returned exit code', result.returncode )
