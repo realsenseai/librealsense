@@ -14,6 +14,7 @@
 #include "rendering.h"
 #include <atomic>
 #include <memory>
+#include <rsutils/time/timer.h>
 
 namespace rs2
 {
@@ -93,6 +94,8 @@ namespace rs2
 
         void setup_icon();
 
+        void flush_pending_window_state();
+
         void imgui_config_push();
         void imgui_config_pop();
 
@@ -146,5 +149,13 @@ namespace rs2
         context                  &_ctx;
 
         bool                     _is_ui_aligned = false;
+
+        int                      _pending_pos_x = 0;
+        int                      _pending_pos_y = 0;
+        int                      _pending_win_width = 0;
+        int                      _pending_win_height = 0;
+        bool                     _pending_maximized = false;
+        bool                     _pending_window_state = false;
+        rsutils::time::timer     _window_state_timer{ std::chrono::milliseconds( 300 ) };
     };
 }

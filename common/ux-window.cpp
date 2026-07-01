@@ -37,6 +37,7 @@ void glfw_error_callback(int error, const char* description)
     std::cerr << "GLFW Driver Error: " << description << "\n";
 }
 
+
 namespace rs2
 {
     void GLAPIENTRY MessageCallback(GLenum source,
@@ -360,23 +361,29 @@ namespace rs2
             glDebugMessageCallback(MessageCallback, 0);
         }
 
+        glfwSetWindowUserPointer(_win, this);
+
         glfwSetWindowPosCallback(_win, [](GLFWwindow* w, int x, int y)
         {
-            config_file::instance().set(configurations::window::saved_pos, true);
-            config_file::instance().set(configurations::window::position_x, x);
-            config_file::instance().set(configurations::window::position_y, y);
+            auto self = reinterpret_cast<ux_window*>(glfwGetWindowUserPointer(w));
+            if (!self) return;
+            self->_pending_pos_x = x;
+            self->_pending_pos_y = y;
+            self->_pending_window_state = true;
+            self->_window_state_timer.start();
         });
 
-        glfwSetWindowSizeCallback( _win, []( GLFWwindow * window, int width, int height ) {
-            if( width > 0 && height > 0 )
-            {
-                config_file::instance().set( configurations::window::saved_size, true );
-                config_file::instance().set( configurations::window::width, width );
-                config_file::instance().set( configurations::window::height, height );
-                config_file::instance().set( configurations::window::maximized,
-                                             glfwGetWindowAttrib( window, GLFW_MAXIMIZED ) );
-            }
-        } );
+        glfwSetWindowSizeCallback(_win, [](GLFWwindow* w, int width, int height)
+        {
+            if (width <= 0 || height <= 0) return;
+            auto self = reinterpret_cast<ux_window*>(glfwGetWindowUserPointer(w));
+            if (!self) return;
+            self->_pending_win_width = width;
+            self->_pending_win_height = height;
+            self->_pending_maximized = glfwGetWindowAttrib(w, GLFW_MAXIMIZED);
+            self->_pending_window_state = true;
+            self->_window_state_timer.start();
+        });
 
         setup_icon();
 
@@ -396,9 +403,6 @@ namespace rs2
         imgui_easy_theming(_font_dynamic, _font_18, _monofont, font_size);
 
         // Register for UI-controller events
-        glfwSetWindowUserPointer(_win, this);
-
-
         glfwSetCursorPosCallback(_win, [](GLFWwindow* w, double cx, double cy)
         {
             ImGui_ImplGlfw_CursorPosCallback(w, cx, cy); // Forward the cursor position to ImGui
@@ -692,9 +696,26 @@ namespace rs2
         glfwTerminate();
     }
 
+    void ux_window::flush_pending_window_state()
+    {
+        if (_pending_window_state && _window_state_timer.has_expired())
+        {
+            config_file::instance().set(configurations::window::saved_pos, true);
+            config_file::instance().set(configurations::window::position_x, _pending_pos_x);
+            config_file::instance().set(configurations::window::position_y, _pending_pos_y);
+            config_file::instance().set(configurations::window::saved_size, true);
+            config_file::instance().set(configurations::window::width, _pending_win_width);
+            config_file::instance().set(configurations::window::height, _pending_win_height);
+            config_file::instance().set(configurations::window::maximized, _pending_maximized);
+            _pending_window_state = false;
+        }
+    }
+
     void ux_window::begin_frame()
     {
         glfwPollEvents();
+
+        flush_pending_window_state();
 
         int state = glfwGetKey(_win, GLFW_KEY_F8);
         if (state == GLFW_PRESS)
