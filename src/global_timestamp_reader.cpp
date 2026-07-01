@@ -224,6 +224,11 @@ namespace librealsense
             double system_time_finish = duration<double, std::milli>(system_clock::now().time_since_epoch()).count();
             double command_delay = (system_time_finish-system_time_start)/2;
 
+            // While converging, skip an outlier-slow read (typical ~0.5ms): the first read after
+            // stream start can be slow and would skew the few-point regression for ~1-2s.
+            if( ! _is_ready && command_delay > 10. )
+                return false;
+
             std::lock_guard<std::recursive_mutex> lock(_read_mtx);
             if (command_delay < _min_command_delay)
             {
