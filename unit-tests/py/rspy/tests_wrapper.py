@@ -14,7 +14,7 @@ from rspy.stopwatch import Stopwatch
 # option to value N") for several seconds after USB enumeration and after disruptive operations
 # (heavy streaming, hardware_reset). Retry until it takes or we time out. Use this for every
 # D585S safety_mode transition so the tests don't rely on luck / pytest-retry.
-def set_safety_mode( safety_sensor, mode, timeout = 60, interval = 0.5 ):
+def set_safety_mode( safety_sensor, mode, timeout = 8, interval = 0.5 ):
     sw = Stopwatch()
     last_exc = None
     attempt = 0
