@@ -173,14 +173,18 @@ namespace rs2
         size_t max_notifications_kept = 1000;
 
         std::deque<std::string> autocomplete;
+        std::string autocomplete_prefix;
 
         std::mutex devices_mutex;
         std::vector<rs2::device> devices;
 
+        static constexpr int MAX_HISTORY_SIZE = 100;
+
         std::string search_line { "" };
         std::string command_line { "" };
+        std::string history_draft { "" };
         std::deque<std::string> commands_histroy;
-        int history_offset = 0;
+        int history_offset = -1;
         bool command_focus = true;
 
         std::vector<std::shared_ptr<stream_dashboard>> dashboards;
@@ -190,5 +194,6 @@ namespace rs2
         std::thread fw_logger;
 
         void thread_loop();
+        bool cycle_autocomplete(bool forward);
     };
 }
