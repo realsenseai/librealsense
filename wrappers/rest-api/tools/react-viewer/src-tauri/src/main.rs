@@ -174,8 +174,21 @@ fn find_api_executable(exe_name: &str, app_handle: &AppHandle) -> Option<PathBuf
 /// Spawn the FastAPI process with environment variables
 fn spawn_api_process(path: &std::path::Path, port: u16, backend_logs: Arc<Mutex<Vec<String>>>) -> Result<Child, std::io::Error> {
     println!("[Tauri] Spawning FastAPI process from: {:?}", path);
-    
-    let mut cmd = Command::new(path);
+
+    // Validate and sanitize the executable path to prevent command injection
+    if !path.exists() {
+        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Executable path does not exist"));
+    }
+
+    if !path.is_file() {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Path must point to a file"));
+    }
+
+    // Use canonical path to resolve symlinks and prevent path traversal attacks
+    let canonical_path = std::fs::canonicalize(path)
+        .unwrap_or_else(|_| path.to_path_buf());
+
+    let mut cmd = Command::new(&canonical_path);
     cmd.env("UVICORN_PORT", port.to_string())
         .env("UVICORN_HOST", "127.0.0.1")
         .env("PYTHONUNBUFFERED", "1")

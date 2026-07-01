@@ -21,7 +21,7 @@
     "@react-three/drei": "^9.88.0",
     "@react-three/fiber": "^8.14.0",
     "@tauri-apps/api": "^1.5.3",
-    "axios": "1.16.0",
+    "axios": "1.18.0",
     "lucide-react": "^0.290.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
