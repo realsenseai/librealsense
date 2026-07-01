@@ -379,9 +379,12 @@ namespace librealsense
         // building 16 pixels at each iteration 
         for (int y_pix = 0, uv_pix = 0; y_pix < width; y_pix += 16, uv_pix += 16)
         {
+            // Clamp pixel count to actual data size (handles non-16-multiple widths like 424)
+            int pix_count = std::min(16, width - y_pix);
+
             // grabbing matching y,u,v values
             uint8_t y[16] = { 0 };
-            std::memcpy( y, &y_one_line[y_pix], 16 );
+            std::memcpy( y, &y_one_line[y_pix], pix_count );
 
             uint8_t u[16] = {
                 uv_one_line[uv_pix + 0], uv_one_line[uv_pix + 0], uv_one_line[uv_pix + 2], uv_one_line[uv_pix + 2],
@@ -426,8 +429,8 @@ namespace librealsense
                     r[12], g[12], b[12], r[13], g[13], b[13],
                     r[14], g[14], b[14], r[15], g[15], b[15]
                 };
-                std::memcpy( *dst, out, sizeof( out ) );
-                *dst += sizeof out;
+                std::memcpy( *dst, out, pix_count * 3 );
+                *dst += pix_count * 3;
                 continue;
             }
 
@@ -443,8 +446,8 @@ namespace librealsense
                     b[12], g[12], r[12], b[13], g[13], r[13],
                     b[14], g[14], r[14], b[15], g[15], r[15],
                 };
-                std::memcpy( *dst, out, sizeof out );
-                *dst += sizeof out;
+                std::memcpy( *dst, out, pix_count * 3 );
+                *dst += pix_count * 3;
                 continue;
             }
 
@@ -460,8 +463,8 @@ namespace librealsense
                     r[12], g[12], b[12], 255, r[13], g[13], b[13], 255,
                     r[14], g[14], b[14], 255, r[15], g[15], b[15], 255,
                 };
-                std::memcpy( *dst, out, sizeof out );
-                *dst += sizeof out;
+                std::memcpy( *dst, out, pix_count * 4 );
+                *dst += pix_count * 4;
                 continue;
             }
 
@@ -477,8 +480,8 @@ namespace librealsense
                     b[12], g[12], r[12], 255, b[13], g[13], r[13], 255,
                     b[14], g[14], r[14], 255, b[15], g[15], r[15], 255,
                 };
-                std::memcpy( *dst, out, sizeof out );
-                *dst += sizeof out;
+                std::memcpy( *dst, out, pix_count * 4 );
+                *dst += pix_count * 4;
                 continue;
             }
         }
@@ -635,6 +638,12 @@ namespace librealsense
         assert(n % 16 == 0); // All currently supported color resolutions are multiples of 16 pixels. Could easily extend support to other resolutions by copying final n<16 pixels into a zero-padded buffer and recursively calling self for final iteration.
 
 #if defined __SSSE3__ && ! defined ANDROID
+        // The SSE fast path addresses the source in 16-byte chunks and assumes each M420
+        // line (of 'width' bytes) starts on a 16-byte boundary. When 'width' is not a
+        // multiple of 16 (e.g. 424), the integer-division chunk offsets drift line-by-line
+        // and produce a sheared/corrupted image, so fall back to the scalar path below.
+        if (width % 16 == 0)
+        {
         static bool do_avx = has_avx();
 
         auto src = reinterpret_cast<const __m128i*>(s);
@@ -677,7 +686,7 @@ namespace librealsense
 
                 auto offset_to_current_uv_line_for_src = offset_to_current_2_y_lines_for_src + 2 * width / 16;
                 if ( i < width / 16)
-                    source_chunks_uv[i] = _mm_load_si128(&src[offset_to_current_uv_line_for_src + i]);
+                    source_chunks_uv[i] = _mm_loadu_si128(&src[offset_to_current_uv_line_for_src + i]);
             }
 
             if (FORMAT == RS2_FORMAT_RGB8 || FORMAT == RS2_FORMAT_RGBA8 || FORMAT == RS2_FORMAT_BGR8 || FORMAT == RS2_FORMAT_BGRA8)
@@ -700,8 +709,12 @@ namespace librealsense
 
         delete[] source_chunks_y;
         delete[] source_chunks_uv;
+        return;
+        }
+#endif // __SSSE3__
 
-#else
+        // Scalar reference path: byte-accurate, handles any width (including non-multiples of 16).
+        {
         auto src = reinterpret_cast<const uint8_t*>(s);
         auto dst = reinterpret_cast<uint8_t*>(d[0]);
 
@@ -754,7 +767,7 @@ namespace librealsense
             m420_parse_one_line<FORMAT>(start_of_second_line, start_of_uv, &dst, width);
         }
         return;
-#endif // __SSSE3__
+        }
     }
 
     void unpack_yuy2(rs2_format dst_format, rs2_stream dst_stream, uint8_t * const d[], const uint8_t * s, int w, int h, int actual_size)
