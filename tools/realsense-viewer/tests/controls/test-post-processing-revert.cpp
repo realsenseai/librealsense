@@ -40,7 +40,8 @@ VIEWER_TEST( "controls", "post_processing_value_persists" )
 
         test.set_post_processing_value( model, sub, pb, RS2_OPTION_FILTER_MAGNITUDE, target );
 
-        // The write is async — wait until the filter actually applied the new value.
+        // Software-filter writes are synchronous, so the value is already applied by the time
+        // set_post_processing_value returns; this poll is just a defensive safety net.
         IM_CHECK( test.wait_until( 20, 0.25f, [&] {
             return pb->get_block()->get_option( RS2_OPTION_FILTER_MAGNITUDE ) == target_f;
         } ) );

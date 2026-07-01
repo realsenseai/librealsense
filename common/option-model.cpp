@@ -804,11 +804,21 @@ void option_model::write_value( float new_value, std::string & error_message )
         // while the user is writing, so a filter-slider drag stays smooth on the no-change frames.
         if( dev )
             dev->last_user_set_stopwatch.reset();
-        set_option( opt, new_value, error_message );
-        // Only invalidate on a successful write. set_option swallows a failed write into
-        // error_message but still returns true, so gate on that to mirror the async did_write drain.
-        if( invalidate_flag && error_message.empty() )
-            *invalidate_flag = true;
+        // Use a local error buffer: error_message is shared across the frame's option draws, so a
+        // prior option's failure would otherwise make this write look failed. Only invalidate when
+        // THIS write succeeds (set_option swallows failures into the string), mirroring the async
+        // did_write drain; surface a real failure by propagating it out.
+        std::string write_error;
+        set_option( opt, new_value, write_error );
+        if( write_error.empty() )
+        {
+            if( invalidate_flag )
+                *invalidate_flag = true;
+        }
+        else
+        {
+            error_message = write_error;
+        }
     }
     else
     {
