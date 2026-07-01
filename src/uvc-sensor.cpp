@@ -298,6 +298,24 @@ void uvc_sensor::open( const stream_profiles & requests )
     {
         _device->stream_on( [&]( const notification & n ) { _notifications_processor->raise_notification( n ); } );
     }
+    catch( const backend_exception & )          // e.g. "Device or resource busy" - keep its type
+    {
+        for( auto && profile : _internal_config )
+        {
+            try
+            {
+                _device->close( profile );
+            }
+            catch( ... )
+            {
+            }
+        }
+        reset_streaming();
+        _power.reset();
+        _is_opened = false;
+
+        throw;
+    }
     catch( ... )
     {
         std::stringstream error_msg;
