@@ -152,11 +152,14 @@ void log_callback_end( uint32_t fps,
 
     void sensor_base::register_metadata(rs2_frame_metadata_value metadata, std::shared_ptr<md_attribute_parser_base> metadata_parser) const
     {
-        if (_metadata_parsers.get()->end() != _metadata_parsers.get()->find(metadata))
+        auto it = _metadata_parsers.get()->find(metadata);
+        if (it != _metadata_parsers.get()->end())
         {
-            std::string metadata_type_str(rs2_frame_metadata_to_string(metadata));
-            std::string metadata_found_str = "Metadata attribute parser for " + metadata_type_str + " was previously defined";
-            LOG_DEBUG(metadata_found_str.c_str());
+            // A parser for this attribute already exists (e.g. a sensor delivering frames with more than one
+            // metadata layout, like depth/IR and color on the same sensor). Chain them so the parser whose
+            // md_type matches the frame wins; the existing parser keeps priority.
+            it->second = std::make_shared<md_layout_selecting_parser>(it->second, metadata_parser);
+            return;
         }
         _metadata_parsers.get()->insert(std::pair<rs2_frame_metadata_value, std::shared_ptr<md_attribute_parser_base>>(metadata, metadata_parser));
     }

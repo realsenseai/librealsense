@@ -82,15 +82,9 @@ $MultiPinDevices =
     "USB\VID_8086&PID_1155&MI_00",# D421
     "USB\VID_8086&PID_1156&MI_00", # D436
     "USB\VID_8086&PID_0B6A&MI_00",# D585
-    "USB\VID_8086&PID_0B6B&MI_00",# D585S
-    "USB\VID_38E5&PID_0C01&MI_00",# D535 Dual RGB
-    "USB\VID_38E5&PID_0C02&MI_00",# D535
-    "USB\VID_38E5&PID_0C03&MI_00",# D535F
-    "USB\VID_38E5&PID_0C04&MI_00",# D585 Dual RGB
-    "USB\VID_38E5&PID_0C05&MI_00",# D585
-    "USB\VID_38E5&PID_0C06&MI_00",# D585F
-    "USB\VID_38E5&PID_0C07&MI_00",# D585 Proto Dual RGB
-    "USB\VID_38E5&PID_0C08&MI_00" # D585 Prototype
+    "USB\VID_8086&PID_0B6B&MI_00" # D585S
+    # VID_38E5 is RealSense's own vendor ID - its cameras get the full per-pin metadata key set on every video
+    # interface (matched generically by VID below), so they need no per-PID entry here.
 
 #Inhibit system warnings and erros, such as permissions or missing values
 $ErrorActionPreference = "silentlycontinue"
@@ -145,13 +139,23 @@ foreach ($subtree in $SearchTrees)
             Remove-ItemProperty -path $fullPath -name MetadataBufferSizeInKB0
             Remove-ItemProperty -path $fullPath -name MetadataBufferSizeInKB1
 			Remove-ItemProperty -path $fullPath -name MetadataBufferSizeInKB2
+			Remove-ItemProperty -path $fullPath -name MetadataBufferSizeInKB3
         }
         else
         {
-            $val = 0,0,0
+            # Device-instance prefix "USB\VID_xxxx&PID_xxxx&MI_00" identifies the device (strip the instance suffix).
+            # Guard against instances shorter than the prefix before matching against the multi-pin list.
+            # VID_38E5 is RealSense's own vendor ID - enable the full per-pin metadata key set on every video
+            # interface (all MIs) so all streams get metadata, and new PIDs need no list entry.
+            $devInstance = $item.DeviceInstance.ToString()
+            $prefix = if ($devInstance.Length -ge 27) { $devInstance.Substring(0,27) } else { "" }
+            $isMultiPin = ($MultiPinDevices -contains $prefix) -or ($devInstance -match '^USB\\VID_38E5&')
+
+            $val = 0,0,0,0
             $val[0] = Get-ItemPropertyValue -Path $fullPath -Name MetadataBufferSizeInKB0
             $val[1] = Get-ItemPropertyValue -Path $fullPath -Name MetadataBufferSizeInKB1
 			$val[2] = Get-ItemPropertyValue -Path $fullPath -Name MetadataBufferSizeInKB2
+			$val[3] = Get-ItemPropertyValue -Path $fullPath -Name MetadataBufferSizeInKB3
 
             if ($val[0] -eq 0)
             {
@@ -163,19 +167,23 @@ foreach ($subtree in $SearchTrees)
                 "Device " +  $item.DeviceInstance.ToString() + ": skiping - metadata key already exists"
             }
 
-            #convert "USB\VID_8086&PID_0B07&MI_03\6&269496df&0&0003" into "USB\VID_8086&PID_0B07&MI_03"
-            if (($MultiPinDevices -contains $item.DeviceInstance.Substring(0,27)) -and ($val[1] -eq 0))
+            if ($isMultiPin -and ($val[1] -eq 0))
             {
                 # Multi-pin interface requires an additional key
                 "Device " +  $item.DeviceInstance.ToString() +": adding extra key for multipin interface"
                 Set-ItemProperty -path $fullPath -name MetadataBufferSizeInKB1 -value 5
             }
-			#convert "USB\VID_8086&PID_0B07&MI_03\6&269496df&0&0003" into "USB\VID_8086&PID_0B07&MI_03"
-            if (($MultiPinDevices -contains $item.DeviceInstance.Substring(0,27)) -and ($val[2] -eq 0))
+            if ($isMultiPin -and ($val[2] -eq 0))
             {
                 # Multi-pin interface requires an additional key
                 "Device " +  $item.DeviceInstance.ToString() +": adding extra key for multipin interface"
                 Set-ItemProperty -path $fullPath -name MetadataBufferSizeInKB2 -value 5
+            }
+            if ($isMultiPin -and ($val[3] -eq 0))
+            {
+                # Dual-RGB devices route a fourth media-pin (second color) through MI_00
+                "Device " +  $item.DeviceInstance.ToString() +": adding extra key for multipin interface"
+                Set-ItemProperty -path $fullPath -name MetadataBufferSizeInKB3 -value 5
             }
         }
     }

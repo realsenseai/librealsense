@@ -16,7 +16,6 @@
 #include <sstream>
 #include <functional>
 #include <map>
-#include <memory>
 
 #include <librealsense2/rs.hpp>
 #include <rsutils/string/windows.h>
@@ -36,7 +35,7 @@ namespace rs2
 #ifdef WIN32
     struct device_id
     {
-        std::string pid, mi, guid, sn;
+        std::string vid, pid, mi, guid, sn;
     };
 
     inline bool equal(const std::string& a, const std::string& b)
@@ -46,10 +45,11 @@ namespace rs2
 
     inline bool operator==(const device_id& a, const device_id& b)
     {
-        return equal(a.pid, b.pid) &&
-            equal(a.guid, b.guid) &&
-            equal(a.mi, b.mi) &&
-            equal(a.sn, b.sn);
+        return equal(a.vid, b.vid) &&
+               equal(a.pid, b.pid) &&
+               equal(a.guid, b.guid) &&
+               equal(a.mi, b.mi) &&
+               equal(a.sn, b.sn);
     }
 
     class windows_metadata_helper : public metadata_helper
@@ -59,16 +59,17 @@ namespace rs2
     public:
         static bool parse_device_id(const std::string& id, device_id* res)
         {
-            static const std::regex regex("pid_([0-9a-f]+)&mi_([0-9a-f]+)#[0-9a-f]&([0-9a-f]+)&[\\s\\S]*\\{([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\}", std::regex_constants::icase);
+            static const std::regex regex("vid_([0-9a-f]+)&pid_([0-9a-f]+)&mi_([0-9a-f]+)#[0-9a-f]&([0-9a-f]+)&[\\s\\S]*\\{([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\}", std::regex_constants::icase);
 
             std::match_results<std::string::const_iterator> match;
 
-            if (std::regex_search(id, match, regex) && match.size() > 4)
+            if (std::regex_search(id, match, regex) && match.size() > 5)
             {
-                res->pid = match[1];
-                res->mi = match[2];
-                res->sn = match[3];
-                res->guid = match[4];
+                res->vid = match[1];
+                res->pid = match[2];
+                res->mi = match[3];
+                res->sn = match[4];
+                res->guid = match[5];
                 return true;
             }
             return false;
@@ -162,8 +163,16 @@ namespace rs2
         }
 
         // Heuristic that determines how many media-pins UVC device is expected to have
-        static int number_of_mediapins(const std::string& pid, const std::string& mi)
+        static int number_of_mediapins(const std::string& vid, const std::string& pid, const std::string& mi)
         {
+            // Generic to all RealSense vendor ID cameras:
+            // Return the max metadata-key count on every interface (all MIs), for all cameras, so new PIDs need no update.
+            // Unneeded pins create a very small overhead (~5KB per pin that exists but does not need metadata),
+            // Current max count is 4 - depth+IR+color1+color2.
+            static const std::string VID_REALSENSE_CAMERA = "38E5";
+            if (equal(vid, VID_REALSENSE_CAMERA)) return 4;
+
+            // Not changing previous (D400) cameras behavior
             if (mi == "00")
             {
                 // D405 has 3 media-pins
@@ -258,7 +267,7 @@ namespace rs2
                     bool found = true;
                     DWORD len = sizeof(DWORD);//size of data
 
-                    for (int i = 0; i < number_of_mediapins(did.pid, did.mi); i++)
+                    for (int i = 0; i < number_of_mediapins(did.vid, did.pid, did.mi); i++)
                     {
                         std::wstringstream ss; ss << L"MetadataBufferSizeInKB" << i;
                         std::wstring metadatakey = ss.str();
@@ -333,7 +342,7 @@ namespace rs2
                         bool found = true;
                         DWORD len = sizeof(DWORD);//size of data
 
-                        for (int i = 0; i < number_of_mediapins(did.pid, did.mi); i++)
+                        for (int i = 0; i < number_of_mediapins(did.vid, did.pid, did.mi); i++)
                         {
                             std::wstringstream ss; ss << L"MetadataBufferSizeInKB" << i;
                             std::wstring metadatakey = ss.str();

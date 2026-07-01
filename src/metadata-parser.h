@@ -24,6 +24,23 @@ namespace librealsense
         virtual ~md_attribute_parser_base() = default;
     };
 
+    /**\brief Tries two parsers in order, returning the first that finds a valid attribute. Used when one
+     *  sensor delivers frames with different metadata layouts (e.g. depth/IR and color on the same sensor):
+     *  each sub-parser self-validates by md_type, so only the one matching the frame's layout succeeds. */
+    class md_layout_selecting_parser : public md_attribute_parser_base
+    {
+        std::shared_ptr< md_attribute_parser_base > _first, _second;
+    public:
+        md_layout_selecting_parser( std::shared_ptr< md_attribute_parser_base > first,
+                                    std::shared_ptr< md_attribute_parser_base > second )
+            : _first( std::move( first ) ), _second( std::move( second ) ) {}
+
+        bool find( const frame & frm, rs2_metadata_type * p_value ) const override
+        {
+            return ( _first && _first->find( frm, p_value ) ) || ( _second && _second->find( frm, p_value ) );
+        }
+    };
+
     /**\brief metadata parser class - support metadata in format: rs2_frame_metadata_value, rs2_metadata_type */
     class md_constant_parser : public md_attribute_parser_base
     {
@@ -139,14 +156,7 @@ namespace librealsense
 
             if (s->header.md_type_id != expected_type)
             {
-                std::string type
-                    = (md_type_desc.count(s->header.md_type_id) > 0)
-                    ? md_type_desc.at(s->header.md_type_id)
-                    : (rsutils::string::from()
-                        << "0x" << std::hex << static_cast<uint32_t>(s->header.md_type_id) << std::dec);
-                LOG_DEBUG("Metadata type mismatch - actual: " << type << ", expected: 0x" << std::hex
-                    << (uint32_t)expected_type << std::dec << " ("
-                    << md_type_desc.at(expected_type) << ")");
+                // Some mismatched metadata types are expected, e.g dual-RGB color metadata on a depth sensor.
                 return false;
             }
 

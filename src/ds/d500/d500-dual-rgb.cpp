@@ -4,8 +4,11 @@
 #include "d500-dual-rgb.h"
 #include "d500-info.h"
 #include "environment.h"
+#include "metadata.h"
 #include "proc/color-formats-converter.h"  // m420_converter
 #include <src/uvc-sensor.h>
+#include <src/metadata-parser.h>
+#include <src/ds/ds-color-common.h>
 
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
@@ -46,6 +49,33 @@ namespace librealsense
         d500_depth.add_stream( _color_stream_2 );
 
         register_color_extrinsics();
+        register_color_metadata();
+    }
+
+    void d500_dual_rgb::register_color_metadata()
+    {
+        auto & depth_sensor = get_depth_sensor();
+
+        // Color frames arrive on the depth sensor but carry the RGB metadata layout (md_rgb_mode), distinct from
+        // the depth/IR layout already registered. Register common fields with RGB layout offsets.
+        auto md_prop_offset = metadata_raw_mode_offset + offsetof( md_rgb_mode, rgb_mode ) + offsetof( md_rgb_normal_mode, intel_rgb_control );
+        depth_sensor.register_metadata( RS2_FRAME_METADATA_AUTO_EXPOSURE,
+            make_attribute_parser( &md_rgb_control::ae_mode, md_rgb_control_attributes::ae_mode_attribute, md_prop_offset,
+                []( rs2_metadata_type param ) { return ( param != 1 ); } ) ); // OFF value via UVC is 1 (ON is 8)
+
+        auto md_prop_offset_stats = metadata_raw_mode_offset + offsetof( md_rgb_mode, rgb_mode ) + offsetof( md_rgb_normal_mode, intel_capture_stats );
+        depth_sensor.register_metadata( RS2_FRAME_METADATA_FRAME_TIMESTAMP,
+            make_attribute_parser( &md_capture_stats::hw_timestamp, md_capture_stat_attributes::hw_timestamp_attribute, md_prop_offset_stats ) );
+
+        auto md_prop_offset_timing = metadata_raw_mode_offset + offsetof( md_rgb_mode, rgb_mode ) + offsetof( md_rgb_normal_mode, intel_capture_timing );
+        depth_sensor.register_metadata( RS2_FRAME_METADATA_SENSOR_TIMESTAMP,
+            make_rs400_sensor_ts_parser( make_attribute_parser( &md_capture_stats::hw_timestamp, md_capture_stat_attributes::hw_timestamp_attribute, md_prop_offset_stats ),
+                make_attribute_parser( &md_capture_timing::sensor_timestamp, md_capture_timing_attributes::sensor_timestamp_attribute, md_prop_offset_timing ) ) );
+
+        // The remaining RGB control/stats attributes (gain, exposure, white balance, brightness, ...) are common to
+        // all DS color sensors - reuse the shared registration on the depth sensor.
+        ds_color_common color_md( get_raw_depth_sensor(), depth_sensor, _fw_version, _hw_monitor, this );
+        color_md.register_metadata();
     }
 
     void d500_dual_rgb::register_color_extrinsics()

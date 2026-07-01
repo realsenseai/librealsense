@@ -25,6 +25,7 @@ namespace librealsense
 
     private:
         void register_color_extrinsics();
+        void register_color_metadata();
 
         // Stream-id resolver: route M420 color pins to Color 1 / Color 2 streams
         static void resolve_color_stream( const std::vector< platform::stream_profile > & all,
