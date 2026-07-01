@@ -296,12 +296,25 @@ namespace rs2
 
         }
 
+        // Device names historically carried an "Intel " prefix; newer SDKs drop it.
+        // Normalize so DB entries and reported names match regardless of the prefix.
+        static std::string strip_intel_prefix(const std::string &name)
+        {
+            static const std::string prefix = "Intel ";
+            if (0 == name.compare(0, prefix.size(), prefix))
+                return name.substr(prefix.size());
+            return name;
+        }
+
         bool versions_db_manager::is_device_name_equal(const std::string &str_from_db, const std::string &str_compared, bool allow_wildcard)
         {
+            const std::string db = strip_intel_prefix(str_from_db);
+            const std::string cmp = strip_intel_prefix(str_compared);
+
             if (allow_wildcard)
-                return (0 == str_from_db.compare(0, str_from_db.find('*'), str_compared, 0, str_from_db.find('*')));
+                return (0 == db.compare(0, db.find('*'), cmp, 0, db.find('*')));
             else
-                return (str_from_db == str_compared);
+                return (db == cmp);
         }
     }
 
