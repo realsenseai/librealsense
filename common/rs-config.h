@@ -102,8 +102,6 @@ namespace rs2
 
         void remove(const char* key);
 
-        bool is_empty() const { return _j.empty(); }
-
         static config_file& instance();
 
         // Retrieves a value from a nested JSON structure using dot notation
