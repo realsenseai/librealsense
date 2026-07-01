@@ -87,8 +87,9 @@ namespace rs2
         config_file::instance().set_default(configurations::viewer::commands_xml, "./Commands.xml");
         config_file::instance().set_default(configurations::viewer::hwlogger_xml, "./HWLoggerEvents.xml");
 
-        if( config_file::instance().is_empty() )
         {
+            // set_nested_default() only writes a key if it's missing, so this is safe to run
+            // unconditionally - it backfills the grid keys into pre-existing config files too.
             namespace cfg = configurations::viewer::viewport_grid_overlay;
             auto& cf = config_file::instance();
             cf.set_nested_default( cfg::horizontal_lines, 1   );

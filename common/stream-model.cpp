@@ -453,10 +453,11 @@ namespace rs2
     void stream_model::show_stream_header(ImFont* font, const rect &stream_rect, viewer_model& viewer)
     {
         const auto top_bar_height = 32.f;
-        auto num_of_buttons = 6; // Crosshair button is the latest addition
+        auto num_of_buttons = 5;
 
         if (!viewer.allow_stream_close) --num_of_buttons;
         if (viewer.streams.size() > 1) ++num_of_buttons;
+        if (profile.as<rs2::video_stream_profile>()) ++num_of_buttons; // Grid/crosshair button - video streams only
         if (RS2_STREAM_DEPTH == profile.stream_type()) ++num_of_buttons; // Color map ruler button
         if (RS2_FORMAT_MOTION_XYZ32F == profile.format()) ++num_of_buttons; // Motion graph button
         if (RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1) ++num_of_buttons; // Safety zones button
@@ -599,29 +600,32 @@ namespace rs2
         }
         ImGui::SameLine();
 
-        label = rsutils::string::from() << textual_icons::grid << "##Grid " << profile.unique_id();
-        if (show_crosshair)
+        if (profile.as<rs2::video_stream_profile>()) // Grid/crosshair overlay is only meaningful on 2D video streams
         {
-            ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
-            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue);
-            if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
+            label = rsutils::string::from() << textual_icons::grid << "##Grid " << profile.unique_id();
+            if (show_crosshair)
             {
-                show_crosshair = false;
+                ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
+                ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue);
+                if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
+                {
+                    show_crosshair = false;
+                }
+                if (ImGui::IsItemHovered())
+                    RsImGui::CustomTooltip("Hide crosshair overlay");
+                ImGui::PopStyleColor(2);
             }
-            if (ImGui::IsItemHovered())
-                RsImGui::CustomTooltip("Hide crosshair overlay");
-            ImGui::PopStyleColor(2);
-        }
-        else
-        {
-            if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
+            else
             {
-                show_crosshair = true;
+                if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
+                {
+                    show_crosshair = true;
+                }
+                if (ImGui::IsItemHovered())
+                    RsImGui::CustomTooltip("Show crosshair/grid overlay");
             }
-            if (ImGui::IsItemHovered())
-                RsImGui::CustomTooltip("Show crosshair/grid overlay");
+            ImGui::SameLine();
         }
-        ImGui::SameLine();
 
 
         if (RS2_STREAM_DEPTH == profile.stream_type())
@@ -2113,7 +2117,7 @@ namespace rs2
 
             update_ae_roi_rect(stream_rect, g, error_message);
 
-            if (show_crosshair)
+            if (show_crosshair && profile.as<rs2::video_stream_profile>())
                 draw_crosshair(stream_rect, grid_h_lines, grid_v_lines, grid_line_width,
                                grid_color_r, grid_color_g, grid_color_b);
 
