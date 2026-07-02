@@ -1,11 +1,9 @@
 # License: Apache 2.0. See LICENSE file in root directory.
-# Copyright(c) 2023 RealSense, Inc. All Rights Reserved.
-
-#temporary fix to prevent the test from running on Win_SH_Py_DDS_CI 
-#test:donotrun:dds
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import pyrealsense2 as rs
-from rspy import test, repo
+from pytest_check import check
+from rspy import repo
 import os.path
 import time
 ################################################################################################
@@ -20,9 +18,9 @@ def validate_ppf_results(result_frame_data, reference_frame_data):
     result_bytearray_frame_data, result_profile = result_frame_data
     reference_bytearray_frame_data, reference_profile = reference_frame_data
 
-    test.check_equal(result_profile.width(), reference_profile.width())
-    test.check_equal(result_profile.height(), reference_profile.height())
-    test.check_equal_lists(result_bytearray_frame_data,reference_bytearray_frame_data)
+    check.equal(result_profile.width(), reference_profile.width())
+    check.equal(result_profile.height(), reference_profile.height())
+    assert result_bytearray_frame_data == reference_bytearray_frame_data
 
 
 def process_frame(frame, frame_source):
@@ -98,30 +96,31 @@ def compare_processed_frames_vs_recorded_frames(file):
     for sf in frames_data_map:
         ref_frame_data_list.append(frames_data_map[sf])
 
-    test.check_equal(len(processed_frames_data_list),len(ref_frame_data_list))
+    check.equal(len(processed_frames_data_list),len(ref_frame_data_list))
 
     for i in range(len(processed_frames_data_list)):
         validate_ppf_results(processed_frames_data_list[i], ref_frame_data_list[i])
 
 ################################################################################################
 # below commented out until recordings are taken again (after algo improvement done in PR# 14608)
-# with test.closure("Test align depth to color from recording"):
+# def test_align_depth_to_color_from_recording():
+#     global process_frame_callback
 #     align = rs.align(rs.stream.color)
 #     process_frame_callback = lambda fs: align.process(fs).first_or_default(rs.stream.depth)
 #
 #     compare_processed_frames_vs_recorded_frames("[aligned_2c]_all_combinations_depth_color.db3")
 ################################################################################################
 # below commented out until recordings are taken again (after algo improvement done in PR# 14608)
-# with test.closure("Test align color to depth from recording"):
+# def test_align_color_to_depth_from_recording():
+#     global process_frame_callback
 #     align = rs.align(rs.stream.depth)
 #     process_frame_callback = lambda fs: align.process(fs).first_or_default(rs.stream.color)
 #
 #     compare_processed_frames_vs_recorded_frames("[aligned_2d]_all_combinations_depth_color.db3")
 ################################################################################################
-with test.closure("Test point cloud from recording"):
+def test_point_cloud_from_recording():
+    global process_frame_callback
     pc = rs.pointcloud()
     process_frame_callback = lambda fs: pc.calculate(fs.get_depth_frame())
 
     compare_processed_frames_vs_recorded_frames("[pointcloud]_all_combinations_depth_color.db3")
-################################################################################################
-test.print_results_and_exit()
