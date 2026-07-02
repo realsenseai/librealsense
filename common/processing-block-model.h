@@ -43,6 +43,10 @@ namespace rs2
 
         std::shared_ptr<rs2::filter> get_block() { return _block; }
 
+        // Access the UI model for one of this block's options (nullptr if not present).
+        // Used by the viewer UI tests to drive/read post-processing filter controls.
+        option_model * get_option_model( rs2_option opt );
+
         void enable( bool e = true )
         {
             processing_block_enable_disable( _enabled = e );

@@ -143,17 +143,8 @@ static rs2::option_model & find_option( std::shared_ptr< rs2::subdevice_model > 
     return it->second;
 }
 
-void viewer_test::set_control_value( rs2::device_model & model,
-                                     std::shared_ptr< rs2::subdevice_model > sub,
-                                     rs2_option option, const std::string & value )
+void viewer_test::set_value_by_seed( rs2::option_model & opt, ImGuiID seed, const std::string & value )
 {
-    auto & opt = find_option( sub, option );
-
-    // Options can be at sensor level or inside the Controls section — try controls first
-    ImGuiID seed = controls_id_seed( model, sub );
-    if( !imgui->ItemExists( ImHashStr( opt.id.c_str(), 0, seed ) ) )
-        seed = sensor_id_seed( model, sub );
-
     if( opt.is_checkbox() )
     {
         ImGuiID id = ImHashStr( opt.label.c_str(), 0, seed );
@@ -175,16 +166,8 @@ void viewer_test::set_control_value( rs2::device_model & model,
     }
 }
 
-std::string viewer_test::get_control_value( rs2::device_model & model,
-                                            std::shared_ptr< rs2::subdevice_model > sub,
-                                            rs2_option option )
+std::string viewer_test::get_value_by_seed( rs2::option_model & opt, ImGuiID seed )
 {
-    auto & opt = find_option( sub, option );
-
-    ImGuiID seed = controls_id_seed( model, sub );
-    if( !imgui->ItemExists( ImHashStr( opt.id.c_str(), 0, seed ) ) )
-        seed = sensor_id_seed( model, sub );
-
     if( opt.is_checkbox() )
     {
         return imgui->ItemIsChecked( ImHashStr( opt.label.c_str(), 0, seed ) ) ? "1" : "0";
@@ -201,6 +184,33 @@ std::string viewer_test::get_control_value( rs2::device_model & model,
         imgui->ItemSelectAndReadValue( ImHashStr( opt.id.c_str(), 0, seed ), &val );
         return opt.is_all_integers() ? std::to_string( (int)val ) : std::to_string( val );
     }
+}
+
+void viewer_test::set_control_value( rs2::device_model & model,
+                                     std::shared_ptr< rs2::subdevice_model > sub,
+                                     rs2_option option, const std::string & value )
+{
+    auto & opt = find_option( sub, option );
+
+    // Options can be at sensor level or inside the Controls section — try controls first
+    ImGuiID seed = controls_id_seed( model, sub );
+    if( !imgui->ItemExists( ImHashStr( opt.id.c_str(), 0, seed ) ) )
+        seed = sensor_id_seed( model, sub );
+
+    set_value_by_seed( opt, seed, value );
+}
+
+std::string viewer_test::get_control_value( rs2::device_model & model,
+                                            std::shared_ptr< rs2::subdevice_model > sub,
+                                            rs2_option option )
+{
+    auto & opt = find_option( sub, option );
+
+    ImGuiID seed = controls_id_seed( model, sub );
+    if( !imgui->ItemExists( ImHashStr( opt.id.c_str(), 0, seed ) ) )
+        seed = sensor_id_seed( model, sub );
+
+    return get_value_by_seed( opt, seed );
 }
 
 void viewer_test::select_combo_item( ImGuiID combo_id, const std::string & item )
@@ -237,6 +247,110 @@ bool viewer_test::has_option( std::shared_ptr< rs2::subdevice_model > sub, rs2_o
         return opt.supported && !opt.read_only;
     }
     catch( ... ) { return false; }
+}
+
+std::shared_ptr< rs2::processing_block_model >
+viewer_test::find_post_processing_filter( std::shared_ptr< rs2::subdevice_model > sub,
+                                          rs2_option option )
+{
+    for( auto && pb : sub->post_processing )
+    {
+        if( pb->get_option_model( option ) )
+            return pb;
+    }
+    return nullptr;
+}
+
+ImGuiID viewer_test::post_processing_filter_id_seed( rs2::device_model & model,
+                                                     std::shared_ptr< rs2::subdevice_model > sub,
+                                                     std::shared_ptr< rs2::processing_block_model > pb )
+{
+    // sensor node -> "Post-Processing" node -> "<filter name>" node
+    ImGuiID sensor_seed = sensor_id_seed( model, sub );
+    std::string pp_label = rsutils::string::from() << "Post-Processing##" << model.id;
+    ImGuiID pp_seed = ImHashStr( pp_label.c_str(), 0, sensor_seed );
+    std::string filter_label = rsutils::string::from() << pb->get_name() << "##" << model.id;
+    return ImHashStr( filter_label.c_str(), 0, pp_seed );
+}
+
+void viewer_test::expand_post_processing( rs2::device_model & model,
+                                          std::shared_ptr< rs2::subdevice_model > sub )
+{
+    imgui->SetRef( "Control Panel" );
+    std::string path = rsutils::string::from()
+        << sensor_label( model, sub ) << "/Post-Processing##" << model.id;
+    imgui->ItemOpen( path.c_str() );
+    imgui->SleepNoSkip( 0.3f, 0.1f );
+}
+
+void viewer_test::enable_post_processing( rs2::device_model & model,
+                                          std::shared_ptr< rs2::subdevice_model > sub )
+{
+    if( sub->post_processing_enabled )
+        return;
+    // Master toggle is drawn (off state) next to the Post-Processing header, at window scope.
+    imgui->SetRef( "Control Panel" );
+    std::string label = rsutils::string::from()
+        << " " << rs2::textual_icons::toggle_off << "##" << model.id << ","
+        << sub->s->get_info( RS2_CAMERA_INFO_NAME ) << ",post";
+    imgui->ItemClick( label.c_str() );
+    imgui->SleepNoSkip( 0.3f, 0.1f );
+}
+
+void viewer_test::enable_post_processing_filter( rs2::device_model & model,
+                                                 std::shared_ptr< rs2::subdevice_model > sub,
+                                                 std::shared_ptr< rs2::processing_block_model > pb )
+{
+    // The per-filter toggle is inert while the master post-processing toggle is off, and
+    // is_enabled() reflects only the per-filter flag (config-restore can leave it true while
+    // master is off). Ensure master is on first so is_enabled() means the filter is really active.
+    enable_post_processing( model, sub );
+    if( pb->is_enabled() )
+        return;
+    // The per-filter toggle is only rendered when the Post-Processing section is expanded; the
+    // caller is expected to have expanded it. Off-state label:
+    imgui->SetRef( "Control Panel" );
+    std::string label = rsutils::string::from()
+        << " " << rs2::textual_icons::toggle_off << "##" << model.id << ","
+        << sub->s->get_info( RS2_CAMERA_INFO_NAME ) << "," << pb->get_name();
+    imgui->ItemClick( label.c_str() );
+    imgui->SleepNoSkip( 0.3f, 0.1f );
+}
+
+void viewer_test::expand_post_processing_filter( rs2::device_model & model,
+                                                 std::shared_ptr< rs2::subdevice_model > sub,
+                                                 std::shared_ptr< rs2::processing_block_model > pb )
+{
+    imgui->SetRef( "Control Panel" );
+    std::string path = rsutils::string::from()
+        << sensor_label( model, sub ) << "/Post-Processing##" << model.id
+        << "/" << pb->get_name() << "##" << model.id;
+    imgui->ItemOpen( path.c_str() );
+    imgui->SleepNoSkip( 0.3f, 0.1f );
+}
+
+void viewer_test::set_post_processing_value( rs2::device_model & model,
+                                             std::shared_ptr< rs2::subdevice_model > sub,
+                                             std::shared_ptr< rs2::processing_block_model > pb,
+                                             rs2_option option, const std::string & value )
+{
+    rs2::option_model * opt = pb->get_option_model( option );
+    if( !opt )
+        throw std::runtime_error( rsutils::string::from()
+            << "option " << rs2_option_to_string( option ) << " not found on post-processing filter" );
+    set_value_by_seed( *opt, post_processing_filter_id_seed( model, sub, pb ), value );
+}
+
+std::string viewer_test::get_post_processing_value( rs2::device_model & model,
+                                                    std::shared_ptr< rs2::subdevice_model > sub,
+                                                    std::shared_ptr< rs2::processing_block_model > pb,
+                                                    rs2_option option )
+{
+    rs2::option_model * opt = pb->get_option_model( option );
+    if( !opt )
+        throw std::runtime_error( rsutils::string::from()
+            << "option " << rs2_option_to_string( option ) << " not found on post-processing filter" );
+    return get_value_by_seed( *opt, post_processing_filter_id_seed( model, sub, pb ) );
 }
 
 bool viewer_test::all_streams_alive( int max_attempts, float interval )

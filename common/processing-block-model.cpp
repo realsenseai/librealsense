@@ -34,6 +34,12 @@ namespace rs2
         populate_options(ss.str().c_str(), owner, owner ? &owner->_options_invalidated : nullptr, error_message);
     }
 
+    option_model * processing_block_model::get_option_model( rs2_option opt )
+    {
+        auto it = _options_id_to_model.find( opt );
+        return it == _options_id_to_model.end() ? nullptr : &it->second;
+    }
+
     void processing_block_model::save_to_config_file()
     {
         save_processing_block_to_config_file(_full_name.c_str(), _block, _enabled);
@@ -70,12 +76,16 @@ namespace rs2
     {
         for( option_value option : _block->get_supported_option_values() )
         {
-            _options_id_to_model[option->id] = create_option_model( option,
-                                                                opt_base_label,
-                                                                model,
-                                                                _block,
-                                                                model ? &model->_options_invalidated : nullptr,
-                                                                error_message );
+            option_model om = create_option_model( option,
+                                                   opt_base_label,
+                                                   model,
+                                                   _block,
+                                                   model ? &model->_options_invalidated : nullptr,
+                                                   error_message );
+            // Software filter: write synchronously (no FW round-trip) so the value is read back
+            // and the control doesn't revert to a stale value.
+            om.write_synchronously = true;
+            _options_id_to_model[option->id] = om;
         }
     }
 

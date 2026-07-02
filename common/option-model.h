@@ -75,10 +75,17 @@ namespace rs2
         std::function<bool( option_model&, std::string&, notifications_model& )> custom_draw_method = nullptr;
         bool edit_mode = false;
         std::string edit_value;
+        // Selects this option's write path; fixed at construction. Software post-processing block
+        // options set it true: they run in-process (no FW round-trip), so a synchronous set_option
+        // can't freeze the UI and it reads the value back, so the control reflects what was
+        // applied. FW/sensor options keep the async path that avoids blocking the render loop.
+        bool write_synchronously = false;
         bool is_all_integers() const;
         bool is_enum() const;
         bool is_checkbox() const;
     private:
+        // Route a user-initiated write to the synchronous or async path per write_synchronously.
+        void write_value( float new_value, std::string & error_message );
         bool draw_checkbox( notifications_model& model, std::string& error_message, const char* description );
         bool draw_combobox( notifications_model& model, std::string& error_message, const char* description, bool new_line, bool use_option_name );
         bool draw_slider( notifications_model& model, std::string& error_message, const char* description, bool use_cm_units );

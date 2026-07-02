@@ -313,7 +313,7 @@ bool option_model::draw_combobox( notifications_model & model,
             float tmp_value = range.min + range.step * selected;
             model.add_log( rsutils::string::from()
                            << "Setting " << opt << " to " << tmp_value << " (" << labels[selected] << ")" );
-            set_option_async( opt, tmp_value );
+            write_value( tmp_value, error_message );
             item_clicked = true;
         }
     }
@@ -535,7 +535,7 @@ bool option_model::draw_slider( notifications_model & model,
                 else
                 {
                     // run when the value is valid and the enter key is pressed to submit the new value
-                    set_option_async(opt, new_value);
+                    write_value( new_value, error_message );
                     model.add_log( rsutils::string::from() << "Setting " << opt << " to " << value_as_string() );
                 }
                 edit_mode = false;
@@ -655,7 +655,7 @@ bool option_model::draw_checkbox( notifications_model & model,
         model.add_log( rsutils::string::from() << "Setting " << opt << " to " << ( bool_value ? "1.0" : "0.0" ) << " ("
                                                << ( bool_value ? "ON" : "OFF" ) << ")" );
 
-        set_option_async( opt, bool_value ? 1.f : 0.f );
+        write_value( bool_value ? 1.f : 0.f, error_message );
     }
     if( ImGui::IsItemHovered() && description )
     {
@@ -666,15 +666,16 @@ bool option_model::draw_checkbox( notifications_model & model,
 
 bool option_model::slider_selected( rs2_option opt,
                                     float value,
-                                    std::string & /*error_message*/,
+                                    std::string & error_message,
                                     notifications_model & /*model*/ )
 {
-    // Dispatch every UI tick: the dispatcher action coalesces (per-option
-    // _latest_pending_value), and its try_sleep enforces the FW-write floor.
-    // set_option_async is O(atomic-CAS) when a job is already pending, so
-    // per-tick calls are cheap. Invalidate + add_log fire later from draw_option
-    // once the worker reports an actual FW write completed.
-    set_option_async( opt, value );
+    check_opt( opt, __func__ );
+    // Async (FW) path: dispatch every UI tick — the dispatcher action coalesces (per-option
+    // _latest_pending_value) and its try_sleep enforces the FW-write floor, so per-tick calls
+    // are cheap; invalidate + add_log fire later from draw_option once a write completes.
+    // Sync (software-filter) path: an integer-stepped slider only changes on step crossings, so
+    // this fires a handful of times per drag, each an instant in-process write with readback.
+    write_value( value, error_message );
     return true;
 }
 
@@ -790,6 +791,39 @@ void option_model::check_opt( rs2_option opt, char const * caller ) const
         throw std::runtime_error( rsutils::string::from()
                                   << caller << " called on option_model bound to "
                                   << this->opt << " with mismatched opt=" << opt );
+}
+
+void option_model::write_value( float new_value, std::string & error_message )
+{
+    if( write_synchronously )
+    {
+        // Software post-processing filters run in-process (no FW round-trip), so a synchronous
+        // write can't freeze the UI — and unlike the async path set_option reads the value back,
+        // so the control reflects what was applied and never reverts to a stale value.
+        // Match set_option_async: back off subdevice_model::update()'s per-frame FW-option polling
+        // while the user is writing, so a filter-slider drag stays smooth on the no-change frames.
+        if( dev )
+            dev->last_user_set_stopwatch.reset();
+        // Use a local error buffer: error_message is shared across the frame's option draws, so a
+        // prior option's failure would otherwise make this write look failed. Only invalidate when
+        // THIS write succeeds (set_option swallows failures into the string), mirroring the async
+        // did_write drain; surface a real failure by propagating it out.
+        std::string write_error;
+        set_option( opt, new_value, write_error );
+        if( write_error.empty() )
+        {
+            if( invalidate_flag )
+                *invalidate_flag = true;
+        }
+        else
+        {
+            error_message = write_error;
+        }
+    }
+    else
+    {
+        set_option_async( opt, new_value );
+    }
 }
 
 void option_model::set_option_async( rs2_option opt, float value )

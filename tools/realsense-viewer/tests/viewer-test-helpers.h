@@ -5,6 +5,8 @@
 
 #include "viewer.h"
 #include "device-model.h"
+#include "option-model.h"
+#include "processing-block-model.h"
 #include "imgui_te_engine.h"
 #include "imgui_te_context.h"
 
@@ -137,6 +139,37 @@ public:
     // Check if a sensor has a writable option
     bool has_option( std::shared_ptr< rs2::subdevice_model > sub, rs2_option option );
 
+    // -----------------------------------------------------------------------
+    // Post-processing panel
+    // -----------------------------------------------------------------------
+    // Find the post-processing filter exposing the given option (nullptr if none)
+    std::shared_ptr< rs2::processing_block_model > find_post_processing_filter(
+        std::shared_ptr< rs2::subdevice_model > sub, rs2_option option );
+    // Open the sensor's "Post-Processing" section
+    void expand_post_processing( rs2::device_model & model,
+                                 std::shared_ptr< rs2::subdevice_model > sub );
+    // Turn the master post-processing toggle on (no-op if already on)
+    void enable_post_processing( rs2::device_model & model,
+                                 std::shared_ptr< rs2::subdevice_model > sub );
+    // Turn a single filter's toggle on (no-op if already on); requires the
+    // Post-Processing section to be expanded and post-processing enabled first
+    void enable_post_processing_filter( rs2::device_model & model,
+                                        std::shared_ptr< rs2::subdevice_model > sub,
+                                        std::shared_ptr< rs2::processing_block_model > pb );
+    // Open a single filter's controls under the Post-Processing section
+    void expand_post_processing_filter( rs2::device_model & model,
+                                        std::shared_ptr< rs2::subdevice_model > sub,
+                                        std::shared_ptr< rs2::processing_block_model > pb );
+    // Set / read a post-processing filter option value via the UI
+    void set_post_processing_value( rs2::device_model & model,
+                                    std::shared_ptr< rs2::subdevice_model > sub,
+                                    std::shared_ptr< rs2::processing_block_model > pb,
+                                    rs2_option option, const std::string & value );
+    std::string get_post_processing_value( rs2::device_model & model,
+                                           std::shared_ptr< rs2::subdevice_model > sub,
+                                           std::shared_ptr< rs2::processing_block_model > pb,
+                                           rs2_option option );
+
     // Wait until all active streams are receiving frames
     bool all_streams_alive( int max_attempts = 30, float interval = 0.5f );
 
@@ -152,4 +185,10 @@ private:
                             std::shared_ptr< rs2::subdevice_model > sub );
     ImGuiID controls_id_seed( rs2::device_model & model,
                               std::shared_ptr< rs2::subdevice_model > sub );
+    ImGuiID post_processing_filter_id_seed( rs2::device_model & model,
+                                            std::shared_ptr< rs2::subdevice_model > sub,
+                                            std::shared_ptr< rs2::processing_block_model > pb );
+    // Drive / read a control widget given its already-resolved ImGui id seed
+    void set_value_by_seed( rs2::option_model & opt, ImGuiID seed, const std::string & value );
+    std::string get_value_by_seed( rs2::option_model & opt, ImGuiID seed );
 };
