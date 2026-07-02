@@ -11,12 +11,13 @@ from rspy.pytest.device_helpers import is_jetson_platform
 import logging
 log = logging.getLogger(__name__)
 
-if is_jetson_platform():
-    pytestmark = [pytest.mark.context("weekly"), pytest.mark.device_each("D457")]
-else:
-    pytestmark = [pytest.mark.context("weekly"),
-                  pytest.mark.device_each("D455"),
-                  pytest.mark.device_each("D500*")]
+# device_each (not device) so benches lacking the SKU skip instead of failing; not all CI Jetsons have a D457
+pytestmark = [
+    pytest.mark.context("weekly"),
+    pytest.mark.device_each("D457" if is_jetson_platform() else "D455"),
+]
+if not is_jetson_platform():
+    pytestmark.append(pytest.mark.device_each("D500*"))  # also cover D500-series (D555/D585S)
 
 
 def test_motion_intrinsics(test_device):
