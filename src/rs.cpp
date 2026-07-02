@@ -1741,11 +1741,10 @@ HANDLE_EXCEPTIONS_AND_RETURN( , sensor, extrinsics )
 
 double rs2_get_device_time_ms( const rs2_device* device, rs2_error** error ) BEGIN_API_CALL
 {
-	VALIDATE_NOT_NULL(device);
-	VALIDATE_NOT_NULL(device->device);
+    VALIDATE_NOT_NULL(device);
 
-	auto device_global_time = VALIDATE_INTERFACE(device->device, librealsense::global_time_interface);
-	return device_global_time->get_device_time_ms();
+    auto device_global_time = VALIDATE_INTERFACE(device->device, librealsense::global_time_interface);
+    return device_global_time->get_device_time_ms();
 }
 HANDLE_EXCEPTIONS_AND_RETURN(0.0, device)
 
