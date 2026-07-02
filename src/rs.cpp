@@ -40,6 +40,7 @@
 #include "proc/sequence-id-filter.h"
 #include "proc/decimation-embedded-filter.h"
 #include "proc/temporal-embedded-filter.h"
+#include "proc/close-range-embedded-filter.h"
 #include "media/playback/playback_device.h"
 #include "stream.h"
 #include <librealsense2/h/rs_types.h>
