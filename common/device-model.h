@@ -150,6 +150,15 @@ namespace rs2
             static const char* lpc_point_size{ "viewer_model.lpc_point_size" };
             static const char* show_safety_zones_3d{ "viewer_model.show_safety_zones_3d" };
             static const char* show_safety_zones_2d{ "viewer_model.show_safety_zones_2d" };
+            namespace viewport_grid_overlay
+            {
+                static const char* horizontal_lines{ "viewer_model.grid_overlay.horizontal_lines" };
+                static const char* vertical_lines  { "viewer_model.grid_overlay.vertical_lines"   };
+                static const char* line_width      { "viewer_model.grid_overlay.line_width"        };
+                static const char* line_color_r    { "viewer_model.grid_overlay.line_color_r"      };
+                static const char* line_color_g    { "viewer_model.grid_overlay.line_color_g"      };
+                static const char* line_color_b    { "viewer_model.grid_overlay.line_color_b"      };
+            }
         }
         namespace window
         {

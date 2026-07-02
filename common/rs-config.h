@@ -95,7 +95,7 @@ namespace rs2
         }
 
         bool contains(const char* key) const;
-        
+
         void save(const char* filename);
 
         void reset();
@@ -156,6 +156,8 @@ namespace rs2
 
             ( *current )[keys.back()] = val;
             _dirty = true;
+            if( is_grid_overlay_path( path ) )
+                _grid_overlay_dirty = true;
         }
 
         // Sets a default value to the config and default map
@@ -199,6 +201,8 @@ namespace rs2
                 }
                 ( *current )[keys.back()] = default_val;
                 _dirty = true;
+                if( is_grid_overlay_path( path ) )
+                    _grid_overlay_dirty = true;
             }
         }
 
@@ -209,6 +213,11 @@ namespace rs2
         void save_loop();
 
         static constexpr std::chrono::milliseconds SAVE_INTERVAL{ 1000 };
+
+        // True if `path` (dot-notation) falls under the viewport grid/crosshair overlay
+        // section - the one config section save() protects from being overwritten by an
+        // unrelated flush; see _grid_overlay_dirty and save().
+        static bool is_grid_overlay_path( const std::string & path );
 
         // Serializes all reads/writes of `_j` and the on-disk file. Required because
         // viewer reads/writes config_file from multiple threads (UI thread, the
@@ -221,6 +230,7 @@ namespace rs2
         std::string _filename;
         rsutils::json _j;
         std::atomic<bool> _dirty;
+        std::atomic<bool> _grid_overlay_dirty;
         std::condition_variable _save_cv;
         std::mutex _save_cv_mutex;
         bool _save_stop;

@@ -113,6 +113,7 @@ config_file& config_file::instance()
 config_file::config_file( std::string const & filename )
     : _filename( filename )
     , _dirty( false )
+    , _grid_overlay_dirty( false )
     , _save_stop( false )
 {
     try
@@ -123,13 +124,43 @@ config_file::config_file( std::string const & filename )
     }
     catch(...)
     {
-
     }
     _save_thread = std::thread( &config_file::save_loop, this );
 }
 
+bool config_file::is_grid_overlay_path( const std::string & path )
+{
+    static const std::string prefix = "viewer_model.grid_overlay.";
+    return path.rfind( prefix, 0 ) == 0;
+}
+
 void config_file::save()
 {
+    std::lock_guard< std::recursive_mutex > lk( _mutex );
+
+    // If nothing in this process has intentionally changed the crosshair/grid overlay
+    // section since the last flush, adopt whatever is currently on disk for it before
+    // writing. This flush can be triggered by any unrelated set() (window move/resize,
+    // device options, ...) up to once per SAVE_INTERVAL; without this, it would blindly
+    // overwrite a hand-edit made to realsense-config.json while the viewer is running
+    // with our stale in-memory copy.
+    if( ! _grid_overlay_dirty.exchange( false ) && ! _filename.empty() )
+    {
+        try
+        {
+            auto on_disk = rsutils::json_config::load_from_file( _filename );
+            if( on_disk.exists() && on_disk.contains( "viewer_model" )
+                && on_disk["viewer_model"].contains( "grid_overlay" ) )
+            {
+                _j["viewer_model"]["grid_overlay"] = on_disk["viewer_model"]["grid_overlay"];
+            }
+        }
+        catch( ... )
+        {
+            // Best effort - if the file can't be read, fall back to whatever _j already has.
+        }
+    }
+
     if( ! _filename.empty() )
         save( _filename.c_str() );
 }
@@ -163,6 +194,7 @@ void config_file::save_loop()
 config_file::config_file()
     : _j( rsutils::json::object() )
     , _dirty( false )
+    , _grid_overlay_dirty( false )
     , _save_stop( false )
 {
 }
@@ -182,7 +214,12 @@ config_file& config_file::operator=(const config_file& other)
         std::lock_guard< std::recursive_mutex > lk_this( _mutex );
         _j = std::move( j_copy );
         _defaults = std::move( defaults_copy );
+        // Assignment is always an intentional, wholesale replacement (Load Settings,
+        // Restore Defaults + Apply, etc.) - mark grid_overlay dirty too, or the next
+        // deferred flush would discard whatever value came with this assignment by
+        // merging stale on-disk content back over it.
         _dirty = true;
+        _grid_overlay_dirty = true;
     }
     return *this;
 }
