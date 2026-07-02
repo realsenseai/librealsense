@@ -293,6 +293,9 @@ namespace librealsense
                         "Cannot start a running device_watcher" );
                 LOG_DEBUG( "starting win_event_device_watcher" );
                 _data._stopped = false;
+                _data._changed = false;
+                _data._arrival_pending = false;
+                _data._first_event = {};
                 _callback = std::move(callback);
                 _last = backend_device_group( _backend->query_uvc_devices(),
                                               _backend->query_usb_devices(),
@@ -332,6 +335,7 @@ namespace librealsense
 
                 bool _stopped = true;
                 bool _changed = false;
+                bool _arrival_pending = false;  // gate only applies to arrivals
                 HWND hWnd;
                 HDEVNOTIFY hdevnotifyHW, hdevnotifyUVC, hdevnotify_sensor, hdevnotifyUSB;
             } _data;
@@ -378,7 +382,11 @@ namespace librealsense
                             // forever.
                             static constexpr auto MAX_DEFERRAL = std::chrono::milliseconds( 15000 );
                             auto since_first = std::chrono::steady_clock::now() - _data._first_event;
-                            if( hid_binding_in_progress( curr ) && since_first < MAX_DEFERRAL )
+                            const bool may_defer = _data._arrival_pending
+                                && _last.is_contained_in( curr )
+                                && since_first < MAX_DEFERRAL
+                                && hid_binding_in_progress( curr );
+                            if( may_defer )
                             {
                                 _data._timer.start();
                                 // Don't fire yet; fall through to sleep.
@@ -393,6 +401,7 @@ namespace librealsense
                                     _last = curr;
                                 }
                                 _data._changed = false;
+                                _data._arrival_pending = false;
                             }
                         }
                         // Yield CPU resources, as this is required for connect/disconnect events only
@@ -439,6 +448,7 @@ namespace librealsense
                         if( ! data->_changed )
                             data->_first_event = std::chrono::steady_clock::now();
                         data->_changed = true;
+                        data->_arrival_pending = true;
                         data->_timer.start();
                         break;
                     }
