@@ -631,6 +631,14 @@ const rs2_raw_data_buffer* rs2_get_calibration_config(rs2_device* device, rs2_er
 */
 void rs2_set_calibration_config(rs2_device* device, const char* calibration_config_json_str,  rs2_error** error);
 
+/**
+ * Retrieve the current device hardware clock
+ * \param[in]  device     The RealSense device
+ * \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+ * \return                Device hardware time in milliseconds
+ */
+double rs2_get_device_time_ms(const rs2_device* device, rs2_error** error);
+
 #ifdef __cplusplus
 }
 #endif
