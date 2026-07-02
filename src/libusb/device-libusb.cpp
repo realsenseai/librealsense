@@ -4,6 +4,9 @@
 #include "device-libusb.h"
 #include "types.h"
 
+#include <chrono>
+#include <thread>
+
 
 namespace librealsense
 {
@@ -84,18 +87,53 @@ namespace librealsense
 
         std::shared_ptr<handle_libusb> usb_device_libusb::get_handle(uint8_t interface_number)
         {
+            auto i = get_interface(interface_number);
+            if (!i)
+                return nullptr;
+            auto intf = std::dynamic_pointer_cast<usb_interface_libusb>(i);
+
+#ifdef __APPLE__
+            // macOS only: building the handle opens the device and claims its interfaces, which
+            // forces libusb to reset/re-enumerate the device to capture it from the system UVC
+            // extension (UVCAssistant). That races the OS re-grabbing the interface and
+            // intermittently fails with ACCESS (or comes up with no streaming data) - typically
+            // when multiple cameras are brought up together (rs-multicam). Rebuild the handle
+            // from scratch after a growing backoff so the bus can settle between attempts; this
+            // reproduces what manually re-running the app does, and makes bring-up reliable.
+            // Other platforms keep the original single-attempt behavior below.
+            const int max_attempts = 5;
+            for (int attempt = 1; attempt <= max_attempts; ++attempt)
+            {
+                try
+                {
+                    return std::make_shared<handle_libusb>(_context, _device, intf);
+                }
+                catch(const std::exception& e)
+                {
+                    if (attempt == max_attempts)
+                    {
+                        LOG_ERROR("failed to open usb handle for interface " << (int)interface_number
+                                  << " after " << max_attempts << " attempts: " << e.what());
+                        return nullptr;
+                    }
+                    const int delay_ms = 300 * attempt; // 300, 600, 900, 1200 ms backoff
+                    LOG_WARNING("failed to open usb handle for interface " << (int)interface_number
+                                << " (attempt " << attempt << "/" << max_attempts << "): " << e.what()
+                                << " - retrying in " << delay_ms << "ms");
+                    std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+                }
+            }
+            return nullptr;
+#else
             try
             {
-                auto i = get_interface(interface_number);
-                if (!i)
-                    return nullptr;
-                auto intf = std::dynamic_pointer_cast<usb_interface_libusb>(i);
                 return std::make_shared<handle_libusb>(_context, _device, intf);
             }
             catch(const std::exception& e)
             {
                 return nullptr;
             }
+#endif
         }
 
         const std::shared_ptr<usb_messenger> usb_device_libusb::open(uint8_t interface_number)

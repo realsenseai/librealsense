@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    macOS USB device-capture entitlement.
+
+    com.apple.vm.device-access lets a process take EXCLUSIVE ownership of a USB
+    device away from the system (including the userspace UVCAssistant camera
+    extension that auto-claims every UVC camera). With it, libusb's Darwin backend
+    takes the IOServiceAuthorize() capture path instead of racing UVCAssistant for
+    the RealSense UVC interfaces. See src/libusb/handle-libusb.h for the full why.
+
+    This is a RESTRICTED entitlement: AMFI only honors it on a self-signed binary
+    when SIP is disabled (csrutil disable from macOS Recovery, then reboot).
+    With SIP enabled the binary still signs fine but the entitlement is silently
+    ignored at launch.
+
+    WARNING: do NOT set amfi_get_out_of_my_way=1. On Apple Silicon (M1+) the USB
+    controller is driven by DriverKit system extensions that require AMFI validation
+    to load. That boot-arg prevents those extensions from loading, breaking USB
+    enumeration entirely — no USB devices will appear on the system.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.vm.device-access</key>
+    <true/>
+</dict>
+</plist>
