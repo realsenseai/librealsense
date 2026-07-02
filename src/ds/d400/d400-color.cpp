@@ -195,11 +195,11 @@ namespace librealsense
     {
         auto& color_ep = get_color_sensor();
 
-        // MIPI RGB controls require FW >= 5.17.3.15 and d4xx kernel driver >= 1.0.3.15.
+        // MIPI RGB controls require FW >= 5.17.3.15 and d4xx kernel driver >= 1.0.4.9.
         const bool mipi_rgb_controls_supported = _is_mipi_device
             && _fw_version >= firmware_version("5.17.3.15")
             && supports_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION)
-            && rsutils::version(get_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION)) >= rsutils::version("1.0.3.15");
+            && rsutils::version(get_info(RS2_CAMERA_INFO_MIPI_DRIVER_VERSION)) >= rsutils::version("1.0.4.9");
 
         if (!_is_mipi_device)
         {
