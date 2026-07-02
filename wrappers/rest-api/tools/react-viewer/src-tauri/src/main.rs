@@ -174,8 +174,21 @@ fn find_api_executable(exe_name: &str, app_handle: &AppHandle) -> Option<PathBuf
 /// Spawn the FastAPI process with environment variables
 fn spawn_api_process(path: &std::path::Path, port: u16, backend_logs: Arc<Mutex<Vec<String>>>) -> Result<Child, std::io::Error> {
     println!("[Tauri] Spawning FastAPI process from: {:?}", path);
-    
-    let mut cmd = Command::new(path);
+
+    // Resolve to an absolute, existing path in one syscall; also normalises relative fallbacks from find_api_executable().
+    let path = path.canonicalize().map_err(|e| std::io::Error::new(
+        e.kind(),
+        format!("Failed to resolve executable path {:?}: {}", path, e),
+    ))?;
+
+    if port < 1024 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("Port {} is privileged (ports < 1024 require root); use a port in the range 1024-65535", port),
+        ));
+    }
+
+    let mut cmd = Command::new(&path);
     cmd.env("UVICORN_PORT", port.to_string())
         .env("UVICORN_HOST", "127.0.0.1")
         .env("PYTHONUNBUFFERED", "1")
