@@ -83,6 +83,7 @@ namespace rs2
             void parse_versions_data(const std::stringstream &ver_data);
             bool get_version_data_common(const component_part_type component, const version& version, const std::string& req_field, std::string& out);
             bool is_device_name_equal(const std::string &str_from_db, const std::string &str_compared, bool allow_wildcard);
+            static std::string strip_intel_prefix(const std::string &name);
 
 
             bool init();
