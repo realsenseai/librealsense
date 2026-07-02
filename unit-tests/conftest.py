@@ -757,7 +757,12 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         if not teardown_disable:
             log.info(f"Teardown: leaving {serials} enabled (--no-reset)")
             return
-        log.info(f"Teardown: disabling {serials}")
+        if devices.hub is None:
+            # No hub to power the port off: disable() is a no-op, so nothing is removed here.
+            # The device is cleared by hardware_reset at the next module's setup recycle.
+            log.info(f"Teardown: {serials} left enumerated (no hub; recycled at next setup)")
+            return
+        log.info(f"Teardown: disabling {serials} and waiting for removal")
         try:
             devices.disable(serials)
         except Exception as e:
