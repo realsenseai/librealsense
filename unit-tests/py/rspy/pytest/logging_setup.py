@@ -37,6 +37,11 @@ _unit_tests_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..',
 # Live-logging state: set to True when -s is passed (stdout not captured)
 live_logging = False
 
+# Per-(module, camera) log paths already opened this session. The first open truncates
+# (clears any stale file from a previous run); reopens append, so pytest-retry attempts and
+# --repeat/--count passes all accumulate in one file instead of overwriting each other.
+_opened_logs = set()
+
 def bridge_rspy_log():
     """Wrap rspy.log.d/i/w/e to also emit via Python logging."""
     def _wrap(original_fn, py_level):
@@ -282,12 +287,16 @@ def open_log(file_path, device_id, config):
         return None
     log_path = os.path.join(logdir, _compose_log_name(file_path, device_id))
     try:
-        # mode='w': retries/repeats of the same (module, device) overwrite the previous pass's
-        # log so the Jenkins report links to the latest attempt (appending would interleave passes).
-        handler = logging.FileHandler(log_path, mode='w')
+        # First open this session truncates (clears a stale file from a previous run); reopens
+        # append, so pytest-retry attempts and --repeat/--count passes of the same (module, device)
+        # all accumulate in ONE file -- each attempt's setup, test output, failure, and teardown --
+        # instead of the latest attempt overwriting the previous ones.
+        mode = 'a' if log_path in _opened_logs else 'w'
+        handler = logging.FileHandler(log_path, mode=mode)
         handler.setFormatter(_NestedFormatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT))
         handler.setLevel(logging.DEBUG)
         logging.getLogger().addHandler(handler)
+        _opened_logs.add(log_path)
         return handler
     except Exception as e:
         log.warning(f"Could not create test log file {log_path}: {e}")

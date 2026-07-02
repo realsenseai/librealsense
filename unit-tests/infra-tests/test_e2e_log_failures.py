@@ -34,9 +34,10 @@ def _read_log():
 
 class TestLogFailures:
 
-    def test_call_failure_recorded(self):
+    def test_call_failure_and_teardown_recorded(self):
         """A failing call-phase test writes its exception into the per-test log,
-        exactly once (makereport no longer double-logs the call phase)."""
+        exactly once (makereport no longer double-logs the call phase), followed by
+        the teardown marker."""
         _cleanup()
         rc, out, *_ = run_e2e("pytest-logfail.py")
         assert rc != 0, out
@@ -45,15 +46,18 @@ class TestLogFailures:
         assert "call failed: RuntimeError: xioctl" in log, log
         assert "errno=22" in log, log
         assert log.count("call failed: RuntimeError") == 1, f"duplicate failure log line:\n{log}"
+        assert "Teardown: disabling" in log, log
         _cleanup()
 
-    def test_call_failure_recorded_under_retry(self):
-        """Under --retries the module log is truncated + reopened per attempt and
-        makereport is bypassed; the failure must still survive in the final file."""
+    def test_every_retry_attempt_recorded_in_one_file(self):
+        """Under --retries the module log is reopened in append mode per attempt and
+        makereport is bypassed; every attempt's failure AND teardown must accumulate in
+        the one file (not overwritten, not empty). --retries 2 == 3 attempts."""
         _cleanup()
         rc, out, *_ = run_e2e("pytest-logfail.py", "--retries", "2")
         assert rc != 0, out
         assert parse_outcomes(out).get("failed") == 1, out
         log = _read_log()
-        assert "call failed: RuntimeError: xioctl(VIDIOC_G_EXT_CTRLS) failed, errno=22" in log, log
+        assert log.count("call failed: RuntimeError: xioctl(VIDIOC_G_EXT_CTRLS) failed, errno=22") == 3, log
+        assert log.count("Teardown: disabling") == 3, log
         _cleanup()

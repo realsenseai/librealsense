@@ -751,8 +751,13 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     teardown_disable = not no_reset
 
     def _teardown(serials):
+        # Log the teardown so the per-test file shows the module's cleanup -- not just
+        # setup + test. Runs while this module+camera's log handler is still open.
+        ensure_newline()
         if not teardown_disable:
+            log.info(f"Teardown: leaving {serials} enabled (--no-reset)")
             return
+        log.info(f"Teardown: disabling {serials}")
         try:
             devices.disable(serials)
         except Exception as e:
