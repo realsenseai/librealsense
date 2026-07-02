@@ -141,6 +141,17 @@ namespace rs2
             return result;
         }
 
+		/**
+		* Retrieve the current device hardware clock time
+		*/
+		double get_device_time_ms()
+		{
+			rs2_error* e = nullptr;
+			auto result = rs2_get_device_time_ms(_dev.get(), &e);
+			error::handle(e);
+			return result;
+		}
+
         device& operator=(const std::shared_ptr<rs2_device> dev)
         {
             _dev.reset();
