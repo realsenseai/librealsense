@@ -637,7 +637,7 @@ void rs2_set_calibration_config(rs2_device* device, const char* calibration_conf
  * \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
  * \return                Device hardware time in milliseconds
  */
-double rs2_get_device_time_ms(const rs2_device* device, rs2_error** error) const;
+double rs2_get_device_time_ms(const rs2_device* device, rs2_error** error);
 
 #ifdef __cplusplus
 }
