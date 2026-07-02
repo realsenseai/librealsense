@@ -431,7 +431,9 @@ def pytest_runtest_makereport(item, call):
         ensure_newline()
         reason = report.longrepr[-1]
         log.info(reason)
-    if report.failed and call.excinfo:
+    # Call-phase failures are logged from pytest_runtest_call so they also appear on
+    # pytest-retry attempts (which bypass this hook); here we cover setup/teardown.
+    if report.failed and call.excinfo and call.when != "call":
         ensure_newline()
         log.error(f"{call.when} {report.outcome}: {call.excinfo.typename}: {call.excinfo.value}")
     if call.when == "call":
@@ -457,6 +459,16 @@ def pytest_runtest_call(item):
     the buggy case; every other path is left to pytest-check unchanged.
     """
     outcome = yield
+
+    # Record a call-phase failure into the per-test log. pytest-retry reruns a test by
+    # invoking pytest_runtest_call directly -- bypassing pytest_runtest_makereport -- and
+    # reopens the module log in 'w' mode, which truncates the original attempt's logged
+    # failure. Logging here means every attempt (including the last retry) records its
+    # failure, so a failing test's .log never ends on just the "Test:" header.
+    if outcome.excinfo is not None and outcome.excinfo[0].__name__ != "Skipped":
+        ensure_newline()
+        log.error(f"call failed: {outcome.excinfo[0].__name__}: {outcome.excinfo[1]}")
+
     try:
         from pytest_check import check_log
     except ImportError:
@@ -469,7 +481,10 @@ def pytest_runtest_call(item):
         return
     num_failures = check_log._num_failures
     check_log.clear_failures()
-    raise AssertionError("\n".join(failures + ["-" * 60, f"Failed Checks: {num_failures}"]))
+    message = "\n".join(failures + ["-" * 60, f"Failed Checks: {num_failures}"])
+    ensure_newline()
+    log.error(f"call failed: {num_failures} soft-check failure(s):\n{message}")
+    raise AssertionError(message)
 
 
 def pytest_sessionstart(session):
@@ -736,8 +751,18 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     teardown_disable = not no_reset
 
     def _teardown(serials):
+        # Log the teardown so the per-test file shows the module's cleanup -- not just
+        # setup + test. Runs while this module+camera's log handler is still open.
+        ensure_newline()
         if not teardown_disable:
+            log.info(f"Teardown: leaving {serials} enabled (--no-reset)")
             return
+        if devices.hub is None:
+            # No hub to power the port off: disable() is a no-op, so nothing is removed here.
+            # The device is cleared by hardware_reset at the next module's setup recycle.
+            log.info(f"Teardown: {serials} left enumerated (no hub; recycled at next setup)")
+            return
+        log.info(f"Teardown: disabling {serials} and waiting for removal")
         try:
             devices.disable(serials)
         except Exception as e:
