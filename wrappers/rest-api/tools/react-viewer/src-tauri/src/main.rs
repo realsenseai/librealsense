@@ -173,8 +173,13 @@ fn find_api_executable(exe_name: &str, app_handle: &AppHandle) -> Option<PathBuf
 #[cfg(not(debug_assertions))]
 /// Spawn the FastAPI process with environment variables
 fn spawn_api_process(path: &std::path::Path, port: u16, backend_logs: Arc<Mutex<Vec<String>>>) -> Result<Child, std::io::Error> {
+    // Validate port is in safe range (1024-65535 for non-privileged processes)
+    if port < 1024 || port > 65535 {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Port must be between 1024 and 65535"));
+    }
+
     println!("[Tauri] Spawning FastAPI process from: {:?}", path);
-    
+
     let mut cmd = Command::new(path);
     cmd.env("UVICORN_PORT", port.to_string())
         .env("UVICORN_HOST", "127.0.0.1")
