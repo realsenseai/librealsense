@@ -8,7 +8,7 @@ target_sources(${LRS_TARGET}
     PRIVATE
         "${CMAKE_CURRENT_LIST_DIR}/d500-device.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/d500-color.cpp"
-        "${CMAKE_CURRENT_LIST_DIR}/d500-dual-rgb.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/d500-dual-color.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/d500-motion.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/d500-active.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/d500-private.cpp"
@@ -24,7 +24,7 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/d500-debug-protocol-calibration-engine.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/d500-device.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-color.h"
-        "${CMAKE_CURRENT_LIST_DIR}/d500-dual-rgb.h"
+        "${CMAKE_CURRENT_LIST_DIR}/d500-dual-color.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-motion.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-active.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-private.h"

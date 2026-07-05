@@ -156,7 +156,7 @@ namespace librealsense
 
             if (s->header.md_type_id != expected_type)
             {
-                // Some mismatched metadata types are expected, e.g dual-RGB color metadata on a depth sensor.
+                // Some mismatched metadata types are expected, e.g dual-color metadata on a depth sensor.
                 return false;
             }
 

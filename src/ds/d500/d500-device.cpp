@@ -225,7 +225,7 @@ namespace librealsense
             }
             else
             {
-                // Streams contributed by feature mixins (e.g. dual-RGB color), matched by stream type + index.
+                // Streams contributed by feature mixins (e.g. dual-color), matched by stream type + index.
                 bool matched = false;
                 for (auto&& extra : _extra_streams)
                 {
@@ -247,7 +247,7 @@ namespace librealsense
             // Register intrinsics
             if (p->get_format() != RS2_FORMAT_Y16) // Y16 format indicate unrectified images, no intrinsics are available for these
             {
-                // TODO: once available, read the dual RGB intrinsics from the new dual-RGB calibration tables instead of reusing IR here.
+                // TODO: once available, read the dual-color intrinsics from the new dual-color calibration tables instead of reusing IR here.
                 const auto&& profile = to_profile(p.get());
                 std::weak_ptr<d500_depth_sensor> wp = std::dynamic_pointer_cast<d500_depth_sensor>(this->shared_from_this());
                 vid_profile->set_intrinsics([profile, wp]()

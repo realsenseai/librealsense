@@ -13,11 +13,11 @@
 
 namespace librealsense
 {
-    // Supports two RGB streams over USB endpoints (pins) of the depth interface, instead of through a dedicated sensor
-    class d500_dual_rgb : public virtual d500_device
+    // Supports two color streams over USB endpoints (pins) of the depth interface, instead of through a dedicated sensor
+    class d500_dual_color : public virtual d500_device
     {
     public:
-        d500_dual_rgb( std::shared_ptr< const d500_info > const & dev_info );
+        d500_dual_color( std::shared_ptr< const d500_info > const & dev_info );
 
     protected:
         std::shared_ptr< stream_interface > _color_stream_1;
@@ -27,7 +27,7 @@ namespace librealsense
         void register_color_extrinsics();
         void register_color_metadata();
 
-        // Stream-id resolver: route M420 color pins to Color 1 / Color 2 streams
+        // Stream-id resolver: route color pins (NV12/M420/YUY2) to Color 1 / Color 2 streams
         static void resolve_color_stream( const std::vector< platform::stream_profile > & all,
                                           const platform::stream_profile & p, rs2_stream & type, int & index );
         static bool is_color_pin( const std::vector< platform::stream_profile > & all, uint32_t pin );

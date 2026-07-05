@@ -161,6 +161,10 @@ def run_e2e(test_filename, *extra_pytest_args, env=None):
 
         sub_env = os.environ.copy()
         sub_env['INFRA_UNIT_TESTS_DIR'] = os.path.normpath(os.path.join(_E2E_DIR, '..', '..'))  # unit-tests/
+        # Force per-test logs into the tmpdir so they're deterministic (independent of any build
+        # tree) and collectable below; otherwise the location varies (build dir vs unit-tests/logs).
+        e2e_logdir = os.path.join(tmpdir, 'testlogs')
+        sub_env['RS_TEST_LOGDIR'] = e2e_logdir
         if env:
             sub_env.update(env)
 
@@ -183,6 +187,16 @@ def run_e2e(test_filename, *extra_pytest_args, env=None):
         tracking = json.loads(open(tracking_file).read()) if os.path.exists(tracking_file) else {
             "enable_only_calls": [], "rslog_calls": [], "query_kwargs": [], "disable_calls": []
         }
+
+        # Collect per-test log files (name -> content) before the tmpdir is removed, so tests can
+        # assert on log content without depending on where the logs would otherwise land.
+        tracking["logs"] = {}
+        if os.path.isdir(e2e_logdir):
+            for name in os.listdir(e2e_logdir):
+                path = os.path.join(e2e_logdir, name)
+                if os.path.isfile(path):
+                    with open(path, encoding="utf-8", errors="replace") as fh:
+                        tracking["logs"][name] = fh.read()
 
         return p.returncode, p.stdout, tracking
 

@@ -37,6 +37,11 @@ _unit_tests_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..',
 # Live-logging state: set to True when -s is passed (stdout not captured)
 live_logging = False
 
+# Per-(module, camera) log paths already opened this session. The first open truncates
+# (clears any stale file from a previous run); reopens append, so pytest-retry attempts and
+# --repeat/--count passes all accumulate in one file instead of overwriting each other.
+_opened_logs = set()
+
 def bridge_rspy_log():
     """Wrap rspy.log.d/i/w/e to also emit via Python logging."""
     def _wrap(original_fn, py_level):
@@ -75,10 +80,16 @@ def _find_build_dir():
 
 
 def setup_test_logging(config):
-    """Set up per-test log directory and JUnit XML output path (<build_dir>/<config>/unit-tests/)."""
-    build_dir = _find_build_dir()
+    """Set up per-test log directory and JUnit XML output path (<build_dir>/<config>/unit-tests/).
 
-    if build_dir:
+    RS_TEST_LOGDIR overrides the location — used by the infra E2E harness for a deterministic,
+    isolated log dir regardless of whether a build tree is present."""
+    env_logdir = os.environ.get('RS_TEST_LOGDIR')
+    build_dir = None if env_logdir else _find_build_dir()
+
+    if env_logdir:
+        logdir = env_logdir
+    elif build_dir:
         cmake_cache_path = os.path.join(build_dir, 'CMakeCache.txt')
         configuration = None
 
@@ -282,12 +293,14 @@ def open_log(file_path, device_id, config):
         return None
     log_path = os.path.join(logdir, _compose_log_name(file_path, device_id))
     try:
-        # mode='w': retries/repeats of the same (module, device) overwrite the previous pass's
-        # log so the Jenkins report links to the latest attempt (appending would interleave passes).
-        handler = logging.FileHandler(log_path, mode='w')
+        # First open truncates any stale file from a previous run; subsequent opens append so
+        # pytest-retry attempts and --repeat/--count passes accumulate in one file.
+        mode = 'a' if log_path in _opened_logs else 'w'
+        handler = logging.FileHandler(log_path, mode=mode)
         handler.setFormatter(_NestedFormatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT))
         handler.setLevel(logging.DEBUG)
         logging.getLogger().addHandler(handler)
+        _opened_logs.add(log_path)
         return handler
     except Exception as e:
         log.warning(f"Could not create test log file {log_path}: {e}")

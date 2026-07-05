@@ -28,7 +28,8 @@ namespace librealsense
          {fourcc('M','J','P','G'), RS2_FORMAT_MJPEG},
          {fourcc('R','W','1','6'), RS2_FORMAT_RAW16},
          {fourcc('B','Y','R','2'), RS2_FORMAT_RAW16},
-         {fourcc('M','4','2','0'), RS2_FORMAT_M420}
+         {fourcc('M','4','2','0'), RS2_FORMAT_M420},
+         {fourcc('N','V','1','2'), RS2_FORMAT_NV12}
     };
     std::map<fourcc::value_type, rs2_stream> d500_color_fourcc_to_rs2_stream = {
         {fourcc('Y','U','Y','2'), RS2_STREAM_COLOR},
@@ -37,7 +38,8 @@ namespace librealsense
         {fourcc('R','W','1','6'), RS2_STREAM_COLOR},
         {fourcc('B','Y','R','2'), RS2_STREAM_COLOR},
         {fourcc('M','J','P','G'), RS2_STREAM_COLOR},
-        {fourcc('M','4','2','0'), RS2_STREAM_COLOR}
+        {fourcc('M','4','2','0'), RS2_STREAM_COLOR},
+        {fourcc('N','V','1','2'), RS2_STREAM_COLOR}
     };
 
     d500_color::d500_color( std::shared_ptr< const d500_info > const & dev_info, rs2_format native_format )
@@ -139,10 +141,19 @@ namespace librealsense
                 RS2_STREAM_COLOR ) );
             break;
         case RS2_FORMAT_M420:
+        case RS2_FORMAT_NV12:
+            // Register NV12 conversions first so RGB resolve to NV12 when it is present, and to M420 when it is not
+            // (the converter breaks ties by registration order). YUY2 is exposed passthrough-only.
+            color_ep.register_processing_block( processing_block_factory::create_pbf_vector< nv12_converter >(
+                RS2_FORMAT_NV12,
+                map_supported_color_formats( RS2_FORMAT_NV12 ),
+                RS2_STREAM_COLOR ) );
             color_ep.register_processing_block( processing_block_factory::create_pbf_vector< m420_converter >(
                 RS2_FORMAT_M420,
                 map_supported_color_formats( RS2_FORMAT_M420 ),
                 RS2_STREAM_COLOR ) );
+            color_ep.register_processing_block(
+                processing_block_factory::create_id_pbf( RS2_FORMAT_YUYV, RS2_STREAM_COLOR ) );
             break;
         default:
             throw invalid_value_exception( "invalid native color format "

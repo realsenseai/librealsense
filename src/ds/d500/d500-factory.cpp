@@ -16,7 +16,7 @@
 #include "ds/ds-timestamp.h"
 #include "d500-active.h"
 #include "d500-color.h"
-#include "d500-dual-rgb.h"
+#include "d500-dual-color.h"
 #include "d500-motion.h"
 #include "d500-safety.h"
 #include "d500-depth-mapping.h"
@@ -103,11 +103,11 @@ namespace librealsense
     };
 
 
-    // D585 or D535, dual RGB variant. No dedicated color sensor.
+    // D585 or D535, dual color variant. No dedicated color sensor.
     class rs5x5_device
         : public d500_active
         , public d500_motion
-        , public d500_dual_rgb
+        , public d500_dual_color
         , public ds_advanced_mode_base
         , public extended_firmware_logger_device
     {
@@ -118,7 +118,7 @@ namespace librealsense
             , d500_device( dev_info )
             , d500_active( dev_info )
             , d500_motion( dev_info )
-            , d500_dual_rgb( dev_info )
+            , d500_dual_color( dev_info )
             , ds_advanced_mode_base()
             , extended_firmware_logger_device( dev_info, d500_device::_hw_monitor, get_firmware_logs_command() )
         {

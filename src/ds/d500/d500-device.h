@@ -51,7 +51,7 @@ namespace librealsense
         embedded_filters get_supported_embedded_filters() const override { return _embedded_filters; }
         void add_embedded_filter( std::shared_ptr< embedded_filter_interface > filter ) { _embedded_filters.push_back( filter ); }
 
-        // Streams contributed by feature mixins (e.g. dual-RGB color) that this sensor physically carries. They are
+        // Streams contributed by feature mixins (e.g. dual-color) that this sensor physically carries. They are
         // assigned to matching profiles (by stream type + index) during init_stream_profiles.
         void add_stream( std::shared_ptr< stream_interface > stream ) { _extra_streams.push_back( stream ); }
 
