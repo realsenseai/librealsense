@@ -12,7 +12,7 @@ ExternalProject_Add(
     # 'remove_directory' is working but cound as deprecated from cmake version 3.17, 
     # Once we have a minimal version support of cmake 3.17, we can switch the command to rm -rF
     DOWNLOAD_COMMAND   "${CMAKE_COMMAND}" -E  remove_directory  "${CMAKE_BINARY_DIR}/third-party/json"
-             COMMAND   git clone -c advice.detachedHead=false --branch v3.12.0 https://github.com/nlohmann/json.git --depth 1 json
+             COMMAND   git clone -c advice.detachedHead=false --branch v${NLOHMANN_JSON_BUNDLED_VERSION} https://github.com/nlohmann/json.git --depth 1 json
     DOWNLOAD_DIR       "${CMAKE_BINARY_DIR}/third-party/"
     
     # Override default steps with no action, we just want the clone step.
