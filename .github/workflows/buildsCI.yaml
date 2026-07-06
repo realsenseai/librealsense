@@ -412,6 +412,53 @@ jobs:
         python3 -m pip install -r unit-tests/requirements.txt
         python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "linux"
 
+  #--------------------------------------------------------------------------------
+  U24_SH_Py_CI_SYS_JSON:  # Ubuntu 24.04, Shared, Python, LibCI with executables and system provided nlohmann_json library
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+
+    - name: Prebuild
+      shell: bash
+      run: |
+        sudo apt-get update;
+        sudo apt-get install -qq build-essential xorg-dev libgl1-mesa-dev libglu1-mesa-dev libglew-dev libglm-dev;
+        sudo apt-get install -qq libusb-1.0-0-dev;
+        sudo apt-get install -qq libgtk-3-dev;
+        sudo apt-get install -qq libglfw3-dev libglfw3;
+        sudo apt-get install -qq nlohmann-json3-dev;
+        python3 -m pip install numpy
+        # for debugging purpose
+        dpkg -s nlohmann-json3-dev | grep "Package\|Version" | xargs
+
+    - name: Check_API
+      shell: bash
+      run: |
+        cd scripts
+        ./api_check.sh
+        ./pr_check.sh
+        cd ..
+        mkdir build
+
+    - name: Build
+      shell: bash
+      run: |
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=true -DUNIT_TESTS_ARGS="--not-live --context=linux" -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DUSE_EXTERNAL_NLOHMANN_JSON=ON
+        cmake --build . -- -j4
+
+    - name: LibCI
+      # Note: requires BUILD_UNIT_TESTS or the executable C++ unit-tests won't run (and it won't complain)
+      shell: bash
+      run: |
+        python3 unit-tests/run-unit-tests.py --no-color --debug --stdout --not-live --context "linux"
+
+    - name: LibCI (pytest)
+      shell: bash
+      run: |
+        python3 -m pip install -r unit-tests/requirements.txt
+        python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "linux"
 
   #--------------------------------------------------------------------------------
   U22_ST_Py_DDS_RSUSB_SEC:  # Ubuntu 2020, Static, Python, DDS, RSUSB, additional security checks
