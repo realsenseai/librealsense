@@ -60,6 +60,7 @@ option(BUILD_WITH_DDS "Access camera devices through DDS topics (requires CMake 
 option(BUILD_RS2_ALL "Build realsense2-all static bundle containing all realsense libraries (with BUILD_SHARED_LIBS=OFF)" ON)
 option(ENABLE_SECURITY_FLAGS "Enable additional compiler security flags to enhance the build's security" OFF)
 option(USE_EXTERNAL_LZ4 "Use externally build LZ4 library instead of building and using the in this repo provided version" OFF)
+option(USE_EXTERNAL_NLOHMANN_JSON "Use an externally built nlohmann-json development package instead of downloading it as part of this build" OFF)
 option(BUILD_ASAN "Enable AddressSanitizer" OFF)
 option(BUILD_ROSBAG2 "Build and use rosbag2 recording system" ON) # temporary flag, should be removed when deprecated ROSBAG1 recording system is removed
 mark_as_advanced(BUILD_ASAN)
