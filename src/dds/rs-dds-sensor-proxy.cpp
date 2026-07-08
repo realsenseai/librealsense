@@ -52,6 +52,29 @@ using rsutils::json;
 namespace librealsense {
 
 
+static bool try_to_rs2_format( realdds::dds_video_encoding const & encoding, rs2_format & format )
+{
+    if( encoding.to_string() == "h264" )
+        return false;
+
+    try
+    {
+        format = static_cast< rs2_format >( encoding.to_rs2() );
+        return true;
+    }
+    catch( std::exception const & )
+    {
+        return false;
+    }
+}
+
+
+static bool is_variable_size_video_format( rs2_format format )
+{
+    return format == RS2_FORMAT_MJPEG;
+}
+
+
 dds_sensor_proxy::dds_sensor_proxy( std::string const & sensor_name,
                                     software_device * owner,
                                     std::shared_ptr< realdds::dds_device > const & dev )
@@ -132,12 +155,18 @@ void dds_sensor_proxy::register_converters()
         for( auto & profile : stream.second->profiles() )
         {
             if( auto vsp = std::dynamic_pointer_cast< realdds::dds_video_stream_profile >( profile ) )
-                if( vsp->encoding().to_rs2() == RS2_FORMAT_Y8 )
+            {
+                rs2_format format;
+                if( ! try_to_rs2_format( vsp->encoding(), format ) )
+                    continue;
+
+                if( format == RS2_FORMAT_Y8 )
                     y8_indexes.insert( stream.first.index );
-                else if( vsp->encoding().to_rs2() == RS2_FORMAT_Y16 )
+                else if( format == RS2_FORMAT_Y16 )
                     y16_indexes.insert( stream.first.index );
-                else if( vsp->encoding().to_rs2() == RS2_FORMAT_MJPEG )
+                else if( format == RS2_FORMAT_MJPEG )
                     jpeg_indexes.insert( stream.first.index );
+            }
         }
     }
 
@@ -391,12 +420,13 @@ void dds_sensor_proxy::handle_video_data( std::vector< uint8_t > && buffer,
     if( ! vid_profile )
         throw invalid_value_exception( "non-video profile provided to on_video_frame" );
 
+    auto format = vid_profile->get_format();
     auto height = vid_profile->get_height();
     auto width = vid_profile->get_width();
-    auto stride = static_cast< int >(height > 0 ? data.raw_size / height : data.raw_size );
-    auto expected_bpp = get_image_bpp(vid_profile->get_format()) / 8;
-    auto expected_size = height * width * expected_bpp;
-    if( data.raw_size != expected_size )
+    auto expected_bpp = get_image_bpp( format ) / 8;
+    auto stride = static_cast< int >( width > 0 ? width * expected_bpp : data.raw_size );
+    auto expected_size = static_cast< size_t >( height ) * static_cast< size_t >( width ) * expected_bpp;
+    if( ! is_variable_size_video_format( format ) && data.raw_size != expected_size )
         throw invalid_value_exception( rsutils::string::from() << "Received frame with unexpected size " << data.raw_size << ", expected " << expected_size );
 
     auto new_frame_interface = allocate_new_video_frame( vid_profile, stride, expected_bpp, std::move( data ) );    

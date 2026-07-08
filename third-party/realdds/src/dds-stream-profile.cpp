@@ -209,7 +209,8 @@ dds_video_stream_profile::dds_video_stream_profile( rsutils::json const & j, int
 
 bool dds_video_stream_profile::is_compressed_encoding() const
 {
-    return _encoding.to_rs2() == RS2_FORMAT_MJPEG;
+    auto const encoding = _encoding.to_string();
+    return encoding == "jpeg" || encoding == "h264";
 }
 
 

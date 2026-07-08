@@ -87,6 +87,7 @@ rs2_intrinsics to_rs2_intrinsics( const realdds::video_intrinsics & intrinsics )
 static rs2_video_stream to_rs2_video_stream( rs2_stream const stream_type,
                                              sid_index const & sidx,
                                              std::shared_ptr< realdds::dds_video_stream_profile > const & profile,
+                                             rs2_format const format,
                                              const std::set< realdds::video_intrinsics > & intrinsics )
 {
     rs2_video_stream prof;
@@ -96,7 +97,7 @@ static rs2_video_stream to_rs2_video_stream( rs2_stream const stream_type,
     prof.width = profile->width();
     prof.height = profile->height();
     prof.fps = profile->frequency();
-    prof.fmt = static_cast< rs2_format >( profile->encoding().to_rs2() );
+    prof.fmt = format;
 
     // Handle intrinsics
     auto intr = std::find_if( intrinsics.begin(),
@@ -109,6 +110,23 @@ static rs2_video_stream to_rs2_video_stream( rs2_stream const stream_type,
     }
 
     return prof;
+}
+
+
+static bool try_to_rs2_format( realdds::dds_video_encoding const & encoding, rs2_format & format )
+{
+    if( encoding.to_string() == "h264" )
+        return false;
+
+    try
+    {
+        format = static_cast< rs2_format >( encoding.to_rs2() );
+        return true;
+    }
+    catch( std::exception const & )
+    {
+        return false;
+    }
 }
 
 
@@ -290,8 +308,15 @@ dds_device_proxy::dds_device_proxy( std::shared_ptr< const device_info > const &
                     if( video_stream )
                     {
                         auto video_profile = std::static_pointer_cast< realdds::dds_video_stream_profile >( profile );
+                        rs2_format format;
+                        if( ! try_to_rs2_format( video_profile->encoding(), format ) )
+                        {
+                            LOG_WARNING( "Skipping unsupported DDS encoding '" << video_profile->encoding().to_string()
+                                                                               << "' in stream " << stream->name() );
+                            continue;
+                        }
                         auto raw_stream_profile = sensor.add_video_stream(
-                            to_rs2_video_stream( stream_type, sidx, video_profile, video_stream->get_intrinsics() ),
+                            to_rs2_video_stream( stream_type, sidx, video_profile, format, video_stream->get_intrinsics() ),
                             profile == default_profile, stream->name() );
                         _stream_name_to_profiles[stream->name()].push_back( raw_stream_profile );
                     }
@@ -643,11 +668,12 @@ void dds_device_proxy::tag_default_profile_of_stream(
     const std::shared_ptr< const realdds::dds_stream > & stream ) const
 {
     auto const & dds_default_profile = stream->default_profile();
-    int target_format;
+    rs2_format target_format = RS2_FORMAT_ANY;
     auto dds_vsp = std::dynamic_pointer_cast< realdds::dds_video_stream_profile >( dds_default_profile );
     if( dds_vsp )
     {
-        target_format = dds_vsp->encoding().to_rs2();
+        if( ! try_to_rs2_format( dds_vsp->encoding(), target_format ) )
+            return;
         switch( target_format )
         {
         case RS2_FORMAT_YUYV:
