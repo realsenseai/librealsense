@@ -48,6 +48,10 @@ git clone https://github.com/realsenseai/librealsense.git
 cd librealsense
 mkdir build && cd build
 
+PY="$(which python3)"
+PY_VER="$("$PY" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+PREFIX="$HOME/librealsense-d555"
+
 cmake .. \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_WITH_DDS=ON \
@@ -57,12 +61,15 @@ cmake .. \
   -DBUILD_GRAPHICAL_EXAMPLES=OFF \
   -DFORCE_RSUSB_BACKEND=ON \
   -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DCMAKE_INSTALL_PREFIX="$HOME/librealsense-d555" \
-  -DPYTHON_EXECUTABLE="$(which python3)"
+  -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+  -DPYTHON_EXECUTABLE="$PY" \
+  -DPYTHON_INSTALL_DIR="lib/python${PY_VER}/site-packages/pyrealsense2"
 
 cmake --build . -j"$(sysctl -n hw.ncpu)"
 cmake --install .
 ```
+
+On Apple + DDS, CMake defaults `PYTHON_INSTALL_DIR` under the **install prefix** (not Homebrew `site-packages`) so the extension and dylibs stay co-located for `@loader_path`.
 
 ### Why `BUILD_WITH_DDS=ON` and shared FastDDS on Apple?
 
@@ -111,13 +118,17 @@ rs-enumerate-devices --sw-only -s
 
 Without `--sw-only`, USB-only masks may hide DDS devices even when the sniffer sees the participant.
 
+### Environment (production)
+
+```bash
+export PATH="$PREFIX/bin:$PATH"
+export PYTHONPATH="$PREFIX/lib/python${PY_VER}/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+# Do not set DYLD_LIBRARY_PATH — tools and the extension use @rpath/@loader_path.
+```
+
 ### Python
 
 ```bash
-# If pyrealsense2 was installed into the prefix lib:
-export PYTHONPATH="$HOME/librealsense-d555/lib:$PYTHONPATH"
-# (or install the extension into a venv that can load prefix/lib via rpath)
-
 python3 - <<'PY'
 import json, time
 import pyrealsense2 as rs

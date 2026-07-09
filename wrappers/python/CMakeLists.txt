@@ -34,10 +34,14 @@ set_target_properties( pyrealsense2
         FOLDER Library/Python
     )
 if(APPLE AND BUILD_WITH_DDS)
-    # Extension loads librealsense2 (and via it, libfastrtps) from the same lib dir.
+    # Build tree: all dylibs next to the extension (@loader_path).
+    # Install tree (prefix layout):
+    #   lib/librealsense2.dylib
+    #   lib/pythonX.Y/site-packages/pyrealsense2/*.so
+    # → climb three levels: site-packages/pyrealsense2 → lib
     set_target_properties(pyrealsense2 PROPERTIES
         BUILD_RPATH "@loader_path"
-        INSTALL_RPATH "@loader_path;@loader_path/../lib"
+        INSTALL_RPATH "@loader_path;@loader_path/../../.."
         MACOSX_RPATH ON)
 endif()
 
