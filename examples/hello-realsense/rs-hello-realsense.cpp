@@ -14,7 +14,13 @@ int main(int argc, char * argv[]) try
         .process( argc, argv );
 
     // Create a Pipeline - this serves as a top-level API for streaming and processing frames
-    rs2::pipeline p( settings.dump() );
+    rs2::context ctx( settings.dump() );
+    rs2::pipeline p( ctx );
+
+    // DDS/Ethernet devices (e.g. D555) are discovered asynchronously and may not
+    // be present the instant the program starts, unlike USB. Wait for a device so
+    // the example works over both transports before starting the pipeline.
+    rs2::device_hub( ctx ).wait_for_device();
 
     // Configure and start the pipeline
     p.start();

@@ -99,6 +99,16 @@ int main(int argc, char* argv[]) try
 
             setvbuf(stdout, NULL, _IONBF, 0); // unbuffering stdout
 
+            // Not every device exposes firmware logging (e.g. DDS/Ethernet
+            // devices such as the D555). Fail with a clear message instead of
+            // dereferencing a null firmware_logger handle downstream.
+            if (!dev.is<rs2::firmware_logger>())
+            {
+                cerr << "\nDevice " << serial
+                     << " does not support firmware logging (RS2_EXTENSION_FW_LOGGER)." << endl;
+                return EXIT_FAILURE;
+            }
+
             auto fw_log_device = dev.as<rs2::firmware_logger>();
 
             bool using_parser = false;
