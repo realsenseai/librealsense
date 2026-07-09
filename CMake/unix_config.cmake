@@ -124,7 +124,11 @@ macro(os_target_config)
         set(CMAKE_INSTALL_RPATH "${_lrs_install_rpath}")
         set(CMAKE_MACOSX_RPATH ON)
         set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+        # Do NOT set CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE: on Apple that
+        # injects absolute build-tree paths (e.g. …/build-prod/Release) into
+        # installed binaries. realsense-viewer then loads dylibs from the
+        # build tree instead of prefix/lib and breaks after relocate/purge.
+        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
         # ${LRS_TARGET} rpath properties are set once in global_config.cmake;
         # here we only provide the CMAKE_* defaults for later executables/modules.
     endif()

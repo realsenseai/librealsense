@@ -719,6 +719,9 @@ namespace librealsense
 
                         glBindTexture(GL_TEXTURE_2D, curr_tex);
 
+                        // Fixed-function path (macOS legacy 2.1, or when GLSL is off).
+                        // Texcoords must be set *before* the vertex they apply to.
+                        glEnable(GL_TEXTURE_2D);
                         if (_filled_opt->query() > 0.f)
                         {
                             glBegin(GL_QUADS);
@@ -730,10 +733,10 @@ namespace librealsense
                                     if (vertices[a].z && vertices[b].z && vertices[c].z && vertices[d].z
                                         && std::abs(vertices[a].z - vertices[b].z) < threshold && std::abs(vertices[a].z - vertices[c].z) < threshold
                                         && std::abs(vertices[b].z - vertices[d].z) < threshold && std::abs(vertices[c].z - vertices[d].z) < threshold) {
-                                        glVertex3fv(vertices[a]); glTexCoord2fv(tex_coords[a]);
-                                        glVertex3fv(vertices[b]); glTexCoord2fv(tex_coords[b]);
-                                        glVertex3fv(vertices[d]); glTexCoord2fv(tex_coords[d]);
-                                        glVertex3fv(vertices[c]); glTexCoord2fv(tex_coords[c]);
+                                        glTexCoord2fv(tex_coords[a]); glVertex3fv(vertices[a]);
+                                        glTexCoord2fv(tex_coords[b]); glVertex3fv(vertices[b]);
+                                        glTexCoord2fv(tex_coords[d]); glVertex3fv(vertices[d]);
+                                        glTexCoord2fv(tex_coords[c]); glVertex3fv(vertices[c]);
                                     }
                                 }
                             }
@@ -746,8 +749,8 @@ namespace librealsense
                             {
                                 if (vertices[i].z)
                                 {
+                                    glTexCoord2fv(tex_coords[i]);
                                     glVertex3fv(vertices[i]);
-                                    glTexCoord2fv(tex_coords[i + 1]);
                                 }
                             }
                             glEnd();
