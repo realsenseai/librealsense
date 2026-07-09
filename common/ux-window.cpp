@@ -345,10 +345,16 @@ namespace rs2
         {
             int w = config_file::instance().get(configurations::window::width);
             int h = config_file::instance().get(configurations::window::height);
-            glfwSetWindowSize(_win, w, h);
-            
-            if (config_file::instance().get(configurations::window::maximized))
-                glfwMaximizeWindow(_win);
+            // A run in a headless/session-less context can persist degenerate
+            // metrics (e.g. 0x0), leaving every later launch with an invisible
+            // window — only restore a plausibly visible size.
+            if (w >= 320 && h >= 240)
+            {
+                glfwSetWindowSize(_win, w, h);
+
+                if (config_file::instance().get(configurations::window::maximized))
+                    glfwMaximizeWindow(_win);
+            }
         }
 
         glfwMakeContextCurrent(_win);
