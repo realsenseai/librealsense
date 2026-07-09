@@ -103,9 +103,11 @@ macro(global_target_config)
             PRIVATE ${USB_INCLUDE_DIRS}
     )
 
-    # macOS: resolve librealsense2 + (when DDS) libfastrtps/libfastcdr via @rpath
-    # so install/build trees work without DYLD_LIBRARY_PATH.
-    if(APPLE)
+    # macOS + DDS: resolve librealsense2 + libfastrtps/libfastcdr via @rpath so
+    # install/build trees work without DYLD_LIBRARY_PATH. Single source of truth
+    # for ${LRS_TARGET} rpath properties; os_target_config() (unix_config.cmake)
+    # only sets the CMAKE_* defaults inherited by tools / bindings created later.
+    if(APPLE AND BUILD_WITH_DDS)
         set_target_properties(${LRS_TARGET} PROPERTIES
             MACOSX_RPATH ON
             BUILD_RPATH "@loader_path"

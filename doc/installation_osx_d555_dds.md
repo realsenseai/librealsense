@@ -27,8 +27,13 @@ Check:
 ```bash
 ifconfig en0 | grep -E 'inet |mtu|media'
 ping -c 2 192.168.11.55
-route -n get 192.168.11.55   # interface should be en0 (or your Ethernet)
 ```
+
+> Note: `route -n get 192.168.11.55` can be misleading on multi-homed hosts —
+> the camera link is a gateway-less *scoped* route, so `route get` may report
+> the default-route interface (Wi‑Fi) even though traffic correctly uses the
+> Ethernet. Trust `ifconfig` (which interface owns the camera's subnet), not
+> `route get`.
 
 ---
 
@@ -103,6 +108,33 @@ Optional `~/.realsense-config.json`:
 | **enabled** | `true` for Ethernet D555. |
 | **sw_only** | DDS devices are software-backed; tools often need SW product-line bits. |
 
+### Multi-interface hosts: pin discovery with a whitelist
+
+With several active interfaces (Wi‑Fi holding the default route, VPN `utun`,
+Thunderbolt bridges), FastDDS discovery can bind to the wrong interface and
+**silently find no device even though `ping` works**. Pin discovery to the
+host IP on the camera's subnet:
+
+```json
+{
+  "context": {
+    "dds": {
+      "enabled": true,
+      "domain": 0,
+      "udp": {
+        "whitelist": [ "192.168.11.100" ]
+      }
+    }
+  }
+}
+```
+
+`context.dds.udp.whitelist` maps to the FastDDS transport `interfaceWhiteList`
+and is honored by every librealsense context (`rs-enumerate-devices`,
+`rs-dds-sniffer`, `pyrealsense2`, apps). Re-check it whenever the host IP
+changes. The same key can be passed per-context in the settings JSON
+(`"dds": { "udp": { "whitelist": [...] } }`).
+
 ### Enumerate
 
 ```bash
@@ -133,7 +165,12 @@ Python minor version. If `python3` is Homebrew 3.14 but you built with 3.12 you 
 ModuleNotFoundError: No module named 'pyrealsense2.pyrealsense2'
 ```
 
-Use the same interpreter as at configure time (`python3.12`, or the build script’s `d555-python` wrapper).
+Use the same interpreter as at configure time. `d555-python` below refers to a
+small wrapper script that pins the build-time interpreter and prefix
+`PYTHONPATH`; a ready-made version ships with the packaging scripts at
+[bilims/d555-ethernet-macos](https://github.com/bilims/d555-ethernet-macos)
+(`scripts/build-and-install-macos-dds.sh` generates it into `PREFIX/bin`).
+Plain `python3.12` with the `PYTHONPATH` above works identically.
 
 ### Python
 
@@ -180,7 +217,7 @@ PY
 
 | Symptom | Check |
 |---------|--------|
-| `ping` OK, sniffer empty | MTU 9000? Domain ID? PoE power? |
+| `ping` OK, sniffer empty | **Multi-interface host? Set `dds.udp.whitelist`** (see above). MTU 9000? Domain ID? PoE power? |
 | Sniffer sees D555, `query_devices` empty | Use `sw_only` / `device-mask` including SW; wait longer |
 | `create_participant` crash | Rebuild with `BUILD_WITH_DDS=ON` on Apple (shared FastDDS path) |
 | `Couldn't resolve requests` | List `sensor.profiles` and enable those width/height/format/fps |

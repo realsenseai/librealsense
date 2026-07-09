@@ -34,13 +34,15 @@ set_target_properties( pyrealsense2
         FOLDER Library/Python
     )
 if(APPLE AND BUILD_WITH_DDS)
-    # Build tree: all dylibs next to the extension (@loader_path).
+    # Build tree: the extension lives in wrappers/python/ while librealsense2
+    # and shared FastDDS live elsewhere in the build tree, so @loader_path alone
+    # is not enough — add the actual build-tree lib locations.
     # Install tree (prefix layout):
     #   lib/librealsense2.dylib
     #   lib/pythonX.Y/site-packages/pyrealsense2/*.so
     # → climb three levels: site-packages/pyrealsense2 → lib
     set_target_properties(pyrealsense2 PROPERTIES
-        BUILD_RPATH "@loader_path"
+        BUILD_RPATH "@loader_path;${CMAKE_BINARY_DIR};${CMAKE_BINARY_DIR}/fastdds/fastdds_install/lib"
         INSTALL_RPATH "@loader_path;@loader_path/../../.."
         MACOSX_RPATH ON)
 endif()

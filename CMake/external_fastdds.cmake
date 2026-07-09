@@ -52,6 +52,10 @@ function(get_fastdds)
     #   more fragile with FetchContent and still couples singleton lifetime to
     #   the host binary. Shared FastDDS matches normal dylib dependency practice.
     if(APPLE)
+        # Function-scoped; does not leak to the caller. Of FastDDS's bundled
+        # third-parties only fastrtps/fastcdr become dylibs — foonathan_memory
+        # is built by its vendor project and stays a static archive
+        # (libfoonathan_memory-*.a), verified in the installed prefix.
         set(BUILD_SHARED_LIBS ON)
         message(STATUS "FastDDS: shared libraries (required for macOS librealsense2.dylib + DDS)")
     else()

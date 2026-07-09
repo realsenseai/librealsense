@@ -125,13 +125,7 @@ macro(os_target_config)
         set(CMAKE_MACOSX_RPATH ON)
         set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
         set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-        # Librealsense core (already created) + any later tools
-        if(TARGET ${LRS_TARGET})
-            set_target_properties(${LRS_TARGET} PROPERTIES
-                BUILD_RPATH "${_lrs_build_rpath}"
-                INSTALL_RPATH "@loader_path"
-                MACOSX_RPATH ON
-                INSTALL_NAME_DIR "@rpath")
-        endif()
+        # ${LRS_TARGET} rpath properties are set once in global_config.cmake;
+        # here we only provide the CMAKE_* defaults for later executables/modules.
     endif()
 endmacro()

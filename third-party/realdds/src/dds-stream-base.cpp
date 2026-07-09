@@ -39,8 +39,12 @@ void dds_stream_base::init_profiles( dds_stream_profiles const & profiles, size_
                    "invalid default profile index (" + std::to_string( _default_profile_index ) + " for "
                        + std::to_string( profiles.size() ) + " stream profiles" );
 
-    // weak_from_this() is C++17; Apple clang builds realdds as C++14 (cxx_std_14).
-    // Equivalent C++14 form keeps DDS stream init working on macOS arm64.
+    // weak_from_this() is C++17; realdds targets C++14 (cxx_std_14), where strict
+    // compilers (e.g. Apple Clang, or GCC/Clang with -pedantic-errors) reject it.
+    // Note shared_from_this() throws std::bad_weak_ptr if the object is not owned by a
+    // shared_ptr, while weak_from_this() would return an empty weak_ptr. Streams are
+    // always created via std::make_shared (see dds-device-impl.cpp), so a throw here
+    // means an ownership bug upstream and failing loudly is the desired behavior.
     auto self = std::weak_ptr< dds_stream_base >( shared_from_this() );
     for( auto const & profile : profiles )
     {

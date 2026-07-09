@@ -77,6 +77,11 @@ function(get_pybind11)
       # librealsense2, and shared FastDDS stay under CMAKE_INSTALL_PREFIX and
       # resolve via @loader_path (no DYLD_LIBRARY_PATH, no polluting Homebrew).
       if(APPLE AND BUILD_WITH_DDS)
+        # CMAKE_INSTALL_LIBDIR is only defined by GNUInstallDirs; without it the
+        # path below would silently start at the filesystem root.
+        if(NOT DEFINED CMAKE_INSTALL_LIBDIR)
+          include(GNUInstallDirs)
+        endif()
         set( _pyrealsense2_default_install_dir
              "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pyrealsense2" )
       else()
