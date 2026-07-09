@@ -33,6 +33,13 @@ set_target_properties( pyrealsense2
     PROPERTIES
         FOLDER Library/Python
     )
+if(APPLE AND BUILD_WITH_DDS)
+    # Extension loads librealsense2 (and via it, libfastrtps) from the same lib dir.
+    set_target_properties(pyrealsense2 PROPERTIES
+        BUILD_RPATH "@loader_path"
+        INSTALL_RPATH "@loader_path;@loader_path/../lib"
+        MACOSX_RPATH ON)
+endif()
 
 set(RAW_RS
     pybackend.cpp

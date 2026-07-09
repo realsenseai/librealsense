@@ -112,4 +112,26 @@ macro(os_set_flags)
 endmacro()
 
 macro(os_target_config)
+    # When FastDDS is shared on Apple (BUILD_WITH_DDS), tools and the Python
+    # module must find librealsense2 + fastrtps via @rpath without DYLD_LIBRARY_PATH.
+    # Build tree: all outputs under CMAKE_RUNTIME_OUTPUT_DIRECTORY / lib next to each other.
+    # Install tree: binaries in bin/, libs in lib/ → @loader_path/../lib.
+    if(APPLE AND BUILD_WITH_DDS)
+        set(_lrs_install_rpath "@loader_path;@loader_path/../lib")
+        set(_lrs_build_rpath "@loader_path")
+        # Global defaults for executables/modules created after this point
+        set(CMAKE_BUILD_RPATH "${_lrs_build_rpath}")
+        set(CMAKE_INSTALL_RPATH "${_lrs_install_rpath}")
+        set(CMAKE_MACOSX_RPATH ON)
+        set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+        # Librealsense core (already created) + any later tools
+        if(TARGET ${LRS_TARGET})
+            set_target_properties(${LRS_TARGET} PROPERTIES
+                BUILD_RPATH "${_lrs_build_rpath}"
+                INSTALL_RPATH "@loader_path"
+                MACOSX_RPATH ON
+                INSTALL_NAME_DIR "@rpath")
+        endif()
+    endif()
 endmacro()

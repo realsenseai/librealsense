@@ -15,7 +15,9 @@ sudo examples/rs-depth
 
 **Current Limitations:**
 - **RealSense Viewer is not supported** on macOS in the current release
-- **Motion sensors (IMU) are disabled** on macOS in the current release
+- **Motion sensors (IMU) are disabled** on macOS in the current release (USB path; D555 over DDS exposes motion when the device publishes it)
+
+**D555 (PoE / Ethernet + DDS):** see **[installation_osx_d555_dds.md](installation_osx_d555_dds.md)** for network (MTU 9000), `BUILD_WITH_DDS=ON`, shared FastDDS on Apple, `sw_only` enumeration, and Python notes.
 
 ## Building from Source
 

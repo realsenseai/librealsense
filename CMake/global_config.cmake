@@ -103,6 +103,15 @@ macro(global_target_config)
             PRIVATE ${USB_INCLUDE_DIRS}
     )
 
+    # macOS: resolve librealsense2 + (when DDS) libfastrtps/libfastcdr via @rpath
+    # so install/build trees work without DYLD_LIBRARY_PATH.
+    if(APPLE)
+        set_target_properties(${LRS_TARGET} PROPERTIES
+            MACOSX_RPATH ON
+            BUILD_RPATH "@loader_path"
+            INSTALL_RPATH "@loader_path"
+            INSTALL_NAME_DIR "@rpath")
+    endif()
 
 endmacro()
 

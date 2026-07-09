@@ -41,12 +41,19 @@ function(get_fastdds)
     set(NO_TLS ON CACHE INTERNAL "" FORCE)
 
     # Set special values for FastDDS sub directory
-    # On Apple Silicon, static FastDDS linked into librealsense2.dylib makes
-    # DomainParticipantFactory::create_participant crash (null call). Building
-    # FastDDS as shared dylibs avoids the broken static-in-shared singleton path.
-    # (rs-dds-sniffer, fully static, works; rs-enumerate-devices via dylib does not.)
+    #
+    # Link model (important on Apple):
+    # - Default (Linux/Windows): static FastDDS, as upstream historically does.
+    # - APPLE: build FastDDS as *shared* dylibs. Archiving FastDDS into
+    #   librealsense2.dylib breaks DomainParticipantFactory::create_participant
+    #   at runtime (EXC_BAD_ACCESS / null PC). Fully-static tools (rs-dds-sniffer)
+    #   still work; anything that loads librealsense2 as a shared library does not.
+    #   Alternative not chosen: force_load of static archives into the dylib —
+    #   more fragile with FetchContent and still couples singleton lifetime to
+    #   the host binary. Shared FastDDS matches normal dylib dependency practice.
     if(APPLE)
         set(BUILD_SHARED_LIBS ON)
+        message(STATUS "FastDDS: shared libraries (required for macOS librealsense2.dylib + DDS)")
     else()
         set(BUILD_SHARED_LIBS OFF)
     endif()
@@ -74,11 +81,28 @@ function(get_fastdds)
 
     add_definitions(-DBUILD_WITH_DDS)
 
-    install(TARGETS dds fastrtps eProsima_atomic EXPORT realsense2Targets)
-    
+    if(APPLE)
+        # Runtime search path so tools/python next to / under lib find fastrtps without DYLD_LIBRARY_PATH
+        foreach(_dds_tgt fastrtps fastcdr)
+            if(TARGET ${_dds_tgt})
+                set_target_properties(${_dds_tgt} PROPERTIES
+                    BUILD_RPATH "@loader_path"
+                    INSTALL_RPATH "@loader_path"
+                    MACOSX_RPATH ON
+                    INSTALL_NAME_DIR "@rpath")
+            endif()
+        endforeach()
+    endif()
+
+    # Keep dds INTERFACE in the export set (realdds depends on it) on all platforms.
+    install(TARGETS dds fastrtps eProsima_atomic EXPORT realsense2Targets
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
     # fastcdr is installed separately because it cannot be exported to realsense2Targets - it is already exported in fastdds
-    # install in order to set ARCHIVE DESTINATION - to put libfastcdr.a into the x86_64 folder
-    install(TARGETS fastcdr 
+    install(TARGETS fastcdr
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
     message(CHECK_PASS "Done")
 endfunction()
