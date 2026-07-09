@@ -126,10 +126,21 @@ export PYTHONPATH="$PREFIX/lib/python${PY_VER}/site-packages${PYTHONPATH:+:$PYTH
 # Do not set DYLD_LIBRARY_PATH — tools and the extension use @rpath/@loader_path.
 ```
 
+**Python ABI:** the extension is tagged e.g. `cpython-312-darwin.so`. It **only** loads in that
+Python minor version. If `python3` is Homebrew 3.14 but you built with 3.12 you will see:
+
+```text
+ModuleNotFoundError: No module named 'pyrealsense2.pyrealsense2'
+```
+
+Use the same interpreter as at configure time (`python3.12`, or the build script’s `d555-python` wrapper).
+
 ### Python
 
 ```bash
-python3 - <<'PY'
+# Correct interpreter (must match build, e.g. 3.12):
+python3.12 - <<'PY'
+# or: d555-python - <<'PY'
 import json, time
 import pyrealsense2 as rs
 
