@@ -708,7 +708,15 @@ void dds_device::impl::create_notifications_reader()
         {
             // Keep the impl alive for the duration of the dispatch, so it can't be freed mid-loop
             // if a notification handler drops the device's last reference.
-            auto self = weak_from_this().lock();
+            // weak_from_this() is C++17; realdds targets C++14. This reader is created from
+            // the impl constructor, so data can arrive before the impl is shared-owned, where
+            // shared_from_this() throws instead of returning empty — treat both as "not ready".
+            std::shared_ptr< impl > self;
+            try
+            {
+                self = shared_from_this();
+            }
+            catch( std::bad_weak_ptr const & ) {}
             if( ! self )
                 return;
             topics::flexible_msg notification;
@@ -745,7 +753,13 @@ void dds_device::impl::create_metadata_reader()
         {
             // Keep the impl alive for the duration of the dispatch, so it can't be freed mid-loop
             // if a metadata handler drops the device's last reference.
-            auto self = weak_from_this().lock();
+            // weak_from_this() is C++17; realdds targets C++14 — see create_notifications_reader()
+            std::shared_ptr< impl > self;
+            try
+            {
+                self = shared_from_this();
+            }
+            catch( std::bad_weak_ptr const & ) {}
             if( ! self )
                 return;
             topics::flexible_msg message;
