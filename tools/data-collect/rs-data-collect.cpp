@@ -323,17 +323,48 @@ int main(int argc, char** argv) try
 
     bool succeed = false;
     rs2::context ctx( settings.dump() );
+
+    // DDS/Ethernet devices appear asynchronously. Bound the wait so a broken
+    // multi-process discovery session cannot hang forever ("Connect Camera" loop).
+    // On macOS, simultaneous create_participant races are mitigated in realdds;
+    // under heavy multi-client stampede, retry once in a fresh process is safer
+    // than spinning here forever (domain participant is a process singleton).
+    constexpr int k_discovery_timeout_sec = 30;
+    constexpr int k_ready_retries = 10;
+
     rs2::device_list list;
+    {
+        int waited = 0;
+        while( waited < k_discovery_timeout_sec )
+        {
+            list = ctx.query_devices();
+            if( list.size() > 0 )
+                break;
+            if( waited == 0 )
+                std::cout << "Waiting for RealSense device (USB instant; Ethernet/DDS discovery up to "
+                          << k_discovery_timeout_sec << "s)..." << std::endl;
+            else if( waited % 3 == 0 )
+                std::cout << "Still waiting for device... (" << waited << "s)" << std::endl;
+            std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+            ++waited;
+        }
+        if( 0 == list.size() )
+        {
+            throw runtime_error(
+                stringify()
+                << "No RealSense device found after " << k_discovery_timeout_sec
+                << "s. Check cabling/PoE, DDS domain, and interface whitelist. "
+                << "If many clients started at once on macOS, re-run alone "
+                << "(concurrent discovery can leave a process's DDS participant silent)." );
+        }
+    }
 
     while (!succeed)
     {
         list = ctx.query_devices();
-
-        if (0== list.size())
+        if( 0 == list.size() )
         {
-            std::cout << "Connect Realsense Camera to proceed" << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-            continue;
+            throw runtime_error( "Device list became empty; camera disconnected?" );
         }
 
         std::shared_ptr<rs2::device> dev;
@@ -342,10 +373,17 @@ int main(int argc, char** argv) try
             auto target_sn = serial_number.getValue();
             for (const auto& d : list)
             {
-                if (target_sn == d.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER))
+                try
                 {
-                    dev = std::make_shared<rs2::device>(d);
-                    break;
+                    if (target_sn == d.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER))
+                    {
+                        dev = std::make_shared<rs2::device>(d);
+                        break;
+                    }
+                }
+                catch( const rs2::error & )
+                {
+                    // Partial device during multi-client discovery — skip
                 }
             }
             if (!dev)
@@ -356,12 +394,46 @@ int main(int argc, char** argv) try
         }
         else
         {
-            dev = std::make_shared<rs2::device>(list.front());
+            // Prefer a device whose identity is fully readable (skip partials).
+            for( int attempt = 0; attempt < k_ready_retries && ! dev; ++attempt )
+            {
+                list = ctx.query_devices();
+                for( const auto & d : list )
+                {
+                    try
+                    {
+                        (void)d.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER );
+                        dev = std::make_shared< rs2::device >( d );
+                        break;
+                    }
+                    catch( const rs2::error & )
+                    {
+                        // not ready yet
+                    }
+                }
+                if( ! dev )
+                    std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
+            }
+            if( ! dev )
+                throw runtime_error(
+                    "Device(s) present but not ready (partial DDS device). "
+                    "Retry after other clients release the camera." );
         }
 
         data_collector  dc(dev,timeout,max_frames);         // Parser and the data aggregator
 
-        dc.parse_and_configure(config_file);
+        try
+        {
+            dc.parse_and_configure(config_file);
+        }
+        catch( const rs2::error & e )
+        {
+            // Common under concurrent multi-client: stream lock / conflict profiles.
+            throw runtime_error( stringify()
+                                 << "Failed to configure streams: " << e.what()
+                                 << "\nIf another client is streaming (or was kill -9'd), wait ~1–2 min "
+                                 << "or stop the other client cleanly, then retry." );
+        }
 
         std::cout << "\nData collection started.... \n" << std::endl;
 

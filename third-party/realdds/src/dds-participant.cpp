@@ -262,8 +262,16 @@ void dds_participant::init( dds_domain_id domain_id, qos & pqos, rsutils::json c
     // with SO_REUSEPORT on SPDP sockets. Measured: stagger ≥20 ms → dual
     // discovery reliable; 0–5 ms → both permanently silent. Serialize the
     // create + a short settle window via a host advisory lock so simultaneous
-    // process launches cannot land in that race. Single-client cost ≈25 ms once.
+    // process launches cannot land in that race.
+    //
+    // Settle was 25 ms (meets the ≥20 ms threshold). Under heavier dual/stampede
+    // load residual 1/12 dual misses were observed; 50 ms gives more margin while
+    // still costing only one short sleep per process at first participant create.
     // Lock is best-effort: if open/flock fails we proceed unlocked.
+    //
+    // Note: 4+ simultaneous host participants still stress the camera/SPDP path
+    // (partial devices / "Advanced mode expects depth sensor") — that is a
+    // separate soft limit, not fixed by this lock alone.
     struct apple_participant_create_guard
     {
         int fd = -1;
@@ -282,14 +290,14 @@ void dds_participant::init( dds_domain_id domain_id, qos & pqos, rsutils::json c
             {
                 // Hold the critical window open after create so the peer cannot
                 // start its own create_participant still inside the race band.
-                std::this_thread::sleep_for( std::chrono::milliseconds( 25 ) );
+                std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
                 ::flock( fd, LOCK_UN );
                 ::close( fd );
             }
         }
     } apple_create_guard( "/tmp/realdds-dds-participant-create.lock" );
     if( apple_create_guard.fd >= 0 )
-        LOG_DEBUG( "macOS DDS participant create: holding host lock (BUG-1 mitigation)" );
+        LOG_DEBUG( "macOS DDS participant create: holding host lock (BUG-1 mitigation, 50ms settle)" );
 #endif
 
     _participant
