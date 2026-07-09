@@ -21,8 +21,12 @@ int main(int argc, char * argv[]) try
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
 
+    // Shared context so DDS wait and pipeline use the same discovery session
+    rs2::context ctx;
+    rs2::device_hub( ctx ).wait_for_device(); // USB: instant; Ethernet/DDS: async discovery
+
     // Declare RealSense pipeline, encapsulating the actual device and sensors
-    rs2::pipeline pipe;
+    rs2::pipeline pipe( ctx );
     // Start streaming with default recommended configuration
     pipe.start();
 

@@ -33,22 +33,11 @@ int main()
     rs2_context* ctx = rs2_create_context(RS2_API_VERSION, &e);
     check_error(e);
 
-    /* Get a list of all the connected devices. */
-    // The returned object should be released with rs2_delete_device_list(...)
-    rs2_device_list* device_list = rs2_query_devices(ctx, &e);
-    check_error(e);
-
-    int dev_count = rs2_get_device_count(device_list, &e);
-    check_error(e);
-    printf("There are %d connected RealSense devices.\n", dev_count);
-    if (0 == dev_count)
-        return EXIT_FAILURE;
-
-    // Get the first connected device
+    // USB devices appear immediately; Ethernet/DDS devices need discovery — wait first.
     // The returned object should be released with rs2_delete_device(...)
-    rs2_device* dev = rs2_create_device(device_list, 0, &e);
+    rs2_device* dev = wait_for_device(ctx, &e);
     check_error(e);
-
+    printf("There are connected RealSense devices.\n");
     print_device_info(dev);
 
     // Create a pipeline to configure, start and stop camera streaming

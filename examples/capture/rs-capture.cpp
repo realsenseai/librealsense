@@ -17,8 +17,12 @@ int main(int argc, char * argv[]) try
     // Declare rates printer for showing streaming rates of the enabled streams.
     rs2::rates_printer printer;
 
+    // Shared context so DDS wait and pipeline use the same discovery session
+    rs2::context ctx;
+    rs2::device_hub( ctx ).wait_for_device(); // USB: instant; Ethernet/DDS: async discovery
+
     // Declare RealSense pipeline, encapsulating the actual device and sensors
-    rs2::pipeline pipe;
+    rs2::pipeline pipe( ctx );
     rs2::config cfg;
 
     // Enable all camera streams

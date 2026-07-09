@@ -15,6 +15,10 @@
 // Find devices with specified streams
 bool device_with_streams( rs2::context & ctx, std::vector< rs2_stream > stream_requests, std::string & out_serial )
 {
+    // DDS/Ethernet devices appear asynchronously (unlike USB). Wait once so demos
+    // that probe stream profiles do not exit with a false "no device" on startup.
+    rs2::device_hub( ctx ).wait_for_device();
+
     auto devs = ctx.query_devices();
     std::vector <rs2_stream> unavailable_streams = stream_requests;
     for (auto dev : devs)

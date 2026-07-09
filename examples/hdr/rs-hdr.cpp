@@ -14,6 +14,8 @@ int main() try
 {
 
     rs2::context ctx;
+    // Wait before scanning product lines — DDS devices are not instant like USB.
+    rs2::device_hub( ctx ).wait_for_device();
     rs2::device_list devices_list = ctx.query_devices();
     size_t device_count = devices_list.size();
     if (!device_count)
