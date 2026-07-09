@@ -1033,6 +1033,11 @@ namespace rs2
          */
         rs2_vector get_motion_data() const
         {
+            // On combined-motion frames the payload is rs2_combined_motion (doubles);
+            // reading it as three floats silently yields zeros/garbage.
+            if( get_profile().format() == RS2_FORMAT_COMBINED_MOTION )
+                throw std::logic_error(
+                    "get_motion_data() called on a COMBINED_MOTION frame — use get_combined_motion_data()" );
             auto data = reinterpret_cast<const float*>(get_data());
             return rs2_vector{ data[0], data[1], data[2] };
         }

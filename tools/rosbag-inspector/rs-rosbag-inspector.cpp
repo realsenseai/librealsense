@@ -101,7 +101,13 @@ private:
 
         ImGui::CreateContext();
         ImGui_ImplGlfw_InitForOpenGL(_window, true);
+#ifdef __APPLE__
+        // macOS gives a legacy 2.1 context (no version hints requested);
+        // the backend's Apple default "#version 150" needs 3.2 core.
+        ImGui_ImplOpenGL3_Init("#version 120");
+#else
         ImGui_ImplOpenGL3_Init();
+#endif
 
         glfwSetScrollCallback(_window, [](GLFWwindow * w, double xoffset, double yoffset)
         {
