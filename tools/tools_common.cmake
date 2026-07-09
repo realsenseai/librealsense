@@ -24,4 +24,13 @@ macro(tools_target_config _target)
     endif()
     target_link_libraries(${_target} ${DEPENDENCIES} ${RS_VIEWER_LIBS} tclap)
     set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 FOLDER Tools)
+    # Apple: install tree is bin/ + lib/; never bake absolute build-tree paths.
+    if(APPLE)
+        set_target_properties(${_target} PROPERTIES
+            BUILD_RPATH "@loader_path;${CMAKE_BINARY_DIR}/Release;${CMAKE_BINARY_DIR}"
+            INSTALL_RPATH "@loader_path;@loader_path/../lib"
+            INSTALL_RPATH_USE_LINK_PATH FALSE
+            BUILD_WITH_INSTALL_RPATH FALSE
+            MACOSX_RPATH ON)
+    endif()
 endmacro()

@@ -112,4 +112,14 @@ macro(os_set_flags)
 endmacro()
 
 macro(os_target_config)
+    # Apple install tree is bin/ + lib/. Prefer relative @loader_path rpaths and
+    # never bake absolute build-tree paths into installed binaries (CMake's
+    # INSTALL_RPATH_USE_LINK_PATH would add e.g. …/build/Release).
+    if(APPLE)
+        set(CMAKE_BUILD_RPATH "@loader_path")
+        set(CMAKE_INSTALL_RPATH "@loader_path;@loader_path/../lib")
+        set(CMAKE_MACOSX_RPATH ON)
+        set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+    endif()
 endmacro()

@@ -115,6 +115,11 @@ namespace rs2
         // so for now Macs should not use the GLSL stuff
         config_file::instance().set_default(configurations::performance::glsl_for_processing, false);
         config_file::instance().set_default(configurations::performance::glsl_for_rendering, false);
+        // Force-clear any previously saved GLSL-on flags (e.g. config from Linux
+        // or an older build). GLSL 1.30 shaders + FBO float textures need a core
+        // 3.2 context which we cannot combine with the fixed-function 2D path.
+        config_file::instance().set(configurations::performance::glsl_for_processing, false);
+        config_file::instance().set(configurations::performance::glsl_for_rendering, false);
 #else
         auto vendor = (const char*)glGetString(GL_VENDOR);
         auto renderer = (const char*)glGetString(GL_RENDERER);
