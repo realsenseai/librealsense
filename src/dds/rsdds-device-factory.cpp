@@ -118,7 +118,12 @@ rsdds_device_factory::rsdds_device_factory( std::shared_ptr< context > const & c
         if( ! _participant->is_valid() )
         {
             realdds::dds_participant::qos qos( participant_name );  // default settings
-            
+
+            // FastDDS flow-controllers + fastdds.max_message_size currently crash on Apple Silicon
+            // (null call during DomainParticipantFactory/XML profile path when creating the
+            // participant from rsdds_device_factory). rs-dds-sniffer works with a plain qos.
+            // Keep the advanced QoS for non-Apple platforms only until fixed upstream.
+#if ! defined( __APPLE__ )
             // As a client, we send messages to a server; sometimes big messages. E.g., for DFU these may be up to
             // 20MB... flexible messages are up to 4K. The UDP protocol is supposed to break messages (by default, up to
             // 64K) into fragmented packed, but the server may not be able to handle these; certain hardware cannot
@@ -141,6 +146,7 @@ rsdds_device_factory::rsdds_device_factory( std::shared_ptr< context > const & c
             // Further override with settings from device/dfu
             realdds::override_flow_controller_from_json( *dfu_flow_control, dds_settings.nested( "device", "dfu" ) );
             qos.flow_controllers().push_back( dfu_flow_control );
+#endif
 
             // qos will get further overriden with the settings we pass in
             _participant->init( domain_id, qos, dds_settings.default_object() );

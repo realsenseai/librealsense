@@ -41,7 +41,15 @@ function(get_fastdds)
     set(NO_TLS ON CACHE INTERNAL "" FORCE)
 
     # Set special values for FastDDS sub directory
-    set(BUILD_SHARED_LIBS OFF)
+    # On Apple Silicon, static FastDDS linked into librealsense2.dylib makes
+    # DomainParticipantFactory::create_participant crash (null call). Building
+    # FastDDS as shared dylibs avoids the broken static-in-shared singleton path.
+    # (rs-dds-sniffer, fully static, works; rs-enumerate-devices via dylib does not.)
+    if(APPLE)
+        set(BUILD_SHARED_LIBS ON)
+    else()
+        set(BUILD_SHARED_LIBS OFF)
+    endif()
     set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/fastdds/fastdds_install) 
     set(CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/fastdds/fastdds_install)  
 

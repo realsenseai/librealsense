@@ -244,6 +244,9 @@ void dds_participant::init( dds_domain_id domain_id, qos & pqos, rsutils::json c
     // https://fast-dds.docs.eprosima.com/en/latest/fastdds/dds_layer/core/entity/entity.html#listener
     // We need none of the standard callbacks at this level: these can be enabled on a per-reader/-writer basis!
     StatusMask const par_mask = StatusMask::none();
+    // On Apple Silicon, FastDDS must be linked as shared libraries into librealsense2
+    // (see CMake/external_fastdds.cmake). Static FastDDS inside librealsense2.dylib
+    // makes create_participant crash (null call); rs-dds-sniffer (fully static) was fine.
     _participant_factory = DomainParticipantFactory::get_shared_instance();
     _participant
         = DDS_API_CALL( _participant_factory->create_participant( domain_id, pqos, _domain_listener.get(), par_mask ) );
