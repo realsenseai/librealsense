@@ -394,7 +394,15 @@ namespace rs2
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;   // added in order to prevents cursor chang when interacting with other element (when nedded remove the flag accordingly)
         ImGui_ImplGlfw_InitForOpenGL(_win, true);
+#ifdef __APPLE__
+        // GLFW windows are created without version hints, so macOS provides a
+        // legacy 2.1 compatibility context (the viewer needs it for immediate-
+        // mode GL). The backend's Apple default is "#version 150", which only
+        // compiles in a 3.2 core context — pin the GL 2.1 GLSL instead.
+        ImGui_ImplOpenGL3_Init("#version 120");
+#else
         ImGui_ImplOpenGL3_Init();
+#endif
 
         if (_use_glsl_render)
             _2d_vis = std::make_shared<visualizer_2d>(std::make_shared<splash_screen_shader>());
