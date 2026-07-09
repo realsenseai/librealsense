@@ -13,6 +13,17 @@ function(get_fastdds)
     message(CHECK_START  "Fetching fastdds...")
     list(APPEND CMAKE_MESSAGE_INDENT "  ")  # Indent outputs
 
+    # macOS concurrent discovery: FastDDS only set SO_REUSEPORT for QNX on
+    # multicast input sockets. On Apple, two librealsense processes that open
+    # DomainParticipants at the same moment then both miss SPDP (239.255.0.1:7400)
+    # and never discover the D555. SO_REUSEADDR alone is not enough. See
+    # CMake/patches/fastdds-v2.10.4-macos-reuseport.patch and ops audit BUG-1.
+    # Patch is applied after Populate (below) — FetchContent PATCH_COMMAND is
+    # fragile with path expansion in the subbuild; post-populate is reliable.
+    get_filename_component(_FASTDDS_MACOS_REUSEPORT_PATCH
+        "${CMAKE_SOURCE_DIR}/CMake/patches/fastdds-v2.10.4-macos-reuseport.patch"
+        ABSOLUTE)
+
     FetchContent_Declare(
       fastdds
       GIT_REPOSITORY https://github.com/eProsima/Fast-DDS.git
@@ -64,9 +75,34 @@ function(get_fastdds)
     set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/fastdds/fastdds_install) 
     set(CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/fastdds/fastdds_install)  
 
-    # Get fastdds
-    FetchContent_MakeAvailable(fastdds)
-    
+    # Populate first so we can patch sources before the first compile.
+    FetchContent_GetProperties(fastdds)
+    if(NOT fastdds_POPULATED)
+        FetchContent_Populate(fastdds)
+    endif()
+
+    # Apply Apple/QNX SO_REUSEPORT fix on every configure (no-op if already applied).
+    if(EXISTS "${_FASTDDS_MACOS_REUSEPORT_PATCH}" AND EXISTS "${fastdds_SOURCE_DIR}/src/cpp/rtps/transport/UDPv4Transport.cpp")
+        execute_process(
+            COMMAND patch -p1 -N -i "${_FASTDDS_MACOS_REUSEPORT_PATCH}"
+            WORKING_DIRECTORY "${fastdds_SOURCE_DIR}"
+            RESULT_VARIABLE _fastdds_patch_rc
+            OUTPUT_VARIABLE _fastdds_patch_out
+            ERROR_VARIABLE _fastdds_patch_err
+        )
+        # patch returns 0 on success, 1 when all hunks already applied — both OK.
+        if(NOT _fastdds_patch_rc EQUAL 0 AND NOT _fastdds_patch_rc EQUAL 1)
+            message(WARNING "FastDDS macOS SO_REUSEPORT patch failed (rc=${_fastdds_patch_rc}): ${_fastdds_patch_err}")
+        else()
+            message(STATUS "FastDDS macOS SO_REUSEPORT patch applied (rc=${_fastdds_patch_rc})")
+        endif()
+    endif()
+
+    # Add the populated tree (equivalent to the rest of MakeAvailable for this dep).
+    if(NOT TARGET fastrtps)
+        add_subdirectory(${fastdds_SOURCE_DIR} ${fastdds_BINARY_DIR})
+    endif()
+
     # Mark new options from FetchContent as advanced options
     mark_as_advanced(FETCHCONTENT_SOURCE_DIR_FASTDDS)
     mark_as_advanced(FETCHCONTENT_UPDATES_DISCONNECTED_FASTDDS)

@@ -21,6 +21,14 @@
 
 #include <map>
 #include <mutex>
+#include <chrono>
+#include <thread>
+
+#if defined( __APPLE__ )
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+#endif
 
 using namespace eprosima::fastdds::dds;
 using namespace realdds;
@@ -246,6 +254,44 @@ void dds_participant::init( dds_domain_id domain_id, qos & pqos, rsutils::json c
     StatusMask const par_mask = StatusMask::none();
     // Apple links FastDDS shared — rationale in CMake/external_fastdds.cmake
     _participant_factory = DomainParticipantFactory::get_shared_instance();
+
+#if defined( __APPLE__ )
+    // Concurrent multi-process discovery race (macOS + D555 / FastDDS 2.10.4):
+    // Two processes that call create_participant within ~10 ms of each other both
+    // fail to discover the camera for the lifetime of those participants, even
+    // with SO_REUSEPORT on SPDP sockets. Measured: stagger ≥20 ms → dual
+    // discovery reliable; 0–5 ms → both permanently silent. Serialize the
+    // create + a short settle window via a host advisory lock so simultaneous
+    // process launches cannot land in that race. Single-client cost ≈25 ms once.
+    // Lock is best-effort: if open/flock fails we proceed unlocked.
+    struct apple_participant_create_guard
+    {
+        int fd = -1;
+        explicit apple_participant_create_guard( char const * path )
+        {
+            fd = ::open( path, O_CREAT | O_RDWR, 0666 );
+            if( fd >= 0 && ::flock( fd, LOCK_EX ) != 0 )
+            {
+                ::close( fd );
+                fd = -1;
+            }
+        }
+        ~apple_participant_create_guard()
+        {
+            if( fd >= 0 )
+            {
+                // Hold the critical window open after create so the peer cannot
+                // start its own create_participant still inside the race band.
+                std::this_thread::sleep_for( std::chrono::milliseconds( 25 ) );
+                ::flock( fd, LOCK_UN );
+                ::close( fd );
+            }
+        }
+    } apple_create_guard( "/tmp/realdds-dds-participant-create.lock" );
+    if( apple_create_guard.fd >= 0 )
+        LOG_DEBUG( "macOS DDS participant create: holding host lock (BUG-1 mitigation)" );
+#endif
+
     _participant
         = DDS_API_CALL( _participant_factory->create_participant( domain_id, pqos, _domain_listener.get(), par_mask ) );
 

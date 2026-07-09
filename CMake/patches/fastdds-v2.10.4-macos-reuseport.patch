@@ -1,0 +1,46 @@
+diff --git a/src/cpp/rtps/transport/UDPv4Transport.cpp b/src/cpp/rtps/transport/UDPv4Transport.cpp
+index bb1960cc5..04e4fd514 100644
+--- a/src/cpp/rtps/transport/UDPv4Transport.cpp
++++ b/src/cpp/rtps/transport/UDPv4Transport.cpp
+@@ -314,10 +314,16 @@ eProsimaUDPSocket UDPv4Transport::OpenAndBindInputSocket(
+     if (is_multicast)
+     {
+         getSocketPtr(socket)->set_option(ip::udp::socket::reuse_address(true));
+-#if defined(__QNX__)
++        // QNX and Apple require SO_REUSEPORT so multiple processes can all
++        // receive the same multicast datagrams (SPDP 239.255.0.1:7400).
++        // SO_REUSEADDR alone allows the second bind on some platforms but
++        // on macOS concurrent FastDDS participants that start together then
++        // miss discovery entirely. Linux deliberately omitted: SO_REUSEPORT
++        // load-balances and would deliver each packet to only one socket.
++#if defined(__QNX__) || defined(__APPLE__)
+         getSocketPtr(socket)->set_option(asio::detail::socket_option::boolean<
+                     ASIO_OS_DEF(SOL_SOCKET), SO_REUSEPORT>(true));
+-#endif // if defined(__QNX__)
++#endif // if defined(__QNX__) || defined(__APPLE__)
+     }
+     else
+     {
+diff --git a/src/cpp/rtps/transport/UDPv6Transport.cpp b/src/cpp/rtps/transport/UDPv6Transport.cpp
+index 4064af9cf..68a63bf82 100644
+--- a/src/cpp/rtps/transport/UDPv6Transport.cpp
++++ b/src/cpp/rtps/transport/UDPv6Transport.cpp
+@@ -318,10 +318,16 @@ eProsimaUDPSocket UDPv6Transport::OpenAndBindInputSocket(
+     if (is_multicast)
+     {
+         getSocketPtr(socket)->set_option(ip::udp::socket::reuse_address(true));
+-#if defined(__QNX__)
++        // QNX and Apple require SO_REUSEPORT so multiple processes can all
++        // receive the same multicast datagrams (SPDP 239.255.0.1:7400).
++        // SO_REUSEADDR alone allows the second bind on some platforms but
++        // on macOS concurrent FastDDS participants that start together then
++        // miss discovery entirely. Linux deliberately omitted: SO_REUSEPORT
++        // load-balances and would deliver each packet to only one socket.
++#if defined(__QNX__) || defined(__APPLE__)
+         getSocketPtr(socket)->set_option(asio::detail::socket_option::boolean<
+                     ASIO_OS_DEF(SOL_SOCKET), SO_REUSEPORT>(true));
+-#endif // if defined(__QNX__)
++#endif // if defined(__QNX__) || defined(__APPLE__)
+     }
+     else
+     {
