@@ -902,6 +902,31 @@ class RealSenseManager:
                 return sensor
         raise RealSenseError(status_code=404, detail=f"Sensor {sensor_id} not found")
 
+    @staticmethod
+    def _enum_value_descriptions(obj, opt, rng):
+        """Return {value: description} when an option is a full enum, else None.
+
+        Mirrors the legacy viewer's is_enum: integer range with step 1 where EVERY
+        value carries a description. Early-exits on the first value without one (so a
+        slider like exposure bails immediately) and skips wide ranges to avoid a
+        pathological number of probes.
+        """
+        if rng.step != 1.0 or rng.min != int(rng.min) or rng.max != int(rng.max):
+            return None
+        lo, hi = int(rng.min), int(rng.max)
+        if hi - lo > 256:
+            return None
+        descs = {}
+        for val in range(lo, hi + 1):
+            try:
+                desc = obj.get_option_value_description(opt, float(val))
+            except RuntimeError:
+                desc = None
+            if not desc:
+                return None
+            descs[str(val)] = desc
+        return descs or None
+
     def get_sensor_options(self, device_id: str, sensor_id: str) -> List[OptionInfo]:
         """Get all options for a sensor"""
         if device_id not in self.devices:
@@ -946,6 +971,8 @@ class RealSenseManager:
                     step=option_range.step,
                     read_only=sensor.is_option_read_only(option),
                     category="Basic Controls",
+                    # Enum native options (e.g. Visual Preset) → dropdown in the UI.
+                    value_descriptions=self._enum_value_descriptions(sensor, option, option_range),
                 )
                 options.append(option_info)
             except RuntimeError as e:
