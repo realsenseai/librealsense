@@ -1,13 +1,13 @@
 # How to Contribute
 
-This project welcomes third-party code via GitHub pull requests. 
+This project welcomes third-party code via GitHub pull requests.
 
 You are welcome to propose and discuss enhancements using project [issues](https://github.com/realsenseai/librealsense/issues).
 
 > **Branching Policy**:
 > The `master` branch is considered stable, at all times.
 > The `development` branch is the one where all contributions must be merged before being promoted to master.
-> If you plan to propose a patch, please commit into the `development` branch, or its own feature branch. 
+> If you plan to propose a patch, please commit into the `development` branch, or its own feature branch.
 
 We recommend enabling [Github Actions](https://docs.github.com/en/actions) on your fork of `librealsense` to make sure the changes compile on all platforms and pass unit-tests.
 
@@ -21,11 +21,11 @@ In addition, please run `pr_check.sh` and `api_check.sh` under `scripts` directo
 
 Most common issues can be automatically resolved by running `./pr_check.sh --fix`
 
-Please familirize yourself with the [Apache License 2.0](https://github.com/realsenseai/librealsense/blob/master/LICENSE) before contributing. 
+Please familirize yourself with the [Apache License 2.0](https://github.com/realsenseai/librealsense/blob/master/LICENSE) before contributing.
 
 ## Step-by-Step
 
-1. Make sure you have `git` and `cmake` installed on your system. On Windows we recommend using [Git Extensions](https://github.com/gitextensions/gitextensions/releases) for git bash. 
+1. Make sure you have `git` and `cmake` installed on your system. On Windows we recommend using [Git Extensions](https://github.com/gitextensions/gitextensions/releases) for git bash.
 2. Run `git clone https://github.com/realsenseai/librealsense.git` and `cd librealsense`
 3. To align with latest status of the development branch, run:
 ```
@@ -35,7 +35,7 @@ git reset --hard origin/development
 ```
 4. `git checkout -b name_of_your_contribution` to create a dedicated branch
 5. Make your changes to the local repository
-6. Make sure your local git user is updated, or run `git config --global user.email "email@example.com"` and `git config --global user.user "user"` to set it up. This is the user & email that will appear in GitHub history. 
+6. Make sure your local git user is updated, or run `git config --global user.email "email@example.com"` and `git config --global user.user "user"` to set it up. This is the user & email that will appear in GitHub history.
 7. `git add -p` to select the changes you wish to add
 8. `git commit -m "Description of the change"`
 9. Make sure you have a GitHub user and [fork librealsense](https://github.com/realsenseai/librealsense#fork-destination-box)
@@ -60,7 +60,7 @@ The pull request will be automatically updated
 
 ## Comment about the Wrappers
 
-> It is very time consuming (and often impossible) for a single developer to test contributed functionality using all of the supported [wrappers](https://github.com/realsenseai/librealsense/tree/master/wrappers). There is no expectation of adding new functionality to all of the wrappers. One noteable exception is maintaining parity of public enumerations. Without strict maintanance it is easy for these lists to go out of sync and this can have serious runtime consequences. 
+> It is very time consuming (and often impossible) for a single developer to test contributed functionality using all of the supported [wrappers](https://github.com/realsenseai/librealsense/tree/master/wrappers). There is no expectation of adding new functionality to all of the wrappers. One noteable exception is maintaining parity of public enumerations. Without strict maintanance it is easy for these lists to go out of sync and this can have serious runtime consequences.
 
 For example, when adding new value to [`rs2_option`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_option.h) enum, please also add it to:
 1. The list of Matlab options under [`wrappers/matlab/option.m`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/option.m#L3-L46)
@@ -69,4 +69,4 @@ For example, when adding new value to [`rs2_option`](https://github.com/realsens
 4. The list of Java options used for Android integration - [`wrappers/android/librealsense/src/main/java/com/intel/realsense/librealsense/Option.java`](https://github.com/realsenseai/librealsense/blob/v2.32.1/wrappers/android/librealsense/src/main/java/com/intel/realsense/librealsense/Option.java#L4-L64)
 5. The list of options in the [python](https://github.com/realsenseai/librealsense/blob/v2.32.1/wrappers/python/pybackend.cpp#L102-L165) wrapper
 
-Once all are updated [Github Actions](https://docs.github.com/en/actions) will give clear indication that each of the wrappers is still passing compilation. 
+Once all are updated [Github Actions](https://docs.github.com/en/actions) will give clear indication that each of the wrappers is still passing compilation.

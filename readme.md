@@ -125,8 +125,8 @@ For a more custom installation, follow these steps to build the SDK from source.
 [![PyPI - pyrealsense2-beta](https://img.shields.io/pypi/v/pyrealsense2-beta.svg?label=pyrealsense2-beta&logo=pypi)](https://pypi.org/project/pyrealsense2-beta/)
 
 **Which should I use?**
-- **Stable:** `pyrealsense2` — validated releases aligned with SDK tags (Recommended for most users).  
-- **Beta:** `pyrealsense2-beta` — fresher builds for early access and testing. Expect faster updates.  
+- **Stable:** `pyrealsense2` — validated releases aligned with SDK tags (Recommended for most users).
+- **Beta:** `pyrealsense2-beta` — fresher builds for early access and testing. Expect faster updates.
 
 ### Install
 ```bash
@@ -191,7 +191,7 @@ For more information on the library, please follow our [examples](./examples) or
 
 | Ubuntu | Windows | macOS High Sierra | Jetson | Raspberry Pi |
 |--------|---------|-------|--------|----------------|
-| <div align="center"><a href="https://dev.realsenseai.com/docs/compiling-librealsense-for-linux-ubuntu-guide"><img src="https://librealsense.realsenseai.com/readme-media/ubuntu.png" width="40%" alt="Ubuntu" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/compiling-librealsense-for-windows-guide"><img src="https://librealsense.realsenseai.com/readme-media/Windows_logo.png" width="40%" alt="Windows" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/macos-installation-for-intel-realsense-sdk"><picture><source media="(prefers-color-scheme: dark)" srcset="https://librealsense.realsenseai.com/readme-media/apple-dark.png"><img src="https://librealsense.realsenseai.com/readme-media/apple-light.png" width="40%" alt="macOS" /></picture></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/nvidia-jetson-tx2-installation"><img src="https://librealsense.realsenseai.com/readme-media/nvidia.png" width="40%" alt="" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/using-depth-camera-with-raspberry-pi-3"><img src="https://librealsense.realsenseai.com/readme-media/raspberry-pi.png" width="40%" alt="" /></a></div> 
+| <div align="center"><a href="https://dev.realsenseai.com/docs/compiling-librealsense-for-linux-ubuntu-guide"><img src="https://librealsense.realsenseai.com/readme-media/ubuntu.png" width="40%" alt="Ubuntu" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/compiling-librealsense-for-windows-guide"><img src="https://librealsense.realsenseai.com/readme-media/Windows_logo.png" width="40%" alt="Windows" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/macos-installation-for-intel-realsense-sdk"><picture><source media="(prefers-color-scheme: dark)" srcset="https://librealsense.realsenseai.com/readme-media/apple-dark.png"><img src="https://librealsense.realsenseai.com/readme-media/apple-light.png" width="40%" alt="macOS" /></picture></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/nvidia-jetson-tx2-installation"><img src="https://librealsense.realsenseai.com/readme-media/nvidia.png" width="40%" alt="" /></a></div> | <div align="center"><a href="https://dev.realsenseai.com/docs/using-depth-camera-with-raspberry-pi-3"><img src="https://librealsense.realsenseai.com/readme-media/raspberry-pi.png" width="40%" alt="" /></a></div>
 
 
 

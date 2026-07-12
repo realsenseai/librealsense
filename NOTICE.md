@@ -1,11 +1,11 @@
-# RealSense™ 
+# RealSense™
 
 ## Third Party Programs
 
 
 ### This file specifies all 3rd party SW components used for RealSense™ SDK and the inbound license for each of these 3rd party components.
 
-#### MIT License 
+#### MIT License
 
 | Component | Home Page | License| Copyright |
 | ------- | ------- | ------- | ------- |
@@ -19,7 +19,7 @@
 | tclap | http://tclap.sourceforge.net/ | MIT License | Copyright (c) 2003 Michael E. Smoot, Copyright (c) 2004 Daniel Aarno, Copyright (c) 2017 Google Inc.  |
 | yaml-cpp (rosbag2) | https://github.com/jbeder/yaml-cpp | MIT License | Copyright (c) Jesse Beder |
 
-###### MIT License 
+###### MIT License
 The MIT License (MIT)
 
 Copyright (c) 2012-present @abumq (Majid Q.)
@@ -108,13 +108,13 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------------------------------
 
-#### LGPL-2.1 license 
+#### LGPL-2.1 license
 
 | Component | Home Page                        | License          | Copyright                    |
 |-----------|----------------------------------|------------------|------------------------------|
 | libusb    | https://github.com/libusb/libusb | LGPL-2.1 license | Copyright © 2012-2024 libusb |
 
-###### LGPL-2.1 license 
+###### LGPL-2.1 license
 		  GNU LESSER GENERAL PUBLIC LICENSE
 		       Version 2.1, February 1999
 
@@ -172,7 +172,8 @@ modified by someone else and passed on, the recipients should know
 that what they have is not the original version, so that the original
 author's reputation will not be affected by problems that might be
 introduced by others.
-
+
+
   Finally, software patents pose a constant threat to the existence of
 any free program.  We wish to make sure that a company cannot
 effectively restrict the users of a free program by obtaining a
@@ -228,7 +229,8 @@ modification follow.  Pay close attention to the difference between a
 "work based on the library" and a "work that uses the library".  The
 former contains code derived from the library, whereas the latter must
 be combined with the library in order to run.
-
+
+
 		  GNU LESSER GENERAL PUBLIC LICENSE
    TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
 
@@ -263,7 +265,7 @@ such a program is covered only if its contents constitute a work based
 on the Library (independent of the use of the Library in a tool for
 writing it).  Whether that is true depends on what the Library does
 and what the program that uses the Library does.
-  
+
   1. You may copy and distribute verbatim copies of the Library's
 complete source code as you receive it, in any medium, provided that
 you conspicuously and appropriately publish on each copy an
@@ -275,7 +277,8 @@ Library.
   You may charge a fee for the physical act of transferring a copy,
 and you may at your option offer warranty protection in exchange for a
 fee.
-
+
+
   2. You may modify your copy or copies of the Library or any portion
 of it, thus forming a work based on the Library, and copy and
 distribute such modifications or work under the terms of Section 1
@@ -333,7 +336,8 @@ instead of to this License.  (If a newer version than version 2 of the
 ordinary GNU General Public License has appeared, then you can specify
 that version instead if you wish.)  Do not make any other change in
 these notices.
-
+
+
   Once this change is made in a given copy, it is irreversible for
 that copy, so the ordinary GNU General Public License applies to all
 subsequent copies and derivative works made from that copy.
@@ -384,7 +388,8 @@ Library will still fall under Section 6.)
 distribute the object code for the work under the terms of Section 6.
 Any executables containing that work also fall under Section 6,
 whether or not they are linked directly with the Library itself.
-
+
+
   6. As an exception to the Sections above, you may also combine or
 link a "work that uses the Library" with the Library to produce a
 work containing portions of the Library, and distribute that work
@@ -446,7 +451,8 @@ restrictions of other proprietary libraries that do not normally
 accompany the operating system.  Such a contradiction means you cannot
 use both them and the Library together in an executable that you
 distribute.
-
+
+
   7. You may place library facilities that are a work based on the
 Library side-by-side in a single library together with other library
 facilities not covered by this License, and distribute such a combined
@@ -487,7 +493,8 @@ subject to these terms and conditions.  You may not impose any further
 restrictions on the recipients' exercise of the rights granted herein.
 You are not responsible for enforcing compliance by third parties with
 this License.
-
+
+
   11. If, as a consequence of a court judgment or allegation of patent
 infringement or for any other reason (not limited to patent issues),
 conditions are imposed on you (whether by court order, agreement or
@@ -539,7 +546,8 @@ conditions either of that version or of any later version published by
 the Free Software Foundation.  If the Library does not specify a
 license version number, you may choose any version ever published by
 the Free Software Foundation.
-
+
+
   14. If you wish to incorporate parts of the Library into other free
 programs whose distribution conditions are incompatible with these,
 write to the author to ask for permission.  For software which is
@@ -573,7 +581,8 @@ SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH
 DAMAGES.
 
 		     END OF TERMS AND CONDITIONS
-
+
+
            How to Apply These Terms to Your New Libraries
 
   If you develop a new library, and you want it to be of the greatest
@@ -621,7 +630,7 @@ That's all there is to it!
 ------------------------------------------------------------------------------------------------
 
 
-#### Apache-2.0 license 
+#### Apache-2.0 license
 
 | Component | Home Page | License| Copyright |
 | ------- | ------- | ------- | ------- |
@@ -878,7 +887,7 @@ That's all there is to it!
 ------------------------------------------------------------------------------------------------
 
 
-#### Public Domain License  
+#### Public Domain License
 
 | Component | Home Page | License| Copyright |
 | ------- | ------- | ------- | ------- |
@@ -886,7 +895,7 @@ That's all there is to it!
 | STB | https://github.com/nothings/stb | Public Domain License  | N/A  |
 | sqlite3 (rosbag2) | https://sqlite.org | Public Domain | N/A |
 
-###### Public Domain License  
+###### Public Domain License
 This is free and unencumbered software released into the public domain.
 
 Anyone is free to copy, modify, publish, use, compile, sell, or
@@ -914,13 +923,13 @@ For more information, please refer to <http://unlicense.org>
 
 ------------------------------------------------------------------------------------------------
 
-#### Curl License  
+#### Curl License
 
 | Component | Home Page | License| Copyright |
 | ------- | ------- | ------- | ------- |
 | curl | https://github.com/curl/curl | Curl License | Copyright (c) 1996 - 2024, Daniel Stenberg, <daniel@haxx.se> |
 
-###### Curl License  
+###### Curl License
 COPYRIGHT AND PERMISSION NOTICE
 
 Copyright (c) 1996 - 2024, Daniel Stenberg, <daniel@haxx.se>, and many
@@ -946,13 +955,13 @@ in this Software without prior written authorization of the copyright holder.
 
 ------------------------------------------------------------------------------------------------
 
-#### Boost Software License 1.0  
+#### Boost Software License 1.0
 
 | Component | Home Page | License| Copyright |
 | ------- | ------- | ------- | ------- |
 | Catch | https://github.com/philsquared/Catch | Boost Software License 1.0 | Copyright Catch2 Authors, Distributed under the Boost Software License, Version 1.0 |
 
-###### Boost Software License 1.0  
+###### Boost Software License 1.0
 Permission is hereby granted, free of charge, to any person or organization
 obtaining a copy of the software and accompanying documentation covered by
 this license (the "Software") to use, reproduce, display, distribute,
