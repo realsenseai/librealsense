@@ -108,6 +108,16 @@ class ApiClient {
     await this.client.post(`/devices/${deviceId}/hw_reset/`)
   }
 
+  async getAdvancedMode(deviceId: string): Promise<{ supported: boolean; enabled: boolean }> {
+    const response = await this.client.get(`/devices/${deviceId}/advanced_mode`)
+    return response.data
+  }
+
+  async setAdvancedMode(deviceId: string, enable: boolean): Promise<{ supported: boolean; enabled: boolean }> {
+    const response = await this.client.post(`/devices/${deviceId}/advanced_mode`, { enable })
+    return response.data
+  }
+
   async updateFirmwareFromFile(
     deviceId: string,
     file: File

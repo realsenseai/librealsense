@@ -169,6 +169,7 @@ export interface SensorConfig {
 export interface DeviceState {
   device: DeviceInfo
   firmware?: FirmwareState
+  advancedMode?: { supported: boolean; enabled: boolean }
   sensors: SensorInfo[]
   options: Record<string, OptionInfo[]> // keyed by sensor_id
   streamConfigs: StreamConfig[]

@@ -13,6 +13,7 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 from app.core.errors import RealSenseError
+from app.services import advanced_mode
 from app.models.device import Device, DeviceInfo
 from app.models.sensor import Sensor, SensorInfo, SupportedStreamProfile
 from app.models.option import Option, OptionInfo
@@ -921,6 +922,14 @@ class RealSenseManager:
         return colorizer
 
     @staticmethod
+    def _get_advanced_mode(dev):
+        """Return an rs400_advanced_mode wrapper for the device, or None if unsupported."""
+        try:
+            return rs.rs400_advanced_mode(dev)
+        except Exception:
+            return None
+
+    @staticmethod
     def _enum_value_descriptions(obj, opt, rng):
         """Return {value: description} when an option is a full enum, else None.
 
@@ -1107,6 +1116,16 @@ class RealSenseManager:
                 except RuntimeError:
                     pass
 
+            # 4. RS400 Advanced Controls (only when advanced mode is enabled)
+            am = self._get_advanced_mode(dev)
+            if am is not None:
+                try:
+                    if am.is_enabled():
+                        dev_name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
+                        options.extend(advanced_mode.build_advanced_options(am, skip_ae="D457" in dev_name))
+                except Exception:
+                    pass
+
         return options
 
     def _get_or_create_processing_blocks(self, device_id: str, sensor_id: str, sensor) -> List[Dict[str, Any]]:
@@ -1160,6 +1179,39 @@ class RealSenseManager:
             status_code=404, detail=f"Depth visualization option {option_id} not found"
         )
 
+    def get_advanced_mode_status(self, device_id: str) -> Dict[str, Any]:
+        """Return {supported, enabled} for RS400 advanced mode."""
+        if device_id not in self.devices:
+            self.refresh_devices()
+        dev = self.devices.get(device_id)
+        if dev is None:
+            raise RealSenseError(status_code=404, detail=f"Device {device_id} not found")
+        am = self._get_advanced_mode(dev)
+        if am is None:
+            return {"device_id": device_id, "supported": False, "enabled": False}
+        try:
+            return {"device_id": device_id, "supported": True, "enabled": bool(am.is_enabled())}
+        except Exception:
+            return {"device_id": device_id, "supported": False, "enabled": False}
+
+    def set_advanced_mode(self, device_id: str, enable: bool) -> Dict[str, Any]:
+        """Enable/disable advanced mode. This RESTARTS the device; wait for it to return."""
+        if device_id not in self.devices:
+            self.refresh_devices()
+        dev = self.devices.get(device_id)
+        if dev is None:
+            raise RealSenseError(status_code=404, detail=f"Device {device_id} not found")
+        am = self._get_advanced_mode(dev)
+        if am is None:
+            raise RealSenseError(status_code=400, detail="Advanced mode not supported on this device")
+        try:
+            am.toggle_advanced_mode(bool(enable))
+        except Exception as e:
+            raise RealSenseError(status_code=500, detail=f"Failed to toggle advanced mode: {e}")
+        # Device re-enumerates after the toggle — re-resolve it before returning.
+        self._refresh_until_device_returns(device_id)
+        return {"device_id": device_id, "supported": True, "enabled": bool(enable)}
+
     def get_sensor_option(
         self, device_id: str, sensor_id: str, option_id: str
     ) -> OptionInfo:
@@ -1204,6 +1256,13 @@ class RealSenseManager:
         # Depth-visualization (colorizer) option
         if option_id.startswith("VIZ_"):
             return self._set_colorizer_option(device_id, option_id, value)
+
+        # RS400 advanced-mode control
+        if option_id.startswith("ADV_"):
+            am = self._get_advanced_mode(dev)
+            if am is None:
+                raise RealSenseError(status_code=400, detail="Advanced mode not supported on this device")
+            return advanced_mode.set_advanced_option(am, option_id, value)
 
         # Find the option by name (case-insensitive comparison)
         # Match against both raw option name and display name

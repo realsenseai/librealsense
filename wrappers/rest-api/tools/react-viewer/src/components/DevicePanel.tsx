@@ -138,6 +138,7 @@ export function DevicePanel() {
     checkFirmwareUpdates,
     updateFirmwareFromFile,
     updateFirmwareFromRecommended,
+    toggleAdvancedMode,
   } = useAppStore()
 
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -340,6 +341,7 @@ export function DevicePanel() {
                 onStopSensorStreaming={(sensorId) => stopSensorStreaming(device.device_id, sensorId)}
                 onCheckFirmwareUpdates={() => handleCheckFirmwareUpdates(device.device_id)}
                 onUpdateFirmwareFromFile={(file) => handleUpdateFirmwareFromFile(device, file)}
+                onToggleAdvancedMode={(enable) => toggleAdvancedMode(device.device_id, enable)}
                 onShowToast={addToast}
               />
             )
@@ -378,6 +380,7 @@ interface DeviceCardProps {
   onStopSensorStreaming: (sensorId: string) => void
   onCheckFirmwareUpdates: () => void
   onUpdateFirmwareFromFile: (file: File) => void
+  onToggleAdvancedMode: (enable: boolean) => void
   onShowToast: (type: ToastType, message: string) => void
 }
 
@@ -393,6 +396,7 @@ function DeviceCard({
   onStopSensorStreaming,
   onCheckFirmwareUpdates,
   onUpdateFirmwareFromFile,
+  onToggleAdvancedMode,
   onShowToast,
 }: DeviceCardProps) {
   const [showMenu, setShowMenu] = useState(false)
@@ -508,6 +512,23 @@ function DeviceCard({
                       </svg>
                       Check for Firmware Updates
                     </button>
+                    {deviceState?.advancedMode?.supported && (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false)
+                          const enable = !deviceState.advancedMode?.enabled
+                          if (enable && !window.confirm('Enabling Advanced Mode restarts the device. Continue?')) return
+                          onToggleAdvancedMode(enable)
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        {deviceState.advancedMode.enabled ? 'Disable Advanced Mode' : 'Enable Advanced Mode'}
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setShowMenu(false)
@@ -986,7 +1007,7 @@ function SensorOptionsPanel({ sensor, options, searchQuery, isExpanded, onToggle
   }, {} as Record<string, OptionInfo[]>)
 
   // Ensure consistent category order: Basic Controls first, then Post-Processing
-  const categoryOrder = ['Basic Controls', 'Depth Visualization', 'Post-Processing']
+  const categoryOrder = ['Basic Controls', 'Depth Visualization', 'Post-Processing', 'Advanced Controls']
   const sortedCategories = Object.keys(optionsByCategory).sort((a, b) => {
     const indexA = categoryOrder.indexOf(a)
     const indexB = categoryOrder.indexOf(b)
@@ -1129,6 +1150,19 @@ function CategorySection({ category, options, searchQuery, isExpanded, onToggle,
     )
   }
 
+  // Advanced Controls: many fields across groups — render collapsible per-group subsections
+  if (category === 'Advanced Controls') {
+    return (
+      <AdvancedControlsSection
+        options={options}
+        isExpanded={isExpanded}
+        onToggle={onToggle}
+        sensorId={sensorId}
+        onSetOption={onSetOption}
+      />
+    )
+  }
+
   return (
     <div className="border border-gray-700 rounded overflow-hidden">
       <div className="flex items-center bg-gray-750 hover:bg-gray-700 transition-colors">
@@ -1166,6 +1200,64 @@ function CategorySection({ category, options, searchQuery, isExpanded, onToggle,
               sensorId={sensorId}
               onSetOption={onSetOption}
             />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface AdvancedControlsSectionProps {
+  options: OptionInfo[]
+  isExpanded: boolean
+  onToggle: () => void
+  sensorId: string
+  onSetOption: (sensorId: string, optionId: string, value: number | boolean | string) => Promise<void>
+}
+
+function AdvancedControlsSection({ options, isExpanded, onToggle, sensorId, onSetOption }: AdvancedControlsSectionProps) {
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
+
+  // Group by the advanced-mode group name (carried on filter_name)
+  const groups = options.reduce((acc, option) => {
+    const g = option.filter_name || 'Other'
+    ;(acc[g] ||= []).push(option)
+    return acc
+  }, {} as Record<string, OptionInfo[]>)
+
+  const toggleGroup = (g: string) => setOpenGroups(prev => {
+    const next = new Set(prev)
+    next.has(g) ? next.delete(g) : next.add(g)
+    return next
+  })
+
+  return (
+    <div className="border border-gray-700 rounded overflow-hidden">
+      <button onClick={onToggle} className="w-full flex items-center justify-between p-1.5 bg-gray-750 hover:bg-gray-700 transition-colors">
+        <span className="text-xs font-medium text-gray-300">Advanced Controls</span>
+        <svg className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isExpanded && (
+        <div className="p-1.5 space-y-1 bg-gray-800/30">
+          {Object.entries(groups).map(([groupName, groupOptions]) => (
+            <div key={groupName} className="border border-gray-600 rounded overflow-hidden">
+              <button onClick={() => toggleGroup(groupName)} className="w-full flex items-center justify-between p-1.5 bg-gray-700/50 hover:bg-gray-700 transition-colors">
+                <span className="text-xs font-medium text-gray-200">{groupName}</span>
+                <svg className={`w-2.5 h-2.5 transition-transform text-gray-400 ${openGroups.has(groupName) ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              {openGroups.has(groupName) && (
+                <div className="p-1.5 space-y-1 bg-gray-800/50">
+                  {groupOptions.map(option => (
+                    <OptionControl key={option.option_id} option={option} sensorId={sensorId} onSetOption={onSetOption} />
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
