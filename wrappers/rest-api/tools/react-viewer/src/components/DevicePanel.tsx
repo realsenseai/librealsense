@@ -986,7 +986,7 @@ function SensorOptionsPanel({ sensor, options, searchQuery, isExpanded, onToggle
   }, {} as Record<string, OptionInfo[]>)
 
   // Ensure consistent category order: Basic Controls first, then Post-Processing
-  const categoryOrder = ['Basic Controls', 'Post-Processing']
+  const categoryOrder = ['Basic Controls', 'Depth Visualization', 'Post-Processing']
   const sortedCategories = Object.keys(optionsByCategory).sort((a, b) => {
     const indexA = categoryOrder.indexOf(a)
     const indexB = categoryOrder.indexOf(b)

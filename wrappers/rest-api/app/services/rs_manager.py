@@ -123,6 +123,9 @@ class RealSenseManager:
         # Stores filter instances per device/sensor: device_id -> sensor_id -> list of filter dicts
         # Each filter dict: { "filter": rs.filter, "name": str, "enabled": bool }
         self.processing_blocks: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+        # One colorizer per device so depth-visualization options (color scheme,
+        # min/max distance, histogram eq) set on it affect the streamed depth image.
+        self.colorizers: Dict[str, "rs.colorizer"] = {}
         self.sensor_metadata_queues: Dict[str, Dict[str, List[Dict]]] = {}
         # Per-sensor rs.frame_queue objects: device_id -> sensor_id -> rs.frame_queue
         self.sensor_rs_queues: Dict[str, Dict[str, Any]] = {}
@@ -172,6 +175,7 @@ class RealSenseManager:
         # doesn't silently resume emitting PC metadata that the UI thinks is
         # off (frontend resets to off on disconnect).
         self.is_pointcloud_enabled.pop(serial, None)
+        self.colorizers.pop(serial, None)
         self.devices.pop(serial, None)
         self.device_infos.pop(serial, None)
         self._supported_md_by_profile.pop(serial, None)
@@ -902,6 +906,20 @@ class RealSenseManager:
                 return sensor
         raise RealSenseError(status_code=404, detail=f"Sensor {sensor_id} not found")
 
+    # Options exposed by processing blocks that are plumbing, not user controls.
+    _HIDDEN_BLOCK_OPTIONS = {
+        "frames_queue_size", "stream_filter", "stream_format_filter",
+        "stream_index_filter", "noise_estimation", "region_of_interest",
+    }
+
+    def _get_or_create_colorizer(self, device_id: str) -> "rs.colorizer":
+        """Return the device's cached colorizer, creating it on first use."""
+        colorizer = self.colorizers.get(device_id)
+        if colorizer is None:
+            colorizer = rs.colorizer()
+            self.colorizers[device_id] = colorizer
+        return colorizer
+
     @staticmethod
     def _enum_value_descriptions(obj, opt, rng):
         """Return {value: description} when an option is a full enum, else None.
@@ -1003,22 +1021,12 @@ class RealSenseManager:
                 filter_name=filter_name,
             ))
             
-            # Hidden options that shouldn't be shown to users (same as legacy viewer)
-            hidden_options = {
-                'frames_queue_size',
-                'stream_filter', 
-                'stream_format_filter',
-                'stream_index_filter',
-                'noise_estimation',
-                'region_of_interest',
-            }
-            
-            # Add filter-specific options (excluding hidden ones)
+            # Add filter-specific options (excluding hidden plumbing options)
             for opt in filter_obj.get_supported_options():
                 try:
                     opt_name = opt.name
-                    # Skip hidden options
-                    if opt_name in hidden_options:
+                    # Skip hidden options (same as legacy viewer)
+                    if opt_name in self._HIDDEN_BLOCK_OPTIONS:
                         continue
                         
                     current_value = filter_obj.get_option(opt)
@@ -1068,6 +1076,37 @@ class RealSenseManager:
                 except RuntimeError:
                     pass
 
+        # 3. Depth Visualization (colorizer) — only on the depth sensor
+        try:
+            is_depth_sensor = any(
+                p.stream_type() == rs.stream.depth for p in sensor.get_stream_profiles()
+            )
+        except RuntimeError:
+            is_depth_sensor = False
+        if is_depth_sensor:
+            colorizer = self._get_or_create_colorizer(device_id)
+            for opt in colorizer.get_supported_options():
+                try:
+                    opt_name = opt.name
+                    if opt_name in self._HIDDEN_BLOCK_OPTIONS:
+                        continue
+                    rng = colorizer.get_option_range(opt)
+                    options.append(OptionInfo(
+                        option_id=f"VIZ_{opt_name}",
+                        name=opt_name.replace("_", " ").title(),
+                        description=colorizer.get_option_description(opt),
+                        current_value=colorizer.get_option(opt),
+                        default_value=rng.default,
+                        min_value=rng.min,
+                        max_value=rng.max,
+                        step=rng.step,
+                        read_only=colorizer.is_option_read_only(opt),
+                        category="Depth Visualization",
+                        value_descriptions=self._enum_value_descriptions(colorizer, opt, rng),
+                    ))
+                except RuntimeError:
+                    pass
+
         return options
 
     def _get_or_create_processing_blocks(self, device_id: str, sensor_id: str, sensor) -> List[Dict[str, Any]]:
@@ -1106,6 +1145,20 @@ class RealSenseManager:
             self.processing_blocks[device_id][sensor_id] = filters
         
         return self.processing_blocks[device_id][sensor_id]
+
+    def _set_colorizer_option(self, device_id: str, option_id: str, value: Any) -> bool:
+        """Set a colorizer (Depth Visualization) option; option_id is 'VIZ_<opt_name>'."""
+        colorizer = self._get_or_create_colorizer(device_id)
+        opt_name = option_id[len("VIZ_"):]
+        for opt in colorizer.get_supported_options():
+            if opt.name == opt_name:
+                rng = colorizer.get_option_range(opt)
+                v = max(rng.min, min(rng.max, float(value)))
+                colorizer.set_option(opt, v)
+                return True
+        raise RealSenseError(
+            status_code=404, detail=f"Depth visualization option {option_id} not found"
+        )
 
     def get_sensor_option(
         self, device_id: str, sensor_id: str, option_id: str
@@ -1147,6 +1200,10 @@ class RealSenseManager:
         # Check if this is a post-processing filter option (starts with "PP_")
         if option_id.startswith("PP_"):
             return self._set_filter_option(device_id, sensor_id, sensor, option_id, value)
+
+        # Depth-visualization (colorizer) option
+        if option_id.startswith("VIZ_"):
+            return self._set_colorizer_option(device_id, option_id, value)
 
         # Find the option by name (case-insensitive comparison)
         # Match against both raw option name and display name
@@ -2017,9 +2074,9 @@ class RealSenseManager:
                 ir_index = int(stream_name_list[1]) if len(stream_name_list) > 1 else 1
                 stream_mappings[active_stream] = (rs_stream, ir_index)
         
-        # Create a single colorizer instance for depth (reuse for performance)
-        colorizer = rs.colorizer()
-        
+        # Cached per-device colorizer so Depth Visualization options apply live
+        colorizer = self._get_or_create_colorizer(device_id)
+
         try:
             while device_id in self.pipelines:
                 try:
@@ -2489,9 +2546,9 @@ class RealSenseManager:
             stream_types: List of stream types this sensor is producing
         """
         logging.info(f"[SENSOR] Frame collection thread started for {device_id}/{sensor_id} streams: {stream_types}")
-        
-        colorizer = rs.colorizer()
-        
+
+        colorizer = self._get_or_create_colorizer(device_id)
+
         try:
             while True:
                 # Check if we should stop
