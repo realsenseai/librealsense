@@ -132,6 +132,7 @@ namespace librealsense
 #ifdef BUILD_WITH_DDS
             if( Is< librealsense::dds_device_proxy >( dev ) )
             {
+                LOG_DEBUG( "pipeline::unsafe_start: device is a dds_device_proxy -- using open_and_start()" );
                 // For DDS devices open() only sets requested profiles, start() actually starts streaming.
                 // Calling open() then start() sends open-streams control for all sensors before starting to stream,
                 // second open-streams control will resets the first (reverting first requested streams to defaults).
@@ -141,6 +142,7 @@ namespace librealsense
             else
 #endif
             {
+                LOG_DEBUG( "pipeline::unsafe_start: device is not a dds_device_proxy -- using open()+start()" );
                 profile->_multistream.open();
                 profile->_multistream.start( callbacks );
             }
@@ -215,6 +217,11 @@ namespace librealsense
                 if(sync_current)
                     _streams_to_sync_ids.push_back(s->get_unique_id());
             }
+
+            rsutils::string::from aggregated_streams;
+            for (auto&& s : profile->get_active_streams())
+                aggregated_streams << s->get_stream_type() << "#" << s->get_unique_id() << " ";
+            LOG_DEBUG( "pipeline::on_start: streams required for aggregation: " << aggregated_streams.str() );
 
             _syncer = std::unique_ptr<syncer_process_unit>(new syncer_process_unit());
             _aggregator = std::unique_ptr<aggregator>(new aggregator(_streams_to_aggregate_ids, _streams_to_sync_ids));

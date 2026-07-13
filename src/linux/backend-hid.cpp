@@ -1041,6 +1041,16 @@ namespace librealsense
         void v4l_hid_device::open(const std::vector<hid_profile>& hid_profiles)
         {
             _hid_profiles = hid_profiles;
+            rsutils::string::from requested;
+            for (auto& p : hid_profiles)
+                requested << p.sensor_name << "@" << p.frequency << "Hz ";
+            LOG_DEBUG("v4l_hid_device::open: requested profiles: " << requested.str());
+
+            rsutils::string::from enumerated;
+            for (auto& di : _hid_device_infos)
+                enumerated << di.id << "(" << di.device_path << ") ";
+            LOG_DEBUG("v4l_hid_device::open: enumerated hid devices: " << enumerated.str());
+
              for (auto& device_info : _hid_device_infos)
              {
                 try
@@ -1066,8 +1076,14 @@ namespace librealsense
                         }
 
                         if (frequency == 0)
+                        {
+                            LOG_DEBUG("v4l_hid_device::open: no matching requested profile for enumerated device '"
+                                       << device_info.id << "' (" << device_info.device_path << ") -- skipping, it will never stream");
                             continue;
+                        }
 
+                        LOG_DEBUG("v4l_hid_device::open: starting iio_hid_sensor for '" << device_info.id
+                                   << "' (" << device_info.device_path << ") @ " << frequency << "Hz");
                         auto device = std::unique_ptr<iio_hid_sensor>(new iio_hid_sensor(device_info.device_path, frequency, sensitivity));
                         _iio_hid_sensors.push_back(std::move(device));
                     }

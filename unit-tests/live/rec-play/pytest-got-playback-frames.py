@@ -147,14 +147,18 @@ def test_pipeline_interface(test_device):
         # connected device; without enable_device(sn) the pipeline picks the first match.
         cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
         cfg.enable_record_to_file( file_name )
-        pipeline.start( cfg )
+        pipeline_profile = pipeline.start( cfg )
+        for s in pipeline_profile.get_streams():
+            log.info(f"resolved recording stream: {s}")
         time.sleep(3)
         pipeline.stop()
         # we create a new pipeline and use it to playback from the file we just recoded to
         pipeline = rs.pipeline(ctx)
         cfg = rs.config()
         cfg.enable_device_from_file(file_name)
-        pipeline.start(cfg)
+        pipeline_profile = pipeline.start(cfg)
+        for s in pipeline_profile.get_streams():
+            log.info(f"resolved playback stream: {s}")
         # if the record-playback worked we will get frames, otherwise the next line will timeout and throw
         pipeline.wait_for_frames()
     except Exception as e:

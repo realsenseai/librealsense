@@ -26,6 +26,8 @@ def test_depth_units_metadata(test_device):
 
     try:
         pipeline_profile = pipeline.start(cfg)
+        for s in pipeline_profile.get_streams():
+            log.info(f"resolved stream: {s}")
         frame_set = pipeline.wait_for_frames()
         depth_frame = frame_set.get_depth_frame()
         depth_units_from_metadata = depth_frame.get_units()
