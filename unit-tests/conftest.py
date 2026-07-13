@@ -143,7 +143,10 @@ def pytest_addoption(parser):
     group.addoption(
         "--rslog",
         action="store_true",
-        default=False,
+        # TEMPORARY: defaulted True for the D585 accel-hang CI investigation, so the debug
+        # trace comes back without needing a Jenkins job/UNIT_TESTS_ARGS change. Revert to
+        # default=False once the investigation is done.
+        default=True,
         help="Enable LibRS debug logging (routed into the per-test log files)."
     )
     group.addoption(
