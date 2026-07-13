@@ -34,6 +34,9 @@ namespace librealsense
             }
             std::lock_guard<std::mutex> lock(_mutex);
             auto comp = dynamic_cast<composite_frame*>(frame.frame);
+            LOG_DEBUG( "aggregator::handle_frame: received " << (comp ? "composite" : "single")
+                       << " frame, stream_type=" << frame->get_stream()->get_stream_type()
+                       << " unique_id=" << frame->get_stream()->get_unique_id() );
             if (comp)
             {
                 for (auto i = 0; i < comp->get_embedded_frames_count(); i++)
@@ -41,14 +44,21 @@ namespace librealsense
                     auto f = comp->get_frame(i);
                     f->acquire();
                     _last_set[f->get_stream()->get_unique_id()] = f;
+                    LOG_DEBUG( "aggregator::handle_frame: composite embeds stream_type="
+                               << f->get_stream()->get_stream_type()
+                               << " unique_id=" << f->get_stream()->get_unique_id() );
                 }
 
                 // in case not all required streams were aggregated don't publish the frame set
                 for (int s : _streams_to_aggregate_ids)
                 {
                     if (!_last_set[s])
+                    {
+                        LOG_DEBUG( "aggregator::handle_frame: composite path incomplete, missing unique_id=" << s );
                         return;
+                    }
                 }
+                LOG_DEBUG( "aggregator::handle_frame: composite path complete, publishing frameset" );
 
                 // prepare the output frame set for wait_for_frames/poll_frames calls
                 std::vector<frame_holder> sync_set;
@@ -81,6 +91,10 @@ namespace librealsense
             {
                 source->frame_ready(frame.clone());
                 _last_set[frame->get_stream()->get_unique_id()] = frame.clone();
+                LOG_DEBUG( "aggregator::handle_frame: single-frame path, _last_set now has "
+                           << _last_set.size() << "/" << _streams_to_aggregate_ids.size()
+                           << " streams, _streams_to_sync_ids.empty()="
+                           << _streams_to_sync_ids.empty() );
                 if (_streams_to_sync_ids.empty() && _last_set.size() == _streams_to_aggregate_ids.size())
                 {
                     // prepare the output frame set for wait_for_frames/poll_frames calls

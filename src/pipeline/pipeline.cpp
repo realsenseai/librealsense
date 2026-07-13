@@ -240,6 +240,9 @@ namespace librealsense
             return make_frame_callback(
                 [&, synced_streams_ids]( frame_holder fref )
                 {
+                    LOG_DEBUG( "pipeline::get_callback: received frame, stream_type="
+                               << fref->get_stream()->get_stream_type()
+                               << " unique_id=" << fref->get_stream()->get_unique_id() );
                     // if the user requested to sync the frame push it to the syncer, otherwise push it to the
                     // aggregator
                     if( std::find( synced_streams_ids.begin(),
