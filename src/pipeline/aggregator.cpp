@@ -32,46 +32,60 @@ namespace librealsense
 //                std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 return;
             }
-            std::lock_guard<std::mutex> lock(_mutex);
             auto comp = dynamic_cast<composite_frame*>(frame.frame);
+            // NOTE: diagnostic-only. LOG_DEBUG can end up acquiring the Python GIL (when routed
+            // through rs.log_to_callback), so it must never be called while holding _mutex --
+            // doing so risks an AB-BA deadlock against the main thread (which holds the GIL and
+            // may block on this same mutex via another pipeline/aggregator call).
             LOG_DEBUG( "aggregator::handle_frame: received " << (comp ? "composite" : "single")
                        << " frame, stream_type=" << frame->get_stream()->get_stream_type()
                        << " unique_id=" << frame->get_stream()->get_unique_id() );
             if (comp)
             {
-                for (auto i = 0; i < comp->get_embedded_frames_count(); i++)
+                bool complete = false;
+                int missing_id = -1;
+                std::vector<frame_holder> sync_set;
+                std::vector<frame_holder> async_set;
                 {
-                    auto f = comp->get_frame(i);
-                    f->acquire();
-                    _last_set[f->get_stream()->get_unique_id()] = f;
-                    LOG_DEBUG( "aggregator::handle_frame: composite embeds stream_type="
-                               << f->get_stream()->get_stream_type()
-                               << " unique_id=" << f->get_stream()->get_unique_id() );
-                }
-
-                // in case not all required streams were aggregated don't publish the frame set
-                for (int s : _streams_to_aggregate_ids)
-                {
-                    if (!_last_set[s])
+                    std::lock_guard<std::mutex> lock(_mutex);
+                    for (auto i = 0; i < comp->get_embedded_frames_count(); i++)
                     {
-                        LOG_DEBUG( "aggregator::handle_frame: composite path incomplete, missing unique_id=" << s );
-                        return;
+                        auto f = comp->get_frame(i);
+                        f->acquire();
+                        _last_set[f->get_stream()->get_unique_id()] = f;
+                    }
+
+                    // in case not all required streams were aggregated don't publish the frame set
+                    for (int s : _streams_to_aggregate_ids)
+                    {
+                        if (!_last_set[s])
+                        {
+                            missing_id = s;
+                            break;
+                        }
+                    }
+
+                    if (missing_id == -1)
+                    {
+                        complete = true;
+                        // prepare the output frame set for wait_for_frames/poll_frames calls
+                        for (auto&& s : _last_set)
+                        {
+                            sync_set.push_back(s.second.clone());
+                            // send only the synchronized frames to the user callback
+                            if (std::find(_streams_to_sync_ids.begin(), _streams_to_sync_ids.end(),
+                                s.second->get_stream()->get_unique_id()) != _streams_to_sync_ids.end())
+                                async_set.push_back(s.second.clone());
+                        }
                     }
                 }
-                LOG_DEBUG( "aggregator::handle_frame: composite path complete, publishing frameset" );
 
-                // prepare the output frame set for wait_for_frames/poll_frames calls
-                std::vector<frame_holder> sync_set;
-                // prepare the output frame set for the callbacks
-                std::vector<frame_holder> async_set;
-                for (auto&& s : _last_set)
+                if (!complete)
                 {
-                    sync_set.push_back(s.second.clone());
-                    // send only the synchronized frames to the user callback
-                    if (std::find(_streams_to_sync_ids.begin(), _streams_to_sync_ids.end(),
-                        s.second->get_stream()->get_unique_id()) != _streams_to_sync_ids.end())
-                        async_set.push_back(s.second.clone());
+                    LOG_DEBUG( "aggregator::handle_frame: composite path incomplete, missing unique_id=" << missing_id );
+                    return;
                 }
+                LOG_DEBUG( "aggregator::handle_frame: composite path complete, publishing frameset" );
 
                 frame_holder sync_fref = source->allocate_composite_frame(std::move(sync_set));
                 frame_holder async_fref = source->allocate_composite_frame(std::move(async_set));
@@ -89,19 +103,29 @@ namespace librealsense
             }
             else
             {
+                bool should_publish = false;
+                size_t last_set_size = 0;
+                bool sync_ids_empty = false;
+                std::vector<frame_holder> sync_set;
                 source->frame_ready(frame.clone());
-                _last_set[frame->get_stream()->get_unique_id()] = frame.clone();
-                LOG_DEBUG( "aggregator::handle_frame: single-frame path, _last_set now has "
-                           << _last_set.size() << "/" << _streams_to_aggregate_ids.size()
-                           << " streams, _streams_to_sync_ids.empty()="
-                           << _streams_to_sync_ids.empty() );
-                if (_streams_to_sync_ids.empty() && _last_set.size() == _streams_to_aggregate_ids.size())
                 {
-                    // prepare the output frame set for wait_for_frames/poll_frames calls
-                    std::vector<frame_holder> sync_set;
-                    for (auto&& s : _last_set)
-                        sync_set.push_back(s.second.clone());
-
+                    std::lock_guard<std::mutex> lock(_mutex);
+                    _last_set[frame->get_stream()->get_unique_id()] = frame.clone();
+                    last_set_size = _last_set.size();
+                    sync_ids_empty = _streams_to_sync_ids.empty();
+                    should_publish = sync_ids_empty && last_set_size == _streams_to_aggregate_ids.size();
+                    if (should_publish)
+                    {
+                        // prepare the output frame set for wait_for_frames/poll_frames calls
+                        for (auto&& s : _last_set)
+                            sync_set.push_back(s.second.clone());
+                    }
+                }
+                LOG_DEBUG( "aggregator::handle_frame: single-frame path, _last_set now has "
+                           << last_set_size << "/" << _streams_to_aggregate_ids.size()
+                           << " streams, _streams_to_sync_ids.empty()=" << sync_ids_empty );
+                if (should_publish)
+                {
                     frame_holder sync_fref = source->allocate_composite_frame(std::move(sync_set));
                     if (!sync_fref)
                     {
