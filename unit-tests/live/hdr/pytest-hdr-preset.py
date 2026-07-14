@@ -49,6 +49,9 @@ def test_hdr_preset_manual(test_device):
     hdr_helper.load_and_perform_test(MANUAL_HDR_CONFIG, "Auto HDR - Sanity - Manual mode")
 
 
+# D457 (GMSL/MIPI) auto-HDR routes depth-ae through XU control 0x11, which the MIPI
+# backend has no v4l2 CID mapping for; exclude until the mapping is added.
+@pytest.mark.device_exclude("D457")
 def test_hdr_preset_auto(test_device):
     hdr_helper.setup_for_device(test_device)
     hdr_helper.load_and_perform_test(AUTO_HDR_CONFIG, "Auto HDR - Sanity - Auto mode")
