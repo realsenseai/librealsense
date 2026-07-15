@@ -543,6 +543,7 @@ namespace librealsense
 
                 std::vector<uint8_t> raw_data(raw_data_size);
                 auto metadata = has_metadata();
+                LOG_DEBUG( "iio_hid_sensor[" << this->get_sensor_name() << "]::capture_thread: entered, channel_size=" << channel_size );
 
                 do {
                     fd_set fds;
