@@ -50,7 +50,7 @@ class TestCliOptionsRegistered:
         assert "timeout method: thread" in out
 
     def test_rslog(self):
-        """--rslog should call rs.log_to_console."""
+        """--rslog should install the LibRS log bridge (rs.log_to_callback)."""
         rc, out, tracking = run_e2e("pytest-passthrough.py", "--rslog")
         assert rc == 0
         assert len(tracking["rslog_calls"]) > 0

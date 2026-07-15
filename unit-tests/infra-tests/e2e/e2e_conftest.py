@@ -12,7 +12,7 @@ _py_dir = os.path.join(_unit_tests_dir, 'py')
 if _py_dir not in sys.path:
     sys.path.insert(0, _py_dir)
 
-# Fake pyrealsense2 — track log_to_console calls so tests can verify --rslog
+# Fake pyrealsense2 — track LibRS log-bridge calls so tests can verify --rslog
 import json as _json
 _tracking_log = os.path.join(os.path.dirname(os.path.abspath(__file__)), '_tracking.json')
 _tracking = {"rslog_calls": [], "query_kwargs": [], "enable_only_calls": [], "disable_calls": []}
@@ -26,6 +26,16 @@ def _mock_log_to_console(level):
     _tracking["rslog_calls"].append({"level": level})
     _save_tracking()
 _rs.log_to_console = _mock_log_to_console
+class _FakeLogMessage:
+    def raw(self):
+        return "fake librs log line"
+def _mock_log_to_callback(level, callback):
+    _tracking["rslog_calls"].append({"level": level})
+    _save_tracking()
+    # Exercise the routing path (callback fires -> Python logger receives the record),
+    # not just the registration, so the bridge itself is covered by the E2E test.
+    callback(level, _FakeLogMessage())
+_rs.log_to_callback = _mock_log_to_callback
 class _CameraInfo:
     name = "name"
     product_line = "product_line"
@@ -34,6 +44,10 @@ class _CameraInfo:
 _rs.camera_info = _CameraInfo
 class _LogSeverity:
     debug = 0
+    info = 1
+    warn = 2
+    error = 3
+    fatal = 4
 _rs.log_severity = _LogSeverity
 class _FakeContext:
     @property

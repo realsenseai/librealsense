@@ -2438,11 +2438,6 @@ namespace rs2
                 ImGui::SetCursorPos({ rc.x, rc.y + line_h });
             }
 
-            rc = ImGui::GetCursorPos();
-            ImGui::SetCursorPos({ rc.x + 12, rc.y + 4 });
-            std::string download_label = rsutils::string::from() << "Download firmware...##" << id;
-            hyperlink(window, download_label.c_str(), fw_download_url());
-
             ImGui::SetCursorPos({ rc.x + 225, rc.y - 107 });
             ImGui::PopFont();
         }

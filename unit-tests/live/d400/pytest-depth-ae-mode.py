@@ -7,6 +7,7 @@
 # See src/ds/d400/d400-device.cpp (search "DEPTH AUTO EXPOSURE MODE").
 
 import pytest
+import platform
 import pyrealsense2 as rs
 import pyrsutils as rsutils
 from rspy.pytest.device_helpers import require_min_fw_version

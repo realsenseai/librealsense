@@ -58,7 +58,7 @@ from rspy.signals import register_signal_handlers
 from rspy.pytest.logging_setup import (
     setup_test_logging, bridge_rspy_log, ensure_newline, configure_logging,
     open_log, close_log, _compose_log_name, print_terminal_summary,
-    configure_junit_logging,
+    configure_junit_logging, install_rs_log_bridge,
 )
 from rspy.pytest.log_live_format import install as install_live_log_format
 from rspy.pytest.cli import consume_legacy_flags, apply_pending_flags
@@ -144,7 +144,7 @@ def pytest_addoption(parser):
         "--rslog",
         action="store_true",
         default=False,
-        help="Enable LibRS debug logging (rs.log_to_console)."
+        help="Enable LibRS debug logging (routed into the per-test log files)."
     )
     group.addoption(
         "--no-reset",
@@ -279,14 +279,12 @@ def pytest_configure(config):
     # Set up test log directory
     setup_test_logging(config)
 
-    # Enable LibRS debug logging if --rslog (once, globally)
-    # log_to_console writes directly to stderr from C++. Pytest's default fd-level
-    # capture swallows it, so we downgrade to sys-level capture (Python only) which
-    # lets C++ stderr through while still capturing Python stdout/stderr.
+    # Enable LibRS debug logging if --rslog (once, globally). Route the C++ logs through
+    # Python logging so they reach the per-test log files (and console under -s) for every
+    # test and every --repeat/--count pass -- see install_rs_log_bridge for why log_to_console
+    # (fd-level, swallowed by pytest's default capture) only ever showed the first enumeration.
     if rs and config.getoption("--rslog", default=False):
-        rs.log_to_console(rs.log_severity.debug)
-        if config.option.capture == 'fd':
-            config.option.capture = 'sys'
+        install_rs_log_bridge(rs)
 
     # Test discovery defaults (replaces pytest.ini which is .gitignored)
     config.addinivalue_line("python_files", "pytest-*.py")

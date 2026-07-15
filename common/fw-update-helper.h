@@ -11,7 +11,6 @@ namespace rs2
     class viewer_model;
 
     bool is_upgradeable(const std::string& curr, const std::string& available);
-    const char * fw_download_url();
 
     class firmware_update_manager : public process_manager
     {
