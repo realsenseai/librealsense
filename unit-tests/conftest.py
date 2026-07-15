@@ -279,13 +279,6 @@ def pytest_configure(config):
     # Set up test log directory
     setup_test_logging(config)
 
-    # Enable LibRS debug logging if --rslog (once, globally). Route the C++ logs through
-    # Python logging so they reach the per-test log files (and console under -s) for every
-    # test and every --repeat/--count pass -- see install_rs_log_bridge for why log_to_console
-    # (fd-level, swallowed by pytest's default capture) only ever showed the first enumeration.
-    if rs and config.getoption("--rslog", default=False):
-        install_rs_log_bridge(rs)
-
     # Test discovery defaults (replaces pytest.ini which is .gitignored)
     config.addinivalue_line("python_files", "pytest-*.py")
     config.addinivalue_line("python_classes", "Test*")
@@ -376,6 +369,20 @@ def pytest_configure(config):
             devices.map_unknown_ports()
         except Exception as e:
             log.warning(f"Failed to query devices during configuration: {e}")
+
+    # Enable LibRS debug logging if --rslog (once, globally). Route the C++ logs through
+    # Python logging so they reach the per-test log files (and console under -s) for every
+    # test and every --repeat/--count pass -- see install_rs_log_bridge for why log_to_console
+    # (fd-level, swallowed by pytest's default capture) only ever showed the first enumeration.
+    #
+    # Installed AFTER device discovery/hub setup above, not before: rs.context()/query_devices()
+    # during discovery logs heavily from background SDK threads (udev-device-watcher,
+    # backend-v4l2, etc.), and with the bridge active every one of those calls has to acquire
+    # the Python GIL. That combination reproduced as a hard hang during hub/device enumeration
+    # (D585 accel-hang investigation, 2026-07-14/15) -- installing the bridge only once
+    # enumeration is done keeps that high-frequency background-thread logging off the GIL path.
+    if rs and config.getoption("--rslog", default=False):
+        install_rs_log_bridge(rs)
 
 
 def pytest_generate_tests(metafunc):
