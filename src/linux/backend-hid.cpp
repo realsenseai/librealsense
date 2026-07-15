@@ -489,6 +489,7 @@ namespace librealsense
         // start capturing and polling.
         void iio_hid_sensor::start_capture(hid_callback sensor_callback)
         {
+            LOG_DEBUG( "iio_hid_sensor[" << get_sensor_name() << "]::start_capture: called, _is_capturing=" << _is_capturing );
             if (_is_capturing)
                 return;
 
@@ -536,12 +537,14 @@ namespace librealsense
 
             _callback = sensor_callback;
             _is_capturing = true;
+            LOG_DEBUG( "iio_hid_sensor[" << get_sensor_name() << "]::start_capture: spawning capture thread, fd=" << _fd );
             _hid_thread = std::unique_ptr<std::thread>(new std::thread([this](){
                 const uint32_t channel_size = get_channel_size();
                 size_t raw_data_size = channel_size*hid_buf_len;
 
                 std::vector<uint8_t> raw_data(raw_data_size);
                 auto metadata = has_metadata();
+                LOG_DEBUG( "iio_hid_sensor[" << this->get_sensor_name() << "]::capture_thread: entered, channel_size=" << channel_size );
 
                 do {
                     fd_set fds;
@@ -556,6 +559,7 @@ namespace librealsense
                     LOG_DEBUG_HID("HID IIO Select initiated");
                     auto val = select(max_fd + 1, &fds, nullptr, nullptr, &tv);
                     LOG_DEBUG_HID("HID IIO Select done, val = " << val);
+                    LOG_DEBUG( "iio_hid_sensor[" << this->get_sensor_name() << "]::capture_thread: select() returned " << val );
 
                     if (val < 0)
                     {
@@ -587,6 +591,8 @@ namespace librealsense
                         }
 
                         auto sz= read_size / channel_size;
+                        LOG_DEBUG( "iio_hid_sensor[" << this->get_sensor_name() << "]::capture_thread: read_size="
+                                   << read_size << " channel_size=" << channel_size << " sz=" << sz );
                         if (sz > 2)
                         {
                             LOG_DEBUG("HID: Going to handle " <<  sz << " packets");
@@ -638,7 +644,7 @@ namespace librealsense
                     }
                     else
                     {
-                        LOG_WARNING("iio_hid_sensor: Frames didn't arrived within the predefined interval");
+                        LOG_WARNING("iio_hid_sensor[" << this->get_sensor_name() << "]: Frames didn't arrived within the predefined interval");
                         std::this_thread::sleep_for(std::chrono::milliseconds(2));
                     }
                 } while(this->_is_capturing);
