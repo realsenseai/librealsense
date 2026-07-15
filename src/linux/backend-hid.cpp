@@ -11,6 +11,8 @@
 
 #include <thread>
 #include <chrono>
+#include <cerrno>
+#include <cstring>
 #include <ctime>
 #include <dirent.h>
 #include <fcntl.h>
@@ -558,6 +560,7 @@ namespace librealsense
                     LOG_DEBUG_HID("HID IIO Select initiated");
                     auto val = select(max_fd + 1, &fds, nullptr, nullptr, &tv);
                     LOG_DEBUG_HID("HID IIO Select done, val = " << val);
+                    LOG_DEBUG( "iio_hid_sensor[" << this->get_sensor_name() << "]::capture_thread: select() returned " << val );
 
                     if (val < 0)
                     {
@@ -579,7 +582,12 @@ namespace librealsense
                         {
                             read_size = read(_fd, raw_data.data(), raw_data_size);
                             if (read_size < 0 )
+                            {
+                                LOG_DEBUG( "iio_hid_sensor[" << this->get_sensor_name()
+                                           << "]::capture_thread: read() returned " << read_size
+                                           << ", errno=" << errno << " (" << strerror(errno) << ")" );
                                 continue;
+                            }
                         }
                         else
                         {
