@@ -326,8 +326,10 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
         name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
         d555_found = d555_found or "D555" in name
 
-    if hub and not d555_found:
-        # All CI machines with a D555 connected have a hub. Detect camera even in case domain have reset to 0 so applicable tests will run.
+    if not disable_dds and not d555_found:
+        # Detect D555 even if its domain reset to 0 so the recovery test can run.
+        # This must also work without a hub: some DDS-only CI machines rely on
+        # hardware_reset() and would otherwise skip the recovery test entirely.
         ctx = rs.context( { "dds" : { "enabled" : True, "domain" : 0 } } )
         devices = ctx.query_devices(int(rs.product_line.sw_only) | int(rs.product_line.any))
         for dev in devices:
