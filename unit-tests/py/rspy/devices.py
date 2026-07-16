@@ -327,9 +327,7 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
         d555_found = d555_found or "D555" in name
 
     if not disable_dds and not d555_found:
-        # Detect D555 even if its domain reset to 0 so the recovery test can run.
-        # This must also work without a hub: some DDS-only CI machines rely on
-        # hardware_reset() and would otherwise skip the recovery test entirely.
+        # Detect D555 on domain 0 even without a hub so the recovery test can run.
         ctx = rs.context( { "dds" : { "enabled" : True, "domain" : 0 } } )
         devices = ctx.query_devices(int(rs.product_line.sw_only) | int(rs.product_line.any))
         for dev in devices:
