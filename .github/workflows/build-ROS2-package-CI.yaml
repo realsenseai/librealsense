@@ -90,6 +90,23 @@ jobs:
         with:
           required-ros-distributions: ${{ matrix.ros_distribution }}
 
+      - name: mirror ROS buildfarm deb hardening flags
+        # The release binarydebs are built by dpkg-buildpackage, which injects
+        # Ubuntu's default hardening flags (e.g. -Werror=implicit-function-declaration
+        # on noble and later). A plain colcon build doesn't, so farm-only compile
+        # errors slip through CI. Export the same flags so this job fails like
+        # the farm would. LTO flags are dropped — they slow the build without
+        # adding diagnostic coverage.
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update && apt-get install -y --no-install-recommends dpkg-dev
+          strip_lto() { sed -E 's/-f(fat-)?lto[^ ]*//g'; }
+          cppflags="$(dpkg-buildflags --get CPPFLAGS)"
+          echo "CFLAGS=$(dpkg-buildflags --get CFLAGS | strip_lto) ${cppflags}" >> "$GITHUB_ENV"
+          echo "CXXFLAGS=$(dpkg-buildflags --get CXXFLAGS | strip_lto) ${cppflags}" >> "$GITHUB_ENV"
+          echo "LDFLAGS=$(dpkg-buildflags --get LDFLAGS | strip_lto)" >> "$GITHUB_ENV"
+
       - name: build librealsense ROS 2
         uses: ros-tooling/action-ros-ci@3a640b10f09b756dabe556dac5413aba369f71b0 #v0.4.8
         with:
