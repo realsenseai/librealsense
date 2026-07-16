@@ -103,8 +103,23 @@ namespace rs2
             auto supported_options = s->get_supported_option_values();
             for( rs2::option_value option : supported_options )
             {
-                options_metadata[option->id]
-                    = create_option_model( option, opt_base_label, this, s, options_invalidated, error_message );
+                // Build the model first and insert only on success. Some options are
+                // advertised as supported but their metadata/range can't be read on this
+                // platform (e.g. D401 GMSL depth XU controls Inter Cam Sync Mode / Auto
+                // Exposure Mode / Readout Shaping return VIDIOC_QUERY_EXT_CTRL EINVAL).
+                // `options_metadata[id] = create_option_model(...)` would default-insert a
+                // null-endpoint option_model via operator[] and then throw, leaving a broken
+                // entry that later crashes option_model::update_all_fields (null endpoint
+                // deref) - and it aborts the whole loop, dropping every subsequent option.
+                try
+                {
+                    auto option_md = create_option_model( option, opt_base_label, this, s, options_invalidated, error_message );
+                    options_metadata[option->id] = std::move( option_md );
+                }
+                catch( const std::exception & )
+                {
+                    // supported but no readable metadata on this platform; skip it
+                }
             }
 
             s->on_options_changed( [this]( const options_list & list )

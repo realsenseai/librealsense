@@ -93,7 +93,19 @@ namespace librealsense
             auto enable_global_time_option = std::shared_ptr<global_time_option>(new global_time_option());
             platform::uvc_device_info info;
             if (_is_mipi_device)
-                info = color_devs_info[1];
+            {
+                // The color endpoint is the mi==3 UVC interface. Select it explicitly
+                // (as the non-MIPI path does) instead of blindly indexing
+                // group.uvc_devices[1]: on multi-camera / dual-bus (usb+usbv3) GMSL
+                // enumeration [1] may be a non-color node or out of range, which
+                // corrupts the copied uvc_device_info (SIGSEGV / std::bad_alloc).
+                if (!color_devs_info_mi3.empty())
+                    info = color_devs_info_mi3.front();
+                else if (color_devs_info.size() > 1)
+                    info = color_devs_info[1];
+                else
+                    throw invalid_value_exception("RS4XX MIPI: color UVC node (mi=3) not found");
+            }
             else
                 info = color_devs_info.front();
             auto uvcd = get_backend()->create_uvc_device( info );

@@ -200,6 +200,11 @@ void option_model::update_all_fields( std::string & error_message, notifications
 {
     try
     {
+        // Defensive: a valid endpoint is required. A malformed/partially constructed
+        // option_model (null endpoint) would null-deref at get_option_value below.
+        if( ! endpoint )
+            return;
+
         // After slider was dragged value updated using set_option, don't update value again here
         if( last_slider_hold_stopwatch.get_elapsed_ms() < 500 )
             return;
