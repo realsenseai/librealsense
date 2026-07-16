@@ -84,7 +84,7 @@ consume_legacy_flags()
 # pyrealsense2 Import
 # ============================================================================
 # pyrealsense2 is built as part of the CMake build — repo.find_pyrs_dir() locates the .pyd/.so
-pyrs_dir = os.environ.get('PYREALSENSE2_DIR') or repo.find_pyrs_dir()
+pyrs_dir = repo.find_pyrs_dir()
 if pyrs_dir and pyrs_dir not in sys.path:
     sys.path.insert(1, pyrs_dir)
 
@@ -774,8 +774,7 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     no_reset = request.config.getoption("--no-reset", default=False)
     # Decide whether setup power-cycles the device (vs just turning it on):
     #  --no-reset            -> never recycle; isolate statelessly and leave the device on.
-    #  no hub, DDS           -> don't recycle; DDS announces its participant before the device is
-    #                           ready for a new client, causing the next test to miss the device.
+    #  no hub, DDS           -> don't recycle; hardware_reset exposes the participant before ready.
     #  no hub, other devices -> recycle; teardown-disable is a no-op there, so enable_only(recycle=
     #                           True) falls back to hardware_reset() to clear prior state.
     #  hub, port already ON  -> recycle. The device should be OFF here (prev module's teardown
@@ -786,11 +785,9 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     #  hub, port OFF         -> don't recycle; enabling it here IS the power-on (teardown-off +
     #                           setup-on = the cycle). Avoids re-disabling an already-off port.
     serials = serial_number if isinstance(serial_number, list) else [serial_number]
-    has_dds_without_hub = devices.hub is None \
-        and any(getattr(devices.get(sn), 'is_dds', False) for sn in serials)
     if no_reset:
         recycle = False
-    elif has_dds_without_hub:
+    elif devices.hub is None and any(getattr(devices.get(sn), 'is_dds', False) for sn in serials):
         recycle = False
     elif devices.hub is None:
         recycle = True
@@ -807,12 +804,8 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
             log.info(f"Teardown: leaving {serials} enabled (--no-reset)")
             return
         if devices.hub is None:
-            if has_dds_without_hub:
-                log.info(f"Teardown: {serials} left enumerated (no hub DDS device)")
-            else:
-                # No hub to power the port off: disable() is a no-op, so nothing is removed here.
-                # The device is cleared by hardware_reset at the next module's setup recycle.
-                log.info(f"Teardown: {serials} left enumerated (no hub; recycled at next setup)")
+            # No hub to power the port off: disable() is a no-op, so nothing is removed here.
+            log.info(f"Teardown: {serials} left enumerated (no hub)")
             return
         log.info(f"Teardown: disabling {serials} and waiting for removal")
         try:

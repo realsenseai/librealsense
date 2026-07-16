@@ -227,22 +227,19 @@ for pyd in file.find( pyrs_search_dir, linux and r'.*python.*\.so$' or r'(^|/)py
             raise RuntimeError( f'found more than one possible pyrealsense2!\n    previous: {pyrs}\n    and:      {pyd}' )
         pyrs = pyd
     # The path is relative; make it absolute so it can be found by tests
-    pyd_dirs.add( os.path.abspath( os.path.dirname( os.path.join( pyrs_search_dir, pyd ))) )
+    pyd_dirs.add( os.path.dirname( os.path.join( pyrs_search_dir, pyd )))
 pyrs_path = None
 if pyrs:
     # The path is relative; make it absolute and add to PYTHONPATH so it can be found by tests
     pyrs_path = os.path.join( pyrs_search_dir, pyrs )
     # We need to add the directory not the file itself
-    pyrs_path = os.path.abspath( os.path.dirname( pyrs_path ) )
+    pyrs_path = os.path.dirname( pyrs_path )
 elif len(pyd_dirs) == 1:
     # Maybe we found other libraries, like pyrsutils?
     log.d( 'did not find pyrealsense2' )
     pyrs_path = next(iter(pyd_dirs))
 if pyrs_path:
     log.d( 'found python libraries in:', pyd_dirs )
-    # rspy.devices is imported below and otherwise searches the repository for
-    # pyrealsense2 again. Preserve the build explicitly selected by this runner.
-    os.environ['PYREALSENSE2_DIR'] = pyrs_path
     if not exe_dir:
         build_dir = find_build_dir( pyrs_path )
         exe_dir = pyrs_path
@@ -278,13 +275,10 @@ n_failed_tests = 0
 # PYTHONPATH is what Python will ADD to sys.path for child processes BEFORE any standard python paths
 # (We can simply change `sys.path` but any child python scripts won't see it; we change the environment instead)
 #
-python_paths = [os.path.join( current_dir, 'py' )]
-if pyrs_path:
-    python_paths.append( pyrs_path )
-for dir in sorted( pyd_dirs ):
-    if dir != pyrs_path:
-        python_paths.append( dir )
-os.environ["PYTHONPATH"] = os.pathsep.join( python_paths )
+os.environ["PYTHONPATH"] = os.path.join( current_dir, 'py' )
+#
+for dir in pyd_dirs:
+    os.environ["PYTHONPATH"] += os.pathsep + dir
 
 
 def serial_numbers_to_string( sns ):

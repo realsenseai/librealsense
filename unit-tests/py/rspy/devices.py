@@ -32,9 +32,8 @@ except ModuleNotFoundError:
 #
 # And where to look for pyrealsense2
 from rspy import repo
-pyrs_dir = os.environ.get( 'PYREALSENSE2_DIR' ) or repo.find_pyrs_dir()
-if pyrs_dir and pyrs_dir not in sys.path:
-    sys.path.insert( 1, pyrs_dir )
+pyrs_dir = repo.find_pyrs_dir()
+sys.path.insert( 1, pyrs_dir )
 
 MAX_ENUMERATION_TIME = 20  # [sec]
 
@@ -49,8 +48,7 @@ PORTS_DISABLED_TIMEOUT = 10  # [sec]
 from rspy import device_hub
 try:
     import pyrealsense2 as rs
-    log.d( 'pyrealsense2 loaded from:', getattr( rs, '__file__', 'unknown' ) )
-    log.d( 'pyrealsense2 version:', getattr( rs, '__version__', 'unknown' ) )
+    log.d( rs )
 except ModuleNotFoundError:
     log.w( 'No pyrealsense2 library is available! Running as if no cameras available...' )
     import sys
@@ -324,7 +322,7 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
         log.d( f'...{port_str}{sn} {dev}' )
 
         name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
-        d555_found = d555_found or "D555" in name
+        d555_found = "D555" in name
 
     if not disable_dds and not d555_found:
         # Detect D555 on domain 0 even without a hub so the recovery test can run.
@@ -597,9 +595,8 @@ def recovery():
 def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME, disable_other_ports = False ):
     """
     Enable the devices corresponding to the given serial-numbers and wait until they are online.
-    Works with or without a hub: without one non-DDS devices are HW-reset (recycle) and other
-    devices remain present. DDS devices stay enumerated because their participant is announced
-    before the device is ready for a new client after hardware_reset().
+    Works with or without a hub: without one the devices are simply HW-reset (recycle) and other
+    devices remain present.
 
     NOTE: will raise an exception if any SN is unknown!
 
@@ -620,9 +617,6 @@ def enable_only( serial_numbers, recycle = False, timeout = MAX_ENUMERATION_TIME
                     device(s) remain powered (stateless isolation).
     :param timeout: The maximum seconds to wait to make sure the devices are indeed online
     """
-    if recycle and hub is None and any( getattr( get( sn ), 'is_dds', False ) for sn in serial_numbers ):
-        log.d( 'no hub; leaving DDS devices enumerated instead of recycling:', serial_numbers )
-        recycle = False
     if recycle:
         # let the driver/device settle before we disrupt it; helps the MIPI driver in particular
         # recover cleanly when a preceding test left it in a bad state
@@ -965,3 +959,5 @@ if __name__ == '__main__':
         # Disconnect from the hub -- if we don't it might crash on Linux...
         if hub:
             hub.disconnect()
+
+
