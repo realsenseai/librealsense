@@ -55,6 +55,12 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       $<$<COMPILE_LANGUAGE:CXX>:-include cstdint>
       $<$<COMPILE_LANGUAGE:C>:-include stdint.h>
     )
+    # The forced include above locks glibc feature-test macros before zstd.c
+    # gets a chance to define _GNU_SOURCE itself, leaving qsort_r() undeclared.
+    # Define it on the command line so it precedes the forced include.
+    target_compile_definitions(${REALSENSE_FILE_TARGET} PRIVATE
+      $<$<COMPILE_LANGUAGE:C>:_GNU_SOURCE>
+    )
   endif()
 endif()
 
