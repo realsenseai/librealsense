@@ -139,6 +139,7 @@ extern "C" {
         RS2_OPTION_THRESHOLD, /**< Embedded filter: merge threshold in mm (pre-stream only) */
         RS2_OPTION_DOWNSCALE_RATIO, /**< Embedded filter: secondary-frame downscale ratio (pre-stream only) */
         RS2_OPTION_READOUT_SHAPING, /**< IR/depth sensor readout shaping [0-100%]; higher slows readout to avoid dropped frames */
+        RS2_OPTION_ALIGN_DEPTH, /**< Enable/Disable on-device depth-to-color alignment */
         RS2_OPTION_COUNT /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
     } rs2_option;
 
