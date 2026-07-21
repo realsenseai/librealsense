@@ -4,7 +4,7 @@
 import pytest
 from pytest_check import check133
 import pyrealsense2 as rs
-from rspy import repo
+from rspy import repo11
 import os.path
 
 # disabled until LRS-986 ticket is resolved due to stability issues
