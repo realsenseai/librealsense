@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import pytest
-from pytest_check import check
+from pytest_check import check1
 import pyrealsense2 as rs
 from rspy import repo
 import os.path
