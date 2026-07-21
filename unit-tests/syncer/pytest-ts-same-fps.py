@@ -6,7 +6,7 @@ import pytest
 import pyrealsense2 as rs
 import sw_syncer as sw
 
-log = logging.getLogger(__name__)11
+log = logging.getLogger(__name__)
 
 
 # The timestamp jumps are closely correlated to the FPS passed to the video streams:
