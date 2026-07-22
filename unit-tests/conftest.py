@@ -474,6 +474,30 @@ def _reset_pytest_timeout_for_retry(item):
     hooks.pytest_timeout_set_timer(item=item, settings=settings)
 
 
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_teardown(item, nextitem):
+    """Restore the tmp_path stash key that pytest-retry drops between attempts.
+
+    The tmp_path fixture teardown reads request.node.stash[tmppath_result_key] to apply its
+    retention policy. That key is populated ONLY by pytest_runtest_makereport (tmpdir.py). But
+    pytest-retry reruns a test via TestReport.from_item_and_call (bypassing makereport), and its
+    preliminary between-attempts teardown runs the tmp_path finalizer, which deletes the key. A
+    retried test that uses tmp_path then reaches the real protocol teardown with the key gone, and
+    the finalizer raises `KeyError: <StashKey>` -- recorded as a teardown ERROR even though the test
+    passed on retry (Jenkins libci junit: "failed on teardown with KeyError: <StashKey>").
+
+    tryfirst runs this before the fixture finalizers fire. An empty dict is safe: the retention
+    logic reads .get("call", True) (treated as passed, so the tmp dir is eligible for cleanup) then
+    deletes the key. Independent of the pytest-timeout re-arming above."""
+    try:
+        from _pytest.tmpdir import tmppath_result_key
+        if tmppath_result_key not in item.stash:
+            item.stash[tmppath_result_key] = {}
+    except ImportError:
+        pass
+    yield
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_call(item):
     """Reset pytest-timeout between retry attempts + surface pytest-check
