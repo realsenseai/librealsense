@@ -133,7 +133,7 @@ def run_test(dev, ctx, resolution, fps):
                   f"after {FRAMES_TO_CHECK} frames")
 
 
-def test_depth_laser_on(test_device_wrapped, test_context_var):
+def test_depth_fill_rate(test_device_wrapped, test_context_var):
     dev, ctx = test_device_wrapped
 
     all_resolutions = get_available_depth_resolutions(dev)
