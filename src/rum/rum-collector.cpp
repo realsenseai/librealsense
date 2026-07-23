@@ -8,12 +8,13 @@
 
 #include <rsutils/os/atomic-write-file.h>
 #include <rsutils/os/special-folder.h>
-#include <rsutils/os/os.h>  // get_os_name
+#include <rsutils/os/os.h>  // get_os_name, cpu_arch
 #include <rsutils/json.h>
 #include <rsutils/json-config.h>
 
 #include <cstdio>
 #include <random>
+#include <chrono>
 
 
 #ifdef _WIN32
@@ -28,11 +29,13 @@ using json = rsutils::json;
 namespace librealsense {
 namespace rum {
 
+static constexpr int rum_schema_version = 1;
+
 
 namespace {
 
 
-// Rolling report lives at <app-data>/rum/rum.json. Forward slashes work for WinAPI and POSIX.
+// Report file: <app-data>/rum/rum.json. Forward slashes work on Windows and POSIX.
 std::string report_path()
 {
     return rsutils::os::get_special_folder( rsutils::os::special_folder::app_data ) + "rum/rum.json";
@@ -51,11 +54,11 @@ void ensure_report_directory()
 }
 
 
-// Stable, anonymous, opaque id in the canonical UUID 8-4-4-4-12 layout (not a versioned RFC-4122 UUID).
+// Random anonymous id, formatted to look like a UUID.
 std::string generate_source_id()
 {
     std::random_device rd;
-    // Evaluate before formatting — snprintf argument order is unspecified.
+    // Draw the random values first; snprintf may read its arguments in any order.
     unsigned a = rd(), b = rd() & 0xFFFF, c = rd() & 0xFFFF, d = rd() & 0xFFFF, e = rd() & 0xFFFF, f = rd();
     char buf[37];
     std::snprintf( buf, sizeof( buf ), "%08x-%04x-%04x-%04x-%04x%08x", a, b, c, d, e, f );
@@ -63,9 +66,8 @@ std::string generate_source_id()
 }
 
 
-// The id persists inside the report store (rum.json): reuse it across runs, or mint a new one the
-// first time. Kept out of the shared realsense-config.json so the viewer's whole-file config writes
-// can't clobber it.
+// Reuse the id saved in rum.json, or make a new one on first run. Kept out of
+// realsense-config.json so the viewer's config writes can't overwrite it.
 std::string load_or_create_source_id()
 {
     try
@@ -80,8 +82,6 @@ std::string load_or_create_source_id()
     }
     return generate_source_id();
 }
-
-constexpr int rum_schema_version = 2;
 
 char const * build_type()
 {
@@ -105,10 +105,10 @@ constexpr bool cmake_build_with_cuda = true;
 constexpr bool cmake_build_with_cuda = false;
 #endif
 
-#ifdef ENABLED_STATS
-constexpr bool cmake_enabled_stats = true;
+#ifdef ENABLE_STATS
+constexpr bool cmake_enable_stats = true;
 #else
-constexpr bool cmake_enabled_stats = false;
+constexpr bool cmake_enable_stats = false;
 #endif
 
 char const * backend()
@@ -128,26 +128,13 @@ char const * backend()
 #endif
 }
 
-char const * cpu_arch()
-{
-#if defined( _M_X64 ) || defined( __x86_64__ )
-    return "x86_64";
-#elif defined( _M_ARM64 ) || defined( __aarch64__ )
-    return "arm64";
-#elif defined( _M_IX86 ) || defined( __i386__ )
-    return "x86";
-#elif defined( __arm__ )
-    return "arm";
-#else
-    return "unknown";
-#endif
-}
 
 }  // namespace
 
 
 rum_collector::rum_collector()
     : _source_id( load_or_create_source_id() )
+    , _session_id( generate_source_id() )
 {
 }
 
@@ -219,18 +206,21 @@ std::string rum_collector::get_report() const
     json report = json::object();
     report["schema_version"] = rum_schema_version;
     report["source_id"] = _source_id;
+    report["session_id"] = _session_id;
+    report["generated_at"] = std::chrono::duration_cast< std::chrono::seconds >(
+        std::chrono::system_clock::now().time_since_epoch() ).count();
     report["sdk"] = json::object();
     report["sdk"]["version"] = RS2_API_VERSION_STR;
     report["sdk"]["build_type"] = build_type();
     report["sdk"]["backend"] = backend();
     report["sdk"]["cmake_flags"] = {
-        { "ENABLED_STATS", cmake_enabled_stats },
+        { "ENABLE_STATS", cmake_enable_stats },
         { "BUILD_WITH_DDS", cmake_build_with_dds },
         { "BUILD_WITH_CUDA", cmake_build_with_cuda },
     };
     report["system"] = json::object();
     report["system"]["os"] = rsutils::os::get_os_name();
-    report["system"]["arch"] = cpu_arch();
+    report["system"]["arch"] = rsutils::os::cpu_arch();
 
     report["devices"] = json::array();
     for( auto const & entry : _device_counts )

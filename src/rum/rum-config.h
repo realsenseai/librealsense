@@ -12,9 +12,9 @@ namespace librealsense {
 namespace rum {
 
 
-// RUM cloud-upload consent, persisted in the shared realsense-config.json (the same file the
-// viewer's config_file reads/writes). Stored string-encoded so SDK writes and viewer writes
-// interoperate. (The anonymous source_id lives with the report store, not here.)
+// RUM cloud-upload consent, saved in the shared realsense-config.json (the file the viewer's
+// config_file also uses). Stored as a string so SDK and viewer writes agree. (The source_id
+// lives with the report file, not here.)
 class rum_config
 {
 public:
@@ -24,8 +24,7 @@ public:
     // Explicit file path — used by tests to avoid touching the real user config.
     explicit rum_config( std::string filename );
 
-    // Resolved consent: RS2_RUM_CLOUD_ENABLED env var wins, then the config key,
-    // otherwise false (missing decision means no upload).
+    // Resolved consent: env var wins, then the config key, else false (no decision = no upload).
     bool is_cloud_enabled() const;
 
     void set_cloud_enabled( bool enabled );

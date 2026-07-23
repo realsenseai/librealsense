@@ -4,10 +4,12 @@
 
 #include <librealsense2/h/rs_option.h>  // rs2_option
 #include <librealsense2/h/rs_types.h>   // rs2_notification_category
+#include <rsutils/time/stopwatch.h>
 
 #include <memory>
 #include <vector>
 #include <string>
+#include <chrono>
 
 
 namespace librealsense {
@@ -15,18 +17,17 @@ namespace librealsense {
 
 class device_interface;
 class stream_profile_interface;
-class processing_block_interface;
 class options_interface;
 
 
-// Instrumentation facade. Call sites (in the C API / core) invoke these one-liners;
-// all data extraction and aggregation lives here and in the collector, so adding or
-// changing a reported field never reopens the call site. Each is no-op-safe: when
-// ENABLED_STATS is off every hook returns immediately (via RETURN_IF_NO_RUM in the .cpp),
-// so call sites need no guard of their own.
+// Instrumentation facade. Call sites invoke these one-liners; all data extraction lives here
+// and in the collector, so changing a reported field never touches the call site. When
+// ENABLE_STATS is off these become inline no-ops, so call sites need no guard of their own.
 namespace rum {
 namespace hooks {
 
+
+#ifdef ENABLE_STATS
 
 // A device was created — record its type, firmware version, connection and MIPI driver version.
 void on_device( device_interface & dev );
@@ -37,24 +38,56 @@ void on_open( std::vector< std::shared_ptr< stream_profile_interface > > const &
 // A sensor stopped after streaming `seconds` — add that to each active profile's running total.
 void on_stream_duration( std::vector< std::shared_ptr< stream_profile_interface > > const & profiles, double seconds );
 
-// An option was set — recorded only when the value differs from its default AND the
-// target is a device sensor (processing-block options are ignored as internal noise).
+// An option was set — recorded only when the value is non-default and the target is a
+// device sensor (processing-block options are ignored).
 void on_set_option( options_interface & target, rs2_option option, float value, float default_value );
 
-// A processing block actually processed a frame (reported once per block) — recorded only if
-// its name is one of the known SDK post-processing filters (internal blocks: syncer, converters,
-// custom, are ignored). Counts real usage, not mere construction (the viewer builds its whole
-// recommended set regardless of whether the user enables them).
+// A processing block processed a frame (once per block) — real usage, not construction.
+// Restricting to recommended filters is left to the consumer.
 void on_filter( std::string const & name );
 
 // A notification was raised — record it by category.
 void on_notification( rs2_notification_category category );
 
-// A context (an SDK session) is being torn down — persist the collected report to the local
-// store. Called from the context destructor, so it never throws.
+// An SDK session (context) is closing — save the report to the local file. Called from the
+// context destructor, so it never throws.
 void on_context_closed() noexcept;
+
+#else  // ENABLE_STATS — inline no-ops so call sites compile away when stats are disabled
+
+inline void on_device( device_interface & ) {}
+inline void on_open( std::vector< std::shared_ptr< stream_profile_interface > > const & ) {}
+inline void on_stream_duration( std::vector< std::shared_ptr< stream_profile_interface > > const &, double ) {}
+inline void on_set_option( options_interface &, rs2_option, float, float ) {}
+inline void on_filter( std::string const & ) {}
+inline void on_notification( rs2_notification_category ) {}
+inline void on_context_closed() noexcept {}
+
+#endif  // ENABLE_STATS
 
 
 }  // namespace hooks
+
+
+// Times a sensor's streaming intervals and reports each to RUM. A sensor holds one of these
+// instead of a raw stopwatch: restart() when streaming begins, record() when it ends (a no-op
+// unless actually streaming, so re-start/close/teardown never double-count or drop an interval).
+class stream_timer
+{
+public:
+    void restart() { _sw.reset(); }
+
+    void record( bool streaming,
+                 std::vector< std::shared_ptr< stream_profile_interface > > const & active )
+    {
+        if( streaming )
+            hooks::on_stream_duration( active, std::chrono::duration< double >( _sw.get_elapsed() ).count() );
+    }
+
+private:
+    rsutils::time::stopwatch _sw;
+};
+
+
 }  // namespace rum
 }  // namespace librealsense

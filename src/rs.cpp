@@ -840,7 +840,6 @@ void rs2_open(rs2_sensor* sensor, const rs2_stream_profile* profile, rs2_error**
     std::vector<std::shared_ptr<stream_profile_interface>> request;
     request.push_back(std::dynamic_pointer_cast<stream_profile_interface>(profile->profile->shared_from_this()));
     sensor->sensor->open(request);
-    librealsense::rum::hooks::on_open(request);   // record only after a successful open
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, sensor, profile)
 
@@ -856,7 +855,6 @@ void rs2_open_multiple(rs2_sensor* sensor,
         request.push_back(std::dynamic_pointer_cast<stream_profile_interface>(profiles[i]->profile->shared_from_this()));
     }
     sensor->sensor->open(request);
-    librealsense::rum::hooks::on_open(request);   // record only after a successful open
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, sensor, profiles, count)
 

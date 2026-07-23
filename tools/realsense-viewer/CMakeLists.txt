@@ -55,7 +55,6 @@ if(BUILD_GRAPHICAL_EXAMPLES)
 
 )
 
-
 SET(DELAYED
     realsense2d.dll
     realsense2-gld.dll

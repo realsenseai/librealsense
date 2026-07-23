@@ -25,9 +25,7 @@
 #include <rsutils/string/from.h>
 #include <rsutils/json.h>
 
-#ifdef ENABLED_STATS
 #include "rum/rum-hooks.h"
-#endif
 
 #include <array>
 #include <set>
@@ -637,11 +635,14 @@ void log_callback_end( uint32_t fps,
         }
 
         set_active_streams(requests);
+
+        rum::hooks::on_open( requests );
     }
 
     void synthetic_sensor::close()
     {
         std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
+        record_rum_stream_duration();  // closing while still streaming would otherwise drop the interval
         _raw_sensor->close();
 
         std::vector< std::shared_ptr< processing_block > > active_pbs = _formats_converter.get_active_converters();
@@ -662,28 +663,28 @@ void log_callback_end( uint32_t fps,
         set_frames_callback(callback);
         _formats_converter.set_frames_callback( callback );  // TODO duplicate?! Something fishy here!
 
+        record_rum_stream_duration();  // flush any prior interval if start() is called without a stop() between
+
         // Call the processing block on the frame
         _raw_sensor->start(
             make_frame_callback( [&, this]( frame_holder f ) { _formats_converter.convert_frame( f ); } ) );
 
-#ifdef ENABLED_STATS
-        _rum_stream_start = std::chrono::steady_clock::now();
-        _rum_streaming = true;
-#endif
+        _rum_timer.restart();
+    }
+
+
+    void sensor_base::record_rum_stream_duration()
+    {
+        // Call before the sensor actually stops/closes/starts, so is_streaming() still reflects
+        // the interval being closed.
+        _rum_timer.record( is_streaming(), get_active_streams() );
     }
 
     void synthetic_sensor::stop()
     {
         std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
 
-#ifdef ENABLED_STATS
-        if( _rum_streaming )
-        {
-            _rum_streaming = false;
-            auto seconds = std::chrono::duration< double >( std::chrono::steady_clock::now() - _rum_stream_start ).count();
-            rum::hooks::on_stream_duration( get_active_streams(), seconds );
-        }
-#endif
+        record_rum_stream_duration();
 
         _raw_sensor->stop();
     }

@@ -12,10 +12,6 @@
 
 #include "udev-rules.h"
 
-#ifdef ENABLED_STATS
-#include "rum-uploader/rum-uploader.h"
-#endif
-
 #include <opengl3.h>
 
 #include <imgui_internal.h>
@@ -2982,11 +2978,11 @@ namespace rs2
 
                 ImGui::PopStyleColor(2);
 
-#ifdef ENABLED_STATS
+#ifdef ENABLE_STATS
                 ImGui::SameLine();
                 ImGui::PushStyleColor(ImGuiCol_Text, tab != 4 ? light_grey : light_blue);
                 ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, tab != 4 ? light_grey : light_blue);
-                if (ImGui::Button("Privacy", { 110, 30 }))
+                if (ImGui::Button("Usage Statistics", { 160, 30 }))
                 {
                     tab = 4;
                     config_file::instance().set(configurations::viewer::settings_tab, tab);
@@ -3444,24 +3440,16 @@ namespace rs2
 #endif
                 }
 
-#ifdef ENABLED_STATS
+#ifdef ENABLE_STATS
                 if (tab == 4)
                 {
                     ImGui::Text("Real User Monitoring (RUM)");
                     ImGui::Text("Anonymous usage statistics are collected locally. Cloud upload happens only with your consent.");
                     ImGui::Separator();
 
-                    bool cloud_enabled = temp_cfg.get(configurations::privacy::rum_cloud_enabled);
+                    bool cloud_enabled = temp_cfg.get_or_default(configurations::stats::rum_cloud_enabled, false);
                     if (ImGui::Checkbox("Enable anonymous cloud upload", &cloud_enabled))
-                        temp_cfg.set(configurations::privacy::rum_cloud_enabled, cloud_enabled);
-
-                    int cadence_h = temp_cfg.get_or_default(configurations::privacy::rum_upload_cadence_hours, 24);
-                    ImGui::Text("Upload cadence (hours):");
-                    ImGui::SameLine();
-                    ImGui::PushItemWidth(120);
-                    if (ImGui::SliderInt("##rum_cadence_h", &cadence_h, 1, 168))
-                        temp_cfg.set(configurations::privacy::rum_upload_cadence_hours, cadence_h);
-                    ImGui::PopItemWidth();
+                        temp_cfg.set(configurations::stats::rum_cloud_enabled, cloud_enabled);
 
                     ImGui::Separator();
                     if (ImGui::Button("Export RUM data..."))
@@ -3476,42 +3464,28 @@ namespace rs2
                         }
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("Upload now"))
-                    {
-                        if (!rs2::rum::is_cloud_enabled())
-                            LOG_INFO("RUM upload skipped: cloud upload is not enabled");
-                        else if (_rum_uploading.exchange(true))
-                            LOG_INFO("RUM upload already in progress");
-                        else
-                        {
-                            // Upload off the UI thread so a slow/stalled endpoint can't freeze the render
-                            // loop. The _rum_uploading flag above prevents a second click from starting (or
-                            // blocking on) an in-flight upload; the prior thread is already finished here, so
-                            // this join is instant. The thread is also joined in the viewer_model dtor.
-                            if (_rum_upload_thread.joinable())
-                                _rum_upload_thread.join();
-                            _rum_upload_thread = std::thread([this]()
-                            {
-                                try
-                                {
-                                    if (rs2::rum_uploader::upload(rs2::rum::get_report(), rs2::rum_uploader::endpoint()))
-                                    {
-                                        // Manual upload bypasses the cadence window but still resets it.
-                                        auto now = std::chrono::duration_cast<std::chrono::seconds>(
-                                            std::chrono::system_clock::now().time_since_epoch()).count();
-                                        config_file::instance().set(configurations::privacy::rum_last_upload, (long long)now);
-                                        LOG_INFO("RUM report uploaded to " << rs2::rum_uploader::endpoint());
-                                    }
-                                    else
-                                        LOG_ERROR("RUM upload failed");
-                                }
-                                catch (const std::exception& e) { LOG_ERROR("RUM upload error: " << e.what()); }
-                                _rum_uploading = false;
-                            });
-                        }
-                    }
-                    if (ImGui::IsItemHovered())
-                        RsImGui::CustomTooltip("Send the current report now (only if cloud upload is enabled above and applied)");
+                    // TODO: "Upload now" (and rum_uploader::upload_async) is a testing affordance to send
+                    // the live session on demand; boot upload is the product path. Drop it once RUM is fully merged.
+                    // Gate on the saved consent, not the checkbox: upload() reads the persisted value,
+                    // so the button must stay disabled until the choice is applied (OK/Apply).
+                    bool consent_saved = config_file::instance().get_or_default(configurations::stats::rum_cloud_enabled, false);
+                    RsImGui::RsImButton([&]() {
+                        if (ImGui::Button("Upload now"))
+                            // Off the UI thread; the uploader skips if one is already in flight.
+                            // Capture not_model by value so the callback (on the upload thread) stays valid.
+                            _rum_uploader.upload_async(rs2::rum::get_report(),
+                                [not_model = not_model](bool ok) {
+                                    not_model->add_notification({ ok ? "RUM report uploaded" : "RUM upload failed",
+                                        ok ? RS2_LOG_SEVERITY_INFO : RS2_LOG_SEVERITY_ERROR,
+                                        RS2_NOTIFICATION_CATEGORY_UNKNOWN_ERROR });
+                                });
+                    }, !consent_saved);
+                    // AllowWhenDisabled: the button is disabled until consent is applied, but the
+                    // hint explaining why must still show on hover.
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                        RsImGui::CustomTooltip(consent_saved
+                            ? "Send the current report now"
+                            : "Enable cloud upload above and click Apply first");
                 }
 #endif
                 }

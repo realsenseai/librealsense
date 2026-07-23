@@ -1,8 +1,11 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
+import os
 import json
+import pytest
 import pyrealsense2 as rs
+from rspy import config_file
 
 
 def test_rum_submodule_is_exposed():
@@ -10,18 +13,37 @@ def test_rum_submodule_is_exposed():
 
 
 def test_cloud_consent_round_trips():
-    rs.rum.set_cloud_enabled( True )
-    assert rs.rum.is_cloud_enabled()
-    rs.rum.set_cloud_enabled( False )
-    assert not rs.rum.is_cloud_enabled()
+    if os.environ.get( "RS2_RUM_CLOUD_ENABLED" ):
+        pytest.skip( "RS2_RUM_CLOUD_ENABLED is set; env overrides the config value" )
+    # Restore prior consent if the key existed, else drop the key the test added.
+    key = "rum_cloud_enabled"
+    existed = key in config_file.get_config_file()
+    saved = rs.rum.is_cloud_enabled()
+    try:
+        rs.rum.set_cloud_enabled( True )
+        assert rs.rum.is_cloud_enabled()
+        rs.rum.set_cloud_enabled( False )
+        assert not rs.rum.is_cloud_enabled()
+    finally:
+        if existed:
+            rs.rum.set_cloud_enabled( saved )
+        else:
+            cfg = config_file.get_config_file()
+            cfg.pop( key, None )
+            with open( config_file.get_config_path(), "w", encoding="utf-8" ) as f:
+                json.dump( cfg, f )
 
 
 def test_report_is_valid_json_with_expected_fields():
     report = json.loads( rs.rum.get_report() )
-    assert report.get( "schema_version" ) == 2
+    assert report.get( "schema_version" ) == 1
     source_id = report.get( "source_id", "" )
     assert isinstance( source_id, str )
     assert len( source_id ) == 36
+    session_id = report.get( "session_id", "" )
+    assert isinstance( session_id, str )
+    assert len( session_id ) == 36
+    assert isinstance( report.get( "generated_at" ), int )
     assert report.get( "sdk", {} ).get( "version" )
     assert isinstance( report.get( "sdk", {} ).get( "cmake_flags" ), dict )
     assert report.get( "sdk", {} ).get( "backend" )

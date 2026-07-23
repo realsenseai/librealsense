@@ -23,17 +23,6 @@ namespace rum {
 namespace {
 
 
-char const * const cloud_enabled_env = "RS2_RUM_CLOUD_ENABLED";
-
-
-// Environment variable value, or empty if unset/blank.
-std::string env_value( char const * name )
-{
-    char const * v = std::getenv( name );
-    return ( v && *v ) ? std::string( v ) : std::string();
-}
-
-
 std::string default_config_path()
 {
     return rsutils::os::get_special_folder( rsutils::os::special_folder::app_data ) + RS2_CONFIG_FILENAME;
@@ -85,12 +74,23 @@ bool rum_config::save_config( json const & j )
 
 bool rum_config::is_cloud_enabled() const
 {
-    auto env = env_value( cloud_enabled_env );
-    if( ! env.empty() )
-        return parse_bool( env );
-    std::lock_guard< std::mutex > lk( _mutex );
-    auto s = load_config().nested( "rum_cloud_enabled", &json::is_string ).string_ref_or_empty();
-    return ! s.empty() && parse_bool( s );
+    std::string config_str;
+    {
+        std::lock_guard< std::mutex > lk( _mutex );
+        config_str = load_config().nested( "rum_cloud_enabled", &json::is_string ).string_ref_or_empty();
+    }
+    bool const config_consent = ! config_str.empty() && parse_bool( config_str );
+
+    // Env override: =0 always disables (kill switch); =1 enables only if the user hasn't opted out.
+    // The env var can never turn upload on against a saved opt-out.
+    auto env = std::getenv( "RS2_RUM_CLOUD_ENABLED" );
+    if( env && *env )
+    {
+        if( ! parse_bool( env ) )
+            return false;
+        return config_str.empty() || config_consent;
+    }
+    return config_consent;
 }
 
 
@@ -98,8 +98,8 @@ void rum_config::set_cloud_enabled( bool enabled )
 {
     std::lock_guard< std::mutex > lk( _mutex );
     auto j = load_config();
-    // Store as a string ("1"/"0") to match the viewer's config_file, whose contains()
-    // only recognizes string values; a native bool would make the first-run popup re-prompt.
+    // Store as "1"/"0" (string) to match the viewer's config_file; a native bool would
+    // make the first-run popup re-prompt.
     j["rum_cloud_enabled"] = enabled ? "1" : "0";
     if( ! save_config( j ) )
         LOG_WARNING( "RUM: failed to persist rum_cloud_enabled to " << _filename );

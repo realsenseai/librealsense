@@ -108,7 +108,7 @@ namespace librealsense {
 
     context::~context()
     {
-        rum::hooks::on_context_closed();   // persist the RUM report for this session (local file write)
+        rum::hooks::on_context_closed();   // save this session's RUM report to disk
     }
 
 

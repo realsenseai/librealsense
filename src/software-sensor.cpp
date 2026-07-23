@@ -8,6 +8,7 @@
 #include "core/video-frame.h"
 #include "core/notification.h"
 #include "depth-sensor.h"
+#include "rum/rum-hooks.h"
 #include <src/metadata-parser.h>
 
 #include <rsutils/string/from.h>
@@ -79,6 +80,7 @@ software_sensor::software_sensor( std::string const & name, software_device * ow
 
 software_sensor::~software_sensor()
 {
+    try { record_rum_stream_duration(); } catch( ... ) {}  // flush in-flight interval on teardown/disconnect
 }
 
 
@@ -199,6 +201,7 @@ void software_sensor::open( const stream_profiles & requests )
         throw wrong_api_call_sequence_exception( "open(...) failed. Software device is already opened!" );
     _is_opened = true;
     set_active_streams( requests );
+    rum::hooks::on_open( requests );
 }
 
 
@@ -224,6 +227,7 @@ void software_sensor::start( frame_callback_ptr callback )
     _source.set_sensor( this->shared_from_this() );
     _source.set_callback( callback );
     _is_streaming = true;
+    _rum_timer.restart();
     raise_on_before_streaming_changes( true );
 }
 
@@ -233,6 +237,7 @@ void software_sensor::stop()
     if( ! _is_streaming )
         throw wrong_api_call_sequence_exception( "stop_streaming() failed. Software device is not streaming!" );
 
+    record_rum_stream_duration();  // while is_streaming() still true
     _is_streaming = false;
     raise_on_before_streaming_changes( false );
     _source.flush();

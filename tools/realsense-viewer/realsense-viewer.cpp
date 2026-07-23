@@ -25,10 +25,9 @@
 
 #include <imgui_internal.h>
 
-#ifdef ENABLED_STATS
+#ifdef ENABLE_STATS
 #include "rum-uploader/rum-uploader.h"
-#include <rsutils/easylogging/easyloggingpp.h>
-#include <chrono>
+#include <curl/curl.h>
 #endif
 
 using namespace rs2;
@@ -301,6 +300,12 @@ int run_viewer( int argc, const char ** argv,
                 std::function< bool() >                                                  keep_alive,
                 std::function< void() >                                                  on_teardown )
 {
+#ifdef ENABLE_STATS
+    // Initialize libcurl once, before any thread uses it (the sw-update check and the RUM upload
+    // worker), so their first curl_easy_init() calls are thread-safe.
+    curl_global_init( CURL_GLOBAL_DEFAULT );
+#endif
+
     rs2::cli cmd( "realsense-viewer" );
     auto settings = cmd.process( argc, argv );
 
@@ -395,31 +400,33 @@ int run_viewer( int argc, const char ** argv,
     if( on_setup )
         on_setup( *device_models, viewer_model );
 
+#ifdef ENABLE_STATS
+    // Its destructor joins the boot-upload worker on any exit from run_viewer (normal return or an
+    // exception out of the render loop), so the thread is never left running after shutdown.
+    rs2::rum_uploader rum_boot;
+#endif
+
     // Closing the window
     while (window)
     {
         refresh_devices(m, ctx, devices_connection_changes, connected_devs,
             device_names, *device_models, viewer_model, error_message);
 
-#ifdef ENABLED_STATS
+#ifdef ENABLE_STATS
         // First-run RUM consent: shown once when no decision exists in the config
         // (three-state: missing -> ask, true/false -> silent). Choice persists immediately.
         {
             static bool rum_startup_done = false;
             if (!rum_startup_done)
             {
-                rum_startup_done = true;
-                if (!config_file::instance().contains(configurations::privacy::rum_cloud_enabled))
+                if (!config_file::instance().contains(configurations::stats::rum_cloud_enabled))
+                    // First run: ask for consent. No boot upload starts this session by design —
+                    // nothing has been saved yet, so the first upload happens on the next launch.
                     ImGui::OpenPopup("Help improve RealSense");
                 else
-                {
-                    // Background-upload the previous session's saved report (cadence-gated, off the UI thread).
-                    auto& cfg = config_file::instance();
-                    rs2::rum_uploader::start_saved_upload(
-                        cfg.get_or_default(configurations::privacy::rum_upload_cadence_hours, 24),
-                        cfg.get_or_default(configurations::privacy::rum_last_upload, 0ll),
-                        []( long long t ){ config_file::instance().set(configurations::privacy::rum_last_upload, t); } );
-                }
+                    // Background-upload the previous session's saved report (off the UI thread).
+                    rum_boot.start();
+                rum_startup_done = true;
             }
 
             ImGui::SetNextWindowSize({ 460.f, 0.f });
@@ -435,19 +442,21 @@ int run_viewer( int argc, const char ** argv,
                                    "and errors) to help us prioritize fixes and features.");
                 ImGui::Spacing();
                 ImGui::TextWrapped("No personal data, serial numbers, or image content is ever collected. "
-                                   "You can change this any time in Settings > Privacy.");
+                                   "You can change this any time in Settings > Usage Statistics.");
                 ImGui::Spacing();
                 ImGui::Separator();
                 ImGui::Spacing();
                 if (ImGui::Button("Yes, enable", ImVec2(150, 30)))
                 {
-                    config_file::instance().set(configurations::privacy::rum_cloud_enabled, true);
+                    config_file::instance().set(configurations::stats::rum_cloud_enabled, true);
+                    // Upload any saved report now (e.g. re-consent after a config reset); no-op on a true first run.
+                    rum_boot.start();
                     ImGui::CloseCurrentPopup();
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("No thanks", ImVec2(150, 30)))
                 {
-                    config_file::instance().set(configurations::privacy::rum_cloud_enabled, false);
+                    config_file::instance().set(configurations::stats::rum_cloud_enabled, false);
                     ImGui::CloseCurrentPopup();
                 }
                 ImGui::EndPopup();
@@ -736,14 +745,12 @@ int run_viewer( int argc, const char ** argv,
                 sub->stop(viewer_model.not_model);
         }
 
-#ifdef ENABLED_STATS
+#ifdef ENABLE_STATS
     // stop() runs asynchronously and is where streamed-duration is recorded, so join any pending
     // stop here; the session is persisted automatically when the SDK context is destroyed.
     for (auto&& device_model : *device_models)
         for (auto&& sub : device_model->subdevices)
             try { sub->wait_for_stop(); } catch (...) {}
-    // Join the boot-upload worker before teardown so it can't touch singletons during static destruction.
-    rs2::rum_uploader::join_saved_upload();
 #endif
 
     return EXIT_SUCCESS;

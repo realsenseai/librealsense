@@ -11,16 +11,9 @@
 #include "core/enum-helpers.h"               // get_string( rs2_stream / rs2_format / rs2_option / rs2_notification_category )
 
 #include <string>
-#include <set>
 
 
-// The single place ENABLED_STATS is checked. Each hook leads with RETURN_IF_NO_RUM, so when stats
-// are compiled out the collector is never touched (no file I/O) and call sites need no guard.
-#ifdef ENABLED_STATS
-#define RETURN_IF_NO_RUM ( (void)0 )
-#else
-#define RETURN_IF_NO_RUM return
-#endif
+#ifdef ENABLE_STATS
 
 
 namespace librealsense {
@@ -30,7 +23,6 @@ namespace hooks {
 
 void on_device( device_interface & dev )
 {
-    RETURN_IF_NO_RUM;
     auto info = [&]( rs2_camera_info i ) -> std::string {
         return dev.supports_info( i ) ? dev.get_info( i ) : std::string();
     };
@@ -60,7 +52,6 @@ void stream_key_of( std::shared_ptr< stream_profile_interface > const & p,
 
 void on_open( std::vector< std::shared_ptr< stream_profile_interface > > const & profiles )
 {
-    RETURN_IF_NO_RUM;
     for( auto const & p : profiles )
     {
         if( ! p )
@@ -75,7 +66,6 @@ void on_open( std::vector< std::shared_ptr< stream_profile_interface > > const &
 
 void on_stream_duration( std::vector< std::shared_ptr< stream_profile_interface > > const & profiles, double seconds )
 {
-    RETURN_IF_NO_RUM;
     for( auto const & p : profiles )
     {
         if( ! p )
@@ -90,56 +80,32 @@ void on_stream_duration( std::vector< std::shared_ptr< stream_profile_interface 
 
 void on_set_option( options_interface & target, rs2_option option, float value, float default_value )
 {
-    RETURN_IF_NO_RUM;
     if( value == default_value )
         return;
-    // Only record options set on an actual device sensor; processing-block options
-    // (set internally by apps like the viewer) are not user device-tuning.
+    // Only record options set on a device sensor; processing-block options are set
+    // internally, not user tuning.
     if( dynamic_cast< sensor_interface * >( &target ) == nullptr )
         return;
     rum_collector::instance().record_option_change( get_string( option ), value );
 }
 
 
-// The known SDK post-processing filters. Everything else that passes through the
-// processing_block base ctor (syncer, format converters, custom callback blocks,
-// alignment, etc.) is internal plumbing and intentionally not recorded.
-static bool is_tracked_filter( std::string const & name )
-{
-    static const std::set< std::string > filters = {
-        "Decimation Filter",
-        "Spatial Filter",
-        "Temporal Filter",
-        "Hole Filling Filter",
-        "Threshold Filter",
-        "Disparity to Depth",
-        "Depth to Disparity",
-        "HDR Merge",
-        "Rotation Filter",
-        "Filter By Sequence id",
-    };
-    return filters.count( name ) != 0;
-}
-
-
 void on_filter( std::string const & name )
 {
-    RETURN_IF_NO_RUM;
-    if( is_tracked_filter( name ) )
-        rum_collector::instance().record_filter( name );
+    // Record any processing block that processes a frame; narrowing to recommended filters
+    // is left to the consumer.
+    rum_collector::instance().record_filter( name );
 }
 
 
 void on_notification( rs2_notification_category category )
 {
-    RETURN_IF_NO_RUM;
     rum_collector::instance().record_notification( get_string( category ) );
 }
 
 
 void on_context_closed() noexcept
 {
-    RETURN_IF_NO_RUM;
     try
     {
         rum_collector::instance().flush();
@@ -153,3 +119,5 @@ void on_context_closed() noexcept
 }  // namespace hooks
 }  // namespace rum
 }  // namespace librealsense
+
+#endif  // ENABLE_STATS

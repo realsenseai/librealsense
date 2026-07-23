@@ -8,15 +8,15 @@ import pyrealsense2 as rs
 
 def _stats_enabled():
     flags = json.loads( rs.rum.get_report() ).get( "sdk", {} ).get( "cmake_flags", {} )
-    return bool( flags.get( "ENABLED_STATS", False ) )
+    return bool( flags.get( "ENABLE_STATS", False ) )
 
 
 # The collector is fed only by the instrumentation hooks, which compile to no-ops when
-# ENABLED_STATS is off (the build default). Without them the report stays empty, so these
+# ENABLE_STATS is off (the build default). Without them the report stays empty, so these
 # live-device checks only make sense on a stats-enabled build.
 pytestmark = [
-    pytest.mark.device( "D400*" ),
-    pytest.mark.skipif( not _stats_enabled(), reason="SDK built with ENABLED_STATS=OFF" ),
+    pytest.mark.device_each( "D400*" ),
+    pytest.mark.skipif( not _stats_enabled(), reason="SDK built with ENABLE_STATS=OFF" ),
 ]
 
 

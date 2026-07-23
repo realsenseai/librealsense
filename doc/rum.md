@@ -24,17 +24,22 @@ A small JSON report (a few KB), aggregated — counts and configurations, never 
 - No image, depth, or point-cloud content.
 
 The `source_id` is a random token generated once per installation to deduplicate reports on
-the server. It is not tied to the user or the hardware.
+the server. It is not tied to the user or the hardware. Each report also carries a per-run
+`session_id` and a `generated_at` timestamp so the server can dedup a session that is uploaded
+more than once (e.g. a manual upload followed by the next-boot upload).
 
 ## Consent and control
 
 - **Opt-in**: nothing is uploaded until you agree. The viewer shows a one-time consent prompt
-  on first run; you can change the choice any time in **Settings → Privacy**.
-- **Disable upload at runtime**: turn it off in Settings → Privacy, or set the environment
-  variable `RS2_RUM_CLOUD_ENABLED=0` (this overrides the saved setting).
-- **Collection is off by default at build time**: build the SDK with `-DENABLED_STATS=ON` to enable
-  it. When off, the `rs2_rum_*` API stays available (ABI-stable) but is a no-op — nothing is
-  collected, persisted, or uploaded.
+  on first run; you can change the choice any time in **Settings → Usage Statistics**.
+- **Disable upload at runtime**: turn it off in Settings → Usage Statistics, or via the environment
+  variable `RS2_RUM_CLOUD_ENABLED`. The override is asymmetric: `=0` always disables (a kill switch),
+  while `=1` only enables when you have not explicitly opted out — the env var can never turn upload
+  on against a saved opt-out.
+- **Collection is off by default at build time**: build the SDK with `-DENABLE_STATS=ON` to enable
+  it. The `rs2_rum_*` API is always available and functional; `ENABLE_STATS` gates only
+  the instrumentation hooks that feed the collector, so when off the report's collected lists stay
+  empty but the API itself behaves identically.
 
 ## Where the data lives
 
@@ -44,7 +49,11 @@ shared `realsense-config.json`.
 
 ## Uploading
 
-In Phase 1, the viewer performs the upload (the SDK itself never opens a network socket).
+The viewer performs the upload (the SDK itself never opens a network socket).
 If you have consented, the viewer uploads the previously saved report in the background at
-startup, throttled to the configured cadence (default once per 24 h). You can also trigger
-an immediate upload from **Settings → Privacy → "Upload now"**.
+startup (the server deduplicates repeats via each report's `session_id`). You can also trigger
+an immediate upload from **Settings → Usage Statistics → "Upload now"**.
+
+The production ingest endpoint is not live yet, so uploads currently target a local dev-server
+stub (`tools/rum-uploader/dev-server/rum_dev_server.py`) — see its header for how to run and
+point the viewer at it.

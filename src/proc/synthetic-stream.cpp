@@ -17,9 +17,7 @@
 
 #include <rsutils/string/from.h>
 
-#ifdef ENABLED_STATS
 #include "rum/rum-hooks.h"
-#endif
 
 
 namespace librealsense
@@ -45,10 +43,6 @@ namespace librealsense
 
     void processing_block::invoke(frame_holder f)
     {
-#ifdef ENABLED_STATS
-        if( ! _rum_applied.exchange( true ) )  // first frame through -> filter was actually applied/used
-            rum::hooks::on_filter( get_info( RS2_CAMERA_INFO_NAME ) );
-#endif
         frame_source::archive_id id
             = { f->get_stream()->get_stream_type(), f->get_stream()->get_stream_index(), RS2_EXTENSION_VIDEO_FRAME };
         auto callback = _source.begin_callback( id );
@@ -91,6 +85,8 @@ namespace librealsense
             {
                 if (should_process(f))
                 {
+                    if( ! _rum_applied.exchange( true ) )  // first processed frame -> filter actually used
+                        rum::hooks::on_filter( get_info( RS2_CAMERA_INFO_NAME ) );
                     auto res = process_frame(source, f);
                     if (!res) continue;
                     if (auto composite = res.as<rs2::frameset>())

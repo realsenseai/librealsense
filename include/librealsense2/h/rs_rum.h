@@ -7,8 +7,12 @@
 *
 * RUM collects anonymous, aggregated SDK usage statistics locally. Data only leaves
 * the machine when the user explicitly opts in to cloud upload. These entry points are
-* always present; when the SDK is built with ENABLED_STATS=OFF (default is ON) they
-* become inert (report/queries return empty, mutating calls are no-ops).
+* always compiled and functional: rs2_rum_get_report returns the report (SDK/system
+* metadata plus whatever has been collected) and the consent get/set always read and
+* write the per-user config file. The ENABLE_STATS build option (default OFF) gates only
+* the instrumentation hooks that feed the collector; when it is off the report's
+* collected lists (devices, streams, filters, options, notifications) stay empty, but
+* the API itself behaves identically.
 */
 
 
@@ -24,7 +28,7 @@ extern "C" {
 /**
 * Retrieve the live RUM report for the current session as a JSON buffer, reflecting everything
 * collected so far in this process. The SDK also persists the report to the app-data folder when a
-* context is destroyed (for later upload), but this call reads the in-memory aggregate, not the file.
+* context is destroyed (for later upload), but this call reads the in-memory report, not the file.
 * No upload is performed.
 * \param[out] error  If non-null, receives any error that occurs during this call, otherwise, errors are ignored
 * \return  A raw-data buffer holding the UTF-8 JSON report; release with rs2_delete_raw_data

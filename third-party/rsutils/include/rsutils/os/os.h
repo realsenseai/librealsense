@@ -11,5 +11,8 @@ namespace rsutils
         std::string get_os_name();
         std::string get_platform_name();
 
+        // CPU architecture the binary was built for: "x86_64", "arm64", "x86", "arm", or "unknown".
+        std::string cpu_arch();
+
     }
 }

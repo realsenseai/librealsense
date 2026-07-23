@@ -24,6 +24,21 @@ namespace rsutils
             #endif
         }
 
+        std::string cpu_arch()
+        {
+            #if defined( _M_X64 ) || defined( __x86_64__ )
+            return "x86_64";
+            #elif defined( _M_ARM64 ) || defined( __aarch64__ )
+            return "arm64";
+            #elif defined( _M_IX86 ) || defined( __i386__ )
+            return "x86";
+            #elif defined( __arm__ )
+            return "arm";
+            #else
+            return "unknown";
+            #endif
+        }
+
         std::string get_platform_name()
         {
             #ifdef _WIN64

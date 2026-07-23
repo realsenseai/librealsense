@@ -13,46 +13,45 @@ namespace librealsense {
 namespace rum {
 
 
-// Process-wide aggregator for RUM data: SDK metadata plus the per-session arrays
-// (devices, streams, options-changed, filters, notifications) filled by the instrumentation
-// hooks. Builds the JSON report on demand. Thread-safe.
+// Process-wide collector of RUM data: SDK metadata plus per-session tallies
+// (devices, streams, options, filters, notifications) filled by the hooks.
+// Builds the JSON report on demand. Thread-safe.
 class rum_collector
 {
 public:
     static rum_collector & instance();
 
-    // Record a device that was created, aggregated (deduplicated + counted) by
-    // (type, firmware version, connection). Safe to call repeatedly.
+    // Record a created device, counted by (type, fw version, connection, mipi driver).
+    // Safe to call repeatedly.
     void record_device( std::string const & type,
                         std::string const & fw_version,
                         std::string const & connection,
                         std::string const & mipi_driver_version );
 
-    // Record a stream configuration that was opened, aggregated by
-    // (stream type, format, resolution, fps). Safe to call repeatedly.
+    // Record an opened stream config, counted by (type, format, resolution, fps).
+    // Safe to call repeatedly.
     void record_stream( std::string const & stream_type,
                         std::string const & format,
                         std::string const & resolution,
                         int fps );
 
-    // Add streamed seconds (sensor start->stop) to a stream configuration's running total.
+    // Add streamed seconds (start->stop) to a stream config's running total.
     void record_stream_duration( std::string const & stream_type,
                                  std::string const & format,
                                  std::string const & resolution,
                                  int fps,
                                  double seconds );
 
-    // Record an option set to a value that differs from its default. Aggregates
-    // set-count and most-recent value per option name.
+    // Record an option set to a non-default value; tallies set-count and last value per option.
     void record_option_change( std::string const & option, float value );
 
-    // Record that a filter actually processed a frame (first time per block), tallied per name.
+    // Record that a filter processed a frame (first time per block), tallied per name.
     void record_filter( std::string const & name );
 
     // Record a raised notification, tallied per category.
     void record_notification( std::string const & category );
 
-    // Persist the current aggregate to the local store (atomic). Opens no network socket.
+    // Write the current report to the local file. No network.
     void flush();
 
     // The live in-memory report as JSON. This is what rs2_rum_get_report returns.
@@ -81,7 +80,8 @@ private:
     };
 
     mutable std::mutex _mutex;
-    std::string const _source_id;  // read from the store (rum.json) or minted at construction; stable across runs
+    std::string const _source_id;   // loaded from rum.json or created at construction; stable across runs
+    std::string const _session_id;  // new per run; lets the server dedup a session uploaded twice
     // Deduplicated device tallies -> count.
     std::map< device_key, int > _device_counts;
     // Deduplicated stream tallies -> (open count, total streamed seconds).

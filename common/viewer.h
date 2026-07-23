@@ -14,6 +14,9 @@
 #include "measurement.h"
 #include "updates-model.h"
 #include "bag-conversion-helper.h"
+#ifdef ENABLE_STATS
+#include "rum-uploader/rum-uploader.h"
+#endif
 #include <librealsense2/hpp/rs_export.hpp>
 
 namespace rs2
@@ -77,10 +80,6 @@ namespace rs2
 
         ~viewer_model()
         {
-            // Join any in-flight manual RUM upload before teardown so its worker can't touch
-            // config/SDK singletons during static destruction.
-            if( _rum_upload_thread.joinable() )
-                _rum_upload_thread.join();
             // Stopping post processing filter rendering thread
             ppf.stop();
             streams.clear();
@@ -161,8 +160,9 @@ namespace rs2
         post_processing_filters ppf;
 
         context &ctx;
-        std::thread _rum_upload_thread;          // background worker for the "Upload now" button; joined in the dtor
-        std::atomic<bool> _rum_uploading{false}; // guards against overlapping/ blocking manual uploads
+#ifdef ENABLE_STATS
+        rs2::rum_uploader _rum_uploader;  // owns the "Upload now" worker; joins itself in its dtor
+#endif
         std::shared_ptr<notifications_model> not_model = std::make_shared<notifications_model>();
         bool is_3d_view = false;
         bool paused = false;

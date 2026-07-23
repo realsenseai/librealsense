@@ -7,6 +7,7 @@
 #include "source.h"
 #include "core/extension.h"
 #include "proc/formats-converter.h"
+#include "rum/rum-hooks.h"  // rum::stream_timer
 #include <src/synthetic-options-watcher.h>
 #include <src/platform/stream-profile.h>
 #include <src/platform/frame-object.h>
@@ -14,6 +15,7 @@
 #include <rsutils/lazy.h>
 #include <rsutils/signal.h>
 #include <rsutils/deferred.h>
+#include <rsutils/time/stopwatch.h>
 
 #include <chrono>
 #include <memory>
@@ -131,6 +133,9 @@ namespace librealsense
         format_conversion get_format_conversion() const;
 
         void sort_profiles( stream_profiles & );
+
+        void record_rum_stream_duration();  // hand any in-flight streamed interval to RUM; no-op when not streaming
+        rum::stream_timer _rum_timer;       // owns the streamed-duration stopwatch + reporting
 
         std::shared_ptr< frame > generate_frame_from_data( const platform::frame_object & fo,
                                                            rs2_time_t system_time,
@@ -273,11 +278,6 @@ namespace librealsense
         void unregister_processing_block_options(const processing_block& pb);
 
         std::mutex _synthetic_configure_lock;
-
-#ifdef ENABLED_STATS
-        std::chrono::steady_clock::time_point _rum_stream_start;  // RUM: streamed-duration timing
-        bool _rum_streaming = false;
-#endif
 
         rs2_frame_callback_sptr _post_process_callback;
         std::shared_ptr<raw_sensor_base> _raw_sensor;

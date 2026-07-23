@@ -14,8 +14,8 @@ namespace rs2
 {
     namespace rum
     {
-        // The live RUM report for the current session as a JSON string (the in-memory aggregate,
-        // not the on-disk store).
+        // The live RUM report for the current session as a JSON string (the in-memory report,
+        // not the on-disk copy).
         inline std::string get_report()
         {
             rs2_error* e = nullptr;
