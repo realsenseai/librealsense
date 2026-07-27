@@ -43,10 +43,11 @@ namespace librealsense
         auto emitter_always_on_opt = std::make_shared<emitter_always_on_option>( _hw_monitor, emitter_get_opcode, emitter_set_opcode );
         get_depth_sensor().register_option( RS2_OPTION_EMITTER_ALWAYS_ON, emitter_always_on_opt );
 
-        if ((get_pid() == D555_PID) && (_fw_version >= firmware_version("7.58.40743.12685")))
+        // Emitter on/off over USB: D555 + D585 3C
+        bool emitter_on_off_sku = (get_pid() == D555_PID) || (get_pid() == D585_3C_PID) || (get_pid() == D585_3C_PROTO_PID);
+        if (emitter_on_off_sku && (_fw_version >= firmware_version("7.58.40743.12685")))
         {
-            // SW_NOT_READY is D500's -21, same slot as D400's NO_DATA_TO_RETURN
-            auto alternating_emitter_opt = std::make_shared<alternating_emitter_option>(*_hw_monitor, true, ds::d500_hwmon_response::opcodes::SW_NOT_READY);
+            auto alternating_emitter_opt = std::make_shared<alternating_emitter_option>(*_hw_monitor, true);
 
             std::vector<std::pair<std::shared_ptr<option>, std::string>> options_and_reasons = { std::make_pair(emitter_always_on_opt,
                     "Emitter ON/OFF cannot be set while Emitter always ON is enabled") };
