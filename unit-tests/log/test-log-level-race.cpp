@@ -35,7 +35,7 @@ TEST_CASE( "changing log level while logging from another thread", "[log]" )
                 rs2::log( RS2_LOG_SEVERITY_DEBUG, "callback finished" );
         } );
 
-    std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
+    std::this_thread::sleep_for( std::chrono::milliseconds( 300 ) );
     stop = true;
 
     level_changer.join();

@@ -55,22 +55,20 @@
 // The logger's lock must be held while checking enabled() and while the message is being built: rs2::log_to_console()
 // et al. reconfigure the logger (replacing its TypedConfigurations) under that same lock, from any thread, at any
 // time -- an unlocked enabled() check can dereference a TypedConfigurations being deleted concurrently and segfault.
+// The lock is scoped (RAII), not manually released, so it can't leak if building/streaming the message throws; ELPP's
+// own Writer acquires the same (recursive) lock again internally, safely nesting within ours.
 #define LIBRS_LOG_STR_( LEVEL, STR )                                                                                   \
     do                                                                                                                 \
     {                                                                                                                  \
         auto logger__ = el::Loggers::getLogger( rsutils::g_librealsense_elpp_id );                                     \
         if( logger__ )                                                                                                 \
         {                                                                                                              \
-            logger__->acquireLock();                                                                                   \
+            el::base::threading::ScopedLock lock__( logger__->lock() );                                                \
             if( logger__->enabled( el::Level::LEVEL ) )                                                                \
             {                                                                                                          \
                 el::base::Writer( el::Level::LEVEL, __FILE__, __LINE__, ELPP_FUNC, el::base::DispatchAction::NormalLog )\
-                        .construct( logger__, false )                                                                  \
+                        .construct( logger__ )                                                                         \
                     << STR;                                                                                            \
-            }                                                                                                          \
-            else                                                                                                       \
-            {                                                                                                          \
-                logger__->releaseLock();                                                                               \
             }                                                                                                          \
         }                                                                                                              \
     }                                                                                                                  \
@@ -83,18 +81,14 @@
         auto logger__ = el::Loggers::getLogger( rsutils::g_librealsense_elpp_id );                                     \
         if( logger__ )                                                                                                 \
         {                                                                                                              \
-            logger__->acquireLock();                                                                                   \
+            el::base::threading::ScopedLock lock__( logger__->lock() );                                                \
             if( logger__->typedConfigurations() && logger__->enabled( el::Level::LEVEL ) )                             \
             {                                                                                                          \
                 std::ostringstream os__;                                                                               \
                 os__ << __VA_ARGS__;                                                                                   \
                 el::base::Writer( el::Level::LEVEL, __FILE__, __LINE__, ELPP_FUNC, el::base::DispatchAction::NormalLog )\
-                        .construct( logger__, false )                                                                  \
+                        .construct( logger__ )                                                                         \
                     << os__.str();                                                                                     \
-            }                                                                                                          \
-            else                                                                                                       \
-            {                                                                                                          \
-                logger__->releaseLock();                                                                               \
             }                                                                                                          \
         }                                                                                                              \
     }                                                                                                                  \
