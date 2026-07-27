@@ -148,9 +148,21 @@ namespace librealsense {
         if( ! tgt_vspi )
             throw std::runtime_error( "Profile is not video stream profile" );
 
-        // Get intrinsics and set up new ones based on the rotation value.
-        rs2_intrinsics src_intrin = src_vspi->get_intrinsics();
-        rs2_intrinsics tgt_intrin = tgt_vspi->get_intrinsics();
+        // Some profiles (e.g. unrectified Y16 infrared) have no intrinsics registered; fall back to the
+        // profile's own dimensions for those and skip updating intrinsics on the target profile.
+        rs2_intrinsics src_intrin{};
+        bool has_intrinsics = true;
+        try
+        {
+            src_intrin = src_vspi->get_intrinsics();
+        }
+        catch( const not_implemented_exception & )
+        {
+            has_intrinsics = false;
+            src_intrin.width = src_vspi->get_width();
+            src_intrin.height = src_vspi->get_height();
+        }
+        rs2_intrinsics tgt_intrin = src_intrin;
 
         int rotated_width = 0;
         int rotated_height = 0;
@@ -183,12 +195,14 @@ namespace librealsense {
         }
         else { throw std::invalid_argument( "Unsupported rotation angle" ); }
 
-        // Update dimensions for the intrinsics.
-        tgt_intrin.width = rotated_width;
-        tgt_intrin.height = rotated_height;
-
-        tgt_vspi->set_intrinsics( [tgt_intrin]() { return tgt_intrin; } );
         tgt_vspi->set_dims( rotated_width, rotated_height );
+        if( has_intrinsics )
+        {
+            // Update dimensions for the intrinsics.
+            tgt_intrin.width = rotated_width;
+            tgt_intrin.height = rotated_height;
+            tgt_vspi->set_intrinsics( [tgt_intrin]() { return tgt_intrin; } );
+        }
 
         _last_rotation_values[stream_key] = value;
         _target_stream_profiles[stream_key] = target_profile;
@@ -209,9 +223,8 @@ namespace librealsense {
         if( ! video_profile )
             throw std::runtime_error( "Target profile is not a video stream profile interface" );
 
-        rs2_intrinsics intrin = video_profile->get_intrinsics();
-        out_width = intrin.width;
-        out_height = intrin.height;
+        out_width = video_profile->get_width();
+        out_height = video_profile->get_height();
 
         auto ret = source.allocate_video_frame( target_profile,
                                                 f,
