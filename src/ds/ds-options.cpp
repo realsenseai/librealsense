@@ -517,8 +517,8 @@ namespace librealsense
             return "Inter-camera synchronization mode: 0:Default, 1:Master, 2:Slave";
     }
 
-    alternating_emitter_option::alternating_emitter_option(hw_monitor& hwm, bool is_fw_version_using_id, hwmon_response_type no_data_to_return_opcode, bool expect_no_data_to_return)
-        : _hwm(hwm), _is_fw_version_using_id(is_fw_version_using_id), _no_data_to_return_opcode(no_data_to_return_opcode), _expect_no_data_to_return(expect_no_data_to_return)
+    alternating_emitter_option::alternating_emitter_option(hw_monitor& hwm, bool is_fw_version_using_id, bool expect_no_data_to_return, hwmon_response_type no_data_to_return_opcode)
+        : _hwm(hwm), _is_fw_version_using_id(is_fw_version_using_id), _expect_no_data_to_return(expect_no_data_to_return), _no_data_to_return_opcode(no_data_to_return_opcode)
     {
         _range = [this]()
         {

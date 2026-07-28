@@ -4,6 +4,7 @@
 import pytest
 import pyrealsense2 as rs
 from pytest_check import check
+import time
 import logging
 log = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ def test_emitter_on_off_set_get(test_device):
     cfg.enable_stream(rs.stream.depth)
     pipe.start(cfg)
     try:
+        time.sleep(2)
         pipe.wait_for_frames()
 
         # ON: the emitter alternates on/off per frame

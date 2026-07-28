@@ -244,7 +244,7 @@ namespace librealsense
     class alternating_emitter_option : public option
     {
     public:
-        alternating_emitter_option(hw_monitor& hwm, bool is_fw_version_using_id, hwmon_response_type no_data_to_return_opcode, bool expect_no_data_to_return = true);
+        alternating_emitter_option(hw_monitor& hwm, bool is_fw_version_using_id, bool expect_no_data_to_return = false, hwmon_response_type no_data_to_return_opcode = 0);
         virtual ~alternating_emitter_option() = default;
         virtual void set(float value) override;
         virtual float query() const override;
@@ -261,8 +261,8 @@ namespace librealsense
         rsutils::lazy< option_range > _range;
         hw_monitor& _hwm;
         bool _is_fw_version_using_id;
-        hwmon_response_type _no_data_to_return_opcode;
         bool _expect_no_data_to_return;
+        hwmon_response_type _no_data_to_return_opcode;
     };
 
     class emitter_always_on_option : public option
