@@ -6,6 +6,7 @@
 #include <atomic>
 #include <chrono>
 #include <vector>
+#include <cstdio>
 
 // Regression test for RSDSO-21284 (github.com/realsenseai/librealsense/issues/14761):
 // changing the log level from one thread while another thread logs used to segfault.
@@ -26,8 +27,8 @@ TEST_CASE( "changing log level while logging from another thread", "[log]" )
         }
     } );
 
-    // Mimics the streaming thread logging frame-callback info (e.g. log_callback_end()).
-    // Severity is kept below WARN so nothing actually gets printed to the console.
+    // Mimics the streaming thread logging frame-callback info (e.g. log_callback_end()). Level changes
+    // aren't atomic from this thread's point of view, so some DEBUG lines may still leak to the console.
     std::vector< std::thread > loggers;
     for( int i = 0; i < 4; ++i )
         loggers.emplace_back( [&]() {
@@ -38,7 +39,40 @@ TEST_CASE( "changing log level while logging from another thread", "[log]" )
     std::this_thread::sleep_for( std::chrono::milliseconds( 300 ) );
     stop = true;
 
-    level_changer.join();
+    REQUIRE_NOTHROW( level_changer.join() );
     for( auto & t : loggers )
-        t.join();
+        REQUIRE_NOTHROW( t.join() );
+}
+
+
+// Same race, but through rs2::log_to_file(): Logger::configure() mutates m_unflushedCount before taking its
+// lock, and isFlushNeeded() (only reached when logging to a file) reads it under lock on another thread.
+TEST_CASE( "changing log file level while logging from another thread", "[log]" )
+{
+    const char * log_file_path = ".//log-level-race-file.log";
+    std::remove( log_file_path );
+
+    std::atomic<bool> stop( false );
+
+    std::thread level_changer( [&]() {
+        while( ! stop )
+        {
+            rs2::log_to_file( RS2_LOG_SEVERITY_DEBUG, log_file_path );
+            rs2::log_to_file( RS2_LOG_SEVERITY_ERROR, log_file_path );
+        }
+    } );
+
+    std::vector< std::thread > loggers;
+    for( int i = 0; i < 4; ++i )
+        loggers.emplace_back( [&]() {
+            while( ! stop )
+                rs2::log( RS2_LOG_SEVERITY_DEBUG, "callback finished" );
+        } );
+
+    std::this_thread::sleep_for( std::chrono::milliseconds( 300 ) );
+    stop = true;
+
+    REQUIRE_NOTHROW( level_changer.join() );
+    for( auto & t : loggers )
+        REQUIRE_NOTHROW( t.join() );
 }

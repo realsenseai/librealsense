@@ -645,6 +645,7 @@ Logger& Logger::operator=(const Logger& logger) {
 }
 
 void Logger::configure(const Configurations& configurations) {
+  base::threading::ScopedLock scopedLock(lock());
   m_isConfigured = false;  // we set it to false in case if we fail
   initUnflushedCount();
   if (m_typedConfigurations != nullptr) {
@@ -653,7 +654,6 @@ void Logger::configure(const Configurations& configurations) {
       flush();
     }
   }
-  base::threading::ScopedLock scopedLock(lock());
   if (m_configurations != configurations) {
     m_configurations.setFromBase(const_cast<Configurations*>(&configurations));
   }
