@@ -244,8 +244,7 @@ namespace librealsense
     class alternating_emitter_option : public option
     {
     public:
-        // default 1, a value the FW can't return, for when "no data to return" isn't expected
-        alternating_emitter_option(hw_monitor& hwm, bool is_fw_version_using_id, hwmon_response_type no_data_to_return_opcode = 1);
+        alternating_emitter_option(hw_monitor& hwm, bool is_fw_version_using_id, hwmon_response_type no_data_to_return_opcode, bool expect_no_data_to_return = true);
         virtual ~alternating_emitter_option() = default;
         virtual void set(float value) override;
         virtual float query() const override;
@@ -263,6 +262,7 @@ namespace librealsense
         hw_monitor& _hwm;
         bool _is_fw_version_using_id;
         hwmon_response_type _no_data_to_return_opcode;
+        bool _expect_no_data_to_return;
     };
 
     class emitter_always_on_option : public option
