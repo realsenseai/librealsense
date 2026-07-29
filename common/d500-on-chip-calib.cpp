@@ -189,15 +189,15 @@ namespace rs2
             && (action == RS2_CALIB_ACTION_ON_CHIP_CALIB_TRY_NEW
                 || action == RS2_CALIB_ACTION_ON_CHIP_CALIB_TRY_OLD);
 
-        // Auto-start disabled until the FW supports streaming during triggered calibration.
-        // if (interactive_run)
-        // {
-        //     _saved_ui = std::make_shared<subdevice_ui_selection>(_sub->ui);
-        //     _saved_stream_enabled = _sub->stream_enabled;
-        //     _was_streaming = _sub->streaming;
-        //     try_start_viewer(1280, 720, 30, invoke);
-        // }
-        (void)interactive_run;
+        // D5x5 interactive TC needs a live depth stream during the RUN phase (algorithm consumes depth frames).
+        // Mirrors the D400 pattern: 1280x720 @ 30fps on Z16. Skip for TRY/COMMIT/ABORT — those reuse the already-live stream.
+        if (interactive_run)
+        {
+            _saved_ui = std::make_shared<subdevice_ui_selection>(_sub->ui);
+            _saved_stream_enabled = _sub->stream_enabled;
+            _was_streaming = _sub->streaming;
+            try_start_viewer(1280, 720, 30, invoke);
+        }
 
         try
         {
