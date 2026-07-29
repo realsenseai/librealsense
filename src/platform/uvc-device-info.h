@@ -26,6 +26,7 @@ struct uvc_device_info
     uint32_t uvc_capabilities = 0;
     bool has_metadata_node = false;
     std::string metadata_node_id;
+    bool mipi = false;  // enumerated over a MIPI/GMSL V4L2 node rather than USB
 
     operator std::string() const
     {
@@ -33,7 +34,7 @@ struct uvc_device_info
         s << "id- " << id << "\nvid- " << std::hex << vid << "\npid- " << std::hex << pid << "\nmi- " << std::dec << mi
           << "\nunique_id- " << unique_id << "\npath- " << device_path << "\nUVC capabilities- " << std::hex
           << uvc_capabilities << "\nUVC specification- " << std::hex << (uint16_t)conn_spec << std::dec
-          << ( has_metadata_node ? ( "\nmetadata node-" + metadata_node_id ) : "" ) << std::endl;
+          << ( has_metadata_node ? ( "\nmetadata node-" + metadata_node_id ) : "" ) << ( mipi ? "\nmipi" : "" ) << std::endl;
 
         return s.str();
     }

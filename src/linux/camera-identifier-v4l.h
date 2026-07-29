@@ -12,9 +12,6 @@ namespace librealsense
 {
     namespace platform
     {
-        // True if pid is a known RealSense MIPI/GMSL product id.
-        bool is_mipi_pid( uint16_t pid );
-
         // Holds the USB-style VID/PID for a V4L2 device.
         class camera_identifier_v4l : public camera_identifier
         {

@@ -31,8 +31,7 @@ namespace librealsense
         const uint16_t D585F_PID              = 0x0C06; // 3C with IR only L/R cover
         const uint16_t D585_2C_PROTO_PID      = 0x0C07;
         const uint16_t D585_3C_PROTO_PID      = 0x0C08;
-        const uint16_t D585_GMSL_PID          = 0xBAAA; // D585 GMSL (MIPI)
-   
+
         enum d500_xu_id : uint8_t // Note: some values may differ from the D400-family depth_xu selectors in ds-private.h.
         {
             DETECTION_DISTANCE    = 0x01,  // Enable FW depth-derived distance for detections
@@ -59,14 +58,7 @@ namespace librealsense
             D585_3C_PID,
             D585F_PID,
             D585_2C_PROTO_PID,
-            D585_3C_PROTO_PID,
-            D585_GMSL_PID
-        };
-
-        // d500 MIPI (GMSL) devices - color and IMU are exposed as separate V4L2 nodes rather than
-        // the USB layout (color on a dedicated mi=3 node, IMU over HID).
-        static const std::set<std::uint16_t> d500_mipi_device_pid = {
-            D585_GMSL_PID
+            D585_3C_PROTO_PID
         };
 
         // d500 PIDs that expose the projector temperature via HKR selector 0x16
@@ -116,8 +108,7 @@ namespace librealsense
             { D585_3C_PID,            "RealSense D585" },
             { D585F_PID,              "RealSense D585F" },
             { D585_2C_PROTO_PID,      "RealSense D585 Proto Dual RGB" },
-            { D585_3C_PROTO_PID,      "RealSense D585 Prototype" },
-            { D585_GMSL_PID,          "RealSense D585 GMSL" }
+            { D585_3C_PROTO_PID,      "RealSense D585 Prototype" }
         };
 
         // D500-only HWM opcodes. Shared opcodes are in ds::fw_cmd (ds/ds-private.h).

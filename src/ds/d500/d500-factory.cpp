@@ -475,6 +475,7 @@ namespace librealsense
         auto dev_info = std::dynamic_pointer_cast< const d500_info >( shared_from_this() );
 
         auto pid = _group.uvc_devices.front().pid;
+        bool is_mipi = _group.uvc_devices.front().mipi;
 
         try
         {
@@ -490,13 +491,14 @@ namespace librealsense
             case ds::D585_2C_PID:
             case ds::D585_2C_PROTO_PID:
                 return std::make_shared< rs5x5_device >( dev_info );
-            case ds::D585_GMSL_PID:
-                return std::make_shared< rs5x5_gmsl_dedicated_color_device >( dev_info );
             case ds::D535_3C_PID:
             case ds::D535F_PID:
             case ds::D585_3C_PID:
             case ds::D585F_PID:
             case ds::D585_3C_PROTO_PID:
+                // On MIPI/GMSL the color and IMU are exposed as dedicated V4L2 nodes.
+                if( is_mipi )
+                    return std::make_shared< rs5x5_gmsl_dedicated_color_device >( dev_info );
                 return std::make_shared< rs5x5_dedicated_color_device >( dev_info );
             default:
                 throw std::runtime_error( rsutils::string::from() << "unsupported D500 PID 0x" << hexdump( pid ) );

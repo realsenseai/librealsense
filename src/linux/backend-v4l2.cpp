@@ -993,6 +993,7 @@ namespace librealsense
                 }
             }
             info.conn_spec = usb_undefined;
+            info.mipi = true;
             info.uvc_capabilities = get_dev_capabilities(dev_name).device_caps;
 
             return info;
@@ -2822,7 +2823,7 @@ namespace librealsense
 
         std::shared_ptr<uvc_device> v4l_backend::create_uvc_device(uvc_device_info info) const
         {
-            bool mipi_device = is_mipi_pid(info.pid);
+            bool mipi_device = info.mipi;
 
             auto v4l_uvc_dev =        mipi_device ?         std::make_shared<v4l_mipi_device>(info) :
                               ((!info.has_metadata_node) ?  std::make_shared<v4l_uvc_device>(info) :

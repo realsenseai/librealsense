@@ -7,8 +7,10 @@
 
 #include <src/librealsense-exception.h>
 
+#include <rsutils/number/crc32.h>
+
 #include <sstream>
-#include <set>
+#include <cstring>
 
 namespace librealsense
 {
@@ -19,76 +21,67 @@ namespace librealsense
         const uint16_t D415_GMSL_PID = 0xABCF;
         const uint16_t D401_GMSL_PID = 0xABCC;
 
-        const uint16_t D585_GMSL_PID = 0xBAAA;  // TODO - replace with the real D585 GMSL PID
+        // The MIPI GVD control returns a 4-byte HW-monitor opcode header before the GVD struct.
+        static constexpr size_t GVD_OPCODE_HEADER = 4;
+        // D500 GVD struct field offsets, relative to the struct start.
+        static constexpr size_t D500_GVD_PAYLOAD_SIZE_OFFSET = 0x02;  // uint16
+        static constexpr size_t D500_GVD_CRC32_OFFSET        = 0x04;  // uint32
+        static constexpr size_t D500_GVD_HEADER_SIZE         = 0x08;  // version + payload size + CRC32
+        static constexpr size_t D500_GVD_VID_OFFSET          = 0x0C;  // uint16
+        static constexpr size_t D500_GVD_PID_OFFSET          = 0x0E;  // uint16
 
-        static const std::set< uint16_t > mipi_devices_pid = {
-            D457_PID,
-            D430_GMSL_PID,
-            D415_GMSL_PID,
-            D401_GMSL_PID,
-            D585_GMSL_PID
-        };
-
-        bool is_mipi_pid( uint16_t pid )
+        // A D500 GVD is recognized by validating its CRC32 over the payload sized by its own size field.
+        static bool is_d500_gvd( const std::vector< uint8_t > & gvd )
         {
-            return mipi_devices_pid.count( pid ) > 0;
+            if( gvd.size() < GVD_OPCODE_HEADER + D500_GVD_HEADER_SIZE )
+                return false;
+            const uint8_t * gvd_struct = gvd.data() + GVD_OPCODE_HEADER;
+            uint16_t payload_size = gvd_struct[D500_GVD_PAYLOAD_SIZE_OFFSET]
+                                  | ( gvd_struct[D500_GVD_PAYLOAD_SIZE_OFFSET + 1] << 8 );
+            if( GVD_OPCODE_HEADER + D500_GVD_HEADER_SIZE + payload_size > gvd.size() )
+                return false;
+            uint32_t stored_crc;
+            std::memcpy( &stored_crc, gvd_struct + D500_GVD_CRC32_OFFSET, sizeof( stored_crc ) );
+            return rsutils::number::calc_crc32( gvd_struct + D500_GVD_HEADER_SIZE, payload_size ) == stored_crc;
         }
 
         void camera_identifier_v4l_mipi::resolve( const std::string & dev_name )
         {
-            // GVD product ID
-            const uint8_t GVD_PID_OFFSET = 4;
+            std::vector< uint8_t > gvd = v4l_mipi_logic::get_gvd( dev_name );
 
+            if( is_d500_gvd( gvd ) )
+            {
+                // d500 MIPI (e.g. D585 GMSL): the real USB VID/PID are stored in the GVD struct.
+                const uint8_t * gvd_struct = gvd.data() + GVD_OPCODE_HEADER;
+                _vid = gvd_struct[D500_GVD_VID_OFFSET] | ( gvd_struct[D500_GVD_VID_OFFSET + 1] << 8 );
+                _pid = gvd_struct[D500_GVD_PID_OFFSET] | ( gvd_struct[D500_GVD_PID_OFFSET + 1] << 8 );
+                return;
+            }
+
+            // d400 MIPI GVD: a single-byte product id maps to the MIPI/GMSL PID, under the Intel VID.
+            const uint8_t GVD_PID_OFFSET = 4;
             const uint8_t GVD_PID_D457 = 0x12;
             const uint8_t GVD_PID_D401_GMSL = 0x13;
             const uint8_t GVD_PID_D430_GMSL = 0x0F;
             const uint8_t GVD_PID_D415_GMSL = 0x06;
 
-            uint16_t device_pid = 0;
-
-            std::vector< uint8_t > gvd = v4l_mipi_logic::get_gvd( dev_name );
-            if( gvd.size() < 18 )  // need bytes up to the embedded VID at 16-17
+            if( gvd.size() <= 4u + GVD_PID_OFFSET )
                 throw linux_backend_exception( "GVD response too short to identify device" );
 
-            // d500 MIPI (e.g. D585 GMSL) uses a different GVD layout than d400 GMSL:
-            // byte 8 holds the CRC32, and the RealSense VID/PID are embedded at bytes 16-19.
-            // TODO - temp WA for D585 GMSL, until the GVD layout is fixed to match the D400 GMSL layout
-            uint16_t embedded_vid = gvd[16] | ( gvd[17] << 8 );
-            if( embedded_vid == 0x38e5 )  // RealSense VID identifies the d500 GMSL family
+            uint16_t device_pid = 0;
+            switch( gvd[4 + GVD_PID_OFFSET] )
             {
-                device_pid = D585_GMSL_PID;
-            }
-            else
-            {
-                uint8_t product_pid = gvd[4 + GVD_PID_OFFSET];
-
-                switch( product_pid )
-                {
-                case( GVD_PID_D457 ):
-                    device_pid = D457_PID;
-                    break;
-
-                case( GVD_PID_D430_GMSL ):
-                    device_pid = D430_GMSL_PID;
-                    break;
-
-                case( GVD_PID_D415_GMSL ):
-                    device_pid = D415_GMSL_PID;
-                    break;
-
-                case( GVD_PID_D401_GMSL ):
-                    device_pid = D401_GMSL_PID;
-                    break;
-
-                default:
-                    LOG_WARNING( "Unidentified MIPI device product id: 0x" << std::hex << (int)product_pid );
-                    device_pid = 0x0000;
-                    break;
-                }
+            case GVD_PID_D457:      device_pid = D457_PID;      break;
+            case GVD_PID_D430_GMSL: device_pid = D430_GMSL_PID; break;
+            case GVD_PID_D415_GMSL: device_pid = D415_GMSL_PID; break;
+            case GVD_PID_D401_GMSL: device_pid = D401_GMSL_PID; break;
+            default:
+                LOG_WARNING( "Unidentified MIPI device product id: 0x" << std::hex << (int)gvd[4 + GVD_PID_OFFSET] );
+                break;
             }
 
+            _vid = 0x8086;
             _pid = device_pid;
-            _vid = ( _pid == D585_GMSL_PID ) ? 0x38e5 : 0x8086;  // D585 GMSL uses RealSense VID
         }
 
         void camera_identifier_v4l_usb::resolve( const std::string & name )
