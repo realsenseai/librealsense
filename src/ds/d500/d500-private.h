@@ -69,6 +69,13 @@ namespace librealsense
             D585_GMSL_PID
         };
 
+        // d500 dual-RGB (2C) SKUs - the projector strobe is driven by the FW, the host cannot keep the emitter on
+        static const std::set<std::uint16_t> d500_dual_rgb_pids = {
+            D535_2C_PID,
+            D585_2C_PID,
+            D585_2C_PROTO_PID
+        };
+
         // d500 PIDs that expose the projector temperature via HKR selector 0x16
         static const std::set<std::uint16_t> d500_projector_temperature_pids = {
             D585S_PID,
