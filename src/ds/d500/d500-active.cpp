@@ -45,7 +45,7 @@ namespace librealsense
 
         // Emitter on/off over USB: D555 + D585/D535 3C
         bool emitter_on_off_sku = val_in_range( get_pid(), { D555_PID, D585_3C_PID, D585_3C_PROTO_PID, D535_3C_PID } );
-        if (emitter_on_off_sku && (_fw_version >= firmware_version("7.58.40743.12685")))
+        if (emitter_on_off_sku && (_fw_version >= firmware_version("7.58.40805.12940")))
         {
             auto alternating_emitter_opt = std::make_shared<alternating_emitter_option>( *_hw_monitor, true );
 
