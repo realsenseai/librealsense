@@ -11,6 +11,7 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D555"),
     pytest.mark.device_each("D585"),
+    pytest.mark.device_each("D535"),
 ]
 
 
