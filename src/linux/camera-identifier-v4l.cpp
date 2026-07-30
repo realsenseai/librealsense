@@ -8,6 +8,7 @@
 #include <src/librealsense-exception.h>
 
 #include <rsutils/number/crc32.h>
+#include <rsutils/string/from.h>
 
 #include <sstream>
 #include <cstring>
@@ -38,7 +39,7 @@ namespace librealsense
             const uint8_t * gvd_struct = gvd.data() + GVD_OPCODE_HEADER;
             uint16_t payload_size = gvd_struct[D500_GVD_PAYLOAD_SIZE_OFFSET]
                                   | ( gvd_struct[D500_GVD_PAYLOAD_SIZE_OFFSET + 1] << 8 );
-            if( GVD_OPCODE_HEADER + D500_GVD_HEADER_SIZE + payload_size > gvd.size() )
+            if( payload_size == 0 || GVD_OPCODE_HEADER + D500_GVD_HEADER_SIZE + payload_size > gvd.size() )
                 return false;
             uint32_t stored_crc;
             std::memcpy( &stored_crc, gvd_struct + D500_GVD_CRC32_OFFSET, sizeof( stored_crc ) );
@@ -76,8 +77,8 @@ namespace librealsense
             case GVD_PID_D415_GMSL: device_pid = D415_GMSL_PID; break;
             case GVD_PID_D401_GMSL: device_pid = D401_GMSL_PID; break;
             default:
-                LOG_WARNING( "Unidentified MIPI device product id: 0x" << std::hex << (int)gvd[4 + GVD_PID_OFFSET] );
-                break;
+                throw linux_backend_exception( rsutils::string::from()
+                    << "Unidentified MIPI device product id: 0x" << std::hex << (int)gvd[4 + GVD_PID_OFFSET] );
             }
 
             _vid = 0x8086;
