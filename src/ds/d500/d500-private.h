@@ -71,8 +71,7 @@ namespace librealsense
             D585_3C_PID,
             D585F_PID,
             D585_2C_PROTO_PID,
-            D585_3C_PROTO_PID,
-            D585_GMSL_PID
+            D585_3C_PROTO_PID
         };
 
         // D5x5 (non-safety, non-legacy) interactive Triggered Calibration flow.
