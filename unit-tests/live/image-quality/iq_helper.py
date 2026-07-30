@@ -13,6 +13,23 @@ import pyrealsense2 as rs
 WIDTH = 1280
 HEIGHT = 720
 
+# Standard resolution/fps sweep shared across the image-quality tests: a single
+# representative config for regular CI, extended to a broader sweep under nightly.
+# Centralized here so every IQ test uses the same set instead of each hand-maintaining
+# its own copy.
+DEFAULT_CONFIGURATIONS = [((1280, 720), 30)]
+NIGHTLY_CONFIGURATIONS = [
+    ((640, 480), 15),
+    ((640, 480), 30),
+    ((640, 480), 60),
+    ((848, 480), 15),
+    ((848, 480), 30),
+    ((848, 480), 60),
+    ((1280, 720), 5),
+    ((1280, 720), 10),
+    ((1280, 720), 15),
+]
+
 # transformation matrix from frame to aligned region of interest
 M = None
 

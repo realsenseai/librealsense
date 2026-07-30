@@ -12,6 +12,7 @@ from pytest_check import check
 import numpy as np
 import time
 import logging
+from iq_helper import DEFAULT_CONFIGURATIONS, NIGHTLY_CONFIGURATIONS
 log = logging.getLogger(__name__)
 
 # Defines how far in cm do pixels have to be, to be considered in a different distance
@@ -25,30 +26,6 @@ pytestmark = [
     pytest.mark.device_each("D500*"),
     pytest.mark.device_exclude("D401"),
 ]
-
-PREFERRED_FPS = 30
-
-
-def get_available_depth_resolutions(dev, preferred_fps=PREFERRED_FPS):
-    """
-    Query the device for every distinct depth (width, height) it actually advertises
-    for z16, each paired with preferred_fps if that resolution supports it, otherwise
-    its own highest available fps. Sorted by pixel count, highest first.
-    """
-    depth_sensor = dev.first_depth_sensor()
-    fps_by_resolution = {}
-    for profile in depth_sensor.get_stream_profiles():
-        if profile.stream_type() != rs.stream.depth or profile.format() != rs.format.z16:
-            continue
-        vp = profile.as_video_stream_profile()
-        fps_by_resolution.setdefault((vp.width(), vp.height()), set()).add(vp.fps())
-
-    resolutions = [
-        (res, preferred_fps if preferred_fps in fps_set else max(fps_set))
-        for res, fps_set in fps_by_resolution.items()
-    ]
-    resolutions.sort(key=lambda item: item[0][0] * item[0][1], reverse=True)
-    return resolutions
 
 
 def get_distances(depth_frame):
@@ -136,13 +113,9 @@ def run_test(dev, ctx, resolution, fps):
 def test_depth_fill_rate(test_device_wrapped, test_context_var):
     dev, ctx = test_device_wrapped
 
-    all_resolutions = get_available_depth_resolutions(dev)
-
-    # Sweeping every resolution the device advertises is expensive (each waits for up
-    # to FRAMES_TO_CHECK frames), so regular CI only runs the highest-resolution mode;
-    # the full sweep runs under nightly. If nightly still proves too slow, change
-    # "nightly" to "weekly" below to push the extended sweep out further.
-    configurations = all_resolutions if "nightly" in test_context_var else all_resolutions[:1]
+    configurations = DEFAULT_CONFIGURATIONS
+    if "nightly" in test_context_var:
+        configurations = DEFAULT_CONFIGURATIONS + NIGHTLY_CONFIGURATIONS
 
     for resolution, fps in configurations:
         run_test(dev, ctx, resolution, fps)
