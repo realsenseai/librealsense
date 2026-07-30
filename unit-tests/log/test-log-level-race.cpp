@@ -75,4 +75,6 @@ TEST_CASE( "changing log file level while logging from another thread", "[log]" 
     REQUIRE_NOTHROW( level_changer.join() );
     for( auto & t : loggers )
         REQUIRE_NOTHROW( t.join() );
+
+    std::remove( log_file_path );  // best-effort: ELPP may still hold the file open on some platforms
 }
