@@ -410,7 +410,7 @@ namespace librealsense
 
         auto raw_sensor = get_raw_depth_sensor();
         _pid = group.uvc_devices.front().pid;
-        _is_mipi_device = group.uvc_devices.front().mipi;
+        _is_mipi_device = group.uvc_devices.front().is_mipi;
 
         _color_calib_table_raw = [this]()
         {

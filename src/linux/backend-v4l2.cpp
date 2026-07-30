@@ -937,7 +937,7 @@ namespace librealsense
             info.unique_id = busnum + "-" + devpath + "-" + devnum;
             // Find the USB specification (USB2/3) type from the underlying device, traversing from
             // /sys/devices/.../M-N/3-6:1.0/video4linux/video0 up to /sys/devices/.../M-N/version
-            info.conn_spec = v4l_usb_logic::get_usb_connection_type(video_path + "/../../../");
+            info.usb_conn_spec = v4l_usb_logic::get_usb_connection_type(video_path + "/../../../");
             info.uvc_capabilities = get_dev_capabilities(dev_name).device_caps;
 
             return info;
@@ -992,8 +992,8 @@ namespace librealsense
                     break;
                 }
             }
-            info.conn_spec = usb_undefined;
-            info.mipi = true;
+            info.usb_conn_spec = usb_undefined;
+            info.is_mipi = true;
             info.uvc_capabilities = get_dev_capabilities(dev_name).device_caps;
 
             return info;
@@ -1223,7 +1223,7 @@ namespace librealsense
         v4l_uvc_device::v4l_uvc_device(const uvc_device_info& info, bool use_memory_map)
             : _name(info.id), 
               _device_path(info.device_path),
-              _device_usb_spec(info.conn_spec),
+              _device_usb_spec(info.usb_conn_spec),
               _info(info),
               _is_capturing(false),
               _is_alive(true),
@@ -2823,7 +2823,7 @@ namespace librealsense
 
         std::shared_ptr<uvc_device> v4l_backend::create_uvc_device(uvc_device_info info) const
         {
-            bool mipi_device = info.mipi;
+            bool mipi_device = info.is_mipi;
 
             auto v4l_uvc_dev =        mipi_device ?         std::make_shared<v4l_mipi_device>(info) :
                               ((!info.has_metadata_node) ?  std::make_shared<v4l_uvc_device>(info) :

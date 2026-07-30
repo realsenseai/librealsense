@@ -475,7 +475,7 @@ namespace librealsense
         auto dev_info = std::dynamic_pointer_cast< const d500_info >( shared_from_this() );
 
         auto pid = _group.uvc_devices.front().pid;
-        bool is_mipi = _group.uvc_devices.front().mipi;
+        bool is_mipi = _group.uvc_devices.front().is_mipi;
 
         try
         {
