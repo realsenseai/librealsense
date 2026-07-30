@@ -78,7 +78,8 @@ def test_emitter_on_off_blocked_while_always_on(test_device):
     if not depth_sensor.supports(rs.option.emitter_on_off) or not depth_sensor.supports(rs.option.emitter_always_on):
         pytest.skip("Device does not support both emitter options")
 
-    original = depth_sensor.get_option(rs.option.emitter_always_on)
+    original_always_on = depth_sensor.get_option(rs.option.emitter_always_on)
+    original_on_off = depth_sensor.get_option(rs.option.emitter_on_off)
     # the on/off query reports the sub preset the firmware is running, so it only answers while streaming
     pipe = rs.pipeline(ctx)
     cfg = rs.config()
@@ -99,6 +100,6 @@ def test_emitter_on_off_blocked_while_always_on(test_device):
         depth_sensor.set_option(rs.option.emitter_on_off, 1)
         check.equal(depth_sensor.get_option(rs.option.emitter_on_off), 1.0)
     finally:
-        depth_sensor.set_option(rs.option.emitter_on_off, 0)
-        depth_sensor.set_option(rs.option.emitter_always_on, original)
+        depth_sensor.set_option(rs.option.emitter_on_off, original_on_off)
+        depth_sensor.set_option(rs.option.emitter_always_on, original_always_on)
         pipe.stop()
