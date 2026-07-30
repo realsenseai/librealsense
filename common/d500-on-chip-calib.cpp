@@ -191,13 +191,9 @@ namespace rs2
 
         // D5x5 interactive TC needs a live depth stream during the RUN phase (algorithm consumes depth frames).
         // Mirrors the D400 pattern: 1280x720 @ 30fps on Z16. Skip for TRY/COMMIT/ABORT — those reuse the already-live stream.
-        if (interactive_run)
-        {
-            _saved_ui = std::make_shared<subdevice_ui_selection>(_sub->ui);
-            _saved_stream_enabled = _sub->stream_enabled;
-            _was_streaming = _sub->streaming;
-            try_start_viewer(1280, 720, 30, invoke);
-        }
+        // Start is deferred until FW reports progress >= 3, so the FW enters its calibration state before the host
+        // contends for USB bandwidth with a 1280x720@30 depth stream.
+        bool streaming_started = false;
 
         try
         {
@@ -206,7 +202,18 @@ namespace rs2
             float health = 0.f;
             int timeout_ms = 240000; // increased to 4 minutes for additional algo processing
             auto ans = calib_dev.run_on_chip_calibration(json, &health,
-                [&](const float progress) {_progress = progress; }, timeout_ms);
+                [&](const float progress)
+                {
+                    _progress = progress;
+                    if (interactive_run && !streaming_started && progress >= 3.f)
+                    {
+                        streaming_started = true;
+                        _saved_ui = std::make_shared<subdevice_ui_selection>(_sub->ui);
+                        _saved_stream_enabled = _sub->stream_enabled;
+                        _was_streaming = _sub->streaming;
+                        try_start_viewer(1280, 720, 30, invoke);
+                    }
+                }, timeout_ms);
 
             // For D5x5 interactive triggered calibration, the initial RUN call returns at HEALTH_CHECK — populate scalar health
             // so the UI can render pass/fail; the flow is not "done" until a subsequent COMMIT reaches COMPLETE.
