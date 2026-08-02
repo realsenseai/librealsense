@@ -148,57 +148,65 @@ namespace librealsense {
         if( ! tgt_vspi )
             throw std::runtime_error( "Profile is not video stream profile" );
 
-        // Some profiles (e.g. unrectified Y16 infrared) have no intrinsics registered; fall back to the
-        // profile's own dimensions for those and skip updating intrinsics on the target profile.
+        // Some profiles (e.g. unrectified Y16/Y12I infrared) have no usable intrinsics; get_intrinsics() can
+        // fail in more than one way (never registered, or the calibration lookup itself rejects the stream),
+        // so treat any failure the same: fall back to the profile's own dimensions and skip target intrinsics.
         rs2_intrinsics src_intrin{};
         bool has_intrinsics = true;
         try
         {
             src_intrin = src_vspi->get_intrinsics();
         }
-        catch( const not_implemented_exception & )
+        catch( const std::exception & )
         {
             has_intrinsics = false;
-            src_intrin.width = src_vspi->get_width();
-            src_intrin.height = src_vspi->get_height();
         }
-        rs2_intrinsics tgt_intrin = src_intrin;
+
+        int src_width = has_intrinsics ? src_intrin.width : src_vspi->get_width();
+        int src_height = has_intrinsics ? src_intrin.height : src_vspi->get_height();
 
         int rotated_width = 0;
         int rotated_height = 0;
-        if( value == 90 )
+        if( value == 90 || value == -90 )
         {
-            rotated_width = src_intrin.height;
-            rotated_height = src_intrin.width;
-            tgt_intrin.fx = src_intrin.fy;
-            tgt_intrin.fy = src_intrin.fx;
-            tgt_intrin.ppx = src_intrin.height - src_intrin.ppy;
-            tgt_intrin.ppy = src_intrin.ppx;
-        }
-        else if( value == -90 )
-        {
-            rotated_width = src_intrin.height;
-            rotated_height = src_intrin.width;
-            tgt_intrin.fx = src_intrin.fy;
-            tgt_intrin.fy = src_intrin.fx;
-            tgt_intrin.ppx = src_intrin.ppy;
-            tgt_intrin.ppy = src_intrin.width - src_intrin.ppx;
+            rotated_width = src_height;
+            rotated_height = src_width;
         }
         else if( value == 180 )
         {
-            rotated_width = src_intrin.width;
-            rotated_height = src_intrin.height;
-            tgt_intrin.fx = src_intrin.fx;
-            tgt_intrin.fy = src_intrin.fy;
-            tgt_intrin.ppx = src_intrin.width - src_intrin.ppx;
-            tgt_intrin.ppy = src_intrin.height - src_intrin.ppy;
+            rotated_width = src_width;
+            rotated_height = src_height;
         }
         else { throw std::invalid_argument( "Unsupported rotation angle" ); }
 
         tgt_vspi->set_dims( rotated_width, rotated_height );
+
         if( has_intrinsics )
         {
-            // Update dimensions for the intrinsics.
+            // The target profile was cloned from the source, so its intrinsics start identical; only the
+            // fields affected by rotation need adjusting.
+            rs2_intrinsics tgt_intrin = src_intrin;
+            if( value == 90 )
+            {
+                tgt_intrin.fx = src_intrin.fy;
+                tgt_intrin.fy = src_intrin.fx;
+                tgt_intrin.ppx = src_intrin.height - src_intrin.ppy;
+                tgt_intrin.ppy = src_intrin.ppx;
+            }
+            else if( value == -90 )
+            {
+                tgt_intrin.fx = src_intrin.fy;
+                tgt_intrin.fy = src_intrin.fx;
+                tgt_intrin.ppx = src_intrin.ppy;
+                tgt_intrin.ppy = src_intrin.width - src_intrin.ppx;
+            }
+            else  // 180
+            {
+                tgt_intrin.fx = src_intrin.fx;
+                tgt_intrin.fy = src_intrin.fy;
+                tgt_intrin.ppx = src_intrin.width - src_intrin.ppx;
+                tgt_intrin.ppy = src_intrin.height - src_intrin.ppy;
+            }
             tgt_intrin.width = rotated_width;
             tgt_intrin.height = rotated_height;
             tgt_vspi->set_intrinsics( [tgt_intrin]() { return tgt_intrin; } );
