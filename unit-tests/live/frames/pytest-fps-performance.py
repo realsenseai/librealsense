@@ -17,7 +17,6 @@ Code Organization & Redundancy Reduction:
 
 import pytest
 from rspy.stopwatch import Stopwatch
-from rspy.fw_compat import version_to_tuple
 import pyrealsense2 as rs
 import numpy as np
 import platform
@@ -1415,16 +1414,12 @@ def get_depth_color_combinations(device, max_combinations=None):
 
 
 # Known open defect: on D455, depth throughput degrades while colour also runs at 90 fps.
-# Gated on FW so the allowance lapses on its own once a fixed firmware is under test.
-DUAL_90FPS_DEPTH_DEGRADATION_FIXED_IN_FW = (5, 18, 0, 0)
 DUAL_90FPS_DEPTH_DEGRADATION_MIN_RATIO = 0.65
 
 
-def is_depth_degraded_at_dual_90fps(device_name, fw_version, depth_fps, color_fps, stats, tolerance):
-    """Depth alone falls short of target while colour holds 90 fps, on affected D455 firmware."""
+def is_depth_degraded_at_dual_90fps(device_name, depth_fps, color_fps, stats, tolerance):
+    """Depth alone falls short of target while colour holds 90 fps, on D455."""
     if 'D455' not in device_name or depth_fps != 90 or color_fps != 90 or 'error' in stats:
-        return False
-    if not fw_version or version_to_tuple(fw_version) >= DUAL_90FPS_DEPTH_DEGRADATION_FIXED_IN_FW:
         return False
     try:
         ratio = stats['depth']['actual_fps'] / depth_fps
@@ -1454,7 +1449,6 @@ def check_multistream_configurations_comprehensive(device, max_combinations=None
     log.info("\nTesting all depth + color multi-stream configurations...")
 
     device_name = device.get_info(rs.camera_info.name) if device.supports(rs.camera_info.name) else ""
-    fw_version = device.get_info(rs.camera_info.firmware_version) if device.supports(rs.camera_info.firmware_version) else ""
 
     # Get combinations
     combinations = get_depth_color_combinations(device, max_combinations)
@@ -1485,7 +1479,7 @@ def check_multistream_configurations_comprehensive(device, max_combinations=None
             )
 
             known_issue = (not passed) and is_depth_degraded_at_dual_90fps(
-                device_name, fw_version, depth_fps, color_fps, stats, tolerance)
+                device_name, depth_fps, color_fps, stats, tolerance)
             never_started = (not passed) and not known_issue and is_stream_start_failure(stats)
 
             result = {
