@@ -1254,12 +1254,16 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
     # Calculate statistics
     elapsed_time = test_stopwatch.get_elapsed()
 
-    # Check if we have sufficient measurements
+    # Check if we have sufficient measurements. zero_frames distinguishes "the stream never
+    # started" from "the stream was too slow to reach the measurement threshold" - callers key
+    # retry behaviour off it, so it must not be inferred by matching on the message text.
     if len(depth_fps_measurements) < 2:
-        return False, {"error": f"Insufficient depth measurements: {len(depth_fps_measurements)} (got {depth_frame_count} frames)"}
+        return False, {"error": f"Insufficient depth measurements: {len(depth_fps_measurements)} (got {depth_frame_count} frames)",
+                       "zero_frames": depth_frame_count == 0}
 
     if len(color_fps_measurements) < 2:
-        return False, {"error": f"Insufficient color measurements: {len(color_fps_measurements)} (got {color_frame_count} frames)"}
+        return False, {"error": f"Insufficient color measurements: {len(color_fps_measurements)} (got {color_frame_count} frames)",
+                       "zero_frames": color_frame_count == 0}
 
     # Calculate FPS statistics
     depth_avg_fps = sum(depth_fps_measurements) / len(depth_fps_measurements)
@@ -1421,8 +1425,10 @@ def _is_rsdso_21810_pattern(device_name, depth_fps, color_fps):
 def _is_zero_frame_start_failure(stats):
     """RSDSO-21811 (open): intermittent GMSL/MIPI stream-start race where one stream delivers
     zero frames. Distinct from an FPS-deviation failure, so safe to retry once without masking
-    a real rate regression. Remove this retry once the ticket is closed."""
-    return 'error' in stats and 'got 0 frames' in stats['error']
+    a real rate regression. Keyed off the structured 'zero_frames' flag rather than the error
+    text, so rewording a message can't silently disable the retry. Remove once the ticket is
+    closed."""
+    return stats.get('zero_frames', False)
 
 
 def check_multistream_configurations_comprehensive(device, max_combinations=None):
@@ -1724,18 +1730,26 @@ def test_ir_configurations(settled_device, coverage_tier):
 
 
 def describe_multistream_failure(result):
-    """One-line description of a failed combination, for the assertion message."""
-    stats = result['stats']
-    if 'error' in stats:
-        return f"{result['config_name']} -> {stats['error']}"
+    """One-line description of a failed combination, for the assertion message.
 
-    depth_stats = stats['depth']
-    color_stats = stats['color']
-    return (f"{result['config_name']} -> "
-            f"depth {depth_stats['actual_fps']:.1f}/{depth_stats['expected_fps']} fps "
-            f"({depth_stats['deviation']*100:.1f}% dev), "
-            f"color {color_stats['actual_fps']:.1f}/{color_stats['expected_fps']} fps "
-            f"({color_stats['deviation']*100:.1f}% dev)")
+    This only ever runs while building a failure message, so it must not raise: an exception
+    here would replace the real AssertionError with a confusing secondary one.
+    """
+    config_name = result.get('config_name', '?')
+    stats = result.get('stats', {})
+    if 'error' in stats:
+        return f"{config_name} -> {stats['error']}"
+
+    try:
+        depth_stats = stats['depth']
+        color_stats = stats['color']
+        return (f"{config_name} -> "
+                f"depth {depth_stats['actual_fps']:.1f}/{depth_stats['expected_fps']} fps "
+                f"({depth_stats['deviation']*100:.1f}% dev), "
+                f"color {color_stats['actual_fps']:.1f}/{color_stats['expected_fps']} fps "
+                f"({color_stats['deviation']*100:.1f}% dev)")
+    except (KeyError, TypeError, ValueError):
+        return f"{config_name} -> unexpected stats shape: {stats}"
 
 
 @pytest.mark.timeout(14400)
