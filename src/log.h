@@ -72,6 +72,8 @@ namespace librealsense
         void reconfigure_locked( Fn && fn ) const
         {
             auto * logger = el::Loggers::getLogger( log_id );
+            if( ! logger )
+                return;
             el::base::threading::ScopedLock lock( logger->lock() );
             fn();
         }
@@ -280,10 +282,14 @@ namespace librealsense
         // Stop logging and reset logger to initial configurations
         void reset_logger()
         {
-            reconfigure_locked( [&] { el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::Enabled, "false" ); } );
-            reconfigure_locked( [&] { el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::ToFile, "false" ); } );
-            reconfigure_locked( [&] { el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::ToStandardOutput, "false" ); } );
-            reconfigure_locked( [&] { el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::MaxLogFileSize, "0" ); } );
+            // One lock for all four, so a concurrent reader can't observe a partially-reset logger
+            // (e.g. Enabled=false but ToFile still true).
+            reconfigure_locked( [&] {
+                el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::Enabled, "false" );
+                el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::ToFile, "false" );
+                el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::ToStandardOutput, "false" );
+                el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::MaxLogFileSize, "0" );
+            } );
             remove_callbacks();
 
             minimum_console_severity = RS2_LOG_SEVERITY_NONE;
