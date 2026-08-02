@@ -17,6 +17,7 @@ Code Organization & Redundancy Reduction:
 
 import pytest
 from rspy.stopwatch import Stopwatch
+from rspy.fw_compat import version_to_tuple
 import pyrealsense2 as rs
 import numpy as np
 import platform
@@ -1254,16 +1255,12 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
     # Calculate statistics
     elapsed_time = test_stopwatch.get_elapsed()
 
-    # Check if we have sufficient measurements. zero_frames distinguishes "the stream never
-    # started" from "the stream was too slow to reach the measurement threshold" - callers key
-    # retry behaviour off it, so it must not be inferred by matching on the message text.
+    # Check if we have sufficient measurements
     if len(depth_fps_measurements) < 2:
-        return False, {"error": f"Insufficient depth measurements: {len(depth_fps_measurements)} (got {depth_frame_count} frames)",
-                       "zero_frames": depth_frame_count == 0}
+        return False, {"error": f"Insufficient depth measurements: {len(depth_fps_measurements)} (got {depth_frame_count} frames)"}
 
     if len(color_fps_measurements) < 2:
-        return False, {"error": f"Insufficient color measurements: {len(color_fps_measurements)} (got {color_frame_count} frames)",
-                       "zero_frames": color_frame_count == 0}
+        return False, {"error": f"Insufficient color measurements: {len(color_fps_measurements)} (got {color_frame_count} frames)"}
 
     # Calculate FPS statistics
     depth_avg_fps = sum(depth_fps_measurements) / len(depth_fps_measurements)
@@ -1413,22 +1410,21 @@ def get_depth_color_combinations(device, max_combinations=None):
     return combinations
 
 
-def _is_rsdso_21810_pattern(device_name, depth_fps, color_fps):
-    """RSDSO-21810 (open): on D455, depth throughput degrades to ~70-84% of target whenever
-    colour is also configured at 90 fps - confirmed combined-frame-rate triggered and
-    resolution-independent, not a bandwidth limit. Scoped to D455 + 90/90 only, matching the
-    evidence on file; do not widen without new data. Remove this predicate once the ticket
-    is closed and confirm the combination fails again first (see the XPASS note below)."""
-    return 'D455' in device_name and depth_fps == 90 and color_fps == 90
+# Known open defect: on D455, depth throughput degrades while colour also runs at 90 fps.
+# Gated on FW so the allowance lapses on its own once a fixed firmware is under test.
+DUAL_90FPS_DEPTH_DEGRADATION_FIXED_IN_FW = (5, 18, 0, 0)
+DUAL_90FPS_DEPTH_DEGRADATION_MIN_RATIO = 0.65
 
 
-def _is_zero_frame_start_failure(stats):
-    """RSDSO-21811 (open): intermittent GMSL/MIPI stream-start race where one stream delivers
-    zero frames. Distinct from an FPS-deviation failure, so safe to retry once without masking
-    a real rate regression. Keyed off the structured 'zero_frames' flag rather than the error
-    text, so rewording a message can't silently disable the retry. Remove once the ticket is
-    closed."""
-    return stats.get('zero_frames', False)
+def is_depth_degraded_at_dual_90fps(device_name, fw_version, depth_fps, color_fps, stats, tolerance):
+    """Depth alone falls short of target while colour holds 90 fps, on affected D455 firmware."""
+    if 'D455' not in device_name or depth_fps != 90 or color_fps != 90 or 'error' in stats:
+        return False
+    if not fw_version or version_to_tuple(fw_version) >= DUAL_90FPS_DEPTH_DEGRADATION_FIXED_IN_FW:
+        return False
+    ratio = stats['depth']['actual_fps'] / depth_fps
+    return DUAL_90FPS_DEPTH_DEGRADATION_MIN_RATIO <= ratio < (1 - tolerance) \
+        and stats['color']['deviation'] <= tolerance
 
 
 def check_multistream_configurations_comprehensive(device, max_combinations=None):
@@ -1446,6 +1442,7 @@ def check_multistream_configurations_comprehensive(device, max_combinations=None
     log.info("\nTesting all depth + color multi-stream configurations...")
 
     device_name = device.get_info(rs.camera_info.name) if device.supports(rs.camera_info.name) else ""
+    fw_version = device.get_info(rs.camera_info.firmware_version) if device.supports(rs.camera_info.firmware_version) else ""
 
     # Get combinations
     combinations = get_depth_color_combinations(device, max_combinations)
@@ -1475,13 +1472,8 @@ def check_multistream_configurations_comprehensive(device, max_combinations=None
                 device, depth_config, color_config, test_duration, tolerance
             )
 
-            if not passed and _is_zero_frame_start_failure(stats):
-                log.warning(f"  RETRY: {config_name} -> {stats['error']} (RSDSO-21811), retrying once")
-                passed, stats = check_multistream_fps_accuracy(
-                    device, depth_config, color_config, test_duration, tolerance
-                )
-
-            known_issue = (not passed) and _is_rsdso_21810_pattern(device_name, depth_fps, color_fps)
+            known_issue = (not passed) and is_depth_degraded_at_dual_90fps(
+                device_name, fw_version, depth_fps, color_fps, stats, tolerance)
 
             result = {
                 "depth_config": depth_config,
@@ -1498,7 +1490,7 @@ def check_multistream_configurations_comprehensive(device, max_combinations=None
                 if not known_issue:
                     all_passed = False
                 log_fn = log.warning if known_issue else log.error
-                tag = " (known issue: RSDSO-21810, not counted as a CI failure)" if known_issue else ""
+                tag = " (known issue RSDSO-21810, not counted as a CI failure)" if known_issue else ""
                 if 'error' in stats:
                     log_fn(f"  ERROR{tag}: {stats['error']}")
                 else:
@@ -1517,9 +1509,9 @@ def check_multistream_configurations_comprehensive(device, max_combinations=None
                       f"(deviation: {depth_stats['deviation']*100:.1f}%)")
                 log.info(f"    Color: Expected {color_stats['expected_fps']} FPS, got {color_stats['actual_fps']:.1f} FPS "
                       f"(deviation: {color_stats['deviation']*100:.1f}%)")
-                if _is_rsdso_21810_pattern(device_name, depth_fps, color_fps):
-                    log.warning(f"  NOTE: {config_name} matches the RSDSO-21810 known-issue pattern but PASSED - "
-                                f"the bug may be fixed; check before relying on the workaround")
+                if 'D455' in device_name and depth_fps == 90 and color_fps == 90:
+                    log.warning(f"  NOTE: {config_name} PASSED - the known RSDSO-21810 degradation may be fixed; "
+                                f"re-check before keeping the allowance")
 
         except Exception as e:
             log.error(f"  ERROR testing {config_name}: {e}")
@@ -1594,7 +1586,7 @@ def print_multistream_test_summary(all_results, all_passed, product_line):
         depth_str = f"{depth_config[0]}x{depth_config[1]}@{depth_config[2]}"
         color_str = f"{color_config[0]}x{color_config[1]}@{color_config[2]}"
 
-        status = "PASS" if result['passed'] else "FAIL"
+        status = "PASS" if result['passed'] else ("KNOWN" if result.get('known_issue') else "FAIL")
 
         if 'error' in result['stats']:
             log.info(f"{depth_str:<20} {color_str:<20} {status:<8} {'ERROR':<10} {'ERROR':<10} {result['stats']['error']}")
@@ -1609,9 +1601,12 @@ def print_multistream_test_summary(all_results, all_passed, product_line):
 
     successful_results = [r for r in all_results if r['passed'] and 'error' not in r['stats']]
 
+    known_tests = sum(1 for r in all_results if r.get('known_issue'))
+
     if successful_results:
         log.info(f"\n--- MULTI-STREAM STATISTICS ---")
-        log.info(f"Success Rate: {passed_tests}/{len(all_results)} ({passed_tests/len(all_results)*100:.1f}%)")
+        known_note = f", {known_tests} known" if known_tests else ""
+        log.info(f"Success Rate: {passed_tests}/{len(all_results)} ({passed_tests/len(all_results)*100:.1f}%){known_note}")
 
         # FPS performance analysis
         depth_deviations = [r['stats']['depth']['deviation'] for r in successful_results]
@@ -1752,6 +1747,25 @@ def describe_multistream_failure(result):
         return f"{config_name} -> unexpected stats shape: {stats}"
 
 
+MAX_REPORTED_FAILURES = 10
+
+
+def describe_multistream_failures(all_results):
+    """Assertion message naming the failed combinations; known-issue rows are listed separately."""
+    def summarize(results):
+        shown = "; ".join(describe_multistream_failure(r) for r in results[:MAX_REPORTED_FAILURES])
+        extra = len(results) - MAX_REPORTED_FAILURES
+        return shown + (f"; ... and {extra} more (see log)" if extra > 0 else "")
+
+    failed = [r for r in all_results if not r['passed'] and not r.get('known_issue')]
+    known = [r for r in all_results if r.get('known_issue')]
+    msg = (f"Depth + color multi-stream configurations (all combinations) accuracy test - "
+           f"{len(all_results)} combinations tested, {len(failed)} failed: {summarize(failed)}")
+    if known:
+        msg += f" [{len(known)} known-issue failure(s) excluded: {summarize(known)}]"
+    return msg
+
+
 @pytest.mark.timeout(14400)
 def test_multistream_configurations(settled_device, coverage_tier):
     """Test depth + color multi-stream FPS accuracy for all supported configurations"""
@@ -1764,19 +1778,9 @@ def test_multistream_configurations(settled_device, coverage_tier):
 
     if multistream_results:
         print_multistream_test_summary(multistream_results, multistream_tests_passed, product_line)
-        # Name the offending combinations in the assertion itself: the message is all that reaches
-        # the JUnit report, and without it triage means downloading the per-device artifact log.
-        # known_issue failures (open tickets, see check_multistream_configurations_comprehensive)
-        # don't count toward multistream_tests_passed, but are still listed for visibility.
-        failed = [r for r in multistream_results if not r['passed'] and not r.get('known_issue')]
-        known_issues = [r for r in multistream_results if r.get('known_issue')]
-        msg = (f"Depth + color multi-stream configurations (all combinations) accuracy test - "
-               f"{len(multistream_results)} combinations tested, {len(failed)} failed: "
-               + "; ".join(describe_multistream_failure(r) for r in failed))
-        if known_issues:
-            msg += (f" [{len(known_issues)} additional known-issue failure(s) excluded: "
-                    + "; ".join(describe_multistream_failure(r) for r in known_issues) + "]")
-        assert multistream_tests_passed, msg
+        # The assertion message is all that reaches the JUnit report; without the offending
+        # combinations, triage means downloading the per-device artifact log.
+        assert multistream_tests_passed, describe_multistream_failures(multistream_results)
     else:
         # Check if device has no color sensor (like D421, D405)
         product_name = dev.get_info(rs.camera_info.name)
