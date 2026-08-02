@@ -1689,6 +1689,21 @@ def test_ir_configurations(settled_device, coverage_tier):
         f"All supported IR configurations accuracy test - {len(ir_config_results) if ir_config_results else 0} configurations tested"
 
 
+def describe_multistream_failure(result):
+    """One-line description of a failed combination, for the assertion message."""
+    stats = result['stats']
+    if 'error' in stats:
+        return f"{result['config_name']} -> {stats['error']}"
+
+    depth_stats = stats['depth']
+    color_stats = stats['color']
+    return (f"{result['config_name']} -> "
+            f"depth {depth_stats['actual_fps']:.1f}/{depth_stats['expected_fps']} fps "
+            f"({depth_stats['deviation']*100:.1f}% dev), "
+            f"color {color_stats['actual_fps']:.1f}/{color_stats['expected_fps']} fps "
+            f"({color_stats['deviation']*100:.1f}% dev)")
+
+
 @pytest.mark.timeout(14400)
 def test_multistream_configurations(settled_device, coverage_tier):
     """Test depth + color multi-stream FPS accuracy for all supported configurations"""
@@ -1701,8 +1716,13 @@ def test_multistream_configurations(settled_device, coverage_tier):
 
     if multistream_results:
         print_multistream_test_summary(multistream_results, multistream_tests_passed, product_line)
+        # Name the offending combinations in the assertion itself: the message is all that reaches
+        # the JUnit report, and without it triage means downloading the per-device artifact log.
+        failed = [r for r in multistream_results if not r['passed']]
         assert multistream_tests_passed, \
-            f"Depth + color multi-stream configurations (all combinations) accuracy test - {len(multistream_results)} combinations tested"
+            (f"Depth + color multi-stream configurations (all combinations) accuracy test - "
+             f"{len(multistream_results)} combinations tested, {len(failed)} failed: "
+             + "; ".join(describe_multistream_failure(r) for r in failed))
     else:
         # Check if device has no color sensor (like D421, D405)
         product_name = dev.get_info(rs.camera_info.name)
