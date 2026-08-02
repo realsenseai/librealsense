@@ -65,6 +65,13 @@ def is_depth_fill_rate_enough(pipeline):
 
 
 def run_test(dev, ctx, resolution, fps):
+    """Run the fill-rate check for one resolution/fps configuration.
+
+    Returns True if the configuration was supported and exercised, False if it was
+    skipped as unsupported by the device (the caller aggregates skips across the
+    sweep so unsupported configs are visible in the test's own report rather than
+    only in the debug log).
+    """
     product_name = dev.get_info(rs.camera_info.name)
 
     cfg = rs.config()
@@ -76,7 +83,7 @@ def run_test(dev, ctx, resolution, fps):
     pipeline = rs.pipeline(ctx)
     if not cfg.can_resolve(pipeline):
         log.info(f"Configuration {resolution[0]}x{resolution[1]} @ {fps}fps is not supported by the device")
-        return
+        return False
 
     pipeline.start(cfg)
     try:
@@ -108,6 +115,7 @@ def run_test(dev, ctx, resolution, fps):
     check.is_true(has_depth,
                   f"Depth fill rate too low on {product_name} at {resolution[0]}x{resolution[1]}@{fps}fps "
                   f"after {FRAMES_TO_CHECK} frames")
+    return True
 
 
 def test_depth_fill_rate(test_device_wrapped, test_context_var):
@@ -117,5 +125,9 @@ def test_depth_fill_rate(test_device_wrapped, test_context_var):
     if "nightly" in test_context_var:
         configurations = DEFAULT_CONFIGURATIONS + NIGHTLY_CONFIGURATIONS
 
-    for resolution, fps in configurations:
-        run_test(dev, ctx, resolution, fps)
+    skipped = [(resolution, fps) for resolution, fps in configurations
+               if not run_test(dev, ctx, resolution, fps)]
+
+    if skipped:
+        log.warning(f"Skipped {len(skipped)}/{len(configurations)} unsupported configuration(s): "
+                    f"{[f'{r[0]}x{r[1]}@{fps}fps' for r, fps in skipped]}")
