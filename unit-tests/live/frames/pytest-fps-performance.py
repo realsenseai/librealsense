@@ -1774,10 +1774,15 @@ def describe_multistream_failures(all_results):
 
     failed = [r for r in all_results if not r['passed'] and not r.get('known_issue') and not r.get('never_started')]
     known = [r for r in all_results if r.get('known_issue')]
+    never_started = [r for r in all_results if r.get('never_started')]
     msg = (f"Depth + color multi-stream configurations (all combinations) accuracy test - "
            f"{len(all_results)} combinations tested, {len(failed)} failed: {summarize(failed)}")
     if known:
         msg += f" [{len(known)} known-issue failure(s) excluded: {summarize(known)}]"
+    if never_started:
+        # Surfaced here too: when a real failure asserts, the skip below it never runs and these
+        # would otherwise be missing from the JUnit report entirely.
+        msg += f" [{len(never_started)} stream-start failure(s) also detected: {summarize(never_started)}]"
     return msg
 
 
