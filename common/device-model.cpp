@@ -2235,41 +2235,53 @@ namespace rs2
         return false;
     }
 
-    // Shorten text with a trailing ellipsis so it renders within max_width pixels (current font)
-    static std::string fit_text_to_width(const std::string& text, float max_width)
+    namespace
     {
-        if (max_width <= 0 || ImGui::CalcTextSize(text.c_str()).x <= max_width)
-            return text;
+        struct fitted_name
+        {
+            std::string text;
+            bool condensed; // shrunk and/or truncated to fit - full name is available via tooltip
 
-        const std::string ellipsis = "...";
-        std::string fitted = text;
-        while (!fitted.empty() && ImGui::CalcTextSize((fitted + ellipsis).c_str()).x > max_width)
-            fitted.pop_back();
-        return fitted.empty() ? ellipsis : fitted + ellipsis;
-    }
+            // Backstop: guarantees the window font scale is restored even if the caller's own
+            // reset gets skipped by an early return or an exception between the two.
+            ~fitted_name() { ImGui::SetWindowFontScale(1.0f); }
+        };
 
-    struct fitted_name
-    {
-        std::string text;
-        bool condensed; // shrunk and/or truncated to fit - full name is available via tooltip
-    };
+        // Truncates text with a trailing ellipsis so " text" renders within max_width pixels
+        // (current font). Uses a binary search on the character count rather than trimming one
+        // character at a time, since this runs every frame the name doesn't fit.
+        std::string truncate_to_width(const std::string& text, float max_width)
+        {
+            const std::string ellipsis = "...";
+            size_t lo = 0, hi = text.size();
+            while (lo < hi)
+            {
+                size_t mid = (lo + hi + 1) / 2;
+                if (ImGui::CalcTextSize((" " + text.substr(0, mid) + ellipsis).c_str()).x <= max_width)
+                    lo = mid;
+                else
+                    hi = mid - 1;
+            }
+            return " " + text.substr(0, lo) + ellipsis;
+        }
 
-    // Shrinks the current window's font scale so " text" fits within max_width; only truncates (with
-    // ellipsis) if it still doesn't fit once the scale hits min_font_scale. Caller must reset the
-    // window font scale back to 1.0 after drawing, since it stays in effect for the whole window.
-    static fitted_name fit_name_to_width(const std::string& text, float max_width, float min_font_scale)
-    {
-        std::string display = " " + text;
-        if (max_width <= 0 || ImGui::CalcTextSize(display.c_str()).x <= max_width)
-            return { display, false };
+        // Shrinks the current window's font scale so " text" fits within max_width; only truncates
+        // (with ellipsis) if it still doesn't fit once the scale hits min_font_scale. The returned
+        // object restores the window font scale to 1.0 once it goes out of scope.
+        fitted_name fit_name_to_width(const std::string& text, float max_width, float min_font_scale)
+        {
+            std::string display = " " + text;
+            if (max_width <= 0 || ImGui::CalcTextSize(display.c_str()).x <= max_width)
+                return { display, false };
 
-        float scale = std::max(min_font_scale, max_width / ImGui::CalcTextSize(display.c_str()).x);
-        ImGui::SetWindowFontScale(scale);
+            float scale = std::max(min_font_scale, max_width / ImGui::CalcTextSize(display.c_str()).x);
+            ImGui::SetWindowFontScale(scale);
 
-        if (ImGui::CalcTextSize(display.c_str()).x > max_width)
-            display = " " + fit_text_to_width(text, max_width);
+            if (ImGui::CalcTextSize(display.c_str()).x > max_width)
+                display = truncate_to_width(text, max_width);
 
-        return { display, true };
+            return { display, true };
+        }
     }
 
     void device_model::draw_controls(float panel_width, float panel_height,
