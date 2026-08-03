@@ -2235,6 +2235,43 @@ namespace rs2
         return false;
     }
 
+    // Shorten text with a trailing ellipsis so it renders within max_width pixels (current font)
+    static std::string fit_text_to_width(const std::string& text, float max_width)
+    {
+        if (max_width <= 0 || ImGui::CalcTextSize(text.c_str()).x <= max_width)
+            return text;
+
+        const std::string ellipsis = "...";
+        std::string fitted = text;
+        while (!fitted.empty() && ImGui::CalcTextSize((fitted + ellipsis).c_str()).x > max_width)
+            fitted.pop_back();
+        return fitted.empty() ? ellipsis : fitted + ellipsis;
+    }
+
+    struct fitted_name
+    {
+        std::string text;
+        bool condensed; // shrunk and/or truncated to fit - full name is available via tooltip
+    };
+
+    // Shrinks the current window's font scale so " text" fits within max_width; only truncates (with
+    // ellipsis) if it still doesn't fit once the scale hits min_font_scale. Caller must reset the
+    // window font scale back to 1.0 after drawing, since it stays in effect for the whole window.
+    static fitted_name fit_name_to_width(const std::string& text, float max_width, float min_font_scale)
+    {
+        std::string display = " " + text;
+        if (max_width <= 0 || ImGui::CalcTextSize(display.c_str()).x <= max_width)
+            return { display, false };
+
+        float scale = std::max(min_font_scale, max_width / ImGui::CalcTextSize(display.c_str()).x);
+        ImGui::SetWindowFontScale(scale);
+
+        if (ImGui::CalcTextSize(display.c_str()).x > max_width)
+            display = " " + fit_text_to_width(text, max_width);
+
+        return { display, true };
+    }
+
     void device_model::draw_controls(float panel_width, float panel_height,
         ux_window& window,
         std::string& error_message,
@@ -2279,13 +2316,20 @@ namespace rs2
         // Draw device name
         ////////////////////////////////////////
         const ImVec2 name_pos = { pos.x + 9, pos.y + 17 };
+        const float name_area_right_margin = 55.f; // leave room for the remove (X) button
+        const float min_name_font_scale = 0.7f; // below this the name shrinks to illegibility - truncate instead
         ImGui::SetCursorPos(name_pos);
         std::stringstream ss;
         if (dev.supports(RS2_CAMERA_INFO_NAME))
             ss << dev.get_info(RS2_CAMERA_INFO_NAME);
         if (is_ip_device)
         {
-            ImGui::Text(" %s", ss.str().substr(0, ss.str().find("\n IP Device")).c_str());
+            std::string full_name = ss.str().substr(0, ss.str().find("\n IP Device"));
+            auto name = fit_name_to_width(full_name, panel_width - name_pos.x - name_area_right_margin, min_name_font_scale);
+            ImGui::Text("%s", name.text.c_str());
+            ImGui::SetWindowFontScale(1.0f);
+            if (name.condensed && ImGui::IsItemHovered())
+                RsImGui::CustomTooltip(" %s", full_name.c_str());
 
             ImGui::PushFont(window.get_font());
             ImGui::Text("\tNetwork Device at %s", dev.get_info(RS2_CAMERA_INFO_IP_ADDRESS));
@@ -2293,22 +2337,44 @@ namespace rs2
         }
         else
         {
-            ImGui::Text(" %s", ss.str().c_str());
+            std::string full_name = ss.str();
+            std::string badge_text; // includes the same leading spaces the old inline "% s" formatting produced
+            std::string usb_desc;
+            bool is_usb_badge = false;
             if (dev.supports(RS2_CAMERA_INFO_CONNECTION_TYPE))
             {
                 std::string connection_type = dev.get_info(RS2_CAMERA_INFO_CONNECTION_TYPE);
                 if (connection_type == "USB" && dev.supports(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR))
                 {
-                    std::string desc = dev.get_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR);
-                    ss.str("");
-                    ss << "   " << textual_icons::usb << " " << desc;
-                    ImGui::SameLine();
-                    if (!starts_with(desc, "3.")) ImGui::PushStyleColor(ImGuiCol_Text, yellow);
+                    usb_desc = dev.get_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR);
+                    is_usb_badge = true;
+                    badge_text = rsutils::string::from() << "    " << textual_icons::usb << " " << usb_desc;
+                }
+                else
+                {
+                    badge_text = rsutils::string::from() << "    " << connection_type;
+                }
+            }
+
+            auto name = fit_name_to_width(full_name,
+                panel_width - name_pos.x - name_area_right_margin - ImGui::CalcTextSize(badge_text.c_str()).x,
+                min_name_font_scale);
+            ImGui::Text("%s", name.text.c_str());
+            ImGui::SetWindowFontScale(1.0f);
+            if (name.condensed && ImGui::IsItemHovered())
+                RsImGui::CustomTooltip(" %s", full_name.c_str());
+
+            if (!badge_text.empty())
+            {
+                ImGui::SameLine();
+                if (is_usb_badge)
+                {
+                    if (!starts_with(usb_desc, "3.")) ImGui::PushStyleColor(ImGuiCol_Text, yellow);
                     else ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
-                    ImGui::Text(" %s", ss.str().c_str());
+                    ImGui::Text("%s", badge_text.c_str());
                     ImGui::PopStyleColor();
                     ss.str("");
-                    ss << "The camera was detected by the OS as connected to a USB " << desc << " port";
+                    ss << "The camera was detected by the OS as connected to a USB " << usb_desc << " port";
                     ImGui::PushFont(window.get_font());
                     ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
                     if (ImGui::IsItemHovered())
@@ -2318,17 +2384,13 @@ namespace rs2
                 }
                 else
                 {
-                    ss.str("");
-                    ss << "   " << connection_type;
-                    ImGui::SameLine();
                     ImGui::PushStyleColor(ImGuiCol_Text, white);
-                    ImGui::Text(" %s", ss.str().c_str());
+                    ImGui::Text("%s", badge_text.c_str());
                     ImGui::PopStyleColor();
                 }
             }
         }
 
-        //ImGui::Text(" %s", dev.get_info(RS2_CAMERA_INFO_NAME));
         ImGui::PopFont();
 
         ////////////////////////////////////////
