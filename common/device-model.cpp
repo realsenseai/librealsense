@@ -2240,18 +2240,18 @@ namespace rs2
         struct fitted_name
         {
             std::string text;
-            bool condensed; // shrunk and/or truncated to fit - full name is available via tooltip
-
-            // Backstop: guarantees the window font scale is restored even if the caller's own
-            // reset gets skipped by an early return or an exception between the two.
-            ~fitted_name() { ImGui::SetWindowFontScale(1.0f); }
+            bool truncated; // full name is available via tooltip
         };
 
-        // Truncates text with a trailing ellipsis so " text" renders within max_width pixels
-        // (current font). Uses a binary search on the character count rather than trimming one
-        // character at a time, since this runs every frame the name doesn't fit.
-        std::string truncate_to_width(const std::string& text, float max_width)
+        // Truncates text with a trailing ellipsis so " text" fits within max_width pixels (current
+        // font). Uses a binary search on the character count rather than trimming one character at
+        // a time, since this runs every frame the name doesn't fit.
+        fitted_name fit_name_to_width(const std::string& text, float max_width)
         {
+            std::string display = " " + text;
+            if (max_width <= 0 || ImGui::CalcTextSize(display.c_str()).x <= max_width)
+                return { display, false };
+
             const std::string ellipsis = "...";
             size_t lo = 0, hi = text.size();
             while (lo < hi)
@@ -2262,25 +2262,7 @@ namespace rs2
                 else
                     hi = mid - 1;
             }
-            return " " + text.substr(0, lo) + ellipsis;
-        }
-
-        // Shrinks the current window's font scale so " text" fits within max_width; only truncates
-        // (with ellipsis) if it still doesn't fit once the scale hits min_font_scale. The returned
-        // object restores the window font scale to 1.0 once it goes out of scope.
-        fitted_name fit_name_to_width(const std::string& text, float max_width, float min_font_scale)
-        {
-            std::string display = " " + text;
-            if (max_width <= 0 || ImGui::CalcTextSize(display.c_str()).x <= max_width)
-                return { display, false };
-
-            float scale = std::max(min_font_scale, max_width / ImGui::CalcTextSize(display.c_str()).x);
-            ImGui::SetWindowFontScale(scale);
-
-            if (ImGui::CalcTextSize(display.c_str()).x > max_width)
-                display = truncate_to_width(text, max_width);
-
-            return { display, true };
+            return { " " + text.substr(0, lo) + ellipsis, true };
         }
     }
 
@@ -2329,7 +2311,6 @@ namespace rs2
         ////////////////////////////////////////
         const ImVec2 name_pos = { pos.x + 9, pos.y + 17 };
         const float name_area_right_margin = 55.f; // leave room for the remove (X) button
-        const float min_name_font_scale = 0.9f; // below this the name shrinks to illegibility - truncate instead
         ImGui::SetCursorPos(name_pos);
         std::stringstream ss;
         if (dev.supports(RS2_CAMERA_INFO_NAME))
@@ -2337,10 +2318,9 @@ namespace rs2
         if (is_ip_device)
         {
             std::string full_name = ss.str().substr(0, ss.str().find("\n IP Device"));
-            auto name = fit_name_to_width(full_name, panel_width - name_pos.x - name_area_right_margin, min_name_font_scale);
+            auto name = fit_name_to_width(full_name, panel_width - name_pos.x - name_area_right_margin);
             ImGui::Text("%s", name.text.c_str());
-            ImGui::SetWindowFontScale(1.0f);
-            if (name.condensed && ImGui::IsItemHovered())
+            if (name.truncated && ImGui::IsItemHovered())
                 RsImGui::CustomTooltip(" %s", full_name.c_str());
 
             ImGui::PushFont(window.get_font());
@@ -2370,17 +2350,14 @@ namespace rs2
 
             // Reserve a full space-width gap between the name and the badge, on top of the badge's own width.
             float badge_gap = badge_text.empty() ? 0.f : ImGui::CalcTextSize(" ").x + ImGui::CalcTextSize(badge_text.c_str()).x;
-            auto name = fit_name_to_width(full_name,
-                panel_width - name_pos.x - name_area_right_margin - badge_gap,
-                min_name_font_scale);
+            auto name = fit_name_to_width(full_name, panel_width - name_pos.x - name_area_right_margin - badge_gap);
             ImGui::Text("%s", name.text.c_str());
-            ImGui::SetWindowFontScale(1.0f);
-            if (name.condensed && ImGui::IsItemHovered())
+            if (name.truncated && ImGui::IsItemHovered())
                 RsImGui::CustomTooltip(" %s", full_name.c_str());
 
             if (!badge_text.empty())
             {
-                ImGui::SameLine(0.0f, ImGui::CalcTextSize(" ").x); // guarantee a space-width gap regardless of name scale
+                ImGui::SameLine(0.0f, ImGui::CalcTextSize(" ").x); // guarantee a space-width gap before the badge
                 if (is_usb_badge)
                 {
                     if (!starts_with(usb_desc, "3.")) ImGui::PushStyleColor(ImGuiCol_Text, yellow);
