@@ -50,6 +50,7 @@ void init_device(py::module &m) {
         .def(BIND_DOWNCAST(device, auto_calibrated_device))
         .def(BIND_DOWNCAST(device, device_calibration))
         .def(BIND_DOWNCAST(device, calibration_change_device))
+        .def(BIND_DOWNCAST(device, d500_config_tables))
         .def(BIND_DOWNCAST(device, firmware_logger))
         .def("__repr__", [](const rs2::device &self) {
             std::ostringstream ss;
@@ -224,6 +225,17 @@ void init_device(py::module &m) {
         .def("reset_to_factory_calibration", &rs2::auto_calibrated_device::reset_to_factory_calibration, "Reset device to factory calibration.")
         .def("get_calibration_config", &rs2::auto_calibrated_device::get_calibration_config, "Get Calibration Config Table", py::call_guard<py::gil_scoped_release>())
         .def("set_calibration_config", &rs2::auto_calibrated_device::set_calibration_config, "Set Calibration Config Table", "calibration_config_json_str"_a, py::call_guard<py::gil_scoped_release>());
+
+    py::class_<rs2::d500_config_tables, rs2::device, py_holder<rs2::d500_config_tables>> d500_config_tables(m, "d500_config_tables"); // No docstring in C++
+    d500_config_tables.def(py::init<rs2::device>(), "device"_a)
+        .def("get_safety_preset", &rs2::d500_config_tables::get_safety_preset, "get safety preset at index", "index"_a, py::call_guard<py::gil_scoped_release>())
+        .def("set_safety_preset", &rs2::d500_config_tables::set_safety_preset, "set safety preset at index", "index"_a, "sp_json_str"_a, py::call_guard<py::gil_scoped_release>())
+        .def("get_safety_interface_config", &rs2::d500_config_tables::get_safety_interface_config, "get safety interface config", "loc"_a = RS2_CALIB_LOCATION_RAM, py::call_guard<py::gil_scoped_release>())
+        .def("set_safety_interface_config", &rs2::d500_config_tables::set_safety_interface_config, "set safety interface config", "sic_json_str"_a, py::call_guard<py::gil_scoped_release>())
+        .def("get_application_config", &rs2::d500_config_tables::get_application_config, "get application config", py::call_guard<py::gil_scoped_release>())
+        .def("set_application_config", &rs2::d500_config_tables::set_application_config, "set application config", "application_config_json_str"_a, py::call_guard<py::gil_scoped_release>())
+        .def("set_parameters", &rs2::d500_config_tables::set_parameters, "set individual exposed parameters from a flat JSON object", "params_json_str"_a, py::call_guard<py::gil_scoped_release>())
+        .def("get_parameters", &rs2::d500_config_tables::get_parameters, "get all exposed parameters as a flat JSON object", py::call_guard<py::gil_scoped_release>());
 
     py::class_<rs2::device_calibration, rs2::device, py_holder<rs2::device_calibration>> device_calibration( m, "device_calibration" );
     device_calibration.def( py::init<rs2::device>(), "device"_a )

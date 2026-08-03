@@ -63,6 +63,7 @@
 #include "color-sensor.h"
 #include "perception-sensor.h"
 #include "safety-sensor.h"
+#include "ds/d500/d500-config-tables.h"
 #include "depth-mapping-sensor.h"
 #include "composite-frame.h"
 #include "points.h"
@@ -2034,6 +2035,7 @@ int rs2_is_device_extendable_to(const rs2_device* dev, rs2_extension extension, 
         case RS2_EXTENSION_FW_LOGGER             : return VALIDATE_INTERFACE_NO_THROW(dev->device, librealsense::firmware_logger_extensions)    != nullptr;
         case RS2_EXTENSION_CALIBRATION_CHANGE_DEVICE: return VALIDATE_INTERFACE_NO_THROW(dev->device, librealsense::calibration_change_device)  != nullptr;
         case RS2_EXTENSION_ETH_CONFIG            : return VALIDATE_INTERFACE_NO_THROW(dev->device, librealsense::eth_config_device )            != nullptr;
+        case RS2_EXTENSION_D500_CONFIG_TABLES    : return VALIDATE_INTERFACE_NO_THROW(dev->device, librealsense::d500_config_tables )          != nullptr;
 
         default:
             return false;
@@ -4829,6 +4831,108 @@ void rs2_set_application_config(
     safety_sensor->set_application_config(application_config_json_str);
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, sensor, application_config_json_str)
+
+const rs2_raw_data_buffer* rs2_d500_get_safety_preset(
+    rs2_device const* device,
+    int index,
+    rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    VALIDATE_RANGE(index, 0, 63);
+    auto config_tables = VALIDATE_INTERFACE(device->device, librealsense::d500_config_tables);
+    auto ret_str = config_tables->get_safety_preset(index);
+    std::vector<uint8_t> vec(ret_str.begin(), ret_str.end());
+    return new rs2_raw_data_buffer{ std::move(vec) };
+}
+HANDLE_EXCEPTIONS_AND_RETURN(nullptr, device, index)
+
+void rs2_d500_set_safety_preset(
+    rs2_device const* device,
+    int index,
+    const char* sp_json_str,
+    rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    VALIDATE_RANGE(index, 0, 63);
+    VALIDATE_NOT_NULL(sp_json_str);
+    auto config_tables = VALIDATE_INTERFACE(device->device, librealsense::d500_config_tables);
+    config_tables->set_safety_preset(index, sp_json_str);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, device, index, sp_json_str)
+
+const rs2_raw_data_buffer* rs2_d500_get_safety_interface_config(
+    rs2_device const* device,
+    rs2_calib_location loc,
+    rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    VALIDATE_RANGE(loc, RS2_CALIB_LOCATION_FIRST, RS2_CALIB_LOCATION_COUNT);
+    auto config_tables = VALIDATE_INTERFACE(device->device, librealsense::d500_config_tables);
+    auto ret_str = config_tables->get_safety_interface_config(loc);
+    std::vector<uint8_t> vec(ret_str.begin(), ret_str.end());
+    return new rs2_raw_data_buffer{ std::move(vec) };
+}
+HANDLE_EXCEPTIONS_AND_RETURN(nullptr, device, loc)
+
+void rs2_d500_set_safety_interface_config(
+    rs2_device const* device,
+    const char* sic_json_str,
+    rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    VALIDATE_NOT_NULL(sic_json_str);
+    auto config_tables = VALIDATE_INTERFACE(device->device, librealsense::d500_config_tables);
+    config_tables->set_safety_interface_config(sic_json_str);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, device, sic_json_str)
+
+const rs2_raw_data_buffer* rs2_d500_get_application_config(
+    rs2_device const* device,
+    rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    auto config_tables = VALIDATE_INTERFACE(device->device, librealsense::d500_config_tables);
+    auto ret_str = config_tables->get_application_config();
+    std::vector<uint8_t> vec(ret_str.begin(), ret_str.end());
+    return new rs2_raw_data_buffer{ std::move(vec) };
+}
+HANDLE_EXCEPTIONS_AND_RETURN(nullptr, device)
+
+void rs2_d500_set_application_config(
+    rs2_device const* device,
+    const char* application_config_json_str,
+    rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    VALIDATE_NOT_NULL(application_config_json_str);
+    auto config_tables = VALIDATE_INTERFACE(device->device, librealsense::d500_config_tables);
+    config_tables->set_application_config(application_config_json_str);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, device, application_config_json_str)
+
+void rs2_d500_set_parameters(
+    rs2_device const* device,
+    const char* params_json_str,
+    rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    VALIDATE_NOT_NULL(params_json_str);
+    auto config_tables = VALIDATE_INTERFACE(device->device, librealsense::d500_config_tables);
+    config_tables->set_parameters(params_json_str);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, device, params_json_str)
+
+const rs2_raw_data_buffer* rs2_d500_get_parameters(
+    rs2_device const* device,
+    rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    auto config_tables = VALIDATE_INTERFACE(device->device, librealsense::d500_config_tables);
+    auto ret_str = config_tables->get_parameters();
+    std::vector<uint8_t> vec(ret_str.begin(), ret_str.end());
+    return new rs2_raw_data_buffer{ std::move(vec) };
+}
+HANDLE_EXCEPTIONS_AND_RETURN(nullptr, device)
 
 void rs2_hw_monitor_get_opcode_string(int opcode, char* buffer, size_t buffer_size,
     rs2_device* device,

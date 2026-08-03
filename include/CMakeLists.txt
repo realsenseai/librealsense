@@ -14,6 +14,7 @@ target_sources( ${PROJECT_NAME}
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_record_playback.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_sensor.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_safety_sensor.h"
+        "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_d500_config_tables.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_internal.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_pipeline.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_config.h"

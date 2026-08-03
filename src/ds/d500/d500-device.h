@@ -15,6 +15,7 @@
 #include "ds/ds-device-common.h"
 #include "backend-device.h"
 #include "d500-auto-calibration.h"
+#include "d500-config-tables.h"
 #include <src/core/video.h>
 #include <src/depth-sensor.h>
 
@@ -83,6 +84,7 @@ namespace librealsense
         , public global_time_interface
         , public d500_auto_calibrated
         , public updatable
+        , public d500_config_tables
     {
     public:
         std::shared_ptr<synthetic_sensor> create_depth_device(std::shared_ptr<context> ctx,
@@ -124,6 +126,16 @@ namespace librealsense
         void update_flash(const std::vector<uint8_t>& image, rs2_update_progress_callback_sptr callback, int update_mode) override;
         bool check_fw_compatibility( const std::vector<uint8_t>& image ) const override { return true; };
         std::string get_opcode_string(int opcode) const override;
+
+        // d500_config_tables - flash configuration tables shared by all D500 cameras
+        std::string get_safety_preset(int index) const override;
+        void set_safety_preset(int index, const std::string& sp_json_str) const override;
+        std::string get_safety_interface_config(rs2_calib_location loc) const override;
+        void set_safety_interface_config(const std::string& sic_json_str) const override;
+        std::string get_application_config() const override;
+        void set_application_config(const std::string& application_config_json_str) const override;
+        void set_parameters(const std::string& params_json_str) const override;
+        std::string get_parameters() const override;
 
     protected:
         std::shared_ptr<ds_device_common> _ds_device_common;

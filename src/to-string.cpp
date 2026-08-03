@@ -422,6 +422,7 @@ const char * get_string( rs2_extension value )
     CASE( PERCEPTION_SENSOR )
     CASE( PERCEPTION_PROFILE )
     CASE( GPU_FRAME )
+    CASE( D500_CONFIG_TABLES )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;

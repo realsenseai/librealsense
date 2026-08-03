@@ -909,6 +909,102 @@ namespace rs2
         }
     };
 
+    /**
+     * Access to the D500 flash configuration tables. All D500 cameras share the same flash layout,
+     * so these are available on any D500 device (unlike the safety sensor, exposed only by D585S).
+     */
+    class d500_config_tables : public device
+    {
+    public:
+        d500_config_tables(device d)
+            : device(d.get())
+        {
+            rs2_error* e = nullptr;
+            if (rs2_is_device_extendable_to(_dev.get(), RS2_EXTENSION_D500_CONFIG_TABLES, &e) == 0 && !e)
+            {
+                _dev.reset();
+            }
+            error::handle(e);
+        }
+
+        operator bool() const { return _dev.get() != nullptr; }
+
+        std::string get_safety_preset(int index) const
+        {
+            rs2_error* e = nullptr;
+            auto buffer = rs2_d500_get_safety_preset(_dev.get(), index, &e);
+            std::shared_ptr<const rs2_raw_data_buffer> list(buffer, rs2_delete_raw_data);
+            error::handle(e);
+            return raw_data_to_string(list.get());
+        }
+
+        void set_safety_preset(int index, const std::string& sp_json_str) const
+        {
+            rs2_error* e = nullptr;
+            rs2_d500_set_safety_preset(_dev.get(), index, sp_json_str.c_str(), &e);
+            error::handle(e);
+        }
+
+        std::string get_safety_interface_config(rs2_calib_location loc = RS2_CALIB_LOCATION_RAM) const
+        {
+            rs2_error* e = nullptr;
+            auto buffer = rs2_d500_get_safety_interface_config(_dev.get(), loc, &e);
+            std::shared_ptr<const rs2_raw_data_buffer> list(buffer, rs2_delete_raw_data);
+            error::handle(e);
+            return raw_data_to_string(list.get());
+        }
+
+        void set_safety_interface_config(const std::string& sic_json_str) const
+        {
+            rs2_error* e = nullptr;
+            rs2_d500_set_safety_interface_config(_dev.get(), sic_json_str.c_str(), &e);
+            error::handle(e);
+        }
+
+        std::string get_application_config() const
+        {
+            rs2_error* e = nullptr;
+            auto buffer = rs2_d500_get_application_config(_dev.get(), &e);
+            std::shared_ptr<const rs2_raw_data_buffer> list(buffer, rs2_delete_raw_data);
+            error::handle(e);
+            return raw_data_to_string(list.get());
+        }
+
+        void set_application_config(const std::string& application_config_json_str) const
+        {
+            rs2_error* e = nullptr;
+            rs2_d500_set_application_config(_dev.get(), application_config_json_str.c_str(), &e);
+            error::handle(e);
+        }
+
+        void set_parameters(const std::string& params_json_str) const
+        {
+            rs2_error* e = nullptr;
+            rs2_d500_set_parameters(_dev.get(), params_json_str.c_str(), &e);
+            error::handle(e);
+        }
+
+        std::string get_parameters() const
+        {
+            rs2_error* e = nullptr;
+            auto buffer = rs2_d500_get_parameters(_dev.get(), &e);
+            std::shared_ptr<const rs2_raw_data_buffer> list(buffer, rs2_delete_raw_data);
+            error::handle(e);
+            return raw_data_to_string(list.get());
+        }
+
+    private:
+        static std::string raw_data_to_string(const rs2_raw_data_buffer* list)
+        {
+            rs2_error* e = nullptr;
+            auto size = rs2_get_raw_data_size(list, &e);
+            error::handle(e);
+            auto start = rs2_get_raw_data(list, &e);
+            error::handle(e);
+            return std::string(start, start + size);
+        }
+    };
+
     /*
         Wrapper around any callback function that is given to calibration_change_callback.
     */

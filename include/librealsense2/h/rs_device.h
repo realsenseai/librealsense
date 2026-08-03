@@ -15,6 +15,7 @@ extern "C" {
 
 #include "rs_types.h"
 #include "rs_sensor.h"
+#include "rs_d500_config_tables.h"
 
 /**
 * Determines number of devices in a list.

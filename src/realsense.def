@@ -467,6 +467,14 @@ EXPORTS
     rs2_set_calibration_config
     rs2_get_application_config
     rs2_set_application_config
+    rs2_d500_get_safety_preset
+    rs2_d500_set_safety_preset
+    rs2_d500_get_safety_interface_config
+    rs2_d500_set_safety_interface_config
+    rs2_d500_get_application_config
+    rs2_d500_set_application_config
+    rs2_d500_set_parameters
+    rs2_d500_get_parameters
     rs2_hw_monitor_get_opcode_string
 
     rs2_eth_link_priority_to_string
