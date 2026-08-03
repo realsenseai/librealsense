@@ -2360,11 +2360,11 @@ namespace rs2
                 {
                     usb_desc = dev.get_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR);
                     is_usb_badge = true;
-                    badge_text = rsutils::string::from() << "    " << textual_icons::usb << " " << usb_desc;
+                    badge_text = rsutils::string::from() << "   " << textual_icons::usb << " " << usb_desc;
                 }
                 else
                 {
-                    badge_text = rsutils::string::from() << "    " << connection_type;
+                    badge_text = rsutils::string::from() << "   " << connection_type;
                 }
             }
 
