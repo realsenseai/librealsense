@@ -188,6 +188,10 @@ namespace rs2
         {
             // Same key the SDK's RUM config (src/rum/rum-config) uses in realsense-config.json.
             static const char* rum_cloud_enabled{ "rum_cloud_enabled" };
+            // Boot-upload throttle (config-only, no UI): min hours between uploads (default 24, 0 disables)
+            // and the last successful upload time in unix seconds.
+            static const char* rum_upload_interval_hours{ "rum_upload_interval_hours" };
+            static const char* rum_last_upload{ "rum_last_upload" };
         }
         namespace ply
         {

@@ -186,10 +186,19 @@ void rum_collector::record_option_change( std::string const & option, float valu
 }
 
 
+void rum_collector::add_recommended_filter( std::string const & name )
+{
+    std::lock_guard< std::mutex > lk( _mutex );
+    _recommended_filters.insert( name );
+}
+
+
 void rum_collector::record_filter( std::string const & name )
 {
     std::lock_guard< std::mutex > lk( _mutex );
-    ++_filter_counts[name];
+    // Count only recommended (user-facing) filters; ignore viewer/internal blocks.
+    if( _recommended_filters.count( name ) )
+        ++_filter_counts[name];
 }
 
 

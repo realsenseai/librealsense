@@ -15,9 +15,12 @@ def test_rum_submodule_is_exposed():
 def test_cloud_consent_round_trips():
     if os.environ.get( "RS2_RUM_CLOUD_ENABLED" ):
         pytest.skip( "RS2_RUM_CLOUD_ENABLED is set; env overrides the config value" )
-    # Restore prior consent if the key existed, else drop the key the test added.
+    # Leave the config as we found it: restore the value if the key was there, drop the key if only
+    # the file was there, or remove the file entirely if the test created it (e.g. a fresh CI runner).
     key = "rum_cloud_enabled"
-    existed = key in config_file.get_config_file()
+    cfg_path = config_file.get_config_path()
+    had_file = os.path.exists( cfg_path )
+    had_key = had_file and key in config_file.get_config_file()
     saved = rs.rum.is_cloud_enabled()
     try:
         rs.rum.set_cloud_enabled( True )
@@ -25,13 +28,15 @@ def test_cloud_consent_round_trips():
         rs.rum.set_cloud_enabled( False )
         assert not rs.rum.is_cloud_enabled()
     finally:
-        if existed:
+        if had_key:
             rs.rum.set_cloud_enabled( saved )
-        else:
+        elif had_file:
             cfg = config_file.get_config_file()
             cfg.pop( key, None )
-            with open( config_file.get_config_path(), "w", encoding="utf-8" ) as f:
+            with open( cfg_path, "w", encoding="utf-8" ) as f:
                 json.dump( cfg, f )
+        elif os.path.exists( cfg_path ):
+            os.remove( cfg_path )
 
 
 def test_report_is_valid_json_with_expected_fields():

@@ -6,7 +6,8 @@
 
 #include "core/device-interface.h"          // device_interface, supports_info/get_info
 #include "core/video.h"                      // stream_profile_interface, video_stream_profile_interface
-#include "core/sensor-interface.h"           // sensor_interface
+#include "core/sensor-interface.h"           // sensor_interface, get_recommended_processing_blocks
+#include "core/processing-block-interface.h" // processing_block_interface (recommended-filter names)
 #include "core/options-interface.h"          // options_interface
 #include "core/enum-helpers.h"               // get_string( rs2_stream / rs2_format / rs2_option / rs2_notification_category )
 
@@ -30,6 +31,13 @@ void on_device( device_interface & dev )
                                              info( RS2_CAMERA_INFO_FIRMWARE_VERSION ),
                                              info( RS2_CAMERA_INFO_CONNECTION_TYPE ),
                                              info( RS2_CAMERA_INFO_MIPI_DRIVER_VERSION ) );
+
+    // Mark this device's recommended post-processing filters as the ones worth recording, so
+    // record_filter ignores viewer/internal blocks (colorizer/pointcloud/align, format converters).
+    for( size_t i = 0; i < dev.get_sensors_count(); ++i )
+        for( auto const & block : dev.get_sensor( i ).get_recommended_processing_blocks() )
+            if( block && block->supports_info( RS2_CAMERA_INFO_NAME ) )
+                rum_collector::instance().add_recommended_filter( block->get_info( RS2_CAMERA_INFO_NAME ) );
 }
 
 

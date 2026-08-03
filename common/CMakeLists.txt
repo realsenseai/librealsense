@@ -101,6 +101,8 @@ set(UTILITIES_FILES
 set(RUM_UPLOADER_FILES
     "${CMAKE_CURRENT_LIST_DIR}/rum-uploader/rum-uploader.h"
     "${CMAKE_CURRENT_LIST_DIR}/rum-uploader/rum-uploader.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/http-uploader.h"
+    "${CMAKE_CURRENT_LIST_DIR}/http-uploader.cpp"
     )
 
 set(COMMON_SRC

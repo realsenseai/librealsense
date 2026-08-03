@@ -1,26 +1,49 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-#include "rum-uploader.h"
-
+#ifdef ENABLE_STATS
+#include "../rs-config.h"        // config_file, configurations::stats
+#include "../device-model.h"     // configurations, device_model
+#include "../ux-window.h"        // ux_window (consent popup font)
+#include "../subdevice-model.h"  // subdevice_model::wait_for_stop
 #include <librealsense2/rs.hpp>  // rs2::rum::is_cloud_enabled
-#include <rsutils/easylogging/easyloggingpp.h>
 #include <rsutils/os/special-folder.h>
+#include <imgui.h>
 #include <fstream>
 #include <sstream>
 #include <thread>
+#include <chrono>
+#endif  // ENABLE_STATS
 
-#ifdef ENABLE_STATS
-#include <curl/curl.h>
-#endif
+#include "rum-uploader.h"
+#include "../http-uploader.h"    // http::http_uploader (all curl lives there)
+#include <rsutils/easylogging/easyloggingpp.h>
 
 
 namespace rs2 {
 
 
+#ifndef ENABLE_STATS
+
+// Dummy functions - built without RUM collection/upload; the whole feature compiles to no-ops.
+std::string rum_uploader::saved_report() { return std::string(); }
+bool rum_uploader::upload( std::string const & ) { LOG_WARNING( "RUM upload unavailable: built without ENABLE_STATS" ); return false; }
+void rum_uploader::start() {}
+void rum_uploader::upload_async( std::string, std::function< void( bool ) > ) {}
+rum_uploader::~rum_uploader() {}
+void rum_uploader::upload_data( ux_window & ) {}
+void rum_uploader::join_pending_stops( std::shared_ptr< std::vector< std::unique_ptr< device_model > > > ) {}
+
+#else  // ENABLE_STATS
+
+
+// ---- tunables ----
 // No production endpoint yet; upload to the local dev-server stub (see dev-server/) for now.
 // TODO: use the real cloud endpoint once it exists.
 static char const * RUM_ENDPOINT = "http://127.0.0.1:8080/v1/rum";
+static char const * CONSENT_POPUP_ID = "Help improve RealSense";
+static const int  DEFAULT_UPLOAD_INTERVAL_HOURS = 24;   // 0 disables the throttle
+static const int  SECONDS_PER_HOUR = 3600;
 
 
 std::string rum_uploader::saved_report()
@@ -36,18 +59,6 @@ std::string rum_uploader::saved_report()
 }
 
 
-#ifdef ENABLE_STATS
-
-namespace {
-
-size_t discard_response( void *, size_t size, size_t nmemb, void * )
-{
-    return size * nmemb;  // ignore the server's response body
-}
-
-}  // namespace
-
-
 bool rum_uploader::upload( std::string const & json_report )
 {
     // Refuse to send without consent, so no caller can leak data by forgetting to check.
@@ -57,57 +68,43 @@ bool rum_uploader::upload( std::string const & json_report )
         return false;
     }
 
-    CURL * curl = curl_easy_init();
-    if( ! curl )
-        return false;
-
-    curl_slist * headers = curl_slist_append( nullptr, "Content-Type: application/json" );
-
-    curl_easy_setopt( curl, CURLOPT_URL, RUM_ENDPOINT );
-    curl_easy_setopt( curl, CURLOPT_POST, 1L );
-    curl_easy_setopt( curl, CURLOPT_POSTFIELDS, json_report.c_str() );
-    curl_easy_setopt( curl, CURLOPT_POSTFIELDSIZE, (long)json_report.size() );
-    curl_easy_setopt( curl, CURLOPT_HTTPHEADER, headers );
-    curl_easy_setopt( curl, CURLOPT_CONNECTTIMEOUT, 5L );
-    curl_easy_setopt( curl, CURLOPT_TIMEOUT, 15L );  // overall cap so a stalled transfer can't hang the thread
-    curl_easy_setopt( curl, CURLOPT_NOSIGNAL, 1L );
-    curl_easy_setopt( curl, CURLOPT_FAILONERROR, 1L );
-    curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, discard_response );
-
-    auto res = curl_easy_perform( curl );
-    bool ok = ( res == CURLE_OK );
-    if( ! ok )
-        LOG_ERROR( "RUM upload to " << RUM_ENDPOINT << " failed: " << curl_easy_strerror( res ) );
-
-    curl_slist_free_all( headers );
-    curl_easy_cleanup( curl );
-    return ok;
+    // All HTTP/curl lives in http_uploader; we just hand it the endpoint and body.
+    http::http_uploader uploader;
+    return uploader.upload( RUM_ENDPOINT, json_report );
 }
-
-#else  // ENABLE_STATS
-
-bool rum_uploader::upload( std::string const & )
-{
-    LOG_WARNING( "RUM upload unavailable: built without HTTP support (ENABLE_STATS not defined)" );
-    return false;
-}
-
-#endif  // ENABLE_STATS
 
 
 void rum_uploader::start()
 {
+    if( _thread.joinable() )
+        _thread.join();  // don't overwrite a running worker (a second start / start-after-upload would std::terminate)
     _thread = std::thread( []()
     {
         try
         {
             if( ! rs2::rum::is_cloud_enabled() )
                 return;
+
+            // Throttle boot uploads to at most once per interval, read from config (no UI; default
+            // 24h, 0 disables). The last-upload time persists in the same config file.
+            auto & cfg = config_file::instance();
+            int interval_hours = cfg.get_or_default( configurations::stats::rum_upload_interval_hours, DEFAULT_UPLOAD_INTERVAL_HOURS );
+            auto now = std::chrono::duration_cast< std::chrono::seconds >(
+                           std::chrono::system_clock::now().time_since_epoch() ).count();
+            long long last = cfg.get_or_default< long long >( configurations::stats::rum_last_upload, 0 );
+            if( last > now )
+                last = now;  // future timestamp (clock skew / corrupt config) - invalidate to now
+            if( interval_hours > 0 && now - last < (long long)interval_hours * SECONDS_PER_HOUR )
+                return;  // uploaded recently
+
             auto report = saved_report();   // prior session (nothing live yet at boot)
             if( report.empty() )
                 return;  // nothing saved yet
             if( upload( report ) )
+            {
+                cfg.set( configurations::stats::rum_last_upload, now );
                 LOG_INFO( "RUM report uploaded to " << RUM_ENDPOINT );
+            }
         }
         catch( std::exception const & e ) { LOG_ERROR( "RUM upload error: " << e.what() ); }
     } );
@@ -144,6 +141,71 @@ rum_uploader::~rum_uploader()
     if( _thread.joinable() )
         _thread.join();
 }
+
+
+static void draw_consent_popup( rum_uploader & uploader, ux_window & window )
+{
+    ImGui::SetNextWindowSize( { 460.f, 0.f } );
+    if( ! ImGui::BeginPopupModal( CONSENT_POPUP_ID, nullptr,
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove ) )
+        return;
+
+    ImGui::PushFont( window.get_large_font() );
+    ImGui::Text( "%s", CONSENT_POPUP_ID );
+    ImGui::PopFont();
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::TextWrapped( "Share anonymous usage statistics (devices, stream configs, options, "
+                        "and errors) to help us prioritize fixes and features." );
+    ImGui::Spacing();
+    ImGui::TextWrapped( "No personal data, serial numbers, or image content is ever collected. "
+                        "You can change this any time in Settings > Online Services." );
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    if( ImGui::Button( "Yes, enable", ImVec2( 150, 30 ) ) )
+    {
+        config_file::instance().set( configurations::stats::rum_cloud_enabled, true );
+        uploader.start();  // upload any saved report now (e.g. re-consent after a reset); no-op on a true first run
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if( ImGui::Button( "No thanks", ImVec2( 150, 30 ) ) )
+    {
+        config_file::instance().set( configurations::stats::rum_cloud_enabled, false );
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+}
+
+
+void rum_uploader::upload_data( ux_window & window )
+{
+    // First-run consent: decided once (missing -> ask; true/false -> silent). Persists immediately.
+    static bool startup_done = false;
+    if( ! startup_done )
+    {
+        if( ! config_file::instance().contains( configurations::stats::rum_cloud_enabled ) )
+            ImGui::OpenPopup( CONSENT_POPUP_ID );  // first run: ask; nothing saved yet, so no upload this session
+        else
+            start();  // background-upload the previous session's saved report
+        startup_done = true;
+    }
+    draw_consent_popup( *this, window );
+}
+
+
+void rum_uploader::join_pending_stops( std::shared_ptr< std::vector< std::unique_ptr< device_model > > > device_models )
+{
+    // stop() runs asynchronously and is where streamed-duration is recorded, so join any pending
+    // stop here; the session is persisted automatically when the SDK context is destroyed.
+    for( auto && dm : *device_models )
+        for( auto && sub : dm->subdevices )
+            try { sub->wait_for_stop(); } catch( ... ) {}
+}
+
+
+#endif  // ENABLE_STATS
 
 
 }  // namespace rs2

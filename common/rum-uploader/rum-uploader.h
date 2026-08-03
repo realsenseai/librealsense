@@ -6,9 +6,15 @@
 #include <thread>
 #include <atomic>
 #include <functional>
+#include <memory>
+#include <vector>
 
 
 namespace rs2 {
+
+
+class ux_window;
+class device_model;
 
 
 // RUM uploader, linked into the viewer. Owns the background upload thread and joins it in the
@@ -37,6 +43,12 @@ public:
     // so a UI button never blocks on a slow transfer. `on_done( ok )`, if given, runs on that thread
     // when the upload finishes (not called on the skip).
     void upload_async( std::string report, std::function< void( bool ) > on_done = {} );
+
+    // Show consent popup if consent not set, upload if consent granted, no-op if rejected.
+    void upload_data( ux_window & window );
+
+    // On shutdown, join any pending async sensor stops so streamed-duration is recorded before teardown.
+    static void join_pending_stops( std::shared_ptr< std::vector< std::unique_ptr< device_model > > > device_models );
 
 private:
     std::thread _thread;

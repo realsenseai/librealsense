@@ -54,6 +54,9 @@ If you have consented, the viewer uploads the previously saved report in the bac
 startup (the server deduplicates repeats via each report's `session_id`). You can also trigger
 an immediate upload from **Settings → Usage Statistics → "Upload now"**.
 
+The startup upload is throttled to at most once per `rum_upload_interval_hours` (default 24, `0`
+disables the throttle). This is read from `realsense-config.json` and is not exposed in the UI.
+
 The production ingest endpoint is not live yet, so uploads currently target a local dev-server
 stub (`tools/rum-uploader/dev-server/rum_dev_server.py`) — see its header for how to run and
 point the viewer at it.

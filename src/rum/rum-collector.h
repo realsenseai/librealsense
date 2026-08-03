@@ -5,6 +5,7 @@
 #include <string>
 #include <mutex>
 #include <map>
+#include <set>
 #include <tuple>
 #include <utility>
 
@@ -45,7 +46,12 @@ public:
     // Record an option set to a non-default value; tallies set-count and last value per option.
     void record_option_change( std::string const & option, float value );
 
-    // Record that a filter processed a frame (first time per block), tallied per name.
+    // Add a filter name that counts as user-facing post-processing (a sensor's recommended block).
+    // record_filter only tallies names added here, so viewer/internal blocks (colorizer, pointcloud,
+    // align, format converters, ...) never pollute the report.
+    void add_recommended_filter( std::string const & name );
+
+    // Record that a filter processed a frame (first time per block); tallied only if recommended.
     void record_filter( std::string const & name );
 
     // Record a raised notification, tallied per category.
@@ -91,6 +97,9 @@ private:
     std::map< std::string, std::pair< int, float > > _option_changes;
     // Filter usage tallies (first frame through each block), keyed by filter name -> count.
     std::map< std::string, int > _filter_counts;
+    // Names that count as user-facing post-processing (sensors' recommended blocks); record_filter
+    // ignores anything not in here.
+    std::set< std::string > _recommended_filters;
     // Notification tallies, keyed by category -> count.
     std::map< std::string, int > _notification_counts;
 };

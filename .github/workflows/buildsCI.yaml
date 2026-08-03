@@ -36,7 +36,7 @@ jobs:
 
 
   #--------------------------------------------------------------------------------
-  Win_SH_EX_CfU:  # Windows, shared, with Examples & Tools, and Check for Updates
+  Win_SH_EX_CfU_Stats:  # Windows, shared, with Examples & Tools, Check for Updates, and RUM stats (ENABLE_STATS)
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
@@ -368,7 +368,7 @@ jobs:
 
 
   #--------------------------------------------------------------------------------
-  U22_SH_Py_CI:  # Ubuntu 2020, Shared, Python, LibCI with executables
+  U22_SH_Py_CI:  # Ubuntu 2020, Shared, Python, LibCI with executables, and RUM stats (ENABLE_STATS)
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
