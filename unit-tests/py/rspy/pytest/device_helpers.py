@@ -12,15 +12,16 @@ log = logging.getLogger('librealsense')
 
 
 def split_cli_patterns(patterns):
-    """Flatten a list of patterns by splitting each entry on whitespace.
+    """Flatten a list of patterns by splitting each entry on commas.
 
     Supports both repeated flags (``--exclude-device D555 --exclude-device D585S``)
-    and a single flag with a space-separated value (``--exclude-device 'D555 D585S'``),
-    matching the legacy run-unit-tests.py behavior.
+    and a single flag with a comma-separated value (``--exclude-device 'D585 Proto,D585S'``),
+    so device names containing spaces stay intact. Matches the legacy
+    run-unit-tests.py behavior.
     """
     out = []
     for p in patterns or []:
-        out.extend(p.split())
+        out.extend(s.strip() for s in p.split(',') if s.strip())
     return out
 
 
@@ -36,7 +37,7 @@ def _build_sn_filter(markers, cli_includes=None, cli_excludes=None):
     3. **Connection-type**: serial satisfies any ``device_type`` /
        ``device_type_exclude`` markers.
 
-    *cli_includes* / *cli_excludes* may be raw option strings (whitespace-separated
+    *cli_includes* / *cli_excludes* may be raw option strings (comma-separated
     names in a single entry) or already-split lists — ``split_cli_patterns`` is
     applied internally either way.
     """

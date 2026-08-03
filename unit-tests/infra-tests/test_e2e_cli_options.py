@@ -142,16 +142,16 @@ class TestCliOptionsRegistered:
                                "--exclude-device", "D455", "--exclude-device", "D435")
         assert_outcomes(out, passed=1)  # only D401 remains
 
-    def test_exclude_device_space_separated(self):
-        """--exclude-device 'D455 D435' (single flag, space-separated) — Jenkins TEST_EXCLUDE_DEVICES form."""
+    def test_exclude_device_comma_separated(self):
+        """--exclude-device 'D455,D435' (single flag, comma-separated) — Jenkins TEST_EXCLUDE_DEVICES form."""
         rc, out, *_ = run_e2e("pytest-cli.py", "-k", "test_multi_exclude",
-                               "--exclude-device", "D455 D435")
+                               "--exclude-device", "D455,D435")
         assert_outcomes(out, passed=1)  # only D401 remains
 
-    def test_device_space_separated(self):
-        """--device 'D455 D435' (single flag, space-separated) must include both devices."""
+    def test_device_comma_separated(self):
+        """--device 'D455,D435' (single flag, comma-separated) must include both devices."""
         rc, out, *_ = run_e2e("pytest-cli.py", "-k", "test_multi_include",
-                               "--device", "D455 D435")
+                               "--device", "D455,D435")
         assert_outcomes(out, passed=2)
 
     def test_device_and_exclude_combined(self):
