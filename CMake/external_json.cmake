@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.10)
 include(ExternalProject)
 
+# the exact tag that is git-cloned when building with the bundled path
+set(NLOHMANN_JSON_BUNDLED_VERSION 3.12.0)
+
+# the minimum version accepted from a system-provided package (USE_EXTERNAL_NLOHMANN_JSON=ON).
+# set lower than NLOHMANN_JSON_BUNDLED_VERSION to support distros (e.g. Ubuntu 24.04/26.04) that ship an older package.
+# rsutils/json.h static_asserts the same floor, so both must be bumped together.
+set(NLOHMANN_JSON_MIN_VERSION 3.11.3)
 
 
 # We use a function to enforce a scoped variables creation only for the build
@@ -48,9 +55,14 @@ endfunction()
 
 if( USE_EXTERNAL_NLOHMANN_JSON )
     message( STATUS "Using external nlohmann_json package" )
-    find_package( nlohmann_json ${NLOHMANN_JSON_MIN_VERSION} REQUIRED )
+    find_package( nlohmann_json ${NLOHMANN_JSON_MIN_VERSION} CONFIG REQUIRED )
     message( STATUS "Found nlohmann_json ${nlohmann_json_VERSION}" )
+    # rsutils links nlohmann_json::nlohmann_json publicly and is part of realsense2Targets,
+    # so consumers of the installed package have to find the imported target, too
+    set( REALSENSE2_JSON_DEPENDENCIES
+         "include(CMakeFindDependencyMacro)\nfind_dependency(nlohmann_json CONFIG REQUIRED)\n" )
 else()
     # Trigger the build
     get_nlohmann_json()
+    set( REALSENSE2_JSON_DEPENDENCIES "" )
 endif()

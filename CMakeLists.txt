@@ -7,14 +7,6 @@ project( ${LRS_TARGET} LANGUAGES CXX C )
 set(REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${REPO_ROOT})
 
-# define versions for third party libraries
-# the exact tag that is git-cloned when building with the bundled path
-set(NLOHMANN_JSON_BUNDLED_VERSION 3.12.0)
-
-# the minimum version accepted from a system-provided package (USE_EXTERNAL_NLOHMANN_JSON=ON).
-# set lower than NLOHMANN_JSON_BUNDLED_VERSION to support distros (e.g. Ubuntu 24.04/26.04) that ship an older package.
-set(NLOHMANN_JSON_MIN_VERSION 3.11.3)
-
 include(CMake/lrs_options.cmake)
 include(CMake/connectivity_check.cmake)
 #Deprecation message, should be removed in future releases

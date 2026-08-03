@@ -5,6 +5,14 @@
 #include "json-fwd.h"
 #include <nlohmann/json.hpp>
 
+// Keep in sync with NLOHMANN_JSON_MIN_VERSION in CMake/external_json.cmake: with
+// USE_EXTERNAL_NLOHMANN_JSON=ON the header comes from the system package, which may be older
+// than the version we bundle
+static_assert( NLOHMANN_JSON_VERSION_MAJOR * 10000 + NLOHMANN_JSON_VERSION_MINOR * 100
+                       + NLOHMANN_JSON_VERSION_PATCH
+                   >= 31103,
+               "nlohmann/json 3.11.3 or newer is required" );
+
 
 namespace rsutils {
 
