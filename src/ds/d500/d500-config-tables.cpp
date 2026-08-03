@@ -58,6 +58,8 @@ namespace librealsense
 
         void set_at( nlohmann::json& root, const std::vector< std::string >& path, const nlohmann::json& value )
         {
+            if( path.empty() )
+                throw invalid_value_exception( "parameter has empty path" );
             nlohmann::json* node = &root;
             for( size_t i = 0; i + 1 < path.size(); ++i )
                 node = &( ( *node )[path[i]] );
