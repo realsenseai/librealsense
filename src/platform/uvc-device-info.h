@@ -22,18 +22,19 @@ struct uvc_device_info
     std::string device_path;
     std::string dfu_device_path; // for mipi multiple cameras
     std::string serial;
-    usb_spec conn_spec = usb_undefined;
+    usb_spec usb_conn_spec = usb_undefined;
     uint32_t uvc_capabilities = 0;
     bool has_metadata_node = false;
     std::string metadata_node_id;
+    bool is_mipi = false;  // enumerated over a MIPI/GMSL V4L2 node rather than USB
 
     operator std::string() const
     {
         std::ostringstream s;
         s << "id- " << id << "\nvid- " << std::hex << vid << "\npid- " << std::hex << pid << "\nmi- " << std::dec << mi
           << "\nunique_id- " << unique_id << "\npath- " << device_path << "\nUVC capabilities- " << std::hex
-          << uvc_capabilities << "\nUVC specification- " << std::hex << (uint16_t)conn_spec << std::dec
-          << ( has_metadata_node ? ( "\nmetadata node-" + metadata_node_id ) : "" ) << std::endl;
+          << uvc_capabilities << "\nUVC specification- " << std::hex << (uint16_t)usb_conn_spec << std::dec
+          << ( has_metadata_node ? ( "\nmetadata node-" + metadata_node_id ) : "" ) << ( is_mipi ? "\nmipi" : "" ) << std::endl;
 
         return s.str();
     }
@@ -48,7 +49,7 @@ struct uvc_device_info
 inline bool operator==( const uvc_device_info & a, const uvc_device_info & b )
 {
     return ( a.vid == b.vid ) && ( a.pid == b.pid ) && ( a.mi == b.mi ) && ( a.unique_id == b.unique_id )
-        && ( a.id == b.id ) && ( a.device_path == b.device_path ) && ( a.conn_spec == b.conn_spec );
+        && ( a.id == b.id ) && ( a.device_path == b.device_path ) && ( a.usb_conn_spec == b.usb_conn_spec );
 }
 
 

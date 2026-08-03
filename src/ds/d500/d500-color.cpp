@@ -145,28 +145,11 @@ namespace librealsense
         switch( _native_format )
         {
         case RS2_FORMAT_YUYV:
-        {
-            auto platform_dev = get_raw_color_sensor()->get_uvc_device();
-            if( _is_mipi_device && platform_dev->is_platform_jetson() )
-            {
-                // On Jetson deserializer bytes are received swapped so YUYV is received as UYVY.
-                color_ep.register_processing_block( processing_block_factory::create_pbf_vector< uyvy_converter >(
-                    RS2_FORMAT_YUYV,
-                    map_supported_color_formats( RS2_FORMAT_YUYV, false ),
-                    RS2_STREAM_COLOR ) );
-                color_ep.register_processing_block( { { RS2_FORMAT_YUYV } },
-                                                    { { RS2_FORMAT_YUYV, RS2_STREAM_COLOR } },
-                                                    []() { return std::make_shared< uyvy_to_yuyv >(); } );
-            }
-            else
-            {
-                color_ep.register_processing_block( processing_block_factory::create_pbf_vector< yuy2_converter >(
-                    RS2_FORMAT_YUYV,
-                    map_supported_color_formats( RS2_FORMAT_YUYV ),
-                    RS2_STREAM_COLOR ) );
-            }
+            color_ep.register_processing_block( processing_block_factory::create_pbf_vector< yuy2_converter >(
+                RS2_FORMAT_YUYV,
+                map_supported_color_formats( RS2_FORMAT_YUYV ),
+                RS2_STREAM_COLOR ) );
             break;
-            }
         case RS2_FORMAT_M420:
         case RS2_FORMAT_NV12:
             // NV12 registered before M420 so RGB targets resolve to NV12 when present, and to M420 when it is not
@@ -196,15 +179,6 @@ namespace librealsense
         auto raw_color_ep = get_raw_color_sensor();
 
         _ds_color_common->register_color_options();
-
-        // The D585 GMSL MIPI V4L2 backend has no working control for these color PUs
-        // (querying them fails), so drop them from the shared set rather than expose dead controls.
-        if( _is_mipi_device )
-        {
-            color_ep.unregister_option( RS2_OPTION_BRIGHTNESS );
-            color_ep.unregister_option( RS2_OPTION_CONTRAST );
-            color_ep.unregister_option( RS2_OPTION_GAMMA );
-        }
 
         std::map< float, std::string > description_per_value = std::map<float, std::string>{
             { 0.f, "Disabled"},

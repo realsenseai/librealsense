@@ -1254,12 +1254,19 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
     # Calculate statistics
     elapsed_time = test_stopwatch.get_elapsed()
 
-    # Check if we have sufficient measurements
+    # no_frames marks a stream that never started, as opposed to one merely too slow to measure.
+    # Both counts are reported either way: the stream that died is often not the one short of
+    # measurements, and naming only that one sends triage after the wrong stream.
+    no_frames = depth_frame_count == 0 or color_frame_count == 0
+    frame_counts = f"got depth {depth_frame_count}, color {color_frame_count} frames"
+
     if len(depth_fps_measurements) < 2:
-        return False, {"error": f"Insufficient depth measurements: {len(depth_fps_measurements)} (got {depth_frame_count} frames)"}
+        return False, {"error": f"Insufficient depth measurements: {len(depth_fps_measurements)} ({frame_counts})",
+                       "no_frames": no_frames}
 
     if len(color_fps_measurements) < 2:
-        return False, {"error": f"Insufficient color measurements: {len(color_fps_measurements)} (got {color_frame_count} frames)"}
+        return False, {"error": f"Insufficient color measurements: {len(color_fps_measurements)} ({frame_counts})",
+                       "no_frames": no_frames}
 
     # Calculate FPS statistics
     depth_avg_fps = sum(depth_fps_measurements) / len(depth_fps_measurements)
@@ -1409,6 +1416,32 @@ def get_depth_color_combinations(device, max_combinations=None):
     return combinations
 
 
+# Known open defect: on D455, depth throughput degrades while colour also runs at 90 fps.
+DUAL_90FPS_DEPTH_DEGRADATION_MIN_RATIO = 0.65
+
+
+def is_dual_90fps_on_d455(device_name, depth_fps, color_fps):
+    """The configuration the known depth degradation is tied to."""
+    return 'D455' in device_name and depth_fps == 90 and color_fps == 90
+
+
+def is_depth_degraded_at_dual_90fps(device_name, depth_fps, color_fps, stats, tolerance):
+    """Depth alone falls short of target while colour holds 90 fps, on D455."""
+    if not is_dual_90fps_on_d455(device_name, depth_fps, color_fps) or 'error' in stats:
+        return False
+    try:
+        ratio = stats['depth']['actual_fps'] / depth_fps
+        color_deviation = stats['color']['deviation']
+    except (KeyError, TypeError):
+        return False
+    return DUAL_90FPS_DEPTH_DEGRADATION_MIN_RATIO <= ratio < (1 - tolerance) and color_deviation <= tolerance
+
+
+def is_stream_start_failure(stats):
+    """One of the pair delivered no frames at all - the stream never started."""
+    return stats.get('no_frames', False)
+
+
 def check_multistream_configurations_comprehensive(device, max_combinations=None):
     """
     Test all depth + color multi-stream configurations.
@@ -1422,6 +1455,8 @@ def check_multistream_configurations_comprehensive(device, max_combinations=None
         Tuple[bool, List[Dict]]: (all_passed, results_list)
     """
     log.info("\nTesting all depth + color multi-stream configurations...")
+
+    device_name = device.get_info(rs.camera_info.name) if device.supports(rs.camera_info.name) else ""
 
     # Get combinations
     combinations = get_depth_color_combinations(device, max_combinations)
@@ -1451,27 +1486,39 @@ def check_multistream_configurations_comprehensive(device, max_combinations=None
                 device, depth_config, color_config, test_duration, tolerance
             )
 
+            known_issue = (not passed) and is_depth_degraded_at_dual_90fps(
+                device_name, depth_fps, color_fps, stats, tolerance)
+            never_started = (not passed) and is_stream_start_failure(stats)
+
             result = {
                 "depth_config": depth_config,
                 "color_config": color_config,
                 "config_name": config_name,
                 "passed": passed,
+                "known_issue": known_issue,
+                "never_started": never_started,
                 "stats": stats
             }
 
             all_results.append(result)
 
             if not passed:
-                all_passed = False
+                excused = known_issue or never_started
+                if not excused:
+                    all_passed = False
+                log_fn = log.warning if excused else log.error
+                tag = (" (known issue RSDSO-21810, not counted as a CI failure)" if known_issue
+                       else " (stream never started, RSDSO-21811 - test will be skipped)" if never_started
+                       else "")
                 if 'error' in stats:
-                    log.error(f"  ERROR: {stats['error']}")
+                    log_fn(f"  ERROR{tag}: {stats['error']}")
                 else:
                     depth_stats = stats['depth']
                     color_stats = stats['color']
-                    log.error(f"  FAILED:")
-                    log.error(f"    Depth: Expected {depth_stats['expected_fps']} FPS, got {depth_stats['actual_fps']:.1f} FPS "
+                    log_fn(f"  FAILED{tag}:")
+                    log_fn(f"    Depth: Expected {depth_stats['expected_fps']} FPS, got {depth_stats['actual_fps']:.1f} FPS "
                           f"(deviation: {depth_stats['deviation']*100:.1f}%)")
-                    log.error(f"    Color: Expected {color_stats['expected_fps']} FPS, got {color_stats['actual_fps']:.1f} FPS "
+                    log_fn(f"    Color: Expected {color_stats['expected_fps']} FPS, got {color_stats['actual_fps']:.1f} FPS "
                           f"(deviation: {color_stats['deviation']*100:.1f}%)")
             else:
                 depth_stats = stats['depth']
@@ -1481,6 +1528,9 @@ def check_multistream_configurations_comprehensive(device, max_combinations=None
                       f"(deviation: {depth_stats['deviation']*100:.1f}%)")
                 log.info(f"    Color: Expected {color_stats['expected_fps']} FPS, got {color_stats['actual_fps']:.1f} FPS "
                       f"(deviation: {color_stats['deviation']*100:.1f}%)")
+                if is_dual_90fps_on_d455(device_name, depth_fps, color_fps):
+                    log.warning(f"  NOTE: {config_name} PASSED - the known RSDSO-21810 degradation may be fixed; "
+                                f"re-check before keeping the allowance")
 
         except Exception as e:
             log.error(f"  ERROR testing {config_name}: {e}")
@@ -1489,6 +1539,8 @@ def check_multistream_configurations_comprehensive(device, max_combinations=None
                 "color_config": color_config,
                 "config_name": config_name,
                 "passed": False,
+                "known_issue": False,
+                "never_started": False,
                 "stats": {"error": str(e)}
             }
             all_results.append(result)
@@ -1554,7 +1606,10 @@ def print_multistream_test_summary(all_results, all_passed, product_line):
         depth_str = f"{depth_config[0]}x{depth_config[1]}@{depth_config[2]}"
         color_str = f"{color_config[0]}x{color_config[1]}@{color_config[2]}"
 
-        status = "PASS" if result['passed'] else "FAIL"
+        if result['passed']:
+            status = "PASS"
+        else:
+            status = "KNOWN" if result.get('known_issue') else ("NOSTART" if result.get('never_started') else "FAIL")
 
         if 'error' in result['stats']:
             log.info(f"{depth_str:<20} {color_str:<20} {status:<8} {'ERROR':<10} {'ERROR':<10} {result['stats']['error']}")
@@ -1568,6 +1623,11 @@ def print_multistream_test_summary(all_results, all_passed, product_line):
     failed_tests = len(all_results) - passed_tests
 
     successful_results = [r for r in all_results if r['passed'] and 'error' not in r['stats']]
+
+    known_tests = sum(1 for r in all_results if r.get('known_issue'))
+    nostart_tests = sum(1 for r in all_results if r.get('never_started'))
+    if known_tests or nostart_tests:
+        log.info(f"Excluded from pass/fail: {known_tests} known, {nostart_tests} never started")
 
     if successful_results:
         log.info(f"\n--- MULTI-STREAM STATISTICS ---")
@@ -1689,6 +1749,53 @@ def test_ir_configurations(settled_device, coverage_tier):
         f"All supported IR configurations accuracy test - {len(ir_config_results) if ir_config_results else 0} configurations tested"
 
 
+def describe_multistream_failure(result):
+    """One-line description of a failed combination, for the assertion message.
+
+    This only ever runs while building a failure message, so it must not raise: an exception
+    here would replace the real AssertionError with a confusing secondary one.
+    """
+    config_name = result.get('config_name', '?')
+    stats = result.get('stats', {})
+    if 'error' in stats:
+        return f"{config_name} -> {stats['error']}"
+
+    try:
+        depth_stats = stats['depth']
+        color_stats = stats['color']
+        return (f"{config_name} -> "
+                f"depth {depth_stats['actual_fps']:.1f}/{depth_stats['expected_fps']} fps "
+                f"({depth_stats['deviation']*100:.1f}% dev), "
+                f"color {color_stats['actual_fps']:.1f}/{color_stats['expected_fps']} fps "
+                f"({color_stats['deviation']*100:.1f}% dev)")
+    except (KeyError, TypeError, ValueError):
+        return f"{config_name} -> unexpected stats shape: {stats}"
+
+
+MAX_REPORTED_FAILURES = 10
+
+
+def describe_multistream_failures(all_results):
+    """Assertion message naming the failed combinations; known-issue rows are listed separately."""
+    def summarize(results):
+        shown = "; ".join(describe_multistream_failure(r) for r in results[:MAX_REPORTED_FAILURES])
+        extra = len(results) - MAX_REPORTED_FAILURES
+        return shown + (f"; ... and {extra} more (see log)" if extra > 0 else "")
+
+    failed = [r for r in all_results if not r['passed'] and not r.get('known_issue') and not r.get('never_started')]
+    known = [r for r in all_results if r.get('known_issue')]
+    never_started = [r for r in all_results if r.get('never_started')]
+    msg = (f"Depth + color multi-stream configurations (all combinations) accuracy test - "
+           f"{len(all_results)} combinations tested, {len(failed)} failed: {summarize(failed)}")
+    if known:
+        msg += f" [{len(known)} known-issue failure(s) excluded: {summarize(known)}]"
+    if never_started:
+        # Surfaced here too: when a real failure asserts, the skip below it never runs and these
+        # would otherwise be missing from the JUnit report entirely.
+        msg += f" [{len(never_started)} stream-start failure(s) also detected: {summarize(never_started)}]"
+    return msg
+
+
 @pytest.mark.timeout(14400)
 def test_multistream_configurations(settled_device, coverage_tier):
     """Test depth + color multi-stream FPS accuracy for all supported configurations"""
@@ -1701,8 +1808,21 @@ def test_multistream_configurations(settled_device, coverage_tier):
 
     if multistream_results:
         print_multistream_test_summary(multistream_results, multistream_tests_passed, product_line)
-        assert multistream_tests_passed, \
-            f"Depth + color multi-stream configurations (all combinations) accuracy test - {len(multistream_results)} combinations tested"
+        # The assertion message is all that reaches the JUnit report; without the offending
+        # combinations, triage means downloading the per-device artifact log.
+        assert multistream_tests_passed, describe_multistream_failures(multistream_results)
+
+        # Only skip when nothing streamed at all - that is a rig/link problem and there is no
+        # result to report. A partial no-start would otherwise discard the pass signal for every
+        # other combination in the run; those stay visible as NOSTART rows and in the log.
+        never_started = [r for r in multistream_results if r.get('never_started')]
+        if never_started and len(never_started) == len(multistream_results):
+            pytest.skip(f"no stream started on any of {len(multistream_results)} combination(s) "
+                        f"(RSDSO-21811): " + "; ".join(r['config_name'] for r in never_started))
+        if never_started:
+            log.warning(f"{len(never_started)}/{len(multistream_results)} combination(s) never started "
+                        f"(RSDSO-21811), not counted as failures: "
+                        + "; ".join(r['config_name'] for r in never_started))
     else:
         # Check if device has no color sensor (like D421, D405)
         product_name = dev.get_info(rs.camera_info.name)

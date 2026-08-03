@@ -378,9 +378,6 @@ namespace librealsense
     float depth_scale_option::query() const
     {
         auto table = get_depth_table(ds::GET_VAL);
-        // TODO D585 MIPI: proto FW reports depth_units=0 over GMSL; fall back to 1mm default until FW/HWM is fixed.
-        if( table.depth_units == 0 )
-            return 0.001f;
         return (float)(0.000001 * (float)table.depth_units);
     }
 
@@ -520,8 +517,8 @@ namespace librealsense
             return "Inter-camera synchronization mode: 0:Default, 1:Master, 2:Slave";
     }
 
-    alternating_emitter_option::alternating_emitter_option(hw_monitor& hwm, bool is_fw_version_using_id, hwmon_response_type no_data_to_return_opcode)
-        : _hwm(hwm), _is_fw_version_using_id(is_fw_version_using_id), _no_data_to_return_opcode(no_data_to_return_opcode)
+    alternating_emitter_option::alternating_emitter_option(hw_monitor& hwm, bool is_fw_version_using_id, bool expect_no_data_to_return, hwmon_response_type no_data_to_return_opcode)
+        : _hwm(hwm), _is_fw_version_using_id(is_fw_version_using_id), _expect_no_data_to_return(expect_no_data_to_return), _no_data_to_return_opcode(no_data_to_return_opcode)
     {
         _range = [this]()
         {
@@ -557,7 +554,8 @@ namespace librealsense
             {
                 hwmon_response_type response;
                 auto res = _hwm.send( cmd, &response );  // avoid the throw
-                if (response != _no_data_to_return_opcode) // If no subpreset is streaming, the firmware returns "NO_DATA_TO_RETURN" error
+                // when the FW returns a no-data code for an idle subpreset, skip it; otherwise there is always data to read
+                if (!_expect_no_data_to_return || response != _no_data_to_return_opcode)
                 {
                     // if a subpreset is streaming, checking this is the alternating emitter sub preset
                     if( res.size() )
@@ -584,7 +582,7 @@ namespace librealsense
         }
     }
 
-    emitter_always_on_option::emitter_always_on_option( std::shared_ptr<hw_monitor> hwm, ds::fw_cmd _hmc_get_opcode, ds::fw_cmd _hmc_set_opcode )
+    emitter_always_on_option::emitter_always_on_option( std::shared_ptr<hw_monitor> hwm, uint8_t _hmc_get_opcode, uint8_t _hmc_set_opcode )
         : _hwm(hwm), _hmc_get_opcode(_hmc_get_opcode), _hmc_set_opcode(_hmc_set_opcode)
     {
         // On d400 option, We use the same opcode both for set and get.

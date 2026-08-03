@@ -8,7 +8,8 @@ import numpy as np
 import cv2
 import logging
 import re
-from iq_helper import find_roi_location, get_roi_from_frame, is_color_close, save_failure_snapshot, WIDTH, HEIGHT
+from iq_helper import (find_roi_location, get_roi_from_frame, is_color_close, save_failure_snapshot,
+                       WIDTH, HEIGHT, DEFAULT_CONFIGURATIONS, NIGHTLY_CONFIGURATIONS)
 
 log = logging.getLogger(__name__)
 
@@ -158,20 +159,10 @@ def run_test(dev, ctx, resolution, fps):
 def test_basic_color(test_device, test_context_var):
     dev, ctx = test_device
 
-    configurations = [((1280, 720), 30)]
+    configurations = DEFAULT_CONFIGURATIONS
     # on nightly we check additional arbitrary configurations
     if "nightly" in test_context_var:
-        configurations += [
-            ((640,480), 15),
-            ((640,480), 30),
-            ((640,480), 60),
-            ((848,480), 15),
-            ((848,480), 30),
-            ((848,480), 60),
-            ((1280,720), 5),
-            ((1280,720), 10),
-            ((1280,720), 15),
-        ]
+        configurations = DEFAULT_CONFIGURATIONS + NIGHTLY_CONFIGURATIONS
 
     # D436 color stream returns near-black frames at >30 fps with Auto-Exposure ON
     # (reproduced on FW 5.17.3.10 and 5.17.3.21, and in realsense-viewer).

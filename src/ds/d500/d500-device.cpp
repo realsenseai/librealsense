@@ -410,7 +410,7 @@ namespace librealsense
 
         auto raw_sensor = get_raw_depth_sensor();
         _pid = group.uvc_devices.front().pid;
-        _is_mipi_device = ( ds::d500_mipi_device_pid.count( _pid ) > 0 );
+        _is_mipi_device = group.uvc_devices.front().is_mipi;
 
         _color_calib_table_raw = [this]()
         {
@@ -545,55 +545,44 @@ namespace librealsense
                 depth_sensor->register_option(RS2_OPTION_DEPTH_UNITS, depth_scale);
             }
 
-            // Temperature depth-XU selectors (PVT 0x15, OHM 0x17, Projector 0x16) have no CID in the
-            // MIPI V4L2 backend, so skip them on D585 GMSL.
-            // TODO - to be solved XU
-            if (!_is_mipi_device)
+            // defining the temperature options
+            auto pvt_temperature = std::make_shared< temperature_xu_option >(raw_depth_sensor,
+                                                                             depth_xu,
+                                                                             d500_xu_id::PVT_TEMPERATURE,
+                                                                             "PVT Temperature");
+
+            auto ohm_temperature = std::make_shared< temperature_xu_option >(raw_depth_sensor,
+                                                                             depth_xu,
+                                                                             d500_xu_id::OHM_TEMPERATURE,
+                                                                             "OHM Temperature");
+
+            // registering the temperature options
+            depth_sensor.register_option(RS2_OPTION_SOC_PVT_TEMPERATURE, pvt_temperature);
+            depth_sensor.register_option(RS2_OPTION_OHM_TEMPERATURE, ohm_temperature);
+
+            if (d500_projector_temperature_pids.count(_pid))
             {
-                // defining the temperature options
-                auto pvt_temperature = std::make_shared< temperature_xu_option >(raw_depth_sensor,
-                                                                                 depth_xu,
-                                                                                 d500_xu_id::PVT_TEMPERATURE,
-                                                                                 "PVT Temperature");
-
-                auto ohm_temperature = std::make_shared< temperature_xu_option >(raw_depth_sensor,
-                                                                                 depth_xu,
-                                                                                 d500_xu_id::OHM_TEMPERATURE,
-                                                                                 "OHM Temperature");
-
-                // registering the temperature options
-                depth_sensor.register_option(RS2_OPTION_SOC_PVT_TEMPERATURE, pvt_temperature);
-                depth_sensor.register_option(RS2_OPTION_OHM_TEMPERATURE, ohm_temperature);
-
-                if (d500_projector_temperature_pids.count(_pid))
-                {
-                    auto proj_temperature = std::make_shared< temperature_xu_option >(raw_depth_sensor,
-                                                                                      depth_xu,
-                                                                                      d500_xu_id::PROJECTOR_TEMPERATURE,
-                                                                                      "Projector Temperature");
-                    depth_sensor.register_option(RS2_OPTION_PROJECTOR_TEMPERATURE, proj_temperature);
-                }
+                auto proj_temperature = std::make_shared< temperature_xu_option >(raw_depth_sensor,
+                                                                                  depth_xu,
+                                                                                  d500_xu_id::PROJECTOR_TEMPERATURE,
+                                                                                  "Projector Temperature");
+                depth_sensor.register_option(RS2_OPTION_PROJECTOR_TEMPERATURE, proj_temperature);
             }
 
-            // Error-reporting depth-XU selector (0x07) has no CID in the MIPI V4L2 backend, so skip it on D585 GMSL.
-            // TODO - to be solved XU
-            if (!_is_mipi_device)
-            {
-                auto error_control = std::make_shared< uvc_xu_option< uint8_t > >( raw_depth_sensor,
-                                                                                   depth_xu,
-                                                                                   DS5_ERROR_REPORTING,
-                                                                                   "Error reporting" );
+            auto error_control = std::make_shared< uvc_xu_option< uint8_t > >( raw_depth_sensor,
+                                                                               depth_xu,
+                                                                               DS5_ERROR_REPORTING,
+                                                                               "Error reporting" );
 
-                _polling_error_handler = std::make_shared< polling_error_handler >(
-                    1000,
-                    error_control,
-                    std::weak_ptr<std::atomic<bool>>( _device_alive ),
-                    raw_depth_sensor->get_notifications_processor(),
-                    std::make_shared< ds_notification_decoder >( d500_fw_error_report ) );
+            _polling_error_handler = std::make_shared< polling_error_handler >(
+                1000,
+                error_control,
+                std::weak_ptr<std::atomic<bool>>( _device_alive ),
+                raw_depth_sensor->get_notifications_processor(),
+                std::make_shared< ds_notification_decoder >( d500_fw_error_report ) );
 
-                depth_sensor.register_option( RS2_OPTION_ERROR_POLLING_ENABLED,
-                                              std::make_shared< polling_errors_disable >( _polling_error_handler ) );
-            }
+            depth_sensor.register_option( RS2_OPTION_ERROR_POLLING_ENABLED,
+                                          std::make_shared< polling_errors_disable >( _polling_error_handler ) );
 
         }); //group_multiple_fw_calls
 
@@ -683,7 +672,7 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID, gvd_parsed_fields.optical_module_sn);
         register_info(RS2_CAMERA_INFO_FIRMWARE_VERSION, gvd_parsed_fields.fw_version);        
         register_info(RS2_CAMERA_INFO_PHYSICAL_PORT, group.uvc_devices.front().device_path);
-        register_info(RS2_CAMERA_INFO_DEBUG_OP_CODE, std::to_string(static_cast<int>(fw_cmd::GET_FW_LOGS)));
+        register_info(RS2_CAMERA_INFO_DEBUG_OP_CODE, std::to_string(static_cast<int>(d500_fw_cmd::GET_FW_LOGS)));
         std::string pid_hex_str = rsutils::string::from() << std::uppercase << rsutils::string::hexdump( _pid );
         register_info( RS2_CAMERA_INFO_PRODUCT_ID, pid_hex_str );
         register_info(RS2_CAMERA_INFO_PRODUCT_LINE, "D500");
@@ -704,6 +693,11 @@ namespace librealsense
         {
             _coefficients_table_raw.reset();
             _new_calib_table_raw.reset();
+            // _left_right_extrinsics is derived from _coefficients_table_raw (baseline in mm), but its own lazy<>
+            // caches the computed rs2_extrinsics — without this reset, get_extrinsics(depth, right_ir) keeps
+            // returning the pre-calibration baseline forever, even though the coefficients table cache is fresh.
+            if( _left_right_extrinsics )
+                _left_right_extrinsics->reset();
         } );
     }
 

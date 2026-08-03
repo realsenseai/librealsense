@@ -3,6 +3,7 @@
 
 
 #include "d500-options.h"
+#include "d500-private.h"
 
 namespace librealsense
 {
@@ -125,7 +126,7 @@ namespace librealsense
             int param1 = 5; // received from HKR team, probably means toggle
             try
             {
-                command cmd( ds::fw_cmd::HKR_THERMAL_COMPENSATION, param1, on_off );
+                command cmd( ds::d500_fw_cmd::HKR_THERMAL_COMPENSATION, param1, on_off );
                 hwm->send( cmd );
                 _value = value; // Currently no way to query actual value, save set value.
             }

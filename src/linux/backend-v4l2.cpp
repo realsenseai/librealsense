@@ -70,46 +70,7 @@
 
 const double DEFAULT_KPI_FRAME_DROPS_PERCENTAGE = 0.05;
 
-//D457 Dev. TODO -shall be refactored into the kernel headers.
-constexpr uint32_t RS_STREAM_CONFIG_0                       = 0x4000;
-constexpr uint32_t RS_CAMERA_CID_BASE                       = (V4L2_CTRL_CLASS_CAMERA | RS_STREAM_CONFIG_0);
-constexpr uint32_t RS_CAMERA_CID_LASER_POWER                = (RS_CAMERA_CID_BASE+1);
-constexpr uint32_t RS_CAMERA_CID_MANUAL_LASER_POWER         = (RS_CAMERA_CID_BASE+2);
-constexpr uint32_t RS_CAMERA_DEPTH_CALIBRATION_TABLE_GET    = (RS_CAMERA_CID_BASE+3);
-constexpr uint32_t RS_CAMERA_DEPTH_CALIBRATION_TABLE_SET    = (RS_CAMERA_CID_BASE+4);
-constexpr uint32_t RS_CAMERA_COEFF_CALIBRATION_TABLE_GET    = (RS_CAMERA_CID_BASE+5);
-constexpr uint32_t RS_CAMERA_COEFF_CALIBRATION_TABLE_SET    = (RS_CAMERA_CID_BASE+6);
-constexpr uint32_t RS_CAMERA_CID_FW_VERSION                 = (RS_CAMERA_CID_BASE+7);
-constexpr uint32_t RS_CAMERA_CID_GVD                        = (RS_CAMERA_CID_BASE+8);
-constexpr uint32_t RS_CAMERA_CID_AE_ROI_GET                 = (RS_CAMERA_CID_BASE+9);
-constexpr uint32_t RS_CAMERA_CID_AE_ROI_SET                 = (RS_CAMERA_CID_BASE+10);
-constexpr uint32_t RS_CAMERA_CID_AE_SETPOINT_GET            = (RS_CAMERA_CID_BASE+11);
-constexpr uint32_t RS_CAMERA_CID_AE_SETPOINT_SET            = (RS_CAMERA_CID_BASE+12);
-constexpr uint32_t RS_CAMERA_CID_ERB                        = (RS_CAMERA_CID_BASE+13);
-constexpr uint32_t RS_CAMERA_CID_EWB                        = (RS_CAMERA_CID_BASE+14);
-constexpr uint32_t RS_CAMERA_CID_HWMC_LEGACY                = (RS_CAMERA_CID_BASE+15);
-constexpr uint32_t RS_CAMERA_CID_SYNC_MODE                  = (RS_CAMERA_CID_BASE+16);
 
-//const uint32_t RS_CAMERA_GENERIC_XU                     = (RS_CAMERA_CID_BASE+15); // RS_CAMERA_CID_HWMC duplicate??
-constexpr uint32_t RS_CAMERA_CID_MANUAL_EXPOSURE            = (RS_CAMERA_CID_BASE+17);
-constexpr uint32_t RS_CAMERA_CID_LASER_POWER_LEVEL          = (RS_CAMERA_CID_BASE+18); // RS_CAMERA_CID_MANUAL_LASER_POWER ??
-constexpr uint32_t RS_CAMERA_CID_EXPOSURE_MODE              = (RS_CAMERA_CID_BASE+19);
-constexpr uint32_t RS_CAMERA_CID_WHITE_BALANCE_MODE         = (RS_CAMERA_CID_BASE+20); // Similar to RS_CAMERA_CID_EWB ??
-constexpr uint32_t RS_CAMERA_CID_PRESET                     = (RS_CAMERA_CID_BASE+21);
-constexpr uint32_t RS_CAMERA_CID_EMITTER_FREQUENCY          = (RS_CAMERA_CID_BASE+22); // [MIPI - Select projector frequency values: 0->57[KHZ], 1->91[KHZ]
-constexpr uint32_t RS_CAMERA_CID_HWMC                       = (RS_CAMERA_CID_BASE+32);
-constexpr uint32_t RS_CAMERA_CID_READOUT_SHAPING            = (RS_CAMERA_CID_BASE+34);
-constexpr uint32_t RS_CAMERA_CID_AE_MODE                    = (RS_CAMERA_CID_BASE+35);
-/* refe4rence for kernel 4.9 to be removed
-#define UVC_CID_GENERIC_XU          (V4L2_CID_PRIVATE_BASE+15)
-#define UVC_CID_LASER_POWER_MODE    (V4L2_CID_PRIVATE_BASE+16)
-#define UVC_CID_MANUAL_EXPOSURE     (V4L2_CID_PRIVATE_BASE+17)
-#define UVC_CID_LASER_POWER_LEVEL   (V4L2_CID_PRIVATE_BASE+18)
-#define UVC_CID_EXPOSURE_MODE       (V4L2_CID_PRIVATE_BASE+19)
-#define UVC_CID_WHITE_BALANCE_MODE  (V4L2_CID_PRIVATE_BASE+20)
-#define UVC_CID_PRESET              (V4L2_CID_PRIVATE_BASE+21)
-UVC_CID_MANUAL_EXPOSURE
-*/
 #ifdef ANDROID
 
 // https://android.googlesource.com/platform/bionic/+/master/libc/include/bits/lockf.h
@@ -976,7 +937,7 @@ namespace librealsense
             info.unique_id = busnum + "-" + devpath + "-" + devnum;
             // Find the USB specification (USB2/3) type from the underlying device, traversing from
             // /sys/devices/.../M-N/3-6:1.0/video4linux/video0 up to /sys/devices/.../M-N/version
-            info.conn_spec = v4l_usb_logic::get_usb_connection_type(video_path + "/../../../");
+            info.usb_conn_spec = v4l_usb_logic::get_usb_connection_type(video_path + "/../../../");
             info.uvc_capabilities = get_dev_capabilities(dev_name).device_caps;
 
             return info;
@@ -1031,7 +992,8 @@ namespace librealsense
                     break;
                 }
             }
-            info.conn_spec = usb_undefined;
+            info.usb_conn_spec = usb_undefined;
+            info.is_mipi = true;
             info.uvc_capabilities = get_dev_capabilities(dev_name).device_caps;
 
             return info;
@@ -1261,7 +1223,7 @@ namespace librealsense
         v4l_uvc_device::v4l_uvc_device(const uvc_device_info& info, bool use_memory_map)
             : _name(info.id), 
               _device_path(info.device_path),
-              _device_usb_spec(info.conn_spec),
+              _device_usb_spec(info.usb_conn_spec),
               _info(info),
               _is_capturing(false),
               _is_alive(true),
@@ -2697,28 +2659,9 @@ namespace librealsense
         v4l_mipi_device::~v4l_mipi_device()
         {}
 
-        // D457 controls map- temporal solution to bypass backend interface with actual codes
-        // DS5 depth XU identifiers
-        const uint8_t RS_HWMONITOR                       = 1;
-        const uint8_t RS_DEPTH_EMITTER_ENABLED           = 2;
-        const uint8_t RS_EXPOSURE                        = 3;
-        const uint8_t RS_LASER_POWER                     = 4;
-        const uint8_t RS_HARDWARE_PRESET                 = 6;
-        const uint8_t RS_ERROR_REPORTING                 = 7;
-        const uint8_t RS_EXT_TRIGGER                     = 8;
-        const uint8_t RS_ASIC_AND_PROJECTOR_TEMPERATURES = 9;
-        const uint8_t RS_ENABLE_AUTO_WHITE_BALANCE       = 0xA;
-        const uint8_t RS_ENABLE_AUTO_EXPOSURE            = 0xB;
-        const uint8_t RS_LED_PWR                         = 0xE;
-        const uint8_t RS_EMITTER_FREQUENCY               = 0x10; // Match to DS5_EMITTER_FREQUENCY
-        const uint8_t RS_DEPTH_AUTO_EXPOSURE_MODE        = 0x11;
-        const uint8_t RS_EXTERNAL_SYNC                   = 0x12;
-        const uint8_t RS_READOUT_SHAPING                 = 0x13;
-
-
         bool v4l_mipi_device::get_pu(rs2_option opt, int32_t& value) const
         {
-            v4l2_ext_control control{get_cid(opt), 0, 0, 0};
+            v4l2_ext_control control{v4l_mipi_logic::option_to_cid(opt), 0, 0, 0};
             // Extract the control group from the underlying control query
             v4l2_ext_controls ctrls_block { control.id&0xffff0000, 1, 0, 0, 0, &control};
 
@@ -2741,7 +2684,7 @@ namespace librealsense
 
         bool v4l_mipi_device::set_pu(rs2_option opt, int32_t value)
         {
-            v4l2_ext_control control{get_cid(opt), 0, 0, value};
+            v4l2_ext_control control{v4l_mipi_logic::option_to_cid(opt), 0, 0, value};
             if (opt == RS2_OPTION_ENABLE_AUTO_EXPOSURE)
                 control.value = value ? V4L2_EXPOSURE_APERTURE_PRIORITY : V4L2_EXPOSURE_MANUAL;
 
@@ -2762,7 +2705,7 @@ namespace librealsense
 
         bool v4l_mipi_device::set_xu(const extension_unit& xu, uint8_t control, const uint8_t* data, int size)
         {
-            v4l2_ext_control xctrl{xu_to_cid(xu,control), uint32_t(size), 0, 0};
+            v4l2_ext_control xctrl{v4l_mipi_logic::xu_to_cid(xu,control), uint32_t(size), 0, 0};
             switch (size)
             {
                 case 1: xctrl.value   = *(reinterpret_cast<const uint8_t*>(data)); break;
@@ -2773,7 +2716,7 @@ namespace librealsense
                     xctrl.p_u8 = const_cast<uint8_t*>(data); // TODO aggregate initialization with union
             }
 
-            if (control == RS_ENABLE_AUTO_EXPOSURE)
+            if (v4l_mipi_logic::is_auto_exposure_control(control))
                 xctrl.value = xctrl.value ? V4L2_EXPOSURE_APERTURE_PRIORITY : V4L2_EXPOSURE_MANUAL;
 
             // Extract the control group from the underlying control query
@@ -2794,7 +2737,7 @@ namespace librealsense
 
         bool v4l_mipi_device::get_xu(const extension_unit& xu, uint8_t control, uint8_t* data, int size) const
         {
-            v4l2_ext_control xctrl{xu_to_cid(xu,control), uint32_t(size), 0, 0};
+            v4l2_ext_control xctrl{v4l_mipi_logic::xu_to_cid(xu,control), uint32_t(size), 0, 0};
             xctrl.p_u8 = data;
 
             v4l2_ext_controls ext {xctrl.id & 0xffff0000, 1, 0, 0, 0, &xctrl};
@@ -2811,7 +2754,7 @@ namespace librealsense
                     continue;
                 }
 
-                if (control == RS_ENABLE_AUTO_EXPOSURE)
+                if (v4l_mipi_logic::is_auto_exposure_control(control))
                   xctrl.value = (V4L2_EXPOSURE_MANUAL == xctrl.value) ? 0 : 1;
 
                 // used to parse the data when only a value is returned (e.g. laser power),
@@ -2831,7 +2774,7 @@ namespace librealsense
         control_range v4l_mipi_device::get_xu_range(const extension_unit& xu, uint8_t control, int len) const
         {
             v4l2_query_ext_ctrl xctrl_query{};
-            xctrl_query.id = xu_to_cid(xu,control);
+            xctrl_query.id = v4l_mipi_logic::xu_to_cid(xu,control);
 
             if(0 > ioctl(_fd,VIDIOC_QUERY_EXT_CTRL,&xctrl_query)){
                 throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_QUERY_EXT_CTRL) failed, errno=" << errno);
@@ -2846,7 +2789,7 @@ namespace librealsense
                     << xctrl_query.default_value << ", " << xctrl_query.step
                     << "\n Elements = " << xctrl_query.elems);
 
-            if (control == RS_ENABLE_AUTO_EXPOSURE)
+            if (v4l_mipi_logic::is_auto_exposure_control(control))
                 return {0, 1, 1, 1};
             return { static_cast<int32_t>(xctrl_query.minimum), static_cast<int32_t>(xctrl_query.maximum),
                      static_cast<int32_t>(xctrl_query.step), static_cast<int32_t>(xctrl_query.default_value)};
@@ -2864,7 +2807,7 @@ namespace librealsense
             }
 
             struct v4l2_query_ext_ctrl query = {};
-            query.id = get_cid(option);
+            query.id = v4l_mipi_logic::option_to_cid(option);
             if (xioctl(_fd, VIDIOC_QUERY_EXT_CTRL, &query) < 0)
             {
                 // Some controls (exposure, auto exposure, auto hue) do not seem to work on V4L2
@@ -2878,64 +2821,9 @@ namespace librealsense
             return range;
         }
 
-        uint32_t v4l_mipi_device::get_cid(rs2_option option) const
-        {
-            switch(option)
-            {
-                case RS2_OPTION_BACKLIGHT_COMPENSATION: return V4L2_CID_BACKLIGHT_COMPENSATION;
-                case RS2_OPTION_BRIGHTNESS: return V4L2_CID_BRIGHTNESS;
-                case RS2_OPTION_CONTRAST: return V4L2_CID_CONTRAST;
-                case RS2_OPTION_EXPOSURE: return V4L2_CID_EXPOSURE_ABSOLUTE; // Is this actually valid? I'm getting a lot of VIDIOC error 22s...
-                case RS2_OPTION_GAIN: return V4L2_CTRL_CLASS_IMAGE_SOURCE | 0x903; // v4l2-ctl --list-ctrls -d /dev/video0
-                case RS2_OPTION_GAMMA: return V4L2_CID_GAMMA;
-                // case RS2_OPTION_HUE: return V4L2_CID_HUE;
-                case RS2_OPTION_LASER_POWER: return V4L2_CID_EXPOSURE_ABSOLUTE;
-                case RS2_OPTION_EMITTER_ENABLED: return V4L2_CID_EXPOSURE_AUTO;
-                case RS2_OPTION_SATURATION: return V4L2_CID_SATURATION;
-                case RS2_OPTION_SHARPNESS: return V4L2_CID_SHARPNESS;
-                case RS2_OPTION_WHITE_BALANCE: return V4L2_CID_WHITE_BALANCE_TEMPERATURE;
-                case RS2_OPTION_ENABLE_AUTO_EXPOSURE: return V4L2_CID_EXPOSURE_AUTO; // Automatic gain/exposure control
-                case RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE: return V4L2_CID_AUTO_WHITE_BALANCE;
-                case RS2_OPTION_POWER_LINE_FREQUENCY : return V4L2_CID_POWER_LINE_FREQUENCY;
-                case RS2_OPTION_AUTO_EXPOSURE_PRIORITY: return V4L2_CID_EXPOSURE_AUTO_PRIORITY;
-                default: throw linux_backend_exception(rsutils::string::from() << "no v4l2 mipi mapping cid for option " << option);
-            }
-        }
-
-        // D457 controls map - temporal solution to bypass backend interface with actual codes
-        uint32_t v4l_mipi_device::xu_to_cid(const extension_unit& xu, uint8_t control) const
-        {
-            if (0==xu.subdevice)
-            {
-                switch(control)
-                {
-                    case RS_HWMONITOR: return RS_CAMERA_CID_HWMC;
-                    case RS_DEPTH_EMITTER_ENABLED: return RS_CAMERA_CID_LASER_POWER;
-                    case RS_EXPOSURE: return V4L2_CID_EXPOSURE_ABSOLUTE;//RS_CAMERA_CID_MANUAL_EXPOSURE; V4L2_CID_EXPOSURE_ABSOLUTE
-                    case RS_LASER_POWER: return RS_CAMERA_CID_MANUAL_LASER_POWER;
-                    case RS_ENABLE_AUTO_WHITE_BALANCE : return RS_CAMERA_CID_WHITE_BALANCE_MODE;
-                    case RS_ENABLE_AUTO_EXPOSURE: return V4L2_CID_EXPOSURE_AUTO; //RS_CAMERA_CID_EXPOSURE_MODE;
-                    case RS_HARDWARE_PRESET : return RS_CAMERA_CID_PRESET;
-                    case RS_EMITTER_FREQUENCY : return RS_CAMERA_CID_EMITTER_FREQUENCY;
-                    case RS_DEPTH_AUTO_EXPOSURE_MODE : return RS_CAMERA_CID_AE_MODE;
-                    case RS_EXTERNAL_SYNC : return RS_CAMERA_CID_SYNC_MODE;
-                    case RS_READOUT_SHAPING : return RS_CAMERA_CID_READOUT_SHAPING;
-                    // D457 Missing functionality
-                    //case RS_ERROR_REPORTING: TBD;
-                    //case RS_EXT_TRIGGER: TBD;
-                    //case RS_ASIC_AND_PROJECTOR_TEMPERATURES: TBD;
-                    //case RS_LED_PWR: TBD;
-
-                    default: throw linux_backend_exception(rsutils::string::from() << "no v4l2 mipi cid for XU depth control " << std::dec << int(control));
-                }
-            }
-            else
-                throw linux_backend_exception(rsutils::string::from() << "MIPI Controls mapping is for Depth XU only, requested for subdevice " << xu.subdevice);
-        }
-
         std::shared_ptr<uvc_device> v4l_backend::create_uvc_device(uvc_device_info info) const
         {
-            bool mipi_device = is_mipi_pid(info.pid);
+            bool mipi_device = info.is_mipi;
 
             auto v4l_uvc_dev =        mipi_device ?         std::make_shared<v4l_mipi_device>(info) :
                               ((!info.has_metadata_node) ?  std::make_shared<v4l_uvc_device>(info) :

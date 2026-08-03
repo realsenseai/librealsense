@@ -60,6 +60,10 @@ public class Device extends LrsClass {
         nHardwareReset(mHandle);
     }
 
+    public double getDeviceTimeMs(){
+        return nGetDeviceTimeMs(mHandle);
+    }
+
     @Override
     public void close() {
         for (Sensor s : _sensors)
@@ -76,6 +80,7 @@ public class Device extends LrsClass {
     private static native byte[] nSerializePresetToJson(long handle);
     private static native long[] nQuerySensors(long handle);
     private static native void nHardwareReset(long handle);
+    private static native double nGetDeviceTimeMs(long handle);
     private static native boolean nIsDeviceExtendableTo(long handle, int extension);
     private static native void nRelease(long handle);
 }

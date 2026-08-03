@@ -161,3 +161,17 @@ Java_com_intel_realsense_librealsense_Device_nIsDeviceExtendableTo(JNIEnv *env, 
     handle_error(env, e);
     return rv > 0;
 }
+
+extern "C"
+JNIEXPORT jdouble JNICALL
+Java_com_intel_realsense_librealsense_Device_nGetDeviceTimeMs(
+    JNIEnv* env,
+    jclass,
+    jlong handle)
+{
+    rs2_error* e = nullptr;
+    auto const device_time_ms = rs2_get_device_time_ms(reinterpret_cast<const rs2_device*>(handle), &e);
+
+    handle_error(env, e);
+    return static_cast<jdouble>(device_time_ms);
+}

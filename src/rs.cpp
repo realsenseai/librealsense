@@ -1768,6 +1768,15 @@ void rs2_override_extrinsics( const rs2_sensor* sensor, const rs2_extrinsics* ex
 }
 HANDLE_EXCEPTIONS_AND_RETURN( , sensor, extrinsics )
 
+double rs2_get_device_time_ms( const rs2_device* device, rs2_error** error ) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+
+    auto device_global_time = VALIDATE_INTERFACE(device->device, librealsense::global_time_interface);
+    return device_global_time->get_device_time_ms();
+}
+HANDLE_EXCEPTIONS_AND_RETURN(0.0, device)
+
 void rs2_reset_sensor_calibration( rs2_sensor const * sensor, rs2_error** error ) BEGIN_API_CALL
 {
     throw not_implemented_exception( "deprecated" );

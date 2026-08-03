@@ -59,6 +59,7 @@ def extract_version_from_filename(file_path):
     FlashGeneratedImage_Image5_16_7_0.bin -> 5.16.7
     FlashGeneratedImage_RELEASE_DS5_5_16_3_1.bin -> 5.16.3.1
     rvp-flash-dfu-release-7.56.37749.4831.img -> 7.56.37749.4831
+    20260727_7.58.40846.12889.img (NIGHTLY build) -> 7.58.40846.12889
 
     Args:
         file_path (str): Full path to the file.
@@ -78,8 +79,11 @@ def extract_version_from_filename(file_path):
     # FlashGeneratedImage_RELEASE_DS5_5_16_3_1.bin -> 5.16.3.1
     match = re.search(r'(\d+)_(\d+)_(\d+)_(\d+)\.(bin|img)$', filename)
     if not match:
-        # Match patterns like rvp-flash-dfu-release-7.56.37749.4831.img -> 7.56.37749.4831
-        match = re.search(r'-(\d+)\.(\d+)\.(\d+)\.(\d+)\.(bin|img)$', filename)
+        # Match a dot-separated x.y.z.w version immediately before the extension,
+        # regardless of what precedes it (hyphen, underscore, a date prefix, etc.), e.g.:
+        # rvp-flash-dfu-release-7.56.37749.4831.img -> 7.56.37749.4831
+        # 20260727_7.58.40846.12889.img (NIGHTLY build) -> 7.58.40846.12889
+        match = re.search(r'(?<!\d)(\d+)\.(\d+)\.(\d+)\.(\d+)\.(bin|img)$', filename)
         if not match:
             log.i(f"Version not found in filename: {filename}")
             return None

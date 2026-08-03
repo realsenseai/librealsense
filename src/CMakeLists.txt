@@ -203,4 +203,5 @@ if(BUILD_WITH_DDS)
         "${CMAKE_CURRENT_LIST_DIR}/dds/*"
         )
     target_sources( ${LRS_TARGET} PRIVATE ${RS_DDS_SOURCE_FILES} )
+    hide_sources_symbols( ${RS_DDS_SOURCE_FILES} )
 endif()

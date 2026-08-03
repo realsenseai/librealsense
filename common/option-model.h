@@ -24,6 +24,8 @@ namespace rs2
         std::string last_error;     // non-empty = pending error to surface
         bool did_write = false;     // a FW write completed since the last drain
         float written_value = 0.f;  // value that was sent to FW
+        rs2::option_value read_back; // value read back from FW after the write; adopted by the UI
+        bool has_read_back = false;  // read_back is populated
     };
 
     class option_model

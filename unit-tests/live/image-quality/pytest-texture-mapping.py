@@ -19,7 +19,8 @@ from iq_helper import (find_roi_location, get_roi_from_frame, is_color_close,
                        get_median_depth_from_region, sample_bg_depth,
                        get_median_color_from_region, sample_bg_color,
                        make_depth_filter_chain, save_failure_snapshot,
-                       SAMPLE_REGION_SIZE, BG_SAMPLE_POINTS, CUBE_CENTER, WIDTH, HEIGHT)
+                       SAMPLE_REGION_SIZE, BG_SAMPLE_POINTS, CUBE_CENTER, WIDTH, HEIGHT,
+                       DEFAULT_CONFIGURATIONS, NIGHTLY_CONFIGURATIONS)
 
 log = logging.getLogger(__name__)
 
@@ -249,20 +250,10 @@ def run_test(dev, ctx, depth_resolution, depth_fps, color_resolution, color_fps)
 def test_texture_mapping(test_device, test_context_var):
     dev, ctx = test_device
 
-    configurations = [((1280, 720), 30)]
+    configurations = DEFAULT_CONFIGURATIONS
     # on nightly we check additional arbitrary configurations
     if "nightly" in test_context_var or "weekly" in test_context_var:
-        configurations += [
-            ((640, 480), 15),
-            ((640, 480), 30),
-            ((640, 480), 60),
-            ((848, 480), 15),
-            ((848, 480), 30),
-            ((848, 480), 60),
-            ((1280, 720), 5),
-            ((1280, 720), 10),
-            ((1280, 720), 15),
-        ]
+        configurations = DEFAULT_CONFIGURATIONS + NIGHTLY_CONFIGURATIONS
 
     # D436 color stream returns near-black frames at >30 fps with Auto-Exposure ON
     # (reproduced on FW 5.17.3.10 and 5.17.3.21, and in realsense-viewer).

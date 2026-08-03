@@ -39,6 +39,8 @@ void init_device(py::module &m) {
         .def("__bool__", &rs2::device::operator bool) // Called to implement truth value testing in Python 3
         .def( "is_connected", &rs2::device::is_connected )
         .def("is_in_recovery_mode", &rs2::device::is_in_recovery_mode)
+        .def("get_device_time_ms", &rs2::device::get_device_time_ms,
+             "Retrieve the current device hardware clock time in milliseconds.")
         .def("get_firmware_min_version", &rs2::device::get_firmware_min_version,
              "Get the minimum firmware version supported by this device's SKU (e.g. \"5.10.0.17\"). "
              "Throws if the device does not implement the FW-update protocol or has no defined minimum.")

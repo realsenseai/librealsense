@@ -49,6 +49,7 @@ EXPORTS
     rs2_stop
     rs2_hardware_reset
     rs2_is_in_recovery_mode
+    rs2_get_device_time_ms
 
     rs2_set_notifications_callback
     rs2_set_notifications_callback_cpp

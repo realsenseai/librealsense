@@ -76,6 +76,13 @@ jobs:
           # in the stable ros2 apt index.
           use-ros2-testing: true
 
+      - name: checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: recursive
+
       - name: build librealsense ROS 2
         uses: ros-tooling/action-ros-ci@3a640b10f09b756dabe556dac5413aba369f71b0 #v0.4.8
         with:

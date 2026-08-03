@@ -3,14 +3,16 @@
 
 """
 Test depth frame quality. Streams depth, checks that fill rate is above threshold
-(>50% non-zero pixels with laser ON).
+(>50% non-zero pixels with laser ON), across multiple resolutions.
 """
 
 import pytest
 import pyrealsense2 as rs
+from pytest_check import check
 import numpy as np
 import time
 import logging
+from iq_helper import DEFAULT_CONFIGURATIONS, NIGHTLY_CONFIGURATIONS
 log = logging.getLogger(__name__)
 
 # Defines how far in cm do pixels have to be, to be considered in a different distance
@@ -62,17 +64,27 @@ def is_depth_fill_rate_enough(pipeline):
     return fill_rate > (1 - BLACK_PIXEL_THRESHOLD) * 100.0, num_blank_pixels
 
 
-def test_depth_laser_on(test_device_wrapped):
-    dev, ctx = test_device_wrapped
+def run_test(dev, ctx, resolution, fps):
+    """Run the fill-rate check for one resolution/fps configuration.
+
+    Returns True if the configuration was supported and exercised, False if it was
+    skipped as unsupported by the device (the caller aggregates skips across the
+    sweep so unsupported configs are visible in the test's own report rather than
+    only in the debug log).
+    """
     product_name = dev.get_info(rs.camera_info.name)
 
     cfg = rs.config()
     # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
     # connected device; without enable_device(sn) the pipeline picks the first match.
     cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
-    cfg.enable_stream(rs.stream.depth, rs.format.z16, 30)
+    cfg.enable_stream(rs.stream.depth, resolution[0], resolution[1], rs.format.z16, fps)
 
     pipeline = rs.pipeline(ctx)
+    if not cfg.can_resolve(pipeline):
+        log.info(f"Configuration {resolution[0]}x{resolution[1]} @ {fps}fps is not supported by the device")
+        return False
+
     pipeline.start(cfg)
     try:
         pipeline.wait_for_frames()
@@ -90,7 +102,7 @@ def test_depth_laser_on(test_device_wrapped):
         else:
             log.info(f"Device {product_name} does not support emitter control; running with default emitter state")
 
-        log.info(f"Testing depth frame - laser ON - {product_name}")
+        log.info(f"Testing depth frame - laser ON - {resolution[0]}x{resolution[1]}@{fps}fps - {product_name}")
 
         has_depth = False
         for frame_num in range(FRAMES_TO_CHECK):
@@ -100,4 +112,22 @@ def test_depth_laser_on(test_device_wrapped):
     finally:
         pipeline.stop()
 
-    assert has_depth, f"Depth fill rate too low on {product_name} after {FRAMES_TO_CHECK} frames"
+    check.is_true(has_depth,
+                  f"Depth fill rate too low on {product_name} at {resolution[0]}x{resolution[1]}@{fps}fps "
+                  f"after {FRAMES_TO_CHECK} frames")
+    return True
+
+
+def test_depth_fill_rate(test_device_wrapped, test_context_var):
+    dev, ctx = test_device_wrapped
+
+    configurations = DEFAULT_CONFIGURATIONS
+    if "nightly" in test_context_var:
+        configurations = DEFAULT_CONFIGURATIONS + NIGHTLY_CONFIGURATIONS
+
+    skipped = [(resolution, fps) for resolution, fps in configurations
+               if not run_test(dev, ctx, resolution, fps)]
+
+    if skipped:
+        log.warning(f"Skipped {len(skipped)}/{len(configurations)} unsupported configuration(s): "
+                    f"{[f'{r[0]}x{r[1]}@{fps}fps' for r, fps in skipped]}")
