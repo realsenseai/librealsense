@@ -7,6 +7,9 @@
 #test:donotrun:gha
 #test:device each(D400*)
 #test:device each(D555)
+# each(D585) below name-matches D585S too (substring match); the script itself refuses
+# to flash the D585 custom FW onto a D585S device (see the product_name check below).
+#test:device each(D585)
 
 import sys
 import os
@@ -24,6 +27,7 @@ import argparse
 parser = argparse.ArgumentParser(description="Test firmware update")
 parser.add_argument('--custom-fw-d400', type=str, help='Path to custom D400 firmware file')
 parser.add_argument('--custom-fw-d555', type=str, help='Path to custom D555 firmware file')
+parser.add_argument('--custom-fw-d585', type=str, help='Path to custom D585 (non-safety) firmware file; NOT applied to D585S')
 parser.add_argument('--serial', type=str, default=None, help='Serial number of the device to update (for multi-device rigs)')
 args = parser.parse_args()
 
@@ -55,6 +59,7 @@ def extract_version_from_filename(file_path):
     FlashGeneratedImage_Image5_16_7_0.bin -> 5.16.7
     FlashGeneratedImage_RELEASE_DS5_5_16_3_1.bin -> 5.16.3.1
     rvp-flash-dfu-release-7.56.37749.4831.img -> 7.56.37749.4831
+    20260727_7.58.40846.12889.img (NIGHTLY build) -> 7.58.40846.12889
 
     Args:
         file_path (str): Full path to the file.
@@ -74,8 +79,11 @@ def extract_version_from_filename(file_path):
     # FlashGeneratedImage_RELEASE_DS5_5_16_3_1.bin -> 5.16.3.1
     match = re.search(r'(\d+)_(\d+)_(\d+)_(\d+)\.(bin|img)$', filename)
     if not match:
-        # Match patterns like rvp-flash-dfu-release-7.56.37749.4831.img -> 7.56.37749.4831
-        match = re.search(r'-(\d+)\.(\d+)\.(\d+)\.(\d+)\.(bin|img)$', filename)
+        # Match a dot-separated x.y.z.w version immediately before the extension,
+        # regardless of what precedes it (hyphen, underscore, a date prefix, etc.), e.g.:
+        # rvp-flash-dfu-release-7.56.37749.4831.img -> 7.56.37749.4831
+        # 20260727_7.58.40846.12889.img (NIGHTLY build) -> 7.58.40846.12889
+        match = re.search(r'(?<!\d)(\d+)\.(\d+)\.(\d+)\.(\d+)\.(bin|img)$', filename)
         if not match:
             log.i(f"Version not found in filename: {filename}")
             return None
@@ -218,9 +226,13 @@ if product_line == "D400" and args.custom_fw_d400:
     custom_fw_path = args.custom_fw_d400
 elif "D555" in product_name and args.custom_fw_d555:
     custom_fw_path = args.custom_fw_d555
+# "D585" also matches "D585S" (safety SKU) as a substring, so explicitly exclude it here:
+# this custom FW is for the non-safety D585 (name may read "D585 Prototype" etc.) only.
+elif "D585" in product_name and "D585S" not in product_name and args.custom_fw_d585:
+    custom_fw_path = args.custom_fw_d585
 
 if not custom_fw_path:
-    log.w("No custom FW path provided (use --custom-fw-d400 / --custom-fw-d555); skipping FW update test")
+    log.w("No custom FW path provided (use --custom-fw-d400 / --custom-fw-d555 / --custom-fw-d585); skipping FW update test")
     exit(0)
 
 
@@ -313,7 +325,8 @@ if args.serial:
     cmd += ['-s', args.serial]
 # Add '-u' only if the path doesn't include 'signed'
 if ('signed' not in custom_fw_path.lower()
-        and "d555" not in product_name.lower()): # currently -u is not supported for D555
+        and "d555" not in product_name.lower()  # currently -u is not supported for D555
+        and "d585" not in product_name.lower()): # nor for D585/D585S
     cmd.insert(1, '-u')
 
 # for DDS devices we need to close device and context to detect it back after FW update

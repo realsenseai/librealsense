@@ -28,6 +28,7 @@ void init_device(py::module &m) {
         .def("first_motion_sensor", [](rs2::device& self) { return self.first<rs2::motion_sensor>(); }) // No docstring in C++
         .def("first_fisheye_sensor", [](rs2::device& self) { return self.first<rs2::fisheye_sensor>(); }) // No docstring in C++
         .def("first_safety_sensor", [](rs2::device& self) { return self.first<rs2::safety_sensor>(); }) // No docstring in C++
+        .def("first_perception_sensor", [](rs2::device& self) { return self.first<rs2::perception_sensor>(); }) // No docstring in C++
         .def("supports", &rs2::device::supports, "Check if specific camera info is supported.", "info"_a)
         .def("get_info", &rs2::device::get_info, "Retrieve camera specific information, "
              "like versions of various internal components", "info"_a)
@@ -38,6 +39,8 @@ void init_device(py::module &m) {
         .def("__bool__", &rs2::device::operator bool) // Called to implement truth value testing in Python 3
         .def( "is_connected", &rs2::device::is_connected )
         .def("is_in_recovery_mode", &rs2::device::is_in_recovery_mode)
+        .def("get_device_time_ms", &rs2::device::get_device_time_ms,
+             "Retrieve the current device hardware clock time in milliseconds.")
         .def("get_firmware_min_version", &rs2::device::get_firmware_min_version,
              "Get the minimum firmware version supported by this device's SKU (e.g. \"5.10.0.17\"). "
              "Throws if the device does not implement the FW-update protocol or has no defined minimum.")

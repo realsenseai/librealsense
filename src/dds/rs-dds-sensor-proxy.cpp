@@ -41,7 +41,7 @@
 #include <src/ds/ds-private.h>
 
 #include "rs-dds-depth-sensor-proxy.h"
-#include "rs-dds-inference-sensor-proxy.h"
+#include "rs-dds-perception-sensor-proxy.h"
 
 #include <cmath>
 
@@ -208,7 +208,7 @@ void dds_sensor_proxy::register_converters()
     // Confidence
     _formats_converter.register_converter( processing_block_factory::create_id_pbf( RS2_FORMAT_RAW8, RS2_STREAM_CONFIDENCE ) );
 
-    // Inference
+    // Perception
     _formats_converter.register_converter( { { { RS2_FORMAT_Y8, RS2_STREAM_OBJECT_DETECTION } },
                                              { { RS2_FORMAT_Y8, RS2_STREAM_OBJECT_DETECTION } },
                                             []() { return std::make_shared< identity_processing_block >(); } } );
@@ -302,9 +302,9 @@ realdds::dds_stream_profiles dds_sensor_proxy::find_dds_profiles( const libreals
         }
         else if( sp->get_stream_type() == RS2_STREAM_OBJECT_DETECTION )
         {
-            auto inference_profile = find_profile( sidx, realdds::dds_inference_stream_profile( source_profiles[i]->get_framerate() ) );
-            if( inference_profile )
-                realdds_profiles.push_back( inference_profile );
+            auto perception_profile = find_profile( sidx, realdds::dds_perception_stream_profile( source_profiles[i]->get_framerate() ) );
+            if( perception_profile )
+                realdds_profiles.push_back( perception_profile );
             else
                 LOG_ERROR( "no profile found in stream for rs2 profile " << sp );
         }
@@ -319,6 +319,14 @@ realdds::dds_stream_profiles dds_sensor_proxy::find_dds_profiles( const libreals
 
 void dds_sensor_proxy::open( const stream_profiles & profiles )
 {
+    if( Is< perception_sensor >( this ) )
+    {
+        auto dev = dynamic_cast< device * >( &get_device() );
+        if( ! dev )
+            throw invalid_value_exception( "perception sensor's owner is not a device" );
+        dev->throw_if_perception_blocking_filter_enabled();
+    }
+
     _active_converted_profiles = profiles;
     auto source_profiles = profiles; // Start with user requested profiles
     if( get_format_conversion() != format_conversion::raw )
@@ -404,7 +412,7 @@ void dds_sensor_proxy::handle_video_data( std::vector< uint8_t > && buffer,
         return;
 
     auto new_frame = static_cast< frame * >( new_frame_interface );
-    new_frame->data = std::move( buffer );
+    librealsense::assign_frame_data( new_frame->data, std::move( buffer ) );
 
     if( _md_enabled )
     {
@@ -481,10 +489,10 @@ void dds_sensor_proxy::handle_new_metadata( std::string const & stream_name,
 }
 
 
-void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg,
-                                              realdds::dds_sample && sample,
-                                              const std::shared_ptr< stream_profile_interface > & profile,
-                                              streaming_impl & streaming )
+void dds_sensor_proxy::handle_perception_data( realdds::topics::string_msg && msg,
+                                               realdds::dds_sample && sample,
+                                               const std::shared_ptr< stream_profile_interface > & profile,
+                                               streaming_impl & streaming )
 {
     json j;
     try
@@ -493,7 +501,7 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
     }
     catch( json::exception const & e )
     {
-        LOG_ERROR( "Failed to parse inference JSON: " << e.what() );
+        LOG_ERROR( "Failed to parse perception JSON: " << e.what() );
         return;
     }
 
@@ -501,7 +509,7 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
     data.system_time = time_service::get_time();  // time of arrival in system clock
     data.backend_timestamp                        // time when the underlying backend (DDS) received it
         = static_cast< rs2_time_t >( realdds::time_to_double( sample.reception_timestamp ) * SECONDS_TO_MILLISEC );
-    if( auto ts_j = j.nested( "timestamp_us" ) )  // timestamp as provided by the inference engine, convert to millisec
+    if( auto ts_j = j.nested( "timestamp_us" ) )  // timestamp as provided by the perception engine, convert to millisec
         data.timestamp = ts_j.get< double >() * MICROSEC_TO_MILLISEC;
     data.last_timestamp = streaming.last_timestamp.exchange( data.timestamp );
     data.timestamp_domain;                        // leave default (hardware domain)
@@ -541,11 +549,11 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
     }
     else
     {
-        // Currently only object detection frames are supported in inference streams, but in future, when we have more
-        // types of inference frames, we will want to allocate the correct type. For now, we allocate the same
+        // Currently only object detection frames are supported in perception streams, but in future, when we have more
+        // types of perception frames, we will want to allocate the correct type. For now, we allocate the same
         // object detection frame type.
         new_frame_interface = allocate_new_frame( RS2_EXTENSION_OBJECT_DETECTION_FRAME, profile.get(), std::move( data ) );
-        //new_frame_interface = allocate_new_frame( RS2_EXTENSION_INFERENCE_FRAME, profile.get(), std::move( data ) );
+        //new_frame_interface = allocate_new_frame( RS2_EXTENSION_PERCEPTION_FRAME, profile.get(), std::move( data ) );
     }
     if( ! new_frame_interface )
     {
@@ -583,14 +591,14 @@ void dds_sensor_proxy::handle_inference_data( realdds::topics::string_msg && msg
     // Fill header
     payload->header.magic_number = object_detection_frame::MAGIC_NUMBER;
     j.nested( "version" ).get_ex( payload->header.version );
-    payload->header.data_type = static_cast< uint8_t >( inference_frame::type::OBJECT_DETECTION );
+    payload->header.data_type = static_cast< uint8_t >( perception_frame::type::OBJECT_DETECTION );
     payload->header.flags = 0;
     payload->header.size  = static_cast< uint32_t >( total_size - sizeof( object_detection_frame::object_detection_frame_header ) );
     payload->header.spare = 0;
     uint8_t * payload_data = reinterpret_cast< uint8_t * >( payload ) + sizeof( object_detection_frame::object_detection_frame_header );
     payload->header.crc32 = rsutils::number::calc_crc32( payload_data, payload->header.size );
 
-    // No metadata for inference streams, therefore no syncer
+    // No metadata for perception streams, therefore no syncer
     invoke_new_frame( new_frame,
                       nullptr,    // pixels are already inside new_frame->data
                       nullptr );  // so no deleter is necessary
@@ -715,13 +723,13 @@ void dds_sensor_proxy::start( rs2_frame_callback_sptr callback )
                         handle_motion_data( std::move( imu ), std::move( sample ), profile, streaming );
                 } );
         }
-        else if( auto dds_inference_stream = std::dynamic_pointer_cast< realdds::dds_inference_stream >( dds_stream ) )
+        else if( auto dds_perception_stream = std::dynamic_pointer_cast< realdds::dds_perception_stream >( dds_stream ) )
         {
-            dds_inference_stream->on_data_available(
+            dds_perception_stream->on_data_available(
                 [profile, this, &streaming]( realdds::topics::string_msg && msg, realdds::dds_sample && sample )
                 {
                     if( _is_streaming )
-                        handle_inference_data( std::move( msg ), std::move( sample ), profile, streaming );
+                        handle_perception_data( std::move( msg ), std::move( sample ), profile, streaming );
                 } );
         }
         else
@@ -771,9 +779,9 @@ void dds_sensor_proxy::stop()
         {
             dds_motion_stream->on_data_available( nullptr );
         }
-        else if( auto dds_inference_stream = std::dynamic_pointer_cast< realdds::dds_inference_stream >( dds_stream ) )
+        else if( auto dds_perception_stream = std::dynamic_pointer_cast< realdds::dds_perception_stream >( dds_stream ) )
         {
-            dds_inference_stream->on_data_available( nullptr );
+            dds_perception_stream->on_data_available( nullptr );
         }
         else
             throw std::runtime_error( "Unsupported stream type" );
@@ -993,7 +1001,7 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
     std::shared_ptr< embedded_filter_interface > rs_embedded_filter = nullptr;
     if (auto decimation_filter = std::dynamic_pointer_cast< dds_decimation_filter >(embedded_filter) )
     {
-        rs_embedded_filter = std::make_shared< rs_dds_embedded_decimation_filter >(
+        auto filter = std::make_shared< rs_dds_embedded_decimation_filter >(
             embedded_filter,
             [=](json options_value)
             {
@@ -1004,10 +1012,16 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
             {
                 return _dev->query_embedded_filter(embedded_filter);
             });
+        // Capture the owning device (which outlives this sensor, hence the filter) rather than 'this'.
+        auto owning_device = dynamic_cast< device * >( &get_device() );
+        if( ! owning_device )
+            throw invalid_value_exception( "embedded filter's owner is not a device" );
+        filter->set_activation_guard( [owning_device]() { owning_device->throw_if_perception_active(); } );
+        rs_embedded_filter = filter;
     }
     else if (auto temporal_filter = std::dynamic_pointer_cast< dds_temporal_filter >(embedded_filter))
     {
-        rs_embedded_filter = std::make_shared< rs_dds_embedded_temporal_filter >(
+        auto filter = std::make_shared< rs_dds_embedded_temporal_filter >(
             embedded_filter,
             [=](json options_value)
             {
@@ -1018,6 +1032,12 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
             {
                 return _dev->query_embedded_filter(embedded_filter);
             });
+        // Capture the owning device (which outlives this sensor, hence the filter) rather than 'this'.
+        auto owning_device = dynamic_cast< device * >( &get_device() );
+        if( ! owning_device )
+            throw invalid_value_exception( "embedded filter's owner is not a device" );
+        filter->set_activation_guard( [owning_device]() { owning_device->throw_if_perception_active(); } );
+        rs_embedded_filter = filter;
     }
     else if (auto close_range_filter = std::dynamic_pointer_cast< dds_close_range_filter >(embedded_filter))
     {

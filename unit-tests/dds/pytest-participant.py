@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.dds,
-    pytest.mark.flaky( retries=2 ),
+    pytest.mark.flaky( reruns=2 ),
 ]
 
 if rspy.log.nested is not None:

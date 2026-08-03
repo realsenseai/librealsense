@@ -17,39 +17,7 @@ namespace librealsense
 
     void d400_mipi_device::hardware_reset()
     {
-        options_watcher_pause_guard guard(*this);
-        d400_device::hardware_reset();
-        simulate_device_reconnect(this->get_device_info());
-    }
-
-    void d400_mipi_device::simulate_device_reconnect(std::shared_ptr<const device_info> dev_info)
-    {
-        //limitation: the user must hold the context from which the device was created
-        //creating fake notification to trigger invoke_devices_changed_callbacks, causing disconnection and connection
-        auto non_const_device_info = std::const_pointer_cast<librealsense::device_info>(dev_info);
-        std::vector< std::shared_ptr< device_info > > devices{ non_const_device_info };
-        auto ctx = std::weak_ptr< context >(dev_info->get_context());
-        std::thread fake_notification(
-            [ctx, devs = std::move(devices)]()
-            {
-                try
-                {
-                    if (auto strong = ctx.lock())
-                    {
-                        strong->invoke_devices_changed_callbacks(devs, {});
-                        // MIPI devices do not re-enumerate so we need to give them some time to restart
-                        std::this_thread::sleep_for(std::chrono::seconds(5));
-                    }
-                    if (auto strong = ctx.lock())
-                        strong->invoke_devices_changed_callbacks({}, devs);
-                }
-                catch (const std::exception& e)
-                {
-                    LOG_ERROR(e.what());
-                    return;
-                }
-            });
-        fake_notification.detach();
+        _ds_device_common->hardware_reset( std::chrono::seconds( 5 ) );
     }
 
     void d400_mipi_device::update_signed_firmware(const std::vector<uint8_t>& image,
@@ -125,32 +93,14 @@ namespace librealsense
 
     void d400_mipi_device::update_non_const( const void * fw_image, int fw_image_size, rs2_update_progress_callback_sptr progress_callback )
     {
-        options_watcher_pause_guard guard(*this);
+        options_watcher_pause_guard guard(*_ds_device_common);
         std::vector<uint8_t> fw_image_vec (static_cast<const uint8_t*>(fw_image), static_cast<const uint8_t*>(fw_image) + fw_image_size);
         update_signed_firmware(fw_image_vec, progress_callback);
     }
 
     void d400_mipi_device::update_flash(const std::vector<uint8_t>& image, rs2_update_progress_callback_sptr callback, int update_mode)
     {
-        options_watcher_pause_guard guard(*this);
+        options_watcher_pause_guard guard(*_ds_device_common);
         d400_device::update_flash(image, callback, update_mode);
-    }
-
-    void d400_mipi_device::pause_options_watchers()
-    {
-        for( auto& sensor_index : _sensors_indices)
-        {
-            auto& synthetic_sensor_ref = dynamic_cast<synthetic_sensor&>(get_sensor(sensor_index));
-            synthetic_sensor_ref.pause_options_watcher();
-        }
-    }
-
-    void d400_mipi_device::unpause_options_watchers()
-    {
-        for( auto& sensor_index : _sensors_indices)
-        {
-            auto& synthetic_sensor_ref = dynamic_cast<synthetic_sensor&>(get_sensor(sensor_index));
-            synthetic_sensor_ref.unpause_options_watcher();
-        }
     }
 }

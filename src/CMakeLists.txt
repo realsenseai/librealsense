@@ -113,6 +113,7 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/backend.h"
         "${CMAKE_CURRENT_LIST_DIR}/backend-device.h"
         "${CMAKE_CURRENT_LIST_DIR}/platform/backend-device-group.h"
+        "${CMAKE_CURRENT_LIST_DIR}/platform/camera-identifier.h"
         "${CMAKE_CURRENT_LIST_DIR}/platform/platform-device-info.h"
         "${CMAKE_CURRENT_LIST_DIR}/platform/device-watcher.h"
         "${CMAKE_CURRENT_LIST_DIR}/platform/frame-object.h"
@@ -179,7 +180,7 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/composite-frame.h"
         "${CMAKE_CURRENT_LIST_DIR}/points.h"
         "${CMAKE_CURRENT_LIST_DIR}/labeled-points.h"
-        "${CMAKE_CURRENT_LIST_DIR}/inference-frame.h"
+        "${CMAKE_CURRENT_LIST_DIR}/perception-frame.h"
         "${CMAKE_CURRENT_LIST_DIR}/object-detection-frame.h"
         "${CMAKE_CURRENT_LIST_DIR}/depth-sensor.h"
         "${CMAKE_CURRENT_LIST_DIR}/color-sensor.h"
@@ -202,4 +203,5 @@ if(BUILD_WITH_DDS)
         "${CMAKE_CURRENT_LIST_DIR}/dds/*"
         )
     target_sources( ${LRS_TARGET} PRIVATE ${RS_DDS_SOURCE_FILES} )
+    hide_sources_symbols( ${RS_DDS_SOURCE_FILES} )
 endif()

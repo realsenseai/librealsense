@@ -72,15 +72,15 @@ typedef struct rs2_pose_stream
     rs2_format fmt;
 } rs2_pose_stream;
 
-/** \brief All the parameters required to define an inference stream. */
-typedef struct rs2_inference_stream
+/** \brief All the parameters required to define a perception stream. */
+typedef struct rs2_perception_stream
 {
     rs2_stream type;
     int index;
     int uid;
     int fps;
     rs2_format fmt;
-} rs2_inference_stream;
+} rs2_perception_stream;
 
 /** \brief All the parameters required to define a video frame. */
 typedef struct rs2_software_video_frame
@@ -330,21 +330,21 @@ rs2_stream_profile* rs2_software_sensor_add_pose_stream(rs2_sensor* sensor, rs2_
 rs2_stream_profile* rs2_software_sensor_add_pose_stream_ex(rs2_sensor* sensor, rs2_pose_stream pose_stream, int is_default, rs2_error** error);
 
 /**
-* Add inference stream to sensor
+* Add perception stream to sensor
 * \param[in] sensor the software sensor
-* \param[in] inference_stream all the stream components
+* \param[in] perception_stream all the stream components
 * \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
 */
-rs2_stream_profile* rs2_software_sensor_add_inference_stream(rs2_sensor* sensor, rs2_inference_stream inference_stream, rs2_error** error);
+rs2_stream_profile* rs2_software_sensor_add_perception_stream(rs2_sensor* sensor, rs2_perception_stream perception_stream, rs2_error** error);
 
 /**
-* Add inference stream to sensor
+* Add perception stream to sensor
 * \param[in] sensor the software sensor
-* \param[in] inference_stream all the stream components
+* \param[in] perception_stream all the stream components
 * \param[in] is_default whether or not the stream should be a default stream for the device
 * \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
 */
-rs2_stream_profile* rs2_software_sensor_add_inference_stream_ex(rs2_sensor* sensor, rs2_inference_stream inference_stream, int is_default, rs2_error** error);
+rs2_stream_profile* rs2_software_sensor_add_perception_stream_ex(rs2_sensor* sensor, rs2_perception_stream perception_stream, int is_default, rs2_error** error);
 
 /**
  * Add read only option to sensor

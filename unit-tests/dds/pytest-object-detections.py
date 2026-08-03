@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.dds,
-    pytest.mark.flaky( retries=2 ),
+    pytest.mark.flaky( reruns=2 ),
 ]
 
 dds.debug( log.isEnabledFor( logging.DEBUG ) )
@@ -50,8 +50,8 @@ if rspy.log.nested is not None:
     participant = dds.participant()
     participant.init( config_file.get_domain_from_config_file_or_default(), 'server' )
 
-    od = dds.object_detection_stream_server( 'Object Detection', 'Inference Sensor' )
-    od.init_profiles( [dds.inference_stream_profile( 30 )], 0 )
+    od = dds.object_detection_stream_server( 'Object Detection', 'Perception' )
+    od.init_profiles( [dds.perception_stream_profile( 30 )], 0 )
     od.init_options( [] )
 
     color = dds.color_stream_server( 'Color', 'RGB Camera' )
@@ -79,10 +79,10 @@ if rspy.log.nested is not None:
         od.stop_streaming()
 
     def publish_detection():
-        od.publish_inference( json_module.dumps( DETECTIONS_JSON ) )
+        od.publish_perception( json_module.dumps( DETECTIONS_JSON ) )
 
     def publish_zero_detections():
-        od.publish_inference( json_module.dumps( ZERO_DETECTIONS_JSON ) )
+        od.publish_perception( json_module.dumps( ZERO_DETECTIONS_JSON ) )
 
 else:
     ###############################################################################################################

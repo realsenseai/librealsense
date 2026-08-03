@@ -19,7 +19,7 @@ bool object_detection_frame::validate() const
     if( payload->header.magic_number != MAGIC_NUMBER )
         return false;
 
-    if( payload->header.data_type != static_cast< uint8_t >( inference_frame::type::OBJECT_DETECTION ) )
+    if( payload->header.data_type != static_cast< uint8_t >( perception_frame::type::OBJECT_DETECTION ) )
     {
         LOG_WARNING( "Unsupported Object Detection data_type: " << payload->header.data_type );
         return false;

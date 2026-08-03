@@ -4,6 +4,7 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 #include "pyrealsense2.h"
 #include <librealsense2/rs.hpp>
 
+#include <cstdint>
 #include <rsutils/string/from.h>
 #include <src/image.cpp>  // bad idea? for get_image_bpp
 
@@ -74,7 +75,7 @@ void init_frame(py::module &m) {
         .def(BIND_DOWNCAST(stream_profile, video_stream_profile))
         .def(BIND_DOWNCAST(stream_profile, motion_stream_profile))
         .def(BIND_DOWNCAST(stream_profile, pose_stream_profile))
-        .def(BIND_DOWNCAST(stream_profile, inference_stream_profile))
+        .def(BIND_DOWNCAST(stream_profile, perception_stream_profile))
         .def("stream_name", &rs2::stream_profile::stream_name, "The stream's human-readable name.")
         .def("is_default", &rs2::stream_profile::is_default, "Checks if the stream profile is marked/assigned as default, "
              "meaning that the profile will be selected when the user requests stream configuration using wildcards.")
@@ -125,8 +126,8 @@ void init_frame(py::module &m) {
     py::class_<rs2::pose_stream_profile, rs2::stream_profile> pose_stream_profile(m, "pose_stream_profile", "Stream profile instance with an explicit pose extension type.");
     pose_stream_profile.def(py::init<const rs2::stream_profile&>(), "sp"_a);
 
-    py::class_<rs2::inference_stream_profile, rs2::stream_profile> inference_stream_profile(m, "inference_stream_profile", "Stream profile for inference streams.");
-    inference_stream_profile.def(py::init<const rs2::stream_profile&>(), "sp"_a);
+    py::class_<rs2::perception_stream_profile, rs2::stream_profile> perception_stream_profile(m, "perception_stream_profile", "Stream profile for perception streams.");
+    perception_stream_profile.def(py::init<const rs2::stream_profile&>(), "sp"_a);
 
     py::class_<rs2::filter_interface> filter_interface(m, "filter_interface", "Interface for frame filtering functionality");
     filter_interface.def("process", &rs2::filter_interface::process, "frame"_a); // No docstring in C++
@@ -160,8 +161,18 @@ void init_frame(py::module &m) {
         .def(BIND_DOWNCAST(frame, depth_frame))
         .def(BIND_DOWNCAST(frame, motion_frame))
         .def(BIND_DOWNCAST(frame, pose_frame))
-        .def(BIND_DOWNCAST(frame, inference_frame))
+        .def(BIND_DOWNCAST(frame, perception_frame))
         .def(BIND_DOWNCAST(frame, object_detection_frame))
+        .def(BIND_DOWNCAST(frame, gpu_frame))
+        .def("get_gpu_data_or_upload", [](const rs2::frame& self) -> py::object {
+            bool copied = false;
+            const void* p = self.get_gpu_data_or_upload(&copied);
+            if (!p) return py::none();
+            return py::make_tuple(py::int_(reinterpret_cast<std::uintptr_t>(p)), copied);
+        }, "Always returns a usable CUDA device pointer on a CUDA build as a (address:int, copied:bool) "
+           "tuple: zero-copy when available (copied=False), otherwise the SDK uploads to a cached device "
+           "buffer (copied=True). Returns None on non-CUDA builds. Consume the address via "
+           "CuPy/PyCUDA/Numba/TensorRT; keep the frame alive until the GPU work completes.")
         // No apply_filter?
         .def( "__repr__", []( const rs2::frame &self )
         {
@@ -332,13 +343,24 @@ void init_frame(py::module &m) {
                 .def_property_readonly( "height", &rs2::labeled_points::get_height, "labeled point cloud height in pixels. Identical to calling get_height." )
                 .def( "get_bpp", &rs2::labeled_points::get_bits_per_pixel, "Returns labeled point cloud bpp (bits per pixel)." );
 
-    py::class_<rs2::inference_frame, rs2::frame> inference_frame(m, "inference_frame", "Extends the frame class with attributes inferred from the frame content, such as object detection results.");
-    inference_frame.def(py::init<rs2::frame>());
+    py::class_<rs2::perception_frame, rs2::frame> perception_frame(m, "perception_frame", "Extends the frame class with attributes inferred from the frame content, such as object detection results.");
+    perception_frame.def(py::init<rs2::frame>());
 
-    py::class_<rs2::object_detection_frame, rs2::inference_frame> object_detection_frame(m, "object_detection_frame", "Extends inference_frame class with additional object detection related attributes and functions.");
+    py::class_<rs2::object_detection_frame, rs2::perception_frame> object_detection_frame(m, "object_detection_frame", "Extends perception_frame class with additional object detection related attributes and functions.");
     object_detection_frame.def(py::init<rs2::frame>())
         .def("get_detection_count", &rs2::object_detection_frame::get_detection_count, "Get the number of detected objects in this frame")
         .def("get_detection", &rs2::object_detection_frame::get_detection, "index"_a, "Get a specific detection by index");
+
+    py::class_<rs2::gpu_frame, rs2::frame> gpu_frame(m, "gpu_frame", "Extends the frame class for a GPU-resident (zero-copy) frame on "
+        "integrated-GPU CUDA builds. Reach it with frame.as(gpu_frame); the cast is null unless the frame is GPU-resident.");
+    gpu_frame.def(py::init<rs2::frame>())
+        .def("get_gpu_data", [](const rs2::gpu_frame& self) -> py::object {
+            const void* p = self.get_gpu_data();
+            if (!p) return py::none();
+            return py::int_(reinterpret_cast<std::uintptr_t>(p));
+        }, "Retrieve the CUDA device pointer aliasing the frame data for zero-copy GPU consumption "
+           "(CuPy/PyCUDA/Numba/TensorRT). Returns the device address as an int, or None if unavailable. "
+           "Keep the frame alive until the GPU work completes.");
 
     // TODO: Deprecate composite_frame, replace with frameset
     py::class_<rs2::frameset, rs2::frame> frameset(m, "composite_frame", "Extends the frame class with additional frameset related attributes and functions");

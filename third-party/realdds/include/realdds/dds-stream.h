@@ -165,14 +165,14 @@ protected:
     on_data_available_callback _on_data_available = nullptr;
 };
 
-class dds_inference_stream : public dds_stream
+class dds_perception_stream : public dds_stream
 {
     typedef dds_stream super;
 
 public:
-    dds_inference_stream( std::string const & stream_name, std::string const & sensor_name );
+    dds_perception_stream( std::string const & stream_name, std::string const & sensor_name );
 
-    char const * type_string() const override { return "inference"; }
+    char const * type_string() const override { return "perception"; }
 
     void open( std::string const & topic_name, std::shared_ptr< dds_subscriber > const & ) override;
 
@@ -186,9 +186,9 @@ protected:
     on_data_available_callback _on_data_available = nullptr;
 };
 
-class dds_object_detection_stream : public dds_inference_stream
+class dds_object_detection_stream : public dds_perception_stream
 {
-    typedef dds_inference_stream super;
+    typedef dds_perception_stream super;
 
 public:
     dds_object_detection_stream( std::string const & stream_name, std::string const & sensor_name );

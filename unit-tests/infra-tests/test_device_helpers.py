@@ -17,10 +17,30 @@ import pytest
 from unittest.mock import MagicMock
 from rspy.pytest.device_helpers import (
     find_matching_devices, find_matching_devices_multi,
-    resolve_device_each_serials,
+    resolve_device_each_serials, split_cli_patterns,
     _MISSING_SENTINEL_PREFIX, _SKIP_SENTINEL_PREFIX,
 )
 from helpers import fake_by_spec, fake_get, make_device_marker, DEVICE_CONNECTION_TYPES
+
+
+class TestSplitCliPatterns:
+    """Comma-delimited CLI value parsing — device names may contain spaces."""
+
+    def test_repeated_flags_untouched(self):
+        assert split_cli_patterns(['D455', 'D435']) == ['D455', 'D435']
+
+    def test_comma_separated_value(self):
+        assert split_cli_patterns(['D455,D435']) == ['D455', 'D435']
+
+    def test_name_with_space_preserved(self):
+        assert split_cli_patterns(['D585 Proto,D455']) == ['D585 Proto', 'D455']
+
+    def test_whitespace_around_commas_stripped(self):
+        assert split_cli_patterns(['D455 , D435,']) == ['D455', 'D435']
+
+    def test_empty_input(self):
+        assert split_cli_patterns([]) == []
+        assert split_cli_patterns(None) == []
 
 
 class TestFindMatchingDevices:

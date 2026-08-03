@@ -12,6 +12,15 @@
 #include "platform/stream-profile-impl.h"
 #include <src/metadata-parser.h>
 #include <src/core/time-service.h>
+#include <src/core/frame-continuation.h>
+#include <atomic>
+#include <chrono>
+#include <cstdlib>
+#include <thread>
+
+#ifdef RS2_USE_CUDA_ZEROCOPY
+#include <rsutils/accelerators/gpu.h>
+#endif
 
 
 namespace librealsense {
@@ -23,6 +32,28 @@ void log_callback_end( uint32_t fps,
                        rs2_time_t callback_end_time,
                        rs2_stream stream_type,
                        unsigned long long frame_number );
+
+
+// Zero-copy capture: when the build has zero-copy enabled AND we are on an integrated GPU, the
+// captured frame can point directly at the backend (V4L2) buffer instead of memcpy'ing it into a
+// pool frame. The backend buffer is then released only when the frame is destroyed (deferred
+// continuation), so the kernel/CPU can read it in place. Off in every other configuration ->
+// behavior is byte-for-byte unchanged.
+static bool capture_zerocopy_enabled()
+{
+#ifdef RS2_USE_CUDA_ZEROCOPY
+    static bool const enabled = rsutils::rs2_is_cuda_integrated();
+    return enabled;
+#else
+    return false;
+#endif
+}
+
+// Cap on how many backend buffers may be pinned by in-flight zero-copy frames at once.
+// The V4L2 ring is small (default 4); never borrow so many that the camera can starve.
+// When the cap is hit we fall back to the copy path for that frame, so the ring is never
+// drained and the camera never stalls regardless of how long the app holds frames.
+static constexpr int ZC_MAX_INFLIGHT = 2;
 
 
 uvc_sensor::uvc_sensor( std::string const & name,
@@ -113,6 +144,8 @@ void uvc_sensor::open( const stream_profiles & requests )
 
     verify_supported_requests( requests );
 
+    _zc_inflight.clear();  // drained/read in close(); repopulated per stream below
+
     for( auto && req_profile : requests )
     {
         auto && req_profile_base = std::dynamic_pointer_cast< stream_profile_base >( req_profile );
@@ -120,9 +153,14 @@ void uvc_sensor::open( const stream_profiles & requests )
         {
             unsigned long long last_frame_number = 0;
             rs2_time_t last_timestamp = 0;
+            // Shared across the capture lambda and every deferred zero-copy release: counts
+            // backend buffers currently pinned by in-flight zero-copy frames. shared_ptr so
+            // it outlives the lambda if a frame is released later, on another thread.
+            auto zc_inflight = std::make_shared< std::atomic< int > >( 0 );
+            _zc_inflight.push_back( zc_inflight );  // close() drains this before buffers are freed
             _device->probe_and_commit(
                 req_profile_base->get_backend_profile(),
-                [this, req_profile_base, req_profile, last_frame_number, last_timestamp](
+                [this, req_profile_base, req_profile, last_frame_number, last_timestamp, zc_inflight](
                     platform::stream_profile p,
                     platform::frame_object f,
                     std::function< void() > continuation ) mutable
@@ -164,7 +202,6 @@ void uvc_sensor::open( const stream_profiles & requests )
                             fr->additional_data.frame_number = ++_gyro_counter;
                         frame_counter = fr->additional_data.frame_number;
                     }
-                        
 
                     LOG_DEBUG( "FrameAccepted,"
                                << librealsense::get_string( req_profile_base->get_stream_type() ) << ",Counter,"
@@ -185,36 +222,77 @@ void uvc_sensor::open( const stream_profiles & requests )
                     int width = vsp ? vsp->get_width() : 0;
                     int height = vsp ? vsp->get_height() : 0;
 
-                    //assert( ( width * height ) % 8 == 0 ); //Not true for inference streams
+                    //assert( ( width * height ) % 8 == 0 ); //Not true for perception streams
 
                     // TODO: remove when adding confidence format
                     if( req_profile->get_stream_type() == RS2_STREAM_CONFIDENCE )
                         bpp = 4;
 
                     auto extension = frame_source::stream_to_frame_types( req_profile_base->get_stream_type() );
-                    const bool is_inference = ( extension == RS2_EXTENSION_OBJECT_DETECTION_FRAME );
+                    const bool is_perception = ( extension == RS2_EXTENSION_OBJECT_DETECTION_FRAME );
 
                     if( ! msp )
                         expected_size = compute_frame_expected_size( width, height, bpp );
 
-                    // Compressed and inference streams carry variable-length payloads; copy the data as received.
-                    if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG } ) || is_inference )
+                    // Compressed and perception streams carry variable-length payloads; copy the data as received.
+                    if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG } ) || is_perception )
                         expected_size = f.frame_size;
+
+                    // The MIPI 64-byte width realignment path must copy (it rewrites the pixel
+                    // layout into a tightly-packed buffer), so it is never eligible for zero-copy.
+                    const bool align64 = ( ( width * bpp >> 3 ) % 64 != 0 && f.frame_size > expected_size );
+
+                    // Zero-copy capture is taken only on the clean branch where the frame is a
+                    // verbatim view of the backend buffer (sizes match exactly, not motion, not
+                    // realigned) and we have not already pinned too many ring buffers.
+                    const bool do_zc = capture_zerocopy_enabled()
+                                       && ! msp
+                                       && ! align64
+                                       && expected_size == sizeof( uint8_t ) * f.frame_size
+                                       && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT;
                     frame_holder fh = _source.alloc_frame(
                         { req_profile_base->get_stream_type(), req_profile_base->get_stream_index(), extension },
                         expected_size,
                         std::move( fr->additional_data ),
-                        true );
+                        ! do_zc );  // requires_memory=false for zero-copy: the frame points at the backend buffer
                     auto diff = time_service::get_time() - system_time;
                     if( diff > 10 )
                         LOG_DEBUG( "!! Frame allocation took " << diff << " msec" );
 
+                    bool zc_attached = false;
                     if( fh.frame )
                     {
+                        if( do_zc )
+                        {
+                            // Point the frame at the backend buffer and defer its release
+                            // (continuation -> VIDIOC_QBUF) until the frame is destroyed. The
+                            // inflight counter is decremented in the same deferred release.
+                            // Attach first and only count the buffer once the continuation is
+                            // installed: constructing/attaching it can throw (std::function copy),
+                            // and incrementing first would leak the in-flight slot on throw. On
+                            // failure zc_attached stays false, so the copy path below returns the
+                            // backend buffer via the trailing continuation() (no double release).
+                            auto inflight = zc_inflight;
+                            try
+                            {
+                                fh.frame->attach_continuation( frame_continuation(
+                                    [continuation, inflight]() {
+                                        continuation();
+                                        inflight->fetch_sub( 1, std::memory_order_relaxed );
+                                    },
+                                    f.pixels ) );
+                                zc_inflight->fetch_add( 1, std::memory_order_relaxed );
+                                zc_attached = true;
+                            }
+                            catch( ... )
+                            {
+                                zc_attached = false;
+                            }
+                        }
                         // method should be limited to use of MIPI - not for USB
                         // the aim is to grab the data from a bigger buffer, which is aligned to 64 bytes,
                         // when the resolution's width is not aligned to 64
-                        if( ( width * bpp >> 3 ) % 64 != 0 && f.frame_size > expected_size )
+                        else if( align64 )
                         {
                             std::vector< uint8_t > pixels = align_width_to_64( width, height, bpp, (uint8_t *)f.pixels );
                             assert( expected_size == sizeof( uint8_t ) * pixels.size() );
@@ -230,7 +308,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                                 if( ( ( expected_size >> 2 ) * 3 ) == sizeof( uint8_t ) * f.frame_size )
                                     expected_size = sizeof( uint8_t ) * f.frame_size;
 
-                            assert( is_inference || expected_size == sizeof( uint8_t ) * f.frame_size );
+                            assert( is_perception || expected_size == sizeof( uint8_t ) * f.frame_size );
                             memcpy( (void *)fh->get_frame_data(), f.pixels, expected_size );
                         }
 
@@ -248,9 +326,12 @@ void uvc_sensor::open( const stream_profiles & requests )
                             LOG_DEBUG("!! Frame memcpy took " << diff << " msec");
                     }
 
-                    // calling the continuation method, and releasing the backend frame buffer
-                    // since the content of the OS frame buffer has been copied, it can released ASAP
-                    continuation();
+                    // Copy path: the OS buffer content has been copied, so release it ASAP.
+                    // Zero-copy path: the frame now owns the backend buffer and will release it
+                    // (via the deferred continuation attached above) when it is destroyed -- do
+                    // NOT release it here or the camera would overwrite live frame data.
+                    if( ! zc_attached )
+                        continuation();
 
                     if (!fh.frame)
                     {
@@ -335,6 +416,28 @@ void uvc_sensor::close()
         throw wrong_api_call_sequence_exception( "close() failed. UVC device is streaming!" );
     else if( ! _is_opened )
         throw wrong_api_call_sequence_exception( "close() failed. UVC device was not opened!" );
+
+    // Zero-copy frames alias the backend V4L2 buffers via a deferred continuation, and those
+    // buffers are unmapped in _device->close() below. Wait (bounded) for any in-flight zero-copy
+    // frames to be released first, so we never free a buffer a frame still points at. No-op when
+    // none are in flight (the common case and every non-zero-copy build).
+    if( ! _zc_inflight.empty() )
+    {
+        auto inflight_total = [this]()
+        {
+            int s = 0;
+            for( auto & c : _zc_inflight )
+                s += c->load( std::memory_order_relaxed );
+            return s;
+        };
+        auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds( 1 );
+        while( inflight_total() > 0 && std::chrono::steady_clock::now() < deadline )
+            std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
+        if( int remaining = inflight_total() )
+            LOG_WARNING( "close(): " << remaining
+                         << " zero-copy frame(s) still held; release frames before close()" );
+        _zc_inflight.clear();
+    }
 
     for( auto && profile : _internal_config )
     {

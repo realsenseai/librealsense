@@ -4,6 +4,7 @@
 #pragma once
 
 #include "backend.h"
+#include "camera-identifier-v4l.h"
 #include <src/platform/uvc-device.h>
 #include <src/metadata.h>
 #include "types.h"
@@ -113,7 +114,9 @@ namespace librealsense
             int _fildes;
             std::atomic< int > _lock_counter;
         };
-        static int xioctl(int fh, unsigned long request, void *arg);
+
+        // Low-level V4L2 ioctl wrapper (retries on EINTR). Used by low level types (buffer, kernel_buf_guard)
+        int xioctl( int fh, unsigned long request, void * arg );
 
         class buffer
         {
@@ -148,6 +151,7 @@ namespace librealsense
             v4l2_buffer _buf;
             std::mutex _mutex;
             bool _must_enqueue = false;
+            bool _zc_registered = false;  // this mmap buffer is registered with CUDA for zero-copy GPU access
         };
 
         enum supported_kernel_buf_types : uint8_t
@@ -306,31 +310,18 @@ namespace librealsense
             double _kpi_frames_drops_pct;
         };
 
-        typedef std::pair<uvc_device_info,std::string> node_info;
+        // A V4L2 enumeration node: the resolved device info plus its /dev/video* path.
+        typedef std::pair< uvc_device_info, std::string > node_info;
 
         class v4l_uvc_device : public uvc_device, public v4l_uvc_interface
         {
         public:
-            static void foreach_uvc_device(
-                    std::function<void(const uvc_device_info&,
-                                       const std::string&)> action);
+            static void foreach_uvc_device( std::function<void(const uvc_device_info&, const std::string&)> action);
 
             static std::vector<std::string> get_mipi_dfu_paths();
 
-            static bool is_usb_path_valid(const std::string& usb_video_path, const std::string &dev_name,
-                                          std::string &busnum, std::string &devnum, std::string &devpath);
-
-            static bool is_usb_device_path(const std::string& video_path);
-
-            static uvc_device_info get_info_from_usb_device_path(const std::string& video_path, const std::string& dev_name, const std::string& name, const std::vector<std::pair <std::string, std::string>>& sys_to_dev_video_paths);
-
-            static uvc_device_info get_info_from_mipi_device_path(const std::string& video_path, const std::string& name);
-
-            static bool is_format_supported_on_node(const std::string& dev_name, std::string v4l_4cc_fmt);
-            static bool is_device_depth_node(const std::string& dev_name);
-            static uint16_t get_mipi_device_pid(const std::string& dev_name);
-            static void get_mipi_device_info(const std::string& dev_name,
-                                             std::string& bus_info, std::string& card);
+            // Retrieve device video capabilities to discriminate video capturing and metadata nodes.
+            static v4l2_capability get_dev_capabilities( const std::string dev_name );
 
             v4l_uvc_device(const uvc_device_info& info, bool use_memory_map = false);
 
@@ -428,12 +419,15 @@ namespace librealsense
 
             static std::vector<std::pair <std::string, std::string>> generate_v4l_to_dev_video_paths(const std::vector<path_and_identifier>& v4l_videos,
                                                                                                      const std::vector<path_and_identifier>& dev_videos);
-            static std::vector<node_info> get_mipi_rs_enum_nodes();
-            static std::vector<node_info> collect_uvc_nodes(const std::vector<path_and_identifier>& v4l_videos, const std::vector<node_info>& mipi_rs_enum_nodes,
+            static std::vector<node_info> collect_uvc_nodes(const std::vector<path_and_identifier>& v4l_videos,
                                                             const std::vector<std::pair <std::string, std::string>>& v4l_to_dev_video_paths);
             static std::vector<node_info> match_video_with_metadata_nodes(const std::vector<node_info>& uvc_nodes);
             static bool get_info_from_v4l_video_path(const std::string& v4l_video_path, const std::string& dev_name, uvc_device_info& info, bool is_mipi_rs_enum_nodes_empty,
-                                                 const std::vector<std::pair <std::string, std::string>>& v4l_to_dev_video_paths);
+                                                 camera_identifier_v4l_mipi& mipi_id);
+            static std::vector<node_info> get_mipi_rs_enum_nodes();
+            static uvc_device_info get_info_from_mipi_device_path(const std::string& video_path, const std::string& name,
+                                                                  camera_identifier_v4l_mipi& mipi_id);
+            static uvc_device_info get_info_from_usb_device_path(const std::string& video_path, const std::string& dev_name, const std::string& name);
             static std::vector<path_and_identifier> collect_dev_video_path_and_identifier();
 
             power_state _state = D3;
@@ -506,18 +500,6 @@ namespace librealsense
         };
 
 
-        const uint16_t D457_PID      = 0xABCD;
-        const uint16_t D430_GMSL_PID = 0xABCE;
-        const uint16_t D415_GMSL_PID = 0xABCF;
-        const uint16_t D401_GMSL_PID = 0xABCC;
-
-        static const std::set<std::uint16_t> mipi_devices_pid = {
-            D457_PID,
-            D430_GMSL_PID,
-            D415_GMSL_PID,
-            D401_GMSL_PID
-        };
-
         // D457 Development. To be merged into underlying class
         class v4l_mipi_device : public v4l_uvc_meta_device
         {
@@ -547,9 +529,6 @@ namespace librealsense
             control_range get_pu_range(rs2_option option) const override;
             void set_metadata_attributes(buffers_mgr& buf_mgr, __u32 bytesused, uint8_t* md_start) override;
             bool is_platform_jetson() const override;
-        protected:
-            virtual uint32_t get_cid(rs2_option option) const;
-            uint32_t xu_to_cid(const extension_unit& xu, uint8_t control) const; // Find the mapping of XU to the underlying control
         };
 
         class v4l_backend : public backend

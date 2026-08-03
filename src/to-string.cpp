@@ -417,11 +417,11 @@ const char * get_string( rs2_extension value )
     CASE( DECIMATION_EMBEDDED_FILTER )
     CASE( TEMPORAL_EMBEDDED_FILTER )
     CASE( CLOSE_RANGE_EMBEDDED_FILTER )
-    CASE( INFERENCE_FRAME )
+    CASE( PERCEPTION_FRAME )
     CASE( OBJECT_DETECTION_FRAME )
-    CASE( INFERENCE_SENSOR )
-    CASE( OBJECT_DETECTION_SENSOR )
-    CASE( INFERENCE_PROFILE )
+    CASE( PERCEPTION_SENSOR )
+    CASE( PERCEPTION_PROFILE )
+    CASE( GPU_FRAME )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;
@@ -579,6 +579,8 @@ std::string const & get_string_( rs2_option value )
         CASE( DISPARITY_SHIFT )
         CASE( THRESHOLD )
         CASE( DOWNSCALE_RATIO )
+        CASE( READOUT_SHAPING )
+        CASE( DETECTION_DISTANCE )
 #undef CASE
         return arr;
     }();

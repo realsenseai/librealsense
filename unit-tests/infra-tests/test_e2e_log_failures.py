@@ -5,11 +5,10 @@
 E2E: a failing test records its exception in its per-test log file.
 
 Regression for empty failing-test logs (Jetson #17522): a test whose call phase
-raised left a .log ending on just the "Test:" header. Two effects combined --
-pytest_runtest_makereport was the only hook that logged failures, and pytest-retry
-reruns a test via pytest_runtest_call (never makereport). conftest now logs the
-call-phase failure from pytest_runtest_call (fires on every attempt), and the module
-log is opened in append mode so retries/repeats accumulate instead of overwriting.
+raised left a .log ending on just the "Test:" header. conftest logs the call-phase
+failure from pytest_runtest_call (one place that fires on every rerun attempt), and
+the module log is opened in append mode so reruns/repeats accumulate instead of
+overwriting (the between-attempts recycle finishes module_log; it reopens per attempt).
 """
 
 from helpers import run_e2e, parse_outcomes
@@ -39,10 +38,10 @@ class TestLogFailures:
         assert "Teardown:" in log, log   # common prefix across hub / hub-less / --no-reset paths
 
     def test_every_retry_attempt_recorded_in_one_file(self):
-        """Under --retries the module log is reopened in append mode per attempt and
-        makereport is bypassed; every attempt's failure AND teardown must accumulate in
-        the one file (not overwritten, not empty). --retries 2 == 3 attempts."""
-        rc, out, tracking = run_e2e("pytest-logfail.py", "--retries", "2")
+        """Under --reruns the between-attempts recycle finishes module_log and it reopens
+        in append mode per attempt; every attempt's failure AND teardown must accumulate
+        in the one file (not overwritten, not empty). --reruns 2 == 3 attempts."""
+        rc, out, tracking = run_e2e("pytest-logfail.py", "--reruns", "2")
         assert rc != 0, out
         assert parse_outcomes(out).get("failed") == 1, out
         log = _log(tracking)

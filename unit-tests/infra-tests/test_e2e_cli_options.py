@@ -50,7 +50,7 @@ class TestCliOptionsRegistered:
         assert "timeout method: thread" in out
 
     def test_rslog(self):
-        """--rslog should call rs.log_to_console."""
+        """--rslog should install the LibRS log bridge (rs.log_to_callback)."""
         rc, out, tracking = run_e2e("pytest-passthrough.py", "--rslog")
         assert rc == 0
         assert len(tracking["rslog_calls"]) > 0
@@ -67,38 +67,38 @@ class TestCliOptionsRegistered:
         assert rc == 0
 
     def test_retries(self):
-        """--retries 1: a flaky call-phase failure is rescued by retry → single PASS.
+        """--reruns 1: a flaky call-phase failure is rescued by a rerun → single PASS.
 
-        pytest-retry tears down module-scoped fixtures (incl. module_device_setup)
-        between attempts via its preliminary-teardown trick, which is how the device
-        gets recycled and module preconditions re-applied on retry.
+        The conftest recycle hook (pytest_runtest_logreport, outcome=="rerun") tears down
+        every local fixture (incl. module_device_setup) between attempts, which is how the
+        device gets power-cycled and module preconditions re-applied on the rerun.
         """
-        rc, out, tracking = run_e2e("pytest-retry.py", "--retries", "1")
+        rc, out, tracking = run_e2e("pytest-retry.py", "--reruns", "1")
         assert_outcomes(out, passed=2)
         assert rc == 0
         calls = tracking["enable_only_calls"]
-        # Two enable_only calls: initial module-fixture creation + post-retry-teardown re-creation.
+        # Two enable_only calls: initial module-fixture creation + post-recycle re-creation.
         assert len(calls) == 2
         assert all(c['recycle'] is False for c in calls)
-        # the device recycle now comes from the teardown-disable between attempts, not recycle=True
+        # the device recycle comes from the teardown-disable between attempts, not recycle=True
         assert len(tracking["disable_calls"]) >= 1
 
     def test_retries_recreate_module_fixture(self):
         """Module-scoped fixtures must be torn down and re-instantiated between
-        retry attempts.  This is the core mechanic the conftest's
+        rerun attempts.  This is the core mechanic the conftest's
         ``test_device_wrapped`` (and any other module-scoped precondition fixture)
-        relies on for the device recycle / re-apply behaviour on retry."""
-        rc, out, _ = run_e2e("pytest-retry-module-fixture.py", "--retries", "1")
+        relies on for the device recycle / re-apply behaviour on rerun."""
+        rc, out, _ = run_e2e("pytest-retry-module-fixture.py", "--reruns", "1")
         assert_outcomes(out, passed=1)
         assert rc == 0
 
     def test_retries_on_setup_error(self):
-        """Setup-phase ERROR on attempt 1 must still trigger a retry.
+        """Setup-phase ERROR on attempt 1 must still trigger a rerun.
 
-        Regression for Jenkins win #113344.  Native pytest-retry skips setup
-        failures by default (retry_plugin.py:148-149); conftest.py patches
-        ``should_handle_retry`` to relax that gate."""
-        rc, out, _ = run_e2e("pytest-retry-setup-fail.py", "--retries", "1")
+        Regression for Jenkins win #113344.  pytest-rerunfailures reruns setup-phase
+        failures natively (it reruns the whole protocol), so no conftest patching is
+        involved — this locks the behavior in against plugin/config regressions."""
+        rc, out, _ = run_e2e("pytest-retry-setup-fail.py", "--reruns", "1")
         assert_outcomes(out, passed=1)
         assert rc == 0
 
@@ -142,16 +142,16 @@ class TestCliOptionsRegistered:
                                "--exclude-device", "D455", "--exclude-device", "D435")
         assert_outcomes(out, passed=1)  # only D401 remains
 
-    def test_exclude_device_space_separated(self):
-        """--exclude-device 'D455 D435' (single flag, space-separated) — Jenkins TEST_EXCLUDE_DEVICES form."""
+    def test_exclude_device_comma_separated(self):
+        """--exclude-device 'D455,D435' (single flag, comma-separated) — Jenkins TEST_EXCLUDE_DEVICES form."""
         rc, out, *_ = run_e2e("pytest-cli.py", "-k", "test_multi_exclude",
-                               "--exclude-device", "D455 D435")
+                               "--exclude-device", "D455,D435")
         assert_outcomes(out, passed=1)  # only D401 remains
 
-    def test_device_space_separated(self):
-        """--device 'D455 D435' (single flag, space-separated) must include both devices."""
+    def test_device_comma_separated(self):
+        """--device 'D455,D435' (single flag, comma-separated) must include both devices."""
         rc, out, *_ = run_e2e("pytest-cli.py", "-k", "test_multi_include",
-                               "--device", "D455 D435")
+                               "--device", "D455,D435")
         assert_outcomes(out, passed=2)
 
     def test_device_and_exclude_combined(self):

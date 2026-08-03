@@ -31,6 +31,8 @@ Please make sure to update your links to the new RealSenseAI organization for bo
 
 >Note 2: Users who install the SDK via APT are required to update the APT key as explained in the following [guide](https://github.com/realsenseai/librealsense/blob/development/doc/distribution_linux.md#installing-the-packages)
 
+>Note 3: New closed-source libraries are available on our [Perception Studio](https://www.realsenseai.com/perception-studio/) page. Recent drop includes close-range performance (min-z).
+
 #### Branch Policy
 We have updated our branch policy:
 From now on, we will also push beta releases to the master branch, so users can access up-to-date code and features.

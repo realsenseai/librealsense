@@ -8,20 +8,23 @@ Mirrors fps-single-stream but disables auto-exposure and sets exposure to half f
 
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
 import fps_helper
 import platform
 import logging
+from rspy.pytest.device_helpers import require_min_fw_version
 log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
     pytest.mark.device_exclude("D555"),
-    pytest.mark.skip(reason="Test disabled (donotrun)"),
 ]
 
 TESTED_FPS =          [5,   6,   15,  30,  60,  90]
 TIME_TO_TEST_FPS =    [25,  20,  13,  10,  5,   4]
+
+fps_helper.TIME_FOR_STEADY_STATE = 1.2  # t2ff KPI is 1 second + some extra
 
 
 def set_exposure_half_frame_time(sensor, requested_fps):
@@ -109,12 +112,21 @@ def test_color_fps_manual_exposure(test_device):
     product_name = dev.get_info(rs.camera_info.name)
     os_name = platform.system()
 
-    if any(model in product_name for model in ['D421', 'D405']):
-        pytest.skip(f"Device {product_name} has no color sensor")
+    if product_line == "D400":
+        require_min_fw_version(dev, rsutils.version(5, 17, 4, 6), "color manual exposure FPS")
 
     log.info(f"Testing color fps (manual exposure) {product_line} device - {os_name} OS")
 
-    cs = dev.first_color_sensor()
+    # D405 and D401 expose color through the depth sensor (no separate color sensor)
+    try:
+        cs = dev.first_color_sensor()
+    except RuntimeError:
+        if 'D405' in product_name or 'D401' in product_name:
+            cs = dev.first_depth_sensor()
+        elif 'D421' in product_name:
+            pytest.skip(f"Device {product_name} has no color sensor")
+        else:
+            raise
     if product_line == "D400":
         if cs.supports(rs.option.enable_auto_exposure):
             cs.set_option(rs.option.enable_auto_exposure, 0)
@@ -122,21 +134,20 @@ def test_color_fps_manual_exposure(test_device):
             cs.set_option(rs.option.auto_exposure_priority, 0)
 
     failures = []
+    tested_count = 0
     for i in range(len(TESTED_FPS)):
         requested_fps = TESTED_FPS[i]
         try:
-            candidates = [p for p in cs.profiles
-                          if p.fps() == requested_fps
-                          and p.stream_type() == rs.stream.color
-                          and p.format() == rs.format.rgb8]
-            if not candidates:
-                raise StopIteration
-            candidates.sort(key=lambda pr: pr.as_video_stream_profile().width() * pr.as_video_stream_profile().height())
-            cp = candidates[len(candidates)//2]
+            # Pick the first matching profile; resolution does not affect FPS accuracy
+            cp = next(p for p in cs.profiles
+                      if p.fps() == requested_fps
+                      and p.stream_type() == rs.stream.color
+                      and p.format() == rs.format.rgb8)
         except StopIteration:
             log.info(f"Requested fps: {requested_fps:.1f} [Hz], not supported")
             continue
 
+        tested_count += 1
         exposure_val = set_exposure_half_frame_time(cs, requested_fps)
         fps_helper.TIME_TO_COUNT_FRAMES = TIME_TO_TEST_FPS[i]
         fps_dict = fps_helper.measure_fps({cs: [cp]})
@@ -146,4 +157,5 @@ def test_color_fps_manual_exposure(test_device):
         if not (fps >= requested_fps - delta_Hz and fps <= requested_fps + delta_Hz):
             failures.append(f"Color {requested_fps}Hz: got {fps:.1f}Hz")
 
+    assert tested_count > 0, f"No color profiles found on {product_name} — test ran no FPS checks"
     assert not failures, "Color FPS out of tolerance:\n" + "\n".join(failures)

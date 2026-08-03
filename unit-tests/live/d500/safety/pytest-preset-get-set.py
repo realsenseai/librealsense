@@ -16,7 +16,7 @@ pytestmark = [
     pytest.mark.device_each("D585S"),
     pytest.mark.priority(10),
     pytest.mark.context("weekly"),
-    pytest.mark.flaky(retries=3),
+    pytest.mark.flaky(reruns=3),
 ]
 
 

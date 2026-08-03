@@ -45,8 +45,16 @@ namespace librealsense
         std::vector<uint8_t> update_abort_status();
         std::vector< uint8_t > run_triggered_calibration( int timeout_ms, std::string json,
                                                           rs2_update_progress_callback_sptr progress_callback );
+        std::vector< uint8_t > run_interactive_triggered_calibration( int timeout_ms, std::string json,
+                                                                      float * const health,
+                                                                      rs2_update_progress_callback_sptr progress_callback );
+        std::vector< uint8_t > update_interactive_calibration_status( int timeout_ms,
+                                                                      rs2_update_progress_callback_sptr progress_callback );
         std::vector< uint8_t > run_occ( int timeout_ms, std::string json, float * const health,
                                         rs2_update_progress_callback_sptr progress_callback );
+        bool device_uses_interactive_triggered_calibration() const;
+        void cancel_and_wait_for_idle();   // best-effort SET_CALIB_MODE(ABORT) + poll until IDLE (or ~2s)
+        try_calibration_selection _try_selection;
         ds_calib_common::dsc_check_status_result get_calibration_status( int timeout_ms,
                                                             std::function< void( const int count ) > progress_func,
                                                             bool wait_for_final_results = true ) const;

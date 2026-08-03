@@ -25,6 +25,14 @@ endif()
 if(CUDA_VERSION VERSION_GREATER_EQUAL "11.0")
     list(APPEND CUDA_ARCH_LIST 80 86)  # Ampere
 endif()
+# Jetson (Tegra) compute capabilities — distinct from desktop Ampere. Without these the
+# kernels build for sm_86 but fail to launch on Orin with "no kernel image available".
+if(CUDA_VERSION VERSION_GREATER_EQUAL "11.0" AND CUDA_VERSION VERSION_LESS "13.0")
+    list(APPEND CUDA_ARCH_LIST 72)  # Xavier (Volta, sm_72)
+endif()
+if(CUDA_VERSION VERSION_GREATER_EQUAL "11.4" AND CUDA_VERSION VERSION_LESS "13.0")
+    list(APPEND CUDA_ARCH_LIST 87)  # Orin (Ampere, sm_87)
+endif()
 if(CUDA_VERSION VERSION_GREATER_EQUAL "11.8")
     list(APPEND CUDA_ARCH_LIST 89)  # Ada Lovelace
 endif()

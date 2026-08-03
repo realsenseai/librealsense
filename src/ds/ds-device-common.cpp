@@ -19,7 +19,11 @@
 #include "proc/temporal-filter.h"
 
 #include <src/backend.h>
+#include <src/context.h>
+#include <src/sensor.h>
 #include <librealsense2/h/rs_internal.h>
+
+#include <thread>
 
 namespace librealsense
 {
@@ -59,6 +63,87 @@ namespace librealsense
         roi.max_x = words[3];
 
         return roi;
+    }
+
+    // On MIPI/GMSL the device does not physically re-enumerate, so fake a disconnect/reconnect.
+    // On non-MIPI only send the command to the device.
+    void ds_device_common::hardware_reset( std::chrono::milliseconds reconnect_delay )
+    {
+        command cmd( ds::HWRST );
+        cmd.require_response = false;
+
+        // Pause options watchers over the reset so they won't try to query the device while unavailable.
+        options_watcher_pause_guard guard( *this );
+
+        try
+        {
+            _hw_monitor->send( cmd );
+        }
+        catch( const std::exception & e )
+        {
+            if( _is_mipi )
+            {
+                // Device resets before it ACKs the control, so the send times out. Expected, so not an error (require_response = false).
+                // Workaround until FW will fix sending ACK before resetting. Removes many log prints.
+                LOG_DEBUG( "hardware_reset command send did not complete (expected during MIPI reset): " << e.what() );
+            }
+            else
+                throw;
+        }
+
+        if( _is_mipi )
+            simulate_device_reconnect( _owner->get_device_info(), reconnect_delay );
+    }
+
+    void ds_device_common::pause_options_watchers()
+    {
+        for( size_t i = 0; i < _owner->get_sensors_count(); ++i )
+            if( auto ss = dynamic_cast< synthetic_sensor * >( &_owner->get_sensor( i ) ) )
+                ss->pause_options_watcher();
+    }
+
+    void ds_device_common::unpause_options_watchers()
+    {
+        for( size_t i = 0; i < _owner->get_sensors_count(); ++i )
+            if( auto ss = dynamic_cast< synthetic_sensor * >( &_owner->get_sensor( i ) ) )
+                ss->unpause_options_watcher();
+    }
+
+    // Create fake invoke_devices_changed_callbacks notifications, causing a disconnection followed by a reconnection.
+    void ds_device_common::simulate_device_reconnect( std::shared_ptr< const device_info > dev_info,
+                                                      std::chrono::milliseconds reconnect_delay )
+    {
+        // limitation: the user must hold the context from which the device was created.
+        auto non_const_device_info = std::const_pointer_cast< librealsense::device_info >( dev_info );
+        std::vector< std::shared_ptr< device_info > > devices{ non_const_device_info };
+        auto ctx = std::weak_ptr< context >( dev_info->get_context() );
+        std::thread fake_notification(
+            [ctx, devs = std::move( devices ), reconnect_delay]()
+            {
+                try
+                {
+                    if( auto strong = ctx.lock() )
+                    {
+                        strong->invoke_devices_changed_callbacks( devs, {} );
+                        // MIPI devices do not re-enumerate, so give them time to restart.
+                        std::this_thread::sleep_for( reconnect_delay );
+                    }
+                    if( auto strong = ctx.lock() )
+                        strong->invoke_devices_changed_callbacks( {}, devs );
+                    else
+                    {
+                        // Context destroyed during the reconnect delay - normal teardown with a reset in flight, nothing is left stranded
+                        // Note it at DEBUG (an ERROR here would be misleading noise during shutdown).
+                        LOG_DEBUG( "simulate_device_reconnect: context destroyed before reconnect notification - skipping" );
+                    }
+                }
+                catch( const std::exception & e )
+                {
+                    LOG_ERROR( e.what() );
+                    return;
+                }
+            } );
+        fake_notification.detach();
     }
 
     void ds_device_common::enter_update_state(const command& cmd) const

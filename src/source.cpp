@@ -65,7 +65,7 @@ namespace librealsense
                                   RS2_EXTENSION_MOTION_FRAME,
                                   RS2_EXTENSION_POSE_FRAME,
                                   RS2_EXTENSION_LABELED_POINTS,
-                                  RS2_EXTENSION_INFERENCE_FRAME,
+                                  RS2_EXTENSION_PERCEPTION_FRAME,
                                   RS2_EXTENSION_OBJECT_DETECTION_FRAME };
 
         _metadata_parsers = metadata_parsers;

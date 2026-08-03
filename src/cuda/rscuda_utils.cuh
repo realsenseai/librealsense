@@ -14,6 +14,8 @@
 #pragma comment(lib, "cudart_static")
 #endif
 
+#include "cuda-compat.h"   // RS_CUDA_MEMTYPE — single definition shared across CUDA TUs
+
 // Throws std::runtime_error with a descriptive message if a CUDA call returns non-success.
 #define RS_CUDA_CHECK(expr) do {                                                                     \
     cudaError_t _rs_cuda_err = (expr);                                                               \
@@ -33,6 +35,45 @@ namespace rscuda
         if (res != cudaSuccess)
             throw std::runtime_error("cudaMalloc failed status: " + res);
         return std::shared_ptr<T>(d_data, [](T* p) { cudaFree(p); });
+    }
+
+    // Zero-copy probe: if `host` is CUDA pinned+mapped memory (frame buffers on an
+    // integrated GPU), return the aliasing device pointer so a kernel can read/write it
+    // in place with no cudaMemcpy. Returns nullptr otherwise (plain malloc / discrete /
+    // non-zero-copy build), signalling the caller to use the cudaMalloc + copy path.
+    // Clears the CUDA error state on the not-mapped path so it doesn't leak to RS_CUDA_CHECK.
+    template<typename T>
+    T* try_device_ptr(const void* host)
+    {
+#ifdef RS2_USE_CUDA_ZEROCOPY
+        // Only probe in zero-copy builds. In a plain CUDA build this compiles to
+        // `return nullptr;`, so the existing cudaMalloc + cudaMemcpy path is taken
+        // unchanged (no extra per-frame probe, byte-for-byte identical behavior).
+        //
+        // Handles both memory kinds the zero-copy path produces:
+        //   - managed (frame pool, cudaMallocManaged) -> same ptr is device-usable
+        //   - host-registered mapped (V4L2 capture buffers) -> attr.devicePointer
+        // Unregistered (plain malloc / discrete GPU) -> nullptr -> caller copies.
+        cudaPointerAttributes attr{};
+        if (host && cudaPointerGetAttributes(&attr, host) == cudaSuccess)
+        {
+            if (RS_CUDA_MEMTYPE(attr) == cudaMemoryTypeManaged)
+                return static_cast<T*>(const_cast<void*>(host));
+            if (attr.devicePointer)
+                return static_cast<T*>(attr.devicePointer);
+            // Some Jetson L4T CUDA drivers leave attr.devicePointer null for mapped pinned
+            // memory even though it IS device-mapped; cudaHostGetDevicePointer resolves the alias.
+            if (RS_CUDA_MEMTYPE(attr) == cudaMemoryTypeHost)
+            {
+                void* dptr = nullptr;
+                if (cudaHostGetDevicePointer(&dptr, const_cast<void*>(host), 0) == cudaSuccess && dptr)
+                    return static_cast<T*>(dptr);
+            }
+        }
+        cudaGetLastError();
+#endif
+        (void)host;
+        return nullptr;
     }
 
     template<typename  T>

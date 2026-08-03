@@ -5,7 +5,7 @@
 #include "rs-dds-color-sensor-proxy.h"
 #include "rs-dds-depth-sensor-proxy.h"
 #include "rs-dds-motion-sensor-proxy.h"
-#include "rs-dds-inference-sensor-proxy.h"
+#include "rs-dds-perception-sensor-proxy.h"
 
 #include <realdds/dds-device.h>
 #include <realdds/dds-stream.h>
@@ -136,16 +136,16 @@ static rs2_motion_stream to_rs2_motion_stream( rs2_stream const stream_type,
 }
 
 
-static rs2_inference_stream to_rs2_inference_stream( rs2_stream const stream_type,
-                                                     sid_index const & sidx,
-                                                     std::shared_ptr< realdds::dds_inference_stream_profile > const & profile )
+static rs2_perception_stream to_rs2_perception_stream( rs2_stream const stream_type,
+                                                       sid_index const & sidx,
+                                                       std::shared_ptr< realdds::dds_perception_stream_profile > const & profile )
 {
-    rs2_inference_stream prof;
+    rs2_perception_stream prof;
     prof.type = stream_type;
     prof.index = sidx.index;
     prof.uid = sidx.sid;
     prof.fps = profile->frequency();
-    // We use Y8 for inference streams, but this is not actually an image format and should be handled as raw data.
+    // We use Y8 for perception streams, but this is not actually an image format and should be handled as raw data.
     // We set this similar to LPC and safety stream to avoid need for special Linux kernel patches, and because
     // format is required to be able to use the existing format_converter framework.
     prof.fmt = RS2_FORMAT_Y8;
@@ -279,7 +279,7 @@ dds_device_proxy::dds_device_proxy( std::shared_ptr< const device_info > const &
             software_sensor & sensor = get_software_sensor( sensor_info.sensor_index );
             auto video_stream = std::dynamic_pointer_cast< realdds::dds_video_stream >( stream );
             auto motion_stream = std::dynamic_pointer_cast< realdds::dds_motion_stream >( stream );
-            auto inference_stream = std::dynamic_pointer_cast< realdds::dds_inference_stream >( stream );
+            auto perception_stream = std::dynamic_pointer_cast< realdds::dds_perception_stream >( stream );
             auto & profiles = stream->profiles();
             auto const & default_profile = profiles[stream->default_profile_index()];
             for( auto & profile : profiles )
@@ -303,11 +303,11 @@ dds_device_proxy::dds_device_proxy( std::shared_ptr< const device_info > const &
                             profile == default_profile, stream->name() );
                         _stream_name_to_profiles[stream->name()].push_back( raw_stream_profile );
                     }
-                    else if( inference_stream )
+                    else if( perception_stream )
                     {
-                        auto inference_profile = std::static_pointer_cast< realdds::dds_inference_stream_profile >( profile );
-                        auto raw_stream_profile = sensor.add_inference_stream(
-                            to_rs2_inference_stream( stream_type, sidx, inference_profile ),
+                        auto perception_profile = std::static_pointer_cast< realdds::dds_perception_stream_profile >( profile );
+                        auto raw_stream_profile = sensor.add_perception_stream(
+                            to_rs2_perception_stream( stream_type, sidx, perception_profile ),
                             profile == default_profile, stream->name() );
                         _stream_name_to_profiles[stream->name()].push_back( raw_stream_profile );
                     }
@@ -627,7 +627,7 @@ std::shared_ptr< dds_sensor_proxy > dds_device_proxy::create_sensor( const std::
     case RS2_STREAM_MOTION:
         return std::make_shared< dds_motion_sensor_proxy >( sensor_name, this, _dds_dev );
     case RS2_STREAM_OBJECT_DETECTION:
-        return std::make_shared< dds_object_detection_sensor_proxy >( sensor_name, this, _dds_dev );
+        return std::make_shared< dds_perception_sensor_proxy >( sensor_name, this, _dds_dev );
     case RS2_STREAM_ANY:
         // Generic: no type
         return std::make_shared< dds_sensor_proxy >( sensor_name, this, _dds_dev );

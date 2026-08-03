@@ -15,7 +15,10 @@ zstandard==0.25.0 # for verifying ros2_writer's zstd-compressed .db3 frames
 # Pytest framework (cross-platform)
 pytest==8.3.5
 pytest-timeout==2.2.0
-pytest-retry==1.7.0
+# 16.1+ requires Python >= 3.10; Jetson JetPack 5 benches run 3.8. Retry-guard
+# infra tests verified green on both pins.
+pytest-rerunfailures==16.4; python_version >= "3.10"
+pytest-rerunfailures==16.0.1; python_version < "3.10"
 pytest-repeat==0.9.3
 pytest-check==2.8.0
 

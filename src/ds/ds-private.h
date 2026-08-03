@@ -62,6 +62,7 @@ namespace librealsense
         const uint8_t DS5_EMITTER_FREQUENCY                 = 0x10;
         const uint8_t DS5_DEPTH_AUTO_EXPOSURE_MODE          = 0x11;
         const uint8_t DS5_EXTERNAL_SYNC                     = 0x12;
+        const uint8_t DS5_READOUT_SHAPING                   = 0x13;
 
         // DS5 fisheye XU identifiers
         const uint8_t FISHEYE_EXPOSURE                      = 1;
@@ -83,6 +84,9 @@ namespace librealsense
 
         flash_info get_flash_info(const std::vector<uint8_t>& flash_buffer);
 
+        // Shared HWM opcodes for both D400 and D500 families.
+        // D400-only opcodes live in d400_fw_cmd (see ds/d400/d400-private.h).
+        // D500-only opcodes live in d500_fw_cmd (see ds/d500/d500-private.h).
         enum fw_cmd : uint8_t
         {
             MRD = 0x01,     // Read Register
@@ -92,10 +96,7 @@ namespace librealsense
             FEF = 0x0c,     // Erase flash full <Parameter1 Name="0xACE">
             FSRU = 0x0d,     // Flash status register unlock
             FPLOCK = 0x0e,     // Permanent lock on lower Quarter region of the flash
-            GLD = 0x0f,     // Legacy get FW logs command
             GVD = 0x10,     // camera details
-            GETINTCAL = 0x15,     // Read calibration table
-            SETINTCAL = 0x16,     // Set Internal sub calibration table
             LOADINTCAL = 0x1D,     // Get Internal sub calibration table
             DFU = 0x1E,     // Enter to FW update mode
             HWRST = 0x20,     // hardware reset
@@ -109,37 +110,20 @@ namespace librealsense
             SETAEROI = 0x44,     // set auto-exposure region of interest
             GETAEROI = 0x45,     // get auto-exposure region of interest
             MMER = 0x4F,     // MM EEPROM read ( from DS5 cache )
-            CALIBRECALC = 0x51,     // Calibration recalc and update on the fly
             GET_EXTRINSICS = 0x53,     // get extrinsics
             CAL_RESTORE_DFLT = 0x61,     // Reset Depth/RGB calibration to factory settings
-            SETINTCALNEW = 0x62,     // Set Internal sub calibration table
             SET_CAM_SYNC = 0x69,     // set Inter-cam HW sync mode [0-default, 1-master, 2-slave]
             GET_CAM_SYNC = 0x6A,     // fet Inter-cam HW sync mode
             SETRGBAEROI = 0x75,     // set RGB auto-exposure region of interest
             GETRGBAEROI = 0x76,     // get RGB auto-exposure region of interest
             SET_PWM_ON_OFF = 0x77,     // set emitter on and off mode
             GET_PWM_ON_OFF = 0x78,     // get emitter on and off mode
-            ASIC_TEMP_MIPI  = 0x7A,     // get ASIC temperature - with mipi device
             SETSUBPRESET = 0x7B,     // Download sub-preset
             GETSUBPRESET = 0x7C,     // Upload the current sub-preset
             GETSUBPRESETID = 0x7D,     // Retrieve sub-preset's name
             RECPARAMSGET = 0x7E,     // Retrieve depth calibration table in new format (fw >= 5.11.12.100)
             LASERONCONST = 0x7F,     // Enable Laser On constantly (GS SKU Only)
             AUTO_CALIB = 0x80,      // auto calibration commands
-            HKR_THERMAL_COMPENSATION = 0x84, // Control HKR thermal compensation
-            GETAELIMITS = 0x89,   //Auto Exp/Gain Limit command FW version >= 5.13.0.200
-            SETAELIMITS = 0x8A,   //Auto Exp/Gain Limit command FW version >= 5.13.0.200
-            SAFETY_PRESET_READ = 0x94,  // Read safety preset from given index
-            SAFETY_PRESET_WRITE = 0x95,   // Write safety preset to given index
-            APM_STROBE_SET = 0x96,        // Control if Laser on constantly or pulse
-            APM_STROBE_GET = 0x99,        // Query if Laser on constantly or pulse
-            SET_HKR_CONFIG_TABLE = 0xA6, // HKR Set Internal sub calibration table
-            GET_HKR_CONFIG_TABLE = 0xA7, // HKR Get Internal sub calibration table
-            CALIBRESTOREEPROM = 0xA8, // HKR Store EEPROM Calibration
-            RGB_TNR = 0xAA,      // RGB Temporal Noise Reduction
-            GET_FW_LOGS = 0xB4, // Get FW logs extended format
-            SET_CALIB_MODE = 0xB8,      // Set Calibration Mode
-            GET_CALIB_STATUS = 0xB9      // Get Calibration Status
         };
 
 #define TOSTRING(arg) #arg
@@ -150,9 +134,7 @@ namespace librealsense
         {
             switch (state)
             {
-                ENUM2STR(GLD);
                 ENUM2STR(GVD);
-                ENUM2STR(GETINTCAL);
                 ENUM2STR(OBW);
                 ENUM2STR(SET_ADV);
                 ENUM2STR(GET_ADV);
@@ -171,7 +153,6 @@ namespace librealsense
                 ENUM2STR(SETSUBPRESET);
                 ENUM2STR(GETSUBPRESET);
                 ENUM2STR(GETSUBPRESETID);
-                ENUM2STR(GET_FW_LOGS);
             default:
               return ( rsutils::string::from() << "Unrecognized FW command " << state );
             }

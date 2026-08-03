@@ -205,8 +205,8 @@ struct advanced_mode_control
     param_group<STAFactor> amp_factor;
 };
 
-inline void draw_advanced_mode_controls(rs400::advanced_mode& advanced, 
-    advanced_mode_control& amc, bool& get_curr_advanced_controls, bool& was_set, std::string& error_message, bool d457_device=false)
+inline void draw_advanced_mode_controls(rs400::advanced_mode& advanced,
+    advanced_mode_control& amc, bool& get_curr_advanced_controls, bool& was_set, std::string& error_message, bool ae_setpoint_unsupported=false)
 {
     if (get_curr_advanced_controls)
     {
@@ -566,8 +566,8 @@ inline void draw_advanced_mode_controls(rs400::advanced_mode& advanced,
         ImGui::TreePop();
     }
 
-    //AE setpoint is blocked in D457 
-    if (!d457_device && ImGui::TreeNode("AE Control"))
+    //AE setpoint is not supported on D457 and D500-family devices
+    if (!ae_setpoint_unsupported && ImGui::TreeNode("AE Control"))
     {
         ImGui::PushItemWidth(ImGui::CalcItemWidth());
 

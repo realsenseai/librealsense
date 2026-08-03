@@ -142,7 +142,17 @@ valid_sic_table_as_json_str = """
             "sustained_aicv_frame_drops": 90,
             "ossd_self_test_pulse_width": 23
         },
-        "crypto_signature": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        "crypto_signature": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "calibration_monitor_params":
+        {
+            "alpha_rect" : 0.1,
+            "c_min_rect_threshold" : 0.5,
+            "rect_err_max_limit_abs" : 1.0,
+            "alpha_scale" : 0.1,
+            "c_min_scale_threshold" : 0.5,
+            "scale_low_limit_threshold" : 0.9,
+            "scale_high_limit_threshold" : 1.1
+        }
     }
 }
 """
@@ -241,3 +251,41 @@ def test_config_same_in_flash_and_ram(test_device):
     assert check_equal_jsons(json.loads(config_from_ram), json.loads(config_from_flash))
 
     tw.stop_wrapper(dev)
+
+
+# --- calibration_monitor_params negative cases ---
+# SDK-side validation must reject malformed calibration_monitor_params before
+# the config is written to the device.
+
+def _sic_with_calib_mon(overrides=None, drop=None):
+    obj = json.loads(valid_sic_table_as_json_str)
+    calib = obj["safety_interface_config"]["calibration_monitor_params"]
+    if drop is not None:
+        calib.pop(drop, None)
+    if overrides:
+        calib.update(overrides)
+    return json.dumps(obj)
+
+
+def test_calibration_monitor_missing_field_rejected(test_device):
+    dev, _ = test_device
+    safety_sensor = dev.first_safety_sensor()
+    tw.start_wrapper(dev)
+    try:
+        bad = _sic_with_calib_mon(drop="alpha_rect")
+        with pytest.raises(Exception):
+            safety_sensor.set_safety_interface_config(bad)
+    finally:
+        tw.stop_wrapper(dev)
+
+
+def test_calibration_monitor_wrong_type_rejected(test_device):
+    dev, _ = test_device
+    safety_sensor = dev.first_safety_sensor()
+    tw.start_wrapper(dev)
+    try:
+        bad = _sic_with_calib_mon(overrides={"alpha_rect": "not_a_number"})
+        with pytest.raises(Exception):
+            safety_sensor.set_safety_interface_config(bad)
+    finally:
+        tw.stop_wrapper(dev)

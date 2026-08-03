@@ -15,6 +15,7 @@
 | **Windows 10/11** | Visual Studio 2019 or 2022 (MSVC) | CI uses `windows-2025` runners |
 | **Ubuntu 22.04** | GCC | Primary Linux target |
 | **Ubuntu 24.04** | GCC | Also tested in CI |
+| **Ubuntu 26.04** | GCC | Supported |
 | **macOS 15+** | Clang (Xcode) | Tested in CI on `macos-15` |
 | **NVIDIA Jetson** | GCC (ARM64, L4T) | See `doc/installation_jetson.md` |
 | **Raspberry Pi** | GCC (ARM) | See `doc/installation_raspbian.md` |

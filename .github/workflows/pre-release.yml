@@ -1,0 +1,69 @@
+# This adds "pre-release" builds for GitHub Actions. These:
+#   - build the package the same way the ROS build farm builds release
+#     binarydebs (bloom-generated debian packaging + dpkg-buildpackage,
+#     including the distro's default hardening flags)
+#   - catch farm-only failures before a release ships (e.g. the 2.58.2
+#     binarydeb failure on Ubuntu resolute: the distro hardening flag
+#     -Werror=implicit-function-declaration turned a qsort_r declaration
+#     issue into a hard error that the plain colcon CI builds never saw)
+#
+# These builds run on GitHub machines, but in the same environment and using
+# the same flow as actual ROS distro build farm releases, hence "pre-release".
+#
+# NOTE: This workflow is informational only — do not add to required branch
+# protection checks. It may fail due to ROS package server sync issues or
+# build farm infrastructure changes. The main CI workflows are the
+# authoritative build checks.
+#
+# This config uses industrial_ci (https://github.com/ros-industrial/industrial_ci.git).
+# For troubleshooting, see readme (https://github.com/ros-industrial/industrial_ci/blob/master/README.rst)
+
+name: pre-release
+
+on:
+  push:
+    branches:
+      - development
+  pull_request:
+    branches:
+      - development
+  # Allows running this workflow manually from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build pre-release tests for ROS2 ${{ matrix.ros_distro }} and ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        ros_distro: [rolling, lyrical, kilted, jazzy, humble]
+        include:
+        - ros_distro: 'rolling'
+          os: ubuntu-latest
+        - ros_distro: 'lyrical'
+          os: ubuntu-26.04
+        - ros_distro: 'kilted'
+          os: ubuntu-24.04
+        - ros_distro: 'jazzy'
+          os: ubuntu-24.04
+        - ros_distro: 'humble'
+          os: ubuntu-22.04
+
+    env:
+      ROS_DISTRO: ${{ matrix.ros_distro }}
+      PRERELEASE: true
+      BASEDIR: ${{ github.workspace }}/.work
+
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4
+        with:
+          persist-credentials: false
+      - name: industrial_ci
+        # Pinned to master as of 2026-04-30 — first version that knows the
+        # lyrical distro and rolling's retarget to resolute.
+        uses: ros-industrial/industrial_ci@125164b9f1883cdf1858897a7146d1bebf2be5c6

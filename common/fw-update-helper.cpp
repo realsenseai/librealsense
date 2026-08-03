@@ -30,8 +30,6 @@ namespace rs2
         RS2_FWU_STATE_FAILED = 3,
     };
 
-    const char * fw_download_url() { return recommended_fw_url; }
-
     bool is_upgradeable(const std::string& curr, const std::string& available)
     {
         if (curr == "" || available == "") return false;

@@ -343,7 +343,7 @@ namespace rs2
         }
     }
 
-    bool device_model::subdevice_has_inference_stream_enabled( const subdevice_model & sub )
+    bool device_model::subdevice_has_perception_stream_enabled( const subdevice_model & sub ) const
     {
         for( auto const & kv : sub.stream_enabled )
         {
@@ -371,16 +371,37 @@ namespace rs2
         return false;
     }
 
-    void device_model::stop_inference_if_video_stopped( viewer_model & viewer )
+    void device_model::stop_perception_if_video_stopped( viewer_model & viewer )
     {
-        // If color or depth are no longer both streaming, stop any inference subdevice that is still running.
+        // If color or depth are no longer both streaming, stop any perception subdevice that is still running.
         if( are_color_and_depth_streaming() )
             return;
         for( auto & sub : subdevices )
         {
-            if( sub->streaming && subdevice_has_inference_stream_enabled( *sub ) )
+            if( sub->streaming && subdevice_has_perception_stream_enabled( *sub ) )
                 sub->stop( viewer.not_model );
         }
+    }
+
+    bool device_model::is_perception_streaming() const
+    {
+        for( auto const & sub : subdevices )
+            if( sub->streaming && subdevice_has_perception_stream_enabled( *sub ) )
+                return true;
+        return false;
+    }
+
+    bool device_model::is_perception_blocking_filter_enabled() const
+    {
+        for( auto const & sub : subdevices )
+            for( auto const & ef : sub->embedded_filters )
+            {
+                auto type = ef->get_filter()->get_type();
+                if( ( type == RS2_EMBEDDED_FILTER_TYPE_DECIMATION || type == RS2_EMBEDDED_FILTER_TYPE_TEMPORAL )
+                    && ef->is_enabled() )
+                    return true;
+            }
+        return false;
     }
 
     void device_model::play_defaults(viewer_model& viewer)
@@ -830,9 +851,9 @@ namespace rs2
                 if (advanced.is_enabled())
                 {
                     std::string dev_name = dev.supports(RS2_CAMERA_INFO_NAME) ? dev.get_info(RS2_CAMERA_INFO_NAME) : "";
-                    bool d457_device = (dev_name.find("D457") != std::string::npos);
+                    bool ae_setpoint_unsupported = (dev_name.find("D457") != std::string::npos) || _is_d500_device;
 
-                    draw_advanced_mode_controls(advanced, amc, get_curr_advanced_controls, was_set, error_message, d457_device);
+                    draw_advanced_mode_controls(advanced, amc, get_curr_advanced_controls, was_set, error_message, ae_setpoint_unsupported);
                 }
                 else
                 {
@@ -2438,11 +2459,6 @@ namespace rs2
                 ImGui::SetCursorPos({ rc.x, rc.y + line_h });
             }
 
-            rc = ImGui::GetCursorPos();
-            ImGui::SetCursorPos({ rc.x + 12, rc.y + 4 });
-            std::string download_label = rsutils::string::from() << "Download firmware...##" << id;
-            hyperlink(window, download_label.c_str(), fw_download_url());
-
             ImGui::SetCursorPos({ rc.x + 225, rc.y - 107 });
             ImGui::PopFont();
         }
@@ -2523,9 +2539,12 @@ namespace rs2
                         }
                         if (can_stream)
                         {
-                            // Disable the start button for inference streams unless color and depth are already streaming.
-                            bool disable_inference = subdevice_has_inference_stream_enabled( *sub ) && ! are_color_and_depth_streaming();
-                            if( disable_inference )
+                            // Disable the start button for perception streams unless color and depth are already
+                            // streaming, and while a decimation/temporal embedded filter is enabled (mutually exclusive).
+                            bool sub_has_perception = subdevice_has_perception_stream_enabled( *sub );
+                            bool blocking_filter_enabled = sub_has_perception && is_perception_blocking_filter_enabled();
+                            bool disable_perception = ( sub_has_perception && ! are_color_and_depth_streaming() ) || blocking_filter_enabled;
+                            if( disable_perception )
                                 ImGui::BeginDisabled();
 
                             if( ImGui::Button( label.c_str(), button_size ) )
@@ -2561,11 +2580,13 @@ namespace rs2
                                     viewer.begin_stream(sub, profile);
                                 }
                             }
-                            if( disable_inference )
+                            if( disable_perception )
                             {
                                 ImGui::EndDisabled();
                                 if( ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
-                                    RsImGui::CustomTooltip( "Color and Depth streams must be streaming before starting inference" );
+                                    RsImGui::CustomTooltip( blocking_filter_enabled
+                                        ? "Disable the decimation/temporal embedded filter before starting perception (cannot run together)"
+                                        : "Color and Depth streams must be streaming before starting perception" );
                             }
                             else if (ImGui::IsItemHovered())
                             {
@@ -2585,7 +2606,7 @@ namespace rs2
                         if( ImGui::Button( label.c_str(), button_size ) )
                         {
                             sub->stop(viewer.not_model);
-                            stop_inference_if_video_stopped( viewer );
+                            stop_perception_if_video_stopped( viewer );
                             std::string friendly_name = sub->s->get_info(RS2_CAMERA_INFO_NAME);
                             if ((friendly_name.find("Tracking") != std::string::npos) ||
                                 (friendly_name.find("Motion") != std::string::npos))
@@ -3031,7 +3052,13 @@ namespace rs2
                         ImGui::SetCursorPos({ windows_width - 42, pos.y - 3 });
 
                         const bool pb_available = pb->is_available();
-                        disable_guard dg( !pb_available );
+                        // Block turning a decimation/temporal filter on while perception streams (mutually exclusive).
+                        auto ef_type = pb->get_filter()->get_type();
+                        const bool block_enable_while_perception = !pb->is_enabled()
+                            && ( ef_type == RS2_EMBEDDED_FILTER_TYPE_DECIMATION
+                              || ef_type == RS2_EMBEDDED_FILTER_TYPE_TEMPORAL )
+                            && is_perception_streaming();
+                        disable_guard dg( !pb_available || block_enable_while_perception );
                         try
                         {
                             ImGui::PushFont(window.get_font());
@@ -3089,6 +3116,8 @@ namespace rs2
                             if( !pb_available && !pb->unavailable_tooltip.empty()
                                 && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
                                 RsImGui::CustomTooltip( "%s", pb->unavailable_tooltip.c_str() );
+                            else if( block_enable_while_perception && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
+                                RsImGui::CustomTooltip( "Stop the perception stream before enabling this filter (cannot run together)" );
 
                             ImGui::PopStyleColor(5);
                             ImGui::PopFont();

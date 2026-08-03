@@ -13,7 +13,7 @@
 #include <src/color-sensor.h>
 #include <src/safety-sensor.h>
 #include <src/depth-mapping-sensor.h>
-#include <src/inference-sensor.h>
+#include <src/perception-sensor.h>
 #include <src/points.h>
 #include <src/labeled-points.h>
 #include <src/context.h>
@@ -168,13 +168,13 @@ namespace librealsense
         read_frame_metadata(additional_data);
 
         bool is_imu_topic       = (msg->topic_name.find("/" + std::string(ros2_topic::ros_imu_type_str())              + "/") != std::string::npos);
-        bool is_inference_topic = (msg->topic_name.find("/" + std::string(ros2_topic::ros_object_detection_type_str()) + "/") != std::string::npos);
+        bool is_perception_topic = (msg->topic_name.find("/" + std::string(ros2_topic::ros_object_detection_type_str()) + "/") != std::string::npos);
 
         std::vector<uint8_t> data;
 
-        if (is_inference_topic)
+        if (is_perception_topic)
         {
-            // Inference frames are stored as a JSON string (std_msgs/msg/String).
+            // Perception frames are stored as a JSON string (std_msgs/msg/String).
             // Re-parse using the same format written by ros2_writer and construct the binary payload.
             auto json_str = deserialize_message<cdr_string>(msg).value;
             auto j = rsutils::json::parse( json_str );
@@ -215,7 +215,7 @@ namespace librealsense
             // Fill header so object_detection_frame::validate() passes
             payload->header.magic_number = object_detection_frame::MAGIC_NUMBER;
             payload->header.version      = static_cast< uint16_t >( j.value( "version", 1 ) );
-            payload->header.data_type    = static_cast< uint8_t >( inference_frame::type::OBJECT_DETECTION );
+            payload->header.data_type    = static_cast< uint8_t >( perception_frame::type::OBJECT_DETECTION );
             payload->header.flags        = 0;
             payload->header.spare        = 0;
             payload->header.size         = static_cast< uint32_t >( total_size - sizeof( object_detection_frame::object_detection_frame_header ) );
@@ -294,7 +294,7 @@ namespace librealsense
         stream_identifier stream_id = ros2_topic::get_stream_identifier(msg->topic_name);
 
         // Peek at the next message — if it's intrinsics data, consume and use it;
-        // otherwise this is a bare stream profile (e.g. inference) with no extra intrinsics.
+        // otherwise this is a bare stream profile (e.g. perception) with no extra intrinsics.
         auto next = peek_next_cached();
         if (next && (next->topic_name.find("imu_intrinsic") != std::string::npos
                   || next->topic_name.find("camera_info")  != std::string::npos))
@@ -312,10 +312,10 @@ namespace librealsense
             }
         }
 
-        // Bare stream profile — e.g. inference streams
+        // Bare stream profile — e.g. perception streams
         if (stream_id.stream_type == RS2_STREAM_OBJECT_DETECTION)
         {
-            auto profile = std::make_shared<inference_stream_profile>();
+            auto profile = std::make_shared<perception_stream_profile>();
             profile->set_framerate(fps);
             profile->set_format(format);
             profile->set_stream_index(int(stream_id.stream_index));
@@ -738,17 +738,9 @@ namespace librealsense
         void update(std::shared_ptr< extension_snapshot > ext) override {}
     };
 
-    class inference_sensor_snapshot
-        : public virtual inference_sensor
+    class perception_sensor_snapshot
+        : public virtual perception_sensor
         , public extension_snapshot
-    {
-    public:
-        void update(std::shared_ptr< extension_snapshot > ext) override {}
-    };
-
-    class object_detection_sensor_snapshot
-        : public virtual object_detection_sensor
-        , public inference_sensor_snapshot
     {
     public:
         void update(std::shared_ptr< extension_snapshot > ext) override {}
@@ -801,14 +793,9 @@ namespace librealsense
         {
             sensor_extensions[RS2_EXTENSION_DEPTH_MAPPING_SENSOR] = std::make_shared<depth_mapping_sensor_snapshot>();
         }
-        else if (is_object_detection_sensor(sensor_name))
+        else if (is_perception_module_sensor(sensor_name))
         {
-            sensor_extensions[RS2_EXTENSION_OBJECT_DETECTION_SENSOR] = std::make_shared<object_detection_sensor_snapshot>();
-            sensor_extensions[RS2_EXTENSION_INFERENCE_SENSOR] = std::make_shared<inference_sensor_snapshot>();
-        }
-        else if (is_inference_module_sensor(sensor_name))
-        {
-            sensor_extensions[RS2_EXTENSION_INFERENCE_SENSOR] = std::make_shared<inference_sensor_snapshot>();
+            sensor_extensions[RS2_EXTENSION_PERCEPTION_SENSOR] = std::make_shared<perception_sensor_snapshot>();
         }
     }
 
@@ -848,14 +835,12 @@ namespace librealsense
         return (sensor_name.compare("Depth Mapping Camera") == 0);
     }
 
-    bool ros2_reader::is_inference_module_sensor(const std::string& sensor_name)
+    bool ros2_reader::is_perception_module_sensor(const std::string& sensor_name)
     {
-        return (sensor_name.compare("Inference Sensor") == 0);
-    }
-
-    bool ros2_reader::is_object_detection_sensor(const std::string& sensor_name)
-    {
-        return (sensor_name.compare("Object Detection Sensor") == 0);
+        // Old names kept for backward compat with bags recorded before the perception rename.
+        return sensor_name == "Perception"
+            || sensor_name == "Inference Sensor"
+            || sensor_name == "Object Detection Sensor";
     }
 
     // Helpers ---------------------------------------------------------------------

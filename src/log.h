@@ -10,7 +10,6 @@
 #include <rsutils/os/ensure-console.h>
 
 #include <stdexcept>
-#include <mutex>
 #include <fstream>
 
 
@@ -59,12 +58,25 @@ namespace librealsense
         rs2_log_severity minimum_file_severity = RS2_LOG_SEVERITY_NONE;
         rs2_log_severity minimum_callback_severity = RS2_LOG_SEVERITY_NONE;
 
-        std::mutex log_mutex;
         std::ofstream log_file;
         std::vector< std::string > callback_dispatchers;
 
         std::string filename;
         const std::string log_id = NAME;
+
+        // el::Loggers::reconfigureLogger() ends up in Logger::configure(), which mutates state before taking
+        // its own lock (a bug present in every released version of this now-archived, unmaintained library --
+        // see RSDSO-21284). We can't patch third-party code, so we serialize externally instead, using the
+        // same (recursive) el::Logger lock that LIBRS_LOG_/LIBRS_LOG_STR_ already hold while reading.
+        template< typename Fn >
+        void reconfigure_locked( Fn && fn ) const
+        {
+            auto * logger = el::Loggers::getLogger( log_id );
+            if( ! logger )
+                return;
+            el::base::threading::ScopedLock lock( logger->lock() );
+            fn();
+        }
 
     public:
         static el::Level severity_to_level(rs2_log_severity severity)
@@ -136,7 +148,7 @@ namespace librealsense
                                  severity >= minimum_file_severity ? "true" : "false" );
             }
 
-            el::Loggers::reconfigureLogger(log_id, defaultConf);
+            reconfigure_locked( [&] { el::Loggers::reconfigureLogger( log_id, defaultConf ); } );
         }
 
         void open_def() const
@@ -149,7 +161,7 @@ namespace librealsense
             defaultConf.setGlobally( el::ConfigurationType::ToFile, "false" );
             defaultConf.setGlobally( el::ConfigurationType::ToStandardOutput, "false" );
 
-            el::Loggers::reconfigureLogger(log_id, defaultConf);
+            reconfigure_locked( [&] { el::Loggers::reconfigureLogger( log_id, defaultConf ); } );
         }
 
 
@@ -270,10 +282,14 @@ namespace librealsense
         // Stop logging and reset logger to initial configurations
         void reset_logger()
         {
-            el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::Enabled, "false" );
-            el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::ToFile, "false" );
-            el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::ToStandardOutput, "false" );
-            el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::MaxLogFileSize, "0" );
+            // One lock for all four, so a concurrent reader can't observe a partially-reset logger
+            // (e.g. Enabled=false but ToFile still true).
+            reconfigure_locked( [&] {
+                el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::Enabled, "false" );
+                el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::ToFile, "false" );
+                el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::ToStandardOutput, "false" );
+                el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::MaxLogFileSize, "0" );
+            } );
             remove_callbacks();
 
             minimum_console_severity = RS2_LOG_SEVERITY_NONE;
@@ -316,7 +332,7 @@ namespace librealsense
             // Or, with the flag el::LoggingFlags::StrictLogFileSizeCheck, at each log output...
             //el::Loggers::addFlag( el::LoggingFlag::StrictLogFileSizeCheck );
 
-            el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::MaxLogFileSize, size.c_str() );
+            reconfigure_locked( [&] { el::Loggers::reconfigureLogger( log_id, el::ConfigurationType::MaxLogFileSize, size.c_str() ); } );
             el::Helpers::installPreRollOutCallback( rolloutHandler );
         }
     };

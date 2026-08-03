@@ -15,7 +15,7 @@ log.nested = 'C  '
 
 pytestmark = [
     pytest.mark.dds,
-    pytest.mark.flaky( retries=2 ),
+    pytest.mark.flaky( reruns=2 ),
 ]
 
 dds.debug( log.isEnabledFor( logging.DEBUG ), 'C  ' )

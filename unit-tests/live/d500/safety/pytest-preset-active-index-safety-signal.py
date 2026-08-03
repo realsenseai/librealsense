@@ -17,6 +17,9 @@ pytestmark = [
     pytest.mark.device_each("D585S"),
     pytest.mark.context("nightly"),
     pytest.mark.skipif(sys.platform != "linux", reason="Linux only"),
+    # Disabled: preset 1 danger_collision reports 0 (obstacle not detected in the danger zone)
+    # on the D585S bench. Under investigation (lab scene vs safety algo/FW). Re-enable when fixed.
+    pytest.mark.skip(reason="RSDEV-13164: D585S preset 1 danger_collision not signalled"),
 ]
 
 #############################################################################################

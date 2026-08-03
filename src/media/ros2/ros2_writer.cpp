@@ -376,7 +376,7 @@ namespace librealsense
             LOG_WARNING("Failed to write frame metadata for " << stream_id.stream_type << ". Exception: " << e.what());
         }
 
-        // Inference streams don't participate in the extrinsics map
+        // Perception streams don't participate in the extrinsics map
         if (stream_id.stream_type != RS2_STREAM_OBJECT_DETECTION)
         {
             try
@@ -545,9 +545,9 @@ namespace librealsense
             write_streaming_info(timestamp, { device_id, sensor_id }, profile);
             break;
         }*/
-        case RS2_EXTENSION_INFERENCE_PROFILE:
+        case RS2_EXTENSION_PERCEPTION_PROFILE:
         {
-            auto profile = SnapshotAs<RS2_EXTENSION_INFERENCE_PROFILE>(snapshot);
+            auto profile = SnapshotAs<RS2_EXTENSION_PERCEPTION_PROFILE>(snapshot);
             write_stream_info(timestamp, { device_id, sensor_id }, profile);
             break;
         }

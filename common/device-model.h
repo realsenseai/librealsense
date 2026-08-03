@@ -150,6 +150,15 @@ namespace rs2
             static const char* lpc_point_size{ "viewer_model.lpc_point_size" };
             static const char* show_safety_zones_3d{ "viewer_model.show_safety_zones_3d" };
             static const char* show_safety_zones_2d{ "viewer_model.show_safety_zones_2d" };
+            namespace viewport_grid_overlay
+            {
+                static const char* horizontal_lines{ "viewer_model.grid_overlay.horizontal_lines" };
+                static const char* vertical_lines  { "viewer_model.grid_overlay.vertical_lines"   };
+                static const char* line_width      { "viewer_model.grid_overlay.line_width"        };
+                static const char* line_color_r    { "viewer_model.grid_overlay.line_color_r"      };
+                static const char* line_color_g    { "viewer_model.grid_overlay.line_color_g"      };
+                static const char* line_color_b    { "viewer_model.grid_overlay.line_color_b"      };
+            }
         }
         namespace window
         {
@@ -361,9 +370,12 @@ namespace rs2
 
         bool show_advanced_mode_popup = false;
         
-        bool subdevice_has_inference_stream_enabled( const subdevice_model & sub );
+        bool subdevice_has_perception_stream_enabled( const subdevice_model & sub ) const;
         bool are_color_and_depth_streaming() const;
-        void stop_inference_if_video_stopped( viewer_model & viewer );
+        void stop_perception_if_video_stopped( viewer_model & viewer );
+        // Perception and the decimation/temporal embedded filters are mutually exclusive.
+        bool is_perception_streaming() const;
+        bool is_perception_blocking_filter_enabled() const;
 
         void draw_info_icon(ux_window& window, ImFont* font, const ImVec2& size);
         int draw_seek_bar();

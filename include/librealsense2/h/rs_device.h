@@ -631,6 +631,18 @@ const rs2_raw_data_buffer* rs2_get_calibration_config(rs2_device* device, rs2_er
 */
 void rs2_set_calibration_config(rs2_device* device, const char* calibration_config_json_str,  rs2_error** error);
 
+/**
+ * Retrieve the current device hardware clock time.
+ * \note Raw ASIC clock, NOT host time and NOT the frame's global-time domain.
+ * \note Underlying counter is 32-bit microseconds — wraps roughly every 71.6 min.
+ * \note Each call is a blocking hardware-monitor round-trip (few ms); do not poll per frame.
+ * \note Not supported on every device/backend; errors if the device lacks RS2_EXTENSION_GLOBAL_TIMER.
+ * \param[in]  device     The RealSense device
+ * \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
+ * \return                Device hardware time in milliseconds
+ */
+double rs2_get_device_time_ms(const rs2_device* device, rs2_error** error);
+
 #ifdef __cplusplus
 }
 #endif

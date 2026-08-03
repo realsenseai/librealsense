@@ -260,22 +260,22 @@ void dds_motion_stream_server::publish_motion( topics::imu_msg && imu )
 }
 
 
-dds_inference_stream_server::dds_inference_stream_server( std::string const & stream_name,
+dds_perception_stream_server::dds_perception_stream_server( std::string const & stream_name,
                                                           std::string const & sensor_name )
     : dds_stream_server( stream_name, sensor_name )
 {
 }
 
 
-void dds_inference_stream_server::check_profile( std::shared_ptr< dds_stream_profile > const & profile ) const
+void dds_perception_stream_server::check_profile( std::shared_ptr< dds_stream_profile > const & profile ) const
 {
     super::check_profile( profile );
-    if( ! std::dynamic_pointer_cast< dds_inference_stream_profile >( profile ) )
-        DDS_THROW( runtime_error, "profile '" + profile->to_string() + "' is not an inference profile" );
+    if( ! std::dynamic_pointer_cast< dds_perception_stream_profile >( profile ) )
+        DDS_THROW( runtime_error, "profile '" + profile->to_string() + "' is not a perception profile" );
 }
 
 
-void dds_inference_stream_server::open( std::string const & topic_name,
+void dds_perception_stream_server::open( std::string const & topic_name,
                                         std::shared_ptr< dds_publisher > const & publisher )
 {
     if( is_open() )
@@ -290,13 +290,13 @@ void dds_inference_stream_server::open( std::string const & topic_name,
 }
 
 
-void dds_inference_stream_server::start_streaming()
+void dds_perception_stream_server::start_streaming()
 {
     super::start_streaming();
 }
 
 
-void dds_inference_stream_server::publish_inference( topics::string_msg const & msg )
+void dds_perception_stream_server::publish_perception( topics::string_msg const & msg )
 {
     if( ! is_streaming() )
         DDS_THROW( runtime_error, "stream '" + name() + "' cannot publish before start_streaming()" );

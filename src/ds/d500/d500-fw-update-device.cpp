@@ -7,6 +7,9 @@
 
 namespace librealsense
 {
+    // update_device::parse_serial_number iterates sizeof(serial_number_data::serial); keep it aligned with the ds constant.
+    static_assert( sizeof( serial_number_data::serial ) == ds::module_serial_size, "serial number field size mismatch" );
+
 ds_d500_update_device::ds_d500_update_device( std::shared_ptr< const device_info > const & dev_info,
                                     std::shared_ptr< platform::usb_device > const & usb_device )
     : update_device( dev_info, usb_device, "D500" )
@@ -21,18 +24,6 @@ ds_d500_update_device::ds_d500_update_device( std::shared_ptr< const device_info
     {
         // Currently we cannot extract FW version from HKR FW image
         return true;
-    }
-
-    std::string ds_d500_update_device::parse_serial_number(const std::vector<uint8_t>& buffer) const
-    {
-        if (buffer.size() != sizeof(serial_number_data))
-            throw std::runtime_error("DFU - failed to parse serial number!");
-
-        std::stringstream rv;
-        for (auto i = 0; i < ds::module_serial_size; i++)
-            rv << std::setfill('0') << std::setw(2) << std::hex << static_cast<int>(buffer[i]);
-
-        return rv.str();
     }
 
     void ds_d500_update_device::update(const void* fw_image, int fw_image_size, rs2_update_progress_callback_sptr update_progress_callback) const
@@ -117,25 +108,8 @@ ds_d500_update_device::ds_d500_update_device( std::shared_ptr< const device_info
         if (!wait_for_manifest_completion(messenger, RS2_DFU_STATE_DFU_MANIFEST, std::chrono::seconds(200), update_progress_callback))
             throw std::runtime_error("Firmware manifest completion failed");
 
-
-        // After the zero length DFU_DNLOAD request terminates the Transfer
-        // phase, the device is ready to manifest the new firmware. As described
-        // previously, some devices may accumulate the firmware image and perform
-        // the entire reprogramming operation at one time. Others may have only a
-        // small amount remaining to be reprogrammed, and still others may have
-        // none. Regardless, the device enters the dfuMANIFEST-SYNC state and
-        // awaits the solicitation of the status report by the host. Upon receipt
-        // of the anticipated DFU_GETSTATUS, the device enters the dfuMANIFEST
-        // state, where it completes its reprogramming operations.
-
-        // WaitForDFU state sends several DFU_GETSTATUS requests, until we hit
-        // either RS2_DFU_STATE_DFU_MANIFEST_WAIT_RESET or RS2_DFU_STATE_DFU_ERROR status.
-        // This command also reset the device
         if (_is_dfu_monitoring_enabled)
-        {
-            if (!wait_for_state(messenger, RS2_DFU_STATE_DFU_MANIFEST_WAIT_RESET, 20000))
-                throw std::runtime_error("Firmware manifest failed");
-        }
+            update_device::dfu_manifest_phase(messenger, update_progress_callback);
     }
 
     void ds_d500_update_device::report_progress_and_wait_for_fw_burn(rs2_update_progress_callback_sptr update_progress_callback, int required_dfu_time) const
@@ -154,11 +128,5 @@ ds_d500_update_device::ds_d500_update_device( std::shared_ptr< const device_info
         }
         else
             std::this_thread::sleep_for(std::chrono::seconds(required_dfu_time));
-    }
-    float ds_d500_update_device::compute_progress(float progress, float start, float end, float threshold) const
-    {
-        if( threshold > 1.f )
-            progress = ceil( progress * threshold ) / threshold;
-        return start + progress * ( end - start );
     }
 }

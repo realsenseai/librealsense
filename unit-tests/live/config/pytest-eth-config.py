@@ -13,6 +13,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D555"), # Currently only D555 supports DDS configuration natively
+    pytest.mark.priority(2), # Run early (before streaming/fps tests) so the teardown heal lands first
 ]
 
 get_eth_config_opcode = 0xBB
@@ -47,8 +48,10 @@ def _module_setup_teardown():
     yield
     if 'orig' in _module_orig and 'dev' in _module_orig:
         try:
-            # If the device's link.timeout is outside our toggle set, overwrite it in order to write a sane value to flash.
-            # This heals units stuck at abnormal values from prior interrupted runs without any manual intervention.
+            # Overwrite streaming-critical fields with known-good values before writing to flash, healing
+            # a unit left throttled (bad MTU/transmission_delay/link.timeout) by a prior interrupted run.
+            _module_orig['orig'].link.mtu = 9000
+            _module_orig['orig'].transmission_delay = 0
             if _module_orig['orig'].link.timeout != LINK_TIMEOUT_BASELINE:
                 _module_orig['orig'].link.timeout = LINK_TIMEOUT_BASELINE
             set_eth_config(_module_orig['dev'], _module_orig['orig'])
@@ -99,14 +102,14 @@ def test_link_timeout_configuration(_test_setup_teardown):
 def test_mtu_configuration(_test_setup_teardown):
     dev, orig_config, new_config = _test_setup_teardown
 
-    new_config.link.mtu = 4000
+    new_config.link.mtu = 8500  # close to default 9000 so an interrupted run leaves the unit streamable
     if new_config.header.version == 3:
         with pytest.raises(ValueError, match="Camera FW supports only MTU 9000."):
             set_eth_config(dev, new_config)
     else:
         set_eth_config(dev, new_config)
         updated_config = get_eth_config(dev)
-        check.is_true(updated_config.link.mtu == 4000)
+        check.is_true(updated_config.link.mtu == 8500)
 
         new_config.link.mtu = 0
         with pytest.raises(ValueError, match=r"MTU size should be 500-9000\. Current 0"):
@@ -121,14 +124,14 @@ def test_mtu_configuration(_test_setup_teardown):
 def test_transmission_delay_configuration(_test_setup_teardown):
     dev, orig_config, new_config = _test_setup_teardown
 
-    new_config.transmission_delay = 21
+    new_config.transmission_delay = 3  # close to default 0 so an interrupted run leaves the unit streamable
     if new_config.header.version == 3:
         with pytest.raises(ValueError, match="Camera FW does not support transmission delay."):
             set_eth_config(dev, new_config)
     else:
         set_eth_config(dev, new_config)
         updated_config = get_eth_config(dev)
-        check.is_true(updated_config.transmission_delay == 21)
+        check.is_true(updated_config.transmission_delay == 3)
 
         new_config.transmission_delay = 222
         with pytest.raises(ValueError, match=r"Transmission delay should be 0-144\. Current 222"):

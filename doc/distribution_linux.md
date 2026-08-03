@@ -1,7 +1,7 @@
 # Linux Distribution
 
 #### Using pre-build packages
-**RealSense™ SDK 2.0** provides installation packages for Intel X86/AMD64/ARM-based Debian distributions in [`dpkg`](https://en.wikipedia.org/wiki/Dpkg) format for Ubuntu 20/22/24 [LTS](https://wiki.ubuntu.com/LTS).
+**RealSense™ SDK 2.0** provides installation packages for Intel X86/AMD64/ARM-based Debian distributions in [`dpkg`](https://en.wikipedia.org/wiki/Dpkg) format for Ubuntu 20/22/24/26 [LTS](https://wiki.ubuntu.com/LTS).
 
 > Note: For EOL Ubuntu distributions please use the following versions:  
 Ubuntu 16 -> [2.51.1](https://github.com/realsenseai/librealsense/releases/tag/v2.51.1).  

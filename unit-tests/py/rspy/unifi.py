@@ -55,6 +55,8 @@ SWITCH_SSH_PASS = os.environ["UNIFI_SSH_PASSWORD"]
 # channel_timeout protects against hangs during SSH channel establishment,
 # which paramiko's exec_command(timeout=) does NOT cover.
 CHANNEL_TIMEOUT = 30
+REBOOT_WAIT = 30     # let the switch's SSH accept auth again after a reboot
+REBOOT_RETRIES = 8   # discover() attempts while the switch is booting
 
 def discover(ip=SWITCH_IP, ssh_username=SWITCH_SSH_USER, ssh_password=SWITCH_SSH_PASS, retries = 0):
     """
@@ -69,6 +71,13 @@ def discover(ip=SWITCH_IP, ssh_username=SWITCH_SSH_USER, ssh_password=SWITCH_SSH
            client.connect(hostname=ip, username=ssh_username,
                                 password=ssh_password, timeout=10,
                                 channel_timeout=CHANNEL_TIMEOUT)
+           # Bound a send stalled under TCP retransmit (Linux); paramiko's timeouts
+           # guard the reply read, not the send, so a wedged switch would hang ~15min.
+           if hasattr(socket, "TCP_USER_TIMEOUT"):
+               try:
+                   client.get_transport().sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_USER_TIMEOUT, CHANNEL_TIMEOUT * 1000)
+               except OSError as e:
+                   log.d(f"TCP_USER_TIMEOUT setsockopt failed: {e}")
            log.debug_indent()
            log.d("...", f"connected to {ip} via SSH")
            log.debug_unindent()
@@ -107,6 +116,8 @@ class UniFiSwitch(device_hub.device_hub):
 
         self.mac_port_dict = None
 
+        self._log_port_link_speeds()
+
     def _init_mac_port_dict(self):
         """
         Initialize mac_port_dict which maps MAC addresses to port numbers
@@ -133,6 +144,53 @@ class UniFiSwitch(device_hub.device_hub):
 
         return port_stats
 
+    # Rate column in 'swctrl port show' looks like "1000F" (1000 Mbps full duplex) or "0H" when down
+    GIGABIT_MBPS = 1000
+
+    def _get_port_link_info(self):
+        """
+        Parse 'swctrl port show' into per-port link state and negotiated speed.
+        :return: {port_num: {'up': bool, 'speed_mbps': int, 'duplex': str}}
+        """
+        cmd_out = self._run_command("swctrl port show")
+        info = {}
+        for line in cmd_out.splitlines():
+            parts = line.split()
+            if len(parts) < 3 or not parts[0].isdigit():
+                continue  # skip headers/separators
+            port = int(parts[0])
+            link = parts[1]  # admin/phys, e.g. "U/U" (up/up) or "U/D" (up/down)
+            rate = parts[2]  # e.g. "1000F", "100F", "0H"
+            up = link.split('/')[-1].upper() == 'U'
+            m = re.match(r'(\d+)([FH])', rate)
+            if m is None:
+                log.w(f"UniFi port {port}: unrecognised rate field {rate!r}, skipping")
+                continue
+            speed = int(m.group(1))
+            duplex = {'F': 'full', 'H': 'half'}.get(m.group(2), '')
+            info[port] = {'up': up, 'speed_mbps': speed, 'duplex': duplex}
+        return info
+
+    def _log_port_link_speeds(self):
+        """
+        Log the negotiated link speed of every linked port, and warn on any port
+        that came up below 1 Gbps (a common symptom of a bad cable, crimp, or port
+        that silently starves the D555 video path of jumbo frames).
+        """
+        try:
+            info = self._get_port_link_info()
+        except Exception as e:
+            log.w(f"could not read UniFi port link speeds: {e}")
+            return
+        for port, i in sorted(info.items()):
+            if not i['up']:
+                continue
+            msg = f"UniFi port {port} link: {i['speed_mbps']} Mbps {i['duplex']}".rstrip()
+            if i['speed_mbps'] < self.GIGABIT_MBPS:
+                log.w(f"{msg} -- below 1 Gbps! suspect cable/port/crimp on this link")
+            else:
+                log.d(msg)
+
     def get_name(self):
         """
         :return: name of the switch
@@ -143,15 +201,24 @@ class UniFiSwitch(device_hub.device_hub):
         if self.client is None:
             self.client = discover(self.ip, self.username, self.password, retries=retries)
 
-        if reset:
-            # rebooting the switch takes over a minute, so the reboot code is commented out
-            # log.w("reset flag passed to unifi switch, ignoring it")
-            return
-            # self._run_command("reboot")
-            # time.sleep(5)
-            # # we need to reconnect to the device after it's rebooted, might take several tries
-            # self.disconnect()
-            # self.client = discover(retries=5)
+        if reset and self.client is not None:
+            # --hub-reset: reboot the switch (like the Acroname) to clear a wedged CLI
+            self._reboot()
+
+    def _reboot(self):
+        """
+        Reboot the switch and wait for its SSH to accept connections again.
+        """
+        log.d("rebooting UniFi switch...")
+        try:
+            self.client.exec_command("reboot", timeout=10)
+        except Exception:
+            pass  # the connection drops as the switch goes down
+        self.disconnect()
+        time.sleep(REBOOT_WAIT)
+        self.client = discover(self.ip, self.username, self.password, retries=REBOOT_RETRIES)
+        if self.client is None:
+            raise RuntimeError("UniFi switch did not come back after reboot")
 
     def is_connected(self):
         if self.client is None:

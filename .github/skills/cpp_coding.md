@@ -31,3 +31,10 @@ Use this protocol to ensure all C++ code modifications align with the project's 
 ### 6. Performance Checks
 *   **Hot Paths**: Check for hidden allocations in loops or streaming callbacks.
 *   **Copying**: Minimize data copying; use const references (`const T&`) for non-primitive arguments.
+
+### 7. Comments
+*   **Comments should be sparse.** Keep to 1–2 lines unless the code is large and genuinely complex.
+*   **Intention:** Don't restate what the code already says, comment should convey the reason for the code.
+*   **Locality:** The comment should refer to the local code. e.g. class description should not mention inheritors or where other logic live.
+*   **Length:** Comment lines can be as long as the surrounding code. If code lines usually trim at 120 characters comment lines don't have to be 80 characters long.
+*   **Generality:** Don't reference internal session reasoning e.g. "as you instructed" 

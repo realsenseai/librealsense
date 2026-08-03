@@ -213,7 +213,7 @@ def set_app_config_table(hwm_dev, app_config_table):
     flash_mem_enum = 1
     app_config_id = 0xc0de
     d500_dynamic = 0
-    version_array = np.array([1, 2])
+    version_array = np.array([3, 1])
     header = build_header(app_config_table, app_config_id, version_array)
     table_with_header = np.hstack((header, app_config_table))
     cmd = hwm_dev.build_command(opcode=set_table_opcode,

@@ -177,28 +177,28 @@ private:
 
 
 
-class dds_inference_stream_server : public dds_stream_server
+class dds_perception_stream_server : public dds_stream_server
 {
     typedef dds_stream_server super;
 
 public:
-    dds_inference_stream_server( std::string const & stream_name, std::string const & sensor_name );
+    dds_perception_stream_server( std::string const & stream_name, std::string const & sensor_name );
 
     void open( std::string const & topic_name, std::shared_ptr< dds_publisher > const & ) override;
 
     void start_streaming();
-    virtual void publish_inference( topics::string_msg const & msg );
+    virtual void publish_perception( topics::string_msg const & msg );
 
-    char const * type_string() const override { return "inference"; }
+    char const * type_string() const override { return "perception"; }
 
 private:
     void check_profile( std::shared_ptr< dds_stream_profile > const & ) const override;
 };
 
 
-class dds_object_detection_stream_server : public dds_inference_stream_server
+class dds_object_detection_stream_server : public dds_perception_stream_server
 {
-    typedef dds_inference_stream_server super;
+    typedef dds_perception_stream_server super;
 
 public:
     dds_object_detection_stream_server( std::string const & stream_name, std::string const & sensor_name );

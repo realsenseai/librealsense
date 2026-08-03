@@ -2,10 +2,10 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 // This example demonstrates how to receive and print object detection results
-// from a RealSense device that supports inference streaming.
+// from a RealSense device that supports perception streaming.
 //
 // Prerequisites:
-//   - A RealSense device with an inference sensor (e.g. connected via DDS).
+//   - A RealSense device with a perception sensor (e.g. connected via DDS).
 //   - Color stream must be active; object detection runs on top of it.
 //
 // The example enables Color and Object Detection streams, then loops
@@ -43,7 +43,7 @@ int main( int /*argc*/, char * /*argv*/[] ) try
     rs2::pipeline pipe;
     rs2::config   cfg;
 
-    // Color is required for inference to run on. Use device default settings for resolution/fps.
+    // Color is required for perception to run on. Use device default settings for resolution/fps.
     cfg.enable_stream( RS2_STREAM_COLOR );
     cfg.enable_stream( RS2_STREAM_OBJECT_DETECTION );
 

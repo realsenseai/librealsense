@@ -3,14 +3,14 @@
 #pragma once
 
 #include "frame.h"
-#include "inference-frame.h"
+#include "perception-frame.h"
 #include "core/extension.h"
 #include <librealsense2/h/rs_types.h>
 #include <rsutils/string/from.h>
 
 namespace librealsense {
 
-class object_detection_frame : public inference_frame
+class object_detection_frame : public perception_frame
 {
 public:
     // Frames received over the object detection stream are binary blobs with object_detection_payload layout.

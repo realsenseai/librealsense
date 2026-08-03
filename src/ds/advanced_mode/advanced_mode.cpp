@@ -576,6 +576,9 @@ namespace librealsense
 
     void ds_advanced_mode_base::set_ae_control( const STAEControl & val )
     {
+        if( _dev->get_info( rs2_camera_info::RS2_CAMERA_INFO_PRODUCT_LINE ) == "D500" )
+            throw invalid_value_exception( "set_ae_control(...) failed! AE Setpoint is not supported on D500-family devices" );
+
         set( val, advanced_mode_traits< STAEControl >::group );
         if( _preset_opt )
             _preset_opt->set( RS2_RS400_VISUAL_PRESET_CUSTOM );

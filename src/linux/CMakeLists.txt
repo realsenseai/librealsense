@@ -6,6 +6,12 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/backend-hid.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/backend-v4l2.h"
         "${CMAKE_CURRENT_LIST_DIR}/backend-hid.h"
+        "${CMAKE_CURRENT_LIST_DIR}/camera-identifier-v4l.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/camera-identifier-v4l.h"
+        "${CMAKE_CURRENT_LIST_DIR}/v4l-mipi-logic.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/v4l-mipi-logic.h"
+        "${CMAKE_CURRENT_LIST_DIR}/v4l-usb-logic.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/v4l-usb-logic.h"
 )
 
 include(libusb_config)

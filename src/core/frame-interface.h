@@ -26,6 +26,10 @@ public:
     virtual bool find_metadata( rs2_frame_metadata_value, rs2_metadata_type * p_output_value ) const = 0;
     virtual int get_frame_data_size() const = 0;
     virtual const uint8_t * get_frame_data() const = 0;
+    // Return a GPU device pointer for the frame, uploading it if needed. Zero-copy when the
+    // frame is already GPU-mapped (sets copied=false); otherwise the SDK copies it to a cached
+    // device buffer (copied=true). Returns nullptr on non-CUDA builds. Default: no GPU data.
+    virtual const void * get_gpu_data_or_upload( bool * copied ) { if( copied ) *copied = false; return nullptr; }
     virtual rs2_time_t get_frame_timestamp() const = 0;
     virtual rs2_timestamp_domain get_frame_timestamp_domain() const = 0;
     virtual void set_timestamp( double new_ts ) = 0;

@@ -24,12 +24,17 @@ class rs_dds_embedded_filter
 public:
     typedef std::function< void( rsutils::json value ) > set_embedded_filter_callback;
     typedef std::function< rsutils::json() > query_embedded_filter_callback;
+    // Invoked right before the filter is turned on, lets the owner reject activation.
+    typedef std::function< void() > activation_guard_callback;
     virtual void add_option(std::shared_ptr< realdds::dds_option > option) = 0;
+
+    void set_activation_guard( activation_guard_callback cb ) { _activation_guard = std::move( cb ); }
 
 protected:
     std::shared_ptr< realdds::dds_embedded_filter > _dds_ef;
     set_embedded_filter_callback _set_ef_cb;
     query_embedded_filter_callback _query_ef_cb;
+    activation_guard_callback _activation_guard;
 
 public:
     rs_dds_embedded_filter( const std::shared_ptr< realdds::dds_embedded_filter > & dds_embedded_filter, 

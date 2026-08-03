@@ -13,7 +13,9 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
-    pytest.mark.timeout(20),
+    # func_only: keep the tight deadlock guard on the test body only -- device setup (e.g. D555
+    # PoE power-on + DDS discovery takes ~17s) must not eat the budget; it has its own bounded waits
+    pytest.mark.timeout(20, func_only=True),
     pytest.mark.context("weekly"),
 ]
 

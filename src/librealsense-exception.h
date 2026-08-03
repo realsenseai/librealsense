@@ -78,8 +78,8 @@ public:
 class backend_exception : public unrecoverable_exception
 {
 public:
-    backend_exception( const std::string & msg, rs2_exception_type exception_type ) noexcept
-        : unrecoverable_exception( msg, exception_type )
+    backend_exception( const std::string & msg ) noexcept
+        : unrecoverable_exception( msg, RS2_EXCEPTION_TYPE_BACKEND )
     {
     }
 };
@@ -89,7 +89,7 @@ class linux_backend_exception : public backend_exception
 {
 public:
     linux_backend_exception( const std::string & msg ) noexcept
-        : backend_exception( generate_last_error_message( msg ), RS2_EXCEPTION_TYPE_BACKEND )
+        : backend_exception( generate_last_error_message( msg ) )
     {
     }
 
@@ -106,7 +106,7 @@ class windows_backend_exception : public backend_exception
 public:
     // TODO: get last error
     windows_backend_exception( const std::string & msg ) noexcept
-        : backend_exception( msg, RS2_EXCEPTION_TYPE_BACKEND )
+        : backend_exception( msg )
     {
     }
 };

@@ -95,7 +95,7 @@ namespace rs2
         }
 
         bool contains(const char* key) const;
-        
+
         void save(const char* filename);
 
         void reset();

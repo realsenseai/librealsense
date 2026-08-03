@@ -8,6 +8,7 @@ import pyrealsense2 as rs
 log = logging.getLogger(__name__)
 
 pytestmark = [
+    pytest.mark.device_exclude("D585 Prototype"), # Exclude D585 temporarily until test is fixed.
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
 ]

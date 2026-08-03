@@ -12,7 +12,7 @@ import time
 pytestmark = [
     pytest.mark.device_each("D457"),
     pytest.mark.skipif(platform.machine() != "aarch64", reason="Jetson only"),
-    pytest.mark.flaky(retries=3),
+    pytest.mark.flaky(reruns=3),
 ]
 
 gyro_frame_count = 0

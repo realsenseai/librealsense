@@ -9,7 +9,6 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
-    pytest.mark.context("nightly"),
 ]
 
 
@@ -245,6 +244,7 @@ def test_set_color_correction(test_device_wrapped):
     assert new_cc.colorCorrection12 == pytest.approx(1.3, abs=0.01)
 
 
+@pytest.mark.device_exclude("D500*")  # AE Setpoint is not supported on D500-family devices
 def test_set_ae_control(test_device_wrapped):
     if not _module_state.get('preset_ok'):
         pytest.skip("prerequisite test_visual_preset_support failed")

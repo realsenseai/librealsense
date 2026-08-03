@@ -6,6 +6,10 @@
 #include "sensor.h"
 #include "platform/uvc-device.h"
 
+#include <atomic>
+#include <memory>
+#include <vector>
+
 
 namespace librealsense {
 
@@ -118,6 +122,10 @@ private:
     std::vector< platform::extension_unit > _xus;
     std::unique_ptr< power > _power;
     std::unique_ptr< frame_timestamp_reader > _timestamp_reader;
+    // Per-stream in-flight zero-copy frame counters (shared with each capture callback). close()
+    // drains these before the backend frees its buffers, so a held zero-copy frame is never left
+    // pointing at unmapped memory. Only used on zero-copy builds; empty/no-op otherwise.
+    std::vector< std::shared_ptr< std::atomic< int > > > _zc_inflight;
 };
 
 

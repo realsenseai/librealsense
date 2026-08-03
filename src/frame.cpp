@@ -7,6 +7,9 @@
 
 #include "metadata-parser.h"
 #include "core/enum-helpers.h"
+#ifdef RS2_USE_CUDA
+#include "cuda/cuda-frame-memory.h"
+#endif
 
 #include <rsutils/string/from.h>
 
@@ -124,7 +127,10 @@ bool frame::find_metadata( rs2_frame_metadata_value frame_metadata, rs2_metadata
 
 int frame::get_frame_data_size() const
 {
-    return (int)data.size();
+    // Continuation-backed frames (e.g. zero-copy capture) do not own `data` -- their pixels live
+    // in an external buffer reached via get_frame_data(). `data` is empty for them, so return the
+    // logical size recorded at allocation. For ordinary frames data.size() == _data_size.
+    return (int)( data.empty() ? _data_size : data.size() );
 }
 
 const uint8_t * frame::get_frame_data() const
@@ -137,6 +143,33 @@ const uint8_t * frame::get_frame_data() const
     }
 
     return frame_data;
+}
+
+const void * frame::get_gpu_data_or_upload( bool * copied )
+{
+    if( copied )
+        *copied = false;   // default: zero-copy or unavailable; set true only when we upload
+#ifdef RS2_USE_CUDA
+  #ifdef RS2_USE_CUDA_ZEROCOPY
+    // True zero-copy: the frame is already GPU-mapped, no copy needed.
+    if( void * z = rs_frame_zc_device_ptr( get_frame_data() ) )
+        return z;
+  #endif
+    // Otherwise upload to the frame's cached device buffer (a real, SDK-managed copy). Lock: the
+    // same frame may be uploaded from two threads, and rs_frame_gpu_upload mutates the cached
+    // buffer/capacity (cudaMalloc/cudaFree) -- serialize so growth can't race into a double-free.
+    {
+        std::lock_guard< std::mutex > lock( _gpu_upload_mutex );
+        if( void * dev = rs_frame_gpu_upload( &_gpu_upload_buffer, &_gpu_upload_capacity,
+                                              get_frame_data(), static_cast< size_t >( get_frame_data_size() ) ) )
+        {
+            if( copied )
+                *copied = true;
+            return dev;
+        }
+    }
+#endif
+    return nullptr;
 }
 
 rs2_timestamp_domain frame::get_frame_timestamp_domain() const

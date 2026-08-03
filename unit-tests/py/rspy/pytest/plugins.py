@@ -18,10 +18,10 @@ import pytest
 
 REQUIRED_PYTEST_PLUGINS = {
     # module name          : pip package name (for the install hint)
-    'pytest_timeout':      'pytest-timeout',
-    'pytest_retry':        'pytest-retry',
-    'pytest_repeat':       'pytest-repeat',
-    'pytest_check':        'pytest-check',
+    'pytest_timeout':        'pytest-timeout',
+    'pytest_rerunfailures':  'pytest-rerunfailures',
+    'pytest_repeat':         'pytest-repeat',
+    'pytest_check':          'pytest-check',
 
 }
 

@@ -328,8 +328,8 @@ namespace librealsense
     };
 
     /***
-     * Application Config Table (according to flash0.95 specs)
-     * Version:    0x01 0x02 (major.minor)
+     * Application Config Table (according to flash0.96 specs)
+     * Version:    0x01 0x03 (major.minor)
      * Table type: 0xC0DE (ctAppConfig)
      * Table size: 464 (bytes)
      *

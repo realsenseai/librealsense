@@ -103,8 +103,21 @@ namespace rs2
             auto supported_options = s->get_supported_option_values();
             for( rs2::option_value option : supported_options )
             {
-                options_metadata[option->id]
-                    = create_option_model( option, opt_base_label, this, s, options_invalidated, error_message );
+                // Build the model first and insert only on success: options that cannot be
+                // queried (e.g. a MIPI color control with no V4L2 CID mapping) throw here, and
+                // map::operator[] would otherwise leave a default-constructed (null-endpoint)
+                // entry that crashes subdevice_model::update(). Isolate per option so one bad
+                // control does not drop the rest.
+                try
+                {
+                    auto model = create_option_model( option, opt_base_label, this, s, options_invalidated, error_message );
+                    options_metadata[option->id] = std::move( model );
+                }
+                catch( const std::exception & e )
+                {
+                    if( viewer.not_model )
+                        viewer.not_model->add_log( e.what(), RS2_LOG_SEVERITY_WARN );
+                }
             }
 
             s->on_options_changed( [this]( const options_list & list )
@@ -384,18 +397,6 @@ namespace rs2
         {
             auto option_value = depth_colorizer->get_option(RS2_OPTION_VISUAL_PRESET);
             depth_colorizer->set_option(RS2_OPTION_VISUAL_PRESET, option_value);
-        }
-
-        // Disable histogram equalization for D585 prototype variants (0C07, 0C08).
-        // Must be applied AFTER the VISUAL_PRESET restore block above: re-setting the Dynamic
-        // preset (default) re-enables histogram equalization via its on_set callback.
-        if (s->supports(RS2_CAMERA_INFO_PRODUCT_ID))
-        {
-            std::string device_pid = s->get_info(RS2_CAMERA_INFO_PRODUCT_ID);
-            if (device_pid == "0C07" || device_pid == "0C08")
-            {
-                depth_colorizer->set_option(RS2_OPTION_HISTOGRAM_EQUALIZATION_ENABLED, 0.f);
-            }
         }
 
         std::stringstream ss;

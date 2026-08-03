@@ -38,7 +38,10 @@ namespace librealsense
         void reset();
         void add_value(CSample val);
         void add_const_y_coefs(double dy);
+        void refit_from_samples(const std::deque<CSample>& samples);
         bool update_samples_base(double x);
+        double to_fit_domain(double x) const;
+        static double align_to_epoch(double x, double anchor);
         void update_last_sample_time(double x);
         double calc_value(double x) const;
         bool is_full() const;
@@ -46,6 +49,7 @@ namespace librealsense
     private:
         void calc_linear_coefs();
         void get_a_b(double x, double& a, double& b) const;
+        static bool theil_sen_fit(const std::deque<CSample>& values, const CSample& base_sample, double& a, double& b);
 
     private:
         unsigned int _buffer_size;
@@ -85,7 +89,11 @@ namespace librealsense
         mutable std::recursive_mutex _enable_mtx; // Watch only 1 start/stop operation at a time.
         CLinearCoefficients _coefs;
         double _min_command_delay;
+        unsigned int _rejections_in_row; // Consecutive samples rejected for excessive command delay.
+        unsigned int _innovation_rejections_in_row; // Consecutive samples rejected for excessive innovation (value vs. fit prediction).
+        std::deque<CSample> _rejected_samples;   // Last re_fit_window (x, y) pairs rejected on value; refit source if rejections persist.
         bool _is_ready;
+        bool _first_sample_dropped; // the first (often slow) clock read after start is dropped
     };
 
     class global_timestamp_reader : public frame_timestamp_reader
@@ -101,11 +109,16 @@ namespace librealsense
         void reset() override;
 
     private:
+        double enforce_monotonicity(double hw_time, double global_time);
+
+    private:
         std::unique_ptr<frame_timestamp_reader> _device_timestamp_reader;
         std::weak_ptr<time_diff_keeper> _time_diff_keeper;
         mutable std::recursive_mutex _mtx;
         std::shared_ptr<global_time_option> _option_is_enabled;
         bool _ts_is_ready;
+        double _last_hw_time_ms;        // HW timestamp of the last frame (-1 if none yet).
+        double _last_global_time_ms;    // Global timestamp given to the last frame.
     };
 
     class global_time_interface

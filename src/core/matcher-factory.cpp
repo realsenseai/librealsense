@@ -39,7 +39,7 @@ std::shared_ptr< matcher > matcher_factory::create( rs2_matchers matcher,
 
 std::shared_ptr< matcher > matcher_factory::create_DLR_C_matcher( std::vector< stream_interface * > const & profiles )
 {
-    auto infer = get_inference_profiles( profiles );
+    auto infer = get_perception_profiles( profiles );
 
     std::vector< stream_interface * > synchronized_profiles;
     synchronized_profiles.reserve( profiles.size() );
@@ -212,7 +212,7 @@ matcher_factory::get_color_profiles( std::vector< stream_interface * > const & p
 
 
 std::vector< stream_interface * >
-matcher_factory::get_inference_profiles( std::vector< stream_interface * > const & profiles )
+matcher_factory::get_perception_profiles( std::vector< stream_interface * > const & profiles )
 {
     std::vector< stream_interface * > ret;
     for( auto & profile : profiles )

@@ -501,7 +501,7 @@ namespace librealsense
 
         if (depth_devs_info.empty() || depth_devices.empty())
         {
-            throw backend_exception("cannot access depth sensor", RS2_EXCEPTION_TYPE_BACKEND);
+            throw backend_exception("cannot access depth sensor");
         }
 
         std::unique_ptr< frame_timestamp_reader > timestamp_reader_backup( new ds_timestamp_reader() );
@@ -595,7 +595,7 @@ namespace librealsense
         set_hw_monitor_for_auto_calib(_hw_monitor);
 
 
-        _ds_device_common = std::make_shared<ds_device_common>(this, _hw_monitor, (_is_mipi_device) ? true : false);
+        _ds_device_common = std::make_shared<ds_device_common>(this, _hw_monitor, _is_mipi_device);
         
 
         // Define Left-to-Right extrinsics calculation (lazy)
@@ -852,8 +852,13 @@ namespace librealsense
                 gain_option = uvc_pu_gain_option;
             }
 
-            // DEPTH AUTO EXPOSURE MODE
-            if ((val_in_range(_pid, { RS455_PID })) && (_fw_version >= firmware_version("5.15.0.0")))
+            // DEPTH AUTO EXPOSURE MODE - available on global-shutter D400 SKUs.
+            // D455: since FW 5.15.0.0; other SKUs: FW 5.17.3.20.
+            const bool is_global_shutter = ( _device_capabilities & ds_caps::CAP_GLOBAL_SHUTTER ) == ds_caps::CAP_GLOBAL_SHUTTER;
+            const firmware_version min_fw_for_ae_mode = (_pid == RS455_PID) ? firmware_version("5.15.0.0")
+                                                                            : firmware_version("5.17.3.20");
+            if (is_global_shutter && _fw_version >= min_fw_for_ae_mode &&
+                    (!_is_mipi_device || mipi_driver_version >= rsutils::version("1.0.5.7")))
             {
                 auto depth_auto_exposure_mode = std::make_shared<uvc_xu_option<uint8_t>>( raw_depth_sensor,
                     depth_xu,
@@ -885,7 +890,7 @@ namespace librealsense
             if ((_fw_version >= firmware_version("5.11.3.0")) && ((_device_capabilities & mask) == mask))
             {
                 bool is_fw_version_using_id = (_fw_version >= firmware_version("5.12.8.100"));
-                auto alternating_emitter_opt = std::make_shared<alternating_emitter_option>(*_hw_monitor, is_fw_version_using_id, ds::d400_hwmon_response::opcodes::NO_DATA_TO_RETURN);
+                auto alternating_emitter_opt = std::make_shared<alternating_emitter_option>(*_hw_monitor, is_fw_version_using_id, true, ds::d400_hwmon_response::opcodes::NO_DATA_TO_RETURN);
                 auto emitter_always_on_opt = std::make_shared<emitter_always_on_option>( _hw_monitor, ds::LASERONCONST, ds::LASERONCONST );
 
                 if ((_fw_version >= firmware_version("5.12.1.0")) && ((_device_capabilities & ds_caps::CAP_GLOBAL_SHUTTER) == ds_caps::CAP_GLOBAL_SHUTTER))
@@ -949,6 +954,15 @@ namespace librealsense
                 }
             }
 
+            if( _fw_version >= firmware_version( "5.17.3.13" )
+                && val_in_range( _pid, { RS405_PID, RS455_PID, RS457_PID, RS435I_PID, RS401_GMSL_PID } ) )
+            {
+                depth_sensor.register_option( RS2_OPTION_READOUT_SHAPING,
+                    std::make_shared< uvc_xu_option< uint8_t > >( raw_depth_sensor, depth_xu,
+                        DS5_READOUT_SHAPING,
+                        "IR/depth sensor readout shaping [0-100%]; higher slows readout to avoid dropped frames" ) );
+            }
+
             depth_sensor.register_option( RS2_OPTION_STEREO_BASELINE,
                                           std::make_shared< const_value_option >(
                                               "Distance in mm between the stereo imagers",
@@ -1001,7 +1015,7 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID, asic_serial);
         register_info(RS2_CAMERA_INFO_FIRMWARE_VERSION, _fw_version);
         register_info(RS2_CAMERA_INFO_PHYSICAL_PORT, group.uvc_devices.front().device_path);
-        register_info(RS2_CAMERA_INFO_DEBUG_OP_CODE, std::to_string(static_cast<int>(fw_cmd::GLD)));
+        register_info(RS2_CAMERA_INFO_DEBUG_OP_CODE, std::to_string(static_cast<int>(d400_fw_cmd::GLD)));
         register_info(RS2_CAMERA_INFO_ADVANCED_MODE, ((advanced_mode) ? "YES" : "NO"));
         register_info(RS2_CAMERA_INFO_PRODUCT_ID, pid_hex_str);
         register_info(RS2_CAMERA_INFO_PRODUCT_LINE, "D400");

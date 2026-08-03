@@ -244,6 +244,34 @@ int rs2_get_frame_data_size(const rs2_frame* frame, rs2_error** error);
 const void* rs2_get_frame_data(const rs2_frame* frame, rs2_error** error);
 
 /**
+* Retrieve a GPU (CUDA) device pointer aliasing the frame data, for zero-copy consumption on
+* the GPU (e.g. feeding the frame directly to a CUDA kernel / TensorRT inference without a
+* host->device copy). Returns NULL unless the SDK was built with BUILD_WITH_CUDA_ZEROCOPY and
+* is running on an integrated GPU (Jetson) where the frame buffer is GPU-mapped; in every
+* other configuration callers should fall back to rs2_get_frame_data() + their own upload.
+* The returned pointer is valid only while the frame is held; do not use it after the frame
+* is released.
+* \param[in] frame      handle returned from a callback
+* \param[out] error     if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return               GPU device pointer aliasing the frame data, or NULL if unavailable
+*/
+const void* rs2_get_frame_gpu_data(const rs2_frame* frame, rs2_error** error);
+
+/**
+* Retrieve a GPU (CUDA) device pointer for the frame, uploading it if necessary. Unlike
+* rs2_get_frame_gpu_data() (which returns NULL when true zero-copy is unavailable), this always
+* returns a usable device pointer on a CUDA build: zero-copy when the frame is GPU-mapped, or an
+* SDK-managed host->device copy otherwise. `copied` (if non-null) is set to 0 when the pointer
+* was zero-copy and 1 when the SDK uploaded. Returns NULL on non-CUDA builds. The pointer is
+* valid only while the frame is held.
+* \param[in] frame      handle returned from a callback
+* \param[out] copied    if non-null, set to 1 if the SDK uploaded (a copy), 0 if zero-copy
+* \param[out] error     if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return               GPU device pointer for the frame, or NULL on non-CUDA builds
+*/
+const void* rs2_get_frame_gpu_data_or_upload(const rs2_frame* frame, int* copied, rs2_error** error);
+
+/**
 * retrieve frame width in pixels
 * \param[in] frame      handle returned from a callback
 * \param[out] error     if non-null, receives any error that occurs during this call, otherwise, errors are ignored

@@ -99,7 +99,7 @@ See `.github/skills/build.md` for full build instructions. The project uses **CM
 | Platform | Notes |
 |---|---|
 | **Windows 10/11** | MSVC (Visual Studio 2019/2022) |
-| **Ubuntu 20.04 / 22.04 / 24.04** | GCC, primary Linux target |
+| **Ubuntu 20.04 / 22.04 / 24.04 / 26.04** | GCC, primary Linux target |
 | **macOS** | Clang, macOS 15+ tested in CI |
 | **NVIDIA Jetson** | ARM64, L4T |
 | **Raspberry Pi** | ARM (Raspbian) |

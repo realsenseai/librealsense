@@ -161,6 +161,7 @@ namespace librealsense
         bool wait_for_state(std::shared_ptr<platform::usb_messenger> messenger, const rs2_dfu_state state, size_t timeout = 1000) const;
         virtual void dfu_manifest_phase(const platform::rs_usb_messenger& messenger, rs2_update_progress_callback_sptr update_progress_callback) const;
         void read_device_info(std::shared_ptr<platform::usb_messenger> messenger);
+        std::string parse_serial_number(const std::vector<uint8_t>& buffer) const;
 
         const std::string & get_name() const { return _name; }
         const std::string & get_product_line() const { return _product_line; }

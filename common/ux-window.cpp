@@ -88,6 +88,19 @@ namespace rs2
         config_file::instance().set_default(configurations::viewer::commands_xml, "./Commands.xml");
         config_file::instance().set_default(configurations::viewer::hwlogger_xml, "./HWLoggerEvents.xml");
 
+        {
+            // set_nested_default() only writes a key if it's missing, so this is safe to run
+            // unconditionally - it backfills the grid keys into pre-existing config files too.
+            namespace cfg = configurations::viewer::viewport_grid_overlay;
+            auto& cf = config_file::instance();
+            cf.set_nested_default( cfg::horizontal_lines, 1   );
+            cf.set_nested_default( cfg::vertical_lines,   1   );
+            cf.set_nested_default( cfg::line_width,       1   );
+            cf.set_nested_default( cfg::line_color_r,     255 );
+            cf.set_nested_default( cfg::line_color_g,     255 );
+            cf.set_nested_default( cfg::line_color_b,     255 );
+        }
+
         std::string path;
         try
         {
@@ -345,8 +358,15 @@ namespace rs2
         {
             int w = config_file::instance().get(configurations::window::width);
             int h = config_file::instance().get(configurations::window::height);
-            glfwSetWindowSize(_win, w, h);
-            
+            // Guard against a corrupt/legacy config with zero dimensions: XConfigureWindow rejects
+            // 0 width/height with BadValue. A normal desktop's window manager clamps such requests,
+            // but CI runs the viewer under Xvfb (headless X server, no WM) where Xlib aborts.
+            if (w > 0 && h > 0)
+                glfwSetWindowSize(_win, w, h);
+            else
+                rs2::log(RS2_LOG_SEVERITY_WARN,
+                    "Ignoring persisted window size (width/height <= 0); falling back to monitor default");
+
             if (config_file::instance().get(configurations::window::maximized))
                 glfwMaximizeWindow(_win);
         }

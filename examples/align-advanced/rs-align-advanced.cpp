@@ -18,7 +18,8 @@ void render_slider(rect location, float& clipping_dist);
 void remove_background(rs2::video_frame& other, const rs2::depth_frame& depth_frame, float depth_scale, float clipping_dist);
 float get_depth_scale(rs2::device dev);
 rs2_stream find_stream_to_align(const std::vector<rs2::stream_profile>& streams);
-bool profile_changed(const std::vector<rs2::stream_profile>& current, const std::vector<rs2::stream_profile>& prev);
+bool streams_alignable(const std::vector<rs2::stream_profile>& streams);
+void configure_alignable_streams(const rs2::device& dev, rs2::config& cfg);
 
 int main(int argc, char * argv[]) try
 {
@@ -37,17 +38,23 @@ int main(int argc, char * argv[]) try
 
     // Create a pipeline to easily configure and start the camera
     rs2::pipeline pipe( settings.dump() );
-    //Calling pipeline's start() without any additional parameters will start the first device
-    // with its default streams.
+
+    //Pipeline could choose a device whose default profile has no color/IR stream to align depth to
+    //(e.g. some GMSL devices default to depth-only). Resolve the default profile up front, without
+    //starting the device, so we can request depth + a non-depth video stream explicitly in that
+    //case and start only once.
+    rs2::config cfg;
+    rs2::pipeline_profile default_profile = cfg.resolve(pipe);
+    if (!streams_alignable(default_profile.get_streams()))
+        configure_alignable_streams(default_profile.get_device(), cfg);
+
     //The start function returns the pipeline profile which the pipeline used to start the device
-    rs2::pipeline_profile profile = pipe.start();
+    rs2::pipeline_profile profile = pipe.start(cfg);
 
     // Each depth camera might have different units for depth pixels, so we get it here
     // Using the pipeline's profile, we can retrieve the device that the pipeline uses
     float depth_scale = get_depth_scale(profile.get_device());
 
-    //Pipeline could choose a device that does not have a color stream
-    //If there is no color stream, choose to align depth to another stream
     rs2_stream align_to = find_stream_to_align(profile.get_streams());
 
     // Create a rs2::align object.
@@ -62,18 +69,6 @@ int main(int argc, char * argv[]) try
     {
         // Using the align object, we block the application until a frameset is available
         rs2::frameset frameset = pipe.wait_for_frames();
-
-        // rs2::pipeline::wait_for_frames() can replace the device it uses in case of device error or disconnection.
-        // Since rs2::align is aligning depth to some other stream, we need to make sure that the stream was not changed
-        //  after the call to wait_for_frames();
-        if (profile_changed(pipe.get_active_profile().get_streams(), profile.get_streams()))
-        {
-            //If the profile was changed, update the align object, and also get the new device's depth scale
-            profile = pipe.get_active_profile();
-            align_to = find_stream_to_align(profile.get_streams());
-            align = rs2::align(align_to);
-            depth_scale = get_depth_scale(profile.get_device());
-        }
 
         //Get processed aligned frame
         auto processed = align.process(frameset);
@@ -230,7 +225,11 @@ rs2_stream find_stream_to_align(const std::vector<rs2::stream_profile>& streams)
     for (rs2::stream_profile sp : streams)
     {
         rs2_stream profile_stream = sp.stream_type();
-        if (profile_stream != RS2_STREAM_DEPTH)
+        if (profile_stream == RS2_STREAM_DEPTH)
+        {
+            depth_stream_found = true;
+        }
+        else if (sp.is<rs2::video_stream_profile>())
         {
             if (!color_stream_found)         //Prefer color
                 align_to = profile_stream;
@@ -240,10 +239,7 @@ rs2_stream find_stream_to_align(const std::vector<rs2::stream_profile>& streams)
                 color_stream_found = true;
             }
         }
-        else
-        {
-            depth_stream_found = true;
-        }
+        //Motion streams (ACCEL/GYRO/POSE) are neither depth nor alignable video - skip them
     }
 
     if(!depth_stream_found)
@@ -255,16 +251,47 @@ rs2_stream find_stream_to_align(const std::vector<rs2::stream_profile>& streams)
     return align_to;
 }
 
-bool profile_changed(const std::vector<rs2::stream_profile>& current, const std::vector<rs2::stream_profile>& prev)
+bool streams_alignable(const std::vector<rs2::stream_profile>& streams)
 {
-    for (auto&& sp : prev)
+    bool depth_found = false, video_found = false;
+    for (auto& sp : streams)
     {
-        //If previous profile is in current (maybe just added another)
-        auto itr = std::find_if(std::begin(current), std::end(current), [&sp](const rs2::stream_profile& current_sp) { return sp.unique_id() == current_sp.unique_id(); });
-        if (itr == std::end(current)) //If it previous stream wasn't found in current
-        {
-            return true;
-        }
+        if (sp.stream_type() == RS2_STREAM_DEPTH)
+            depth_found = true;
+        else if (sp.is<rs2::video_stream_profile>())
+            video_found = true;
     }
-    return false;
+    return depth_found && video_found;
 }
+
+//Explicitly enables depth and a non-depth video stream on cfg, picked from whatever the device
+//actually offers. Once any stream is explicitly enabled, streams that aren't are no longer picked
+//up by default, so both must be requested together.
+void configure_alignable_streams(const rs2::device& dev, rs2::config& cfg)
+{
+    bool depth_found = false, video_found = false;
+    for (auto& sensor : dev.query_sensors())
+    {
+        for (auto& sp : sensor.get_stream_profiles())
+        {
+            if (!depth_found && sp.stream_type() == RS2_STREAM_DEPTH)
+            {
+                cfg.enable_stream(RS2_STREAM_DEPTH, sp.stream_index());
+                depth_found = true;
+            }
+            else if (!video_found && sp.stream_type() != RS2_STREAM_DEPTH && sp.is<rs2::video_stream_profile>())
+            {
+                cfg.enable_stream(sp.stream_type(), sp.stream_index());
+                video_found = true;
+            }
+        }
+        if (depth_found && video_found)
+            break;
+    }
+
+    if (!depth_found)
+        throw std::runtime_error("No Depth stream available");
+    if (!video_found)
+        throw std::runtime_error("Device has no non-depth video stream to align with Depth");
+}
+

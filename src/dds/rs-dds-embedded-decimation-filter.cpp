@@ -65,6 +65,9 @@ namespace librealsense {
                 json option_with_value = dds_option_to_name_and_value_json(option, value);
                 // validate values
                 validate_filter_option(option_with_value);
+                // Let owner reject turning the filter on, or add some other pre-activation logic
+                if (_activation_guard && option->get_name() == TOGGLE_OPTION_NAME && value.get<double>() != 0.)
+                    _activation_guard();
                 // set updated options to the remote device
                 _set_ef_cb(option_with_value);
                 // Delegate to DDS filter

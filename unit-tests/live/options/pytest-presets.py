@@ -5,13 +5,14 @@ import pytest
 import pyrealsense2 as rs
 import time
 import logging
+from rspy.snippets import is_dds_dev
 log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
     pytest.mark.context("nightly"),
-    pytest.mark.flaky(retries=2),  # See FW stability issue RSDSO-18908
+    pytest.mark.flaky(reruns=2),  # See FW stability issue RSDSO-18908
 ]
 
 
@@ -32,8 +33,12 @@ def test_set_presets(test_device_wrapped):
     dev, ctx = test_device_wrapped
     depth_sensor = dev.first_depth_sensor()
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.high_accuracy))
+    if is_dds_dev(dev):
+        time.sleep(1)  # Command is handled in the DDS device, not host. It may take some time to be fully handled.
     assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.high_accuracy
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.default))
+    if is_dds_dev(dev):
+        time.sleep(1)
     assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.default
 
 

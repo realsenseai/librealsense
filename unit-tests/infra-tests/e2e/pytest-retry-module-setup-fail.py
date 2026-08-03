@@ -1,7 +1,7 @@
 # A module-scoped fixture (autouse-dependency chain) that fails its first two setup
-# attempts. pytest-retry reruns setup+call unconditionally; on the failed re-setup the
-# call phase would raise KeyError('<fixture>'), masking the real error. The conftest guard
-# surfaces the real error instead, so the retry sees the true (retryable) exception.
+# attempts, then recovers. Setup-phase failures must be retried natively and the real
+# error recorded in the per-test log — never a masking KeyError('<fixture>') (which the
+# old pytest-retry engine produced by rerunning the call phase after a failed re-setup).
 import pytest
 _base = 0
 _dep = 0

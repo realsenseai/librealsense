@@ -34,6 +34,7 @@ namespace rs2
         // A note to a maintainer - preserve order when adding values to avoid duplicates
         static const textual_icon search{ u8"\uf002" };
         static const textual_icon file_movie{ u8"\uf008" };
+        static const textual_icon grid{ u8"\uf00a" };  // fa-th: 3x3 grid of squares (viewport grid overlay)
         static const textual_icon check{ u8"\uf00c" };
         static const textual_icon times{ u8"\uf00d" };
         static const textual_icon power_off{ u8"\uf011" };

@@ -123,13 +123,13 @@ config_file::config_file( std::string const & filename )
     }
     catch(...)
     {
-
     }
     _save_thread = std::thread( &config_file::save_loop, this );
 }
 
 void config_file::save()
 {
+    std::lock_guard< std::recursive_mutex > lk( _mutex );
     if( ! _filename.empty() )
         save( _filename.c_str() );
 }

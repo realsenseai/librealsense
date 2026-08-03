@@ -8,19 +8,19 @@
 
 namespace librealsense {
 
-class inference_frame : public frame
+class perception_frame : public frame
 {
 public:
-    // This class currently serves as a base type for inference frames
-    inference_frame() : frame() {}
+    // This class currently serves as a base type for perception frames
+    perception_frame() : frame() {}
 
-    // Currently only object detection is supported, but this can be extended in the future to support more types of inference results
+    // Currently only object detection is supported, but this can be extended in the future to support more types of perception results
     enum class type : uint8_t
     {
         OBJECT_DETECTION = 0
     };
 };
 
-MAP_EXTENSION(RS2_EXTENSION_INFERENCE_FRAME, librealsense::inference_frame);
+MAP_EXTENSION(RS2_EXTENSION_PERCEPTION_FRAME, librealsense::perception_frame);
 
 }  // namespace librealsense

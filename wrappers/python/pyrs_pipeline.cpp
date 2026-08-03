@@ -85,7 +85,7 @@ void init_pipeline(py::module &m) {
         .def("can_resolve", [](rs2::config* c, pipeline_wrapper pw) -> bool { return c->can_resolve(pw._ptr); }, "Check if the config can resolve the configuration filters, "
              "to find a matching device and streams profiles. The resolution conditions are as described in resolve().", "p"_a);
     
-    py::class_<rs2::pipeline> pipeline(m, "pipeline", "The pipeline simplifies the user interaction with the device and computer vision processing modules.\n"
+    py::class_<rs2::pipeline, py_holder<rs2::pipeline>> pipeline(m, "pipeline", "The pipeline simplifies the user interaction with the device and computer vision processing modules.\n"
                                        "The class abstracts the camera configuration and streaming, and the vision modules triggering and threading.\n"
                                        "It lets the application focus on the computer vision output of the modules, or the device output data.\n"
                                        "The pipeline can manage computer vision modules, which are implemented as a processing blocks.\n"

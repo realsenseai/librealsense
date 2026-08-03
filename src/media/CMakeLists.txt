@@ -28,33 +28,34 @@ if(BUILD_ROSBAG2)
     target_compile_definitions(${LRS_TARGET} PRIVATE BUILD_ROSBAG2)
     # Include path for ROS2 message types (only needed when building rosbag2 support)
     target_include_directories(${LRS_TARGET} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types")
-    target_sources(${LRS_TARGET}
-        PRIVATE
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_file_format.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.cpp"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader_base.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader_base.cpp"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.cpp"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_native_reader.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_native_reader.cpp"
-            # ROS2 message types for CDR serialization
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/builtin_interfaces/msg/Time.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/builtin_interfaces/msg/Time.cpp"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/std_msgs/msg/Header.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/std_msgs/msg/Header.cpp"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/Vector3.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/Vector3.cpp"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/Quaternion.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/Quaternion.cpp"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Image.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Image.cpp"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Imu.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Imu.cpp"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/RegionOfInterest.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/RegionOfInterest.cpp"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/CameraInfo.h"
-            "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/CameraInfo.cpp"
+    set(ROS2_SOURCE_FILES
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_file_format.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader_base.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader_base.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_native_reader.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_native_reader.cpp"
+        # ROS2 message types for CDR serialization
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/builtin_interfaces/msg/Time.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/builtin_interfaces/msg/Time.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/std_msgs/msg/Header.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/std_msgs/msg/Header.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/Vector3.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/Vector3.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/Quaternion.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/Quaternion.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Image.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Image.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Imu.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/Imu.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/RegionOfInterest.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/RegionOfInterest.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/CameraInfo.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/CameraInfo.cpp"
     )
+    target_sources(${LRS_TARGET} PRIVATE ${ROS2_SOURCE_FILES})
+    hide_sources_symbols( ${ROS2_SOURCE_FILES} )
 endif()

@@ -73,7 +73,7 @@ void dds_motion_stream::open( std::string const & topic_name, std::shared_ptr< d
 }
 
 
-void dds_inference_stream::open( std::string const & topic_name, std::shared_ptr< dds_subscriber > const & subscriber )
+void dds_perception_stream::open( std::string const & topic_name, std::shared_ptr< dds_subscriber > const & subscriber )
 {
     if( is_open() )
         DDS_THROW( runtime_error, "stream '" + name() + "' is already open" );
@@ -133,7 +133,7 @@ void dds_motion_stream::handle_data()
 }
 
 
-void dds_inference_stream::handle_data()
+void dds_perception_stream::handle_data()
 {
     topics::string_msg msg;
     dds_sample sample;
@@ -195,7 +195,7 @@ dds_motion_stream::dds_motion_stream( std::string const & stream_name, std::stri
 }
 
 
-dds_inference_stream::dds_inference_stream( std::string const & stream_name, std::string const & sensor_name )
+dds_perception_stream::dds_perception_stream( std::string const & stream_name, std::string const & sensor_name )
     : super( stream_name, sensor_name )
 {
 }

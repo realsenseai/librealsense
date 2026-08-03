@@ -156,6 +156,38 @@ namespace librealsense
             { RS401_GMSL_PID,       "RealSense D401" },
         };
 
+        // D400-only HWM opcodes. Shared opcodes are in ds::fw_cmd (ds/ds-private.h).
+        enum d400_fw_cmd : uint8_t
+        {
+            GLD                = 0x0f, // Legacy get FW logs command
+            GETINTCAL          = 0x15, // Read calibration table
+            SETINTCAL          = 0x16, // Set Internal sub calibration table
+            CALIBRECALC        = 0x51, // Calibration recalc and update on the fly
+            SETINTCALNEW       = 0x62, // Set Internal sub calibration table (new format)
+            ASIC_TEMP_MIPI     = 0x7A, // get ASIC temperature - with mipi device
+            GETAELIMITS        = 0x89, // Auto Exp/Gain Limit command FW version >= 5.13.0.200
+            SETAELIMITS        = 0x8A, // Auto Exp/Gain Limit command FW version >= 5.13.0.200
+            AE_ACCEL_PARAMS    = 0x95, // Get/Set Accelerated AE tuning parameters, FW >= 5.17.3.20
+        };
+
+        inline std::string d400_fw_cmd2str(const d400_fw_cmd state)
+        {
+            switch (state)
+            {
+                ENUM2STR(GLD);
+                ENUM2STR(GETINTCAL);
+                ENUM2STR(SETINTCAL);
+                ENUM2STR(CALIBRECALC);
+                ENUM2STR(SETINTCALNEW);
+                ENUM2STR(ASIC_TEMP_MIPI);
+                ENUM2STR(GETAELIMITS);
+                ENUM2STR(SETAELIMITS);
+                ENUM2STR(AE_ACCEL_PARAMS);
+            default:
+                return ( rsutils::string::from() << "Unrecognized D400 FW command " << state );
+            }
+        }
+
         static std::map<uint16_t, std::string> d400_device_to_fw_min_version = {
             {RS400_PID, "5.8.15.0"},
             {RS410_PID, "5.8.15.0"},

@@ -20,7 +20,5 @@ namespace librealsense
         std::string get_firmware_min_version() const override;
 
         float compute_progress(float progress, float start, float end, float threshold) const override;
-    private:
-        std::string parse_serial_number(const std::vector<uint8_t>& buffer) const;
     };
 }

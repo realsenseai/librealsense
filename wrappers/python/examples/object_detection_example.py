@@ -4,7 +4,7 @@
 # Object Detection example
 # ========================
 # Streams Color and Object Detection from a RealSense device that
-# supports inference, and draws labelled bounding boxes on the live color feed.
+# supports perception, and draws labelled bounding boxes on the live color feed.
 #
 # Prerequisites:
 #   pip install pyrealsense2 numpy opencv-python

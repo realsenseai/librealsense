@@ -64,6 +64,10 @@ namespace librealsense
             {
                 backbuffer.data.resize(size, 0); // TODO: Allow users to provide a custom allocator for frame buffers
             }
+            // Record the logical size even when we don't allocate `data` (requires_memory==false,
+            // e.g. zero-copy capture where the pixels live in an external continuation buffer), so
+            // get_frame_data_size() stays correct. Harmless for the normal path (== data.size()).
+            backbuffer.set_data_size(size);
             backbuffer.additional_data = std::move( additional_data );
             return backbuffer;
         }

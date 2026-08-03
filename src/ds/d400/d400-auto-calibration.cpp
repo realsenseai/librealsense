@@ -700,9 +700,12 @@ namespace librealsense
                     if (progress_callback)
                     {
                         if (host_assistance != host_assistance_type::no_assistance)
-                            if (count < 20) progress_callback->on_update_progress(static_cast<float>(80 + count++));
+                        {
+                            if (count < 20)
+                                progress_callback->on_update_progress(static_cast<float>(80 + count++));
                             else
                                 progress_callback->on_update_progress(count++ * (2.f * speed)); //curently this number does not reflect the actual progress
+                        }
                     }
                 }, false);
             // Handle errors from firmware
@@ -1559,7 +1562,7 @@ namespace librealsense
 
         table_header* hd = (table_header*)(_curr_calibration.data());
         d400_calibration_table_id  tbl_id = static_cast<d400_calibration_table_id>(hd->table_type);
-        fw_cmd cmd{};
+        d400_fw_cmd cmd{};
         uint32_t param2 = 0;
         switch (tbl_id)
         {

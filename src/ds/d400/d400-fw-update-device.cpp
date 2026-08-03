@@ -61,17 +61,6 @@ ds_d400_update_device::ds_d400_update_device(
         return it->second;
     }
 
-    std::string ds_d400_update_device::parse_serial_number(const std::vector<uint8_t>& buffer) const
-    {
-        if (buffer.size() != sizeof(serial_number_data))
-            throw std::runtime_error("DFU - failed to parse serial number!");
-
-        std::stringstream rv;
-        for (auto i = 0; i < ds::module_serial_size; i++)
-            rv << std::setfill('0') << std::setw(2) << std::hex << static_cast<int>(buffer[i]);
-
-        return rv.str();
-    }
     float ds_d400_update_device::compute_progress(float progress, float start, float end, float threshold) const
     {
         return (progress*100);

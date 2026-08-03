@@ -201,7 +201,12 @@ The SDK no longer ships a bundled firmware blob, so `test-fw-update` **requires*
 ```bash
 python3 run-unit-tests.py --custom-fw-d400 /path/to/firmware.bin
 python3 run-unit-tests.py --custom-fw-d555 /path/to/firmware.bin
+python3 run-unit-tests.py --custom-fw-d585 /path/to/firmware.bin
 ```
+
+`--custom-fw-d585` is only ever flashed onto a device whose name contains "D585" but not "D585S"
+(e.g. "D585 Prototype") -- the safety SKU D585S is never updated with it, even though the
+`#test:device each(D585)` directive dispatches the test for both (D585S just logs a skip).
 
 ## Troubleshooting
 

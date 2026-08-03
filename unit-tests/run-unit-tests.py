@@ -44,13 +44,15 @@ def usage():
     print( '        --retry <#>          Retry each test <#> times (unless test specified more)' )
     print( '        --config <>          Ignore test configurations; use the one provided' )
     print( '        --device <>          Run only on the specified devices; ignore any test that does not match (implies --live).' )
-    print( '                             Can be repeated or given a space-separated list, e.g. --device "D455 D435".' )
+    print( '                             Can be repeated or given a comma-separated list, e.g. --device "D455,D435".' )
     print( '        --exclude-device <>  Exclude the specified devices from testing.' )
-    print( '                             Can be repeated or given a space-separated list, e.g. --exclude-device "D555 D585S".' )
+    print( '                             Can be repeated or given a comma-separated list, e.g. --exclude-device "D585 Proto,D585S".' )
     print( '        --no-reset           Do not try to reset any devices, with or without a hub' )
     print( '        --hub-reset          If a hub is available, reset the hub itself' )
     print( '        --custom-fw-d400          If custom fw provided flash it if its different that the current fw installed' )
     print( '        --custom-fw-d555          If custom fw provided flash it if its different that the current fw installed' )
+    print( '        --custom-fw-d585          If custom fw provided flash it if its different that the current fw installed;' )
+    print( '                                  applies to D585 only (name contains "D585" but not "D585S") -- D585S is never flashed with it' )
     print( '        --rslog              Enable LibRS logging (LOG_DEBUG etc.) to console in each test' )
     print( '        --skip-disconnected  Skip live test if required device is disconnected (only applies w/o a hub)' )
     print( '        --test-dir <>        Restrict discovery to tests under this dir or file (repeatable);' )
@@ -75,12 +77,15 @@ if system == 'Linux' and "microsoft" not in platform.release().lower():
 else:
     linux = False
 
+def split_comma_list( arg ):
+    return [s.strip() for s in arg.split( ',' ) if s.strip()]
+
 # Parse command-line:
 try:
     opts, args = getopt.getopt( sys.argv[1:], 'hvqr:st:',
                                 longopts=['help', 'verbose', 'debug', 'quiet', 'regex=', 'stdout', 'tag=', 'list-tags',
                                           'list-tests', 'no-exceptions', 'context=', 'repeat=', 'retry=', 'config=', 'no-reset', 'hub-reset',
-                                          'rslog', 'skip-disconnected', 'live', 'not-live', 'device=', 'exclude-device=', 'test-dir=','skip-regex=','custom-fw-d400=','custom-fw-d555='] )
+                                          'rslog', 'skip-disconnected', 'live', 'not-live', 'device=', 'exclude-device=', 'test-dir=','skip-regex=','custom-fw-d400=','custom-fw-d555=','custom-fw-d585='] )
 except getopt.GetoptError as err:
     log.e( err )  # something like "option -a not recognized"
     usage()
@@ -101,6 +106,7 @@ hub_reset = False
 skip_disconnected = False
 custom_fw_path=''
 custom_fw_d555_path=''
+custom_fw_d585_path=''
 rslog = False
 only_live = False
 only_not_live = False
@@ -146,11 +152,11 @@ for opt, arg in opts:
         only_live = True
         if device_set is None:
             device_set = []
-        device_set.extend( arg.split() )
+        device_set.extend( split_comma_list( arg ) )
     elif opt == '--exclude-device':
         if exclude_device_set is None:
             exclude_device_set = []
-        exclude_device_set.extend( arg.split() )
+        exclude_device_set.extend( split_comma_list( arg ) )
     elif opt == '--no-reset':
         no_reset = True
     elif opt == '--hub-reset':
@@ -176,10 +182,13 @@ for opt, arg in opts:
         skip_regex = arg
     elif opt == '--custom-fw-d400':
         custom_fw_path = arg  # Store the custom firmware path
-        log.i(f"custom D400 firmware path was provided ${custom_fw_path}")
+        log.i(f"custom D400 firmware path was provided {custom_fw_path}")
     elif opt == '--custom-fw-d555':
         custom_fw_d555_path = arg  # Store the custom D555 firmware path
-        log.i(f"custom D555 firmware path was provided ${custom_fw_d555_path}")
+        log.i(f"custom D555 firmware path was provided {custom_fw_d555_path}")
+    elif opt == '--custom-fw-d585':
+        custom_fw_d585_path = arg  # Store the custom D585 (non-safety) firmware path; never applied to D585S
+        log.i(f"custom D585 firmware path was provided {custom_fw_d585_path}")
 
 if not test_dirs:
     test_dirs = [current_dir]
@@ -492,6 +501,9 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
     if test.name == "test-fw-update" and custom_fw_d555_path:
         opts.append('--custom-fw-d555')
         opts.append(custom_fw_d555_path)
+    if test.name == "test-fw-update" and custom_fw_d585_path:
+        opts.append('--custom-fw-d585')
+        opts.append(custom_fw_d585_path)
     if test.name == 'test-fw-update' and sns and len( sns ) == 1:
         opts.append( '--serial' )
         opts.append( next( iter( sns ) ) )

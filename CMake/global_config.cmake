@@ -55,6 +55,13 @@ macro(global_set_flags)
         add_definitions(-DRS2_USE_CUDA)
     endif()
 
+    if (BUILD_WITH_CUDA_ZEROCOPY)
+        if (NOT BUILD_WITH_CUDA)
+            message(FATAL_ERROR "BUILD_WITH_CUDA_ZEROCOPY requires BUILD_WITH_CUDA=ON")
+        endif()
+        add_definitions(-DRS2_USE_CUDA_ZEROCOPY)
+    endif()
+
     if (BUILD_WITH_NEON)
         add_definitions(-DBUILD_WITH_NEON)
     endif()

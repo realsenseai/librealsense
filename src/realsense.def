@@ -49,6 +49,7 @@ EXPORTS
     rs2_stop
     rs2_hardware_reset
     rs2_is_in_recovery_mode
+    rs2_get_device_time_ms
 
     rs2_set_notifications_callback
     rs2_set_notifications_callback_cpp
@@ -72,6 +73,8 @@ EXPORTS
     rs2_get_frame_number
     rs2_get_frame_data_size
     rs2_get_frame_data
+    rs2_get_frame_gpu_data
+    rs2_get_frame_gpu_data_or_upload
     rs2_get_frame_width
     rs2_get_frame_height
     rs2_get_frame_stride_in_bytes
@@ -360,8 +363,8 @@ EXPORTS
     rs2_software_sensor_add_motion_stream_ex
     rs2_software_sensor_add_pose_stream
     rs2_software_sensor_add_pose_stream_ex
-    rs2_software_sensor_add_inference_stream
-    rs2_software_sensor_add_inference_stream_ex
+    rs2_software_sensor_add_perception_stream
+    rs2_software_sensor_add_perception_stream_ex
     rs2_software_sensor_add_read_only_option
     rs2_software_sensor_update_read_only_option
     rs2_software_sensor_add_option

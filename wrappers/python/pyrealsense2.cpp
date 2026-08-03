@@ -6,6 +6,12 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 #include <librealsense2/hpp/rs_export.hpp>
 #include <src/types.h>
 
+#if defined( BUILD_EASYLOGGINGPP ) && defined( BUILD_SHARED_LIBS )
+// A shared realsense2 doesn't export ELPP's storage, so rsutils objects linked into this
+// module (e.g. dispatcher) need our own -- see rsutils/easylogging/easyloggingpp.h
+INITIALIZE_EASYLOGGINGPP
+#endif
+
 PYBIND11_MODULE(NAME, m) {
     m.doc() = R"pbdoc(
         Librealsense Python Bindings
@@ -114,14 +120,90 @@ PYBIND11_MODULE(NAME, m) {
                 super::release();
         }
     };
+    // asynchronous=True: on_log never acquires the GIL on the emitting librealsense thread
+    // (which may hold internal locks -- sync dispatch can AB-BA deadlock against the main
+    // thread); a dispatcher thread delivers (severity, raw_text) to Python instead.
+    class py_async_log_callback : public rs2_log_callback
+    {
+        py::function _fn;
+        dispatcher _dispatcher{ 4096 };  // bounded; oldest dropped on overflow
+
+    public:
+        explicit py_async_log_callback( py::function fn )
+            : _fn( std::move( fn ) )
+        {
+            _dispatcher.start();  // constructed stopped, despite what the header says
+        }
+
+        void on_log( rs2_log_severity severity, rs2_log_message const & msg ) noexcept override
+        {
+            try
+            {
+                rs2_error * e = nullptr;
+                char const * raw = rs2_get_raw_log_message( &msg, &e );
+                if( e ) { rs2_free_error( e ); return; }
+                std::string text( raw ? raw : "" );
+                _dispatcher.invoke(
+                    [this, severity, text]( dispatcher::cancellable_timer )
+                    {
+                        try
+                        {
+                            py::gil_scoped_acquire gil;
+                            _fn( severity, text );
+                        }
+                        catch( std::exception const & e )
+                        {
+                            std::cerr << "EXCEPTION in " SNAME ".log_to_callback (async): " << e.what() << std::endl;
+                        }
+                        catch( ... )
+                        {
+                            std::cerr << "UNKNOWN EXCEPTION in " SNAME ".log_to_callback (async)" << std::endl;
+                        }
+                    } );
+            }
+            catch( ... ) {}
+        }
+
+        // Called via Python atexit (interpreter still alive); caller must not hold the GIL
+        void stop()
+        {
+            _dispatcher.flush();  // deliver what's pending -- stop() discards the queue
+            _dispatcher.stop();
+        }
+
+        void release() override {}  // leaked at exit, same as py_log_callback above
+    };
+
     m.def( "log_to_callback",
-           []( rs2_log_severity min_severity, py_log_callback::log_fn callback )
+           []( rs2_log_severity min_severity, py::function callback, bool asynchronous )
            {
                rs2_error * e = nullptr;
-               py::gil_scoped_release gil;
-               rs2_log_to_callback_cpp( min_severity, new py_log_callback( std::move( callback ) ), &e );
+               if( asynchronous )
+               {
+                   auto cb = new py_async_log_callback( std::move( callback ) );
+                   {
+                       py::gil_scoped_release gil;
+                       rs2_log_to_callback_cpp( min_severity, cb, &e );
+                   }
+                   rs2::error::handle( e );  // register atexit only for a live callback
+                   py::module_::import( "atexit" ).attr( "register" )( py::cpp_function(
+                       [cb]()
+                       {
+                           py::gil_scoped_release gil;  // let the worker finish an in-flight dispatch
+                           cb->stop();
+                       } ) );
+               }
+               else
+               {
+                   py_log_callback::log_fn fn
+                       = [callback]( rs2_log_severity severity, rs2::log_message const & msg )
+                       { callback( severity, msg ); };
+                   py::gil_scoped_release gil;
+                   rs2_log_to_callback_cpp( min_severity, new py_log_callback( std::move( fn ) ), &e );
+               }
                rs2::error::handle( e );
-           } );
+           },
+           "min_severity"_a, "callback"_a, "asynchronous"_a = false );
 #endif
 
     // A call to rs.log() will cause a callback to get called! We should already own the GIL, but

@@ -23,6 +23,9 @@ def test_depth_units_metadata(test_device):
     # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
     # connected device; without enable_device(sn) the pipeline picks the first match.
     cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
+    # Depth-only: the test validates depth units, and a default config would also wait on
+    # color/IMU streams, failing the test if any unrelated stream doesn't deliver.
+    cfg.enable_stream(rs.stream.depth)
 
     try:
         pipeline_profile = pipeline.start(cfg)

@@ -49,13 +49,26 @@
 #else //__ANDROID__  
 
 // Direct log to ELPP, without conversion to string first; use this as an optimization, if you have simple string output
-// 
+//
 // We've seen cases where this fails in U22, causing weird effects with custom overloads/types (e.g., json)
+//
+namespace rsutils {
+// log_to_console() et al. reconfigure the logger (replacing TypedConfigurations) under its lock, from any thread, at
+// any time; check enabled() under that same lock too, or risk dereferencing a TypedConfigurations mid-delete.
+inline bool elpp_enabled( el::Logger * logger__, el::Level level )
+{
+    if( ! logger__ )
+        return false;
+    el::base::threading::ScopedLock lock__( logger__->lock() );
+    return logger__->typedConfigurations() && logger__->enabled( level );
+}
+}  // namespace rsutils
+
 #define LIBRS_LOG_STR_( LEVEL, STR )                                                                                   \
     do                                                                                                                 \
     {                                                                                                                  \
         auto logger__ = el::Loggers::getLogger( rsutils::g_librealsense_elpp_id );                                     \
-        if( logger__ && logger__->enabled( el::Level::LEVEL ) )                                                        \
+        if( rsutils::elpp_enabled( logger__, el::Level::LEVEL ) )                                                      \
         {                                                                                                              \
             el::base::Writer( el::Level::LEVEL, __FILE__, __LINE__, ELPP_FUNC, el::base::DispatchAction::NormalLog )   \
                     .construct( logger__ )                                                                             \
@@ -69,7 +82,7 @@
     do                                                                                                                 \
     {                                                                                                                  \
         auto logger__ = el::Loggers::getLogger( rsutils::g_librealsense_elpp_id );                                     \
-        if( logger__ && logger__->typedConfigurations() &&  logger__->enabled( el::Level::LEVEL ) )                    \
+        if( rsutils::elpp_enabled( logger__, el::Level::LEVEL ) )                                                      \
         {                                                                                                              \
             std::ostringstream os__;                                                                                   \
             os__ << __VA_ARGS__;                                                                                       \

@@ -177,7 +177,7 @@ namespace librealsense
         else
         {
             _converter = std::make_unique< converter_16_bit_mipi >( deg2rad( gyro_scale_factor ) );
-            _accel_converter = std::make_unique< converter_32_bit_mipi >( accelerator_scale_factor );
+            _accel_converter = std::make_unique< converter_16_bit_mipi >( accelerator_scale_factor );
         }
         configure_processing_callback();
     }

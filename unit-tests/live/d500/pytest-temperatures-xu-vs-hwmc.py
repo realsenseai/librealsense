@@ -48,6 +48,9 @@ def test_temperatures_xu_vs_hwmc(test_device):
                 * the whole value part is 0x28 = 40
                 * the decimal value part is 0x90 = 144. 144/256 = 0.5625
                 So in this example, the resulting temperature is 40.5625 deg.
+              - the whole value part is signed (int8_t), to support sub-zero temperatures.
+              - a pair of 0xff 0xff means the component's temperature is unavailable, and is
+                reported as 0 deg, mirroring temperature_option::query() in d500-options.cpp.
         This function parses the hwmc returned list to a list of temperatures, parsed as explained above.
         """
         # stepping over the 4 first values (opcode of the request, see above explanation)
@@ -62,7 +65,13 @@ def test_temperatures_xu_vs_hwmc(test_device):
                 decimal_part = relevant_data[i]
             else:
                 whole_number_part = relevant_data[i]
-                current_temp = whole_number_part + decimal_part / 256.0
+                if decimal_part == 0xff or whole_number_part == 0xff:
+                    assert decimal_part == 0xff and whole_number_part == 0xff, \
+                        f"Partial unavailability sentinel: decimal=0x{decimal_part:02x} whole=0x{whole_number_part:02x}"
+                    current_temp = 0.0
+                else:
+                    signed_whole_number_part = whole_number_part - 256 if whole_number_part > 127 else whole_number_part
+                    current_temp = signed_whole_number_part + decimal_part / 256.0
                 temperatures_list.append(current_temp)
                 whole_number_part = 0
                 decimal_part = 0

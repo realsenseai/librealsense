@@ -12,6 +12,7 @@
 #include <src/proc/processing-blocks-factory.h>
 #include "stream.h"
 #include "platform/platform-utils.h"
+#include <src/platform/uvc-option.h>
 
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
@@ -27,7 +28,6 @@ namespace librealsense
     const std::map< uint32_t, rs2_stream > od_fourcc_to_rs2_stream = {
         { rs_fourcc( 'G', 'R', 'E', 'Y' ), RS2_STREAM_OBJECT_DETECTION },
     };
-
 
     d500_object_detection::d500_object_detection( std::shared_ptr< const d500_info > const & dev_info )
         : device( dev_info )
@@ -72,12 +72,21 @@ namespace librealsense
                                                                                     enable_global_time_option ) ),
             this );
 
+        raw_od_ep->register_xu( ds::inference_xu ); // ensure the XU is initialized every time we power the camera
+
         auto od_ep = std::make_shared< d500_object_detection_sensor >( this,
                                                                        raw_od_ep,
                                                                        od_fourcc_to_rs2_format,
                                                                        od_fourcc_to_rs2_stream );
 
         od_ep->register_option( RS2_OPTION_GLOBAL_TIME_ENABLED, enable_global_time_option );
+
+        auto detection_distance = std::make_shared< uvc_xu_option< uint8_t > >(raw_od_ep,
+                                                                               ds::inference_xu,
+                                                                               ds::d500_xu_id::DETECTION_DISTANCE,
+                                                                               "Enable firmware distance calculation for detections" );
+        od_ep->register_option( RS2_OPTION_DETECTION_DISTANCE, detection_distance );
+
         od_ep->register_info( RS2_CAMERA_INFO_PHYSICAL_PORT, od_devices_info.front().device_path );
 
         register_metadata( raw_od_ep );
@@ -109,12 +118,19 @@ namespace librealsense
             raw_depth->invoke_powered( [enable]( platform::uvc_device & dev )
             {
                 uint8_t val = enable ? 1 : 0;
-                if( !dev.set_xu( ds::depth_xu, ds::DS5_ALIGN_DEPTH, &val, sizeof( val ) ) )
+                if( !dev.set_xu( ds::depth_xu, ds::d500_xu_id::ALIGN_DEPTH, &val, sizeof( val ) ) )
                     LOG_WARNING( "Failed to " << ( enable ? "enable" : "disable" ) << " Align_Depth XU" );
             } );
         }
         catch( std::exception const & e ) { LOG_WARNING( "Align_Depth XU exception: " << e.what() ); }
         catch( ... )                       { LOG_WARNING( "Align_Depth XU: unknown exception" ); }
+    }
+
+    void d500_object_detection_sensor::open( const stream_profiles & requests )
+    {
+        // Perception and some embedded filters cannot run together. Reject here before the device is touched.
+        _owner->throw_if_perception_blocking_filter_enabled();
+        synthetic_sensor::open( requests );
     }
 
     void d500_object_detection_sensor::start( rs2_frame_callback_sptr callback )
@@ -140,7 +156,7 @@ namespace librealsense
             if( p->get_stream_type() == RS2_STREAM_OBJECT_DETECTION )
             {
                 assign_stream( _owner->_object_detection_stream, p );
-                p->set_name( "Person Detection" );
+                p->set_name( perception_sensor::STREAM_NAME );
             }
         }
         return results;

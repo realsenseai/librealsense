@@ -25,7 +25,7 @@ class dds_stream;
 class dds_option;
 class dds_video_stream_profile;
 class dds_motion_stream_profile;
-class dds_inference_stream;
+class dds_perception_stream;
 namespace topics {
 class imu_msg;
 class string_msg;
@@ -125,10 +125,10 @@ protected:
                              streaming_impl & );
     void handle_new_metadata( std::string const & stream_name,
                               std::shared_ptr< const rsutils::json > const & metadata );
-    void handle_inference_data( realdds::topics::string_msg &&,
-                                realdds::dds_sample &&,
-                                const std::shared_ptr< stream_profile_interface > &,
-                                streaming_impl & );
+    void handle_perception_data( realdds::topics::string_msg &&,
+                                 realdds::dds_sample &&,
+                                 const std::shared_ptr< stream_profile_interface > &,
+                                 streaming_impl & );
 
     virtual void add_no_metadata( frame *, streaming_impl & );
     virtual void add_frame_metadata( frame *, rsutils::json const & metadata, streaming_impl & );
