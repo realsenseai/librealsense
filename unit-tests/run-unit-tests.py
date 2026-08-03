@@ -44,9 +44,9 @@ def usage():
     print( '        --retry <#>          Retry each test <#> times (unless test specified more)' )
     print( '        --config <>          Ignore test configurations; use the one provided' )
     print( '        --device <>          Run only on the specified devices; ignore any test that does not match (implies --live).' )
-    print( '                             Can be repeated or given a space-separated list, e.g. --device "D455 D435".' )
+    print( '                             Can be repeated or given a comma-separated list, e.g. --device "D455,D435".' )
     print( '        --exclude-device <>  Exclude the specified devices from testing.' )
-    print( '                             Can be repeated or given a space-separated list, e.g. --exclude-device "D555 D585S".' )
+    print( '                             Can be repeated or given a comma-separated list, e.g. --exclude-device "D585 Proto,D585S".' )
     print( '        --no-reset           Do not try to reset any devices, with or without a hub' )
     print( '        --hub-reset          If a hub is available, reset the hub itself' )
     print( '        --custom-fw-d400          If custom fw provided flash it if its different that the current fw installed' )
@@ -76,6 +76,9 @@ if system == 'Linux' and "microsoft" not in platform.release().lower():
     linux = True
 else:
     linux = False
+
+def split_comma_list( arg ):
+    return [s.strip() for s in arg.split( ',' ) if s.strip()]
 
 # Parse command-line:
 try:
@@ -149,11 +152,11 @@ for opt, arg in opts:
         only_live = True
         if device_set is None:
             device_set = []
-        device_set.extend( arg.split() )
+        device_set.extend( split_comma_list( arg ) )
     elif opt == '--exclude-device':
         if exclude_device_set is None:
             exclude_device_set = []
-        exclude_device_set.extend( arg.split() )
+        exclude_device_set.extend( split_comma_list( arg ) )
     elif opt == '--no-reset':
         no_reset = True
     elif opt == '--hub-reset':

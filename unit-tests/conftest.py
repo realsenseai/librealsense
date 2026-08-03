@@ -66,6 +66,7 @@ from rspy.pytest.cli import consume_legacy_flags, apply_pending_flags
 from rspy.pytest.device_helpers import (
     resolve_device_each_serials,
     select_target_device,
+    split_cli_patterns,
     _MISSING_SENTINEL_PREFIX,
     _SKIP_SENTINEL_PREFIX,
 )
@@ -131,14 +132,14 @@ def pytest_addoption(parser):
         action="append",
         default=[],
         help="Include only devices matching pattern (e.g., --device D455). "
-             "Can be used multiple times or with a space-separated value (--device 'D455 D435')."
+             "Can be used multiple times or with a comma-separated value (--device 'D455,D435')."
     )
     group.addoption(
         "--exclude-device",
         action="append",
         default=[],
         help="Exclude devices matching pattern (e.g., --exclude-device D455). "
-             "Can be used multiple times or with a space-separated value (--exclude-device 'D555 D585S')."
+             "Can be used multiple times or with a comma-separated value (--exclude-device 'D585 Proto,D585S')."
     )
     group.addoption(
         "--context",
@@ -342,13 +343,13 @@ def pytest_configure(config):
     # Create hub after logging is configured so discovery prints are visible
     devices.init_hub()
 
-    # Echo CLI device filters once (' '.join handles both repeated-flag and space-separated forms)
-    exclude_list = config.getoption("--exclude-device", default=[])
+    # Echo CLI device filters once (split handles both repeated-flag and comma-separated forms)
+    exclude_list = split_cli_patterns(config.getoption("--exclude-device", default=[]))
     if exclude_list:
-        print(f"-D- excluding devices: {' '.join(exclude_list)}")
-    include_list = config.getoption("--device", default=[])
+        print(f"-D- excluding devices: {', '.join(exclude_list)}")
+    include_list = split_cli_patterns(config.getoption("--device", default=[]))
     if include_list:
-        print(f"-D- including only devices: {' '.join(include_list)}")
+        print(f"-D- including only devices: {', '.join(include_list)}")
 
     # Skip under --not-live: nothing reads harness devices then, and the DDS context it
     # creates would otherwise pollute discovery for the forked DDS servers.
