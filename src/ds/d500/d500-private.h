@@ -445,6 +445,18 @@ namespace librealsense
             EHU_IDX_FLASH_DATA_CRC_ERR         = 125U,
             EHU_IDX_FRAME_DELAY_ERR            = 126U,
             EHU_IDX_DSP_UP_CHECKSUM_ERR        = 127U,
+            EHU_IDX_SN_NOT_MATCHED             = 128U,
+            EHU_IDX_FLASH_ACCESS_ERR           = 129U,
+            EHU_IDX_OHM_ACCESS_ERR             = 130U,
+            EHU_IDX_I2C_PORT_ERR               = 131U,
+            EHU_IDX_SYS_IPC_ERR                = 132U,
+            EHU_IDX_PIPE_BUILD_ERR             = 133U,
+            EHU_IDX_PIPE_START_ERR             = 134U,
+            EHU_IDX_PIPE_RUN_ERR               = 135U,
+            EHU_IDX_PIPE_STOP_ERR              = 136U,
+            EHU_IDX_PIPE_TASK_TIMEOUT_ERR      = 137U,
+            EHU_IDX_POT_FAIL                   = 138U,
+            EHU_IDX_IPU_SW_FUNCTION_ERR        = 139U,
         }; 
 
         const std::map< int, std::string > d500_fw_error_report = { // Received from HKR team [RSDEV-643]
@@ -576,6 +588,18 @@ namespace librealsense
             { EHU_IDX_SF_OS_EXCEPTION, "SF OS EXCEPTION ERROR" },
             { EHU_IDX_FLASH_DATA_CRC_ERR, "FLASH DATA CRC ERROR" },
             { EHU_IDX_DSP_UP_CHECKSUM_ERR, "DSP UP CHECKSUM ERROR" },
+            { EHU_IDX_SN_NOT_MATCHED, "SN NOT MATCHED" },
+            { EHU_IDX_FLASH_ACCESS_ERR, "FLASH ACCESS ERROR" },
+            { EHU_IDX_OHM_ACCESS_ERR, "OHM ACCESS ERROR" },
+            { EHU_IDX_I2C_PORT_ERR, "I2C PORT ERROR" },
+            { EHU_IDX_SYS_IPC_ERR, "SYS IPC ERROR" },
+            { EHU_IDX_PIPE_BUILD_ERR, "PIPE BUILD ERROR" },
+            { EHU_IDX_PIPE_START_ERR, "PIPE START ERROR" },
+            { EHU_IDX_PIPE_RUN_ERR, "PIPE RUN ERROR" },
+            { EHU_IDX_PIPE_STOP_ERR, "PIPE STOP ERROR" },
+            { EHU_IDX_PIPE_TASK_TIMEOUT_ERR, "PIPE TASK TIMEOUT ERROR" },
+            { EHU_IDX_POT_FAIL, "POT FAIL" },
+            { EHU_IDX_IPU_SW_FUNCTION_ERR, "IPU SW FUNCTION ERROR" },
         };
 
         class d500_hwmon_response : public hwmon_response_interface
