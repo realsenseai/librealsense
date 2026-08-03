@@ -1,6 +1,7 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
+#include "d500-config-tables.h"
 #include "d500-device.h"
 #include "d500-private.h"
 #include "d500-types/safety-preset.h"
@@ -111,7 +112,6 @@ namespace librealsense
 
         // prepare vector of data to be sent (header + sp)
         uint16_t version = ((uint16_t)0x03 << 8) | 0x01;  // major=0x03, minor=0x01 --> ver = major.minor
-        uint32_t calib_version = 0;  // ignoring this field, as requested by sw architect
         safety_preset_header header(version, static_cast<uint16_t>(ds::d500_calibration_table_id::safety_preset_id), sizeof(safety_preset_with_header), computed_crc32);
         safety_preset_with_header sp_with_header(header, sp);
         auto data_as_ptr = reinterpret_cast<const uint8_t*>(&sp_with_header);

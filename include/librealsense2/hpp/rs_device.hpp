@@ -996,6 +996,8 @@ namespace rs2
     private:
         static std::string raw_data_to_string(const rs2_raw_data_buffer* list)
         {
+            if (!list)
+                return std::string();
             rs2_error* e = nullptr;
             auto size = rs2_get_raw_data_size(list, &e);
             error::handle(e);
