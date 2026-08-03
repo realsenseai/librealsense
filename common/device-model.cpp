@@ -2329,7 +2329,7 @@ namespace rs2
         ////////////////////////////////////////
         const ImVec2 name_pos = { pos.x + 9, pos.y + 17 };
         const float name_area_right_margin = 55.f; // leave room for the remove (X) button
-        const float min_name_font_scale = 0.7f; // below this the name shrinks to illegibility - truncate instead
+        const float min_name_font_scale = 0.9f; // below this the name shrinks to illegibility - truncate instead
         ImGui::SetCursorPos(name_pos);
         std::stringstream ss;
         if (dev.supports(RS2_CAMERA_INFO_NAME))
@@ -2368,8 +2368,10 @@ namespace rs2
                 }
             }
 
+            // Reserve a full space-width gap between the name and the badge, on top of the badge's own width.
+            float badge_gap = badge_text.empty() ? 0.f : ImGui::CalcTextSize(" ").x + ImGui::CalcTextSize(badge_text.c_str()).x;
             auto name = fit_name_to_width(full_name,
-                panel_width - name_pos.x - name_area_right_margin - ImGui::CalcTextSize(badge_text.c_str()).x,
+                panel_width - name_pos.x - name_area_right_margin - badge_gap,
                 min_name_font_scale);
             ImGui::Text("%s", name.text.c_str());
             ImGui::SetWindowFontScale(1.0f);
@@ -2378,7 +2380,7 @@ namespace rs2
 
             if (!badge_text.empty())
             {
-                ImGui::SameLine();
+                ImGui::SameLine(0.0f, ImGui::CalcTextSize(" ").x); // guarantee a space-width gap regardless of name scale
                 if (is_usb_badge)
                 {
                     if (!starts_with(usb_desc, "3.")) ImGui::PushStyleColor(ImGuiCol_Text, yellow);
