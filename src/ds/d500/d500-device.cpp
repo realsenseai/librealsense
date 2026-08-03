@@ -93,9 +93,7 @@ namespace librealsense
 
     void d500_device::hardware_reset()
     {
-        command cmd(ds::HWRST);
-        cmd.require_response = false;
-        _hw_monitor->send(cmd);
+        _ds_device_common->hardware_reset( std::chrono::seconds( 5 ) );
     }
 
     void d500_device::enter_update_state() const
@@ -431,7 +429,7 @@ namespace librealsense
                                                      raw_sensor ), _hw_monitor_response);
         }
 
-        _ds_device_common = std::make_shared<ds_device_common>(this, _hw_monitor);
+        _ds_device_common = std::make_shared<ds_device_common>(this, _hw_monitor, _is_mipi_device);
 
         // Define Left-to-Right extrinsics calculation (lazy)
         // Reference CS - Right-handed; positive [X,Y,Z] point to [Left,Up,Forward] accordingly.

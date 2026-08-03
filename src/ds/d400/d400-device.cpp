@@ -595,7 +595,7 @@ namespace librealsense
         set_hw_monitor_for_auto_calib(_hw_monitor);
 
 
-        _ds_device_common = std::make_shared<ds_device_common>(this, _hw_monitor, (_is_mipi_device) ? true : false);
+        _ds_device_common = std::make_shared<ds_device_common>(this, _hw_monitor, _is_mipi_device);
         
 
         // Define Left-to-Right extrinsics calculation (lazy)

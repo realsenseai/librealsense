@@ -8,6 +8,8 @@
 
 namespace librealsense
 {
+    class hid_sensor;
+
     // Transport chosen at runtime according to d500_device::_is_mipi_device. HID device on USB, UVC-based V4L2 on GMSL.
     class d500_motion : public virtual d500_device
     {
@@ -36,6 +38,10 @@ namespace librealsense
         // this flag because `_ds_motion_common` remains null in the partial
         // case. Mirrors the same flag in d400_motion_base.
         bool _has_motion_module_failed = false;
+
+        ds_motion_sensor & get_motion_sensor();
+        std::shared_ptr< hid_sensor > get_raw_motion_sensor();
+        void register_gyro_sensitivity();
 
     private:
         void register_stream_to_extrinsic_group(const stream_interface& stream, uint32_t group_index);

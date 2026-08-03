@@ -67,11 +67,11 @@ namespace librealsense
         catch( const std::exception & e )
         {
             LOG_WARNING( "Interactive TC: CANCEL / status poll failed (" << e.what()
-                         << ") — FW may not be in Idle when this returns" );
+                         << ") - FW may not be in Idle when this returns" );
         }
         catch( ... )
         {
-            LOG_WARNING( "Interactive TC: CANCEL / status poll failed (non-std exception) — swallowed to keep cancel_and_wait_for_idle non-throwing" );
+            LOG_WARNING( "Interactive TC: CANCEL / status poll failed (non-std exception) - swallowed to keep cancel_and_wait_for_idle non-throwing" );
         }
 
         // Belt-and-suspenders: on some FW builds CANCEL does not restore the flashed depth table into the RAM
@@ -102,22 +102,22 @@ namespace librealsense
             }
             else if( ! flash_table.empty() )
             {
-                LOG_WARNING( "Interactive TC: flash→RAM revert skipped — GET_HKR_CONFIG_TABLE returned "
+                LOG_WARNING( "Interactive TC: flash->RAM revert skipped - GET_HKR_CONFIG_TABLE returned "
                              << flash_table.size() << " bytes, expected "
                              << sizeof( ds::d500_coefficients_table ) );
             }
         }
         catch( const std::exception & e )
         {
-            LOG_WARNING( "Interactive TC: flash→RAM revert failed (" << e.what()
-                         << ") — depth stream may still reflect the candidate table until next stream restart" );
+            LOG_WARNING( "Interactive TC: flash->RAM revert failed (" << e.what()
+                         << ") - depth stream may still reflect the candidate table until next stream restart" );
         }
         catch( ... )
         {
             // Preserve the pre-refactor non-throwing property of this helper — the pre-run auto-cancel path relied
             // on it. Non-std exceptions here are pathological (there is no code that throws non-std types on this
             // path today), but a bare catch is cheap insurance.
-            LOG_WARNING( "Interactive TC: flash→RAM revert failed (non-std exception) — swallowed to keep cancel_and_wait_for_idle non-throwing" );
+            LOG_WARNING( "Interactive TC: flash->RAM revert failed (non-std exception) - swallowed to keep cancel_and_wait_for_idle non-throwing" );
         }
     }
 
@@ -232,8 +232,8 @@ namespace librealsense
                 if( raw.size() >= sizeof( ds::table_header ) )
                 {
                     auto hdr = reinterpret_cast< const ds::table_header * >( raw.data() );
-                    LOG_INFO( "Interactive TC: depth calibration CRC32 "
-                              << label << " = 0x" << std::hex << hdr->crc32 << std::dec );
+                    LOG_DEBUG( "Interactive TC: depth calibration CRC32 "
+                               << label << " = 0x" << std::hex << hdr->crc32 << std::dec );
                 }
             }
             catch( ... )
@@ -260,8 +260,8 @@ namespace librealsense
                 {
                     raw.erase( raw.begin(), raw.begin() + 4 );
                     auto hdr = reinterpret_cast< const ds::table_header * >( raw.data() );
-                    LOG_INFO( "Interactive TC: RAM depth calibration CRC32 "
-                              << label << " = 0x" << std::hex << hdr->crc32 << std::dec );
+                    LOG_DEBUG( "Interactive TC: RAM depth calibration CRC32 "
+                               << label << " = 0x" << std::hex << hdr->crc32 << std::dec );
                 }
             }
             catch( ... )
@@ -288,7 +288,7 @@ namespace librealsense
                 {
                     LOG_INFO( "Interactive TC: FW at "
                               << calibration_state_strings[static_cast<int>(_state)]
-                              << " — sending CANCEL to return to Idle before RUN" );
+                              << " - sending CANCEL to return to Idle before RUN" );
                     cancel_and_wait_for_idle();
                     _state = _calib_engine->get_triggered_calibration_state();
                 }
