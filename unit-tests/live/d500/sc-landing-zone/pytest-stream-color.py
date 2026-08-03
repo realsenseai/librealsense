@@ -7,7 +7,7 @@ import logging
 log = logging.getLogger(__name__)
 
 pytestmark = [
-    pytest.mark.device_each("D585S"),  # matches D585 and D585S (prefix match)
+    pytest.mark.device_each("D585S"),
     pytest.mark.context("nightly"),
 ]
 
