@@ -2341,6 +2341,7 @@ namespace rs2
         std::stringstream ss;
         if (dev.supports(RS2_CAMERA_INFO_NAME))
             ss << dev.get_info(RS2_CAMERA_INFO_NAME);
+        ss.str("Realsense D585 Proto Dual RGB"); // RSDEV-13403 TEMP TEST HACK - revert this commit before merging
         if (is_ip_device)
         {
             std::string full_name = ss.str().substr(0, ss.str().find("\n IP Device"));
