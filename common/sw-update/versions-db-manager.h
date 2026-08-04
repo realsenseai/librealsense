@@ -7,7 +7,7 @@
 #include <functional>
 #include <string>
 #include <vector>
-#include "http-downloader.h"
+#include "../http/http-downloader.h"
 #include <sstream>
 #include <rsutils/version.h>
 

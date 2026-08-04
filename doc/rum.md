@@ -31,8 +31,8 @@ more than once (e.g. a manual upload followed by the next-boot upload).
 ## Consent and control
 
 - **Opt-in**: nothing is uploaded until you agree. The viewer shows a one-time consent prompt
-  on first run; you can change the choice any time in **Settings → Usage Statistics**.
-- **Disable upload at runtime**: turn it off in Settings → Usage Statistics, or via the environment
+  on first run; you can change the choice any time in **Settings → Online Services**.
+- **Disable upload at runtime**: turn it off in Settings → Online Services, or via the environment
   variable `RS2_RUM_CLOUD_ENABLED`. The override is asymmetric: `=0` always disables (a kill switch),
   while `=1` only enables when you have not explicitly opted out — the env var can never turn upload
   on against a saved opt-out.
@@ -52,7 +52,7 @@ shared `realsense-config.json`.
 The viewer performs the upload (the SDK itself never opens a network socket).
 If you have consented, the viewer uploads the previously saved report in the background at
 startup (the server deduplicates repeats via each report's `session_id`). You can also trigger
-an immediate upload from **Settings → Usage Statistics → "Upload now"**.
+an immediate upload from **Settings → Online Services → "Upload now"**.
 
 The startup upload is throttled to at most once per `rum_upload_interval_hours` (default 24, `0`
 disables the throttle). This is read from `realsense-config.json` and is not exposed in the UI.

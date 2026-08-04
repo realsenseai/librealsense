@@ -26,9 +26,6 @@
 #include <imgui_internal.h>
 
 #include "rum-uploader/rum-uploader.h"
-#ifdef BUILD_WITH_LIBCURL
-#include <curl/curl.h>
-#endif
 
 using namespace rs2;
 using namespace rs400;
@@ -300,12 +297,6 @@ int run_viewer( int argc, const char ** argv,
                 std::function< bool() >                                                  keep_alive,
                 std::function< void() >                                                  on_teardown )
 {
-#ifdef BUILD_WITH_LIBCURL
-    // One-time libcurl init before any worker thread uses it (the sw-update check and the RUM
-    // upload worker). Gated on curl being linked, not on either feature specifically.
-    curl_global_init( CURL_GLOBAL_DEFAULT );
-#endif
-
     rs2::cli cmd( "realsense-viewer" );
     auto settings = cmd.process( argc, argv );
 

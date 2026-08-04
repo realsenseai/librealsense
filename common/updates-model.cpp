@@ -8,7 +8,7 @@
 #include "os.h"
 #include <stb_image.h>
 #include <realsense_imgui.h>
-#include "sw-update/http-downloader.h"
+#include "http/http-downloader.h"
 #include <rsutils/easylogging/easyloggingpp.h>
 
 using namespace rs2;

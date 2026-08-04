@@ -16,7 +16,7 @@
 #endif  // ENABLE_STATS
 
 #include "rum-uploader.h"
-#include "../http-uploader.h"    // http::http_uploader (all curl lives there)
+#include "../http/http-uploader.h"
 #include <rsutils/easylogging/easyloggingpp.h>
 
 

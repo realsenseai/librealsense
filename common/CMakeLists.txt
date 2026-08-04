@@ -79,9 +79,15 @@ set(COMMON_SRC
     "${CMAKE_CURRENT_LIST_DIR}/textual-icons.h"
     )
 
+set(HTTP_FILES
+    "${CMAKE_CURRENT_LIST_DIR}/http/curl-wrapper.h"
+    "${CMAKE_CURRENT_LIST_DIR}/http/curl-wrapper.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/http/http-downloader.h"
+    "${CMAKE_CURRENT_LIST_DIR}/http/http-downloader.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/http/http-uploader.h"
+    )
+
 set(SW_UPDATE_FILES
-    "${CMAKE_CURRENT_LIST_DIR}/sw-update/http-downloader.h"
-    "${CMAKE_CURRENT_LIST_DIR}/sw-update/http-downloader.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/sw-update/dev-updates-profile.h"
     "${CMAKE_CURRENT_LIST_DIR}/sw-update/dev-updates-profile.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/sw-update/versions-db-manager.h"
@@ -101,12 +107,11 @@ set(UTILITIES_FILES
 set(RUM_UPLOADER_FILES
     "${CMAKE_CURRENT_LIST_DIR}/rum-uploader/rum-uploader.h"
     "${CMAKE_CURRENT_LIST_DIR}/rum-uploader/rum-uploader.cpp"
-    "${CMAKE_CURRENT_LIST_DIR}/http-uploader.h"
-    "${CMAKE_CURRENT_LIST_DIR}/http-uploader.cpp"
     )
 
 set(COMMON_SRC
     ${COMMON_SRC}
+    ${HTTP_FILES}
     ${SW_UPDATE_FILES}
     ${REFLECTIVITY_FILES}
     ${UTILITIES_FILES}
