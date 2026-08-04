@@ -127,6 +127,145 @@ namespace librealsense
         , _owner(owner)
         , _depth_units(-1)
     {
+        uvc_sensor->register_before_stream_on(
+            [this]( const std::vector< platform::stream_profile > & configurations )
+            {
+                declare_expected_streams( configurations );
+            } );
+    }
+
+    void d500_depth_sensor::declare_expected_streams(
+        const std::vector< platform::stream_profile > & configurations )
+    {
+        if( ! _owner || _owner->_pid != ds::D585_2C_PROTO_PID || ! _owner->_hw_monitor )
+            return;
+
+        struct manifest_entry
+        {
+            bool valid = false;
+            uint8_t branch = 0;
+            platform::stream_profile profile = {};
+        };
+        manifest_entry entries[4];
+        uint8_t expected_mask = 0;
+        uint8_t count = 0;
+
+        for( auto const & configuration : configurations )
+        {
+            std::shared_ptr< stream_profile_interface > identity;
+            for( auto const & raw : get_raw_stream_profiles() )
+            {
+                auto const * backend = dynamic_cast< backend_stream_profile const * >( raw.get() );
+                if( backend && backend->get_backend_profile() == configuration )
+                {
+                    identity = raw;
+                    break;
+                }
+            }
+            if( ! identity )
+            {
+                LOG_WARNING( "D585 2C stream transaction: no identity for committed pin "
+                             << configuration.pin_index << "; using legacy admission" );
+                return;
+            }
+
+            int branch = -1;
+            if( identity->get_stream_type() == RS2_STREAM_DEPTH )
+                branch = 0;
+            else if( identity->get_stream_type() == RS2_STREAM_INFRARED )
+                branch = 1;
+            // SDK color indexes are arranged to match the IR imagers, while
+            // the FW transaction mask names physical USB branches. On 0C07,
+            // Color 1 is carried by EP8 and Color 2 by EP4.
+            else if( identity->get_stream_type() == RS2_STREAM_COLOR
+                     && identity->get_stream_index() == 1 )
+                branch = 3;
+            else if( identity->get_stream_type() == RS2_STREAM_COLOR
+                     && identity->get_stream_index() == 2 )
+                branch = 2;
+            else
+                continue;
+
+            if( entries[branch].valid )
+            {
+                LOG_WARNING( "D585 2C stream transaction: duplicate branch "
+                             << branch << "; using legacy admission" );
+                return;
+            }
+            entries[branch].valid = true;
+            entries[branch].branch = static_cast< uint8_t >( branch );
+            entries[branch].profile = configuration;
+            expected_mask |= static_cast< uint8_t >( 1U << branch );
+            ++count;
+        }
+        if( count == 0 )
+            return;
+
+        uint32_t transaction_id = ++_next_stream_transaction_id;
+        if( transaction_id == 0 )
+            transaction_id = ++_next_stream_transaction_id;
+
+        std::vector< uint8_t > payload;
+        payload.reserve( 8U + static_cast< size_t >( count ) * 12U );
+        auto append_u16 = [&payload]( uint16_t value )
+        {
+            payload.push_back( static_cast< uint8_t >( value & 0xffU ) );
+            payload.push_back( static_cast< uint8_t >( ( value >> 8U ) & 0xffU ) );
+        };
+        auto append_u32 = [&payload]( uint32_t value )
+        {
+            payload.push_back( static_cast< uint8_t >( value & 0xffU ) );
+            payload.push_back( static_cast< uint8_t >( ( value >> 8U ) & 0xffU ) );
+            payload.push_back( static_cast< uint8_t >( ( value >> 16U ) & 0xffU ) );
+            payload.push_back( static_cast< uint8_t >( ( value >> 24U ) & 0xffU ) );
+        };
+
+        payload.push_back( 1U );
+        payload.push_back( count );
+        payload.push_back( expected_mask );
+        payload.push_back( 0U );
+        append_u32( transaction_id );
+        for( auto const & entry : entries )
+        {
+            if( ! entry.valid )
+                continue;
+            if( entry.profile.width > 0xffffU || entry.profile.height > 0xffffU
+                || entry.profile.fps > 0xffffU )
+            {
+                LOG_WARNING( "D585 2C stream transaction: profile exceeds wire limits" );
+                return;
+            }
+            payload.push_back( entry.branch );
+            payload.push_back( 0U );
+            append_u16( static_cast< uint16_t >( entry.profile.width ) );
+            append_u16( static_cast< uint16_t >( entry.profile.height ) );
+            append_u16( static_cast< uint16_t >( entry.profile.fps ) );
+            append_u32( entry.profile.format );
+        }
+
+        command cmd( ds::STREAM_GROUP_TRANSACTION, 1U );
+        cmd.data = std::move( payload );
+        cmd.timeout_ms = 15000;
+        hwmon_response_type response = 0;
+        try
+        {
+            _owner->_hw_monitor->send( cmd, &response );
+            if( response != _owner->_hw_monitor_response->success_value() )
+            {
+                LOG_WARNING( "D585 2C stream transaction " << transaction_id
+                             << " rejected (" << response
+                             << "); using legacy admission" );
+                return;
+            }
+            LOG_INFO( "D585 2C stream transaction " << transaction_id
+                      << " prepared mask=0x" << std::hex
+                      << static_cast< unsigned >( expected_mask ) << std::dec );
+        }
+        catch( std::exception const & e )
+        {
+            LOG_WARNING( "D585 2C stream transaction unavailable: " << e.what()
+                         << "; using legacy admission" );
+        }
     }
 
     processing_blocks d500_depth_sensor::get_recommended_processing_blocks() const

@@ -65,6 +65,9 @@ namespace librealsense
         float _stereo_baseline_mm;
 
     private:
+        void declare_expected_streams(
+            const std::vector< platform::stream_profile > & configurations );
+        uint32_t _next_stream_transaction_id = 0;
         embedded_filters _embedded_filters;
         std::vector< std::shared_ptr< stream_interface > > _extra_streams;
     };

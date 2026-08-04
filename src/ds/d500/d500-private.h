@@ -125,6 +125,7 @@ namespace librealsense
             GET_FW_LOGS              = 0xB4, // Get FW logs extended format
             SET_CALIB_MODE           = 0xB8, // Set Calibration Mode
             GET_CALIB_STATUS         = 0xB9, // Get Calibration Status
+            STREAM_GROUP_TRANSACTION = 0xBD,
         };
 
         inline std::string d500_fw_cmd2str(const d500_fw_cmd state)

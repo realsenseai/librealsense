@@ -44,6 +44,10 @@ public:
                                                      rs2_stream & type,
                                                      int & index ) >;
     void set_stream_id_resolver( stream_id_resolver resolver ) { _stream_id_resolver = std::move( resolver ); }
+    void register_before_stream_on( on_open callback )
+    {
+        _before_stream_on = std::move( callback );
+    }
 
     std::vector< platform::stream_profile > get_configuration() const { return _internal_config; }
     std::shared_ptr< platform::uvc_device > get_uvc_device() { return _device; }
@@ -115,6 +119,7 @@ private:
 
     std::shared_ptr< platform::uvc_device > _device;
     stream_id_resolver _stream_id_resolver;
+    on_open _before_stream_on;
     std::vector< platform::stream_profile > _internal_config;
     std::atomic< int > _user_count;
     std::mutex _power_lock;

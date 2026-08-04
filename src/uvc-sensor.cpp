@@ -372,6 +372,9 @@ void uvc_sensor::open( const stream_profiles & requests )
     if( _on_open )
         _on_open( _internal_config );
 
+    if( _before_stream_on )
+        _before_stream_on( _internal_config );
+
     _power = std::move( on );
     _is_opened = true;
 
