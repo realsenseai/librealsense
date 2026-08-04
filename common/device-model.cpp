@@ -2243,21 +2243,27 @@ namespace rs2
         // Any font scale this object applies is restored to 1.0 as soon as it goes out of scope -
         // callers control how long the scale should stay in effect (e.g. through a badge drawn
         // alongside the text) simply by choosing where that scope ends.
+        //
+        // trailing_width is the scale-1.0 width of other content (e.g. a badge) drawn right after
+        // this text at the same font scale - it competes for the same max_width and shrinks by the
+        // same factor, so it's folded into the fit instead of being reserved at full size.
         class fitted_string
         {
         public:
-            fitted_string(const std::string& text, float max_width, float min_font_scale)
+            fitted_string(const std::string& text, float max_width, float min_font_scale, float trailing_width = 0.f)
                 : _full(text), _display(" " + text)
             {
-                if (max_width <= 0 || ImGui::CalcTextSize(_display.c_str()).x <= max_width)
+                float text_width = ImGui::CalcTextSize(_display.c_str()).x;
+                if (max_width <= 0 || text_width + trailing_width <= max_width)
                     return;
 
-                float scale = std::max(min_font_scale, max_width / ImGui::CalcTextSize(_display.c_str()).x);
+                float scale = std::max(min_font_scale, max_width / (text_width + trailing_width));
                 ImGui::SetWindowFontScale(scale);
                 _condensed = true;
 
-                if (ImGui::CalcTextSize(_display.c_str()).x > max_width)
-                    _display = truncate(text, max_width);
+                float text_budget = max_width - scale * trailing_width;
+                if (ImGui::CalcTextSize(_display.c_str()).x > text_budget)
+                    _display = truncate(text, text_budget);
             }
 
             ~fitted_string() { ImGui::SetWindowFontScale(1.0f); }
@@ -2376,38 +2382,43 @@ namespace rs2
                 }
             }
 
-            fitted_string name(full_name,
-                panel_width - name_pos.x - name_area_right_margin - ImGui::CalcTextSize(badge_text.c_str()).x,
-                min_name_font_scale);
-            ImGui::Text("%s", name.text());
-            if (name.condensed() && ImGui::IsItemHovered())
-                RsImGui::CustomTooltip(" %s", name.full_text());
+            {   // Dedicated scope: name and badge share the font scale fitted_string applies, and
+                // its destructor restores scale to 1.0 right after the badge - any code added below
+                // this scope, still inside the outer else, is guaranteed to run at normal scale.
+                fitted_string name(full_name,
+                    panel_width - name_pos.x - name_area_right_margin,
+                    min_name_font_scale,
+                    ImGui::CalcTextSize(badge_text.c_str()).x);
+                ImGui::Text("%s", name.text());
+                if (name.condensed() && ImGui::IsItemHovered())
+                    RsImGui::CustomTooltip(" %s", name.full_text());
 
-            if (!badge_text.empty())
-            {
-                ImGui::SameLine();
-                if (is_usb_badge)
+                if (!badge_text.empty())
                 {
-                    if (!starts_with(usb_desc, "3.")) ImGui::PushStyleColor(ImGuiCol_Text, yellow);
-                    else ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
-                    ImGui::Text("%s", badge_text.c_str());
-                    ImGui::PopStyleColor();
-                    ss.str("");
-                    ss << "The camera was detected by the OS as connected to a USB " << usb_desc << " port";
-                    ImGui::PushFont(window.get_font());
-                    ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
-                    if (ImGui::IsItemHovered())
-                        RsImGui::CustomTooltip(" %s", ss.str().c_str());
-                    ImGui::PopStyleColor();
-                    ImGui::PopFont();
+                    ImGui::SameLine();
+                    if (is_usb_badge)
+                    {
+                        if (!starts_with(usb_desc, "3.")) ImGui::PushStyleColor(ImGuiCol_Text, yellow);
+                        else ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
+                        ImGui::Text("%s", badge_text.c_str());
+                        ImGui::PopStyleColor();
+                        ss.str("");
+                        ss << "The camera was detected by the OS as connected to a USB " << usb_desc << " port";
+                        ImGui::PushFont(window.get_font());
+                        ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
+                        if (ImGui::IsItemHovered())
+                            RsImGui::CustomTooltip(" %s", ss.str().c_str());
+                        ImGui::PopStyleColor();
+                        ImGui::PopFont();
+                    }
+                    else
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, white);
+                        ImGui::Text("%s", badge_text.c_str());
+                        ImGui::PopStyleColor();
+                    }
                 }
-                else
-                {
-                    ImGui::PushStyleColor(ImGuiCol_Text, white);
-                    ImGui::Text("%s", badge_text.c_str());
-                    ImGui::PopStyleColor();
-                }
-            } // name's destructor restores the font scale here, after the badge is drawn at the same scale
+            }
         }
 
         ImGui::PopFont();
