@@ -2237,51 +2237,58 @@ namespace rs2
 
     namespace
     {
-        struct fitted_name
+        // Fits text into max_width pixels for the device header: first shrinking the current
+        // window's font scale down to min_font_scale, then truncating with an ellipsis if it still
+        // doesn't fit at that floor. The full (untruncated) text stays available for a tooltip.
+        // Any font scale this object applies is restored to 1.0 as soon as it goes out of scope -
+        // callers control how long the scale should stay in effect (e.g. through a badge drawn
+        // alongside the text) simply by choosing where that scope ends.
+        class fitted_string
         {
-            std::string text;
-            bool condensed; // shrunk and/or truncated to fit - full name is available via tooltip
-
-            // Backstop: guarantees the window font scale is restored even if the caller's own
-            // reset gets skipped by an early return or an exception between the two.
-            ~fitted_name() { ImGui::SetWindowFontScale(1.0f); }
-        };
-
-        // Truncates text with a trailing ellipsis so " text" fits within max_width pixels (current
-        // font). Uses a binary search on the character count rather than trimming one character at
-        // a time, since this runs every frame the name doesn't fit.
-        std::string truncate_to_width(const std::string& text, float max_width)
-        {
-            const std::string ellipsis = "...";
-            size_t lo = 0, hi = text.size();
-            while (lo < hi)
+        public:
+            fitted_string(const std::string& text, float max_width, float min_font_scale)
+                : _full(text), _display(" " + text)
             {
-                size_t mid = (lo + hi + 1) / 2;
-                if (ImGui::CalcTextSize((" " + text.substr(0, mid) + ellipsis).c_str()).x <= max_width)
-                    lo = mid;
-                else
-                    hi = mid - 1;
+                if (max_width <= 0 || ImGui::CalcTextSize(_display.c_str()).x <= max_width)
+                    return;
+
+                float scale = std::max(min_font_scale, max_width / ImGui::CalcTextSize(_display.c_str()).x);
+                ImGui::SetWindowFontScale(scale);
+                _condensed = true;
+
+                if (ImGui::CalcTextSize(_display.c_str()).x > max_width)
+                    _display = truncate(text, max_width);
             }
-            return " " + text.substr(0, lo) + ellipsis;
-        }
 
-        // Shrinks the current window's font scale so " text" fits within max_width; only truncates
-        // (with ellipsis) if it still doesn't fit once the scale hits min_font_scale. The returned
-        // object restores the window font scale to 1.0 once it goes out of scope.
-        fitted_name fit_name_to_width(const std::string& text, float max_width, float min_font_scale)
-        {
-            std::string display = " " + text;
-            if (max_width <= 0 || ImGui::CalcTextSize(display.c_str()).x <= max_width)
-                return { display, false };
+            ~fitted_string() { ImGui::SetWindowFontScale(1.0f); }
 
-            float scale = std::max(min_font_scale, max_width / ImGui::CalcTextSize(display.c_str()).x);
-            ImGui::SetWindowFontScale(scale);
+            const char* text() const { return _display.c_str(); }
+            const char* full_text() const { return _full.c_str(); }
+            bool condensed() const { return _condensed; } // full text is available via tooltip
 
-            if (ImGui::CalcTextSize(display.c_str()).x > max_width)
-                display = truncate_to_width(text, max_width);
+        private:
+            // Truncates text with a trailing ellipsis so " text" fits within max_width pixels
+            // (current font). Uses a binary search on the character count rather than trimming one
+            // character at a time, since this runs every frame the name doesn't fit.
+            static std::string truncate(const std::string& text, float max_width)
+            {
+                const std::string ellipsis = "...";
+                size_t lo = 0, hi = text.size();
+                while (lo < hi)
+                {
+                    size_t mid = (lo + hi + 1) / 2;
+                    if (ImGui::CalcTextSize((" " + text.substr(0, mid) + ellipsis).c_str()).x <= max_width)
+                        lo = mid;
+                    else
+                        hi = mid - 1;
+                }
+                return " " + text.substr(0, lo) + ellipsis;
+            }
 
-            return { display, true };
-        }
+            std::string _full;
+            std::string _display;
+            bool _condensed = false;
+        };
     }
 
     void device_model::draw_controls(float panel_width, float panel_height,
@@ -2337,11 +2344,12 @@ namespace rs2
         if (is_ip_device)
         {
             std::string full_name = ss.str().substr(0, ss.str().find("\n IP Device"));
-            auto name = fit_name_to_width(full_name, panel_width - name_pos.x - name_area_right_margin, min_name_font_scale);
-            ImGui::Text("%s", name.text.c_str());
-            ImGui::SetWindowFontScale(1.0f);
-            if (name.condensed && ImGui::IsItemHovered())
-                RsImGui::CustomTooltip(" %s", full_name.c_str());
+            {
+                fitted_string name(full_name, panel_width - name_pos.x - name_area_right_margin, min_name_font_scale);
+                ImGui::Text("%s", name.text());
+                if (name.condensed() && ImGui::IsItemHovered())
+                    RsImGui::CustomTooltip(" %s", name.full_text());
+            } // name's destructor restores the font scale before the network-device line below
 
             ImGui::PushFont(window.get_font());
             ImGui::Text("\tNetwork Device at %s", dev.get_info(RS2_CAMERA_INFO_IP_ADDRESS));
@@ -2360,21 +2368,20 @@ namespace rs2
                 {
                     usb_desc = dev.get_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR);
                     is_usb_badge = true;
-                    badge_text = rsutils::string::from() << "   " << textual_icons::usb << " " << usb_desc;
+                    badge_text = rsutils::string::from() << "  " << textual_icons::usb << " " << usb_desc;
                 }
                 else
                 {
-                    badge_text = rsutils::string::from() << "   " << connection_type;
+                    badge_text = rsutils::string::from() << "  " << connection_type;
                 }
             }
 
-            auto name = fit_name_to_width(full_name,
+            fitted_string name(full_name,
                 panel_width - name_pos.x - name_area_right_margin - ImGui::CalcTextSize(badge_text.c_str()).x,
                 min_name_font_scale);
-            ImGui::Text("%s", name.text.c_str());
-            ImGui::SetWindowFontScale(1.0f);
-            if (name.condensed && ImGui::IsItemHovered())
-                RsImGui::CustomTooltip(" %s", full_name.c_str());
+            ImGui::Text("%s", name.text());
+            if (name.condensed() && ImGui::IsItemHovered())
+                RsImGui::CustomTooltip(" %s", name.full_text());
 
             if (!badge_text.empty())
             {
@@ -2400,7 +2407,7 @@ namespace rs2
                     ImGui::Text("%s", badge_text.c_str());
                     ImGui::PopStyleColor();
                 }
-            }
+            } // name's destructor restores the font scale here, after the badge is drawn at the same scale
         }
 
         ImGui::PopFont();
