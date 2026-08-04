@@ -2237,16 +2237,10 @@ namespace rs2
 
     namespace
     {
-        // Fits text into max_width pixels for the device header: first shrinking the current
-        // window's font scale down to min_font_scale, then truncating with an ellipsis if it still
-        // doesn't fit at that floor. The full (untruncated) text stays available for a tooltip.
-        // Any font scale this object applies is restored to 1.0 as soon as it goes out of scope -
-        // callers control how long the scale should stay in effect (e.g. through a badge drawn
-        // alongside the text) simply by choosing where that scope ends.
-        //
-        // trailing_width is the scale-1.0 width of other content (e.g. a badge) drawn right after
-        // this text at the same font scale - it competes for the same max_width and shrinks by the
-        // same factor, so it's folded into the fit instead of being reserved at full size.
+        // Fits text (plus an optional trailing_width, e.g. a badge drawn alongside it at the same
+        // scale) into max_width pixels: shrinks the window's font scale down to min_font_scale,
+        // then truncates with an ellipsis if it still doesn't fit. Font scale resets to 1.0 when
+        // this object goes out of scope, so callers control its lifetime by choosing that scope.
         class fitted_string
         {
         public:
