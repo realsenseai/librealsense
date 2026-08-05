@@ -2,16 +2,16 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, PlusCircle, Loader2, Sparkles, Paperclip, Square, Mic, MicOff, X, FileText, Repeat } from 'lucide-react'
+import { Send, PlusCircle, Loader2, Sparkles, Paperclip, Square, Mic, MicOff, X, FileText, Wrench } from 'lucide-react'
 import { useAppStore } from '../../store'
 import { getActiveProviderName } from '../../api/chat'
 import { AssistantMessageBubble } from './AssistantMessage'
 import { ExpandIcon, CollapseIcon, SunIcon, MoonIcon, CloseIcon } from './icons'
 import { useVoiceInput } from './useVoiceInput'
 import { usePendingAttachments } from './usePendingAttachments'
-import { LegacyChatContent } from './LegacyChatContent'
+import { ChatBotContent } from './ChatBotContent'
 
-type PanelMode = 'assistant' | 'legacy'
+type PanelMode = 'assistant' | 'chatbot'
 
 /**
  * Slide-out panel for the RealSense AI Assistant. Always mounted (not conditionally
@@ -40,7 +40,7 @@ export function AssistantPanel() {
   const isWide = assistantSize === 'wide'
 
   const [mode, setMode] = useState<PanelMode>('assistant')
-  const isLegacyMode = mode === 'legacy'
+  const isChatbotMode = mode === 'chatbot'
   const providerName = getActiveProviderName()
 
   const [inputValue, setInputValue] = useState('')
@@ -131,76 +131,115 @@ export function AssistantPanel() {
       aria-hidden={!isAssistantOpen}
     >
       {/* Header */}
-      <div className={`flex items-center justify-between px-4 py-3 border-b ${headerBg}`}>
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-white overflow-hidden shrink-0 ring-2 ring-rs-blue/40">
-            {/* See AssistantButton.tsx for why this crops with object-cover instead of object-contain. */}
-            <img src="/realsense-logo.png" alt="" className="w-full h-full object-cover object-left" />
-          </span>
-          <div className="min-w-0">
-            <h3 className={`font-semibold text-sm truncate ${titleText}`}>
-              {isLegacyMode ? 'Device Config Assistant' : 'RealSense AI Assistant'}
-            </h3>
-            <div className={`flex items-center gap-1.5 text-[11px] ${mutedText}`}>
-              {isLegacyMode ? (
-                <span className="truncate">{providerName ? `Using ${providerName}` : 'AI Assistant'}</span>
+      <div className={`border-b ${headerBg}`}>
+        <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1.5">
+          <div className="flex items-center gap-3 min-w-0">
+            <span
+              className={`flex items-center justify-center w-9 h-9 rounded-full overflow-hidden shrink-0 ring-2 transition-colors ${
+                isChatbotMode ? 'bg-amber-500 ring-amber-500/40' : 'bg-white ring-rs-blue/40'
+              }`}
+            >
+              {isChatbotMode ? (
+                <Wrench className="w-4 h-4 text-white" />
               ) : (
-                <>
-                  <span className="relative flex w-1.5 h-1.5">
-                    {isAssistantOnline && (
-                      <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping motion-reduce:animate-none" />
-                    )}
-                    <span className={`relative inline-flex rounded-full w-1.5 h-1.5 ${isAssistantOnline ? 'bg-green-500' : 'bg-gray-500'}`} />
-                  </span>
-                  {isAssistantOnline ? 'Online' : 'Reconnecting…'} · powered by RealSense AI
-                </>
+                // See AssistantButton.tsx for why this crops with object-cover instead of object-contain.
+                <img src="/realsense-logo.png" alt="" className="w-full h-full object-cover object-left" />
               )}
+            </span>
+            <div className="min-w-0">
+              <h3 className={`font-semibold text-sm truncate ${titleText}`}>
+                {isChatbotMode ? 'Device Config Chatbot' : 'RealSense AI Assistant'}
+              </h3>
+              <div className={`flex items-center gap-1.5 text-[11px] whitespace-nowrap ${mutedText}`}>
+                {isChatbotMode ? (
+                  <>
+                    <span className="relative inline-flex rounded-full w-1.5 h-1.5 bg-amber-500 shrink-0" />
+                    <span className="truncate">{providerName ? `Using ${providerName}` : 'Local camera settings'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="relative flex w-1.5 h-1.5 shrink-0">
+                      {isAssistantOnline && (
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping motion-reduce:animate-none" />
+                      )}
+                      <span className={`relative inline-flex rounded-full w-1.5 h-1.5 ${isAssistantOnline ? 'bg-green-500' : 'bg-gray-500'}`} />
+                    </span>
+                    <span className="truncate">{isAssistantOnline ? 'Online' : 'Reconnecting…'} · powered by RealSense AI</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {isChatAvailable && (
-            <button
-              onClick={() => setMode((m) => (m === 'assistant' ? 'legacy' : 'assistant'))}
-              className={`p-1.5 rounded transition-colors ${iconBtn}`}
-              title={isLegacyMode ? 'Switch to RealSense AI Assistant' : 'Switch to device-config chatbot'}
-            >
-              <Repeat className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            onClick={toggleAssistantTheme}
-            className={`p-1.5 rounded transition-colors hidden sm:inline-flex ${iconBtn}`}
-            title={isLight ? 'Switch to dark theme' : 'Switch to light theme'}
-          >
-            {isLight ? <MoonIcon /> : <SunIcon />}
-          </button>
-          <button
-            onClick={toggleAssistantSize}
-            className={`p-1.5 rounded transition-colors hidden sm:inline-flex ${iconBtn}`}
-            title={isWide ? 'Collapse panel' : 'Expand panel'}
-          >
-            {isWide ? <CollapseIcon /> : <ExpandIcon />}
-          </button>
-          <button
-            onClick={isLegacyMode ? clearChat : clearAssistantChat}
-            className={`p-1.5 rounded transition-colors ${iconBtn}`}
-            title="New chat"
-          >
-            <PlusCircle className="w-4 h-4" />
-          </button>
           <button
             onClick={toggleAssistant}
-            className={`p-1.5 rounded transition-colors ${iconBtn}`}
+            className={`p-1.5 rounded transition-colors shrink-0 ${iconBtn}`}
             title="Close"
           >
             <CloseIcon />
           </button>
         </div>
+
+        <div className="flex items-center justify-between gap-2 px-4 pb-2">
+          {isChatAvailable ? (
+            <div
+              role="group"
+              aria-label="Choose assistant mode"
+              className={`flex items-center rounded-full p-0.5 gap-0.5 ${isLight ? 'bg-gray-200' : 'bg-gray-800'}`}
+            >
+              <button
+                onClick={() => setMode('assistant')}
+                title="Switch to the RealSense AI Assistant (product Q&A)"
+                aria-pressed={!isChatbotMode}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  !isChatbotMode ? 'bg-rs-blue text-white' : iconBtn
+                }`}
+              >
+                <Sparkles className="w-3 h-3 shrink-0" />
+                AI Assistant
+              </button>
+              <button
+                onClick={() => setMode('chatbot')}
+                title="Switch to the device-config Chatbot (camera settings)"
+                aria-pressed={isChatbotMode}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  isChatbotMode ? 'bg-amber-600 text-white' : iconBtn
+                }`}
+              >
+                <Wrench className="w-3 h-3 shrink-0" />
+                Chatbot
+              </button>
+            </div>
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={toggleAssistantTheme}
+              className={`p-1.5 rounded transition-colors hidden sm:inline-flex ${iconBtn}`}
+              title={isLight ? 'Switch to dark theme' : 'Switch to light theme'}
+            >
+              {isLight ? <MoonIcon /> : <SunIcon />}
+            </button>
+            <button
+              onClick={toggleAssistantSize}
+              className={`p-1.5 rounded transition-colors hidden sm:inline-flex ${iconBtn}`}
+              title={isWide ? 'Collapse panel' : 'Expand panel'}
+            >
+              {isWide ? <CollapseIcon /> : <ExpandIcon />}
+            </button>
+            <button
+              onClick={isChatbotMode ? clearChat : clearAssistantChat}
+              className={`p-1.5 rounded transition-colors ${iconBtn}`}
+              title="New chat"
+            >
+              <PlusCircle className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {isLegacyMode ? (
-        <LegacyChatContent />
+      {isChatbotMode ? (
+        <ChatBotContent theme={assistantTheme} />
       ) : (
         <>
       {/* Messages */}

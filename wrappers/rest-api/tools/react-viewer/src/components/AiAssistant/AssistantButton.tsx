@@ -22,8 +22,8 @@ export function AssistantButton() {
 
   useEffect(() => {
     pingAssistantHealth()
-    // Populates isChatAvailable so the panel can show a toggle into the legacy device-config
-    // chatbot mode only when it's actually configured (a provider API key present).
+    // Populates isChatAvailable so the panel can show a toggle into the device-config chatbot
+    // mode only when it's actually configured (a provider API key present).
     checkChatAvailability()
   }, [pingAssistantHealth, checkChatAvailability])
 
