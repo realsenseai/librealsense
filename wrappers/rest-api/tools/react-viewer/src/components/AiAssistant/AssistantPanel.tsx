@@ -1,85 +1,13 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Send, PlusCircle, Loader2, Sparkles, Paperclip, Square, Mic, MicOff, X, FileText } from 'lucide-react'
 import { useAppStore } from '../../store'
 import { AssistantMessageBubble } from './AssistantMessage'
-import type { AssistantFileAttachment } from '../../api/assistantChat'
-
-// Minimal shape of the (still vendor-prefixed) Web Speech API — not in lib.dom.d.ts.
-interface MinimalSpeechRecognition extends EventTarget {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
-  onerror: (() => void) | null
-  onend: (() => void) | null
-  start: () => void
-  stop: () => void
-}
-
-function getSpeechRecognitionCtor(): (new () => MinimalSpeechRecognition) | null {
-  const w = window as unknown as {
-    SpeechRecognition?: new () => MinimalSpeechRecognition
-    webkitSpeechRecognition?: new () => MinimalSpeechRecognition
-  }
-  return w.SpeechRecognition || w.webkitSpeechRecognition || null
-}
-
-// Keeps a huge/misselected file (e.g. a video) from OOMing the tab as a base64 data URI
-// and from bloating the SSE request body.
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
-
-function readFileAsDataUri(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
-// Icons matching the reference widget (widget.js) exactly, rather than the closest lucide-react
-// equivalents, so the panel chrome looks identical to the production embed.
-const iconProps = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true } as const
-
-function ExpandIcon() {
-  return (
-    <svg {...iconProps}>
-      <path d="M4 10V4h6M20 14v6h-6M4 4l7 7M20 20l-7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-function CollapseIcon() {
-  return (
-    <svg {...iconProps}>
-      <path d="M10 4v6H4M14 20v-6h6M10 10L4 4M14 14l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-function SunIcon() {
-  return (
-    <svg {...iconProps}>
-      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
-      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-function MoonIcon() {
-  return (
-    <svg {...iconProps}>
-      <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-    </svg>
-  )
-}
-function CloseIcon() {
-  return (
-    <svg width={16} height={16} viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M4 4L14 14M14 4L4 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
+import { ExpandIcon, CollapseIcon, SunIcon, MoonIcon, CloseIcon } from './icons'
+import { useVoiceInput } from './useVoiceInput'
+import { usePendingAttachments } from './usePendingAttachments'
 
 /**
  * Slide-out panel for the RealSense AI Assistant. Always mounted (not conditionally
@@ -106,16 +34,17 @@ export function AssistantPanel() {
   const isWide = assistantSize === 'wide'
 
   const [inputValue, setInputValue] = useState('')
-  const [pendingImages, setPendingImages] = useState<string[]>([])
-  const [pendingFiles, setPendingFiles] = useState<AssistantFileAttachment[]>([])
-  const [isListening, setIsListening] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const recognitionRef = useRef<MinimalSpeechRecognition | null>(null)
   const wasOpenRef = useRef(isAssistantOpen)
   const panelRef = useRef<HTMLDivElement>(null)
-  const micSupported = useMemo(() => getSpeechRecognitionCtor() !== null, [])
+
+  const { pendingImages, pendingFiles, handleFileChange, removeImage, removeFile, clear: clearAttachments } =
+    usePendingAttachments(setError)
+  const { isListening, micSupported, toggleListening } = useVoiceInput((transcript) =>
+    setInputValue((prev) => (prev ? `${prev} ${transcript}` : transcript))
+  )
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -148,11 +77,6 @@ export function AssistantPanel() {
     wasOpenRef.current = isAssistantOpen
   }, [isAssistantOpen])
 
-  // Stop any active speech recognition when the panel unmounts.
-  useEffect(() => {
-    return () => recognitionRef.current?.stop()
-  }, [])
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const message = inputValue.trim()
@@ -161,54 +85,8 @@ export function AssistantPanel() {
     const attachments = (pendingImages.length || pendingFiles.length)
       ? { imageDataUris: pendingImages, fileDataUris: pendingFiles }
       : undefined
-    setPendingImages([])
-    setPendingFiles([])
+    clearAttachments()
     sendAssistantMessage(message, attachments)
-  }
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    e.target.value = '' // allow re-selecting the same file later
-    for (const file of files) {
-      if (file.size > MAX_ATTACHMENT_BYTES) {
-        setError(`"${file.name}" is too large to attach (max ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB).`)
-        continue
-      }
-      try {
-        const dataUri = await readFileAsDataUri(file)
-        if (file.type.startsWith('image/')) {
-          setPendingImages((prev) => [...prev, dataUri])
-        } else {
-          setPendingFiles((prev) => [...prev, { dataUri, fileName: file.name, mimeType: file.type || 'application/octet-stream' }])
-        }
-      } catch (error) {
-        console.warn('Failed to read attached file:', error)
-      }
-    }
-  }
-
-  const toggleListening = () => {
-    if (isListening) {
-      recognitionRef.current?.stop()
-      return
-    }
-    const SpeechRecognitionCtor = getSpeechRecognitionCtor()
-    if (!SpeechRecognitionCtor) return
-
-    const recognition = new SpeechRecognitionCtor()
-    recognition.continuous = false
-    recognition.interimResults = false
-    recognition.lang = 'en-US'
-    recognition.onresult = (event) => {
-      const transcript = Array.from(event.results).map((r) => r[0]?.transcript || '').join(' ')
-      setInputValue((prev) => (prev ? `${prev} ${transcript}` : transcript))
-    }
-    recognition.onerror = () => setIsListening(false)
-    recognition.onend = () => setIsListening(false)
-
-    recognitionRef.current = recognition
-    setIsListening(true)
-    recognition.start()
   }
 
   const panelBg = isLight ? 'bg-white border-gray-200' : 'bg-rs-dark border-gray-700'
@@ -332,7 +210,7 @@ export function AssistantPanel() {
                 <img src={dataUri} alt="" className="w-full h-full object-cover" />
                 <button
                   type="button"
-                  onClick={() => setPendingImages((prev) => prev.filter((_, idx) => idx !== i))}
+                  onClick={() => removeImage(i)}
                   className="absolute top-0 right-0 bg-black/60 text-white rounded-bl p-0.5"
                   title="Remove image"
                 >
@@ -349,7 +227,7 @@ export function AssistantPanel() {
                 <span className="max-w-[120px] truncate">{file.fileName}</span>
                 <button
                   type="button"
-                  onClick={() => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                  onClick={() => removeFile(i)}
                   className={iconBtn}
                   title="Remove file"
                 >

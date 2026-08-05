@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { User, Bot, ExternalLink, ThumbsUp, ThumbsDown, Loader2, Copy, Check, RotateCw, FileText } from 'lucide-react'
 import { useAppStore } from '../../store'
 import type { AssistantChatMessage } from '../../api/assistantChat'
+import { renderMessageContent, stripCitationMarkers } from './messageFormatting'
 
 interface AssistantMessageBubbleProps {
   message: AssistantChatMessage
@@ -13,8 +14,9 @@ interface AssistantMessageBubbleProps {
 }
 
 /**
- * Individual assistant/user message bubble: code-block + bold/inline-code rendering,
- * citation chips, and (on the latest completed assistant turn only) reaction buttons.
+ * Individual assistant/user message bubble: attachment thumbnails, formatted content (see
+ * messageFormatting.tsx), citation chips, and (on the latest completed assistant turn only)
+ * copy/regenerate/reaction actions.
  */
 export function AssistantMessageBubble({ message, isLatestAssistant, theme }: AssistantMessageBubbleProps) {
   const sendAssistantReaction = useAppStore((s) => s.sendAssistantReaction)
@@ -24,86 +26,6 @@ export function AssistantMessageBubble({ message, isLatestAssistant, theme }: As
   const isUser = message.role === 'user'
   const isLight = theme === 'light'
 
-  // The assistant embeds raw citation placeholders (e.g. "【4:1†source】") in the streamed
-  // text, meant to be spliced into a rendered link. We show citations as chips below the
-  // bubble instead (see the citations block further down), so just strip the placeholders
-  // here rather than leaving them visible as noise.
-  const stripCitationMarkers = (content: string) => {
-    let stripped = content
-    for (const citation of message.citations || []) {
-      if (citation.textToReplace) stripped = stripped.split(citation.textToReplace).join('')
-    }
-    return stripped.replace(/【\d+(?::\d+)?†[^】]*】/g, '')
-  }
-
-  const renderContent = (content: string) => {
-    const parts = content.split(/(```[\s\S]*?```)/g)
-
-    return parts.map((part, i) => {
-      if (part.startsWith('```')) {
-        const match = part.match(/```(\w+)?\n?([\s\S]*?)```/)
-        if (match) {
-          const [, lang, code] = match
-          return (
-            <pre key={i} className={`mt-2 p-2 rounded text-xs whitespace-pre-wrap break-words ${isLight ? 'bg-gray-100' : 'bg-gray-900'}`}>
-              <code className={`language-${lang || 'text'}`}>{code.trim()}</code>
-            </pre>
-          )
-        }
-      }
-
-      return (
-        <span key={i}>
-          {part.split('\n').map((line, j) => (
-            <span key={j}>
-              {j > 0 && <br />}
-              {formatInline(line)}
-            </span>
-          ))}
-        </span>
-      )
-    })
-  }
-
-  const formatInline = (text: string) => {
-    const parts: (string | JSX.Element)[] = []
-    let remaining = text
-    let key = 0
-
-    while (remaining) {
-      const boldMatch = remaining.match(/\*\*(.+?)\*\*/)
-      const codeMatch = remaining.match(/`([^`]+)`/)
-
-      let earliestMatch: RegExpMatchArray | null = null
-      let type: 'bold' | 'code' | null = null
-
-      if (boldMatch && (!codeMatch || boldMatch.index! < codeMatch.index!)) {
-        earliestMatch = boldMatch
-        type = 'bold'
-      } else if (codeMatch) {
-        earliestMatch = codeMatch
-        type = 'code'
-      }
-
-      if (earliestMatch && type) {
-        if (earliestMatch.index! > 0) {
-          parts.push(remaining.slice(0, earliestMatch.index))
-        }
-        if (type === 'bold') {
-          parts.push(<strong key={key++} className="font-semibold">{earliestMatch[1]}</strong>)
-        } else {
-          parts.push(<code key={key++} className={`px-1 py-0.5 rounded text-xs ${isLight ? 'bg-gray-200' : 'bg-gray-800'}`}>{earliestMatch[1]}</code>)
-        }
-        remaining = remaining.slice(earliestMatch.index! + earliestMatch[0].length)
-      } else {
-        parts.push(remaining)
-        break
-      }
-    }
-
-    return parts
-  }
-
   const handleReaction = (value: 1 | -1) => {
     setReactionSent(value)
     sendAssistantReaction(value)
@@ -111,7 +33,7 @@ export function AssistantMessageBubble({ message, isLatestAssistant, theme }: As
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(stripCitationMarkers(message.content))
+      await navigator.clipboard.writeText(stripCitationMarkers(message.content, message.citations))
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
@@ -160,7 +82,7 @@ export function AssistantMessageBubble({ message, isLatestAssistant, theme }: As
           {message.isStreaming && !message.content ? (
             <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
           ) : (
-            renderContent(stripCitationMarkers(message.content))
+            renderMessageContent(stripCitationMarkers(message.content, message.citations), isLight)
           )}
         </div>
 
