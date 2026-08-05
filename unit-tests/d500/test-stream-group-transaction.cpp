@@ -69,4 +69,6 @@ TEST_CASE( "D500 stream-group QUERY decodes status and rejects malformed masks",
                      invalid_value_exception );
     CHECK_THROWS_AS( d500_stream_group_transaction::decode_status( { 0, 0, 0, 0, 0x10, 0, 0, 0 } ),
                      invalid_value_exception );
+    CHECK_THROWS_AS( d500_stream_group_transaction::decode_status( { 0, 0, 0, 0, 0, 0, 0, 6 } ),
+                     invalid_value_exception );
 }

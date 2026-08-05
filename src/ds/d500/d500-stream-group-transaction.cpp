@@ -135,6 +135,8 @@ namespace librealsense
         uint8_t const valid_mask = 0x0f;
         if( ( status.expected_mask | status.started_mask | status.built_mask ) & ~valid_mask )
             throw invalid_value_exception( "stream-group QUERY response contains an invalid branch mask" );
+        if( status.state > static_cast< uint8_t >( d500_stream_group_state::cancelled ) )
+            throw invalid_value_exception( "stream-group QUERY response contains an invalid state" );
         return status;
     }
 

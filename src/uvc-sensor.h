@@ -31,6 +31,8 @@ public:
     void stop() override;
     void register_xu( platform::extension_unit xu );
     void register_pu( rs2_option id );
+    void append_on_open( on_open callback );
+    void register_on_open_error( std::function< void() > callback );
 
     virtual void prepare_for_bulk_operation() override;
     virtual void finished_bulk_operation() override;
@@ -46,6 +48,10 @@ public:
     void set_stream_id_resolver( stream_id_resolver resolver ) { _stream_id_resolver = std::move( resolver ); }
 
     std::vector< platform::stream_profile > get_configuration() const { return _internal_config; }
+    std::vector< platform::stream_profile > const & get_advertised_profiles() const
+    {
+        return _advertised_profiles;
+    }
     std::shared_ptr< platform::uvc_device > get_uvc_device() { return _device; }
     platform::usb_spec get_usb_specification() const { return _device->get_usb_specification(); }
     std::string get_device_path() const { return _device->get_device_location(); }
@@ -79,6 +85,7 @@ private:
     void acquire_power();
     void release_power();
     void reset_streaming();
+    void notify_open_error() noexcept;
     std::atomic<int64_t> _gyro_counter;
     std::atomic<int64_t> _accel_counter;
 
@@ -115,7 +122,9 @@ private:
 
     std::shared_ptr< platform::uvc_device > _device;
     stream_id_resolver _stream_id_resolver;
+    std::vector< platform::stream_profile > _advertised_profiles;
     std::vector< platform::stream_profile > _internal_config;
+    std::function< void() > _on_open_error;
     std::atomic< int > _user_count;
     std::mutex _power_lock;
     std::mutex _configure_lock;

@@ -3,6 +3,8 @@
 
 #include "d500-dual-color.h"
 #include "d500-info.h"
+#include "d500-stream-group-adapter.h"
+#include "d500-stream-group-transaction.h"
 #include "environment.h"
 #include "metadata.h"
 #include "proc/color-formats-converter.h"  // m420_converter, nv12_converter
@@ -15,6 +17,10 @@
 using rs_fourcc = rsutils::type::fourcc;
 
 #include <set>
+#include <chrono>
+#include <cstdlib>
+#include <cstring>
+#include <thread>
 
 
 namespace librealsense
@@ -69,6 +75,110 @@ namespace librealsense
 
         register_color_extrinsics();
         register_color_metadata();
+    }
+
+    void d500_dual_color::register_stream_group_transaction()
+    {
+        auto mode = std::getenv( "RS2_D500_STREAM_GROUP" );
+        if( ! mode || ! std::strcmp( mode, "disabled" ) )
+            return;
+        if( std::strcmp( mode, "required" ) )
+        {
+            LOG_WARNING( "Ignoring unsupported RS2_D500_STREAM_GROUP mode: " << mode );
+            return;
+        }
+
+        auto raw_sensor = get_raw_depth_sensor();
+        std::weak_ptr< uvc_sensor > weak_sensor = raw_sensor;
+        raw_sensor->append_on_open(
+            [this, weak_sensor]( std::vector< platform::stream_profile > configurations ) {
+                auto sensor = weak_sensor.lock();
+                if( ! sensor )
+                    throw wrong_api_call_sequence_exception( "D500 stream-group sensor is unavailable" );
+
+                // Clear a transaction left by an interrupted prior open before
+                // allocating the next nonzero generation.
+                cancel_active_stream_group();
+                if( ++_next_stream_group_transaction_id == 0 )
+                    ++_next_stream_group_transaction_id;
+                _active_stream_group_transaction_id =
+                    _next_stream_group_transaction_id;
+
+                auto manifest = d500_dual_color_stream_group_adapter::build_manifest(
+                    configurations, sensor->get_advertised_profiles() );
+                d500_stream_group_transaction transaction( _hw_monitor );
+                transaction.prepare( _active_stream_group_transaction_id, manifest );
+
+                auto const deadline = std::chrono::steady_clock::now()
+                    + std::chrono::seconds( 1 );
+                while( std::chrono::steady_clock::now() < deadline )
+                {
+                    auto const status = transaction.query(
+                        _active_stream_group_transaction_id );
+                    if( status.transaction_id != _active_stream_group_transaction_id )
+                        throw std::runtime_error( "D500 stream-group QUERY returned a different transaction" );
+                    if( status.state
+                        == static_cast< uint8_t >( d500_stream_group_state::prepared ) )
+                    {
+                        uint8_t expected = 0;
+                        for( auto const & profile : manifest )
+                            expected |= static_cast< uint8_t >(
+                                1u << static_cast< uint8_t >( profile.branch ) );
+                        if( status.expected_mask != expected
+                            || status.built_mask != expected )
+                            throw std::runtime_error( "D500 stream-group PREPARED mask mismatch" );
+                        return;
+                    }
+                    if( status.state
+                            == static_cast< uint8_t >( d500_stream_group_state::failed )
+                        || status.state
+                            == static_cast< uint8_t >( d500_stream_group_state::cancelled ) )
+                        throw std::runtime_error( "D500 stream-group graph preparation failed" );
+                    std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
+                }
+                throw std::runtime_error( "D500 stream-group graph preparation timed out" );
+            } );
+        raw_sensor->register_on_open_error(
+            [this]() { cancel_active_stream_group(); } );
+    }
+
+    void d500_dual_color::cancel_active_stream_group() noexcept
+    {
+        auto const transaction_id = _active_stream_group_transaction_id;
+        if( ! transaction_id )
+            return;
+
+        try
+        {
+            d500_stream_group_transaction transaction( _hw_monitor );
+            auto const deadline = std::chrono::steady_clock::now()
+                + std::chrono::milliseconds( 250 );
+            while( std::chrono::steady_clock::now() < deadline )
+            {
+                auto const status = transaction.query( transaction_id );
+                if( status.state
+                        == static_cast< uint8_t >( d500_stream_group_state::idle )
+                    || status.transaction_id == 0 )
+                    break;
+                if( status.transaction_id != transaction_id )
+                    break;
+                if( status.started_mask == 0 )
+                {
+                    transaction.cancel( transaction_id );
+                    break;
+                }
+                std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
+            }
+        }
+        catch( std::exception const & e )
+        {
+            LOG_WARNING( "D500 stream-group rollback failed: " << e.what() );
+        }
+        catch( ... )
+        {
+            LOG_WARNING( "D500 stream-group rollback failed" );
+        }
+        _active_stream_group_transaction_id = 0;
     }
 
     void d500_dual_color::register_color_metadata()

@@ -20,6 +20,16 @@ namespace librealsense
         color_right = 3
     };
 
+    enum class d500_stream_group_state : uint8_t
+    {
+        idle = 0,
+        preparing = 1,
+        prepared = 2,
+        running = 3,
+        failed = 4,
+        cancelled = 5
+    };
+
     struct d500_stream_group_profile
     {
         d500_stream_group_branch branch;
