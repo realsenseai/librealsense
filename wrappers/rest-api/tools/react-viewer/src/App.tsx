@@ -6,7 +6,7 @@ import { IMUViewer } from './components/IMUViewer'
 import { Header } from './components/Header'
 import { LoadingSplash } from './components/LoadingSplash'
 import { WhatsNew } from './components/WhatsNew'
-import { ChatButton, ChatPanel } from './components/ChatBot'
+import { AssistantButton, AssistantPanel } from './components/AiAssistant'
 import { ApiDiagnostics } from './components/ApiDiagnostics'
 import { useAppStore } from './store'
 import { socketService } from './api/socket'
@@ -96,9 +96,9 @@ function App() {
       {/* API Diagnostics (shows when there's a connection error) */}
       <ApiDiagnostics />
 
-      {/* AI Chat Assistant */}
-      <ChatPanel />
-      <ChatButton />
+      {/* RealSense AI Assistant */}
+      <AssistantPanel />
+      <AssistantButton />
     </div>
   )
 }
