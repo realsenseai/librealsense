@@ -39,8 +39,8 @@ export function usePendingAttachments(onError: (message: string) => void) {
         } else {
           setPendingFiles((prev) => [...prev, { dataUri, fileName: file.name, mimeType: file.type || 'application/octet-stream' }])
         }
-      } catch (error) {
-        console.warn('Failed to read attached file:', error)
+      } catch {
+        onError(`Failed to read "${file.name}".`)
       }
     }
   }
