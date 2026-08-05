@@ -145,6 +145,13 @@ namespace librealsense
         switch( _native_format )
         {
         case RS2_FORMAT_YUYV:
+            // Register NV12 first so MIPI RGB targets prefer it while YUYV remains a fallback.
+            if( _is_mipi_device )
+                color_ep.register_processing_block( processing_block_factory::create_pbf_vector< nv12_converter >(
+                    RS2_FORMAT_NV12,
+                    map_supported_color_formats( RS2_FORMAT_NV12 ),
+                    RS2_STREAM_COLOR ) );
+
             color_ep.register_processing_block( processing_block_factory::create_pbf_vector< yuy2_converter >(
                 RS2_FORMAT_YUYV,
                 map_supported_color_formats( RS2_FORMAT_YUYV ),
