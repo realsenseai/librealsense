@@ -1,3 +1,6 @@
+// License: Apache 2.0. See LICENSE file in root directory.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+//
 // Client for the hosted RealSense AI Assistant (general product Q&A, anonymous, no API key).
 // See INTEGRATION.md / API.md: POST /api/chat/stream returns a text/event-stream of typed frames.
 // The assistant's CORS allowlist permits any origin, so we call the Front Door endpoint directly.
@@ -117,25 +120,30 @@ export async function* streamChatMessage(
     while (true) {
       const { value, done } = await reader.read()
       if (done) break
-      buffer += decoder.decode(value, { stream: true })
+      // Normalize CRLF to LF on the whole buffer (not just the new chunk) so a "\r\n\r\n"
+      // frame separator straddling two reads still gets caught.
+      buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, '\n')
 
-      let separatorIndex: number
-      while ((separatorIndex = buffer.indexOf('\n\n')) !== -1) {
+      let separatorIndex = buffer.indexOf('\n\n')
+      while (separatorIndex !== -1) {
         const rawFrame = buffer.slice(0, separatorIndex)
         buffer = buffer.slice(separatorIndex + 2)
 
         const dataLine = rawFrame.split('\n').find((line) => line.startsWith('data:'))
-        if (!dataLine) continue
-        const jsonStr = dataLine.slice(5).trim()
-        if (!jsonStr) continue
-
-        try {
-          const parsed = JSON.parse(jsonStr) as AssistantStreamEvent
-          yield parsed
-          if (parsed.type === 'done' || parsed.type === 'error') return
-        } catch (error) {
-          console.warn('Failed to parse assistant SSE frame:', jsonStr, error)
+        if (dataLine) {
+          const jsonStr = dataLine.slice(5).trim()
+          if (jsonStr) {
+            try {
+              const parsed = JSON.parse(jsonStr) as AssistantStreamEvent
+              yield parsed
+              if (parsed.type === 'done' || parsed.type === 'error') return
+            } catch (error) {
+              console.warn('Failed to parse assistant SSE frame:', jsonStr, error)
+            }
+          }
         }
+
+        separatorIndex = buffer.indexOf('\n\n')
       }
     }
   } finally {

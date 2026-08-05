@@ -1,3 +1,6 @@
+// License: Apache 2.0. See LICENSE file in root directory.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Send, PlusCircle, Loader2, Sparkles, Paperclip, Square, Mic, MicOff, X, FileText } from 'lucide-react'
 import { useAppStore } from '../../store'
@@ -23,6 +26,10 @@ function getSpeechRecognitionCtor(): (new () => MinimalSpeechRecognition) | null
   }
   return w.SpeechRecognition || w.webkitSpeechRecognition || null
 }
+
+// Keeps a huge/misselected file (e.g. a video) from OOMing the tab as a base64 data URI
+// and from bloating the SSE request body.
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 function readFileAsDataUri(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -90,6 +97,7 @@ export function AssistantPanel() {
     stopAssistantMessage,
     clearAssistantChat,
     toggleAssistant,
+    setError,
     toggleAssistantTheme,
     toggleAssistantSize,
   } = useAppStore()
@@ -106,6 +114,7 @@ export function AssistantPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<MinimalSpeechRecognition | null>(null)
   const wasOpenRef = useRef(isAssistantOpen)
+  const panelRef = useRef<HTMLDivElement>(null)
   const micSupported = useMemo(() => getSpeechRecognitionCtor() !== null, [])
 
   useEffect(() => {
@@ -125,6 +134,12 @@ export function AssistantPanel() {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isAssistantOpen, toggleAssistant])
+
+  // aria-hidden alone doesn't stop Tab from focusing elements inside a hidden, only
+  // pointer-events-none'd panel — `inert` removes it from the tab order too.
+  useEffect(() => {
+    if (panelRef.current) panelRef.current.inert = !isAssistantOpen
+  }, [isAssistantOpen])
 
   useEffect(() => {
     if (wasOpenRef.current && !isAssistantOpen) {
@@ -155,6 +170,10 @@ export function AssistantPanel() {
     const files = Array.from(e.target.files || [])
     e.target.value = '' // allow re-selecting the same file later
     for (const file of files) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        setError(`"${file.name}" is too large to attach (max ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB).`)
+        continue
+      }
       try {
         const dataUri = await readFileAsDataUri(file)
         if (file.type.startsWith('image/')) {
@@ -208,6 +227,7 @@ export function AssistantPanel() {
 
   return (
     <div
+      ref={panelRef}
       className={`
         fixed inset-0 z-40 w-full h-full rounded-none border-0
         sm:inset-auto sm:right-6 sm:bottom-24 sm:rounded-2xl sm:border ${panelSize}

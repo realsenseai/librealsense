@@ -1,3 +1,6 @@
+// License: Apache 2.0. See LICENSE file in root directory.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
 import { useState } from 'react'
 import { User, Bot, ExternalLink, ThumbsUp, ThumbsDown, Loader2, Copy, Check, RotateCw, FileText } from 'lucide-react'
 import { useAppStore } from '../../store'

@@ -1,3 +1,6 @@
+// License: Apache 2.0. See LICENSE file in root directory.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+//
 // RealSense AI Assistant state (hosted, anonymous product Q&A — separate from the legacy
 // device-config chatbot slice that lives inline in index.ts).
 import type { StateCreator } from 'zustand'
@@ -67,6 +70,10 @@ async function streamAssistantTurn(
   content: string,
   attachments?: { imageDataUris?: string[]; fileDataUris?: AssistantFileAttachment[] }
 ) {
+  // A prior turn (e.g. a fast double-submit, or regenerate firing while the original
+  // answer is still streaming) must be cancelled first — otherwise it keeps running
+  // un-stoppably in the background since only the latest controller stays reachable.
+  currentAssistantAbortController?.abort()
   const controller = new AbortController()
   currentAssistantAbortController = controller
 
