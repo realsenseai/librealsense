@@ -10,12 +10,22 @@ import { useAppStore } from '../../store'
  * so the status dot is cosmetic only and never gates opening the panel.
  */
 export function AssistantButton() {
-  const { isAssistantOpen, isAssistantOnline, assistantTheme, toggleAssistant, pingAssistantHealth } = useAppStore()
+  const {
+    isAssistantOpen,
+    isAssistantOnline,
+    assistantTheme,
+    toggleAssistant,
+    pingAssistantHealth,
+    checkChatAvailability,
+  } = useAppStore()
   const isLight = assistantTheme === 'light'
 
   useEffect(() => {
     pingAssistantHealth()
-  }, [pingAssistantHealth])
+    // Populates isChatAvailable so the panel can show a toggle into the legacy device-config
+    // chatbot mode only when it's actually configured (a provider API key present).
+    checkChatAvailability()
+  }, [pingAssistantHealth, checkChatAvailability])
 
   return (
     <button

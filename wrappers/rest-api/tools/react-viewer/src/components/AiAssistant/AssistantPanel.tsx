@@ -2,12 +2,16 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, PlusCircle, Loader2, Sparkles, Paperclip, Square, Mic, MicOff, X, FileText } from 'lucide-react'
+import { Send, PlusCircle, Loader2, Sparkles, Paperclip, Square, Mic, MicOff, X, FileText, Repeat } from 'lucide-react'
 import { useAppStore } from '../../store'
+import { getActiveProviderName } from '../../api/chat'
 import { AssistantMessageBubble } from './AssistantMessage'
 import { ExpandIcon, CollapseIcon, SunIcon, MoonIcon, CloseIcon } from './icons'
 import { useVoiceInput } from './useVoiceInput'
 import { usePendingAttachments } from './usePendingAttachments'
+import { LegacyChatContent } from './LegacyChatContent'
+
+type PanelMode = 'assistant' | 'legacy'
 
 /**
  * Slide-out panel for the RealSense AI Assistant. Always mounted (not conditionally
@@ -28,10 +32,16 @@ export function AssistantPanel() {
     setError,
     toggleAssistantTheme,
     toggleAssistantSize,
+    isChatAvailable,
+    clearChat,
   } = useAppStore()
 
   const isLight = assistantTheme === 'light'
   const isWide = assistantSize === 'wide'
+
+  const [mode, setMode] = useState<PanelMode>('assistant')
+  const isLegacyMode = mode === 'legacy'
+  const providerName = getActiveProviderName()
 
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -128,19 +138,36 @@ export function AssistantPanel() {
             <img src="/realsense-logo.png" alt="" className="w-full h-full object-cover object-left" />
           </span>
           <div className="min-w-0">
-            <h3 className={`font-semibold text-sm truncate ${titleText}`}>RealSense AI Assistant</h3>
+            <h3 className={`font-semibold text-sm truncate ${titleText}`}>
+              {isLegacyMode ? 'Device Config Assistant' : 'RealSense AI Assistant'}
+            </h3>
             <div className={`flex items-center gap-1.5 text-[11px] ${mutedText}`}>
-              <span className="relative flex w-1.5 h-1.5">
-                {isAssistantOnline && (
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping motion-reduce:animate-none" />
-                )}
-                <span className={`relative inline-flex rounded-full w-1.5 h-1.5 ${isAssistantOnline ? 'bg-green-500' : 'bg-gray-500'}`} />
-              </span>
-              {isAssistantOnline ? 'Online' : 'Reconnecting…'} · powered by RealSense AI
+              {isLegacyMode ? (
+                <span className="truncate">{providerName ? `Using ${providerName}` : 'AI Assistant'}</span>
+              ) : (
+                <>
+                  <span className="relative flex w-1.5 h-1.5">
+                    {isAssistantOnline && (
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping motion-reduce:animate-none" />
+                    )}
+                    <span className={`relative inline-flex rounded-full w-1.5 h-1.5 ${isAssistantOnline ? 'bg-green-500' : 'bg-gray-500'}`} />
+                  </span>
+                  {isAssistantOnline ? 'Online' : 'Reconnecting…'} · powered by RealSense AI
+                </>
+              )}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {isChatAvailable && (
+            <button
+              onClick={() => setMode((m) => (m === 'assistant' ? 'legacy' : 'assistant'))}
+              className={`p-1.5 rounded transition-colors ${iconBtn}`}
+              title={isLegacyMode ? 'Switch to RealSense AI Assistant' : 'Switch to device-config chatbot'}
+            >
+              <Repeat className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={toggleAssistantTheme}
             className={`p-1.5 rounded transition-colors hidden sm:inline-flex ${iconBtn}`}
@@ -156,7 +183,7 @@ export function AssistantPanel() {
             {isWide ? <CollapseIcon /> : <ExpandIcon />}
           </button>
           <button
-            onClick={clearAssistantChat}
+            onClick={isLegacyMode ? clearChat : clearAssistantChat}
             className={`p-1.5 rounded transition-colors ${iconBtn}`}
             title="New chat"
           >
@@ -172,6 +199,10 @@ export function AssistantPanel() {
         </div>
       </div>
 
+      {isLegacyMode ? (
+        <LegacyChatContent />
+      ) : (
+        <>
       {/* Messages */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4">
         {assistantMessages.length === 0 ? (
@@ -295,6 +326,8 @@ export function AssistantPanel() {
           )}
         </div>
       </form>
+        </>
+      )}
     </div>
   )
 }
