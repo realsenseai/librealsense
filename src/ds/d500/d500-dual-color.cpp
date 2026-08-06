@@ -99,6 +99,9 @@ namespace librealsense
                 // Clear a transaction left by an interrupted prior open before
                 // allocating the next nonzero generation.
                 cancel_active_stream_group();
+                if( _active_stream_group_transaction_id )
+                    throw wrong_api_call_sequence_exception(
+                        "previous D500 stream-group transaction did not settle" );
                 if( ++_next_stream_group_transaction_id == 0 )
                     ++_next_stream_group_transaction_id;
                 _active_stream_group_transaction_id =
@@ -110,7 +113,7 @@ namespace librealsense
                 transaction.prepare( _active_stream_group_transaction_id, manifest );
 
                 auto const deadline = std::chrono::steady_clock::now()
-                    + std::chrono::seconds( 1 );
+                    + std::chrono::seconds( 5 );
                 while( std::chrono::steady_clock::now() < deadline )
                 {
                     auto const status = transaction.query(
@@ -152,23 +155,32 @@ namespace librealsense
         {
             d500_stream_group_transaction transaction( _hw_monitor );
             auto const deadline = std::chrono::steady_clock::now()
-                + std::chrono::milliseconds( 250 );
+                + std::chrono::seconds( 3 );
+            bool cancel_sent = false;
+            bool settled = false;
             while( std::chrono::steady_clock::now() < deadline )
             {
                 auto const status = transaction.query( transaction_id );
                 if( status.state
                         == static_cast< uint8_t >( d500_stream_group_state::idle )
                     || status.transaction_id == 0 )
+                {
+                    settled = true;
                     break;
+                }
                 if( status.transaction_id != transaction_id )
                     break;
-                if( status.started_mask == 0 )
+                if( ! cancel_sent && status.started_mask == 0 )
                 {
                     transaction.cancel( transaction_id );
-                    break;
+                    cancel_sent = true;
                 }
                 std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
             }
+            if( settled )
+                _active_stream_group_transaction_id = 0;
+            else
+                LOG_WARNING( "D500 stream-group rollback did not reach IDLE" );
         }
         catch( std::exception const & e )
         {
@@ -178,7 +190,6 @@ namespace librealsense
         {
             LOG_WARNING( "D500 stream-group rollback failed" );
         }
-        _active_stream_group_transaction_id = 0;
     }
 
     void d500_dual_color::register_color_metadata()
