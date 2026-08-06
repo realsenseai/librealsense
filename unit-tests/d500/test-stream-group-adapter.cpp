@@ -53,8 +53,8 @@ TEST_CASE( "D500 dual-color manifest is canonical regardless of selected profile
     auto nv12 = fourcc( 'N', 'V', '1', '2' );
     auto z16 = fourcc( 'Z', '1', '6', ' ' );
     std::vector< platform::stream_profile > selected = {
-        profile( nv12, 10 ),  // lowest RGB pin -> Color 2 / right
-        profile( nv12, 20 ),  // highest RGB pin -> Color 1 / left
+        profile( nv12, 10 ),  // lowest RGB pin -> firmware EP4 / left
+        profile( nv12, 20 ),  // highest RGB pin -> firmware EP8 / right
         profile( z16, 2, 640, 480, 30 )
     };
     std::reverse( selected.begin(), selected.end() );
@@ -70,6 +70,22 @@ TEST_CASE( "D500 dual-color manifest is canonical regardless of selected profile
     CHECK( manifest[2].branch == d500_stream_group_branch::color_right );
 }
 
+TEST_CASE( "D500 dual-color manifest follows firmware endpoint branch mapping", "[d500]" )
+{
+    using namespace librealsense;
+    auto nv12 = fourcc( 'N', 'V', '1', '2' );
+
+    auto ep4 = d500_dual_color_stream_group_adapter::build_manifest(
+        { profile( nv12, 10 ) }, advertised_profiles() );
+    REQUIRE( ep4.size() == 1 );
+    CHECK( ep4[0].branch == d500_stream_group_branch::color_left );
+
+    auto ep8 = d500_dual_color_stream_group_adapter::build_manifest(
+        { profile( nv12, 20 ) }, advertised_profiles() );
+    REQUIRE( ep8.size() == 1 );
+    CHECK( ep8[0].branch == d500_stream_group_branch::color_right );
+}
+
 TEST_CASE( "D500 dual-color manifest maps the physical stereo IR branch", "[d500]" )
 {
     using namespace librealsense;
@@ -79,6 +95,17 @@ TEST_CASE( "D500 dual-color manifest maps the physical stereo IR branch", "[d500
     REQUIRE( manifest.size() == 1 );
     CHECK( manifest[0].branch == d500_stream_group_branch::infrared );
     CHECK( manifest[0].fourcc == y8i );
+}
+
+TEST_CASE( "D500 dual-color manifest maps single-channel IR to the physical IR branch", "[d500]" )
+{
+    using namespace librealsense;
+    auto grey = fourcc( 'G', 'R', 'E', 'Y' );
+    auto manifest = d500_dual_color_stream_group_adapter::build_manifest(
+        { profile( grey, 5 ) }, advertised_profiles() );
+    REQUIRE( manifest.size() == 1 );
+    CHECK( manifest[0].branch == d500_stream_group_branch::infrared );
+    CHECK( manifest[0].fourcc == grey );
 }
 
 TEST_CASE( "D500 dual-color manifest rejects ambiguous physical mappings", "[d500]" )

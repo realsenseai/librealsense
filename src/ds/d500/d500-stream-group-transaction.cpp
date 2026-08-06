@@ -59,7 +59,8 @@ namespace librealsense
             case d500_stream_group_branch::depth:
                 return fourcc == make_fourcc( 'Z', '1', '6', ' ' );
             case d500_stream_group_branch::infrared:
-                return fourcc == make_fourcc( 'Y', '8', 'I', ' ' );
+                return fourcc == make_fourcc( 'Y', '8', 'I', ' ' )
+                    || fourcc == make_fourcc( 'G', 'R', 'E', 'Y' );
             case d500_stream_group_branch::color_left:
             case d500_stream_group_branch::color_right:
                 return fourcc == make_fourcc( 'M', '4', '2', '0' )

@@ -54,6 +54,19 @@ TEST_CASE( "D500 stream-group PREPARE rejects ambiguous manifests", "[d500]" )
                      invalid_value_exception );
 }
 
+TEST_CASE( "D500 stream-group PREPARE accepts single-channel infrared", "[d500]" )
+{
+    using namespace librealsense;
+    auto payload = d500_stream_group_transaction::encode_prepare( 1, {
+        { d500_stream_group_branch::infrared,
+          fourcc( 'G', 'R', 'E', 'Y' ),
+          640,
+          480,
+          30 }
+    } );
+    CHECK_FALSE( payload.empty() );
+}
+
 TEST_CASE( "D500 stream-group QUERY decodes status and rejects malformed masks", "[d500]" )
 {
     using namespace librealsense;

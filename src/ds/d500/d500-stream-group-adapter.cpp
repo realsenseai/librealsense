@@ -65,11 +65,13 @@ namespace librealsense
             if( color_pins.size() != 2 || ! color_pins.count( pin ) )
                 throw invalid_value_exception( "stream-group color profile does not belong to a complete dual-color pin pair" );
 
-            // Keep the same physical mapping used by d500_dual_color:
-            // highest color pin -> Color 1 / left, lowest -> Color 2 / right.
+            // The UVC OPEN lifecycle uses the firmware endpoint mapping:
+            // lowest color pin -> EP4 / left, highest -> EP8 / right.
+            // This is intentionally independent of the public SDK Color 1/2
+            // labels, whose pin ranking is reversed by resolve_color_stream().
             return pin == *color_pins.rbegin()
-                ? d500_stream_group_branch::color_left
-                : d500_stream_group_branch::color_right;
+                ? d500_stream_group_branch::color_right
+                : d500_stream_group_branch::color_left;
         }
     }
 
@@ -87,7 +89,8 @@ namespace librealsense
             d500_stream_group_branch branch;
             if( profile.format == make_fourcc( 'Z', '1', '6', ' ' ) )
                 branch = d500_stream_group_branch::depth;
-            else if( profile.format == make_fourcc( 'Y', '8', 'I', ' ' ) )
+            else if( profile.format == make_fourcc( 'Y', '8', 'I', ' ' )
+                     || profile.format == make_fourcc( 'G', 'R', 'E', 'Y' ) )
                 branch = d500_stream_group_branch::infrared;
             else if( is_color_format( profile.format ) )
                 branch = color_branch( profile.pin_index, color_pins );
