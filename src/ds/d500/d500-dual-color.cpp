@@ -18,8 +18,6 @@ using rs_fourcc = rsutils::type::fourcc;
 
 #include <set>
 #include <chrono>
-#include <cstdlib>
-#include <cstring>
 #include <thread>
 
 
@@ -79,12 +77,22 @@ namespace librealsense
 
     void d500_dual_color::register_stream_group_transaction()
     {
-        auto mode = std::getenv( "RS2_D500_STREAM_GROUP" );
-        if( ! mode || ! std::strcmp( mode, "disabled" ) )
-            return;
-        if( std::strcmp( mode, "required" ) )
+        try
         {
-            LOG_WARNING( "Ignoring unsupported RS2_D500_STREAM_GROUP mode: " << mode );
+            // QUERY is read-only and doubles as the protocol capability probe.
+            // Older firmware rejects the command, in which case the existing
+            // admission-window flow remains unchanged.
+            d500_stream_group_transaction( _hw_monitor ).query();
+        }
+        catch( std::exception const & e )
+        {
+            LOG_INFO( "D500 stream-group transaction is unavailable; using legacy flow: "
+                      << e.what() );
+            return;
+        }
+        catch( ... )
+        {
+            LOG_INFO( "D500 stream-group transaction is unavailable; using legacy flow" );
             return;
         }
 
