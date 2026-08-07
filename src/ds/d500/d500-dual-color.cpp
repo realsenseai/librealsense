@@ -77,26 +77,79 @@ namespace librealsense
 
     void d500_dual_color::register_stream_group_transaction()
     {
-        try
+        auto raw_sensor = get_raw_depth_sensor();
+        auto block_streaming = [raw_sensor]( std::string const & reason ) {
+            LOG_ERROR( reason );
+            raw_sensor->append_on_open(
+                [reason]( std::vector< platform::stream_profile > ) {
+                    throw wrong_api_call_sequence_exception( reason );
+                } );
+        };
+
+        d500_stream_group_transaction transaction( _hw_monitor );
+        d500_stream_group_status device_status = {};
+        std::string query_error;
+        bool protocol_supported = false;
+        for( unsigned attempt = 0; attempt < 3; ++attempt )
         {
-            // QUERY is read-only and doubles as the protocol capability probe.
-            // Older firmware rejects the command, in which case the existing
-            // admission-window flow remains unchanged.
-            d500_stream_group_transaction( _hw_monitor ).query();
+            try
+            {
+                // Only an explicit unsupported-opcode response selects the
+                // legacy admission-window flow. Transport, readiness, and
+                // protocol errors are retried and then fail closed.
+                if( ! transaction.query_if_supported( device_status ) )
+                {
+                    LOG_INFO( "D500 stream-group transaction is unavailable; using legacy flow" );
+                    return;
+                }
+                protocol_supported = true;
+                break;
+            }
+            catch( std::exception const & e )
+            {
+                query_error = e.what();
+            }
+            catch( ... )
+            {
+                query_error = "unknown error";
+            }
+            if( attempt != 2 )
+                std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
         }
-        catch( std::exception const & e )
+
+        if( ! protocol_supported )
         {
-            LOG_INFO( "D500 stream-group transaction is unavailable; using legacy flow: "
-                      << e.what() );
-            return;
-        }
-        catch( ... )
-        {
-            LOG_INFO( "D500 stream-group transaction is unavailable; using legacy flow" );
+            block_streaming(
+                "D500 stream-group capability query failed after 3 attempts; "
+                "reconnect or hardware-reset the device before streaming: "
+                + query_error );
             return;
         }
 
-        auto raw_sensor = get_raw_depth_sensor();
+        // A new SDK process has no C++ record of a transaction owned by a
+        // process that exited abruptly. Reconcile the device-owned generation
+        // before installing the runtime hook.
+        if( device_status.transaction_id )
+        {
+            _next_stream_group_transaction_id = device_status.transaction_id;
+            _active_stream_group_transaction_id = device_status.transaction_id;
+            if( device_status.started_mask )
+            {
+                block_streaming(
+                    "D500 has a stale started stream-group transaction; "
+                    "hardware-reset or power-cycle the device before streaming" );
+                return;
+            }
+            cancel_active_stream_group();
+            if( _active_stream_group_transaction_id )
+            {
+                block_streaming(
+                    "D500 stale stream-group transaction did not reach IDLE; "
+                    "hardware-reset or power-cycle the device before streaming" );
+                return;
+            }
+        }
+
         std::weak_ptr< uvc_sensor > weak_sensor = raw_sensor;
         raw_sensor->append_on_open(
             [this, weak_sensor]( std::vector< platform::stream_profile > configurations ) {

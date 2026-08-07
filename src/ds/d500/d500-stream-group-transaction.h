@@ -59,6 +59,8 @@ namespace librealsense
         void prepare( uint32_t transaction_id,
                       std::vector< d500_stream_group_profile > const & profiles ) const;
         d500_stream_group_status query( uint32_t transaction_id = 0 ) const;
+        bool query_if_supported( d500_stream_group_status & status,
+                                 uint32_t transaction_id = 0 ) const;
         void cancel( uint32_t transaction_id ) const;
 
         static std::vector< uint8_t > encode_prepare(

@@ -3,11 +3,38 @@
 
 #include <unit-tests/catch.h>
 #include <src/ds/d500/d500-stream-group-transaction.h>
+#include <src/hw-monitor.h>
 #include <src/librealsense-exception.h>
+
+#include <utility>
 
 
 namespace
 {
+    class fake_hw_monitor : public librealsense::hw_monitor
+    {
+    public:
+        fake_hw_monitor( librealsense::hwmon_response_type response,
+                         std::vector< uint8_t > data )
+            : hw_monitor( nullptr, nullptr )
+            , _response( response )
+            , _data( std::move( data ) )
+        {
+        }
+
+        std::vector< uint8_t > send( librealsense::command const &,
+                                     librealsense::hwmon_response_type * response,
+                                     bool ) const override
+        {
+            *response = _response;
+            return _data;
+        }
+
+    private:
+        librealsense::hwmon_response_type _response;
+        std::vector< uint8_t > _data;
+    };
+
     uint32_t fourcc( char a, char b, char c, char d )
     {
         return ( static_cast< uint32_t >( static_cast< uint8_t >( a ) ) << 24 )
@@ -84,4 +111,36 @@ TEST_CASE( "D500 stream-group QUERY decodes status and rejects malformed masks",
                      invalid_value_exception );
     CHECK_THROWS_AS( d500_stream_group_transaction::decode_status( { 0, 0, 0, 0, 0, 0, 0, 6 } ),
                      invalid_value_exception );
+    CHECK_THROWS_AS( d500_stream_group_transaction::decode_status( { 0, 0, 0, 0, 1, 1, 0, 0 } ),
+                     invalid_value_exception );
+    CHECK_THROWS_AS( d500_stream_group_transaction::decode_status( { 1, 0, 0, 0, 1, 2, 0, 3 } ),
+                     invalid_value_exception );
+    CHECK_THROWS_AS( d500_stream_group_transaction::decode_status( { 1, 0, 0, 0, 0, 0, 0, 0 } ),
+                     invalid_value_exception );
+}
+
+TEST_CASE( "D500 stream-group capability probe falls back only for unsupported opcode", "[d500]" )
+{
+    using namespace librealsense;
+    d500_stream_group_status status = {};
+
+    for( auto response : { -1, -19 } )
+    {
+        auto hwm = std::make_shared< fake_hw_monitor >( response, std::vector< uint8_t >{} );
+        CHECK_FALSE( d500_stream_group_transaction( hwm ).query_if_supported( status ) );
+    }
+
+    auto not_ready = std::make_shared< fake_hw_monitor >( -3, std::vector< uint8_t >{} );
+    CHECK_THROWS_AS( d500_stream_group_transaction( not_ready ).query_if_supported( status ),
+                     invalid_value_exception );
+
+    auto malformed = std::make_shared< fake_hw_monitor >( 0, std::vector< uint8_t >{ 0, 0 } );
+    CHECK_THROWS_AS( d500_stream_group_transaction( malformed ).query_if_supported( status ),
+                     invalid_value_exception );
+
+    auto supported = std::make_shared< fake_hw_monitor >(
+        0, std::vector< uint8_t >{ 0, 0, 0, 0, 0, 0, 0, 0 } );
+    CHECK( d500_stream_group_transaction( supported ).query_if_supported( status ) );
+    CHECK( status.transaction_id == 0 );
+    CHECK( status.state == static_cast< uint8_t >( d500_stream_group_state::idle ) );
 }

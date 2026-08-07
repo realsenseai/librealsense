@@ -2,6 +2,7 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 #include "d500-stream-group-transaction.h"
+#include "d500-private.h"
 
 #include <src/hw-monitor.h>
 #include <src/librealsense-exception.h>
@@ -136,8 +137,17 @@ namespace librealsense
         uint8_t const valid_mask = 0x0f;
         if( ( status.expected_mask | status.started_mask | status.built_mask ) & ~valid_mask )
             throw invalid_value_exception( "stream-group QUERY response contains an invalid branch mask" );
+        if( ( status.started_mask | status.built_mask ) & ~status.expected_mask )
+            throw invalid_value_exception( "stream-group QUERY response contains inconsistent branch masks" );
         if( status.state > static_cast< uint8_t >( d500_stream_group_state::cancelled ) )
             throw invalid_value_exception( "stream-group QUERY response contains an invalid state" );
+        if( ! status.transaction_id
+            && ( status.expected_mask || status.started_mask || status.built_mask
+                 || status.state != static_cast< uint8_t >( d500_stream_group_state::idle ) ) )
+            throw invalid_value_exception( "stream-group QUERY response contains an invalid idle state" );
+        if( status.transaction_id
+            && status.state == static_cast< uint8_t >( d500_stream_group_state::idle ) )
+            throw invalid_value_exception( "stream-group QUERY response contains an invalid transaction state" );
         return status;
     }
 
@@ -154,6 +164,24 @@ namespace librealsense
     {
         command cmd( stream_group_opcode, query_command, transaction_id );
         return decode_status( _hwm->send( cmd ) );
+    }
+
+    bool d500_stream_group_transaction::query_if_supported(
+        d500_stream_group_status & status, uint32_t transaction_id ) const
+    {
+        command cmd( stream_group_opcode, query_command, transaction_id );
+        hwmon_response_type response = ds::d500_hwmon_response::SUCCESS;
+        auto const data = _hwm->send( cmd, &response );
+        if( response == ds::d500_hwmon_response::INVALID_COMMAND
+            || response == ds::d500_hwmon_response::COMMAND_NOT_SUPPORTED )
+            return false;
+        if( response != ds::d500_hwmon_response::SUCCESS )
+            throw invalid_value_exception(
+                "stream-group QUERY failed with firmware response "
+                + std::to_string( response ) );
+
+        status = decode_status( data );
+        return true;
     }
 
     void d500_stream_group_transaction::cancel( uint32_t transaction_id ) const
