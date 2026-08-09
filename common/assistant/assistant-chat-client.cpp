@@ -147,11 +147,18 @@ namespace rs2
             if (_cancel_requested)
                 return 0; // returning less than `bytes` tells curl to abort the transfer
 
-            _sse_parser.feed(ptr, bytes, [this](const sse_event& event) {
+            bool ok = _sse_parser.feed(ptr, bytes, [this](const sse_event& event) {
                 auto on_event = _active_on_event;
                 if (on_event)
                     safe_invoke(_active_invoke, [on_event, event]() { on_event(event); });
             });
+            if (!ok)
+            {
+                auto on_error = _active_on_error;
+                if (on_error)
+                    safe_invoke(_active_invoke, [on_error]() { on_error("The assistant's response was too large to process."); });
+                return 0; // abort the transfer, same as a user-requested cancel
+            }
             return bytes;
         }
 
@@ -167,6 +174,7 @@ namespace rs2
             _sse_parser.reset();
             _active_invoke = invoke;
             _active_on_event = on_event;
+            _active_on_error = on_error;
 
             std::string body = build_chat_request_body(message, conversation_id);
             struct curl_slist* headers = nullptr;
@@ -185,9 +193,10 @@ namespace rs2
 
             _active_invoke = nullptr;
             _active_on_event = nullptr;
+            _active_on_error = nullptr;
 
-            if (_cancel_requested)
-                return; // caller already knows it cancelled; no error needed
+            if (_cancel_requested || _sse_parser.overflowed())
+                return; // on_curl_data already reported this (or it's a silent user cancel)
 
             report_transfer_result(res, http_status, invoke, on_error);
         }

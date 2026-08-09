@@ -58,6 +58,7 @@ namespace rs2
             sse_frame_parser _sse_parser;
             invoke_fn _active_invoke;             // valid only while a request is in flight (busy() == true)
             event_callback _active_on_event;
+            error_callback _active_on_error;
             std::atomic<bool> _cancel_requested{ false };
             std::atomic<bool> _busy{ false };
         };

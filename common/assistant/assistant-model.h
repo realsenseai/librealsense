@@ -50,10 +50,11 @@ namespace rs2
         // (the log/output panel) so the launcher and chat panel float above it instead of behind it.
         void draw(ux_window& win, float bottom_clearance = 0.f);
 
-        single_consumer_queue<std::function<void()>> dispatch_queue;
         void invoke(std::function<void()> action);
 
     private:
+        single_consumer_queue<std::function<void()>> dispatch_queue;
+
         // assistant-launcher.cpp
         void draw_launcher_button(ux_window& win, float bottom_clearance);
         void draw_logo(float cx, float cy, float radius); // white disc + RealSense mark, lazy-loaded
@@ -86,6 +87,7 @@ namespace rs2
         char _input_buffer[2048] = {};
         std::string _conversation_id;
         bool _waiting_for_response = false;
+        bool _cancelling = false; // true from cancel until _client->busy() confirms the abort landed
         std::chrono::steady_clock::time_point _request_started;
         std::string _last_user_message; // kept for the retry affordance on error
 

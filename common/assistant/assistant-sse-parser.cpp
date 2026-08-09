@@ -23,11 +23,22 @@ namespace rs2
             }
         }
 
-        void sse_frame_parser::feed(const char* data, size_t len, const std::function<void(const sse_event&)>& on_event)
+        bool sse_frame_parser::feed(const char* data, size_t len, const std::function<void(const sse_event&)>& on_event)
         {
+            if (_overflowed)
+                return false;
+
             // libcurl delivers arbitrary byte chunks with no alignment to SSE frame/line boundaries,
             // so bytes accumulate in _buffer until a complete frame ("...\n\n") can be pulled out.
             _buffer.append(data, len);
+
+            static const size_t MAX_BUFFER_BYTES = 2 * 1024 * 1024; // a stalled/malformed reply must not grow this forever
+            if (_buffer.size() > MAX_BUFFER_BYTES)
+            {
+                _overflowed = true;
+                _buffer.clear();
+                return false;
+            }
 
             for (;;)
             {
@@ -77,6 +88,7 @@ namespace rs2
                     LOG_WARNING("Assistant: error handling SSE frame: " << ex.what());
                 }
             }
+            return true;
         }
     }
 }

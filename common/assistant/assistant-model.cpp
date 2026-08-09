@@ -30,7 +30,8 @@ namespace rs2
         });
 
         bool res;
-        if (!sptr_q->dequeue(&res, 100000) || !res)
+        const unsigned int timeout_ms = 5000;
+        if (!sptr_q->dequeue(&res, timeout_ms) || !res)
             throw std::runtime_error("Assistant invoke operation failed!");
     }
 
@@ -42,6 +43,15 @@ namespace rs2
 #ifndef ENABLE_AI_ASSISTANT
         return; // not built into this copy of the viewer - no launcher, no panel, nothing to show
 #endif
+
+        // cancel() only requests an abort; the background thread may take a moment to notice and
+        // unwind. Keep _waiting_for_response true (Stop shown, Send disabled) until busy() confirms
+        // it landed, so a send in that window can't hit send()'s "still busy" rejection.
+        if (_cancelling && !_client->busy())
+        {
+            _cancelling = false;
+            _waiting_for_response = false;
+        }
 
         if (!_health_check_started)
         {
@@ -89,23 +99,23 @@ namespace rs2
     void assistant_model::cancel_current_request()
     {
         // run() deliberately returns without calling on_error on a user-requested cancel, so
-        // nothing will update _waiting_for_response/streaming on its own - do it directly here
-        // instead of waiting for a callback that isn't coming.
+        // nothing will update streaming on its own - do it directly here. _waiting_for_response
+        // clears once draw() sees _client->busy() go false (see draw()), not immediately.
         _client->cancel();
         if (!_messages.empty() && _messages.back().role == assistant_chat_message::assistant_role)
             _messages.back().streaming = false;
-        _waiting_for_response = false;
+        _cancelling = true;
     }
 
     void assistant_model::new_conversation()
     {
-        // A request still in flight will find _messages empty when its callbacks fire and just
-        // no-op (see the guard at the top of handle_event/handle_error) - the old stream is
-        // abandoned rather than appended to a conversation the user has already cleared.
+        // Abort an in-flight request instead of just abandoning it: otherwise the client stays
+        // busy() after _messages is cleared, and the next send() rejects with "still answering".
+        if (_waiting_for_response)
+            cancel_current_request();
         _messages.clear();
         _conversation_id.clear();
         _last_user_message.clear();
-        _waiting_for_response = false;
     }
 
     void assistant_model::send_reaction(int value)
