@@ -181,25 +181,33 @@ export function AssistantPanel() {
 
         <div className="flex items-center justify-between gap-2 px-4 pb-2">
           {isChatAvailable ? (
-            <div className="flex items-center gap-1.5">
-              <Sparkles className={`w-3.5 h-3.5 shrink-0 ${!isChatbotMode ? 'text-rs-blue' : mutedText}`} />
+            <div
+              role="group"
+              aria-label="Choose assistant mode"
+              className={`flex items-center rounded-full p-0.5 gap-0.5 ${isLight ? 'bg-gray-200' : 'bg-gray-800'}`}
+            >
               <button
-                role="switch"
-                aria-checked={isChatbotMode}
-                aria-label="Choose assistant mode"
-                title={isChatbotMode ? 'Switch to the RealSense AI Assistant (product Q&A)' : 'Switch to the device-config Chatbot (camera settings)'}
-                onClick={() => setMode(isChatbotMode ? 'assistant' : 'chatbot')}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full shrink-0 transition-colors ${
-                  isChatbotMode ? 'bg-amber-600' : 'bg-rs-blue'
+                onClick={() => setMode('assistant')}
+                title="Switch to the RealSense AI Assistant (product Q&A)"
+                aria-pressed={!isChatbotMode}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  !isChatbotMode ? 'bg-rs-blue text-white' : iconBtn
                 }`}
               >
-                <span
-                  className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
-                    isChatbotMode ? 'translate-x-[18px]' : 'translate-x-0.5'
-                  }`}
-                />
+                <Sparkles className="w-3 h-3 shrink-0" />
+                AI Assistant
               </button>
-              <Wrench className={`w-3.5 h-3.5 shrink-0 ${isChatbotMode ? 'text-amber-500' : mutedText}`} />
+              <button
+                onClick={() => setMode('chatbot')}
+                title="Switch to the device-config Chatbot (camera settings)"
+                aria-pressed={isChatbotMode}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  isChatbotMode ? 'bg-amber-600 text-white' : iconBtn
+                }`}
+              >
+                <Wrench className="w-3 h-3 shrink-0" />
+                Chatbot
+              </button>
             </div>
           ) : (
             <span />
