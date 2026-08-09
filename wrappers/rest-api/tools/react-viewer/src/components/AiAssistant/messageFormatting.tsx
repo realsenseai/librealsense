@@ -22,40 +22,54 @@ export function stripCitationMarkers(content: string, citations?: AssistantCitat
   return stripped.replace(/【\d+(?::\d+)?†[^】]*】/g, '')
 }
 
+const LINK_CLASSES = 'text-rs-blue hover:underline break-all'
+
 function formatInline(text: string, isLight: boolean): (string | ReactNode)[] {
   const parts: (string | ReactNode)[] = []
   let remaining = text
   let key = 0
 
   while (remaining) {
+    const candidates: { match: RegExpMatchArray; type: 'bold' | 'code' | 'link' | 'url' }[] = []
     const boldMatch = remaining.match(/\*\*(.+?)\*\*/)
+    if (boldMatch) candidates.push({ match: boldMatch, type: 'bold' })
     const codeMatch = remaining.match(/`([^`]+)`/)
+    if (codeMatch) candidates.push({ match: codeMatch, type: 'code' })
+    // Markdown links are checked before bare URLs so "[label](url)" wins the tie over the
+    // bare-url match that would otherwise fire on the URL portion inside it.
+    const linkMatch = remaining.match(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/)
+    if (linkMatch) candidates.push({ match: linkMatch, type: 'link' })
+    const urlMatch = remaining.match(/https?:\/\/[^\s<>()[\]"']+/)
+    if (urlMatch) candidates.push({ match: urlMatch, type: 'url' })
 
-    let earliestMatch: RegExpMatchArray | null = null
-    let type: 'bold' | 'code' | null = null
-
-    if (boldMatch && (!codeMatch || boldMatch.index! < codeMatch.index!)) {
-      earliestMatch = boldMatch
-      type = 'bold'
-    } else if (codeMatch) {
-      earliestMatch = codeMatch
-      type = 'code'
-    }
-
-    if (earliestMatch && type) {
-      if (earliestMatch.index! > 0) {
-        parts.push(remaining.slice(0, earliestMatch.index))
-      }
-      if (type === 'bold') {
-        parts.push(<strong key={key++} className="font-semibold">{earliestMatch[1]}</strong>)
-      } else {
-        parts.push(<code key={key++} className={`px-1 py-0.5 rounded text-xs ${isLight ? 'bg-gray-200' : 'bg-gray-800'}`}>{earliestMatch[1]}</code>)
-      }
-      remaining = remaining.slice(earliestMatch.index! + earliestMatch[0].length)
-    } else {
+    if (candidates.length === 0) {
       parts.push(remaining)
       break
     }
+
+    const { match, type } = candidates.reduce((earliest, c) => (c.match.index! < earliest.match.index! ? c : earliest))
+
+    if (match.index! > 0) {
+      parts.push(remaining.slice(0, match.index))
+    }
+    if (type === 'bold') {
+      parts.push(<strong key={key++} className="font-semibold">{match[1]}</strong>)
+    } else if (type === 'code') {
+      parts.push(<code key={key++} className={`px-1 py-0.5 rounded text-xs ${isLight ? 'bg-gray-200' : 'bg-gray-800'}`}>{match[1]}</code>)
+    } else if (type === 'link') {
+      parts.push(
+        <a key={key++} href={match[2]} target="_blank" rel="noopener noreferrer" className={LINK_CLASSES}>
+          {match[1]}
+        </a>
+      )
+    } else {
+      parts.push(
+        <a key={key++} href={match[0]} target="_blank" rel="noopener noreferrer" className={LINK_CLASSES}>
+          {match[0]}
+        </a>
+      )
+    }
+    remaining = remaining.slice(match.index! + match[0].length)
   }
 
   return parts
