@@ -13,27 +13,48 @@
 
 namespace rs2
 {
+    namespace
+    {
+        struct launcher_geometry
+        {
+            float x, y, btn_w, btn_h, logo_r, dot_r, left_pad, logo_gap, dot_gap, text_w;
+        };
+
+        // Pure layout math for the collapsed launcher pill, kept separate from draw_launcher_button()
+        // below so that function only has to deal with ImGui calls and state, not geometry arithmetic.
+        launcher_geometry compute_launcher_geometry(ux_window& win, float bottom_clearance, const char* label)
+        {
+            launcher_geometry g;
+            g.btn_h = 44.f;
+            g.left_pad = 10.f;
+            g.logo_gap = 10.f;
+            g.dot_gap = 10.f;
+            g.logo_r = g.btn_h * 0.5f - 8.f;
+            g.dot_r = 4.f;
+            const float right_pad = 14.f;
+
+            ImGui::PushFont(win.get_font());
+            g.text_w = ImGui::CalcTextSize(label).x;
+            ImGui::PopFont();
+
+            g.btn_w = g.left_pad + g.logo_r * 2.f + g.logo_gap + g.text_w + g.dot_gap + g.dot_r * 2.f + right_pad;
+            const float margin = 20.f;
+            g.x = win.width() - g.btn_w - margin;
+            g.y = win.height() - g.btn_h - margin - bottom_clearance;
+            return g;
+        }
+    }
+
     void assistant_model::draw_launcher_button(ux_window& win, float bottom_clearance)
     {
         const char* label = "Ask RealSenseAI";
-        const float btn_h = 44.f;
-        const float left_pad = 10.f, logo_gap = 10.f, text_gap = 10.f, dot_gap = 10.f, right_pad = 14.f;
-        const float logo_r = btn_h * 0.5f - 8.f;
-        const float dot_r = 4.f;
         const float pill_rounding = 999.f; // always clamps to a true stadium/pill, regardless of btn_h
+        auto g = compute_launcher_geometry(win, bottom_clearance, label);
 
-        ImGui::PushFont(win.get_font());
-        float text_w = ImGui::CalcTextSize(label).x;
-        ImGui::PopFont();
+        assistant_detail::draw_soft_shadow({ g.x, g.y }, { g.btn_w, g.btn_h }, g.btn_h * 0.5f);
 
-        const float btn_w = left_pad + logo_r * 2.f + logo_gap + text_w + dot_gap + dot_r * 2.f + right_pad;
-        const float margin = 20.f;
-        const float x = win.width() - btn_w - margin, y = win.height() - btn_h - margin - bottom_clearance;
-
-        assistant_detail::draw_soft_shadow({ x, y }, { btn_w, btn_h }, btn_h * 0.5f);
-
-        ImGui::SetNextWindowPos({ x, y });
-        ImGui::SetNextWindowSize({ btn_w, btn_h });
+        ImGui::SetNextWindowPos({ g.x, g.y });
+        ImGui::SetNextWindowSize({ g.btn_w, g.btn_h });
         ImGui::SetNextWindowBgAlpha(0.f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0)); // else default padding clips the button
         auto flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
@@ -44,7 +65,7 @@ namespace rs2
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, header_color);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, header_color);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, pill_rounding);
-        bool clicked = ImGui::Button("##ask_ai", { btn_w, btn_h });
+        bool clicked = ImGui::Button("##ask_ai", { g.btn_w, g.btn_h });
         bool hovered = ImGui::IsItemHovered();
         auto bmin = ImGui::GetItemRectMin();
         ImGui::PopStyleVar();
@@ -56,13 +77,13 @@ namespace rs2
                 _focus_input_next_frame = true;
         }
 
-        float cy = bmin.y + btn_h * 0.5f;
-        float logo_cx = bmin.x + left_pad + logo_r;
-        draw_logo(logo_cx, cy, logo_r);
+        float cy = bmin.y + g.btn_h * 0.5f;
+        float logo_cx = bmin.x + g.left_pad + g.logo_r;
+        draw_logo(logo_cx, cy, g.logo_r);
 
         ImGui::PushFont(win.get_font());
         ImGui::PushStyleColor(ImGuiCol_Text, _open ? light_blue : light_grey);
-        float text_x = logo_cx + logo_r + logo_gap;
+        float text_x = logo_cx + g.logo_r + g.logo_gap;
         ImGui::SetCursorScreenPos({ text_x, cy - ImGui::GetTextLineHeight() * 0.5f });
         ImGui::TextUnformatted(label);
         ImGui::PopStyleColor();
@@ -70,9 +91,9 @@ namespace rs2
 
         if (_health != assistant_health::unknown)
         {
-            float dot_cx = text_x + text_w + dot_gap + dot_r;
+            float dot_cx = text_x + g.text_w + g.dot_gap + g.dot_r;
             ImVec4 dot_color = _health == assistant_health::healthy ? green : redish;
-            ImGui::GetWindowDrawList()->AddCircleFilled({ dot_cx, cy }, dot_r, ImColor(dot_color));
+            ImGui::GetWindowDrawList()->AddCircleFilled({ dot_cx, cy }, g.dot_r, ImColor(dot_color));
         }
 
         if (hovered)

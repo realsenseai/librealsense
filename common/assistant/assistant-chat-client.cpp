@@ -39,6 +39,57 @@ namespace rs2
 
         static const long REQUEST_TIMEOUT_SEC = 120L; // overall cap; SSE answers can stream for a while
 
+        namespace
+        {
+            std::string build_chat_request_body(const std::string& message, const std::string& conversation_id)
+            {
+                rsutils::json body_json;
+                body_json["message"] = message;
+                if (!conversation_id.empty())
+                    body_json["conversationId"] = conversation_id;
+                return body_json.dump();
+            }
+
+            // Wires up everything curl needs for the POST /api/chat/stream request; the caller
+            // still owns `headers`'s lifetime (curl_slist_free_all) since it must outlive perform().
+            void configure_chat_request(CURL* curl, const std::string& url, const std::string& body,
+                curl_slist* headers, curl_write_callback write_cb, void* write_userdata)
+            {
+                curl_easy_reset(curl);
+                curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+                curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+                curl_easy_setopt(curl, CURLOPT_POST, 1L);
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
+                curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONNECT_TIMEOUT_SEC);
+                curl_easy_setopt(curl, CURLOPT_TIMEOUT, REQUEST_TIMEOUT_SEC);
+                curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+                curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+                curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+                curl_easy_setopt(curl, CURLOPT_WRITEDATA, write_userdata);
+            }
+
+            // Maps a finished transfer's curl/HTTP result to on_error, if it wasn't a clean 2xx (that
+            // case, including a 2xx with no explicit SSE 'done'/'error' event, has nothing to report).
+            void report_transfer_result(CURLcode res, long http_status, const invoke_fn& invoke, const error_callback& on_error)
+            {
+                if (res != CURLE_OK)
+                {
+                    std::string message_text = rsutils::string::from() << "Couldn't reach the assistant: " << curl_easy_strerror(res);
+                    safe_invoke(invoke, [on_error, message_text]() { on_error(message_text); });
+                }
+                else if (http_status == 429)
+                {
+                    safe_invoke(invoke, [on_error]() { on_error("Too many requests - please wait a moment and try again."); });
+                }
+                else if (http_status >= 400)
+                {
+                    std::string message_text = rsutils::string::from() << "The assistant returned an error (HTTP " << http_status << ").";
+                    safe_invoke(invoke, [on_error, message_text]() { on_error(message_text); });
+                }
+            }
+        }
+
         size_t assistant_chat_client::write_trampoline(char* ptr, size_t size, size_t nmemb, void* userdata)
         {
             return static_cast<assistant_chat_client*>(userdata)->on_curl_data(ptr, size * nmemb);
@@ -98,7 +149,8 @@ namespace rs2
 
             _sse_parser.feed(ptr, bytes, [this](const sse_event& event) {
                 auto on_event = _active_on_event;
-                safe_invoke(_active_invoke, [on_event, event]() { on_event(event); });
+                if (on_event)
+                    safe_invoke(_active_invoke, [on_event, event]() { on_event(event); });
             });
             return bytes;
         }
@@ -116,30 +168,14 @@ namespace rs2
             _active_invoke = invoke;
             _active_on_event = on_event;
 
-            rsutils::json body_json;
-            body_json["message"] = message;
-            if (!conversation_id.empty())
-                body_json["conversationId"] = conversation_id;
-            std::string body = body_json.dump();
-
+            std::string body = build_chat_request_body(message, conversation_id);
             struct curl_slist* headers = nullptr;
             headers = curl_slist_append(headers, "Content-Type: application/json");
             headers = curl_slist_append(headers, "X-RS-Integration: viewer");
 
             std::string chat_url = std::string(BASE_URL) + "/api/chat/stream";
             auto* curl = static_cast<CURL*>(_curl);
-            curl_easy_reset(curl);
-            curl_easy_setopt(curl, CURLOPT_URL, chat_url.c_str());
-            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-            curl_easy_setopt(curl, CURLOPT_POST, 1L);
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
-            curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONNECT_TIMEOUT_SEC);
-            curl_easy_setopt(curl, CURLOPT_TIMEOUT, REQUEST_TIMEOUT_SEC);
-            curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_trampoline);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
+            configure_chat_request(curl, chat_url, body, headers, write_trampoline, this);
 
             auto res = curl_easy_perform(curl);
 
@@ -153,23 +189,7 @@ namespace rs2
             if (_cancel_requested)
                 return; // caller already knows it cancelled; no error needed
 
-            if (res != CURLE_OK)
-            {
-                std::string message_text = rsutils::string::from() << "Couldn't reach the assistant: " << curl_easy_strerror(res);
-                safe_invoke(invoke, [on_error, message_text]() { on_error(message_text); });
-                return;
-            }
-            if (http_status == 429)
-            {
-                safe_invoke(invoke, [on_error]() { on_error("Too many requests - please wait a moment and try again."); });
-            }
-            else if (http_status >= 400)
-            {
-                std::string message_text = rsutils::string::from() << "The assistant returned an error (HTTP " << http_status << ").";
-                safe_invoke(invoke, [on_error, message_text]() { on_error(message_text); });
-            }
-            // A 2xx transfer that ended without an explicit SSE 'done'/'error' event is treated as
-            // successfully finished by the caller (it just stops waiting once the thread completes).
+            report_transfer_result(res, http_status, invoke, on_error);
         }
 #endif
     }
