@@ -14,6 +14,7 @@
 #include "measurement.h"
 #include "updates-model.h"
 #include "bag-conversion-helper.h"
+#include "assistant/assistant-model.h"
 #include <librealsense2/hpp/rs_export.hpp>
 
 namespace rs2
@@ -158,6 +159,7 @@ namespace rs2
 
         context &ctx;
         std::shared_ptr<notifications_model> not_model = std::make_shared<notifications_model>();
+        std::shared_ptr<assistant_model> assistant = std::make_shared<assistant_model>();
         bool is_3d_view = false;
         bool paused = false;
         bool metric_system = true;
