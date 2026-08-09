@@ -8,7 +8,7 @@
 // are visually distinguishable at a glance, without having to read the header title.
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Loader2, Wrench } from 'lucide-react'
+import { Send, Loader2, Square, Wrench } from 'lucide-react'
 import { useAppStore } from '../../store'
 import { ChatMessageBubble } from '../ChatBot/ChatMessage'
 import { SettingsPreview } from '../ChatBot/SettingsPreview'
@@ -19,7 +19,7 @@ interface ChatBotContentProps {
 
 export function ChatBotContent({ theme }: ChatBotContentProps) {
   const isLight = theme === 'light'
-  const { isChatLoading, chatMessages, pendingSettings, sendChatMessage } = useAppStore()
+  const { isChatLoading, chatMessages, pendingSettings, sendChatMessage, stopChatMessage } = useAppStore()
 
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -87,6 +87,20 @@ export function ChatBotContent({ theme }: ChatBotContentProps) {
             className="p-2 bg-amber-600 text-white rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Send className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1 mt-2">
+          <button
+            type="button"
+            onClick={stopChatMessage}
+            disabled={!isChatLoading}
+            title="Stop generating"
+            className={`p-1.5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+              isLight ? 'text-gray-500 hover:text-gray-900 hover:bg-gray-200' : 'text-gray-400 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            <Square className="w-4 h-4" />
           </button>
         </div>
       </form>

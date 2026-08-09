@@ -15,6 +15,9 @@ import type {
   SensorConfig,
 } from '../api/types'
 
+// Tracks the in-flight legacy-chatbot request so `stopChatMessage` can abort it.
+let currentChatAbortController: AbortController | null = null
+
 // Map to track pending stop operations by "deviceId:sensorId" key
 // Used to await completion before allowing a new start
 const pendingStopPromises = new Map<string, Promise<void>>()
@@ -197,6 +200,7 @@ interface AppState {
   toggleChat: () => void
   checkChatAvailability: () => Promise<void>
   sendChatMessage: (content: string) => Promise<void>
+  stopChatMessage: () => void
   applyProposedSettings: () => Promise<void>
   dismissProposedSettings: () => void
   clearChat: () => void
@@ -1213,12 +1217,18 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
       isChatLoading: true,
     }))
 
+    // A prior turn must be cancelled first, otherwise it keeps running un-stoppably
+    // in the background since only the latest controller stays reachable.
+    currentChatAbortController?.abort()
+    const controller = new AbortController()
+    currentChatAbortController = controller
+
     try {
       // Get all messages for context
       const allMessages = [...state.chatMessages, userMessage]
 
       // Send to API with device context
-      const response: ChatResponse = await sendChatMessageApi(allMessages, state.deviceStates)
+      const response: ChatResponse = await sendChatMessageApi(allMessages, state.deviceStates, controller.signal)
 
       // Add assistant message
       const assistantMessage: ChatMessage = {
@@ -1232,21 +1242,27 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
       set((s) => ({
         chatMessages: [...s.chatMessages, assistantMessage],
         pendingSettings: response.proposedSettings || s.pendingSettings,
-        isChatLoading: false,
       }))
     } catch (error) {
-      const errorMessage: ChatMessage = {
-        id: generateMessageId(),
-        role: 'assistant',
-        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-        timestamp: Date.now(),
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        // User-initiated stop — no error message, just stop loading.
+      } else {
+        const errorMessage: ChatMessage = {
+          id: generateMessageId(),
+          role: 'assistant',
+          content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+          timestamp: Date.now(),
+        }
+        set((s) => ({ chatMessages: [...s.chatMessages, errorMessage] }))
       }
-
-      set((s) => ({
-        chatMessages: [...s.chatMessages, errorMessage],
-        isChatLoading: false,
-      }))
+    } finally {
+      if (currentChatAbortController === controller) currentChatAbortController = null
+      set({ isChatLoading: false })
     }
+  },
+
+  stopChatMessage: () => {
+    currentChatAbortController?.abort()
   },
 
   applyProposedSettings: async () => {
