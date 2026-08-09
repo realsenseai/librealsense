@@ -184,14 +184,16 @@ export function AssistantPanel() {
             <div
               role="group"
               aria-label="Choose assistant mode"
-              className={`flex items-center rounded-full p-0.5 gap-0.5 ${isLight ? 'bg-gray-200' : 'bg-gray-800'}`}
+              className={`flex items-center rounded-full p-0.5 gap-0.5 ${isLight ? 'bg-gray-200' : 'bg-gray-700'}`}
             >
               <button
                 onClick={() => setMode('assistant')}
                 title="Switch to the RealSense AI Assistant (product Q&A)"
                 aria-pressed={!isChatbotMode}
                 className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                  !isChatbotMode ? 'bg-rs-blue text-white' : iconBtn
+                  !isChatbotMode
+                    ? 'bg-rs-blue text-white'
+                    : isLight ? 'text-gray-500 hover:text-gray-900 hover:bg-gray-300' : 'text-gray-400 hover:text-white hover:bg-gray-600'
                 }`}
               >
                 <Sparkles className="w-3 h-3 shrink-0" />
@@ -202,7 +204,9 @@ export function AssistantPanel() {
                 title="Switch to the device-config Chatbot (camera settings)"
                 aria-pressed={isChatbotMode}
                 className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                  isChatbotMode ? 'bg-amber-600 text-white' : iconBtn
+                  isChatbotMode
+                    ? 'bg-amber-600 text-white'
+                    : isLight ? 'text-gray-500 hover:text-gray-900 hover:bg-gray-300' : 'text-gray-400 hover:text-white hover:bg-gray-600'
                 }`}
               >
                 <Wrench className="w-3 h-3 shrink-0" />
