@@ -52,6 +52,7 @@ function formatInline(text: string, isLight: boolean): (string | ReactNode)[] {
     if (match.index! > 0) {
       parts.push(remaining.slice(0, match.index))
     }
+    let consumed = match[0].length
     if (type === 'bold') {
       parts.push(<strong key={key++} className="font-semibold">{match[1]}</strong>)
     } else if (type === 'code') {
@@ -63,13 +64,17 @@ function formatInline(text: string, isLight: boolean): (string | ReactNode)[] {
         </a>
       )
     } else {
+      // A trailing sentence-ending character (".", "See https://x.com.") isn't part of the
+      // URL — strip it from the link itself and leave it in `remaining` as plain text.
+      const url = match[0].replace(/[.,;!?]+$/, '')
+      consumed = url.length
       parts.push(
-        <a key={key++} href={match[0]} target="_blank" rel="noopener noreferrer" className={LINK_CLASSES}>
-          {match[0]}
+        <a key={key++} href={url} target="_blank" rel="noopener noreferrer" className={LINK_CLASSES}>
+          {url}
         </a>
       )
     }
-    remaining = remaining.slice(match.index! + match[0].length)
+    remaining = remaining.slice(match.index! + consumed)
   }
 
   return parts
