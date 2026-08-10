@@ -15,6 +15,9 @@ import type {
   SensorConfig,
 } from '../api/types'
 
+// Tracks the in-flight legacy-chatbot request so `stopChatMessage` can abort it.
+let currentChatAbortController: AbortController | null = null
+
 // Map to track pending stop operations by "deviceId:sensorId" key
 // Used to await completion before allowing a new start
 const pendingStopPromises = new Map<string, Promise<void>>()
@@ -110,6 +113,8 @@ import {
   type ChatResponse,
 } from '../api/chat'
 import type { ProposedSettings } from '../utils/chatPrompt'
+import type { AssistantChatMessage, AssistantFileAttachment } from '../api/assistantChat'
+import { createAssistantSlice } from './assistantSlice'
 
 interface IMUHistory {
   accel: { timestamp: number; x: number; y: number; z: number }[]
@@ -135,7 +140,7 @@ interface AppState {
   toggleDeviceActive: (device: DeviceInfo) => Promise<void>
   getActiveDevices: () => DeviceState[]
   isAnyDeviceStreaming: () => boolean
-  
+
   resetDevice: (deviceId: string) => Promise<void>
 
   // Per-device sensors fetch
@@ -150,7 +155,7 @@ interface AppState {
     value: number | boolean | string
   ) => Promise<void>
 
-  // Per-device stream configuration  
+  // Per-device stream configuration
   updateStreamConfig: (deviceId: string, config: StreamConfig) => void
   updateSensorConfig: (deviceId: string, sensorId: string, config: Partial<SensorConfig>) => void
 
@@ -195,9 +200,31 @@ interface AppState {
   toggleChat: () => void
   checkChatAvailability: () => Promise<void>
   sendChatMessage: (content: string) => Promise<void>
+  stopChatMessage: () => void
   applyProposedSettings: () => Promise<void>
   dismissProposedSettings: () => void
   clearChat: () => void
+
+  // RealSense AI Assistant state (hosted, anonymous product Q&A — separate from the chat slice above)
+  isAssistantOpen: boolean
+  isAssistantOnline: boolean
+  isAssistantLoading: boolean
+  assistantMessages: AssistantChatMessage[]
+  assistantConversationId: string | null
+  assistantTheme: 'light' | 'dark'
+  assistantSize: 'compact' | 'wide'
+  toggleAssistant: () => void
+  pingAssistantHealth: () => Promise<void>
+  sendAssistantMessage: (
+    content: string,
+    attachments?: { imageDataUris?: string[]; fileDataUris?: AssistantFileAttachment[] }
+  ) => Promise<void>
+  regenerateLastAssistantMessage: () => Promise<void>
+  stopAssistantMessage: () => void
+  sendAssistantReaction: (value: 1 | -1 | 0) => Promise<void>
+  clearAssistantChat: () => void
+  toggleAssistantTheme: () => void
+  toggleAssistantSize: () => void
 
   // Error handling
   error: string | null
@@ -214,7 +241,9 @@ interface AppState {
   pointCloudColors: Uint8Array | null
 }
 
-export const useAppStore = create<AppState>()((set, get) => ({
+export type { AppState }
+
+export const useAppStore = create<AppState>()((set, get, api) => ({
   // Connection state
   isConnected: false,
   setConnected: (connected) => set({ isConnected: connected }),
@@ -224,7 +253,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   deviceStates: {},
   isLoadingDevices: false,
   hasUserInteracted: false,
-  
+
   fetchDevices: async (forceRefresh = false) => {
     // Guard against concurrent fetches: a slow force-refresh must not be clobbered
     // by a cache-hit poll that resolves after it.
@@ -274,7 +303,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
         return { devices, deviceStates: newDeviceStates, isLoadingDevices: false }
       })
-      
+
       // Auto-activate if exactly 1 device and user hasn't manually interacted
       const currentState = get()
       const activeDevices = Object.values(currentState.deviceStates).filter(ds => ds.isActive)
@@ -401,10 +430,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
   toggleDeviceActive: async (device: DeviceInfo) => {
     // Mark that user has interacted (skip future auto-activation)
     set({ hasUserInteracted: true })
-    
+
     const state = get()
     const existing = state.deviceStates[device.device_id]
-    
+
     if (existing?.isActive) {
       // Deactivate: stop streaming if active, then remove
       if (existing.isStreaming) {
@@ -443,7 +472,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       set((s) => ({
         deviceStates: { ...s.deviceStates, [device.device_id]: deviceState },
       }))
-      
+
       // Fetch sensors for this device
       await get().fetchSensors(device.device_id)
     }
@@ -548,7 +577,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       set((state) => {
         const deviceState = state.deviceStates[deviceId]
         if (!deviceState) return state
-        
+
         return {
           deviceStates: {
             ...state.deviceStates,
@@ -559,7 +588,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
                 [sensorId]: deviceState.options[sensorId]?.map((opt) =>
                   // Match by option_id OR by name (case-insensitive) for chatbot compatibility
                   (opt.option_id === optionId || opt.name.toLowerCase() === optionId.toLowerCase())
-                    ? { ...opt, current_value: value } 
+                    ? { ...opt, current_value: value }
                     : opt
                 ),
               },
@@ -579,7 +608,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((state) => {
       const deviceState = state.deviceStates[deviceId]
       if (!deviceState) return state
-      
+
       return {
         deviceStates: {
           ...state.deviceStates,
@@ -599,9 +628,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((state) => {
       const deviceState = state.deviceStates[deviceId]
       if (!deviceState) return state
-      
+
       const currentConfig = deviceState.sensorConfigs[sensorId] || { resolution: { width: 0, height: 0 }, framerate: 0 }
-      
+
       return {
         deviceStates: {
           ...state.deviceStates,
@@ -746,7 +775,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   startAllStreaming: async () => {
     const state = get()
     const activeDevices = Object.values(state.deviceStates).filter(ds => ds.isActive)
-    
+
     for (const deviceState of activeDevices) {
       const enabledConfigs = deviceState.streamConfigs.filter(c => c.enable)
       if (enabledConfigs.length > 0) {
@@ -758,7 +787,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   stopAllStreaming: async () => {
     const state = get()
     const streamingDevices = Object.values(state.deviceStates).filter(ds => ds.isStreaming)
-    
+
     for (const deviceState of streamingDevices) {
       await get().stopDeviceStreaming(deviceState.device.device_id)
     }
@@ -819,7 +848,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
     try {
       const status = await apiClient.startSensor(deviceId, sensorId, configs)
-      
+
       set((s) => ({
         deviceStates: {
           ...s.deviceStates,
@@ -846,7 +875,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           errorMessage = axiosError.message
         }
       }
-      
+
       // Store error in sensor status
       set((s) => ({
         deviceStates: {
@@ -917,7 +946,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const stopPromise = (async () => {
       try {
         const status = await apiClient.stopSensor(deviceId, sensorId)
-        
+
         set((s) => {
           const deviceState = s.deviceStates[deviceId]
           if (!deviceState) return s
@@ -984,7 +1013,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   refreshSensorStatus: async (deviceId) => {
     try {
       const batchStatus = await apiClient.getBatchSensorStatus(deviceId)
-      
+
       set((s) => {
         const deviceState = s.deviceStates[deviceId]
         if (!deviceState) return s
@@ -995,7 +1024,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         }
 
         const anyStreaming = batchStatus.sensors.some(ss => ss.is_streaming)
-        const mode = batchStatus.mode === 'sensor' ? 'sensor' : 
+        const mode = batchStatus.mode === 'sensor' ? 'sensor' :
                      batchStatus.mode === 'pipeline' ? 'pipeline' : 'idle'
 
         return {
@@ -1021,7 +1050,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((state) => {
       const deviceState = state.deviceStates[deviceId]
       if (!deviceState) return state
-      
+
       return {
         deviceStates: {
           ...state.deviceStates,
@@ -1164,17 +1193,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
   isChatLoading: false,
   chatMessages: [],
   pendingSettings: null,
-  
+
   toggleChat: () => set((state) => ({ isChatOpen: !state.isChatOpen })),
-  
+
   checkChatAvailability: async () => {
     const available = await checkChatAvailability()
     set({ isChatAvailable: available })
   },
-  
+
   sendChatMessage: async (content: string) => {
     const state = get()
-    
+
     // Add user message
     const userMessage: ChatMessage = {
       id: generateMessageId(),
@@ -1182,19 +1211,25 @@ export const useAppStore = create<AppState>()((set, get) => ({
       content,
       timestamp: Date.now(),
     }
-    
+
     set((s) => ({
       chatMessages: [...s.chatMessages, userMessage],
       isChatLoading: true,
     }))
-    
+
+    // A prior turn must be cancelled first, otherwise it keeps running un-stoppably
+    // in the background since only the latest controller stays reachable.
+    currentChatAbortController?.abort()
+    const controller = new AbortController()
+    currentChatAbortController = controller
+
     try {
       // Get all messages for context
       const allMessages = [...state.chatMessages, userMessage]
-      
+
       // Send to API with device context
-      const response: ChatResponse = await sendChatMessageApi(allMessages, state.deviceStates)
-      
+      const response: ChatResponse = await sendChatMessageApi(allMessages, state.deviceStates, controller.signal)
+
       // Add assistant message
       const assistantMessage: ChatMessage = {
         id: generateMessageId(),
@@ -1203,58 +1238,64 @@ export const useAppStore = create<AppState>()((set, get) => ({
         proposedSettings: response.proposedSettings,
         timestamp: Date.now(),
       }
-      
+
       set((s) => ({
         chatMessages: [...s.chatMessages, assistantMessage],
         pendingSettings: response.proposedSettings || s.pendingSettings,
-        isChatLoading: false,
       }))
     } catch (error) {
-      const errorMessage: ChatMessage = {
-        id: generateMessageId(),
-        role: 'assistant',
-        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-        timestamp: Date.now(),
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        // User-initiated stop — no error message, just stop loading.
+      } else {
+        const errorMessage: ChatMessage = {
+          id: generateMessageId(),
+          role: 'assistant',
+          content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+          timestamp: Date.now(),
+        }
+        set((s) => ({ chatMessages: [...s.chatMessages, errorMessage] }))
       }
-      
-      set((s) => ({
-        chatMessages: [...s.chatMessages, errorMessage],
-        isChatLoading: false,
-      }))
+    } finally {
+      if (currentChatAbortController === controller) currentChatAbortController = null
+      set({ isChatLoading: false })
     }
   },
-  
+
+  stopChatMessage: () => {
+    currentChatAbortController?.abort()
+  },
+
   applyProposedSettings: async () => {
     const state = get()
     const settings = state.pendingSettings
     if (!settings) return
-    
+
     try {
       // Find the device
       const deviceState = Object.values(state.deviceStates).find(
         ds => ds.device.serial_number === settings.deviceSerial
       )
-      
+
       if (!deviceState) {
         throw new Error(`Device ${settings.deviceSerial} not found`)
       }
-      
+
       const deviceId = deviceState.device.device_id
-      
+
       // Apply stream configurations to local state first
       // Apply stream configurations - match by stream_type (case-insensitive)
       if (settings.streamConfigs && settings.streamConfigs.length > 0) {
         set((state) => {
           const deviceState = state.deviceStates[deviceId]
           if (!deviceState) return state
-          
+
           // Create updated stream configs
           const updatedConfigs = deviceState.streamConfigs.map(existingConfig => {
             // Find matching proposed config by stream_type (case-insensitive)
             const proposedConfig = settings.streamConfigs!.find(
               pc => pc.stream_type.toLowerCase() === existingConfig.stream_type.toLowerCase()
             )
-            
+
             if (proposedConfig) {
               // Merge proposed config with existing, keeping sensor_id from existing
               return {
@@ -1267,7 +1308,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
             }
             return existingConfig
           })
-          
+
           return {
             deviceStates: {
               ...state.deviceStates,
@@ -1279,7 +1320,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           }
         })
       }
-      
+
       // Apply option changes
       if (settings.optionChanges) {
         for (const change of settings.optionChanges) {
@@ -1296,7 +1337,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           await get().setOption(deviceId, uniqueSensorId, change.optionId, change.value)
         }
       }
-      
+
       // Handle stream start/stop actions
       if (settings.streamAction === 'start') {
         // Make sure we have stream configs before starting
@@ -1309,10 +1350,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
       } else if (settings.streamAction === 'stop') {
         await get().stopDeviceStreaming(deviceId)
       }
-      
+
       // Clear pending settings
       set({ pendingSettings: null })
-      
+
       // Build confirmation message
       let confirmContent = '✓ Settings applied successfully'
       if (settings.streamAction === 'start') {
@@ -1323,7 +1364,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       if (settings.explanation) {
         confirmContent += `: ${settings.explanation}`
       }
-      
+
       // Add confirmation message
       const confirmMessage: ChatMessage = {
         id: generateMessageId(),
@@ -1338,17 +1379,20 @@ export const useAppStore = create<AppState>()((set, get) => ({
       get().setError(`Failed to apply settings: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   },
-  
+
   dismissProposedSettings: () => {
     set({ pendingSettings: null })
   },
-  
+
   clearChat: () => {
     set({
       chatMessages: [],
       pendingSettings: null,
     })
   },
+
+  // RealSense AI Assistant state — extracted to assistantSlice.ts
+  ...createAssistantSlice(set, get, api),
 
   // Error handling
   error: null,
