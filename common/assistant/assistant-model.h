@@ -26,7 +26,11 @@ namespace rs2
 
     struct assistant_chat_message
     {
-        enum role_t { user_role, assistant_role } role;
+        enum role_t { user_role, assistant_role };
+
+        explicit assistant_chat_message(role_t role) : role(role) {}
+
+        role_t role;
         std::string text;
         std::vector<assistant_citation> citations;
         bool streaming = false;

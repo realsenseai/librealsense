@@ -38,7 +38,7 @@ namespace rs2
             while (i < in.size())
             {
                 unsigned char c = static_cast<unsigned char>(in[i]);
-                if (c < 0x80) { out += in[i]; ++i; continue; }
+                if (c < UTF8_CONTINUATION_MIN) { out += in[i]; ++i; continue; }
 
                 bool matched = false;
                 for (auto&& r : replacements)
@@ -55,7 +55,7 @@ namespace rs2
                 if (matched)
                     continue;
 
-                i += (c >= 0xF0) ? 4 : (c >= 0xE0) ? 3 : (c >= 0xC0) ? 2 : 1;
+                i += (c >= UTF8_4BYTE_LEAD_MIN) ? 4 : (c >= UTF8_3BYTE_LEAD_MIN) ? 3 : (c >= UTF8_2BYTE_LEAD_MIN) ? 2 : 1;
             }
             return out;
         }

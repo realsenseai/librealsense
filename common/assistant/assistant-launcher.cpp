@@ -123,7 +123,7 @@ namespace rs2
         }
 
         auto* dl = ImGui::GetWindowDrawList();
-        dl->AddCircleFilled({ cx, cy }, radius, ImColor(255, 255, 255, 255));
+        dl->AddCircleFilled({ cx, cy }, radius, ImColor(white));
         if (auto tex = _mark_tex.get_gl_handle())
         {
             float inset = radius * 0.8f;

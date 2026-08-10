@@ -90,7 +90,10 @@ namespace rs2
         ImGui::PopStyleColor();
         ImGui::EndGroup();
 
-        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - 88.f);
+        // 3 icon buttons (new-conversation/expand/close) at draw_icon_button()'s 24px size, plus
+        // ImGui's default ~8px ItemSpacing between each of the 2 gaps between them.
+        const float header_icons_w = 3.f * 24.f + 2.f * 8.f;
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - header_icons_w);
         ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
         if (draw_icon_button(textual_icons::plus_circle))
             new_conversation();

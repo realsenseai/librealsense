@@ -79,8 +79,7 @@ namespace rs2
             return;
         text = text.substr(first, text.find_last_not_of(" \t\n\r") - first + 1);
 
-        assistant_chat_message user_msg;
-        user_msg.role = assistant_chat_message::user_role;
+        assistant_chat_message user_msg(assistant_chat_message::user_role);
         user_msg.text = text;
         _messages.push_back(user_msg);
 
@@ -131,8 +130,7 @@ namespace rs2
 
     void assistant_model::dispatch_send(const std::string& text)
     {
-        assistant_chat_message reply;
-        reply.role = assistant_chat_message::assistant_role;
+        assistant_chat_message reply(assistant_chat_message::assistant_role);
         reply.streaming = true;
         _messages.push_back(reply);
 
@@ -168,7 +166,7 @@ namespace rs2
             // multi-byte char split across chunks.
             const size_t window = 1024;
             size_t tail_start = msg.text.size() > window ? msg.text.size() - window : 0;
-            while (tail_start > 0 && (unsigned char)msg.text[tail_start] >= 0x80 && (unsigned char)msg.text[tail_start] < 0xC0)
+            while (tail_start > 0 && assistant_detail::is_utf8_continuation_byte((unsigned char)msg.text[tail_start]))
                 tail_start--; // never cut the window mid-UTF8-sequence
             msg.text = msg.text.substr(0, tail_start) + assistant_detail::sanitize_for_display(msg.text.substr(tail_start));
             break;

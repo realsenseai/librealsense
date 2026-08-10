@@ -34,7 +34,7 @@ namespace rs2
                         std::string response;
                         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
                         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONNECT_TIMEOUT_SEC);
-                        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+                        curl_easy_setopt(curl, CURLOPT_TIMEOUT, ONE_SHOT_TIMEOUT_SEC);
                         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
                         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
                         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
@@ -85,7 +85,7 @@ namespace rs2
                         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
                         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
                         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, CONNECT_TIMEOUT_SEC);
-                        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+                        curl_easy_setopt(curl, CURLOPT_TIMEOUT, ONE_SHOT_TIMEOUT_SEC);
                         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 
                         auto res = curl_easy_perform(curl);

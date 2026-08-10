@@ -95,7 +95,7 @@ namespace rs2
         {
             size_t start = std::string::npos;
             size_t length = 0;
-            span_kind kind;
+            span_kind kind = span_kind::link; // unused unless start != npos, but never left indeterminate
             std::string label; // display text (the link's label, or its url if there was no label)
             std::string url;
         };
