@@ -107,6 +107,7 @@ set(ASSISTANT_FILES
     "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-panel.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-messages.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-markdown.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-markdown-parser.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-markdown.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-ui-utils.h"
     "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-ui-utils.cpp"

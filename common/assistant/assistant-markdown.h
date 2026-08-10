@@ -33,6 +33,10 @@ namespace rs2
             std::vector<markdown_line> lines;
         };
 
+        // Pure parsing (no ImGui/UI dependency, defined in assistant-markdown-parser.cpp) - split
+        // out from rendering specifically so it's unit-testable without pulling in ImGui.
+        std::vector<markdown_line> parse_markdown(const std::string& text);
+
         // Renders one assistant reply's markdown as flowing ImGui text: headings get a bigger font,
         // rules become a real separator, links are styled/clickable, everything else word-wraps at
         // wrap_width. `cache` must be the same instance across calls for a given message.
