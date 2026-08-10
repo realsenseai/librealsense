@@ -42,15 +42,17 @@ option(FORCE_LIBUVC "Explicitly turn-on libuvc backend - deprecated, use FORCE_R
 option(FORCE_WINUSB_UVC "Explicitly turn-on winusb_uvc (for win7) backend - deprecated, use FORCE_RSUSB_BACKEND instead" OFF)
 option(ANDROID_USB_HOST_UVC "Build UVC backend for Android - deprecated, use FORCE_RSUSB_BACKEND instead" OFF)
 # This feature requires OpenSSL installation on Linux/OSX, OSX normally does not come with OpenSSL integrated(Thats why default is OFF on OSX)
-# ENABLE_AI_ASSISTANT shares this libcurl/OpenSSL dependency profile, so both derive their default
-# from the same per-OS condition below.
 if (NOT APPLE)
-    set(CURL_DEPENDENT_FEATURE_DEFAULT ON)
+    option(CHECK_FOR_UPDATES "Checks for versions updates" ON)
 else()
-    set(CURL_DEPENDENT_FEATURE_DEFAULT OFF)
+    option(CHECK_FOR_UPDATES "Checks for versions updates" OFF)
 endif()
-option(CHECK_FOR_UPDATES "Checks for versions updates" ${CURL_DEPENDENT_FEATURE_DEFAULT})
-option(ENABLE_AI_ASSISTANT "Build the AI Assistant chat panel into the viewer" ${CURL_DEPENDENT_FEATURE_DEFAULT})
+# Same libcurl/OpenSSL dependency profile as CHECK_FOR_UPDATES above, so the same per-OS default applies.
+if (NOT APPLE)
+    option(ENABLE_AI_ASSISTANT "Build the AI Assistant chat panel into the viewer" ON)
+else()
+    option(ENABLE_AI_ASSISTANT "Build the AI Assistant chat panel into the viewer" OFF)
+endif()
 option(BUILD_WITH_CPU_EXTENSIONS "Enable compiler optimizations using CPU extensions (such as AVX)" ON)
 # Enable NEON option only on 64-bit ARM platforms (ARM64/AArch64)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|ARM64|aarch64|AARCH64)")
