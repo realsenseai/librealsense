@@ -22,6 +22,16 @@
 #include <map>
 #include <mutex>
 
+#if defined( __APPLE__ )
+#include <cerrno>
+#include <chrono>
+#include <cstdlib>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <thread>
+#include <unistd.h>
+#endif
+
 using namespace eprosima::fastdds::dds;
 using namespace realdds;
 
@@ -32,6 +42,67 @@ namespace {
     participant_id last_participants_id = 0;
 
     std::map< std::string, dds_guid_prefix > participant_by_name;
+
+#if defined( __APPLE__ )
+    // FastDDS 2.10.4 participant creation has a narrow cross-process race on
+    // macOS. Serialize only this critical window. The lock is best-effort and
+    // bounded so a stale or hostile holder cannot wedge discovery indefinitely.
+    class apple_participant_create_guard
+    {
+    public:
+        apple_participant_create_guard()
+        {
+            auto const * tmpdir = std::getenv( "TMPDIR" );
+            std::string const lock_path
+                = std::string( tmpdir && *tmpdir ? tmpdir : "/tmp" )
+                + "/realdds-dds-participant-create.lock";
+            _fd = ::open( lock_path.c_str(), O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0600 );
+            if( _fd < 0 )
+                return;
+
+            for( int attempt = 0; attempt < 40; ++attempt )
+            {
+                if( ::flock( _fd, LOCK_EX | LOCK_NB ) == 0 )
+                    return;
+                if( errno != EWOULDBLOCK && errno != EAGAIN )
+                    break;
+                if( attempt != 39 )
+                    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+            }
+
+            ::close( _fd );
+            _fd = -1;
+        }
+
+        ~apple_participant_create_guard() { release(); }
+
+        bool owns_lock() const { return _fd >= 0; }
+
+        void settle_and_release()
+        {
+            if( _fd >= 0 )
+            {
+                // Participant creation succeeded; keep peers out of the
+                // empirically observed race window before releasing the lock.
+                std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+                release();
+            }
+        }
+
+    private:
+        void release()
+        {
+            if( _fd >= 0 )
+            {
+                ::flock( _fd, LOCK_UN );
+                ::close( _fd );
+                _fd = -1;
+            }
+        }
+
+        int _fd = -1;
+    };
+#endif
 
     struct participant_info
     {
@@ -245,11 +316,22 @@ void dds_participant::init( dds_domain_id domain_id, qos & pqos, rsutils::json c
     // We need none of the standard callbacks at this level: these can be enabled on a per-reader/-writer basis!
     StatusMask const par_mask = StatusMask::none();
     _participant_factory = DomainParticipantFactory::get_shared_instance();
+
+#if defined( __APPLE__ )
+    apple_participant_create_guard apple_create_guard;
+    if( ! apple_create_guard.owns_lock() )
+        LOG_WARNING( "macOS DDS participant create lock unavailable after bounded wait; proceeding unlocked" );
+#endif
+
     _participant
         = DDS_API_CALL( _participant_factory->create_participant( domain_id, pqos, _domain_listener.get(), par_mask ) );
 
     if( ! _participant )
         DDS_THROW( runtime_error, "failed creating participant " << pqos.name() << " on domain id " << domain_id );
+
+#if defined( __APPLE__ )
+    apple_create_guard.settle_and_release();
+#endif
 
     if( settings.is_object() )
         _settings = settings;

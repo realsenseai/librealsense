@@ -110,6 +110,14 @@ macro(global_target_config)
             PRIVATE ${USB_INCLUDE_DIRS}
     )
 
+    # Apple DDS builds link shared FastDDS dylibs. Keep this target relocatable
+    # without changing the RPATH policy of non-DDS Apple builds.
+    if(APPLE AND BUILD_WITH_DDS)
+        set_target_properties(${LRS_TARGET} PROPERTIES
+            MACOSX_RPATH ON
+            BUILD_RPATH "@loader_path"
+            INSTALL_RPATH "@loader_path"
+            INSTALL_NAME_DIR "@rpath")
+    endif()
 
 endmacro()
-

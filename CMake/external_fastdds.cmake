@@ -13,6 +13,12 @@ function(get_fastdds)
     message(CHECK_START  "Fetching fastdds...")
     list(APPEND CMAKE_MESSAGE_INDENT "  ")  # Indent outputs
 
+    if(APPLE)
+        get_filename_component(_FASTDDS_MACOS_REUSEPORT_PATCH
+            "${CMAKE_SOURCE_DIR}/CMake/patches/fastdds-v2.10.4-macos-reuseport.patch"
+            ABSOLUTE)
+    endif()
+
     FetchContent_Declare(
       fastdds
       GIT_REPOSITORY https://github.com/eProsima/Fast-DDS.git
@@ -40,13 +46,75 @@ function(get_fastdds)
     # Enforce NO_TLS to disable SSL: if OpenSSL is found, it will be linked to, and we don't want it!
     set(NO_TLS ON CACHE INTERNAL "" FORCE)
 
-    # Set special values for FastDDS sub directory
-    set(BUILD_SHARED_LIBS OFF)
+    # Set special values for FastDDS sub directory. This function scope keeps
+    # BUILD_SHARED_LIBS from leaking back into librealsense. On Apple, FastDDS
+    # must be shared: linking its static archives into librealsense2.dylib
+    # crashes in DomainParticipantFactory::create_participant at runtime.
+    if(APPLE)
+        set(BUILD_SHARED_LIBS ON)
+        message(STATUS "FastDDS: shared libraries (required for macOS librealsense2.dylib + DDS)")
+    else()
+        set(BUILD_SHARED_LIBS OFF)
+    endif()
     set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/fastdds/fastdds_install)
     set(CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/fastdds/fastdds_install)
 
-    # Get fastdds
-    FetchContent_MakeAvailable(fastdds)
+    # Populate first so the Apple transport patch is applied before FastDDS is
+    # configured or compiled.
+    FetchContent_GetProperties(fastdds)
+    if(NOT fastdds_POPULATED)
+        FetchContent_Populate(fastdds)
+    endif()
+
+    if(APPLE)
+        if(NOT EXISTS "${_FASTDDS_MACOS_REUSEPORT_PATCH}")
+            message(FATAL_ERROR "FastDDS macOS SO_REUSEPORT patch is missing: ${_FASTDDS_MACOS_REUSEPORT_PATCH}")
+        endif()
+        if(NOT EXISTS "${fastdds_SOURCE_DIR}/src/cpp/rtps/transport/UDPv4Transport.cpp")
+            message(FATAL_ERROR "FastDDS source tree is incomplete: ${fastdds_SOURCE_DIR}")
+        endif()
+
+        # BSD patch can auto-detect a reversed patch even with -R --dry-run,
+        # producing a false "already applied" result on clean sources. Check
+        # the semantic marker in both transport files instead.
+        set(_fastdds_udp4 "${fastdds_SOURCE_DIR}/src/cpp/rtps/transport/UDPv4Transport.cpp")
+        set(_fastdds_udp6 "${fastdds_SOURCE_DIR}/src/cpp/rtps/transport/UDPv6Transport.cpp")
+        file(READ "${_fastdds_udp4}" _fastdds_udp4_contents)
+        file(READ "${_fastdds_udp6}" _fastdds_udp6_contents)
+        string(FIND "${_fastdds_udp4_contents}" "defined(__QNX__) || defined(__APPLE__)" _fastdds_udp4_marker)
+        string(FIND "${_fastdds_udp6_contents}" "defined(__QNX__) || defined(__APPLE__)" _fastdds_udp6_marker)
+        if(NOT _fastdds_udp4_marker EQUAL -1 AND NOT _fastdds_udp6_marker EQUAL -1)
+            message(STATUS "FastDDS macOS SO_REUSEPORT patch already applied")
+        else()
+            execute_process(
+                COMMAND patch -p1 --forward --dry-run -i "${_FASTDDS_MACOS_REUSEPORT_PATCH}"
+                WORKING_DIRECTORY "${fastdds_SOURCE_DIR}"
+                RESULT_VARIABLE _fastdds_patch_dry_run_rc
+                OUTPUT_VARIABLE _fastdds_patch_dry_run_out
+                ERROR_VARIABLE _fastdds_patch_dry_run_err)
+            if(NOT _fastdds_patch_dry_run_rc EQUAL 0)
+                message(FATAL_ERROR
+                    "FastDDS macOS SO_REUSEPORT patch dry-run failed (rc=${_fastdds_patch_dry_run_rc}): "
+                    "${_fastdds_patch_dry_run_err}${_fastdds_patch_dry_run_out}")
+            endif()
+            execute_process(
+                COMMAND patch -p1 --forward -i "${_FASTDDS_MACOS_REUSEPORT_PATCH}"
+                WORKING_DIRECTORY "${fastdds_SOURCE_DIR}"
+                RESULT_VARIABLE _fastdds_patch_rc
+                OUTPUT_VARIABLE _fastdds_patch_out
+                ERROR_VARIABLE _fastdds_patch_err)
+            if(NOT _fastdds_patch_rc EQUAL 0)
+                message(FATAL_ERROR
+                    "FastDDS macOS SO_REUSEPORT patch failed (rc=${_fastdds_patch_rc}): "
+                    "${_fastdds_patch_err}${_fastdds_patch_out}")
+            endif()
+            message(STATUS "FastDDS macOS SO_REUSEPORT patch applied")
+        endif()
+    endif()
+
+    if(NOT TARGET fastrtps)
+        add_subdirectory(${fastdds_SOURCE_DIR} ${fastdds_BINARY_DIR})
+    endif()
 
     # GCC 14 / libstdc++-15 (Ubuntu 26.04 "resolute") removed transitive <cstdint>
     # includes from many std headers. FastDDS 2.10.4 uses uint8_t (e.g. in
@@ -83,11 +151,29 @@ function(get_fastdds)
 
     add_definitions(-DBUILD_WITH_DDS)
 
-    install(TARGETS dds fastrtps eProsima_atomic EXPORT realsense2Targets)
+    if(APPLE)
+        # foonathan_memory remains a static vendor archive in the observed
+        # FastDDS build; only fastrtps and fastcdr need dylib RPATH metadata.
+        foreach(_dds_tgt fastrtps fastcdr)
+            if(TARGET ${_dds_tgt})
+                set_target_properties(${_dds_tgt} PROPERTIES
+                    BUILD_RPATH "@loader_path"
+                    INSTALL_RPATH "@loader_path"
+                    MACOSX_RPATH ON
+                    INSTALL_NAME_DIR "@rpath")
+            endif()
+        endforeach()
+    endif()
+
+    install(TARGETS dds fastrtps eProsima_atomic EXPORT realsense2Targets
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
     
     # fastcdr is installed separately because it cannot be exported to realsense2Targets - it is already exported in fastdds
-    # install in order to set ARCHIVE DESTINATION - to put libfastcdr.a into the x86_64 folder
-    install(TARGETS fastcdr 
+    install(TARGETS fastcdr
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
     message(CHECK_PASS "Done")
 endfunction()

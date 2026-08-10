@@ -39,7 +39,10 @@ void dds_stream_base::init_profiles( dds_stream_profiles const & profiles, size_
                    "invalid default profile index (" + std::to_string( _default_profile_index ) + " for "
                        + std::to_string( profiles.size() ) + " stream profiles" );
 
-    auto self = weak_from_this();
+    // weak_from_this() requires C++17; realdds targets C++14. Streams are
+    // always shared-owned before profile initialization, so shared_from_this()
+    // throwing here correctly exposes an ownership bug.
+    auto self = std::weak_ptr< dds_stream_base >( shared_from_this() );
     for( auto const & profile : profiles )
     {
         check_profile( profile );
