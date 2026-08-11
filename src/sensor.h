@@ -79,6 +79,15 @@ namespace librealsense
         {
             _on_open = callback;
         }
+        void append_on_open( on_open callback )
+        {
+            auto previous = _on_open;
+            _on_open = [previous, callback]( std::vector< platform::stream_profile > profiles ) {
+                if( previous )
+                    previous( profiles );
+                callback( profiles );
+            };
+        }
         virtual void set_frame_metadata_modifier(on_frame_md callback) { _metadata_modifier = callback; }
         device_interface& get_device() override;
 

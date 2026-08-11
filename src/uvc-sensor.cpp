@@ -369,27 +369,8 @@ void uvc_sensor::open( const stream_profiles & requests )
 
     _internal_config = commited;
 
-    try
-    {
-        if( _on_open )
-            _on_open( _internal_config );
-    }
-    catch( ... )
-    {
-        for( auto && profile : _internal_config )
-        {
-            try
-            {
-                _device->close( profile );
-            }
-            catch( ... )
-            {
-            }
-        }
-        notify_open_error();
-        _internal_config.clear();
-        throw;
-    }
+    if( _on_open )
+        _on_open( _internal_config );
 
     _power = std::move( on );
     _is_opened = true;
@@ -416,7 +397,6 @@ void uvc_sensor::open( const stream_profiles & requests )
         }
         error_msg << std::endl;
         reset_streaming();
-        notify_open_error();
         _power.reset();
         _is_opened = false;
 
@@ -484,43 +464,6 @@ void uvc_sensor::register_pu( rs2_option id )
 {
     register_option( id, std::make_shared< uvc_pu_option >( std::dynamic_pointer_cast< uvc_sensor >( shared_from_this() ), id ) );
 }
-
-void uvc_sensor::append_on_open( on_open callback )
-{
-    if( ! callback )
-        return;
-    if( ! _on_open )
-    {
-        _on_open = std::move( callback );
-        return;
-    }
-
-    auto previous = _on_open;
-    _on_open = [previous, callback]( std::vector< platform::stream_profile > configurations ) {
-        previous( configurations );
-        callback( configurations );
-    };
-}
-
-void uvc_sensor::register_on_open_error( std::function< void() > callback )
-{
-    _on_open_error = std::move( callback );
-}
-
-void uvc_sensor::notify_open_error() noexcept
-{
-    if( ! _on_open_error )
-        return;
-    try
-    {
-        _on_open_error();
-    }
-    catch( ... )
-    {
-        LOG_WARNING( "UVC open rollback callback failed" );
-    }
-}
-
 
 void uvc_sensor::prepare_for_bulk_operation()
 {

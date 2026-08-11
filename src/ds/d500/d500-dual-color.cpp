@@ -3,7 +3,7 @@
 
 #include "d500-dual-color.h"
 #include "d500-info.h"
-#include "d500-stream-group-transaction.h"
+#include "d500-private.h"
 #include "environment.h"
 #include "metadata.h"
 #include "proc/color-formats-converter.h"  // m420_converter, nv12_converter
@@ -11,6 +11,7 @@
 #include <src/uvc-sensor.h>
 #include <src/metadata-parser.h>
 #include <src/ds/ds-color-common.h>
+#include <src/hw-monitor.h>
 
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
@@ -23,6 +24,29 @@ using rs_fourcc = rsutils::type::fourcc;
 
 namespace librealsense
 {
+    namespace
+    {
+        void append_u16( std::vector< uint8_t > & data, uint16_t value )
+        {
+            data.push_back( static_cast< uint8_t >( value ) );
+            data.push_back( static_cast< uint8_t >( value >> 8 ) );
+        }
+
+        void append_u32( std::vector< uint8_t > & data, uint32_t value )
+        {
+            append_u16( data, static_cast< uint16_t >( value ) );
+            append_u16( data, static_cast< uint16_t >( value >> 16 ) );
+        }
+
+        uint32_t read_u32( uint8_t const * data )
+        {
+            return static_cast< uint32_t >( data[0] )
+                | static_cast< uint32_t >( data[1] ) << 8
+                | static_cast< uint32_t >( data[2] ) << 16
+                | static_cast< uint32_t >( data[3] ) << 24;
+        }
+    }
+
     d500_dual_color::d500_dual_color( std::shared_ptr< const d500_info > const & dev_info )
         : d500_device( dev_info )
         , device( dev_info )
@@ -78,95 +102,53 @@ namespace librealsense
     void d500_dual_color::register_stream_group_transaction()
     {
         auto raw_sensor = get_raw_depth_sensor();
-        auto block_streaming = [raw_sensor]( std::string const & reason ) {
-            LOG_ERROR( reason );
-            raw_sensor->append_on_open(
-                [reason]( std::vector< platform::stream_profile > ) {
-                    throw wrong_api_call_sequence_exception( reason );
-                } );
-        };
-
-        d500_stream_group_transaction transaction( _hw_monitor );
-        d500_stream_group_status device_status = {};
-        std::string query_error;
-        bool protocol_supported = false;
-        for( unsigned attempt = 0; attempt < 3; ++attempt )
-        {
-            try
+        auto settle_previous = [this]() {
+            auto const deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 500 );
+            uint32_t previous_id = 0;
+            bool cancel_sent = false;
+            while( std::chrono::steady_clock::now() < deadline )
             {
-                // Only an explicit unsupported-opcode response selects the
-                // legacy admission-window flow. Transport, readiness, and
-                // protocol errors are retried and then fail closed.
-                if( ! transaction.query_if_supported( device_status ) )
+                command query( 0xbd, 3, previous_id );
+                hwmon_response_type response = ds::d500_hwmon_response::SUCCESS;
+                auto status = _hw_monitor->send( query, &response );
+                if( response == ds::d500_hwmon_response::INVALID_COMMAND
+                    || response == ds::d500_hwmon_response::COMMAND_NOT_SUPPORTED )
                 {
-                    LOG_INFO( "D500 stream-group transaction is unavailable; using legacy flow" );
+                    _stream_group_unsupported = true;
+                    LOG_INFO( "D500 stream-group commands unsupported; using legacy flow" );
                     return;
                 }
-                protocol_supported = true;
-                break;
+                if( response != ds::d500_hwmon_response::SUCCESS || status.size() != 8 )
+                    throw invalid_value_exception( "invalid stream-group status" );
+                auto const transaction_id = read_u32( status.data() );
+                if( ! transaction_id )
+                    return;
+                if( previous_id && transaction_id != previous_id )
+                    throw wrong_api_call_sequence_exception( "unexpected stream-group owner" );
+                previous_id = transaction_id;
+                if( ! cancel_sent && ! status[5] )
+                {
+                    command cancel( 0xbd, 2, transaction_id );
+                    _hw_monitor->send( cancel );
+                    cancel_sent = true;
+                }
+                std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
             }
-            catch( std::exception const & e )
-            {
-                query_error = e.what();
-            }
-            catch( ... )
-            {
-                query_error = "unknown error";
-            }
-            if( attempt != 2 )
-                std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
-        }
+            throw wrong_api_call_sequence_exception( "previous stream group did not stop" );
+        };
 
-        if( ! protocol_supported )
-        {
-            block_streaming(
-                "D500 stream-group capability query failed after 3 attempts; "
-                "reconnect or hardware-reset the device before streaming: "
-                + query_error );
-            return;
-        }
-
-        // A new SDK process has no C++ record of a transaction owned by a
-        // process that exited abruptly. Reconcile the device-owned generation
-        // before installing the runtime hook.
-        if( device_status.transaction_id )
-        {
-            _next_stream_group_transaction_id = device_status.transaction_id;
-            _active_stream_group_transaction_id = device_status.transaction_id;
-            if( device_status.started_mask )
-            {
-                block_streaming(
-                    "D500 has a stale started stream-group transaction; "
-                    "hardware-reset or power-cycle the device before streaming" );
-                return;
-            }
-            cancel_active_stream_group();
-            if( _active_stream_group_transaction_id )
-            {
-                block_streaming(
-                    "D500 stale stream-group transaction did not reach IDLE; "
-                    "hardware-reset or power-cycle the device before streaming" );
-                return;
-            }
-        }
-
+        // Do this during device discovery where possible, so terminal cleanup does not inflate stream-on latency.
+        settle_previous();
         std::weak_ptr< uvc_sensor > weak_sensor = raw_sensor;
         raw_sensor->append_on_open(
-            [this, weak_sensor]( std::vector< platform::stream_profile > configurations ) {
+            [this, weak_sensor, settle_previous]( std::vector< platform::stream_profile > configurations ) {
+                if( _stream_group_unsupported )
+                    return;
                 auto sensor = weak_sensor.lock();
                 if( ! sensor )
                     throw wrong_api_call_sequence_exception( "D500 stream-group sensor is unavailable" );
 
-                // Clear a transaction left by an interrupted prior open before
-                // allocating the next nonzero generation.
-                cancel_active_stream_group();
-                if( _active_stream_group_transaction_id )
-                    throw wrong_api_call_sequence_exception(
-                        "previous D500 stream-group transaction did not settle" );
-                if( ++_next_stream_group_transaction_id == 0 )
-                    ++_next_stream_group_transaction_id;
-                _active_stream_group_transaction_id =
-                    _next_stream_group_transaction_id;
+                settle_previous();
 
                 auto const & advertised = sensor->get_advertised_profiles();
                 std::set< uint32_t > color_pins;
@@ -174,101 +156,59 @@ namespace librealsense
                     if( is_color_pin( advertised, profile.pin_index ) )
                         color_pins.insert( profile.pin_index );
 
-                std::map< d500_stream_group_branch, d500_stream_group_profile > entries;
+                std::map< uint8_t, platform::stream_profile > entries;
                 for( auto const & profile : configurations )
                 {
-                    d500_stream_group_branch branch;
+                    uint8_t branch;
                     if( profile.format == rs_fourcc( 'Z', '1', '6', ' ' ) )
-                        branch = d500_stream_group_branch::depth;
+                        branch = 0;
                     else if( profile.format == rs_fourcc( 'Y', '8', 'I', ' ' )
                              || profile.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) )
-                        branch = d500_stream_group_branch::infrared;
+                        branch = 1;
                     else if( color_pins.size() == 2
                              && color_pins.count( profile.pin_index ) )
-                        branch = profile.pin_index == *color_pins.begin()
-                            ? d500_stream_group_branch::color_left
-                            : d500_stream_group_branch::color_right;
+                        branch = profile.pin_index == *color_pins.begin() ? 2 : 3;
                     else
-                        throw invalid_value_exception(
-                            "cannot map raw profile to a stream-group branch" );
+                        throw invalid_value_exception( "cannot map stream-group profile" );
 
-                    if( ! entries.emplace(
-                            branch,
-                            d500_stream_group_profile{
-                                branch,
-                                profile.format,
-                                static_cast< uint16_t >( profile.width ),
-                                static_cast< uint16_t >( profile.height ),
-                                static_cast< uint16_t >( profile.fps ) } )
-                              .second )
-                        throw invalid_value_exception(
-                            "multiple raw profiles map to one stream-group branch" );
+                    if( ! entries.emplace( branch, profile ).second )
+                        throw invalid_value_exception( "duplicate stream-group branch" );
                 }
 
-                std::vector< d500_stream_group_profile > manifest;
+                if( ++_stream_group_transaction_id == 0 )
+                    ++_stream_group_transaction_id;
+                uint8_t expected_mask = 0;
                 for( auto const & entry : entries )
-                    manifest.push_back( entry.second );
-                d500_stream_group_transaction transaction( _hw_monitor );
-                transaction.prepare( _active_stream_group_transaction_id, manifest );
+                    expected_mask |= static_cast< uint8_t >( 1u << entry.first );
 
-                // PREPARE acceptance is the only synchronous barrier on the
-                // normal open path. Let uvc_sensor::open() continue directly
-                // to the existing backend stream_on() call so host UVC setup
-                // overlaps firmware graph construction. Firmware processes
-                // PREPARE and all D585 2C OPEN/START events on one FIFO queue,
-                // therefore the graph is published before a queued START can
-                // activate its branch. QUERY remains available for capability,
-                // stale-process reconciliation, rollback, and diagnostics.
+                std::vector< uint8_t > manifest = {
+                    1, static_cast< uint8_t >( entries.size() ), expected_mask, 0
+                };
+                append_u32( manifest, _stream_group_transaction_id );
+                for( auto const & entry : entries )
+                {
+                    auto const & profile = entry.second;
+                    manifest.push_back( entry.first );
+                    manifest.push_back( 0 );
+                    append_u16( manifest, static_cast< uint16_t >( profile.width ) );
+                    append_u16( manifest, static_cast< uint16_t >( profile.height ) );
+                    append_u16( manifest, static_cast< uint16_t >( profile.fps ) );
+                    append_u32( manifest, profile.format );
+                }
+
+                command cmd( 0xbd, 1 );
+                cmd.data = std::move( manifest );
+                hwmon_response_type response = ds::d500_hwmon_response::SUCCESS;
+                _hw_monitor->send( cmd, &response );
+                if( response == ds::d500_hwmon_response::INVALID_COMMAND
+                    || response == ds::d500_hwmon_response::COMMAND_NOT_SUPPORTED )
+                {
+                    _stream_group_unsupported = true;
+                    LOG_INFO( "D500 stream-group PREPARE unsupported; using legacy flow" );
+                }
+                else if( response != ds::d500_hwmon_response::SUCCESS )
+                    throw invalid_value_exception( "D500 stream-group PREPARE failed" );
             } );
-        raw_sensor->register_on_open_error(
-            [this]() { cancel_active_stream_group(); } );
-    }
-
-    void d500_dual_color::cancel_active_stream_group() noexcept
-    {
-        auto const transaction_id = _active_stream_group_transaction_id;
-        if( ! transaction_id )
-            return;
-
-        try
-        {
-            d500_stream_group_transaction transaction( _hw_monitor );
-            auto const deadline = std::chrono::steady_clock::now()
-                + std::chrono::seconds( 3 );
-            bool cancel_sent = false;
-            bool settled = false;
-            while( std::chrono::steady_clock::now() < deadline )
-            {
-                auto const status = transaction.query( transaction_id );
-                if( status.state
-                        == static_cast< uint8_t >( d500_stream_group_state::idle )
-                    || status.transaction_id == 0 )
-                {
-                    settled = true;
-                    break;
-                }
-                if( status.transaction_id != transaction_id )
-                    break;
-                if( ! cancel_sent && status.started_mask == 0 )
-                {
-                    transaction.cancel( transaction_id );
-                    cancel_sent = true;
-                }
-                std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-            }
-            if( settled )
-                _active_stream_group_transaction_id = 0;
-            else
-                LOG_WARNING( "D500 stream-group rollback did not reach IDLE" );
-        }
-        catch( std::exception const & e )
-        {
-            LOG_WARNING( "D500 stream-group rollback failed: " << e.what() );
-        }
-        catch( ... )
-        {
-            LOG_WARNING( "D500 stream-group rollback failed" );
-        }
     }
 
     void d500_dual_color::register_color_metadata()

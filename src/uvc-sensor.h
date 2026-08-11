@@ -31,8 +31,6 @@ public:
     void stop() override;
     void register_xu( platform::extension_unit xu );
     void register_pu( rs2_option id );
-    void append_on_open( on_open callback );
-    void register_on_open_error( std::function< void() > callback );
 
     virtual void prepare_for_bulk_operation() override;
     virtual void finished_bulk_operation() override;
@@ -85,7 +83,6 @@ private:
     void acquire_power();
     void release_power();
     void reset_streaming();
-    void notify_open_error() noexcept;
     std::atomic<int64_t> _gyro_counter;
     std::atomic<int64_t> _accel_counter;
 
@@ -124,7 +121,6 @@ private:
     stream_id_resolver _stream_id_resolver;
     std::vector< platform::stream_profile > _advertised_profiles;
     std::vector< platform::stream_profile > _internal_config;
-    std::function< void() > _on_open_error;
     std::atomic< int > _user_count;
     std::mutex _power_lock;
     std::mutex _configure_lock;
