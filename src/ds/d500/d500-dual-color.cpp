@@ -3,7 +3,6 @@
 
 #include "d500-dual-color.h"
 #include "d500-info.h"
-#include "d500-stream-group-adapter.h"
 #include "d500-stream-group-transaction.h"
 #include "environment.h"
 #include "metadata.h"
@@ -17,6 +16,7 @@
 using rs_fourcc = rsutils::type::fourcc;
 
 #include <set>
+#include <map>
 #include <chrono>
 #include <thread>
 
@@ -168,8 +168,46 @@ namespace librealsense
                 _active_stream_group_transaction_id =
                     _next_stream_group_transaction_id;
 
-                auto manifest = d500_dual_color_stream_group_adapter::build_manifest(
-                    configurations, sensor->get_advertised_profiles() );
+                auto const & advertised = sensor->get_advertised_profiles();
+                std::set< uint32_t > color_pins;
+                for( auto const & profile : advertised )
+                    if( is_color_pin( advertised, profile.pin_index ) )
+                        color_pins.insert( profile.pin_index );
+
+                std::map< d500_stream_group_branch, d500_stream_group_profile > entries;
+                for( auto const & profile : configurations )
+                {
+                    d500_stream_group_branch branch;
+                    if( profile.format == rs_fourcc( 'Z', '1', '6', ' ' ) )
+                        branch = d500_stream_group_branch::depth;
+                    else if( profile.format == rs_fourcc( 'Y', '8', 'I', ' ' )
+                             || profile.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) )
+                        branch = d500_stream_group_branch::infrared;
+                    else if( color_pins.size() == 2
+                             && color_pins.count( profile.pin_index ) )
+                        branch = profile.pin_index == *color_pins.begin()
+                            ? d500_stream_group_branch::color_left
+                            : d500_stream_group_branch::color_right;
+                    else
+                        throw invalid_value_exception(
+                            "cannot map raw profile to a stream-group branch" );
+
+                    if( ! entries.emplace(
+                            branch,
+                            d500_stream_group_profile{
+                                branch,
+                                profile.format,
+                                static_cast< uint16_t >( profile.width ),
+                                static_cast< uint16_t >( profile.height ),
+                                static_cast< uint16_t >( profile.fps ) } )
+                              .second )
+                        throw invalid_value_exception(
+                            "multiple raw profiles map to one stream-group branch" );
+                }
+
+                std::vector< d500_stream_group_profile > manifest;
+                for( auto const & entry : entries )
+                    manifest.push_back( entry.second );
                 d500_stream_group_transaction transaction( _hw_monitor );
                 transaction.prepare( _active_stream_group_transaction_id, manifest );
 
