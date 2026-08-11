@@ -22,7 +22,6 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/d500-fw-update-device.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/d500-auto-calibration.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/d500-debug-protocol-calibration-engine.cpp"
-        "${CMAKE_CURRENT_LIST_DIR}/d500-stream-group-transaction.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/d500-device.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-color.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-dual-color.h"
@@ -41,5 +40,4 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/d585s-md.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-auto-calibration.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-debug-protocol-calibration-engine.h"
-        "${CMAKE_CURRENT_LIST_DIR}/d500-stream-group-transaction.h"
 )
