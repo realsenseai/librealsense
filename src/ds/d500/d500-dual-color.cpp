@@ -173,34 +173,14 @@ namespace librealsense
                 d500_stream_group_transaction transaction( _hw_monitor );
                 transaction.prepare( _active_stream_group_transaction_id, manifest );
 
-                auto const deadline = std::chrono::steady_clock::now()
-                    + std::chrono::seconds( 5 );
-                while( std::chrono::steady_clock::now() < deadline )
-                {
-                    auto const status = transaction.query(
-                        _active_stream_group_transaction_id );
-                    if( status.transaction_id != _active_stream_group_transaction_id )
-                        throw std::runtime_error( "D500 stream-group QUERY returned a different transaction" );
-                    if( status.state
-                        == static_cast< uint8_t >( d500_stream_group_state::prepared ) )
-                    {
-                        uint8_t expected = 0;
-                        for( auto const & profile : manifest )
-                            expected |= static_cast< uint8_t >(
-                                1u << static_cast< uint8_t >( profile.branch ) );
-                        if( status.expected_mask != expected
-                            || status.built_mask != expected )
-                            throw std::runtime_error( "D500 stream-group PREPARED mask mismatch" );
-                        return;
-                    }
-                    if( status.state
-                            == static_cast< uint8_t >( d500_stream_group_state::failed )
-                        || status.state
-                            == static_cast< uint8_t >( d500_stream_group_state::cancelled ) )
-                        throw std::runtime_error( "D500 stream-group graph preparation failed" );
-                    std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-                }
-                throw std::runtime_error( "D500 stream-group graph preparation timed out" );
+                // PREPARE acceptance is the only synchronous barrier on the
+                // normal open path. Let uvc_sensor::open() continue directly
+                // to the existing backend stream_on() call so host UVC setup
+                // overlaps firmware graph construction. Firmware processes
+                // PREPARE and all D585 2C OPEN/START events on one FIFO queue,
+                // therefore the graph is published before a queued START can
+                // activate its branch. QUERY remains available for capability,
+                // stale-process reconciliation, rollback, and diagnostics.
             } );
         raw_sensor->register_on_open_error(
             [this]() { cancel_active_stream_group(); } );
