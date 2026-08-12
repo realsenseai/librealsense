@@ -117,4 +117,14 @@ macro(os_set_flags)
 endmacro()
 
 macro(os_target_config)
+    # Shared FastDDS libraries live next to librealsense2 in the build tree
+    # and under ../lib from installed tools. Apply these defaults before the
+    # wrapper, example, and tool targets are created.
+    if(APPLE AND BUILD_WITH_DDS)
+        set(CMAKE_BUILD_RPATH "@loader_path")
+        set(CMAKE_INSTALL_RPATH "@loader_path;@loader_path/../lib")
+        set(CMAKE_MACOSX_RPATH ON)
+        set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+        set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+    endif()
 endmacro()
