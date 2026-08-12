@@ -43,7 +43,13 @@ static rs2_device* wait_for_device(rs2_context* ctx, rs2_error** e)
     {
         rs2_device_list* list = rs2_query_devices_ex(
             ctx, RS2_PRODUCT_LINE_ANY | RS2_PRODUCT_LINE_SW_ONLY, e);
-        if ((e && *e) || !list)
+        if (e && *e)
+        {
+            if (list)
+                rs2_delete_device_list(list);
+            return NULL;
+        }
+        if (!list)
             return NULL;
 
         int count = rs2_get_device_count(list, e);

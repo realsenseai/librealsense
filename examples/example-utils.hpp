@@ -41,7 +41,16 @@ inline rs2::device_list wait_for_devices( rs2::context & ctx, int timeout_second
 // Find devices with specified streams
 bool device_with_streams( rs2::context & ctx, std::vector< rs2_stream > stream_requests, std::string & out_serial )
 {
-    auto devs = wait_for_devices( ctx );
+    rs2::device_list devs;
+    try
+    {
+        devs = wait_for_devices( ctx );
+    }
+    catch( std::runtime_error const & error )
+    {
+        std::cerr << error.what() << std::endl;
+        return false;
+    }
     std::vector <rs2_stream> unavailable_streams = stream_requests;
     for (auto dev : devs)
     {
