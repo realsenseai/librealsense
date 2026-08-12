@@ -17,6 +17,9 @@ def test_combined_motion_orientation():
     motion.orientation = orientation
 
     assert motion.orientation == orientation
+    assert repr(motion).endswith(
+        "orientation[0.123457,-0.234568,0.345679,0.987654]"
+    )
 
 
 def test_combined_motion_orientation_requires_four_values():

@@ -183,7 +183,9 @@ void init_c_files(py::module &m) {
                   std::ostringstream ss;
                   ss << "gyro[" << self.angular_velocity.x << "," << self.angular_velocity.y << ","
                       << self.angular_velocity.z << "] accel[" << self.linear_acceleration.x << ","
-                      << self.linear_acceleration.y << "," << self.linear_acceleration.z << "]";
+                      << self.linear_acceleration.y << "," << self.linear_acceleration.z << "] orientation["
+                      << self.orientation.x << "," << self.orientation.y << "," << self.orientation.z << ","
+                      << self.orientation.w << "]";
                   return ss.str();
               } );
 
