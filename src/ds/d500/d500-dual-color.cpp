@@ -17,7 +17,6 @@
 using rs_fourcc = rsutils::type::fourcc;
 
 #include <set>
-#include <map>
 #include <chrono>
 #include <thread>
 
@@ -26,16 +25,10 @@ namespace librealsense
 {
     namespace
     {
-        void append_u16( std::vector< uint8_t > & data, uint16_t value )
-        {
-            data.push_back( static_cast< uint8_t >( value ) );
-            data.push_back( static_cast< uint8_t >( value >> 8 ) );
-        }
-
         void append_u32( std::vector< uint8_t > & data, uint32_t value )
         {
-            append_u16( data, static_cast< uint16_t >( value ) );
-            append_u16( data, static_cast< uint16_t >( value >> 16 ) );
+            for( unsigned shift = 0; shift < 32; shift += 8 )
+                data.push_back( static_cast< uint8_t >( value >> shift ) );
         }
 
         uint32_t read_u32( uint8_t const * data )
@@ -156,7 +149,7 @@ namespace librealsense
                     if( is_color_pin( advertised, profile.pin_index ) )
                         color_pins.insert( profile.pin_index );
 
-                std::map< uint8_t, platform::stream_profile > entries;
+                uint8_t expected_mask = 0;
                 for( auto const & profile : configurations )
                 {
                     uint8_t branch;
@@ -171,33 +164,19 @@ namespace librealsense
                     else
                         throw invalid_value_exception( "cannot map stream-group profile" );
 
-                    if( ! entries.emplace( branch, profile ).second )
+                    auto const bit = static_cast< uint8_t >( 1u << branch );
+                    if( expected_mask & bit )
                         throw invalid_value_exception( "duplicate stream-group branch" );
+                    expected_mask |= bit;
                 }
 
                 if( ++_stream_group_transaction_id == 0 )
                     ++_stream_group_transaction_id;
-                uint8_t expected_mask = 0;
-                for( auto const & entry : entries )
-                    expected_mask |= static_cast< uint8_t >( 1u << entry.first );
-
-                std::vector< uint8_t > manifest = {
-                    1, static_cast< uint8_t >( entries.size() ), expected_mask, 0
-                };
-                append_u32( manifest, _stream_group_transaction_id );
-                for( auto const & entry : entries )
-                {
-                    auto const & profile = entry.second;
-                    manifest.push_back( entry.first );
-                    manifest.push_back( 0 );
-                    append_u16( manifest, static_cast< uint16_t >( profile.width ) );
-                    append_u16( manifest, static_cast< uint16_t >( profile.height ) );
-                    append_u16( manifest, static_cast< uint16_t >( profile.fps ) );
-                    append_u32( manifest, profile.format );
-                }
+                std::vector< uint8_t > request = { 2, expected_mask, 0, 0 };
+                append_u32( request, _stream_group_transaction_id );
 
                 command cmd( 0xbd, 1 );
-                cmd.data = std::move( manifest );
+                cmd.data = std::move( request );
                 hwmon_response_type response = ds::d500_hwmon_response::SUCCESS;
                 _hw_monitor->send( cmd, &response );
                 if( response == ds::d500_hwmon_response::INVALID_COMMAND
