@@ -25,9 +25,9 @@
 #if defined( __APPLE__ )
 #include <cerrno>
 #include <chrono>
-#include <cstdlib>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/stat.h>
 #include <thread>
 #include <unistd.h>
 #endif
@@ -52,13 +52,11 @@ namespace {
     public:
         apple_participant_create_guard()
         {
-            auto const * tmpdir = std::getenv( "TMPDIR" );
-            std::string const lock_path
-                = std::string( tmpdir && *tmpdir ? tmpdir : "/tmp" )
-                + "/realdds-dds-participant-create.lock";
-            _fd = ::open( lock_path.c_str(), O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0600 );
+            char const * const lock_path = "/tmp/realdds-dds-participant-create.lock";
+            _fd = ::open( lock_path, O_CREAT | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0666 );
             if( _fd < 0 )
                 return;
+            ::fchmod( _fd, 0666 );
 
             for( int attempt = 0; attempt < 40; ++attempt )
             {

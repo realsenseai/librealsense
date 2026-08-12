@@ -17,6 +17,14 @@ function(get_fastdds)
         get_filename_component(_FASTDDS_MACOS_REUSEPORT_PATCH
             "${CMAKE_SOURCE_DIR}/CMake/patches/fastdds-v2.10.4-macos-reuseport.patch"
             ABSOLUTE)
+        get_filename_component(_FASTDDS_MACOS_PATCH_SCRIPT
+            "${CMAKE_SOURCE_DIR}/CMake/patches/apply-fastdds-macos-patch.cmake"
+            ABSOLUTE)
+        set(_FASTDDS_PATCH_COMMAND
+            PATCH_COMMAND ${CMAKE_COMMAND}
+                -DFASTDDS_SOURCE_DIR=<SOURCE_DIR>
+                -DFASTDDS_PATCH=${_FASTDDS_MACOS_REUSEPORT_PATCH}
+                -P ${_FASTDDS_MACOS_PATCH_SCRIPT})
     endif()
 
     FetchContent_Declare(
@@ -30,6 +38,7 @@ function(get_fastdds)
       GIT_SUBMODULES ""     # Submodules will be cloned as part of the FastDDS cmake configure stage
       GIT_SHALLOW ON        # No history needed
       SOURCE_DIR ${CMAKE_BINARY_DIR}/third-party/fastdds
+      ${_FASTDDS_PATCH_COMMAND}
     )
 
     # Set FastDDS internal variables
@@ -59,62 +68,7 @@ function(get_fastdds)
     set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/fastdds/fastdds_install)
     set(CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/fastdds/fastdds_install)
 
-    # Populate first so the Apple transport patch is applied before FastDDS is
-    # configured or compiled.
-    FetchContent_GetProperties(fastdds)
-    if(NOT fastdds_POPULATED)
-        FetchContent_Populate(fastdds)
-    endif()
-
-    if(APPLE)
-        if(NOT EXISTS "${_FASTDDS_MACOS_REUSEPORT_PATCH}")
-            message(FATAL_ERROR "FastDDS macOS SO_REUSEPORT patch is missing: ${_FASTDDS_MACOS_REUSEPORT_PATCH}")
-        endif()
-        if(NOT EXISTS "${fastdds_SOURCE_DIR}/src/cpp/rtps/transport/UDPv4Transport.cpp")
-            message(FATAL_ERROR "FastDDS source tree is incomplete: ${fastdds_SOURCE_DIR}")
-        endif()
-
-        # BSD patch can auto-detect a reversed patch even with -R --dry-run,
-        # producing a false "already applied" result on clean sources. Check
-        # the semantic marker in both transport files instead.
-        set(_fastdds_udp4 "${fastdds_SOURCE_DIR}/src/cpp/rtps/transport/UDPv4Transport.cpp")
-        set(_fastdds_udp6 "${fastdds_SOURCE_DIR}/src/cpp/rtps/transport/UDPv6Transport.cpp")
-        file(READ "${_fastdds_udp4}" _fastdds_udp4_contents)
-        file(READ "${_fastdds_udp6}" _fastdds_udp6_contents)
-        string(FIND "${_fastdds_udp4_contents}" "defined(__QNX__) || defined(__APPLE__)" _fastdds_udp4_marker)
-        string(FIND "${_fastdds_udp6_contents}" "defined(__QNX__) || defined(__APPLE__)" _fastdds_udp6_marker)
-        if(NOT _fastdds_udp4_marker EQUAL -1 AND NOT _fastdds_udp6_marker EQUAL -1)
-            message(STATUS "FastDDS macOS SO_REUSEPORT patch already applied")
-        else()
-            execute_process(
-                COMMAND patch -p1 --forward --dry-run -i "${_FASTDDS_MACOS_REUSEPORT_PATCH}"
-                WORKING_DIRECTORY "${fastdds_SOURCE_DIR}"
-                RESULT_VARIABLE _fastdds_patch_dry_run_rc
-                OUTPUT_VARIABLE _fastdds_patch_dry_run_out
-                ERROR_VARIABLE _fastdds_patch_dry_run_err)
-            if(NOT _fastdds_patch_dry_run_rc EQUAL 0)
-                message(FATAL_ERROR
-                    "FastDDS macOS SO_REUSEPORT patch dry-run failed (rc=${_fastdds_patch_dry_run_rc}): "
-                    "${_fastdds_patch_dry_run_err}${_fastdds_patch_dry_run_out}")
-            endif()
-            execute_process(
-                COMMAND patch -p1 --forward -i "${_FASTDDS_MACOS_REUSEPORT_PATCH}"
-                WORKING_DIRECTORY "${fastdds_SOURCE_DIR}"
-                RESULT_VARIABLE _fastdds_patch_rc
-                OUTPUT_VARIABLE _fastdds_patch_out
-                ERROR_VARIABLE _fastdds_patch_err)
-            if(NOT _fastdds_patch_rc EQUAL 0)
-                message(FATAL_ERROR
-                    "FastDDS macOS SO_REUSEPORT patch failed (rc=${_fastdds_patch_rc}): "
-                    "${_fastdds_patch_err}${_fastdds_patch_out}")
-            endif()
-            message(STATUS "FastDDS macOS SO_REUSEPORT patch applied")
-        endif()
-    endif()
-
-    if(NOT TARGET fastrtps)
-        add_subdirectory(${fastdds_SOURCE_DIR} ${fastdds_BINARY_DIR})
-    endif()
+    FetchContent_MakeAvailable(fastdds)
 
     # GCC 14 / libstdc++-15 (Ubuntu 26.04 "resolute") removed transitive <cstdint>
     # includes from many std headers. FastDDS 2.10.4 uses uint8_t (e.g. in
