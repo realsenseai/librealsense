@@ -813,10 +813,10 @@ void rs2_delete_raw_data(const rs2_raw_data_buffer* buffer) BEGIN_API_CALL
 }
 NOEXCEPT_RETURN(, buffer)
 
-const rs2_raw_data_buffer* rs2_rum_get_report(rs2_error** error) BEGIN_API_CALL
+const rs2_raw_data_buffer* rs2_rum_get_report_path(rs2_error** error) BEGIN_API_CALL
 {
-    auto report = librealsense::rum::rum_collector::instance().get_report();
-    return new rs2_raw_data_buffer{ std::vector<uint8_t>( report.begin(), report.end() ) };
+    auto path = librealsense::rum::report_path();
+    return new rs2_raw_data_buffer{ std::vector<uint8_t>( path.begin(), path.end() ) };
 }
 NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
 

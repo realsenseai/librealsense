@@ -201,7 +201,7 @@ void software_sensor::open( const stream_profiles & requests )
         throw wrong_api_call_sequence_exception( "open(...) failed. Software device is already opened!" );
     _is_opened = true;
     set_active_streams( requests );
-    rum::hooks::on_open( requests );
+    rum::hooks::on_open( get_device(), requests );
 }
 
 

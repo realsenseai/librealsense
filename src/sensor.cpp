@@ -636,7 +636,7 @@ void log_callback_end( uint32_t fps,
 
         set_active_streams(requests);
 
-        rum::hooks::on_open( requests );
+        rum::hooks::on_open( get_device(), requests );
     }
 
     void synthetic_sensor::close()
@@ -677,7 +677,7 @@ void log_callback_end( uint32_t fps,
     {
         // Call before the sensor actually stops/closes/starts, so is_streaming() still reflects
         // the interval being closed.
-        _rum_timer.record( is_streaming(), get_active_streams() );
+        _rum_timer.record( is_streaming(), get_device(), get_active_streams() );
     }
 
     void synthetic_sensor::stop()

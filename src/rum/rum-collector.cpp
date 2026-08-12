@@ -12,6 +12,7 @@
 #include <rsutils/json.h>
 #include <rsutils/json-config.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <random>
 #include <chrono>
@@ -32,14 +33,14 @@ namespace rum {
 static constexpr int rum_schema_version = 1;
 
 
-namespace {
-
-
 // Report file: <app-data>/rum/rum.json. Forward slashes work on Windows and POSIX.
 std::string report_path()
 {
     return rsutils::os::get_special_folder( rsutils::os::special_folder::app_data ) + "rum/rum.json";
 }
+
+
+namespace {
 
 
 // Create the report's parent directory; benign if it already exists.
@@ -146,41 +147,41 @@ rum_collector & rum_collector::instance()
 }
 
 
-void rum_collector::record_device( std::string const & type,
-                                   std::string const & fw_version,
+void rum_collector::record_device( std::string const & device_key,
                                    std::string const & connection,
-                                   std::string const & mipi_driver_version )
+                                   std::string const & fw_version,
+                                   std::string const & mipi_driver_version,
+                                   std::string const & serial )
 {
     std::lock_guard< std::mutex > lk( _mutex );
-    ++_device_counts[device_key{ type, fw_version, connection, mipi_driver_version }];
+    auto & d = _devices[device_key];
+    d.connection = connection;
+    d.fw_version = fw_version;
+    d.mipi_driver_version = mipi_driver_version;
+    d.seen_this_session = true;
+    if( ! serial.empty() )
+        d.serials.insert( serial );  // in memory only - distinct units this session; never serialized
 }
 
 
-void rum_collector::record_stream( std::string const & stream_type,
-                                   std::string const & format,
-                                   std::string const & resolution,
-                                   int fps )
+void rum_collector::record_stream( std::string const & device_key, std::string const & stream_label )
 {
     std::lock_guard< std::mutex > lk( _mutex );
-    ++_stream_counts[stream_key{ stream_type, format, resolution, fps }].count;
+    ++_devices[device_key].streams[stream_label].count;
 }
 
 
-void rum_collector::record_stream_duration( std::string const & stream_type,
-                                            std::string const & format,
-                                            std::string const & resolution,
-                                            int fps,
-                                            double seconds )
+void rum_collector::record_stream_duration( std::string const & device_key, std::string const & stream_label, double seconds )
 {
     std::lock_guard< std::mutex > lk( _mutex );
-    _stream_counts[stream_key{ stream_type, format, resolution, fps }].duration_seconds += seconds;
+    _devices[device_key].streams[stream_label].duration_seconds += seconds;
 }
 
 
-void rum_collector::record_option_change( std::string const & option, float value )
+void rum_collector::record_option_change( std::string const & device_key, std::string const & option, float value )
 {
     std::lock_guard< std::mutex > lk( _mutex );
-    auto & entry = _option_changes[option];
+    auto & entry = _devices[device_key].options[option];
     ++entry.first;
     entry.second = value;
 }
@@ -193,12 +194,11 @@ void rum_collector::add_recommended_filter( std::string const & name )
 }
 
 
-void rum_collector::record_filter( std::string const & name )
+void rum_collector::record_filter( std::string const & device_key, std::string const & name )
 {
     std::lock_guard< std::mutex > lk( _mutex );
-    // Count only recommended (user-facing) filters; ignore viewer/internal blocks.
-    if( _recommended_filters.count( name ) )
-        ++_filter_counts[name];
+    if( _recommended_filters.count( name ) )   // ignore viewer/internal blocks
+        ++_devices[device_key].filters[name];
 }
 
 
@@ -231,50 +231,41 @@ std::string rum_collector::get_report() const
     report["system"]["os"] = rsutils::os::get_os_name();
     report["system"]["arch"] = rsutils::os::cpu_arch();
 
-    report["devices"] = json::array();
-    for( auto const & entry : _device_counts )
+    report["devices"] = json::object();
+    for( auto const & de : _devices )
     {
-        auto const & key = entry.first;
+        auto const & d = de.second;
         json device = json::object();
-        device["type"] = key.type;
-        device["fw_version"] = key.fw_version;
-        device["connection"] = key.connection;
-        device["mipi_driver_version"] = key.mipi_driver_version;
-        device["count"] = entry.second;
-        report["devices"].push_back( device );
-    }
+        device["connection"] = d.connection;
+        device["fw_version"] = d.fw_version;
+        device["mipi_driver_version"] = d.mipi_driver_version;
+        // count = number of identical devices seen at the same time, can't count different devices across sessions as we do not store SNs
+        int session_count = d.seen_this_session ? ( d.serials.empty() ? 1 : (int)d.serials.size() ) : 0;
+        device["count"] = std::max( session_count, d.count );
 
-    report["streams"] = json::array();
-    for( auto const & entry : _stream_counts )
-    {
-        auto const & key = entry.first;
-        json stream = json::object();
-        stream["type"] = key.type;
-        stream["format"] = key.format;
-        stream["resolution"] = key.resolution;
-        stream["fps"] = key.fps;
-        stream["count"] = entry.second.count;
-        stream["duration_seconds"] = entry.second.duration_seconds;
-        report["streams"].push_back( stream );
-    }
+        device["streams"] = json::object();
+        for( auto const & se : d.streams )
+        {
+            json stream = json::object();
+            stream["count"] = se.second.count;
+            stream["duration_seconds"] = se.second.duration_seconds;
+            device["streams"][se.first] = stream;
+        }
 
-    report["options_changed"] = json::array();
-    for( auto const & entry : _option_changes )
-    {
-        json option = json::object();
-        option["option"] = entry.first;
-        option["set_count"] = entry.second.first;
-        option["last_value"] = entry.second.second;
-        report["options_changed"].push_back( option );
-    }
+        device["options_changed"] = json::object();
+        for( auto const & oe : d.options )
+        {
+            json option = json::object();
+            option["set_count"] = oe.second.first;
+            option["last_value"] = oe.second.second;
+            device["options_changed"][oe.first] = option;
+        }
 
-    report["filters"] = json::array();
-    for( auto const & entry : _filter_counts )
-    {
-        json filter = json::object();
-        filter["name"] = entry.first;
-        filter["count"] = entry.second;
-        report["filters"].push_back( filter );
+        device["filters"] = json::object();
+        for( auto const & fe : d.filters )
+            device["filters"][fe.first] = fe.second;
+
+        report["devices"][de.first] = device;
     }
 
     report["notifications"] = json::array();
@@ -289,8 +280,70 @@ std::string rum_collector::get_report() const
 }
 
 
+void rum_collector::merge_saved_report()
+{
+    std::lock_guard< std::mutex > lk( _mutex );
+    if( _merged_from_disk )
+        return;  // fold in once per process; flush() runs per context close, re-merging would double
+    _merged_from_disk = true;
+
+    json j;
+    try
+    {
+        j = rsutils::json_config::load_from_file( report_path() );
+    }
+    catch( ... )
+    {
+        return;  // no file yet, or unreadable - nothing to fold in
+    }
+    if( ! j.is_object() )
+        return;
+
+    auto devices = j.value( "devices", json::object() );
+    for( auto dit = devices.begin(); dit != devices.end(); ++dit )
+    {
+        auto const & dobj = dit.value();
+        auto & d = _devices[ dit.key() ];
+        if( d.connection.empty() )          d.connection = dobj.value( "connection", std::string() );
+        if( d.fw_version.empty() )          d.fw_version = dobj.value( "fw_version", std::string() );
+        if( d.mipi_driver_version.empty() ) d.mipi_driver_version = dobj.value( "mipi_driver_version", std::string() );
+        d.count = std::max( d.count, dobj.value( "count", 0 ) );  // peak -> max, not sum
+
+        auto streams = dobj.value( "streams", json::object() );
+        for( auto sit = streams.begin(); sit != streams.end(); ++sit )
+        {
+            auto & s = d.streams[ sit.key() ];
+            s.count += sit.value().value( "count", 0 );
+            s.duration_seconds += sit.value().value( "duration_seconds", 0.0 );
+        }
+
+        auto filters = dobj.value( "filters", json::object() );
+        for( auto fit = filters.begin(); fit != filters.end(); ++fit )
+            d.filters[ fit.key() ] += fit.value().get< int >();
+
+        auto options = dobj.value( "options_changed", json::object() );
+        for( auto oit = options.begin(); oit != options.end(); ++oit )
+        {
+            auto found = d.options.find( oit.key() );
+            if( found == d.options.end() )
+                d.options[ oit.key() ] = { oit.value().value( "set_count", 0 ), oit.value().value( "last_value", 0.0f ) };
+            else
+                found->second.first += oit.value().value( "set_count", 0 );  // keep newer last_value
+        }
+    }
+
+    for( auto const & e : j.value( "notifications", json::array() ) )
+    {
+        auto category = e.value( "category", std::string() );
+        if( ! category.empty() )
+            _notification_counts[ category ] += e.value( "count", 0 );
+    }
+}
+
+
 void rum_collector::flush()
 {
+    merge_saved_report();  // accumulate across sessions; a successful upload is what resets the file
     ensure_report_directory();
     rsutils::os::atomic_write_file( report_path(), get_report() );
 }

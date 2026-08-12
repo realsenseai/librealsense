@@ -6,8 +6,9 @@
 #include "../device-model.h"     // configurations, device_model
 #include "../ux-window.h"        // ux_window (consent popup font)
 #include "../subdevice-model.h"  // subdevice_model::wait_for_stop
-#include <librealsense2/rs.hpp>  // rs2::rum::is_cloud_enabled
-#include <rsutils/os/special-folder.h>
+#include <librealsense2/rs.hpp>  // rs2::rum::is_cloud_enabled, rs2::rum::get_report_path
+#include <rsutils/os/atomic-write-file.h>
+#include <rsutils/json.h>
 #include <imgui.h>
 #include <fstream>
 #include <sstream>
@@ -27,6 +28,7 @@ namespace rs2 {
 
 // Dummy functions - built without RUM collection/upload; the whole feature compiles to no-ops.
 std::string rum_uploader::saved_report() { return std::string(); }
+bool rum_uploader::saved_report_has_usage() { return false; }
 bool rum_uploader::upload( std::string const & ) { LOG_WARNING( "RUM upload unavailable: built without ENABLE_STATS" ); return false; }
 void rum_uploader::start() {}
 void rum_uploader::upload_async( std::string, std::function< void( bool ) > ) {}
@@ -46,16 +48,36 @@ static const int  DEFAULT_UPLOAD_INTERVAL_HOURS = 24;   // 0 disables the thrott
 static const int  SECONDS_PER_HOUR = 3600;
 
 
+static void reset_saved_report( rsutils::json const & report )
+{
+    auto src = report.value( "source_id", std::string() );
+    rsutils::os::atomic_write_file( rs2::rum::get_report_path(), rsutils::json{ { "source_id", src } }.dump( 2 ) );
+}
+
+
+static bool report_has_usage( rsutils::json const & report )
+{
+    return ! report.value( "devices", rsutils::json::object() ).empty()        // devices (streams/options nested)
+        || ! report.value( "notifications", rsutils::json::array() ).empty();  // notifications (top-level)
+}
+
+
 std::string rum_uploader::saved_report()
 {
-    auto path = rsutils::os::get_special_folder( rsutils::os::special_folder::app_data ) + "rum/rum.json";
     // Read the file exactly as saved (binary = no newline translation).
-    std::ifstream f( path, std::ios::binary );
+    std::ifstream f( rs2::rum::get_report_path(), std::ios::binary );
     if( ! f )
         return std::string();
     std::ostringstream ss;
     ss << f.rdbuf();
     return ss.str();
+}
+
+
+bool rum_uploader::saved_report_has_usage()
+{
+    try { return report_has_usage( rsutils::json::parse( saved_report() ) ); }
+    catch( ... ) { return false; }  // no file / unparseable / reset stub -> nothing to send
 }
 
 
@@ -97,11 +119,15 @@ void rum_uploader::start()
             if( interval_hours > 0 && now - last < (long long)interval_hours * SECONDS_PER_HOUR )
                 return;  // uploaded recently
 
-            auto report = saved_report();   // prior session (nothing live yet at boot)
-            if( report.empty() )
-                return;  // nothing saved yet
+            auto report = saved_report();   // sessions accumulated on disk since the last upload
+            rsutils::json j;
+            try { j = rsutils::json::parse( report ); }
+            catch( ... ) { return; }  // no file / unparseable -> nothing to send
+            if( ! report_has_usage( j ) )
+                return;  // only source_id left after a reset, or empty
             if( upload( report ) )
             {
+                reset_saved_report( j );  // clear the delivered batch; keep source_id
                 cfg.set( configurations::stats::rum_last_upload, now );
                 LOG_INFO( "RUM report uploaded to " << RUM_ENDPOINT );
             }

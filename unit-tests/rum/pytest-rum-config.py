@@ -39,8 +39,8 @@ def test_cloud_consent_round_trips():
             os.remove( cfg_path )
 
 
-def test_report_is_valid_json_with_expected_fields():
-    report = json.loads( rs.rum.get_report() )
+def test_report_is_valid_json_with_expected_fields( rum_report ):
+    report = rum_report()
     assert report.get( "schema_version" ) == 1
     source_id = report.get( "source_id", "" )
     assert isinstance( source_id, str )
@@ -54,20 +54,22 @@ def test_report_is_valid_json_with_expected_fields():
     assert report.get( "sdk", {} ).get( "backend" )
     assert report.get( "system", {} ).get( "os" )
     assert report.get( "system", {} ).get( "arch" )
-    # Aggregation arrays are always present (possibly empty) so the schema is stable.
-    for key in ( "devices", "streams", "options_changed", "filters", "notifications" ):
-        assert isinstance( report.get( key ), list )
+    # devices is a keyed object (streams/options/filters nested under each); notifications top-level.
+    assert isinstance( report.get( "devices" ), dict )
+    assert isinstance( report.get( "notifications" ), list )
 
 
-def test_source_id_is_stable_across_calls():
-    first = json.loads( rs.rum.get_report() ).get( "source_id" )
-    again = json.loads( rs.rum.get_report() ).get( "source_id" )
+def test_source_id_is_stable_across_calls( rum_report ):
+    first = rum_report().get( "source_id" )
+    again = rum_report().get( "source_id" )
     assert first == again
 
 
-def test_processing_block_option_excluded_from_options_changed():
+def test_processing_block_option_excluded_from_options_changed( rum_report ):
     # A processing-block option must never land in options_changed (only device options do).
     th = rs.threshold_filter()
     th.set_option( rs.option.min_distance, 0.5 )
-    names = [ o.get( "option" ) for o in json.loads( rs.rum.get_report() ).get( "options_changed", [] ) ]
+    names = []
+    for d in rum_report().get( "devices", {} ).values():
+        names += list( d.get( "options_changed", {} ).keys() )
     assert "Min Distance" not in names

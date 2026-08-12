@@ -3437,37 +3437,49 @@ namespace rs2
 
                     if (ImGui::Button("Export RUM data..."))
                     {
-                        if (auto ret = file_dialog_open(save_file, "JSON\0*.json\0", NULL, NULL))
+                        // The accumulated on-disk report (prior sessions); the live session is not
+                        // persisted until this context is destroyed, so it isn't included here. Skip
+                        // if there's no usage yet (missing file, or a post-upload reset stub).
+                        if (!_rum_uploader.saved_report_has_usage())
+                            not_model->add_notification({ "No RUM report saved yet", RS2_LOG_SEVERITY_INFO,
+                                RS2_NOTIFICATION_CATEGORY_UNKNOWN_ERROR });
+                        else if (auto ret = file_dialog_open(save_file, "JSON\0*.json\0", NULL, NULL))
                         {
                             try
                             {
-                                std::ofstream(ret) << rs2::rum::get_report();
+                                std::ofstream(ret) << _rum_uploader.saved_report();
                             }
                             catch (const std::exception& e) { LOG_ERROR("RUM export failed: " << e.what()); }
                         }
                     }
                     ImGui::SameLine();
                     // TODO: "Upload now" (and rum_uploader::upload_async) is a testing affordance to send
-                    // the live session on demand; boot upload is the product path. Drop it once RUM is fully merged.
+                    // the accumulated on-disk report on demand; boot upload is the product path. Drop it once RUM is fully merged.
                     // Gate on the saved consent, not the checkbox: upload() reads the persisted value,
                     // so the button must stay disabled until the choice is applied (OK/Apply).
                     bool consent_saved = config_file::instance().get_or_default(configurations::stats::rum_cloud_enabled, false);
                     RsImGui::RsImButton([&]() {
                         if (ImGui::Button("Upload now"))
-                            // Off the UI thread; the uploader skips if one is already in flight.
-                            // Capture not_model by value so the callback (on the upload thread) stays valid.
-                            _rum_uploader.upload_async(rs2::rum::get_report(),
-                                [not_model = not_model](bool ok) {
-                                    not_model->add_notification({ ok ? "RUM report uploaded" : "RUM upload failed",
-                                        ok ? RS2_LOG_SEVERITY_INFO : RS2_LOG_SEVERITY_ERROR,
-                                        RS2_NOTIFICATION_CATEGORY_UNKNOWN_ERROR });
-                                });
+                        {
+                            if (!_rum_uploader.saved_report_has_usage())
+                                not_model->add_notification({ "No RUM report saved yet", RS2_LOG_SEVERITY_INFO,
+                                    RS2_NOTIFICATION_CATEGORY_UNKNOWN_ERROR });
+                            else
+                                // Off the UI thread; the uploader skips if one is already in flight.
+                                // Capture not_model by value so the callback (on the upload thread) stays valid.
+                                _rum_uploader.upload_async(_rum_uploader.saved_report(),
+                                    [not_model = not_model](bool ok) {
+                                        not_model->add_notification({ ok ? "RUM report uploaded" : "RUM upload failed",
+                                            ok ? RS2_LOG_SEVERITY_INFO : RS2_LOG_SEVERITY_ERROR,
+                                            RS2_NOTIFICATION_CATEGORY_UNKNOWN_ERROR });
+                                    });
+                        }
                     }, !consent_saved);
                     // AllowWhenDisabled: the button is disabled until consent is applied, but the
                     // hint explaining why must still show on hover.
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                         RsImGui::CustomTooltip(consent_saved
-                            ? "Send the current report now"
+                            ? "Upload the saved report now"
                             : "Enable cloud upload above and click Apply first");
 #endif
                 }

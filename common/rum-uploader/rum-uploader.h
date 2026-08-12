@@ -27,9 +27,13 @@ public:
     rum_uploader( rum_uploader const & ) = delete;
     rum_uploader & operator=( rum_uploader const & ) = delete;
 
-    // The last report saved to disk (<app-data>/rum/rum.json), or "" if none — the prior session
-    // the boot upload ships. (The live session is via rs2::rum::get_report().)
+    // The accumulated report saved to disk (<app-data>/rum/rum.json), or "" if none — this is what
+    // the boot upload ships. The SDK writes it on context destruction (rs2::rum::get_report_path()).
     static std::string saved_report();
+
+    // True if the saved report actually carries usage (devices or notifications). False for a
+    // missing file or a post-upload reset stub ({source_id} only) — nothing worth uploading/exporting.
+    static bool saved_report_has_usage();
 
     // POST the report over HTTP(S); true on success. No-op returning false when built without HTTP.
     // This is the call that actually sends data off the machine.

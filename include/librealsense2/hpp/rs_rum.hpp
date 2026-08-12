@@ -14,13 +14,12 @@ namespace rs2
 {
     namespace rum
     {
-        // The live RUM report for the current session as a JSON string (the in-memory report,
-        // not the on-disk copy).
-        inline std::string get_report()
+        // Path of the on-disk RUM report file (read that file to inspect or upload the report).
+        inline std::string get_report_path()
         {
             rs2_error* e = nullptr;
             std::shared_ptr<const rs2_raw_data_buffer> buffer(
-                rs2_rum_get_report(&e), rs2_delete_raw_data);
+                rs2_rum_get_report_path(&e), rs2_delete_raw_data);
             error::handle(e);
             if (!buffer)
                 return std::string();
