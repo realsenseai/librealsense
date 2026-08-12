@@ -23,23 +23,6 @@ using rs_fourcc = rsutils::type::fourcc;
 
 namespace librealsense
 {
-    namespace
-    {
-        void append_u32( std::vector< uint8_t > & data, uint32_t value )
-        {
-            for( unsigned shift = 0; shift < 32; shift += 8 )
-                data.push_back( static_cast< uint8_t >( value >> shift ) );
-        }
-
-        uint32_t read_u32( uint8_t const * data )
-        {
-            return static_cast< uint32_t >( data[0] )
-                | static_cast< uint32_t >( data[1] ) << 8
-                | static_cast< uint32_t >( data[2] ) << 16
-                | static_cast< uint32_t >( data[3] ) << 24;
-        }
-    }
-
     d500_dual_color::d500_dual_color( std::shared_ptr< const d500_info > const & dev_info )
         : d500_device( dev_info )
         , device( dev_info )
@@ -113,7 +96,10 @@ namespace librealsense
                 }
                 if( response != ds::d500_hwmon_response::SUCCESS || status.size() != 8 )
                     throw invalid_value_exception( "invalid stream-group status" );
-                auto const transaction_id = read_u32( status.data() );
+                auto const transaction_id = static_cast< uint32_t >( status[0] )
+                    | static_cast< uint32_t >( status[1] ) << 8
+                    | static_cast< uint32_t >( status[2] ) << 16
+                    | static_cast< uint32_t >( status[3] ) << 24;
                 if( ! transaction_id )
                     return;
                 if( previous_id && transaction_id != previous_id )
@@ -132,22 +118,14 @@ namespace librealsense
 
         // Do this during device discovery where possible, so terminal cleanup does not inflate stream-on latency.
         settle_previous();
-        std::weak_ptr< uvc_sensor > weak_sensor = raw_sensor;
         raw_sensor->append_on_open(
-            [this, weak_sensor, settle_previous]( std::vector< platform::stream_profile > configurations ) {
+            [this, settle_previous]( std::vector< platform::stream_profile > configurations ) {
                 if( _stream_group_unsupported )
                     return;
-                auto sensor = weak_sensor.lock();
-                if( ! sensor )
-                    throw wrong_api_call_sequence_exception( "D500 stream-group sensor is unavailable" );
 
                 settle_previous();
 
-                auto const & advertised = sensor->get_advertised_profiles();
-                std::set< uint32_t > color_pins;
-                for( auto const & profile : advertised )
-                    if( is_color_pin( advertised, profile.pin_index ) )
-                        color_pins.insert( profile.pin_index );
+                auto const & raw_profiles = get_raw_depth_sensor()->get_raw_stream_profiles();
 
                 uint8_t expected_mask = 0;
                 for( auto const & profile : configurations )
@@ -158,11 +136,24 @@ namespace librealsense
                     else if( profile.format == rs_fourcc( 'Y', '8', 'I', ' ' )
                              || profile.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) )
                         branch = 1;
-                    else if( color_pins.size() == 2
-                             && color_pins.count( profile.pin_index ) )
-                        branch = profile.pin_index == *color_pins.begin() ? 2 : 3;
                     else
-                        throw invalid_value_exception( "cannot map stream-group profile" );
+                    {
+                        branch = 0xff;
+                        for( auto const & raw_profile : raw_profiles )
+                        {
+                            auto backend = dynamic_cast< backend_stream_profile const * >( raw_profile.get() );
+                            if( raw_profile->get_stream_type() != RS2_STREAM_COLOR || ! backend
+                                || backend->get_backend_profile().pin_index != profile.pin_index )
+                                continue;
+                            if( raw_profile->get_stream_index() == 2 )
+                                branch = 2;  // low pin: EP4 / RGB left / public Color 2
+                            else if( raw_profile->get_stream_index() == 1 )
+                                branch = 3;  // high pin: EP8 / RGB right / public Color 1
+                            break;
+                        }
+                        if( branch == 0xff )
+                            throw invalid_value_exception( "cannot map stream-group profile" );
+                    }
 
                     auto const bit = static_cast< uint8_t >( 1u << branch );
                     if( expected_mask & bit )
@@ -172,8 +163,16 @@ namespace librealsense
 
                 if( ++_stream_group_transaction_id == 0 )
                     ++_stream_group_transaction_id;
-                std::vector< uint8_t > request = { 2, expected_mask, 0, 0 };
-                append_u32( request, _stream_group_transaction_id );
+                std::vector< uint8_t > request = {
+                    2,
+                    expected_mask,
+                    0,
+                    0,
+                    static_cast< uint8_t >( _stream_group_transaction_id ),
+                    static_cast< uint8_t >( _stream_group_transaction_id >> 8 ),
+                    static_cast< uint8_t >( _stream_group_transaction_id >> 16 ),
+                    static_cast< uint8_t >( _stream_group_transaction_id >> 24 )
+                };
 
                 command cmd( 0xbd, 1 );
                 cmd.data = std::move( request );

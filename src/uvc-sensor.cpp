@@ -465,6 +465,7 @@ void uvc_sensor::register_pu( rs2_option id )
     register_option( id, std::make_shared< uvc_pu_option >( std::dynamic_pointer_cast< uvc_sensor >( shared_from_this() ), id ) );
 }
 
+
 void uvc_sensor::prepare_for_bulk_operation()
 {
     acquire_power();
@@ -572,7 +573,6 @@ stream_profiles uvc_sensor::init_stream_profiles()
     power on( std::dynamic_pointer_cast< uvc_sensor >( shared_from_this() ) );
 
     auto uvc_profiles = _device->get_profiles();
-    _advertised_profiles = uvc_profiles;
     for( auto && p : uvc_profiles )
     {
         const auto && rs2_fmt = fourcc_to_rs2_format( p.format );
