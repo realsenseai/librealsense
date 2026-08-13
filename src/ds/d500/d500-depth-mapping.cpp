@@ -44,15 +44,28 @@ namespace librealsense
         _point_cloud_stream(new stream(RS2_STREAM_LABELED_POINT_CLOUD))
     {
         using namespace ds;
+
+        // Depth mapping is currently only supported over USB; skip on MIPI/GMSL transport
+        // rather than failing device creation for units that don't expose it (yet).
+        if( _is_mipi_device )
+            return;
+
         const uint32_t mapping_stream_mi = 13;
         auto mapping_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, mapping_stream_mi);
-        
+
+        // A missing interface most commonly means older FW that predates depth mapping.
+        // Degrade gracefully (no occupancy/point-cloud streams) instead of failing the
+        // whole device - some units in the field won't have this FW yet.
         if (mapping_devs_info.size() != 1)
-            throw invalid_value_exception(rsutils::string::from() << "RS5XX models with Safety are expected to include a single depth mapping device! - "
-                << mapping_devs_info.size() << " found");
+        {
+            LOG_WARNING( "depth mapping device not found (expected 1, found " << mapping_devs_info.size()
+                << ") - occupancy/point-cloud streams will not be available" );
+            return;
+        }
 
         auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_devs_info );
         _depth_mapping_device_idx = add_sensor(mapping_ep);
+        _depth_mapping_active = true;
     }
 
     std::shared_ptr<synthetic_sensor> d500_depth_mapping::create_depth_mapping_device(std::shared_ptr<context> ctx,
@@ -97,26 +110,24 @@ namespace librealsense
     void d500_depth_mapping::register_extrinsics()
     {
         using rsutils::json;
-        // extrinsics to depth lazy, becasue safety sensor's api is used and it may be constructed later
-        // than the depth mapping device (though it may not be the case in the device contructor's order, in ds500-factory)
+        // Lazy because it reads the safety interface config table over the HW monitor,
+        // and the depth mapping device may be constructed before the rest of the device
+        // is fully up (though it may not be the case in the device contructor's order, in ds500-factory)
         _depth_to_depth_mapping_extrinsics = std::make_shared< rsutils::lazy< rs2_extrinsics > > ( [this]()
             {
-                // getting access to safety sensor api
-                auto safety_device = dynamic_cast<d500_safety*>(this);
-                if (!safety_device)
-                    throw invalid_value_exception("null pointer recieved from dynamic pointer casting.");
-                auto& safety_sensor = dynamic_cast<d500_safety_sensor&>(safety_device->get_safety_sensor());
-                
-                // Pull extrinsic from safety interface config, according to HKR 0.9 QS
+                // Pull extrinsic from safety interface config, according to HKR 0.9 QS.
+                // Read directly via the HW monitor (shared helper, also used by
+                // d500_safety_sensor::get_safety_interface_config) rather than through a
+                // safety sensor object - depth mapping doesn't require d500_safety.
                 rs2_extrinsics res;
                 json sic_json;
-                try 
+                try
                 {
-                    sic_json = json::parse(safety_sensor.get_safety_interface_config());
+                    sic_json = json::parse(read_safety_interface_config(_hw_monitor));
                 }
-                catch (...)
+                catch (const std::exception& e)
                 {
-                    throw std::runtime_error("Could not read safety interface config");
+                    throw std::runtime_error(rsutils::string::from() << "Could not read safety interface config: " << e.what());
                 }
                 camera_position extrinsics_from_preset(sic_json["safety_interface_config"]["camera_position"]);
                 auto rot = extrinsics_from_preset.get_rotation();
@@ -136,6 +147,22 @@ namespace librealsense
 
         register_stream_to_extrinsic_group(*_point_cloud_stream, 0);
         environment::get_instance().get_extrinsics_graph().register_extrinsics(*_depth_stream, *_point_cloud_stream, _depth_to_depth_mapping_extrinsics);
+    }
+
+    void d500_depth_mapping::add_streams_if_active( std::vector< std::shared_ptr< stream_interface > > & streams ) const
+    {
+        if( is_depth_mapping_active() )
+        {
+            streams.push_back( _occupancy_stream );
+            streams.push_back( _point_cloud_stream );
+        }
+    }
+
+    void d500_depth_mapping::add_profile_tag_if_active( std::vector< tagged_profile > & tags ) const
+    {
+        if( is_depth_mapping_active() )
+            tags.push_back( { RS2_STREAM_OCCUPANCY, -1, 256, 320, RS2_FORMAT_Y8, 30,
+                              profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
     }
 
     void d500_depth_mapping::register_options(std::shared_ptr<d500_depth_mapping_sensor> occupancy_ep, std::shared_ptr<uvc_sensor> raw_mapping_sensor)

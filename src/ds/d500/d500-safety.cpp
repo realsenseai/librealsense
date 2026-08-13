@@ -472,7 +472,8 @@ namespace librealsense
         _owner->_hw_monitor->send(cmd);
     }
 
-    std::string d500_safety_sensor::get_safety_interface_config(rs2_calib_location loc) const
+    std::string read_safety_interface_config( std::shared_ptr< hw_monitor_extended_buffers > const & hw_monitor,
+                                               rs2_calib_location loc )
     {
         if (loc != RS2_CALIB_LOCATION_FLASH && loc != RS2_CALIB_LOCATION_RAM)
             throw io_exception(rsutils::string::from() << "Safety Interface Config can be read only from Flash or RAM");
@@ -489,22 +490,27 @@ namespace librealsense
         cmd.require_response = true;
 
         // send command to device and get response (safety_interface_config entry + header)
-        std::vector< uint8_t > response = _owner->_hw_monitor->send(cmd);
+        std::vector< uint8_t > response = hw_monitor->send(cmd);
         if (response.size() < sizeof(safety_interface_config_with_header))
         {
             throw io_exception(rsutils::string::from() << "Safety Interface Config failed");
         }
 
-        // check CRC before returning result       
+        // check CRC before returning result
         auto computed_crc32 = rsutils::number::calc_crc32(response.data() + sizeof(table_header), sizeof(safety_interface_config));
         result = reinterpret_cast<safety_interface_config_with_header*>(response.data());
         if (computed_crc32 != result->get_table_header().get_crc32())
         {
             throw invalid_value_exception(rsutils::string::from() << "Safety Interface Config invalid CRC value");
         }
-        
+
         rsutils::json j = result->get_safety_interface_config().to_json();
         return j.dump();
+    }
+
+    std::string d500_safety_sensor::get_safety_interface_config(rs2_calib_location loc) const
+    {
+        return read_safety_interface_config(_owner->_hw_monitor, loc);
     }
 
     void d500_safety_sensor::set_safety_interface_config(const std::string& sic_json_str) const
