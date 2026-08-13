@@ -65,24 +65,11 @@ namespace librealsense
             _sensor_to_id[gyro] = REPORT_ID_GYROMETER_3D;
             _sensor_to_id[accel] = REPORT_ID_ACCELEROMETER_3D;
             _sensor_to_id[custom] = REPORT_ID_CUSTOM;
-#ifdef __APPLE__
-            hidapi_device_info *devices = hid_enumerate(0x8086, 0x0);
-            if(devices)
-            {
-                _hidapi_device = hid_open(devices[0].vendor_id, devices[0].product_id, devices[0].serial_number);
-                hidapi_PowerDevice(REPORT_ID_ACCELEROMETER_3D);
-                hidapi_PowerDevice(REPORT_ID_GYROMETER_3D);
-            }
-#endif
             _action_dispatcher.start();
         }
 
         rs_hid_device::~rs_hid_device()
         {
-#ifdef __APPLE__
-            if( _hidapi_device )
-                hid_close( _hidapi_device );
-#endif
             _action_dispatcher.stop();
         }
 
@@ -117,7 +104,6 @@ namespace librealsense
             {
                 if(!_running)
                     return;
-#ifndef __APPLE__
                 _request_callback->cancel();
 
                 _queue.clear();
@@ -126,11 +112,8 @@ namespace librealsense
                     _messenger->cancel_request(r);
 
                 _requests.clear();
-#endif
                 _handle_interrupts_thread->stop();
-#ifndef __APPLE__
                 _messenger.reset();
-#endif
                _running = false;
             }, [this](){ return !_running; }, true);
         }
@@ -143,10 +126,12 @@ namespace librealsense
                     return;
 
                 _callback = callback;
-#ifndef __APPLE__
                 auto in = get_hid_interface()->get_number();
                 _messenger = _usb_device->open(in);
-#endif
+                if( ! _messenger )
+                    throw std::runtime_error( rsutils::string::from()
+                                              << "failed to open HID interface " << static_cast< int >( in ) );
+
                 _handle_interrupts_thread = std::make_shared<active_object<>>([this](dispatcher::cancellable_timer cancellable_timer)
                 {
                     handle_interrupt();
@@ -154,7 +139,6 @@ namespace librealsense
 
                 _handle_interrupts_thread->start();
 
-#ifndef __APPLE__
                 _request_callback = std::make_shared<usb_request_callback>([&](platform::rs_usb_request r)
                     {
                         _action_dispatcher.invoke([this, r](dispatcher::cancellable_timer c)
@@ -210,12 +194,9 @@ namespace librealsense
                     r->set_buffer(std::vector<uint8_t>(sizeof(REALSENSE_HID_REPORT)));
                     r->set_callback(_request_callback);
                 }
-#endif
                 _running = true;
-#ifndef __APPLE__
                 for(auto&& r : _requests)
                     _messenger->submit_request(r);
-#endif
 
             }, [this](){ return _running; }, true);
         }
@@ -229,46 +210,6 @@ namespace librealsense
             // For FW >= 5.16 we can just use memcpy as the structs size match
            
 
-#ifdef __APPLE__
-            unsigned char tmp_buffer[100] = { 0 };
-            hid_read( _hidapi_device, tmp_buffer, _realsense_hid_report_actual_size );
-            if( _realsense_hid_report_actual_size != sizeof( REALSENSE_HID_REPORT ) )
-            {
-               
-                // x,y,z are all short with: x at offset 10
-                //                           y at offset 12
-                //                           z at offset 14
-                memcpy( &report, tmp_buffer, 10 );
-                const int16_t * x = reinterpret_cast< const int16_t * >( tmp_buffer + 10 );
-                const int16_t * y = reinterpret_cast< const int16_t * >( tmp_buffer + 12 );
-                const int16_t * z = reinterpret_cast< const int16_t * >( tmp_buffer + 14 );
-                report.x = *x;
-                report.y = *y;
-                report.z = *z;
-
-                // the rest of the data in the old struct size (after z element) starts from offset 16 and has 16 bytes till end
-                memcpy( &report.customValue1, tmp_buffer + 16, 16 );
-            }
-            else
-            {
-                memcpy( &report, tmp_buffer, sizeof( REALSENSE_HID_REPORT ) );
-            }
-
-            sensor_data data{};
-            data.sensor = { _id_to_sensor[report.reportId] };
-
-            hid_data hid{};
-            hid.x = report.x;
-            hid.y = report.y;
-            hid.z = report.z;
-
-            data.fo.pixels = &(hid.x);
-            data.fo.metadata = &(report.timeStamp);
-            data.fo.frame_size = sizeof(REALSENSE_HID_REPORT);
-            data.fo.metadata_size = sizeof(report.timeStamp);
-
-            _callback(data);
-#else
             if(_queue.dequeue(&report, 10))
             {
                 if(std::find_if(_configured_profiles.begin(), _configured_profiles.end(), [&](hid_profile& p)
@@ -293,7 +234,6 @@ namespace librealsense
                     _callback(data);
                 }
             }
-#endif
         }
 
         usb_status rs_hid_device::set_feature_report( unsigned char power, int report_id, int fps, double sensitivity)
@@ -374,56 +314,6 @@ namespace librealsense
             }
             return res;
         }
-
-#ifdef __APPLE__
-        int rs_hid_device::hidapi_PowerDevice(unsigned char reportId)
-        {
-            if (_hidapi_device == NULL)
-                return -1;
-
-            REALSENSE_FEATURE_REPORT featureReport;
-            int ret;
-
-            memset(&featureReport,0, sizeof(featureReport));
-            featureReport.reportId = reportId;
-            // Reading feature report.
-            ret = hid_get_feature_report(_hidapi_device, (unsigned char *)
-                                         &featureReport ,sizeof(featureReport) );
-
-            if (ret == -1) {
-                LOG_ERROR("fail to read feature report from device");
-                return ret;
-            }
-
-            // change report to power the device to D0
-
-            featureReport.power = DEVICE_POWER_D0;
-
-            // Write feature report back.
-            ret = hid_send_feature_report(_hidapi_device, (unsigned char *) &featureReport, sizeof(featureReport));
-
-            if (ret == -1) {
-                LOG_ERROR("fail to write feature report from device");
-                return ret;
-            }
-
-            ret = hid_get_feature_report(_hidapi_device, (unsigned char *) &featureReport ,sizeof(featureReport) );
-
-            if (ret == -1) {
-                LOG_ERROR("fail to read feature report from device");
-                return ret;
-            }
-
-            if (featureReport.power == DEVICE_POWER_D0) {
-                LOG_INFO("Device is powered up");
-            } else {
-                LOG_INFO("Device is powered off");
-                return -1;
-            }
-
-            return 0;
-        }
-#endif
 
         rs_usb_interface rs_hid_device::get_hid_interface()
         {
