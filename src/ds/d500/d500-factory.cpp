@@ -124,7 +124,7 @@ namespace librealsense
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
             if( get_pid() == ds::D585_2C_PROTO_PID )
-                register_stream_group_transaction();
+                register_stream_group_prepare();
 
             // Improved Close Range Depth - USB toggle
             register_feature( std::make_shared< close_range_filter_feature >(

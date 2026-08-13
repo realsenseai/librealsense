@@ -20,7 +20,7 @@ namespace librealsense
         d500_dual_color( std::shared_ptr< const d500_info > const & dev_info );
 
     protected:
-        void register_stream_group_transaction();
+        void register_stream_group_prepare();
 
         std::shared_ptr< stream_interface > _color_stream_1;
         std::shared_ptr< stream_interface > _color_stream_2;
@@ -33,7 +33,6 @@ namespace librealsense
         static void resolve_color_stream( const std::vector< platform::stream_profile > & all,
                                           const platform::stream_profile & p, rs2_stream & type, int & index );
         static bool is_color_pin( const std::vector< platform::stream_profile > & all, uint32_t pin );
-        uint32_t _stream_group_transaction_id = 0;
         bool _stream_group_unsupported = false;
     };
 }

@@ -17,8 +17,6 @@
 using rs_fourcc = rsutils::type::fourcc;
 
 #include <set>
-#include <chrono>
-#include <thread>
 
 
 namespace librealsense
@@ -75,55 +73,13 @@ namespace librealsense
         register_color_metadata();
     }
 
-    void d500_dual_color::register_stream_group_transaction()
+    void d500_dual_color::register_stream_group_prepare()
     {
         auto raw_sensor = get_raw_depth_sensor();
-        auto settle_previous = [this]() {
-            auto const deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 500 );
-            uint32_t previous_id = 0;
-            bool cancel_sent = false;
-            while( std::chrono::steady_clock::now() < deadline )
-            {
-                command query( 0xbd, 3, previous_id );
-                hwmon_response_type response = ds::d500_hwmon_response::SUCCESS;
-                auto status = _hw_monitor->send( query, &response );
-                if( response == ds::d500_hwmon_response::INVALID_COMMAND
-                    || response == ds::d500_hwmon_response::COMMAND_NOT_SUPPORTED )
-                {
-                    _stream_group_unsupported = true;
-                    LOG_INFO( "D500 stream-group commands unsupported; using legacy flow" );
-                    return;
-                }
-                if( response != ds::d500_hwmon_response::SUCCESS || status.size() != 8 )
-                    throw invalid_value_exception( "invalid stream-group status" );
-                auto const transaction_id = static_cast< uint32_t >( status[0] )
-                    | static_cast< uint32_t >( status[1] ) << 8
-                    | static_cast< uint32_t >( status[2] ) << 16
-                    | static_cast< uint32_t >( status[3] ) << 24;
-                if( ! transaction_id )
-                    return;
-                if( previous_id && transaction_id != previous_id )
-                    throw wrong_api_call_sequence_exception( "unexpected stream-group owner" );
-                previous_id = transaction_id;
-                if( ! cancel_sent && ! status[5] )
-                {
-                    command cancel( 0xbd, 2, transaction_id );
-                    _hw_monitor->send( cancel );
-                    cancel_sent = true;
-                }
-                std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
-            }
-            throw wrong_api_call_sequence_exception( "previous stream group did not stop" );
-        };
-
-        // Do this during device discovery where possible, so terminal cleanup does not inflate stream-on latency.
-        settle_previous();
         raw_sensor->append_on_open(
-            [this, settle_previous]( std::vector< platform::stream_profile > configurations ) {
+            [this]( std::vector< platform::stream_profile > configurations ) {
                 if( _stream_group_unsupported )
                     return;
-
-                settle_previous();
 
                 auto const & raw_profiles = get_raw_depth_sensor()->get_raw_stream_profiles();
 
@@ -161,17 +117,11 @@ namespace librealsense
                     expected_mask |= bit;
                 }
 
-                if( ++_stream_group_transaction_id == 0 )
-                    ++_stream_group_transaction_id;
                 std::vector< uint8_t > request = {
-                    2,
+                    3,
                     expected_mask,
                     0,
-                    0,
-                    static_cast< uint8_t >( _stream_group_transaction_id ),
-                    static_cast< uint8_t >( _stream_group_transaction_id >> 8 ),
-                    static_cast< uint8_t >( _stream_group_transaction_id >> 16 ),
-                    static_cast< uint8_t >( _stream_group_transaction_id >> 24 )
+                    0
                 };
 
                 command cmd( 0xbd, 1 );
