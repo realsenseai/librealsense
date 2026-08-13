@@ -78,23 +78,19 @@ namespace librealsense
         auto raw_sensor = get_raw_depth_sensor();
         raw_sensor->append_on_open(
             [this]( std::vector< platform::stream_profile > configurations ) {
-                if( _stream_group_unsupported )
-                    return;
-
                 auto const & raw_profiles = get_raw_depth_sensor()->get_raw_stream_profiles();
 
                 uint8_t expected_mask = 0;
                 for( auto const & profile : configurations )
                 {
-                    uint8_t branch;
+                    uint8_t bit = 0;
                     if( profile.format == rs_fourcc( 'Z', '1', '6', ' ' ) )
-                        branch = 0;
+                        bit = 0x01;
                     else if( profile.format == rs_fourcc( 'Y', '8', 'I', ' ' )
                              || profile.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) )
-                        branch = 1;
+                        bit = 0x02;
                     else
                     {
-                        branch = 0xff;
                         for( auto const & raw_profile : raw_profiles )
                         {
                             auto backend = dynamic_cast< backend_stream_profile const * >( raw_profile.get() );
@@ -102,36 +98,25 @@ namespace librealsense
                                 || backend->get_backend_profile().pin_index != profile.pin_index )
                                 continue;
                             if( raw_profile->get_stream_index() == 2 )
-                                branch = 2;  // low pin: EP4 / RGB left / public Color 2
+                                bit = 0x04;  // low pin: EP4 / RGB left / public Color 2
                             else if( raw_profile->get_stream_index() == 1 )
-                                branch = 3;  // high pin: EP8 / RGB right / public Color 1
+                                bit = 0x08;  // high pin: EP8 / RGB right / public Color 1
                             break;
                         }
-                        if( branch == 0xff )
-                            throw invalid_value_exception( "cannot map stream-group profile" );
                     }
 
-                    auto const bit = static_cast< uint8_t >( 1u << branch );
-                    if( expected_mask & bit )
-                        throw invalid_value_exception( "duplicate stream-group branch" );
+                    if( ! bit || ( expected_mask & bit ) )
+                        throw invalid_value_exception( "invalid stream-group profile" );
                     expected_mask |= bit;
                 }
 
-                std::vector< uint8_t > request = {
-                    3,
-                    expected_mask,
-                    0,
-                    0
-                };
-
                 command cmd( 0xbd, 1 );
-                cmd.data = std::move( request );
+                cmd.data = { 3, expected_mask, 0, 0 };
                 hwmon_response_type response = ds::d500_hwmon_response::SUCCESS;
                 _hw_monitor->send( cmd, &response );
                 if( response == ds::d500_hwmon_response::INVALID_COMMAND
                     || response == ds::d500_hwmon_response::COMMAND_NOT_SUPPORTED )
                 {
-                    _stream_group_unsupported = true;
                     LOG_INFO( "D500 stream-group PREPARE unsupported; using legacy flow" );
                 }
                 else if( response != ds::d500_hwmon_response::SUCCESS )
