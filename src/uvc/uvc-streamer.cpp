@@ -24,6 +24,17 @@ namespace librealsense
             _read_endpoint = inf->first_endpoint(platform::RS2_USB_ENDPOINT_DIRECTION_READ);
 
             _read_buff_length = UVC_PAYLOAD_MAX_HEADER_LENGTH + _context.control->dwMaxVideoFrameSize;
+            // Compressed streams naturally have a variable payload length. D555 object
+            // detection does too: its UVC descriptor advertises the maximum EP13 frame,
+            // while each transfer contains only the 43-byte header and populated entries.
+            // Scope the exception to the D555 OD streaming interface so regular Y8 images
+            // retain strict frame-size validation.
+            constexpr uint16_t d555_pid = 0x0b56;
+            constexpr uint8_t d555_object_detection_streaming_mi = 10;
+            _allow_variable_length_payload
+                = val_in_range( _context.profile.format, { 0x4d4a5047U, 0x5a313648U } )  // MJPEG, Z16H
+               || ( context.usb_device->get_info().pid == d555_pid
+                    && context.control->bInterfaceNumber == d555_object_detection_streaming_mi );
             LOG_INFO("endpoint " << (int)_read_endpoint->get_address() << " read buffer size: " << std::dec <<_read_buff_length);
 
             _action_dispatcher.start();
@@ -118,9 +129,9 @@ namespace librealsense
                       return;
 
                     auto al = r->get_actual_length();
-                    // Relax the frame size constrain for compressed streams
-                    bool is_compressed = val_in_range(_context.profile.format, { 0x4d4a5047U , 0x5a313648U}); // MJPEG, Z16H
-                    if(al > 0L && ((al == r->get_buffer().data()[0] + _context.control->dwMaxVideoFrameSize) || is_compressed ))
+                    if( al > 0L
+                        && ( al == r->get_buffer().data()[0] + _context.control->dwMaxVideoFrameSize
+                             || _allow_variable_length_payload ) )
                     {
                         auto f = backend_frame_ptr(_frames_archive->allocate(), &cleanup_frame);
                         if(f)

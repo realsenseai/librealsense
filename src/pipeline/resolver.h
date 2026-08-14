@@ -143,8 +143,28 @@ namespace librealsense
                     // As a workaround for pipeline API usage, we use the assumption that depth sensor is first in the map if it is added to the configuration,
                     // When we reverse iterate it, the depth sensor opening will be last This should not affect other stream
                     // which are capable of being opened decoupled from other sensors
+                    auto has_object_detection = []( stream_profiles const & profiles )
+                    {
+                        for( auto const & profile : profiles )
+                            if( profile->get_stream_type() == RS2_STREAM_OBJECT_DETECTION )
+                                return true;
+                        return false;
+                    };
+
+                    // The D555 USB transaction must establish its producer streams before
+                    // opening the OD consumer. Keep the legacy reverse order among all other
+                    // sensors, then open perception last.
                     for( auto it = _dev_to_profiles.rbegin(); it != _dev_to_profiles.rend(); it++ )
                     {
+                        if( has_object_detection( it->second ) )
+                            continue;
+                        auto && sub = _results.at( it->first );
+                        sub->open( it->second );
+                    }
+                    for( auto it = _dev_to_profiles.rbegin(); it != _dev_to_profiles.rend(); it++ )
+                    {
+                        if( ! has_object_detection( it->second ) )
+                            continue;
                         auto && sub = _results.at( it->first );
                         sub->open( it->second );
                     }
@@ -153,8 +173,24 @@ namespace librealsense
                 template<class T>
                 void start(T callback)
                 {
+                    auto has_object_detection = [this]( int sensor_index )
+                    {
+                        auto const & profiles = _dev_to_profiles.at( sensor_index );
+                        for( auto const & profile : profiles )
+                            if( profile->get_stream_type() == RS2_STREAM_OBJECT_DETECTION )
+                                return true;
+                        return false;
+                    };
+
+                    // Start the OD consumer before its producer streams. Firmware commits the
+                    // multi-stream transaction when the producer starts; doing this in the
+                    // opposite order can leave Color inactive on the D555 USB path.
+                    for( auto && sensor : _results )
+                        if( has_object_detection( sensor.first ) )
+                            sensor.second->start( callback );
                     for (auto&& sensor : _results)
-                        sensor.second->start(callback);
+                        if( ! has_object_detection( sensor.first ) )
+                            sensor.second->start(callback);
                 }
 
                 template< class T >
