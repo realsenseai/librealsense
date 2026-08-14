@@ -558,6 +558,17 @@ unsigned int rs2_get_frame_object_detection_count(const rs2_frame* frame, rs2_er
 */
 void rs2_get_frame_object_detection(const rs2_frame* frame, unsigned int index, rs2_object_detection* detection, rs2_error** error);
 
+/**
+* When called on Object Detection frame type, this method returns a detection
+* with center-of-mass camera and image coordinates. Version-2 frames return
+* com_valid=0 and zero COM coordinates.
+* \param[in] frame       Object Detection frame
+* \param[in] index       Index of detection to retrieve
+* \param[out] detection  Pointer to extended detection data
+* \param[out] error      If non-null, receives any error that occurs during this call
+*/
+void rs2_get_frame_object_detection_3d(const rs2_frame* frame, unsigned int index, rs2_object_detection_3d* detection, rs2_error** error);
+
 
 #ifdef __cplusplus
 }

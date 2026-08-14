@@ -231,17 +231,17 @@ namespace librealsense
             // Re-encode the binary object_detection_payload back to the same JSON format the DDS server sends,
             // so that playback can reconstruct the frame using the same parse path.
             auto od = As<object_detection_frame>(frame.frame);
-            auto raw = reinterpret_cast<object_detection_frame::object_detection_payload const *>(od->get_frame_data());
-            auto n = raw->number_of_detections;
+            auto const payload = od->get_payload_header();
+            auto const n = od->get_detection_count();
 
             std::ostringstream json;
             json << "{"
-                 << "\"frame_id\":" << raw->frame_id << ","
+                 << "\"frame_id\":" << payload.frame_id << ","
                  << "\"number_of_detections\":" << n << ","
                  << "\"detections\":[";
             for (uint16_t i = 0; i < n; ++i)
             {
-                auto const & e = raw->detections[i];
+                auto const e = od->get_detection(i);
                 if (i) json << ",";
                 json << "{"
                      << "\"class_id\":"    << static_cast<int>(e.detection_type) << ","
@@ -250,13 +250,21 @@ namespace librealsense
                      << "\"y1\":"          << e.top_left_y << ","
                      << "\"x2\":"          << e.bottom_right_x << ","
                      << "\"y2\":"          << e.bottom_right_y << ","
-                     << "\"distance\":"    << e.distance
-                     << "}";
+                     << "\"distance\":"    << e.distance;
+                if( e.com_valid )
+                    json << ",\"world_pos\":{"
+                         << "\"x\":" << e.world_position.x << ","
+                         << "\"y\":" << e.world_position.y << ","
+                         << "\"z\":" << e.world_position.z << "},"
+                         << "\"image_pos\":{"
+                         << "\"x\":" << e.image_x << ","
+                         << "\"y\":" << e.image_y << "}";
+                json << "}";
             }
             json << "],"
-                 << "\"source_frame_id\":" << raw->source_frame_id << ","
-                 << "\"version\":"         << raw->header.version << ","
-                 << "\"timestamp_us\":"    << (raw->timestamp_ms * MILLISEC_TO_MICROSEC)
+                 << "\"source_frame_id\":" << payload.source_frame_id << ","
+                 << "\"version\":1,"
+                 << "\"timestamp_us\":"    << (payload.timestamp_ms * MILLISEC_TO_MICROSEC)
                  << "}";
 
             write_string(ros2_topic::frame_data_topic(stream_id), timestamp, json.str());

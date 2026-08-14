@@ -1214,6 +1214,21 @@ namespace rs2
             error::handle(e);
             return detection;
         }
+
+        /**
+        * Get a detection with center-of-mass camera and image coordinates.
+        * Version-2 frames return com_valid=0 and zero COM coordinates.
+        * \param[in] index - zero-based index of the detection
+        * \return rs2_object_detection_3d - extended detection result
+        */
+        rs2_object_detection_3d get_detection_3d(unsigned int index) const
+        {
+            rs2_object_detection_3d detection{};
+            rs2_error* e = nullptr;
+            rs2_get_frame_object_detection_3d(get(), index, &detection, &e);
+            error::handle(e);
+            return detection;
+        }
     };
 
     class frameset : public frame

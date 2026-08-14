@@ -181,12 +181,34 @@ namespace librealsense
 
             auto n_detections = j.value( "number_of_detections", uint16_t(0) );
 
-            size_t const base_size = sizeof( object_detection_frame::object_detection_payload )
-                                   - sizeof( object_detection_frame::object_detection_entry );
-            size_t const total_size = base_size + n_detections * sizeof( object_detection_frame::object_detection_entry );
+            auto dets_j = j.find( "detections" );
+            bool has_com = n_detections > 0 && dets_j != j.end() && dets_j->is_array()
+                        && dets_j->size() >= n_detections;
+            if( has_com )
+            {
+                for( uint16_t i = 0; i < n_detections; ++i )
+                {
+                    auto const & det = (*dets_j)[i];
+                    if( ! det.contains( "world_pos" ) || ! det["world_pos"].is_object()
+                        || ! det.contains( "image_pos" ) || ! det["image_pos"].is_object() )
+                    {
+                        has_com = false;
+                        break;
+                    }
+                }
+            }
+
+            size_t const entry_size = has_com ? sizeof( object_detection_frame::object_detection_entry_v3 )
+                                              : sizeof( object_detection_frame::object_detection_entry_v2 );
+            size_t const base_size = sizeof( object_detection_frame::object_detection_frame_header )
+                                   + sizeof( object_detection_frame::object_detection_payload_header );
+            size_t const total_size = base_size + n_detections * entry_size;
 
             data.resize( total_size );
-            auto * payload = reinterpret_cast< object_detection_frame::object_detection_payload * >( data.data() );
+            auto * header = reinterpret_cast< object_detection_frame::object_detection_frame_header * >( data.data() );
+            auto * payload = reinterpret_cast< object_detection_frame::object_detection_payload_header * >(
+                data.data() + sizeof( *header ) );
+            auto * entries = data.data() + base_size;
 
             payload->frame_id             = j.value( "frame_id", uint64_t(0) );
             payload->number_of_detections = n_detections;
@@ -194,33 +216,49 @@ namespace librealsense
             payload->source_frame_id      = j.value( "source_frame_id", uint32_t(0) );
             payload->timestamp_ms         = j.value( "timestamp_us", 0.0 ) * MICROSEC_TO_MILLISEC;
 
-            auto dets_j = j.find( "detections" );
             if( dets_j != j.end() && dets_j->is_array() )
             {
                 for( uint16_t i = 0; i < n_detections && i < dets_j->size(); ++i )
                 {
                     auto const & det = (*dets_j)[i];
-                    auto & e         = payload->detections[i];
-                    e.detection_id   = i;
-                    e.detection_type = det.value( "class_id",    uint8_t(0) );
-                    e.confidence     = det.value( "confidence",  uint8_t(0) );
-                    e.top_left_x     = det.value( "x1",          uint16_t(0) );
-                    e.top_left_y     = det.value( "y1",          uint16_t(0) );
-                    e.bottom_right_x = det.value( "x2",          uint16_t(0) );
-                    e.bottom_right_y = det.value( "y2",          uint16_t(0) );
-                    e.distance       = det.value( "distance",    0.0f );
+                    object_detection_frame::object_detection_entry_v2 common{};
+                    common.detection_id   = i;
+                    common.detection_type = det.value( "class_id",    uint8_t(0) );
+                    common.confidence     = det.value( "confidence",  uint8_t(0) );
+                    common.top_left_x     = det.value( "x1",          uint16_t(0) );
+                    common.top_left_y     = det.value( "y1",          uint16_t(0) );
+                    common.bottom_right_x = det.value( "x2",          uint16_t(0) );
+                    common.bottom_right_y = det.value( "y2",          uint16_t(0) );
+                    common.distance       = det.value( "distance",    0.0f );
+
+                    if( has_com )
+                    {
+                        object_detection_frame::object_detection_entry_v3 entry{};
+                        entry.detection = common;
+                        auto const & world = det["world_pos"];
+                        auto const & image = det["image_pos"];
+                        entry.world_x = world.value( "x", 0.0f );
+                        entry.world_y = world.value( "y", 0.0f );
+                        entry.world_z = world.value( "z", 0.0f );
+                        entry.image_x = image.value( "x", 0.0f );
+                        entry.image_y = image.value( "y", 0.0f );
+                        memcpy( entries + i * entry_size, &entry, sizeof( entry ) );
+                    }
+                    else
+                        memcpy( entries + i * entry_size, &common, sizeof( common ) );
                 }
             }
 
             // Fill header so object_detection_frame::validate() passes
-            payload->header.magic_number = object_detection_frame::MAGIC_NUMBER;
-            payload->header.version      = static_cast< uint16_t >( j.value( "version", 1 ) );
-            payload->header.data_type    = static_cast< uint8_t >( perception_frame::type::OBJECT_DETECTION );
-            payload->header.flags        = 0;
-            payload->header.spare        = 0;
-            payload->header.size         = static_cast< uint32_t >( total_size - sizeof( object_detection_frame::object_detection_frame_header ) );
-            uint8_t * payload_data       = reinterpret_cast< uint8_t * >( payload ) + sizeof( object_detection_frame::object_detection_frame_header );
-            payload->header.crc32        = rsutils::number::calc_crc32( payload_data, payload->header.size );
+            header->magic_number = object_detection_frame::MAGIC_NUMBER;
+            header->version      = has_com ? object_detection_frame::VERSION_V3
+                                           : object_detection_frame::VERSION_V2;
+            header->data_type    = static_cast< uint8_t >( perception_frame::type::OBJECT_DETECTION );
+            header->flags        = 0;
+            header->spare        = 0;
+            header->size         = static_cast< uint32_t >( total_size - sizeof( *header ) );
+            uint8_t * payload_data = data.data() + sizeof( *header );
+            header->crc32        = rsutils::number::calc_crc32( payload_data, header->size );
 
             // Update additional_data fields from the JSON payload
             additional_data.frame_number = static_cast< unsigned long long >( payload->frame_id );

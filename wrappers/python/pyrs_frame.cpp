@@ -270,6 +270,22 @@ void init_frame(py::module &m) {
             return oss.str();
         });
 
+    py::class_<rs2_object_detection_3d> object_detection_3d(m, "object_detection_3d");
+    object_detection_3d.def_readwrite("detection", &rs2_object_detection_3d::detection)
+        .def_readwrite("world_position", &rs2_object_detection_3d::world_position)
+        .def_readwrite("image_x", &rs2_object_detection_3d::image_x)
+        .def_readwrite("image_y", &rs2_object_detection_3d::image_y)
+        .def_readwrite("com_valid", &rs2_object_detection_3d::com_valid)
+        .def("__repr__", [](const rs2_object_detection_3d& d) {
+            std::ostringstream oss;
+            oss << "detection: [" << d.detection.class_id << ", " << d.detection.score
+                << "%], world_position: [" << d.world_position.x << ", "
+                << d.world_position.y << ", " << d.world_position.z
+                << "], image_position: [" << d.image_x << ", " << d.image_y
+                << "], com_valid: " << d.com_valid;
+            return oss.str();
+        });
+
     py::class_<rs2::points, rs2::frame> points(m, "points", "Extends the frame class with additional point cloud related attributes and functions.");
     points.def(py::init<>())
         .def(py::init<rs2::frame>())
@@ -349,7 +365,9 @@ void init_frame(py::module &m) {
     py::class_<rs2::object_detection_frame, rs2::perception_frame> object_detection_frame(m, "object_detection_frame", "Extends perception_frame class with additional object detection related attributes and functions.");
     object_detection_frame.def(py::init<rs2::frame>())
         .def("get_detection_count", &rs2::object_detection_frame::get_detection_count, "Get the number of detected objects in this frame")
-        .def("get_detection", &rs2::object_detection_frame::get_detection, "index"_a, "Get a specific detection by index");
+        .def("get_detection", &rs2::object_detection_frame::get_detection, "index"_a, "Get a specific detection by index")
+        .def("get_detection_3d", &rs2::object_detection_frame::get_detection_3d, "index"_a,
+             "Get a detection with center-of-mass camera and image coordinates");
 
     py::class_<rs2::gpu_frame, rs2::frame> gpu_frame(m, "gpu_frame", "Extends the frame class for a GPU-resident (zero-copy) frame on "
         "integrated-GPU CUDA builds. Reach it with frame.as(gpu_frame); the cast is null unless the frame is GPU-resident.");

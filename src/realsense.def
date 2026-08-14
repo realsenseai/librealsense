@@ -97,6 +97,7 @@ EXPORTS
     rs2_extract_target_dimensions
     rs2_get_frame_object_detection_count
     rs2_get_frame_object_detection
+    rs2_get_frame_object_detection_3d
 
     rs2_get_option
     rs2_get_option_value

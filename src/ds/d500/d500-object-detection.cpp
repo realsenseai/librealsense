@@ -24,9 +24,11 @@ namespace librealsense
 {
     const std::map< uint32_t, rs2_format > od_fourcc_to_rs2_format = {
         { rs_fourcc( 'G', 'R', 'E', 'Y' ), RS2_FORMAT_Y8 },
+        { rs_fourcc( 'Y', '8', ' ', ' ' ), RS2_FORMAT_Y8 },
     };
     const std::map< uint32_t, rs2_stream > od_fourcc_to_rs2_stream = {
         { rs_fourcc( 'G', 'R', 'E', 'Y' ), RS2_STREAM_OBJECT_DETECTION },
+        { rs_fourcc( 'Y', '8', ' ', ' ' ), RS2_STREAM_OBJECT_DETECTION },
     };
 
     d500_object_detection::d500_object_detection( std::shared_ptr< const d500_info > const & dev_info )
@@ -34,8 +36,20 @@ namespace librealsense
         , d500_device( dev_info )
         , _object_detection_stream( new stream( RS2_STREAM_OBJECT_DETECTION ) )
     {
-        static const uint32_t od_stream_mi = 9; // UVC interface index of the object-detection stream.
-        auto od_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, od_stream_mi );
+        // D500 UVC descriptors expose OD through the occupancy video function.
+        // The control interface number varies with optional CDC functions.
+        // D555E exposes OD on MI 9.  Keep it first: MI 11 can also be a valid
+        // video-control interface on the same device, but belongs to another
+        // function and advertises ordinary image profiles rather than the
+        // fixed-size OD payload.  Other D500 layouts may shift the OD function.
+        static const uint32_t od_stream_mis[] = { 9, 11, 7 };
+        std::vector< platform::uvc_device_info > od_devs_info;
+        for( auto mi : od_stream_mis )
+        {
+            od_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, mi );
+            if( ! od_devs_info.empty() )
+                break;
+        }
 
         // Skip if the device does not expose the stream; the rest of the device enumerates normally.
         if( od_devs_info.empty() )

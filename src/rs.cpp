@@ -5114,3 +5114,28 @@ void rs2_get_frame_object_detection(const rs2_frame* frame, unsigned int index, 
     detection->depth          = entry.distance;
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, frame, index, output_arg(detection))
+
+void rs2_get_frame_object_detection_3d(const rs2_frame* frame, unsigned int index, rs2_object_detection_3d* detection, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(frame);
+    VALIDATE_NOT_NULL(detection);
+    auto od_frame = VALIDATE_INTERFACE((frame_interface*)frame, librealsense::object_detection_frame);
+
+    if(index >= od_frame->get_detection_count() )
+        throw invalid_value_exception( "index " + std::to_string(index) + " is out of range (" +
+                                        std::to_string(od_frame->get_detection_count()) + ")" );
+
+    const auto & entry = od_frame->get_detection( index );
+    detection->detection.class_id       = entry.detection_type;
+    detection->detection.score          = entry.confidence;
+    detection->detection.top_left_x     = entry.top_left_x;
+    detection->detection.top_left_y     = entry.top_left_y;
+    detection->detection.bottom_right_x = entry.bottom_right_x;
+    detection->detection.bottom_right_y = entry.bottom_right_y;
+    detection->detection.depth          = entry.distance;
+    detection->world_position           = entry.world_position;
+    detection->image_x                  = entry.image_x;
+    detection->image_y                  = entry.image_y;
+    detection->com_valid                = entry.com_valid ? 1 : 0;
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, frame, index, output_arg(detection))

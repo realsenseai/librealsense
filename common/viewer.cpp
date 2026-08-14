@@ -3996,27 +3996,30 @@ namespace rs2
             // Non-maximum suppression: sort by score, suppress overlapping same-class boxes
             static constexpr float NMS_IOU_THRESHOLD   = 0.55f;
             static constexpr int   NMS_SCORE_THRESHOLD = 45;
-            std::vector< rs2_object_detection > raw_dets( count );
+            std::vector< rs2_object_detection_3d > raw_dets( count );
             for( unsigned int i = 0; i < count; ++i )
-                raw_dets[i] = odf.get_detection( i );
+                raw_dets[i] = odf.get_detection_3d( i );
             std::sort( raw_dets.begin(), raw_dets.end(),
-                []( const rs2_object_detection & a, const rs2_object_detection & b ) { return a.score > b.score; } );
+                []( const rs2_object_detection_3d & a, const rs2_object_detection_3d & b )
+                { return a.detection.score > b.detection.score; } );
             std::vector< bool > suppressed( count, false );
             for( size_t i = 0; i < count; ++i )
-                if( raw_dets[i].score < NMS_SCORE_THRESHOLD )
+                if( raw_dets[i].detection.score < NMS_SCORE_THRESHOLD )
                     suppressed[i] = true;
             for( size_t i = 0; i < count; ++i )
             {
                 if( suppressed[i] ) continue;
-                rs2::rect bi{ float( raw_dets[i].top_left_x ), float( raw_dets[i].top_left_y ),
-                              float( raw_dets[i].bottom_right_x - raw_dets[i].top_left_x ),
-                              float( raw_dets[i].bottom_right_y - raw_dets[i].top_left_y ) };
+                auto const & det_i = raw_dets[i].detection;
+                rs2::rect bi{ float( det_i.top_left_x ), float( det_i.top_left_y ),
+                              float( det_i.bottom_right_x - det_i.top_left_x ),
+                              float( det_i.bottom_right_y - det_i.top_left_y ) };
                 for( size_t j = i + 1; j < count; ++j )
                 {
-                    if( suppressed[j] || raw_dets[j].class_id != raw_dets[i].class_id ) continue;
-                    rs2::rect bj{ float( raw_dets[j].top_left_x ), float( raw_dets[j].top_left_y ),
-                                  float( raw_dets[j].bottom_right_x - raw_dets[j].top_left_x ),
-                                  float( raw_dets[j].bottom_right_y - raw_dets[j].top_left_y ) };
+                    auto const & det_j = raw_dets[j].detection;
+                    if( suppressed[j] || det_j.class_id != det_i.class_id ) continue;
+                    rs2::rect bj{ float( det_j.top_left_x ), float( det_j.top_left_y ),
+                                  float( det_j.bottom_right_x - det_j.top_left_x ),
+                                  float( det_j.bottom_right_y - det_j.top_left_y ) };
                     float inter_area = bi.intersection( bj ).area();
                     float union_area = bi.area() + bj.area() - inter_area;
                     if( union_area > 0.f && inter_area / union_area > NMS_IOU_THRESHOLD )
@@ -4028,7 +4031,8 @@ namespace rs2
             for( size_t i = 0; i < count; ++i )
             {
                 if( suppressed[i] ) continue;
-                rs2_object_detection const & det = raw_dets[i];
+                rs2_object_detection_3d const & det3d = raw_dets[i];
+                rs2_object_detection const & det = det3d.detection;
 
                 // Pixel-coordinate bounding box in the color frame
                 rs2::rect color_bbox{ float( det.top_left_x ),
@@ -4055,12 +4059,19 @@ namespace rs2
                 float viewer_depth_m = 0.f;
                 float com_rel_u = 0.5f, com_rel_v = 0.5f;
 
+                if( det3d.com_valid && color_bbox.w > 0.f && color_bbox.h > 0.f )
+                {
+                    auto clamp01 = []( float v ) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; };
+                    com_rel_u = clamp01( ( det3d.image_x - color_bbox.x ) / color_bbox.w );
+                    com_rel_v = clamp01( ( det3d.image_y - color_bbox.y ) / color_bbox.h );
+                }
+
                 // TODO: temporary fallback — viewer-side COM runs only when HKR firmware
                 // returns 0 (XU command not supported or device not ready).
                 // Checked per-detection intentionally: firmware could return 0 for individual
                 // detections (e.g. out-of-range) even when HKR COM is otherwise working.
                 // Remove once HKR COM is fully implemented and reliable on all devices.
-                if( hkr_depth_m == 0.f )
+                if( ! det3d.com_valid && hkr_depth_m == 0.f )
                 {
                     if( !depth8u_ready )
                     {

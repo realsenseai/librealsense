@@ -73,14 +73,22 @@ int main( int /*argc*/, char * /*argv*/[] ) try
 
         for( unsigned int i = 0; i < count; ++i )
         {
-            rs2_object_detection det = odf.get_detection( i );
+            rs2_object_detection_3d det3d = odf.get_detection_3d( i );
+            rs2_object_detection const & det = det3d.detection;
 
             std::cout << "  [" << i << "] "
                       << std::left << std::setw( 8 ) << class_label( det.class_id )
                       << "  score=" << std::right << std::setw( 3 ) << det.score << "%"
                       << "  bbox=("  << det.top_left_x     << "," << det.top_left_y     << ")-"
                       <<       "("   << det.bottom_right_x << "," << det.bottom_right_y << ")"
-                      << "\n";
+                      << "  distance=" << std::fixed << std::setprecision( 3 ) << det.depth << "m";
+            if( det3d.com_valid )
+                std::cout << "  world=(" << det3d.world_position.x << ","
+                          << det3d.world_position.y << "," << det3d.world_position.z << ")m"
+                          << "  image=(" << det3d.image_x << "," << det3d.image_y << ")px";
+            else
+                std::cout << "  COM=unavailable";
+            std::cout << "\n";
         }
         std::cout << "\n";
     }

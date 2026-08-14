@@ -128,8 +128,18 @@ typedef struct rs2_object_detection
     int top_left_y;     /**< Top-left corner pixel Y coordinate */
     int bottom_right_x; /**< Bottom-right corner pixel X coordinate */
     int bottom_right_y; /**< Bottom-right corner pixel Y coordinate */
-    float depth;        /**< Distance to detected object in meters, as computed by firmware */
+    float depth;        /**< Euclidean distance to detected object in meters, as computed by firmware */
 } rs2_object_detection;
+
+/** \brief Object detection result with center-of-mass coordinates */
+typedef struct rs2_object_detection_3d
+{
+    rs2_object_detection detection; /**< Legacy detection fields */
+    rs2_vector world_position;      /**< COM X, Y, Z in camera coordinates, meters */
+    float image_x;                  /**< COM column in source-image pixels */
+    float image_y;                  /**< COM row in source-image pixels */
+    int com_valid;                  /**< Nonzero when world and image COM fields are valid */
+} rs2_object_detection_3d;
 
 /** \brief Severity of the librealsense logger. */
 typedef enum rs2_log_severity {
