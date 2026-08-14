@@ -16,7 +16,9 @@
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
 
+#include <chrono>
 #include <set>
+#include <thread>
 
 
 namespace librealsense
@@ -113,7 +115,13 @@ namespace librealsense
                 command cmd( 0xbd, 1 );
                 cmd.data = { 3, expected_mask, 0, 0 };
                 hwmon_response_type response = ds::d500_hwmon_response::SUCCESS;
-                _hw_monitor->send( cmd, &response );
+                for( unsigned retry = 0; retry < 30; ++retry )
+                {
+                    _hw_monitor->send( cmd, &response );
+                    if( response != ds::d500_hwmon_response::SW_NOT_READY )
+                        break;
+                    std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+                }
                 if( response == ds::d500_hwmon_response::INVALID_COMMAND
                     || response == ds::d500_hwmon_response::COMMAND_NOT_SUPPORTED )
                 {
