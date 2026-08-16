@@ -30,11 +30,16 @@ function formatInline(text: string, isLight: boolean): (string | ReactNode)[] {
   let key = 0
 
   while (remaining) {
-    const candidates: { match: RegExpMatchArray; type: 'bold' | 'code' | 'link' | 'url' }[] = []
+    const candidates: { match: RegExpMatchArray; type: 'bold' | 'code' | 'link' | 'url' | 'image' }[] = []
     const boldMatch = remaining.match(/\*\*(.+?)\*\*/)
     if (boldMatch) candidates.push({ match: boldMatch, type: 'bold' })
     const codeMatch = remaining.match(/`([^`]+)`/)
     if (codeMatch) candidates.push({ match: codeMatch, type: 'code' })
+    // Images ("![alt](url)") are matched separately from plain links so they render as an
+    // <img> instead of a clickable text link — animated GIFs need no special handling beyond
+    // this, a plain <img> plays them natively.
+    const imageMatch = remaining.match(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/)
+    if (imageMatch) candidates.push({ match: imageMatch, type: 'image' })
     // Markdown links are checked before bare URLs so "[label](url)" wins the tie over the
     // bare-url match that would otherwise fire on the URL portion inside it.
     const linkMatch = remaining.match(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/)
@@ -57,6 +62,12 @@ function formatInline(text: string, isLight: boolean): (string | ReactNode)[] {
       parts.push(<strong key={key++} className="font-semibold">{match[1]}</strong>)
     } else if (type === 'code') {
       parts.push(<code key={key++} className={`px-1 py-0.5 rounded text-xs ${isLight ? 'bg-gray-200' : 'bg-gray-800'}`}>{match[1]}</code>)
+    } else if (type === 'image') {
+      parts.push(
+        <a key={key++} href={match[2]} target="_blank" rel="noopener noreferrer" className="block mt-2">
+          <img src={match[2]} alt={match[1]} className="max-w-full rounded-lg" />
+        </a>
+      )
     } else if (type === 'link') {
       parts.push(
         <a key={key++} href={match[2]} target="_blank" rel="noopener noreferrer" className={LINK_CLASSES}>
