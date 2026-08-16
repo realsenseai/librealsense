@@ -45,6 +45,10 @@ namespace rs2
 
     std::string get_post_processing_device_sensor_name(subdevice_model* sub);
 
+    // True for D500 devices with a wired-up depth-mapping sensor (occupancy grid /
+    // labeled point cloud): D585S, D555, and the non-safety dedicated-color D585/D535 (3C/F) USB units.
+    bool device_has_depth_mapping(const std::string& pid);
+
     class frame_queues
     {
     public:

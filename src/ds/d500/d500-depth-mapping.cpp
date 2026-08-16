@@ -64,7 +64,7 @@ namespace librealsense
         }
 
         auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_devs_info );
-        _depth_mapping_device_idx = add_sensor(mapping_ep);
+        add_sensor(mapping_ep);
         _depth_mapping_active = true;
     }
 
@@ -115,10 +115,8 @@ namespace librealsense
         // is fully up (though it may not be the case in the device contructor's order, in ds500-factory)
         _depth_to_depth_mapping_extrinsics = std::make_shared< rsutils::lazy< rs2_extrinsics > > ( [this]()
             {
-                // Pull extrinsic from safety interface config, according to HKR 0.9 QS.
-                // Read directly via the HW monitor (shared helper, also used by
-                // d500_safety_sensor::get_safety_interface_config) rather than through a
-                // safety sensor object - depth mapping doesn't require d500_safety.
+                // Pull extrinsic from safety interface config (HKR 0.9 QS) via the shared
+                // HW-monitor read - depth mapping doesn't require a d500_safety sibling.
                 rs2_extrinsics res;
                 json sic_json;
                 try

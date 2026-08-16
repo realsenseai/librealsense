@@ -25,11 +25,8 @@ namespace librealsense
         // transport, or USB FW that doesn't yet expose the interface).
         bool is_depth_mapping_active() const { return _depth_mapping_active; }
 
-        // Appends the occupancy/point-cloud streams (and their default profile tag)
-        // only when depth mapping is actually active; no-op otherwise. Devices mixing
-        // in d500_depth_mapping should go through these rather than pushing
-        // _occupancy_stream/_point_cloud_stream directly, so the active-check can't be
-        // forgotten at a call site.
+        // Append the occupancy/point-cloud streams (and default profile tag) only when
+        // active; go through these instead of the raw members so a call site can't forget.
         void add_streams_if_active( std::vector< std::shared_ptr< stream_interface > > & streams ) const;
         void add_profile_tag_if_active( std::vector< tagged_profile > & tags ) const;
 
@@ -49,7 +46,6 @@ namespace librealsense
     protected:
         std::shared_ptr<stream_interface> _occupancy_stream;
         std::shared_ptr<stream_interface> _point_cloud_stream;
-        uint8_t _depth_mapping_device_idx = 0;
         bool _depth_mapping_active = false;
         std::shared_ptr<rsutils::lazy<rs2_extrinsics>> _depth_to_depth_mapping_extrinsics;
     };
