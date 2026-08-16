@@ -3286,7 +3286,7 @@ namespace rs2
     bool device_model::is_depth_mapping_camera_streaming_alone()
     {
         std::string pid = dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
-        if (pid == "0B6B")
+        if (device_has_depth_mapping(pid))
         {
             bool depth_mapping_sensor_streaming = false;
             bool depth_stereo_sensor_streaming = false;

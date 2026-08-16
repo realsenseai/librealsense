@@ -94,6 +94,17 @@ namespace rs2
         return ss.str();
     }
 
+    bool device_has_depth_mapping(const std::string& pid)
+    {
+        return pid == "0B6B" || // D585S
+               pid == "0B56" || // D555
+               pid == "0C02" || // D535_3C
+               pid == "0C03" || // D535F
+               pid == "0C05" || // D585_3C
+               pid == "0C06" || // D585F
+               pid == "0C08";   // D585_3C_PROTO
+    }
+
     void subdevice_model::populate_options( const std::string & opt_base_label,
                                             bool * options_invalidated,
                                             std::string & error_message )
@@ -2372,7 +2383,7 @@ namespace rs2
     {
         std::string pid = dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
         std::string sensor_name = s->get_info(RS2_CAMERA_INFO_NAME);
-        if (pid == "0B6B" && sensor_name == "Depth Mapping Camera")
+        if (device_has_depth_mapping(pid) && sensor_name == "Depth Mapping Camera")
         {
             //_labeled_point_cloud_to_depth_extrinsics
             stream_profile depth_profile;

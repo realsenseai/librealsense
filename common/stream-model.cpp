@@ -1086,16 +1086,9 @@ namespace rs2
         if (dev)
         {
             pid = dev->dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
-            // D585S, D555 (shares the white-balance metadata quirk), and the non-safety
-            // dedicated-color D585/D535 units that also stream depth mapping.
-            use_d585S_metadata_adaptations =
-                pid == "0B6B" || // D585S
-                pid == "0B56" || // D555
-                pid == "0C02" || // D535_3C
-                pid == "0C03" || // D535F
-                pid == "0C05" || // D585_3C
-                pid == "0C06" || // D585F
-                pid == "0C08";   // D585_3C_PROTO
+            // D555 shares the white-balance metadata quirk with the other depth-mapping
+            // devices, so it rides along on the same check here.
+            use_d585S_metadata_adaptations = device_has_depth_mapping(pid);
             if (use_d585S_metadata_adaptations)
                 add_d585S_metadata_descriptions(descriptions);
 
