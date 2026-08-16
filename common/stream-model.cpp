@@ -1082,10 +1082,21 @@ namespace rs2
 
         //add_descriptions_for_d500_metadata_fields(descriptions);
         std::string pid;
+        bool use_d585S_metadata_adaptations = false;
         if (dev)
         {
             pid = dev->dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
-            if (pid == "0B6B")
+            // D585S, D555 (shares the white-balance metadata quirk), and the non-safety
+            // dedicated-color D585/D535 units that also stream depth mapping.
+            use_d585S_metadata_adaptations =
+                pid == "0B6B" || // D585S
+                pid == "0B56" || // D555
+                pid == "0C02" || // D535_3C
+                pid == "0C03" || // D535F
+                pid == "0C05" || // D585_3C
+                pid == "0C06" || // D585F
+                pid == "0C08";   // D585_3C_PROTO
+            if (use_d585S_metadata_adaptations)
                 add_d585S_metadata_descriptions(descriptions);
 
             if (dev->dev.supports(RS2_CAMERA_INFO_CONNECTION_TYPE))
@@ -1103,7 +1114,7 @@ namespace rs2
             {
                 auto val = (rs2_frame_metadata_value)i;
                 std::string name = rs2_frame_metadata_to_string(val);
-                if( pid == "0B6B" )
+                if( use_d585S_metadata_adaptations )
                     name = adapt_d585S_metadata_name( name );
                 std::string desc;
                 if( descriptions.find( val ) != descriptions.end() )
