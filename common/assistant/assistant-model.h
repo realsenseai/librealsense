@@ -96,6 +96,7 @@ namespace rs2
         std::string _last_user_message; // kept for the retry affordance on error
 
         std::shared_ptr<assistant::assistant_chat_client> _client = std::make_shared<assistant::assistant_chat_client>();
+        std::shared_ptr<assistant::assistant_image_cache> _image_cache = std::make_shared<assistant::assistant_image_cache>();
 
         texture_buffer _mark_tex;
         bool _mark_loaded = false;

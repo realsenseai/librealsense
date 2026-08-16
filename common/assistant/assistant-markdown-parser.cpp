@@ -31,9 +31,21 @@ namespace rs2
             return s.rfind("- ", 0) == 0 || s.rfind("* ", 0) == 0;
         }
 
+        // A whole line of the form "![alt](https://...)" - the shape a model uses to embed a
+        // picture inline in its markdown reply. `out_url` receives the URL when it matches.
+        bool is_image_line(const std::string& s, std::string* out_url = nullptr)
+        {
+            static const std::regex image_re(R"(^\s*!\[[^\]]*\]\((https?://[^)\s]+)\)\s*$)");
+            std::smatch m;
+            if (!std::regex_match(s, m, image_re))
+                return false;
+            if (out_url) *out_url = m[1].str();
+            return true;
+        }
+
         // Merges a soft mid-sentence '\n' into the previous logical line (joined by a space) so our
         // own word-wrap re-flows it, instead of treating it as a paragraph break with visible gaps.
-        // A line breaks the merge if it or the next one is blank, a heading, a rule, or a bullet.
+        // A line breaks the merge if it or the next one is blank, a heading, a rule, a bullet, or an image.
         std::vector<std::string> to_logical_lines(const std::string& text)
         {
             std::vector<std::string> physical;
@@ -50,13 +62,13 @@ namespace rs2
             bool prev_continuable = false; // can the previous logical line accept a merge?
             for (auto&& p : physical)
             {
-                bool p_is_break = p.empty() || starts_heading_or_rule(p) || starts_bullet(p);
+                bool p_is_break = p.empty() || starts_heading_or_rule(p) || starts_bullet(p) || is_image_line(p);
                 if (!logical.empty() && prev_continuable && !p_is_break)
                     logical.back() += " " + p;
                 else
                     logical.push_back(p);
 
-                prev_continuable = !p.empty() && !starts_heading_or_rule(p);
+                prev_continuable = !p.empty() && !starts_heading_or_rule(p) && !is_image_line(p);
             }
             return logical;
         }
@@ -184,9 +196,15 @@ namespace rs2
             {
                 markdown_line ml;
                 bool is_heading = raw_line.rfind("#", 0) == 0;
+                std::string image_url;
 
                 if (raw_line.empty())
                     ml.kind = markdown_line::kind::blank;
+                else if (is_image_line(raw_line, &image_url))
+                {
+                    ml.kind = markdown_line::kind::image;
+                    ml.image_url = image_url;
+                }
                 else if (!is_heading && is_rule_line(raw_line))
                     ml.kind = markdown_line::kind::rule;
                 else

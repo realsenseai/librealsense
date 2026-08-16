@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "assistant-image-cache.h"
 #include <string>
 #include <vector>
 
@@ -21,8 +22,9 @@ namespace rs2
 
         struct markdown_line
         {
-            enum class kind { blank, rule, heading, bullet, text } kind = kind::text;
-            std::vector<markdown_word> words; // unused for blank/rule
+            enum class kind { blank, rule, heading, bullet, text, image } kind = kind::text;
+            std::vector<markdown_word> words; // unused for blank/rule/image
+            std::string image_url; // set only for kind::image
         };
 
         // Owned by the message itself (see assistant_chat_message::md_cache) and reused across
@@ -38,8 +40,9 @@ namespace rs2
         std::vector<markdown_line> parse_markdown(const std::string& text);
 
         // Renders one assistant reply's markdown as flowing ImGui text: headings get a bigger font,
-        // rules become a real separator, links are styled/clickable, everything else word-wraps at
-        // wrap_width. `cache` must be the same instance across calls for a given message.
-        void draw_markdown_body(ux_window& win, const std::string& text, float wrap_width, markdown_cache& cache);
+        // rules become a real separator, links are styled/clickable, images/gifs are fetched via
+        // `images` and drawn inline. `cache` must be the same instance across calls for a message.
+        void draw_markdown_body(ux_window& win, const std::string& text, float wrap_width,
+            markdown_cache& cache, assistant::assistant_image_cache& images, const assistant::invoke_fn& invoke);
     }
 }

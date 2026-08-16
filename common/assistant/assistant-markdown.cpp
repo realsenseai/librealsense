@@ -5,15 +5,43 @@
 #include "device-model.h"
 #include "ux-window.h"
 #include "os.h"
+#include <algorithm>
 
 namespace rs2
 {
+    namespace
+    {
+        // Which frame of an animated image should be showing right now, cycling through
+        // frame_delays_ms based on wall-clock time - same idea as the streaming "..." dots.
+        size_t current_frame_index(const assistant::cached_image& img, double time_seconds)
+        {
+            if (img.frame_delays_ms.size() <= 1)
+                return 0;
+
+            long long total_ms = 0;
+            for (int d : img.frame_delays_ms) total_ms += d;
+            if (total_ms <= 0)
+                return 0;
+
+            long long elapsed_ms = (long long)(time_seconds * 1000.0) % total_ms;
+            long long acc = 0;
+            for (size_t i = 0; i < img.frame_delays_ms.size(); i++)
+            {
+                acc += img.frame_delays_ms[i];
+                if (elapsed_ms < acc)
+                    return i;
+            }
+            return img.frame_delays_ms.size() - 1;
+        }
+    }
+
     namespace assistant_detail
     {
         // A deliberately lightweight, line-oriented renderer: each markdown line becomes one
-        // flowing plain-text line, except headings (bigger font) and horizontal rules (a real
-        // separator) - the two cases that are per-line, not inline-mixed-style, formatting.
-        void draw_markdown_body(ux_window& win, const std::string& text, float wrap_width, markdown_cache& cache)
+        // flowing plain-text line, except headings, rules, and images - drawn as their own
+        // per-line blocks rather than inline-mixed-style text.
+        void draw_markdown_body(ux_window& win, const std::string& text, float wrap_width,
+            markdown_cache& cache, assistant::assistant_image_cache& images, const assistant::invoke_fn& invoke)
         {
             if (cache.source != text)
             {
@@ -33,6 +61,48 @@ namespace rs2
                 if (line.kind == markdown_line::kind::rule)
                 {
                     ImGui::Separator();
+                    continue;
+                }
+                if (line.kind == markdown_line::kind::image)
+                {
+                    auto* img = images.get_or_load(line.image_url, invoke);
+                    if (img->state == assistant::image_load_state::loading)
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, alpha(light_grey, 0.6f));
+                        ImGui::TextUnformatted("Loading image...");
+                        ImGui::PopStyleColor();
+                    }
+                    else if (img->state == assistant::image_load_state::failed)
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
+                        ImGui::TextUnformatted(line.image_url.c_str());
+                        ImGui::PopStyleColor();
+                        if (ImGui::IsItemClicked())
+                            open_url(line.image_url.c_str());
+                        if (ImGui::IsItemHovered())
+                        {
+                            RsImGui::CustomTooltip(line.image_url.c_str());
+                            win.link_hovered();
+                        }
+                    }
+                    else // loaded
+                    {
+                        const float max_display_h = 300.f;
+                        float scale = std::min(wrap_width / (float)img->width, max_display_h / (float)img->height);
+                        scale = std::min(scale, 1.f); // never upscale past native size
+                        ImVec2 disp_size{ img->width * scale, img->height * scale };
+
+                        size_t frame = current_frame_index(*img, win.time());
+                        auto tex = img->frame_textures[frame]->get_gl_handle();
+                        ImGui::Image((void*)(intptr_t)tex, disp_size);
+                        if (ImGui::IsItemClicked())
+                            open_url(line.image_url.c_str());
+                        if (ImGui::IsItemHovered())
+                        {
+                            RsImGui::CustomTooltip(line.image_url.c_str());
+                            win.link_hovered();
+                        }
+                    }
                     continue;
                 }
 

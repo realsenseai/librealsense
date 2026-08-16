@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <cstddef>
+
 namespace rs2
 {
     namespace assistant
@@ -10,5 +12,7 @@ namespace rs2
         constexpr const char* BASE_URL = "https://rs-chat-hnd6gchgesc9fre6.a02.azurefd.net";
         constexpr long CONNECT_TIMEOUT_SEC = 5L; // time allowed to establish the connection
         constexpr long ONE_SHOT_TIMEOUT_SEC = 10L; // overall cap for check_health()/send_reaction()
+        constexpr long IMAGE_FETCH_TIMEOUT_SEC = 20L; // overall cap for fetching a markdown image/gif
+        constexpr size_t MAX_IMAGE_BYTES = 20 * 1024 * 1024; // guards a huge/misbehaving image URL
     }
 }
