@@ -555,6 +555,25 @@ namespace librealsense
             throw std::runtime_error( rsutils::string::from() << "Unsupported control - " << opt );
         }
 
+        bool wmf_uvc_device::get_pu(const processing_unit& unit, rs2_option opt, int32_t& value) const
+        {
+            long val = 0, flags = 0;
+            for (auto & pu : pu_controls)
+            {
+                if (opt == pu.option)
+                {
+                    auto hr = get_video_proc(unit.node)->Get(pu.property, &val, &flags);
+                    if (hr == DEVICE_NOT_READY_ERROR)
+                        return false;
+
+                    value = pu.enable_auto ? (flags == VideoProcAmp_Flags_Auto) : val;
+                    CHECK_HR(hr);
+                    return true;
+                }
+            }
+            return get_pu(opt, value);
+        }
+
         bool wmf_uvc_device::set_pu(rs2_option opt, int value)
         {
             if (opt == RS2_OPTION_EXPOSURE)
@@ -676,6 +695,54 @@ namespace librealsense
             throw std::runtime_error( rsutils::string::from() << "Unsupported control - " << opt );
         }
 
+        bool wmf_uvc_device::set_pu(const processing_unit& unit, rs2_option opt, int value)
+        {
+            for (auto & pu : pu_controls)
+            {
+                if (opt != pu.option)
+                    continue;
+
+                auto video_proc = get_video_proc(unit.node);
+                if (pu.enable_auto)
+                {
+                    if (value)
+                    {
+                        auto hr = video_proc->Set(pu.property, 0, VideoProcAmp_Flags_Auto);
+                        if (hr == DEVICE_NOT_READY_ERROR)
+                            return false;
+                        CHECK_HR(hr);
+                    }
+                    else
+                    {
+                        long min, max, step, def, caps;
+                        auto hr = video_proc->GetRange(pu.property, &min, &max, &step, &def, &caps);
+                        if (hr == DEVICE_NOT_READY_ERROR)
+                            return false;
+                        CHECK_HR(hr);
+
+                        hr = video_proc->Set(pu.property, def, VideoProcAmp_Flags_Manual);
+                        if (hr == DEVICE_NOT_READY_ERROR)
+                            return false;
+                        CHECK_HR(hr);
+                    }
+                }
+                else
+                {
+                    auto hr = video_proc->Set(pu.property, value, VideoProcAmp_Flags_Manual);
+                    if( hr == DEVICE_NOT_READY_ERROR || hr == SEMAPHORE_TIMEOUT_ERROR )
+                    {
+                        if( hr == SEMAPHORE_TIMEOUT_ERROR )
+                            LOG_DEBUG( "set_pu returned error code: "
+                                       << rsutils::hresult::hr_to_string( hr ) );
+                        return false;
+                    }
+                    CHECK_HR(hr);
+                }
+                return true;
+            }
+            return set_pu(opt, value);
+        }
+
         control_range wmf_uvc_device::get_pu_range(rs2_option opt) const
         {
             if (opt == RS2_OPTION_ENABLE_AUTO_EXPOSURE ||
@@ -713,6 +780,24 @@ namespace librealsense
                 }
             }
             throw std::runtime_error("unsupported control");
+        }
+
+        control_range wmf_uvc_device::get_pu_range(const processing_unit& unit, rs2_option opt) const
+        {
+            if (opt == RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE)
+                return control_range(0, 1, 1, 1);
+
+            long min = 0, max = 0, step = 0, def = 0, caps = 0;
+            for (auto & pu : pu_controls)
+            {
+                if (opt == pu.option)
+                {
+                    CHECK_HR(get_video_proc(unit.node)->GetRange(
+                        pu.property, &min, &max, &step, &def, &caps));
+                    return control_range(min, max, step, def);
+                }
+            }
+            return get_pu_range(opt);
         }
 
         void wmf_uvc_device::foreach_uvc_device(enumeration_callback action)
@@ -918,6 +1003,7 @@ namespace librealsense
             // Release any stale COM pointers from a previously failed set_d0() or set_d3()
             safe_release(_camera_control);
             safe_release(_video_proc);
+            _video_procs.clear();
             safe_release(_reader);
             if (_source)
             {
@@ -945,6 +1031,7 @@ namespace librealsense
         {
             safe_release(_camera_control);
             safe_release(_video_proc);
+            _video_procs.clear();
             safe_release(_reader);
             if (_source)
             {
@@ -1188,6 +1275,39 @@ namespace librealsense
             if (!_video_proc.p)
                 throw std::runtime_error("The device does not support adjusting the qualities of an incoming video signal, such as brightness, contrast, hue, saturation, gamma, and sharpness.");
             return _video_proc.p;
+        }
+
+        IAMVideoProcAmp* wmf_uvc_device::get_video_proc(int node) const
+        {
+            if (get_power_state() != D0)
+                throw std::runtime_error("Device must be powered to query a processing-unit node!");
+
+            auto const found = _video_procs.find(node);
+            if (found != _video_procs.end())
+                return found->second.p;
+
+            CComPtr<IKsTopologyInfo> topology = nullptr;
+            CHECK_HR(_source->QueryInterface(__uuidof(IKsTopologyInfo),
+                reinterpret_cast<void **>(&topology)));
+
+            DWORD node_count = 0;
+            CHECK_HR(topology->get_NumNodes(&node_count));
+            if (node < 0 || static_cast<DWORD>(node) >= node_count)
+                throw std::runtime_error(rsutils::string::from()
+                    << "Processing-unit node " << node << " is outside topology node count " << node_count);
+
+            GUID node_type = {};
+            CHECK_HR(topology->get_NodeType(static_cast<DWORD>(node), &node_type));
+            if (!IsEqualGUID(node_type, KSNODETYPE_VIDEO_PROCESSING))
+                throw std::runtime_error(rsutils::string::from()
+                    << "Topology node " << node << " is not a video processing node");
+
+            CComPtr<IAMVideoProcAmp> video_proc = nullptr;
+            CHECK_HR(topology->CreateNodeInstance(static_cast<DWORD>(node),
+                __uuidof(IAMVideoProcAmp), reinterpret_cast<LPVOID *>(&video_proc)));
+
+            auto const inserted = _video_procs.emplace(node, video_proc);
+            return inserted.first->second.p;
         }
 
         IAMCameraControl* wmf_uvc_device::get_camera_control() const

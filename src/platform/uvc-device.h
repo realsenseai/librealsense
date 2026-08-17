@@ -52,6 +52,14 @@ struct extension_unit
     guid id;
 };
 
+// subdevice and node are assigned by the host driver; unit is the UVC firmware entity ID
+struct processing_unit
+{
+    int subdevice;
+    uint8_t unit;
+    int node;
+};
+
 enum power_state
 {
     D0,
@@ -136,6 +144,21 @@ public:
     virtual bool get_pu( rs2_option opt, int32_t & value ) const = 0;
     virtual bool set_pu( rs2_option opt, int32_t value ) = 0;
     virtual control_range get_pu_range( rs2_option opt ) const = 0;
+
+    // Most devices expose one PU per UVC function, so backends may use the default PU transport. Composite UVC
+    // functions can override these methods to address a specific host topology node.
+    virtual bool get_pu( const processing_unit &, rs2_option opt, int32_t & value ) const
+    {
+        return get_pu( opt, value );
+    }
+    virtual bool set_pu( const processing_unit &, rs2_option opt, int32_t value )
+    {
+        return set_pu( opt, value );
+    }
+    virtual control_range get_pu_range( const processing_unit &, rs2_option opt ) const
+    {
+        return get_pu_range( opt );
+    }
 
     virtual std::vector< stream_profile > get_profiles() const = 0;
 
@@ -240,6 +263,35 @@ public:
 
     control_range get_pu_range( rs2_option opt ) const override { return _dev->get_pu_range( opt ); }
 
+    bool get_pu( const processing_unit & pu, rs2_option opt, int32_t & value ) const override
+    {
+        for( auto i = 0; i < MAX_RETRIES; ++i )
+        {
+            if( _dev->get_pu( pu, opt, value ) )
+                return true;
+
+            std::this_thread::sleep_for( std::chrono::milliseconds( DELAY_FOR_RETRIES ) );
+        }
+        return false;
+    }
+
+    bool set_pu( const processing_unit & pu, rs2_option opt, int32_t value ) override
+    {
+        for( auto i = 0; i < MAX_RETRIES; ++i )
+        {
+            if( _dev->set_pu( pu, opt, value ) )
+                return true;
+
+            std::this_thread::sleep_for( std::chrono::milliseconds( DELAY_FOR_RETRIES ) );
+        }
+        return false;
+    }
+
+    control_range get_pu_range( const processing_unit & pu, rs2_option opt ) const override
+    {
+        return _dev->get_pu_range( pu, opt );
+    }
+
     std::vector< stream_profile > get_profiles() const override { return _dev->get_profiles(); }
 
     std::string get_device_location() const override { return _dev->get_device_location(); }
@@ -337,6 +389,21 @@ public:
     bool set_pu( rs2_option opt, int32_t value ) override { return _dev.front()->set_pu( opt, value ); }
 
     control_range get_pu_range( rs2_option opt ) const override { return _dev.front()->get_pu_range( opt ); }
+
+    bool get_pu( const processing_unit & pu, rs2_option opt, int32_t & value ) const override
+    {
+        return _dev.front()->get_pu( pu, opt, value );
+    }
+
+    bool set_pu( const processing_unit & pu, rs2_option opt, int32_t value ) override
+    {
+        return _dev.front()->set_pu( pu, opt, value );
+    }
+
+    control_range get_pu_range( const processing_unit & pu, rs2_option opt ) const override
+    {
+        return _dev.front()->get_pu_range( pu, opt );
+    }
 
     std::vector< stream_profile > get_profiles() const override
     {

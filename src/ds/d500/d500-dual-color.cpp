@@ -10,6 +10,9 @@
 #include <src/uvc-sensor.h>
 #include <src/metadata-parser.h>
 #include <src/ds/ds-color-common.h>
+#if defined(_WIN32)
+#include <src/platform/uvc-option.h>
+#endif
 
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
@@ -69,7 +72,54 @@ namespace librealsense
 
         register_color_extrinsics();
         register_color_metadata();
+#if defined(_WIN32)
+        register_color_options();
+#endif
     }
+
+#if defined(_WIN32)
+    void d500_dual_color::register_color_options()
+    {
+        // The dual-color UVC function contains Depth and RGB processing units. Windows' aggregate
+        // IAMVideoProcAmp binds to the first (Depth) PU, so RGB controls must address its topology node directly.
+        static const platform::processing_unit rgb_pu = { 0, 0x07, 6 };
+
+        auto & color_ep = get_depth_sensor();
+        auto raw_ep = get_raw_depth_sensor();
+        auto make_rgb_option = [raw_ep](rs2_option option)
+        {
+            return std::make_shared<uvc_pu_option>(raw_ep, option, rgb_pu);
+        };
+
+        color_ep.register_option(RS2_OPTION_BACKLIGHT_COMPENSATION,
+                                 make_rgb_option(RS2_OPTION_BACKLIGHT_COMPENSATION));
+        color_ep.register_option(RS2_OPTION_BRIGHTNESS, make_rgb_option(RS2_OPTION_BRIGHTNESS));
+        color_ep.register_option(RS2_OPTION_CONTRAST, make_rgb_option(RS2_OPTION_CONTRAST));
+        color_ep.register_option(RS2_OPTION_SATURATION, make_rgb_option(RS2_OPTION_SATURATION));
+        color_ep.register_option(RS2_OPTION_GAMMA, make_rgb_option(RS2_OPTION_GAMMA));
+        color_ep.register_option(RS2_OPTION_SHARPNESS, make_rgb_option(RS2_OPTION_SHARPNESS));
+        color_ep.register_option(RS2_OPTION_HUE, make_rgb_option(RS2_OPTION_HUE));
+
+        std::map<float, std::string> power_line_descriptions = {
+            { 0.f, "Disabled" },
+            { 1.f, "50Hz" },
+            { 2.f, "60Hz" }
+        };
+        color_ep.register_option(
+            RS2_OPTION_POWER_LINE_FREQUENCY,
+            std::make_shared<uvc_pu_option>(raw_ep,
+                                            RS2_OPTION_POWER_LINE_FREQUENCY,
+                                            rgb_pu,
+                                            power_line_descriptions));
+
+        auto white_balance = make_rgb_option(RS2_OPTION_WHITE_BALANCE);
+        auto auto_white_balance = make_rgb_option(RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE);
+        color_ep.register_option(RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE, auto_white_balance);
+        color_ep.register_option(
+            RS2_OPTION_WHITE_BALANCE,
+            std::make_shared<auto_disabling_control>(white_balance, auto_white_balance));
+    }
+#endif
 
     void d500_dual_color::register_color_metadata()
     {

@@ -88,6 +88,9 @@ namespace librealsense
             bool get_pu(rs2_option opt, int32_t& value) const override;
             bool set_pu(rs2_option opt, int value) override;
             control_range get_pu_range(rs2_option opt) const override;
+            bool get_pu(const processing_unit& pu, rs2_option opt, int32_t& value) const override;
+            bool set_pu(const processing_unit& pu, rs2_option opt, int value) override;
+            control_range get_pu_range(const processing_unit& pu, rs2_option opt) const override;
 
             void lock() const override { _systemwide_lock.lock(); }
             void unlock() const override { _systemwide_lock.unlock(); }
@@ -97,6 +100,7 @@ namespace librealsense
             std::string get_device_location() const override { return _location; }
             usb_spec get_usb_specification() const override { return _device_usb_spec; }
             IAMVideoProcAmp* get_video_proc() const;
+            IAMVideoProcAmp* get_video_proc(int node) const;
             IAMCameraControl* get_camera_control() const;
 
         private:
@@ -128,6 +132,7 @@ namespace librealsense
 
             CComPtr<IAMCameraControl>               _camera_control = nullptr;
             CComPtr<IAMVideoProcAmp>                _video_proc = nullptr;
+            mutable std::unordered_map<int, CComPtr<IAMVideoProcAmp>> _video_procs;
             std::unordered_map<int, CComPtr<IKsControl>>      _ks_controls;
 
             auto_reset_event                        _is_flushed;

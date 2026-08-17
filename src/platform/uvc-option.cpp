@@ -18,6 +18,34 @@ uvc_pu_option::uvc_pu_option( const std::weak_ptr< uvc_sensor > & ep, rs2_option
                               const std::map< float, std::string > & description_per_value )
     : _ep(ep), _id(id), _description_per_value(description_per_value)
 {
+    initialize_range();
+}
+
+
+uvc_pu_option::uvc_pu_option( const std::weak_ptr< uvc_sensor > & ep,
+                              rs2_option id,
+                              platform::processing_unit pu )
+    : uvc_pu_option( ep, id, pu, std::map< float, std::string >() )
+{
+}
+
+
+uvc_pu_option::uvc_pu_option( const std::weak_ptr< uvc_sensor > & ep,
+                              rs2_option id,
+                              platform::processing_unit pu,
+                              const std::map< float, std::string > & description_per_value )
+    : _ep( ep )
+    , _id( id )
+    , _description_per_value( description_per_value )
+    , _pu( pu )
+    , _use_processing_unit( true )
+{
+    initialize_range();
+}
+
+
+void uvc_pu_option::initialize_range()
+{
     _range = [this]()
     {
         auto ep = _ep.lock();
@@ -26,7 +54,9 @@ uvc_pu_option::uvc_pu_option( const std::weak_ptr< uvc_sensor > & ep, rs2_option
 
         auto uvc_range = ep->invoke_powered( [this]( platform::uvc_device & dev )
             {
-                return dev.get_pu_range(_id);
+                if( _use_processing_unit )
+                    return dev.get_pu_range( _pu, _id );
+                return dev.get_pu_range( _id );
             });
 
         if (uvc_range.min.size() < sizeof(int32_t)) return option_range{ 0,0,1,0 };
@@ -51,7 +81,10 @@ void uvc_pu_option::set(float value)
     ep->invoke_powered(
         [this, value](platform::uvc_device& dev)
         {
-            if (!dev.set_pu(_id, static_cast<int32_t>(value)))
+            auto const success = _use_processing_unit
+                ? dev.set_pu( _pu, _id, static_cast< int32_t >( value ) )
+                : dev.set_pu( _id, static_cast< int32_t >( value ) );
+            if( ! success )
             throw invalid_value_exception( rsutils::string::from()
                                            << "set_pu(id=" << std::to_string( _id ) << ") failed!"
                                            << " Last Error: " << strerror( errno ) );
@@ -69,7 +102,10 @@ float uvc_pu_option::query() const
         [this](platform::uvc_device& dev)
         {
             int32_t value = 0;
-            if (!dev.get_pu(_id, value))
+            auto const success = _use_processing_unit
+                ? dev.get_pu( _pu, _id, value )
+                : dev.get_pu( _id, value );
+            if( ! success )
                 throw invalid_value_exception( rsutils::string::from()
                                                << "get_pu(id=" << std::to_string( _id ) << ") failed!"
                                                << " Last Error: " << strerror( errno ) );
