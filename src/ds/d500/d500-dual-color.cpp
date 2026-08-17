@@ -99,10 +99,10 @@ namespace librealsense
                             if( raw_profile->get_stream_type() != RS2_STREAM_COLOR || ! backend
                                 || backend->get_backend_profile().pin_index != profile.pin_index )
                                 continue;
-                            if( raw_profile->get_stream_index() == 2 )
-                                bit = 0x04;  // low pin: EP4 / RGB left / public Color 2
-                            else if( raw_profile->get_stream_index() == 1 )
-                                bit = 0x08;  // high pin: EP8 / RGB right / public Color 1
+                            if( raw_profile->get_stream_index() == 1 )
+                                bit = 0x04;  // EP4 / RGB left / public Color 1
+                            else if( raw_profile->get_stream_index() == 2 )
+                                bit = 0x08;  // EP8 / RGB right / public Color 2
                             break;
                         }
                     }
