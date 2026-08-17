@@ -389,6 +389,7 @@ namespace rs2
         GLuint texture;
         rs2::frame_queue last_queue[2];
         mutable rs2::frame last[2];
+        std::vector<uint8_t> raw16_rgb;
     public:
         std::shared_ptr<colorizer> colorize;
         std::shared_ptr<yuy_decoder> yuy2rgb;
@@ -398,6 +399,7 @@ namespace rs2
         bool zoom_preview = false;
         rect curr_preview_rect{};
         int texture_id = 0;
+        bool raw16_grbg10 = false;
 
         // Own the GL texture properly. Each Stop/Start cycle gc_streams destroys
         // and recreates this object, so without a destructor the GL texture (and
@@ -678,6 +680,40 @@ namespace rs2
                 case RS2_FORMAT_Y10BPACK:
                     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, data);
                     break;
+                case RS2_FORMAT_RAW16:
+                {
+                    if( ! raw16_grbg10 )
+                    {
+                        memset( (void *)data, 0, height * width );
+                        glTexImage2D( GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, data );
+                        break;
+                    }
+
+                    int const output_width = width / 2;
+                    int const output_height = height / 2;
+                    raw16_rgb.resize( static_cast< size_t >( output_width ) * output_height * 3 );
+                    auto out = raw16_rgb.data();
+                    auto bytes = static_cast< const uint8_t * >( data );
+                    for( int y = 0; y < height - 1; y += 2 )
+                    {
+                        auto row0 = reinterpret_cast< const uint16_t * >( bytes + y * stride );
+                        auto row1 = reinterpret_cast< const uint16_t * >( bytes + ( y + 1 ) * stride );
+                        for( int x = 0; x < width - 1; x += 2 )
+                        {
+                            auto const green = ( ( row0[x] & 0x03ffu ) + ( row1[x + 1] & 0x03ffu ) ) / 2;
+                            *out++ = static_cast< uint8_t >( ( row0[x + 1] & 0x03ffu ) >> 2 );
+                            *out++ = static_cast< uint8_t >( green >> 2 );
+                            *out++ = static_cast< uint8_t >( ( row1[x] & 0x03ffu ) >> 2 );
+                        }
+                    }
+
+                    GLint unpack_alignment;
+                    glGetIntegerv( GL_UNPACK_ALIGNMENT, &unpack_alignment );
+                    glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
+                    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, output_width, output_height, 0, GL_RGB, GL_UNSIGNED_BYTE, raw16_rgb.data() );
+                    glPixelStorei( GL_UNPACK_ALIGNMENT, unpack_alignment );
+                    break;
+                }
                 case RS2_FORMAT_RAW8:
                 case RS2_FORMAT_MOTION_RAW:
                 case RS2_FORMAT_GPIO_RAW:

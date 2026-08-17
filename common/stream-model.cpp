@@ -219,6 +219,10 @@ namespace rs2
         texture->m420_to_rgb = d->m420_to_rgb;
         texture->nv12_to_rgb = d->nv12_to_rgb;
         texture->y411 = d->y411;
+        texture->raw16_grbg10 = p.stream_type() == RS2_STREAM_COLOR && p.format() == RS2_FORMAT_RAW16
+            && d->dev.supports( RS2_CAMERA_INFO_PRODUCT_LINE )
+            && std::string( d->dev.get_info( RS2_CAMERA_INFO_PRODUCT_LINE ) ) == "D500"
+            && d->dev.supports( RS2_CAMERA_INFO_MIPI_DRIVER_VERSION );
 
         if (auto vd = p.as<video_stream_profile>())
         {
