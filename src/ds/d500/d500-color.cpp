@@ -179,6 +179,14 @@ namespace librealsense
         }
         color_ep.register_processing_block(  // Color Raw (Bayer 10-bit embedded in 16-bit) for calibration
             processing_block_factory::create_id_pbf( RS2_FORMAT_RAW16, RS2_STREAM_COLOR ) );
+
+        // MJPG is advertised on USB only. Decode to RGB8 for display, and also
+        // expose the compressed stream passthrough for consumers that want it.
+        color_ep.register_processing_block( { { RS2_FORMAT_MJPEG } },
+                                            { { RS2_FORMAT_RGB8, RS2_STREAM_COLOR } },
+                                            []() { return std::make_shared< mjpeg_converter >( RS2_FORMAT_RGB8 ); } );
+        color_ep.register_processing_block(
+            processing_block_factory::create_id_pbf( RS2_FORMAT_MJPEG, RS2_STREAM_COLOR ) );
     }
 
     void d500_color::register_options()
