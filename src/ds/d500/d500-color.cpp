@@ -141,16 +141,19 @@ namespace librealsense
     void d500_color::register_color_processing_blocks()
     {
         auto & color_ep = get_color_sensor();
+        auto register_nv12 = [&]() {
+            color_ep.register_processing_block( processing_block_factory::create_pbf_vector< nv12_converter >(
+                RS2_FORMAT_NV12,
+                map_supported_color_formats( RS2_FORMAT_NV12 ),
+                RS2_STREAM_COLOR ) );
+        };
 
         switch( _native_format )
         {
         case RS2_FORMAT_YUYV:
             // Register NV12 first so MIPI RGB targets prefer it while YUYV remains a fallback.
             if( _is_mipi_device )
-                color_ep.register_processing_block( processing_block_factory::create_pbf_vector< nv12_converter >(
-                    RS2_FORMAT_NV12,
-                    map_supported_color_formats( RS2_FORMAT_NV12 ),
-                    RS2_STREAM_COLOR ) );
+                register_nv12();
 
             color_ep.register_processing_block( processing_block_factory::create_pbf_vector< yuy2_converter >(
                 RS2_FORMAT_YUYV,
@@ -161,10 +164,7 @@ namespace librealsense
         case RS2_FORMAT_NV12:
             // NV12 registered before M420 so RGB targets resolve to NV12 when present, and to M420 when it is not
             // (converter breaks ties by registration order). YUY2 is exposed passthrough-only.
-            color_ep.register_processing_block( processing_block_factory::create_pbf_vector< nv12_converter >(
-                RS2_FORMAT_NV12,
-                map_supported_color_formats( RS2_FORMAT_NV12 ),
-                RS2_STREAM_COLOR ) );
+            register_nv12();
             color_ep.register_processing_block( processing_block_factory::create_pbf_vector< m420_converter >(
                 RS2_FORMAT_M420,
                 map_supported_color_formats( RS2_FORMAT_M420 ),
