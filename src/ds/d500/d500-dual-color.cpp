@@ -133,8 +133,6 @@ namespace librealsense
                     LOG_INFO( "D500 stream-group PREPARE unsupported; using legacy flow" );
                     _stream_group_prepare_unsupported = true;
                 }
-                else if( response == ds::d500_hwmon_response::SW_NOT_READY )
-                    LOG_WARNING( "D500 stream-group PREPARE remained busy; using legacy flow for this open" );
                 else if( response != ds::d500_hwmon_response::SUCCESS )
                     throw invalid_value_exception( "D500 stream-group PREPARE failed" );
             } );
