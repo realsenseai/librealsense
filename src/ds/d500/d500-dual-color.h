@@ -24,6 +24,7 @@ namespace librealsense
 
         std::shared_ptr< stream_interface > _color_stream_1;
         std::shared_ptr< stream_interface > _color_stream_2;
+        bool _stream_group_prepare_unsupported = false;
 
     private:
         void register_color_extrinsics();

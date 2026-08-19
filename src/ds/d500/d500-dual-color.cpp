@@ -80,6 +80,9 @@ namespace librealsense
         auto raw_sensor = get_raw_depth_sensor();
         raw_sensor->append_on_open(
             [this]( std::vector< platform::stream_profile > configurations ) {
+                if( _stream_group_prepare_unsupported )
+                    return;
+
                 auto const & raw_profiles = get_raw_depth_sensor()->get_raw_stream_profiles();
 
                 uint8_t expected_mask = 0;
@@ -122,11 +125,16 @@ namespace librealsense
                         break;
                     std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
                 }
+                // Legacy firmware has an older handler for this opcode and rejects the V3 payload by size.
                 if( response == ds::d500_hwmon_response::INVALID_COMMAND
-                    || response == ds::d500_hwmon_response::COMMAND_NOT_SUPPORTED )
+                    || response == ds::d500_hwmon_response::COMMAND_NOT_SUPPORTED
+                    || response == ds::d500_hwmon_response::ILLEGAL_SIZE )
                 {
                     LOG_INFO( "D500 stream-group PREPARE unsupported; using legacy flow" );
+                    _stream_group_prepare_unsupported = true;
                 }
+                else if( response == ds::d500_hwmon_response::SW_NOT_READY )
+                    LOG_WARNING( "D500 stream-group PREPARE remained busy; using legacy flow for this open" );
                 else if( response != ds::d500_hwmon_response::SUCCESS )
                     throw invalid_value_exception( "D500 stream-group PREPARE failed" );
             } );
