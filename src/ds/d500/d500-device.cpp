@@ -519,14 +519,24 @@ namespace librealsense
             {
                 if( _fw_version >= firmware_version( "7.58.40929.13516" ) )
                 {
-                    std::map< float, std::string > description_per_value = { { 2.f, "Internal" },
-                                                                             { 3.f, "External" } };
+                    // GMSL: d4xx kernel driver exposes the D457-style range 0..2 (0:Internal, 1:Master, 2:External);
+                    // USB: FW register 0x2C uses the D500-native 2:Internal, 3:External. Different range → different
+                    // labels are needed for the viewer to render this as an enum combo rather than a slider.
+                    std::map< float, std::string > description_per_value = _is_mipi_device
+                        ? std::map< float, std::string >{ { 0.f, "Internal" },
+                                                          { 1.f, "Master" },
+                                                          { 2.f, "External" } }
+                        : std::map< float, std::string >{ { 2.f, "Internal" },
+                                                          { 3.f, "External" } };
+                    const char * desc = _is_mipi_device
+                        ? "Inter-camera synchronization mode: 0:Internal, 1:Master, 2:External"
+                        : "Inter-camera synchronization mode: 2:Internal, 3:External";
                     depth_sensor.register_option( RS2_OPTION_INTER_CAM_SYNC_MODE,
                                                   std::make_shared< uvc_xu_option< uint16_t > >(
                                                       raw_depth_sensor,
                                                       depth_xu,
                                                       d500_xu_id::EXTERNAL_SYNC_MODE,
-                                                      "Inter-camera synchronization mode: 2:Internal, 3:External",
+                                                      desc,
                                                       description_per_value,
                                                       false /* allow_set_while_streaming */ ) );
                 }

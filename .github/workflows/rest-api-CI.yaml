@@ -1,0 +1,87 @@
+name: rest-api_CI
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'wrappers/rest-api/**'
+      - '.github/workflows/rest-api-CI.yaml'
+  pull_request:
+    branches: ['**']
+    paths:
+      - 'wrappers/rest-api/**'
+      - '.github/workflows/rest-api-CI.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+
+  #--------------------------------------------------------------------------------
+  React_Viewer_Tests:  # react-viewer Vitest suite (MSW-mocked, no build, no devices)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: wrappers/rest-api/tools/react-viewer
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+      with:
+        persist-credentials: false
+
+    - name: Install
+      run: npm ci
+
+    - name: Run Vitest
+      run: npm test
+
+    - name: Build
+      run: npm run build
+
+    - name: Install rest-api server deps
+      working-directory: wrappers/rest-api
+      run: |
+        pip3 install -r requirements.txt
+        pip3 install pyrealsense2
+
+    - name: Install Playwright browser
+      run: npx playwright install --with-deps chromium
+
+    # Vite proxies /api and /socket to :8000, so the viewer talks to the real server.
+    # No camera here, so the device list is empty: this covers the API and socket
+    # contract, not streaming. real-device self-skips without REAL_DEVICE=true.
+    - name: Run Playwright against a live server
+      working-directory: wrappers/rest-api
+      run: |
+        python3 -m uvicorn main:combined_app --host 127.0.0.1 --port 8000 &
+        server_pid=$!
+        trap 'kill $server_pid' EXIT
+        for _ in $(seq 1 30); do
+          curl -sfL http://127.0.0.1:8000/api/v1/devices/ > /dev/null && break
+          sleep 1
+        done
+        curl -sfL http://127.0.0.1:8000/api/v1/devices/ > /dev/null
+        cd tools/react-viewer
+        npm run test:e2e -- --project=chromium
+
+
+  #--------------------------------------------------------------------------------
+  Rest_API_Tests:  # non-live rest-api pytest (mocked devices, no build, no devices)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+      with:
+        persist-credentials: false
+
+    - name: Install
+      run: |
+        pip3 install -r wrappers/rest-api/requirements.txt -r unit-tests/wrappers/rest-api/requirements.txt
+        # app.services.rs_manager imports pyrealsense2. It is left out of requirements.txt
+        # so LibCI keeps using the locally-built module; GHA does not build, so pull the
+        # latest released wheel — this job doubles as a check against the published SDK.
+        pip3 install pyrealsense2
+
+    - name: Run non-live tests
+      working-directory: wrappers/rest-api
+      run: python3 -m pytest tests/ -v --ignore=tests/live/

@@ -246,6 +246,24 @@ else:
     #
     #############################################################################################
     #
+    @pytest.mark.parametrize( 'corruption', ['count', 'crc'] )
+    def test_rejects_invalid_payload(remote_and_streaming, corruption):
+        remote, _, _, queue = remote_and_streaming
+        remote.run( 'publish_two_detections()' )
+        f = queue.wait_for_frame( 500 )
+        if check.is_true( f, msg='no frame received' ):
+            odf = f.as_object_detection_frame()
+            if check.is_true( odf, msg='frame is not an object_detection_frame' ):
+                raw = memoryview( odf.get_data() )
+                if corruption == 'count':
+                    raw[36:38] = b'\x41\x00'  # little-endian detection count 65
+                else:
+                    raw[-1] ^= 0x01
+                check.equal( odf.get_detection_count(), 0 )
+
+    #
+    #############################################################################################
+    #
     def test_sensor_downcast(remote_and_streaming):
         _, sensor, _, _ = remote_and_streaming
         check.is_true( sensor.is_perception_sensor(), msg='sensor should be a perception_sensor' )

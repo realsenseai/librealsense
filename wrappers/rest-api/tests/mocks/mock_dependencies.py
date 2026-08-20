@@ -32,12 +32,8 @@ def patch_dependencies(monkeypatch):
 
 
 
-    monkeypatch.setattr(
-        dependencies, "get_realsense_manager", lambda: rs_manager
-    )
-    monkeypatch.setattr(
-        dependencies, "get_webrtc_manager", lambda: webrtc_manager
-    )
+    monkeypatch.setattr(dependencies, "get_realsense_manager", lambda: rs_manager)
+    monkeypatch.setattr(dependencies, "get_webrtc_manager", lambda: webrtc_manager)
     monkeypatch.setattr(dependencies, "oauth2_scheme", mock_oauth2_scheme)
 
     # Also patch the global variables in the original module

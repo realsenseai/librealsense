@@ -76,6 +76,7 @@ namespace librealsense
             static constexpr uint8_t RS_PVT_TEMPERATURE                 = 0x15;
             static constexpr uint8_t RS_PROJECTOR_TEMPERATURE           = 0x16;
             static constexpr uint8_t RS_OHM_TEMPERATURE                 = 0x17;
+            static constexpr uint8_t RS_EXTERNAL_SYNC_D500              = 0x1A; // d500_xu_id::EXTERNAL_SYNC_MODE
 
             bool is_auto_exposure_control( uint8_t control )
             {
@@ -293,7 +294,7 @@ namespace librealsense
                 }
             }
 
-            // D457 controls map - temporal solution to bypass backend interface with actual codes
+            // MIPI controls map - temporal solution to bypass backend interface with actual codes
             uint32_t xu_to_cid( const extension_unit & xu, uint8_t control )
             {
                 if( 0 == xu.subdevice )
@@ -309,7 +310,8 @@ namespace librealsense
                     case RS_HARDWARE_PRESET : return RS_CAMERA_CID_PRESET;
                     case RS_EMITTER_FREQUENCY : return RS_CAMERA_CID_EMITTER_FREQUENCY;
                     case RS_DEPTH_AUTO_EXPOSURE_MODE : return RS_CAMERA_CID_AE_MODE;
-                    case RS_EXTERNAL_SYNC : return RS_CAMERA_CID_SYNC_MODE;
+                    case RS_EXTERNAL_SYNC :
+                    case RS_EXTERNAL_SYNC_D500 : return RS_CAMERA_CID_SYNC_MODE;
                     case RS_READOUT_SHAPING : return RS_CAMERA_CID_READOUT_SHAPING;
                     case RS_PVT_TEMPERATURE : return RS_CAMERA_CID_SOC_PVT_TEMPERATURE;
                     case RS_OHM_TEMPERATURE : return RS_CAMERA_CID_OHM_TEMPERATURE;

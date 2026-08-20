@@ -42,7 +42,15 @@ def record(file_name, default_profile):
     depth_sensor.start(frame_queue)
 
     recorder = rs.recorder(file_name, dev)
-    time.sleep(3)
+    time.sleep(1)
+    if depth_sensor.supports(rs.option.emitter_enabled):
+        try:
+            emitter = depth_sensor.get_option(rs.option.emitter_enabled)
+            depth_sensor.set_option(rs.option.emitter_enabled, 0 if emitter else 1)
+        except RuntimeError as e:
+            # D585S rejects the write while streaming; the check below still verifies the snapshot
+            log.warning(f"could not change an option mid-recording: {e}")
+    time.sleep(2)
     recorder.pause()
     recorder = None
 
@@ -69,6 +77,11 @@ def play_recording(file_name, default_profile):
 
     playback = ctx.load_device(file_name)
     depth_sensor = playback.first_depth_sensor()
+
+    # An option re-written while recording used to leave the whole recorded snapshot replaced by
+    # that single option. Not every option reaches the file, so count instead of comparing sets.
+    check.greater(len(depth_sensor.get_supported_options()), 1)
+
     frame_queue = try_streaming(default_profile)
 
     check.is_true(frame_queue.poll_for_frame())

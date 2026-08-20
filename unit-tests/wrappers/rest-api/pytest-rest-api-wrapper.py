@@ -63,7 +63,7 @@ def _fail_if_missing_packages():
 
 def test_rest_api_wrapper(module_device_setup):
     _fail_if_missing_packages()
-    rest_api_test = os.path.join(repo.root, "wrappers", "rest-api", "tests", "test_api_service.py")
+    rest_api_tests = os.path.join(repo.root, "wrappers", "rest-api", "tests")
     # The subprocess starts a fresh interpreter, so the parent's sys.path
     # injection of the locally-built pyrealsense2 (unit-tests/conftest.py)
     # is not inherited. Forward it via PYTHONPATH.
@@ -73,7 +73,7 @@ def test_rest_api_wrapper(module_device_setup):
         existing = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = pyrs_dir + os.pathsep + existing if existing else pyrs_dir
     p = subprocess.run(
-        [sys.executable, "-m", "pytest", "-v", "--log-cli-level=DEBUG", rest_api_test],
+        [sys.executable, "-m", "pytest", "-v", "--log-cli-level=DEBUG", rest_api_tests],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         universal_newlines=True,

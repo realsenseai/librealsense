@@ -989,7 +989,12 @@ namespace librealsense
             else if (std::regex_match(msg->topic_name, std::regex(sensor_option_regex_str)))
             {
                 uint32_t sensor_index = ros2_topic::get_sensor_index(msg->topic_name);
-                sensors_options[sensor_index] = read_sensor_options({ get_device_index(), sensor_index });
+                // An option re-written mid-recording starts a second, partial scan; keep the first, full
+                // snapshot - later changes still reach playback as serialized_option messages.
+                auto options = read_sensor_options({ get_device_index(), sensor_index });
+                auto & recorded_options = sensors_options[sensor_index];
+                if( ! recorded_options )
+                    recorded_options = options;
             }
             else if (std::regex_match(msg->topic_name, std::regex(post_processing_blocks_regex_str)))
             {

@@ -6,19 +6,42 @@
 #include <rsutils/number/crc32.h>
 #include <rsutils/string/from.h>
 #include <rsutils/easylogging/easyloggingpp.h>
+#include <utility>
 
 namespace librealsense
 {
 
+object_detection_frame::object_detection_frame( object_detection_frame && other )
+    : perception_frame( std::move( other ) )
+{
+}
+
+object_detection_frame & object_detection_frame::operator=( object_detection_frame && other )
+{
+    perception_frame::operator=( std::move( other ) );
+    _validated = false;
+    return *this;
+}
+
 bool object_detection_frame::validate() const
 {
-    size_t const base_size = sizeof( object_detection_frame_header )
-                           + sizeof( object_detection_payload_header );
-    if( data.size() < base_size )
+    if( _validated )
+        return true;
+    if( ! validate_payload() )
+        return false;
+    _validated = true;
+    return true;
+}
+
+bool object_detection_frame::validate_payload() const
+{
+    if( data.size() < MIN_FRAME_SIZE )
         return false;
 
     auto const * header = reinterpret_cast< const object_detection_frame_header * >( data.data() );
 
+    // The firmware ABI excludes the fixed frame header from CRC coverage. Validate its fields
+    // independently; header.size never determines a memory-access or CRC bound.
     if( header->magic_number != MAGIC_NUMBER )
         return false;
 
@@ -36,28 +59,35 @@ bool object_detection_frame::validate() const
     }
 
     auto const * payload = reinterpret_cast< const object_detection_payload_header * >(
-        data.data() + sizeof( object_detection_frame_header ) );
-    size_t const detections_size = wire_entry_size * payload->number_of_detections;
-    if( payload->number_of_detections && detections_size / wire_entry_size != payload->number_of_detections )
-        return false;
-    size_t const expected_size = base_size + detections_size;
-    size_t const expected_size_field = expected_size - sizeof( object_detection_frame_header );
-
-    // UVC transports fixed-size frames and may append padding. The header size
-    // identifies the valid payload and must match the versioned entry count.
-    if( data.size() < expected_size || header->size != expected_size_field )
+        data.data() + FRAME_HEADER_SIZE );
+    uint16_t const count = payload->number_of_detections;
+    if( count > MAX_DETECTIONS )
     {
-        LOG_WARNING( "Object Detection frame size mismatch: got " << data.size() << ", expected at least " << expected_size
-                     << ", header size field: " << header->size << ", expected size field: " << expected_size_field );
+        LOG_WARNING( "Object Detection count exceeds ABI maximum: " << count << " > " << MAX_DETECTIONS );
         return false;
     }
 
-    auto const * payload_data = data.data() + sizeof( object_detection_frame_header );
-    auto const crc = rsutils::number::calc_crc32( payload_data, header->size );
-    if( crc != header->crc32 )
+    size_t const detections_size = wire_entry_size * count;
+    size_t const expected_size_field = PAYLOAD_HEADER_SIZE + detections_size;
+    size_t const expected_size = FRAME_HEADER_SIZE + expected_size_field;
+
+    // data.size() may exceed the logical payload if the transport adds trailing padding. The header
+    // declares the valid length, and the bounded detection count keeps every read within the buffer.
+    if( data.size() < expected_size || header->size != expected_size_field )
     {
-        LOG_WARNING( "Object Detection frame CRC mismatch: got 0x" << std::hex << header->crc32
-                     << ", expected 0x" << crc );
+        LOG_WARNING( "Object Detection frame size mismatch: got " << data.size()
+                     << ", expected at least " << expected_size
+                     << ", header size field: " << header->size
+                     << ", expected size field: " << expected_size_field );
+        return false;
+    }
+
+    auto const * payload_data = data.data() + FRAME_HEADER_SIZE;
+    auto const computed_crc32 = rsutils::number::calc_crc32( payload_data, expected_size_field );
+    if( header->crc32 != computed_crc32 )
+    {
+        LOG_WARNING( "Object Detection CRC mismatch: got " << header->crc32
+                     << ", expected " << computed_crc32 );
         return false;
     }
 
@@ -68,19 +98,18 @@ size_t object_detection_frame::get_detection_count() const
 {
     if( validate() )
         return get_payload_header().number_of_detections;
-
     return 0;
 }
 
 object_detection_frame::object_detection_entry object_detection_frame::get_detection( size_t index ) const
 {
-    size_t count = get_detection_count(); // Validates frame as well
+    size_t count = get_detection_count();
     if( index >= count )
         throw std::out_of_range(
             rsutils::string::from() << "Detection index " << index << " is out of range (count=" << count << ")" );
+
     auto const * header = reinterpret_cast< const object_detection_frame_header * >( data.data() );
-    auto const * entries = data.data() + sizeof( object_detection_frame_header )
-                        + sizeof( object_detection_payload_header );
+    auto const * entries = data.data() + FRAME_HEADER_SIZE + PAYLOAD_HEADER_SIZE;
     object_detection_entry result;
     if( header->version == VERSION_V2 )
     {
@@ -115,15 +144,14 @@ object_detection_frame::object_detection_entry object_detection_frame::get_detec
 
 object_detection_frame::object_detection_payload_header object_detection_frame::get_payload_header() const
 {
-    if( data.size() < sizeof( object_detection_frame_header ) + sizeof( object_detection_payload_header ) )
+    if( data.size() < MIN_FRAME_SIZE )
         throw invalid_value_exception( "Object Detection frame is too small" );
-    return *reinterpret_cast< const object_detection_payload_header * >(
-        data.data() + sizeof( object_detection_frame_header ) );
+    return *reinterpret_cast< const object_detection_payload_header * >( data.data() + FRAME_HEADER_SIZE );
 }
 
 uint16_t object_detection_frame::get_version() const
 {
-    if( data.size() < sizeof( object_detection_frame_header ) )
+    if( data.size() < FRAME_HEADER_SIZE )
         return 0;
     return reinterpret_cast< const object_detection_frame_header * >( data.data() )->version;
 }
@@ -133,9 +161,9 @@ size_t object_detection_frame::entry_size() const
     switch( get_version() )
     {
     case VERSION_V2:
-        return sizeof( object_detection_entry_v2 );
+        return V2_ENTRY_SIZE;
     case VERSION_V3:
-        return sizeof( object_detection_entry_v3 );
+        return V3_ENTRY_SIZE;
     default:
         return 0;
     }

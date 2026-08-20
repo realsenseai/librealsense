@@ -448,6 +448,7 @@ namespace librealsense
 
             std::vector<std::shared_ptr<buffer>> _buffers;
             stream_profile _profile;
+            bool _variable_frame_size = false; // some frames may arrive in shorter size than the buffer - skip the partial frame check
             frame_callback _callback;
             std::atomic<bool> _is_capturing;
             std::atomic<bool> _is_alive;
