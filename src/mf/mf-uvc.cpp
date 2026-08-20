@@ -1021,10 +1021,18 @@ namespace librealsense
                         continue;
                     }
 
-                    // On D585S, we need to distinguish the occupancy and the label point cloud streams.
-                    // The condition currently support 3 resolutions for LPC
-                    // This needs to be refactored!
-                    if (this->_info.pid == 0x0b6b && width == 2880 && (height == 1040 || height == 260 || height == 32))
+                    // The device reports GREY for both mapping streams, so the labeled point
+                    // cloud is re-tagged here to keep them apart. Two layouts: D585S (0x0b6b)
+                    // carries them on MI 13 at 2880-wide payloads; every other D5xx carries
+                    // them on MI 11 with LPCL at 640x360. The MI test matters -- 640x360 GREY
+                    // also exists on the depth interface as infrared.
+                    const bool d585s_layout = ( this->_info.pid == 0x0b6b )
+                                           && width == 2880
+                                           && ( height == 1040 || height == 260 || height == 32 );
+                    const bool d5xx_mapping_layout = ( this->_info.pid != 0x0b6b )
+                                                  && ( this->_info.mi == 11 )
+                                                  && width == 640 && height == 360;
+                    if (d585s_layout || d5xx_mapping_layout)
                     {
                         device_fourcc = 0x50414C38; // PAL8 used instead of FGREY in order to distinguish  between occupancy and point cloud streams
                     }

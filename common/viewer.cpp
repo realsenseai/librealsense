@@ -4289,11 +4289,15 @@ namespace rs2
 
     void viewer_model::draw_zone_3d(Zone zone, const rs2::labeled_points& frame)
     {
+        const auto MM_TO_METER_SCALE = 0.001f; // coords are in mm, converts to meters
+        auto zone_to_draw = init_zone(zone, frame, MM_TO_METER_SCALE);
+        // Nothing to draw, and nothing opened: an exception between glBegin and glEnd would
+        // leave the GL state machine mid-primitive and fail every later call.
+        if( zone_to_draw.empty() )
+            return;
+
         glLineWidth(4.0f);
         glBegin(GL_LINE_LOOP);
-
-        const auto MM_TO_METER_SCALE = 0.001f; // coords are in mm, converts to meters
-        auto zone_to_draw = init_zone(zone, frame, MM_TO_METER_SCALE); 
         set_polygon_color(zone);
 
         for (vertex& v : zone_to_draw)
@@ -4417,6 +4421,15 @@ namespace rs2
             return points;
         }
 
+        // The polygons come from metadata that only the safety product supplies; the D500
+        // Mapping stream has none. get_frame_metadata() throws on an unsupported value, and
+        // this runs per frame from inside a glBegin block, so probe before reading.
+        for( int i = 0; i < 8; ++i )
+        {
+            if( ! frame.supports_frame_metadata( static_cast< rs2_frame_metadata_value >( md_value + i ) ) )
+                return points;   // empty -> caller draws nothing
+        }
+
         // assuming all md values are subsequent 
         vertex x0 = { static_cast<float>(frame.get_frame_metadata(static_cast<rs2_frame_metadata_value>(md_value))) * scale_factor,
                         static_cast<float>(frame.get_frame_metadata(static_cast<rs2_frame_metadata_value>(md_value + 1))) * scale_factor, 0 };
@@ -4456,11 +4469,13 @@ namespace rs2
 
     void viewer_model::draw_zone_2d(Zone zone, const rect& draw_within, const frame& frame)
     {
-        glLineWidth(3.0f);
-        glBegin(GL_LINE_LOOP);
-
         auto MM_TO_CM_SCALE = 0.1f;  // coords are in mm, converts to cm
         auto zone_to_draw = init_zone(zone, frame, MM_TO_CM_SCALE);
+        if( zone_to_draw.empty() )
+            return;
+
+        glLineWidth(3.0f);
+        glBegin(GL_LINE_LOOP);
         set_polygon_color(zone);
 
         constexpr GLfloat width = 512; // range of Y values for polygons - -2.56 - +2.56 meters

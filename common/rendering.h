@@ -788,44 +788,98 @@ namespace rs2
 
         void upload_occupancy_frame(const rs2::frame &frame, const void *data)
         {
-            if (!frame.supports_frame_metadata(RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS) ||
-                !frame.supports_frame_metadata(RS2_FRAME_METADATA_OCCUPANCY_GRID_COLUMNS))
-                throw std::runtime_error("Occupancy rows / columns could not be read from frame metadata");
+            // Occupancy cells are one signed byte each: -1 unknown, 0 free, 100 occupied.
+            // Two carriers exist. A MAP1 frame is self-describing -- the OCCG sub-header that
+            // follows the 20-byte common header holds the geometry -- while the legacy stream
+            // reports it out-of-band in UVC metadata. Prefer the in-band form: it cannot
+            // disagree with the payload it travels with.
+            int occup_cols = 0;
+            int occup_rows = 0;
+            const uint8_t * cells = static_cast< const uint8_t * >( data );
 
-            auto occup_cols = static_cast<int>(frame.get_frame_metadata(RS2_FRAME_METADATA_OCCUPANCY_GRID_COLUMNS)); // width
-            auto occup_rows = static_cast<int>(frame.get_frame_metadata(RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS));    // height
+            static const uint32_t MAP1_MAGIC = 0x3150414DU;   // "MAP1"
+            static const size_t MAP1_HEADER_LEN = 20;
+            static const size_t MAP1_OCCG_SUBHEADER_LEN = 32;
+            static const uint8_t MAP1_DATA_TYPE_OCCG = 2;
 
+            const size_t frame_bytes = static_cast< size_t >( frame.get_data_size() );
+            bool map1 = false;
+            if( data && frame_bytes >= MAP1_HEADER_LEN + MAP1_OCCG_SUBHEADER_LEN )
+            {
+                uint32_t magic = 0;
+                std::memcpy( &magic, cells, sizeof( magic ) );
+                if( magic == MAP1_MAGIC && cells[6] == MAP1_DATA_TYPE_OCCG )
+                {
+                    uint16_t w = 0, h = 0;
+                    std::memcpy( &w, cells + MAP1_HEADER_LEN + 0, sizeof( w ) );
+                    std::memcpy( &h, cells + MAP1_HEADER_LEN + 2, sizeof( h ) );
+                    occup_cols = w;
+                    occup_rows = h;
+                    cells += MAP1_HEADER_LEN + MAP1_OCCG_SUBHEADER_LEN;
+                    map1 = true;
+                }
+            }
 
-            // Using look up table to make the following operation faster
-            // Pre-computed lookup table for bit expansion
-            // Example: For byte value 0b10110001 (177)
-            // lut[177] = { 0xFF,  0x00,  0x00,  0x00,  0xFF,  0xFF,  0x00,  0xFF }
-            //              bit0   bit1   bit2   bit3   bit4   bit5   bit6   bit7
-            // Then the below line "std::memcpy(&vec[i * 8], expanded.data(), 8);"
-            // grabs 8 values at once from the LUT instead of calculating each bit one by one
-            static const std::array<std::array<uint8_t, 8>, 256> bit_expand_lut = []() {
-                std::array<std::array<uint8_t, 8>, 256> lut;
-                for (int byte_val = 0; byte_val < 256; ++byte_val) {
-                    for (int bit = 0; bit < 8; ++bit) {
-                        lut[byte_val][bit] = ((byte_val >> bit) & 1) ? 0xFF : 0;
+            if( ! map1 )
+            {
+                // Never throw from here: this runs once per frame inside the render loop, so a
+                // frame we cannot describe must be skipped, not turned into an exception storm.
+                if (!frame.supports_frame_metadata(RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS) ||
+                    !frame.supports_frame_metadata(RS2_FRAME_METADATA_OCCUPANCY_GRID_COLUMNS))
+                    return;
+
+                occup_cols = static_cast<int>(frame.get_frame_metadata(RS2_FRAME_METADATA_OCCUPANCY_GRID_COLUMNS)); // width
+                occup_rows = static_cast<int>(frame.get_frame_metadata(RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS));    // height
+            }
+
+            if( occup_cols <= 0 || occup_rows <= 0 )
+                return;
+
+            const size_t cell_count = static_cast< size_t >( occup_cols ) * occup_rows;
+            const size_t available = frame_bytes - static_cast< size_t >( cells - static_cast< const uint8_t * >( data ) );
+            if( ! data || available < cell_count )
+                return;
+
+            // Three states, so three luminance levels -- free must stay distinguishable from
+            // never-observed, which is the whole point of the -1 value.
+            auto level = []( uint8_t raw ) -> uint8_t {
+                const int8_t v = static_cast< int8_t >( raw );
+                return ( v < 0 ) ? 0x50           // unknown
+                     : ( v == 0 ) ? 0x00          // free
+                                  : 0xFF;         // occupied
+            };
+
+            std::vector< uint8_t > vec( cell_count );
+            int tex_cols = occup_cols;
+            int tex_rows = occup_rows;
+
+            if( map1 )
+            {
+                // MAP1 stores the grid in ROS map order: the width axis is +X, forward from the
+                // camera, and the height axis is +Y, lateral. Drawn straight, that puts forward
+                // along the screen's horizontal. Present it as a top-down map instead -- forward
+                // up the screen, +Y to the left -- which is how the same grid reads in RViz.
+                // The legacy stream already arrives with lateral on the width axis, so it is
+                // uploaded as-is.
+                tex_cols = occup_rows;   // lateral
+                tex_rows = occup_cols;   // forward
+                for( int r = 0; r < tex_rows; ++r )
+                {
+                    const int cx = occup_cols - 1 - r;                  // far row first
+                    for( int c = 0; c < tex_cols; ++c )
+                    {
+                        const int cy = occup_rows - 1 - c;              // +Y on the left
+                        vec[static_cast< size_t >( r ) * tex_cols + c]
+                            = level( cells[static_cast< size_t >( cy ) * occup_cols + cx] );
                     }
                 }
-                return lut;
-                }();
-
-            // We want to reverse the data's bit, because AICV algo is packing each 8 cells into one byte, but in an opposite order
-            // than we (and OpenGL) expect. The rightest bit (LSB) inside the packed byte from AICV algo represents the first bit we want to draw from this byte
-            // e.g. Occupancy Cells: 0 0 1 1 0 0 1 0 ---> AICV packing algo ---> bytes[i] = 01001100. The order is reversed, so we reverse it again.
-            // Each byte represents 8 cells (1 bit <==> 1 cell), therefore the size is ==> rows(height) * cols(width) / 8
-
-            std::vector<uint8_t> vec(occup_rows * occup_cols);
-            uint8_t *byte_array = (uint8_t *)data;
-
-            for (int i = 0; i < occup_rows * occup_cols / 8; i++)
-            {
-                const auto& expanded = bit_expand_lut[byte_array[i]];
-                std::memcpy(&vec[i * 8], expanded.data(), 8);
             }
+            else
+            {
+                for( size_t i = 0; i < cell_count; ++i )
+                    vec[i] = level( cells[i] );
+            }
+
 
             // Default alignment is 4 byte on windows, store it and work with 1 as our grid columns are not a multiple of 4
             GLint unpackAlignment;
@@ -835,7 +889,7 @@ namespace rs2
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
             // Render
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, occup_cols, occup_rows, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, vec.data());
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, tex_cols, tex_rows, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, vec.data());
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

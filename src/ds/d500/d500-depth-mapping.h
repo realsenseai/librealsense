@@ -47,6 +47,9 @@ namespace librealsense
         std::shared_ptr<stream_interface> _occupancy_stream;
         std::shared_ptr<stream_interface> _point_cloud_stream;
         bool _depth_mapping_active = false;
+        // True for D585S (mapping on MI 13, 2880-wide payloads), false for every other
+        // D5xx (mapping on MI 11, OCCG 320x256 and LPCL 640x360).
+        bool _is_safety_layout = false;
         std::shared_ptr<rsutils::lazy<rs2_extrinsics>> _depth_to_depth_mapping_extrinsics;
     };
 

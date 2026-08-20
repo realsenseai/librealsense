@@ -251,12 +251,19 @@ void uvc_sensor::open( const stream_profiles & requests )
 
                     auto extension = frame_source::stream_to_frame_types( req_profile_base->get_stream_type() );
                     const bool is_perception = ( extension == RS2_EXTENSION_OBJECT_DETECTION_FRAME );
+                    // The depth-mapping streams are the same case: the profile describes the
+                    // occupancy canvas / point-cloud geometry, while the wire carries a framed
+                    // payload with its own headers, so width*height*bpp is not its length.
+                    const bool is_depth_mapping
+                        = ( extension == RS2_EXTENSION_LABELED_POINTS )
+                       || ( req_profile_base->get_stream_type() == RS2_STREAM_OCCUPANCY );
 
                     if( ! msp )
                         expected_size = compute_frame_expected_size( width, height, bpp );
 
                     // Compressed and perception streams carry variable-length payloads; copy the data as received.
-                    if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG } ) || is_perception )
+                    if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG } )
+                        || is_perception || is_depth_mapping )
                         expected_size = f.frame_size;
 
                     // The MIPI 64-byte width realignment path must copy (it rewrites the pixel

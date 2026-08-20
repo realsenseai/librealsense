@@ -40,6 +40,13 @@ void init_frame(py::module &m) {
     auto get_frame_data = [](const rs2::frame& self) ->  BufData
     {
         if (auto vf = self.as<rs2::video_frame>()) {
+            // Framed payloads (e.g. the depth-mapping streams) carry headers on top of the
+            // image geometry, so height*stride is smaller than the frame. Hand those back flat
+            // and whole instead of silently truncating to the geometry.
+            if (static_cast<size_t>(self.get_data_size())
+                > static_cast<size_t>(vf.get_height()) * static_cast<size_t>(vf.get_stride_in_bytes()))
+                return BufData(const_cast<void*>(self.get_data()), 1, std::string("@B"), self.get_data_size());
+
             std::map<size_t, std::string> bytes_per_pixel_to_format = { { 1, std::string("@B") },{ 2, std::string("@H") },{ 3, std::string("@I") },{ 4, std::string("@I") } };
             switch (vf.get_profile().format()) {
             case RS2_FORMAT_RGB8: case RS2_FORMAT_BGR8:
