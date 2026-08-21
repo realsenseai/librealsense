@@ -11,6 +11,8 @@
 #include <vector>
 #include <map>
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 
 #include "ds/ds-timestamp.h"
 #include "ds/ds-options.h"
@@ -26,6 +28,156 @@ using rs_fourcc = rsutils::type::fourcc;
 
 namespace librealsense
 {
+    namespace
+    {
+        const uint32_t map1_magic = 0x3150414d;
+        const uint16_t map1_version_major = 1;
+        const uint8_t map1_occupancy_type = 2;
+        const uint16_t map1_occupancy_profile = 0x0201;
+        const size_t map1_common_header_size = 20;
+        const size_t map1_occupancy_header_size = 32;
+        const uint16_t map1_occupancy_width = 320;
+        const uint16_t map1_occupancy_height = 256;
+        const uint16_t map1_occupancy_resolution_mm = 50;
+        const uint32_t map1_occupancy_cell_count =
+            map1_occupancy_width * map1_occupancy_height;
+        const size_t map1_occupancy_frame_size =
+            map1_common_header_size + map1_occupancy_header_size
+            + map1_occupancy_cell_count;
+
+        uint16_t read_le16( const uint8_t * p )
+        {
+            return static_cast< uint16_t >( p[0] )
+                | ( static_cast< uint16_t >( p[1] ) << 8 );
+        }
+
+        uint32_t read_le32( const uint8_t * p )
+        {
+            return static_cast< uint32_t >( p[0] )
+                | ( static_cast< uint32_t >( p[1] ) << 8 )
+                | ( static_cast< uint32_t >( p[2] ) << 16 )
+                | ( static_cast< uint32_t >( p[3] ) << 24 );
+        }
+
+        int32_t read_le_i32( const uint8_t * p )
+        {
+            return static_cast< int32_t >( read_le32( p ) );
+        }
+
+        uint32_t map1_crc32( const uint8_t * data, size_t size )
+        {
+            uint32_t crc = 0xffffffff;
+            for( size_t i = 0; i < size; ++i )
+            {
+                crc ^= data[i];
+                for( uint8_t bit = 0; bit < 8; ++bit )
+                {
+                    const uint32_t mask = 0u - ( crc & 1u );
+                    crc = ( crc >> 1 ) ^ ( 0xedb88320u & mask );
+                }
+            }
+            return ~crc;
+        }
+
+        class map1_occupancy_processing_block : public stream_filter_processing_block
+        {
+        public:
+            map1_occupancy_processing_block()
+                : stream_filter_processing_block( "D500 MAP1 Occupancy Grid" )
+            {
+                _stream_filter.stream = RS2_STREAM_OCCUPANCY;
+                _stream_filter.format = RS2_FORMAT_Y8;
+            }
+
+        protected:
+            rs2::frame process_frame( const rs2::frame_source & source,
+                                      const rs2::frame & frame ) override
+            {
+                const uint8_t * data = static_cast< const uint8_t * >( frame.get_data() );
+                const size_t size = static_cast< size_t >( frame.get_data_size() );
+                const char * error = validate( data, size );
+                if( error )
+                {
+                    ++_invalid_frames;
+                    if( _invalid_frames <= 3 || ( _invalid_frames % 300 ) == 0 )
+                        LOG_WARNING( "Dropping invalid D500 MAP1 Occupancy frame: " << error
+                                     << " (size=" << size << ")" );
+                    return {};
+                }
+
+                auto output = source.allocate_video_frame( frame.get_profile(),
+                                                           frame,
+                                                           1,
+                                                           map1_occupancy_width,
+                                                           map1_occupancy_height,
+                                                           map1_occupancy_width,
+                                                           RS2_EXTENSION_VIDEO_FRAME );
+                if( ! output )
+                    return {};
+
+                std::memcpy( const_cast< void * >( output.get_data() ),
+                             data + map1_common_header_size + map1_occupancy_header_size,
+                             map1_occupancy_cell_count );
+                return output;
+            }
+
+            rs2::frame prepare_output( const rs2::frame_source & source,
+                                       rs2::frame input,
+                                       std::vector< rs2::frame > results ) override
+            {
+                if( results.empty() && ! input.is< rs2::frameset >() )
+                    return {};
+                return generic_processing_block::prepare_output( source, input, results );
+            }
+
+        private:
+            const char * validate( const uint8_t * data, size_t size ) const
+            {
+                if( ! data || size != map1_occupancy_frame_size )
+                    return "unexpected frame size";
+                if( read_le32( data ) != map1_magic )
+                    return "bad magic";
+                if( ( read_le16( data + 4 ) >> 8 ) != map1_version_major )
+                    return "unsupported version";
+                if( data[6] != map1_occupancy_type )
+                    return "unexpected data type";
+                if( ( data[7] & 1u ) == 0 )
+                    return "CRC flag missing";
+                if( read_le32( data + 8 ) != size - map1_common_header_size )
+                    return "payload length mismatch";
+                if( read_le16( data + 12 ) != map1_occupancy_profile )
+                    return "unexpected profile";
+                if( read_le16( data + 14 ) == 0 )
+                    return "zero stream generation";
+                if( map1_crc32( data + map1_common_header_size,
+                                size - map1_common_header_size )
+                    != read_le32( data + 16 ) )
+                    return "CRC mismatch";
+
+                const uint8_t * occupancy = data + map1_common_header_size;
+                if( read_le16( occupancy ) != map1_occupancy_width
+                    || read_le16( occupancy + 2 ) != map1_occupancy_height
+                    || read_le16( occupancy + 4 ) != map1_occupancy_resolution_mm
+                    || read_le16( occupancy + 6 ) != 1
+                    || read_le_i32( occupancy + 8 ) != -8000
+                    || read_le_i32( occupancy + 12 ) != 0
+                    || read_le32( occupancy + 28 ) != map1_occupancy_cell_count )
+                    return "invalid occupancy header";
+
+                const int8_t * cells = reinterpret_cast< const int8_t * >(
+                    occupancy + map1_occupancy_header_size );
+                for( uint32_t i = 0; i < map1_occupancy_cell_count; ++i )
+                {
+                    if( cells[i] != -1 && cells[i] != 0 && cells[i] != 100 )
+                        return "invalid cell value";
+                }
+                return nullptr;
+            }
+
+            uint32_t _invalid_frames = 0;
+        };
+    }
+
     const std::map<uint32_t, rs2_format> mapping_fourcc_to_rs2_format = {
         {rs_fourcc('G','R','E','Y'), RS2_FORMAT_Y8},
         // point cloud - w/a done in backend in order to distinguish between occupancy
@@ -38,21 +190,35 @@ namespace librealsense
         {rs_fourcc('P','A','L','8'), RS2_STREAM_LABELED_POINT_CLOUD}
     };
 
-    d500_depth_mapping::d500_depth_mapping( std::shared_ptr< const d500_info > const & dev_info)
+    d500_depth_mapping::d500_depth_mapping( std::shared_ptr< const d500_info > const & dev_info,
+                                            bool versioned_mapping )
         : device( dev_info ), d500_device( dev_info ),
         _occupancy_stream(new stream(RS2_STREAM_OCCUPANCY)),
-        _point_cloud_stream(new stream(RS2_STREAM_LABELED_POINT_CLOUD))
+        _point_cloud_stream(new stream(RS2_STREAM_LABELED_POINT_CLOUD)),
+        _versioned_mapping( versioned_mapping )
     {
         using namespace ds;
-        const uint32_t mapping_stream_mi = 13;
-        auto mapping_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, mapping_stream_mi);
+        const uint32_t legacy_mapping_stream_mi = 13;
+        const uint32_t d500_mapping_stream_mi = 11;
+        auto mapping_devs_info = filter_by_mi(
+            dev_info->get_group().uvc_devices,
+            _versioned_mapping ? d500_mapping_stream_mi : legacy_mapping_stream_mi );
+
+        // Some early D500 descriptors exposed Mapping at the legacy MI while
+        // keeping the versioned MAP1 payload. Accept it only as a fallback.
+        if( mapping_devs_info.empty() && _versioned_mapping )
+            mapping_devs_info = filter_by_mi( dev_info->get_group().uvc_devices,
+                                              legacy_mapping_stream_mi );
         
+        if( mapping_devs_info.empty() && _versioned_mapping )
+            return;
         if (mapping_devs_info.size() != 1)
             throw invalid_value_exception(rsutils::string::from() << "RS5XX models with Safety are expected to include a single depth mapping device! - "
                 << mapping_devs_info.size() << " found");
 
         auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_devs_info );
         _depth_mapping_device_idx = add_sensor(mapping_ep);
+        _has_depth_mapping = true;
     }
 
     std::shared_ptr<synthetic_sensor> d500_depth_mapping::create_depth_mapping_device(std::shared_ptr<context> ctx,
@@ -60,15 +226,23 @@ namespace librealsense
     {
         using namespace ds;
 
-        std::unique_ptr<frame_timestamp_reader> ds_timestamp_reader_backup(new ds_timestamp_reader());
-        std::unique_ptr<frame_timestamp_reader> ds_timestamp_reader_metadata(new ds_timestamp_reader_from_metadata_depth_mapping(std::move(ds_timestamp_reader_backup)));
+        std::unique_ptr<frame_timestamp_reader> timestamp_reader(new ds_timestamp_reader());
+        if( ! _versioned_mapping )
+        {
+            std::unique_ptr< frame_timestamp_reader > metadata_reader(
+                new ds_timestamp_reader_from_metadata_depth_mapping(
+                    std::move( timestamp_reader ) ) );
+            timestamp_reader = std::move( metadata_reader );
+        }
 
         auto enable_global_time_option = std::shared_ptr<global_time_option>(new global_time_option());
 
         auto raw_mapping_ep = std::make_shared<uvc_sensor>("Raw Depth Mapping Device",
             get_backend()->create_uvc_device(occupancy_devices_info.front()),
-            std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(ds_timestamp_reader_metadata), _tf_keeper, enable_global_time_option)),
+            std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(timestamp_reader), _tf_keeper, enable_global_time_option)),
             this);
+        if( _versioned_mapping )
+            raw_mapping_ep->set_variable_frame_size( true );
 
         auto mapping_ep = std::make_shared<d500_depth_mapping_sensor>(this,
             raw_mapping_ep,
@@ -96,6 +270,11 @@ namespace librealsense
 
     void d500_depth_mapping::register_extrinsics()
     {
+        if( _versioned_mapping )
+        {
+            register_stream_to_extrinsic_group( *_occupancy_stream, 0 );
+            return;
+        }
         using rsutils::json;
         // extrinsics to depth lazy, becasue safety sensor's api is used and it may be constructed later
         // than the depth mapping device (though it may not be the case in the device contructor's order, in ds500-factory)
@@ -147,6 +326,9 @@ namespace librealsense
     {
         raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, 
             make_uvc_header_parser(&platform::uvc_header::timestamp));
+
+        if( _versioned_mapping )
+            return;
 
         register_occupancy_metadata(raw_mapping_ep);
         register_point_cloud_metadata(raw_mapping_ep);
@@ -500,8 +682,12 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
         processing_block_factory occ_pbf
             = { { { RS2_FORMAT_Y8, RS2_STREAM_OCCUPANCY } },
                 { { RS2_FORMAT_Y8, RS2_STREAM_OCCUPANCY } },
-                []() {
-                    return std::make_shared< identity_processing_block >();
+                [this]() {
+                    if( _versioned_mapping )
+                        return std::shared_ptr< processing_block >(
+                            std::make_shared< map1_occupancy_processing_block >() );
+                    return std::shared_ptr< processing_block >(
+                        std::make_shared< identity_processing_block >() );
                 } };
         mapping_ep->register_processing_block( occ_pbf );
 
@@ -525,6 +711,10 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             {
                 auto&& video = dynamic_cast<video_stream_profile_interface*>(p.get());
                 const auto&& profile = to_profile(p.get());
+                if( _owner->_versioned_mapping
+                    && ( profile.width != map1_occupancy_width
+                         || profile.height != map1_occupancy_height ) )
+                    continue;
                 if (profile.width == 2880)
                     continue;
                 relevant_results.push_back(std::move(p));

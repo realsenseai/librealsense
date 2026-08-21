@@ -18,7 +18,10 @@ namespace librealsense
         std::shared_ptr<synthetic_sensor> create_depth_mapping_device(std::shared_ptr<context> ctx,
             const std::vector<platform::uvc_device_info>& mapping_devices_info);
 
-        d500_depth_mapping( std::shared_ptr< const d500_info > const & );
+        d500_depth_mapping( std::shared_ptr< const d500_info > const &,
+                            bool versioned_mapping = false );
+
+        bool has_depth_mapping() const { return _has_depth_mapping; }
 
     private:
 
@@ -38,6 +41,8 @@ namespace librealsense
         std::shared_ptr<stream_interface> _point_cloud_stream;
         uint8_t _depth_mapping_device_idx;
         std::shared_ptr<rsutils::lazy<rs2_extrinsics>> _depth_to_depth_mapping_extrinsics;
+        bool _versioned_mapping = false;
+        bool _has_depth_mapping = false;
     };
 
     class d500_depth_mapping_sensor : public synthetic_sensor,

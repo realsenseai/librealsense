@@ -168,6 +168,7 @@ namespace librealsense
     class rs5x5_dedicated_color_device
         : public d500_active
         , public d500_color
+        , public d500_depth_mapping
         , public d500_motion
         , public d500_object_detection
         , public ds_advanced_mode_base
@@ -180,6 +181,7 @@ namespace librealsense
             , d500_device( dev_info )
             , d500_active( dev_info )
             , d500_color( dev_info, RS2_FORMAT_NV12 )
+            , d500_depth_mapping( dev_info, true )
             , d500_motion( dev_info )
             , d500_object_detection( dev_info )
             , ds_advanced_mode_base()
@@ -198,6 +200,8 @@ namespace librealsense
             std::vector< std::shared_ptr< stream_interface > > streams = { _depth_stream, _left_ir_stream, _right_ir_stream, _color_stream,
                                                                            _object_detection_stream };
             add_motion_streams( _ds_motion_common, streams );
+            if( has_depth_mapping() )
+                streams.push_back( _occupancy_stream );
             return create_default_matcher( streams );
         }
 
@@ -215,6 +219,9 @@ namespace librealsense
             tags.push_back({ RS2_STREAM_GYRO, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, gyro_fps, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_ACCEL, -1, 0, 0, RS2_FORMAT_MOTION_XYZ32F, accel_fps, profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
             tags.push_back({ RS2_STREAM_OBJECT_DETECTION, -1, -1, -1, RS2_FORMAT_Y8, -1, profile_tag::PROFILE_TAG_SUPERSET });
+            if( has_depth_mapping() )
+                tags.push_back({ RS2_STREAM_OCCUPANCY, -1, 320, 256, RS2_FORMAT_Y8, 30,
+                                 profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT });
 
             return tags;
         };

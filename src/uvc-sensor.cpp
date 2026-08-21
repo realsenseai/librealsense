@@ -255,6 +255,12 @@ void uvc_sensor::open( const stream_profiles & requests )
                     if( ! msp )
                         expected_size = compute_frame_expected_size( width, height, bpp );
 
+                    // Some UVC streams carry a versioned, variable-length packet
+                    // behind a conventional video profile. Their owner validates
+                    // and converts the packet in a processing block.
+                    if( _variable_frame_size )
+                        expected_size = f.frame_size;
+
                     // Compressed and perception streams carry variable-length payloads; copy the data as received.
                     if( val_in_range( req_profile_base->get_format(), { RS2_FORMAT_MJPEG } ) || is_perception )
                         expected_size = f.frame_size;

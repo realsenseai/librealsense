@@ -31,6 +31,7 @@ public:
     void stop() override;
     void register_xu( platform::extension_unit xu );
     void register_pu( rs2_option id );
+    void set_variable_frame_size( bool enabled ) { _variable_frame_size = enabled; }
 
     virtual void prepare_for_bulk_operation() override;
     virtual void finished_bulk_operation() override;
@@ -129,6 +130,7 @@ private:
     std::vector< platform::extension_unit > _xus;
     std::unique_ptr< power > _power;
     std::unique_ptr< frame_timestamp_reader > _timestamp_reader;
+    bool _variable_frame_size = false;
     // Per-stream in-flight zero-copy frame counters (shared with each capture callback). close()
     // drains these before the backend frees its buffers, so a held zero-copy frame is never left
     // pointing at unmapped memory. Only used on zero-copy builds; empty/no-op otherwise.
