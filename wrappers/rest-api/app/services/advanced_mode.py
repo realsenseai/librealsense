@@ -8,6 +8,10 @@ mode 0/1/2 = current/min/max. We flatten each group's struct fields into individ
 OptionInfo entries (category "Advanced Controls", filter_name = group) so they flow
 through the same UI as any other control. Int/float and bool (min0/max1) are derived
 from the live struct value types — nothing is hardcoded per field.
+
+TODO: once realsenseai/librealsense#15569 (read all advanced-mode controls in one bulk
+operation) lands, replace the per-group get_<group>() sweep in build_advanced_options()
+with that single query.
 """
 
 import re

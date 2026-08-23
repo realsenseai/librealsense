@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios'
 import { socketService } from './socket'
 import type {
+  AdvancedModeStatus,
   DeviceInfo,
   SensorInfo,
   OptionInfo,
@@ -108,13 +109,13 @@ class ApiClient {
     await this.client.post(`/devices/${deviceId}/hw_reset/`)
   }
 
-  async getAdvancedMode(deviceId: string): Promise<{ supported: boolean; enabled: boolean }> {
-    const response = await this.client.get(`/devices/${deviceId}/advanced_mode`)
+  async getAdvancedMode(deviceId: string): Promise<AdvancedModeStatus> {
+    const response = await this.client.get(`/devices/${deviceId}/advanced_mode/`)
     return response.data
   }
 
-  async setAdvancedMode(deviceId: string, enable: boolean): Promise<{ supported: boolean; enabled: boolean }> {
-    const response = await this.client.post(`/devices/${deviceId}/advanced_mode`, { enable })
+  async setAdvancedMode(deviceId: string, enable: boolean): Promise<AdvancedModeStatus> {
+    const response = await this.client.post(`/devices/${deviceId}/advanced_mode/`, { enable })
     return response.data
   }
 

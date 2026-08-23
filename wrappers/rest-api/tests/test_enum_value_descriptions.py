@@ -51,3 +51,20 @@ def test_non_integer_bounds_is_not_enum():
     obj = _FakeObj({0: "a"})
     rng = Range(0.5, 3.5, 1.0, 0.5)
     assert _harvest(obj, object(), rng) is None
+
+
+def test_object_without_the_description_api_is_not_enum():
+    # Older pyrealsense2 builds (and processing blocks) lack the method entirely.
+    # It must read as "no enum", not blow up the caller's whole option list.
+    class _NoDescribe:
+        pass
+
+    assert _harvest(_NoDescribe(), object(), Range(0, 3, 1.0, 0)) is None
+
+
+def test_description_probe_error_is_not_enum():
+    class _Boom:
+        def get_option_value_description(self, opt, val):
+            raise ValueError("not a RuntimeError")
+
+    assert _harvest(_Boom(), object(), Range(0, 3, 1.0, 0)) is None

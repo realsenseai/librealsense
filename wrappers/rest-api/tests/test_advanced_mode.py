@@ -3,6 +3,7 @@
 
 import pytest
 from app.services.advanced_mode import build_advanced_options, set_advanced_option
+from app.services.rs_manager import RealSenseManager
 from app.core.errors import RealSenseError
 
 
@@ -72,3 +73,45 @@ def test_unknown_option_raises_404():
     with pytest.raises(RealSenseError) as exc:
         set_advanced_option(_FakeAM(), "ADV_depth_control_nope", 1)
     assert exc.value.status_code == 404
+
+
+class _FakeDevice:
+    sensors = [object()]
+
+
+def _mgr_with_advanced_mode(am):
+    """A manager whose only wired-up piece is advanced-mode lookup on device 'dev'."""
+    mgr = RealSenseManager.__new__(RealSenseManager)  # bypass __init__ (no rs.context)
+    mgr.devices = {"dev": _FakeDevice()}
+    mgr._get_advanced_mode = staticmethod(lambda _dev: am)
+    return mgr
+
+
+def test_set_adv_option_while_disabled_raises_400():
+    am = _FakeAM()
+    am.is_enabled = lambda: False
+    with pytest.raises(RealSenseError) as exc:
+        _mgr_with_advanced_mode(am).set_sensor_option(
+            "dev", "sensor-0", "ADV_depth_control_deepSeaSecondPeakThreshold", 500
+        )
+    assert exc.value.status_code == 400
+    assert "disabled" in exc.value.detail
+    assert am.written == {}  # never reached the SDK
+
+
+def test_set_adv_option_when_unsupported_raises_400():
+    with pytest.raises(RealSenseError) as exc:
+        _mgr_with_advanced_mode(None).set_sensor_option(
+            "dev", "sensor-0", "ADV_depth_control_deepSeaSecondPeakThreshold", 500
+        )
+    assert exc.value.status_code == 400
+    assert "not supported" in exc.value.detail
+
+
+def test_set_adv_option_when_enabled_writes_through():
+    am = _FakeAM()
+    am.is_enabled = lambda: True
+    assert _mgr_with_advanced_mode(am).set_sensor_option(
+        "dev", "sensor-0", "ADV_depth_control_deepSeaSecondPeakThreshold", 500
+    ) is True
+    assert am.written["depth_control"] == 500

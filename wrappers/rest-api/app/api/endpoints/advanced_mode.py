@@ -16,7 +16,7 @@ class AdvancedModeUpdate(BaseModel):
     enable: bool
 
 
-@router.get("/{device_id}/advanced_mode", response_model=dict)
+@router.get("/", response_model=dict)
 async def get_advanced_mode(
     device_id: str,
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
@@ -31,7 +31,7 @@ async def get_advanced_mode(
         raise HTTPException(status_code=500, detail="Unexpected error while reading advanced-mode status")
 
 
-@router.post("/{device_id}/advanced_mode", response_model=dict)
+@router.post("/", response_model=dict)
 async def set_advanced_mode(
     device_id: str,
     body: AdvancedModeUpdate,

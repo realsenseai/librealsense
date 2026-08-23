@@ -940,14 +940,20 @@ class RealSenseManager:
         """
         if rng.step != 1.0 or rng.min != int(rng.min) or rng.max != int(rng.max):
             return None
+        # Not every option-bearing object exposes the description API (older
+        # pyrealsense2, processing blocks). Missing it just means "no enum" - it must
+        # not take down the whole option list.
+        describe = getattr(obj, "get_option_value_description", None)
+        if describe is None:
+            return None
         lo, hi = int(rng.min), int(rng.max)
         if hi - lo > 256:
             return None
         descs = {}
         for val in range(lo, hi + 1):
             try:
-                desc = obj.get_option_value_description(opt, float(val))
-            except RuntimeError:
+                desc = describe(opt, float(val))
+            except Exception:
                 desc = None
             if not desc:
                 return None
@@ -1262,6 +1268,15 @@ class RealSenseManager:
             am = self._get_advanced_mode(dev)
             if am is None:
                 raise RealSenseError(status_code=400, detail="Advanced mode not supported on this device")
+            # The advanced-mode getters/setters throw when advanced mode is off, which would
+            # surface as an opaque 500. A client can only get here with a stale option list
+            # (they are published only while enabled), so say what is actually wrong.
+            try:
+                enabled = bool(am.is_enabled())
+            except Exception:
+                enabled = False
+            if not enabled:
+                raise RealSenseError(status_code=400, detail="Advanced mode is disabled on this device")
             return advanced_mode.set_advanced_option(am, option_id, value)
 
         # Find the option by name (case-insensitive comparison)

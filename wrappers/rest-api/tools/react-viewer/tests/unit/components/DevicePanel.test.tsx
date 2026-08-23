@@ -324,6 +324,77 @@ describe('DevicePanel', () => {
     })
   })
 
+  describe('Advanced Mode', () => {
+    const withAdvancedMode = (overrides: Partial<ReturnType<typeof createMockDeviceState>> = {}) => {
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, {
+        isActive: true,
+        advancedMode: { supported: true, enabled: false },
+        ...overrides,
+      })
+      return { device, ds }
+    }
+
+    const openMenu = async () =>
+      userEvent.click(await screen.findByTitle('Device actions'))
+
+    it('hides the toggle on devices that do not support advanced mode', async () => {
+      const { device, ds } = withAdvancedMode({ advancedMode: { supported: false, enabled: false } })
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
+      })
+
+      await openMenu()
+      expect(screen.queryByRole('button', { name: /Advanced Mode/ })).not.toBeInTheDocument()
+    })
+
+    it('toggles without a confirmation prompt', async () => {
+      const toggleAdvancedMode = vi.fn().mockResolvedValue(undefined)
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      useAppStore.setState({ toggleAdvancedMode })
+      const { device, ds } = withAdvancedMode()
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
+      })
+
+      await openMenu()
+      await userEvent.click(screen.getByRole('button', { name: 'Enable Advanced Mode' }))
+
+      expect(confirmSpy).not.toHaveBeenCalled()
+      expect(toggleAdvancedMode).toHaveBeenCalledWith(device.device_id, true)
+      confirmSpy.mockRestore()
+    })
+
+    it('disables the toggle while streaming, as the C++ viewer does', async () => {
+      const toggleAdvancedMode = vi.fn().mockResolvedValue(undefined)
+      useAppStore.setState({ toggleAdvancedMode })
+      const { device, ds } = withAdvancedMode({ isStreaming: true })
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
+      })
+
+      await openMenu()
+      const item = screen.getByRole('button', { name: 'Enable Advanced Mode' })
+      expect(item).toBeDisabled()
+
+      await userEvent.click(item)
+      expect(toggleAdvancedMode).not.toHaveBeenCalled()
+    })
+
+    it('offers to disable once advanced mode is on', async () => {
+      const toggleAdvancedMode = vi.fn().mockResolvedValue(undefined)
+      useAppStore.setState({ toggleAdvancedMode })
+      const { device, ds } = withAdvancedMode({ advancedMode: { supported: true, enabled: true } })
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
+      })
+
+      await openMenu()
+      await userEvent.click(screen.getByRole('button', { name: 'Disable Advanced Mode' }))
+      expect(toggleAdvancedMode).toHaveBeenCalledWith(device.device_id, false)
+    })
+  })
+
   describe('Control Search', () => {
     function renderWithControls(overrides: {
       options?: ReturnType<typeof createMockOption>[]
