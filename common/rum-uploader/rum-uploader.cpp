@@ -171,6 +171,7 @@ rum_uploader::~rum_uploader()
 
 static void draw_consent_popup( rum_uploader & uploader, ux_window & window )
 {
+    return;  // TODO: remove this when server side is ready
     ImGui::SetNextWindowSize( { 460.f, 0.f } );
     if( ! ImGui::BeginPopupModal( CONSENT_POPUP_ID, nullptr,
         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove ) )
