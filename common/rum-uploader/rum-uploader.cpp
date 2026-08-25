@@ -96,44 +96,49 @@ bool rum_uploader::upload( std::string const & json_report )
 }
 
 
+static void run_boot_upload()
+{
+    try
+    {
+        if( ! rs2::rum::is_cloud_enabled() )
+            return;
+
+        // Throttle boot uploads to at most once per interval, read from config (no UI; default
+        // 24h, 0 disables). The last-upload time persists in the same config file.
+        auto & cfg = config_file::instance();
+        int interval_hours = cfg.get_or_default( configurations::stats::rum_upload_interval_hours, DEFAULT_UPLOAD_INTERVAL_HOURS );
+        auto now = std::chrono::duration_cast< std::chrono::seconds >(
+                       std::chrono::system_clock::now().time_since_epoch() ).count();
+        long long last = cfg.get_or_default< long long >( configurations::stats::rum_last_upload, 0 );
+        if( last > now )
+            last = now;  // future timestamp (clock skew / corrupt config) - invalidate to now
+        if( interval_hours > 0 && now - last < (long long)interval_hours * SECONDS_PER_HOUR )
+            return;  // uploaded recently
+
+        auto report = rum_uploader::saved_report();   // sessions accumulated on disk since the last upload
+        rsutils::json j;
+        try { j = rsutils::json::parse( report ); }
+        catch( ... ) { return; }  // no file / unparseable -> nothing to send
+        if( ! report_has_usage( j ) )
+            return;  // only source_id left after a reset, or empty
+        if( rum_uploader::upload( report ) )
+        {
+            reset_saved_report( j );  // clear the delivered batch; keep source_id
+            cfg.set( configurations::stats::rum_last_upload, now );
+            LOG_INFO( "RUM report uploaded to " << RUM_ENDPOINT );
+        }
+    }
+    catch( std::exception const & e ) { LOG_ERROR( "RUM upload error: " << e.what() ); }
+}
+
+
 void rum_uploader::start()
 {
+    if( _uploading.exchange( true ) )
+        return;  // an upload (boot or manual) is already running; don't overwrite it or block the UI thread
     if( _thread.joinable() )
-        _thread.join();  // don't overwrite a running worker (a second start / start-after-upload would std::terminate)
-    _thread = std::thread( []()
-    {
-        try
-        {
-            if( ! rs2::rum::is_cloud_enabled() )
-                return;
-
-            // Throttle boot uploads to at most once per interval, read from config (no UI; default
-            // 24h, 0 disables). The last-upload time persists in the same config file.
-            auto & cfg = config_file::instance();
-            int interval_hours = cfg.get_or_default( configurations::stats::rum_upload_interval_hours, DEFAULT_UPLOAD_INTERVAL_HOURS );
-            auto now = std::chrono::duration_cast< std::chrono::seconds >(
-                           std::chrono::system_clock::now().time_since_epoch() ).count();
-            long long last = cfg.get_or_default< long long >( configurations::stats::rum_last_upload, 0 );
-            if( last > now )
-                last = now;  // future timestamp (clock skew / corrupt config) - invalidate to now
-            if( interval_hours > 0 && now - last < (long long)interval_hours * SECONDS_PER_HOUR )
-                return;  // uploaded recently
-
-            auto report = saved_report();   // sessions accumulated on disk since the last upload
-            rsutils::json j;
-            try { j = rsutils::json::parse( report ); }
-            catch( ... ) { return; }  // no file / unparseable -> nothing to send
-            if( ! report_has_usage( j ) )
-                return;  // only source_id left after a reset, or empty
-            if( upload( report ) )
-            {
-                reset_saved_report( j );  // clear the delivered batch; keep source_id
-                cfg.set( configurations::stats::rum_last_upload, now );
-                LOG_INFO( "RUM report uploaded to " << RUM_ENDPOINT );
-            }
-        }
-        catch( std::exception const & e ) { LOG_ERROR( "RUM upload error: " << e.what() ); }
-    } );
+        _thread.join();  // the previous worker has finished (gate was clear); join is instant
+    _thread = std::thread( [this]() { run_boot_upload(); _uploading = false; } );
 }
 
 
@@ -142,7 +147,7 @@ void rum_uploader::upload_async( std::string report, std::function< void( bool )
     if( _uploading.exchange( true ) )
         return;  // an upload is already running; don't block the caller
     if( _thread.joinable() )
-        _thread.join();  // previous upload finished; join is instant
+        _thread.join();  // the previous worker has finished (gate was clear); join is instant
     _thread = std::thread( [this, report = std::move( report ), on_done = std::move( on_done )]()
     {
         bool ok = false;

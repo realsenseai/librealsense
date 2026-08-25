@@ -36,7 +36,7 @@ jobs:
 
 
   #--------------------------------------------------------------------------------
-  Win_SH_EX_CfU_Stats:  # Windows, shared, with Examples & Tools, Check for Updates, and RUM stats (ENABLE_STATS)
+  Win_SH_EX_CfU:  # Windows, shared, with Examples & Tools, Check for Updates, no usage monitoring
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
@@ -68,7 +68,7 @@ jobs:
         cd ${{env.WIN_BUILD_DIR}}
         pwd
         ls        
-        cmake ${LRS_SRC_DIR} -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=true -DBUILD_TOOLS=true -DCHECK_FOR_UPDATES=true -DENABLE_STATS=ON
+        cmake ${LRS_SRC_DIR} -A x64 -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=true -DBUILD_TOOLS=true -DCHECK_FOR_UPDATES=true -DENABLE_STATS=OFF
 
     - name: Build
       # Build your program with the given configuration
@@ -368,7 +368,7 @@ jobs:
 
 
   #--------------------------------------------------------------------------------
-  U22_SH_Py_CI:  # Ubuntu 2020, Shared, Python, LibCI with executables, and RUM stats (ENABLE_STATS)
+  U22_SH_Py_CI:  # Ubuntu 2020, Shared, Python, LibCI with executables, no usage monitoring
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
@@ -397,7 +397,7 @@ jobs:
       shell: bash
       run: |
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=true -DUNIT_TESTS_ARGS="--not-live --context=linux" -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DENABLE_STATS=ON
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.LRS_RUN_CONFIG}} -DBUILD_SHARED_LIBS=true -DBUILD_EXAMPLES=false -DBUILD_TOOLS=true -DBUILD_UNIT_TESTS=true -DUNIT_TESTS_ARGS="--not-live --context=linux" -DCHECK_FOR_UPDATES=false -DBUILD_WITH_DDS=false -DBUILD_PYTHON_BINDINGS=true -DPYTHON_EXECUTABLE=$(which python3) -DENABLE_STATS=OFF
         cmake --build . -- -j4  
 
     - name: LibCI

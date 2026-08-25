@@ -36,7 +36,7 @@ more than once (e.g. a manual upload followed by the next-boot upload).
   variable `RS2_RUM_CLOUD_ENABLED`. The override is asymmetric: `=0` always disables (a kill switch),
   while `=1` only enables when you have not explicitly opted out — the env var can never turn upload
   on against a saved opt-out.
-- **Collection is off by default at build time**: build the SDK with `-DENABLE_STATS=ON` to enable
+- **Collection is on by default at build time**: build the SDK with `-DENABLE_STATS=OFF` to strip
   it. The `rs2_rum_*` API is always available and functional; `ENABLE_STATS` gates only
   the instrumentation hooks that feed the collector, so when off the report's collected lists stay
   empty but the API itself behaves identically.

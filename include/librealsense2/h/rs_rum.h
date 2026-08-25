@@ -9,7 +9,7 @@
 * the machine when the user explicitly opts in to cloud upload. These entry points are
 * always compiled and functional: rs2_rum_get_report_path returns the path of the on-disk
 * report file (SDK/system metadata plus whatever has been collected) and the consent get/set
-* always read and write the per-user config file. The ENABLE_STATS build option (default OFF)
+* always read and write the per-user config file. The ENABLE_STATS build option (default ON)
 * gates only the instrumentation hooks that feed the collector; when it is off the report's
 * collected lists (devices, streams, filters, options, notifications) stay empty, but
 * the API itself behaves identically.
