@@ -1547,17 +1547,8 @@ namespace librealsense
                             _buf_dispatch.set_md_attributes(0,nullptr);
                         }
 
-                        // Relax the required frame size for compressed formats, i.e. MJPG, Z16H.
-                        // D555 object detection also uses a variable-length payload: the UVC
-                        // descriptor advertises the maximum EP13 frame size, while bytesused is
-                        // the actual 43-byte header plus the populated detection entries. Treat
-                        // only the D555 OD interface like a compressed stream so ordinary Y8
-                        // image streams keep their strict frame-size validation.
-                        constexpr uint16_t d555_pid = 0x0b56;
-                        constexpr uint8_t d555_object_detection_mi = 9;
-                        bool compressed_format = val_in_range(_profile.format, { 0x4d4a5047U , 0x5a313648U})
-                                                 || (_info.pid == d555_pid
-                                                     && _info.mi == d555_object_detection_mi);
+                        // Relax the required frame size for compressed formats, i.e. MJPG, Z16H
+                        bool compressed_format = val_in_range(_profile.format, { 0x4d4a5047U , 0x5a313648U});
 
                         // Compressed and kernel-reported variable-size formats deliver frames shorter than the buffer, so the size check doesn't apply
                         bool skip_partial_frame_check = compressed_format || _variable_frame_size;

@@ -1217,7 +1217,6 @@ namespace rs2
 
         /**
         * Get a detection with center-of-mass camera and image coordinates.
-        * Version-2 frames return com_valid=0 and zero COM coordinates.
         * \param[in] index - zero-based index of the detection
         * \return rs2_object_detection_3d - extended detection result
         */

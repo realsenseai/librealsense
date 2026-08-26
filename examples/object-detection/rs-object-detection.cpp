@@ -13,7 +13,6 @@
 
 #include <librealsense2/rs.hpp>
 
-#include <csignal>
 #include <iomanip>
 #include <iostream>
 
@@ -21,13 +20,6 @@
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-static volatile std::sig_atomic_t stop_streaming = 0;
-
-static void on_signal( int )
-{
-    stop_streaming = 1;
-}
 
 // Human-readable label for a class_id reported by the detection engine.
 // Extend this table to match the model deployed on your device.
@@ -48,8 +40,6 @@ static const char * class_label( int class_id )
 
 int main( int /*argc*/, char * /*argv*/[] ) try
 {
-    std::signal( SIGINT, on_signal );
-
     rs2::pipeline pipe;
     rs2::config   cfg;
 
@@ -61,7 +51,7 @@ int main( int /*argc*/, char * /*argv*/[] ) try
 
     std::cout << "Streaming — press Ctrl+C to stop.\n\n";
 
-    while( ! stop_streaming )
+    while( true )
     {
         rs2::frameset frames = pipe.wait_for_frames();
 
@@ -83,27 +73,17 @@ int main( int /*argc*/, char * /*argv*/[] ) try
 
         for( unsigned int i = 0; i < count; ++i )
         {
-            rs2_object_detection_3d det3d = odf.get_detection_3d( i );
-            rs2_object_detection const & det = det3d.detection;
+            rs2_object_detection det = odf.get_detection( i );
 
             std::cout << "  [" << i << "] "
                       << std::left << std::setw( 8 ) << class_label( det.class_id )
                       << "  score=" << std::right << std::setw( 3 ) << det.score << "%"
                       << "  bbox=("  << det.top_left_x     << "," << det.top_left_y     << ")-"
                       <<       "("   << det.bottom_right_x << "," << det.bottom_right_y << ")"
-                      << "  distance=" << std::fixed << std::setprecision( 3 ) << det.depth << "m";
-            if( det3d.com_valid )
-                std::cout << "  world=(" << det3d.world_position.x << ","
-                          << det3d.world_position.y << "," << det3d.world_position.z << ")m"
-                          << "  image=(" << det3d.image_x << "," << det3d.image_y << ")px";
-            else
-                std::cout << "  COM=unavailable";
-            std::cout << "\n";
+                      << "\n";
         }
         std::cout << "\n";
     }
-
-    pipe.stop();
 
     return EXIT_SUCCESS;
 }

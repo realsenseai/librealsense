@@ -560,8 +560,7 @@ void rs2_get_frame_object_detection(const rs2_frame* frame, unsigned int index, 
 
 /**
 * When called on Object Detection frame type, this method returns a detection
-* with center-of-mass camera and image coordinates. Version-2 frames return
-* com_valid=0 and zero COM coordinates.
+* with center-of-mass camera and image coordinates.
 * \param[in] frame       Object Detection frame
 * \param[in] index       Index of detection to retrieve
 * \param[out] detection  Pointer to extended detection data

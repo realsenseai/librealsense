@@ -3958,6 +3958,10 @@ namespace rs2
         }
         objects->ticks_without_od_frame = 0;
 
+        // OD frame arrived but depth not yet available — skip without clearing
+        if( ! df )
+            return;
+
         // Fresh OD frame with no detections — clear
         if( odf.get_detection_count() == 0 )
         {
@@ -3969,30 +3973,21 @@ namespace rs2
         try
         {
             auto color_vsp = cf.get_profile().as< rs2::video_stream_profile >();
-            rs2_intrinsics color_intrin = color_vsp.get_intrinsics();
-            rs2::rect color_frame_rect{ 0.f, 0.f, float( color_intrin.width ), float( color_intrin.height ) };
+            auto depth_vsp = df.get_profile().as< rs2::video_stream_profile >();
 
-            bool const has_depth = !!df;
-            rs2_intrinsics depth_intrin{};
-            rs2_extrinsics color_to_depth{};
-            rs2_extrinsics depth_to_color{};
-            rs2::rect depth_frame_rect{};
-            uint16_t const * depth_data = nullptr;
-            com::depth_image_16 com_raw{ nullptr, 0, 0 };
-            std::vector< uint8_t > depth8u_buf;
-            com::depth_image_8 com_depth8u{ nullptr, 0, 0 };
-            if( has_depth )
-            {
-                auto depth_vsp = df.get_profile().as< rs2::video_stream_profile >();
-                depth_intrin = depth_vsp.get_intrinsics();
-                color_to_depth = color_vsp.get_extrinsics_to( depth_vsp );
-                depth_to_color = depth_vsp.get_extrinsics_to( color_vsp );
-                depth_frame_rect = { 0.f, 0.f, float( depth_intrin.width ), float( depth_intrin.height ) };
-                depth_data = reinterpret_cast< uint16_t const * >( df.get_data() );
-                com_raw = { depth_data, depth_intrin.width, depth_intrin.height };
-                depth8u_buf.resize( depth_intrin.width * depth_intrin.height );
-                com_depth8u = { depth8u_buf.data(), depth_intrin.width, depth_intrin.height };
-            }
+            rs2_intrinsics color_intrin = color_vsp.get_intrinsics();
+            rs2_intrinsics depth_intrin = depth_vsp.get_intrinsics();
+            rs2_extrinsics color_to_depth = color_vsp.get_extrinsics_to( depth_vsp );
+            rs2_extrinsics depth_to_color = depth_vsp.get_extrinsics_to( color_vsp );
+
+            rs2::rect color_frame_rect{ 0.f, 0.f, float( color_intrin.width ), float( color_intrin.height ) };
+            rs2::rect depth_frame_rect{ 0.f, 0.f, float( depth_intrin.width ), float( depth_intrin.height ) };
+
+            uint16_t const * const depth_data = reinterpret_cast< uint16_t const * >( df.get_data() );
+
+            com::depth_image_16 com_raw{ depth_data, depth_intrin.width, depth_intrin.height };
+            std::vector< uint8_t > depth8u_buf( depth_intrin.width * depth_intrin.height );
+            com::depth_image_8 com_depth8u{ depth8u_buf.data(), depth_intrin.width, depth_intrin.height };
             bool depth8u_ready = false;
 
             objects_in_frame new_objects;
@@ -4001,30 +3996,27 @@ namespace rs2
             // Non-maximum suppression: sort by score, suppress overlapping same-class boxes
             static constexpr float NMS_IOU_THRESHOLD   = 0.55f;
             static constexpr int   NMS_SCORE_THRESHOLD = 45;
-            std::vector< rs2_object_detection_3d > raw_dets( count );
+            std::vector< rs2_object_detection > raw_dets( count );
             for( unsigned int i = 0; i < count; ++i )
-                raw_dets[i] = odf.get_detection_3d( i );
+                raw_dets[i] = odf.get_detection( i );
             std::sort( raw_dets.begin(), raw_dets.end(),
-                []( const rs2_object_detection_3d & a, const rs2_object_detection_3d & b )
-                { return a.detection.score > b.detection.score; } );
+                []( const rs2_object_detection & a, const rs2_object_detection & b ) { return a.score > b.score; } );
             std::vector< bool > suppressed( count, false );
             for( size_t i = 0; i < count; ++i )
-                if( raw_dets[i].detection.score < NMS_SCORE_THRESHOLD )
+                if( raw_dets[i].score < NMS_SCORE_THRESHOLD )
                     suppressed[i] = true;
             for( size_t i = 0; i < count; ++i )
             {
                 if( suppressed[i] ) continue;
-                auto const & det_i = raw_dets[i].detection;
-                rs2::rect bi{ float( det_i.top_left_x ), float( det_i.top_left_y ),
-                              float( det_i.bottom_right_x - det_i.top_left_x ),
-                              float( det_i.bottom_right_y - det_i.top_left_y ) };
+                rs2::rect bi{ float( raw_dets[i].top_left_x ), float( raw_dets[i].top_left_y ),
+                              float( raw_dets[i].bottom_right_x - raw_dets[i].top_left_x ),
+                              float( raw_dets[i].bottom_right_y - raw_dets[i].top_left_y ) };
                 for( size_t j = i + 1; j < count; ++j )
                 {
-                    auto const & det_j = raw_dets[j].detection;
-                    if( suppressed[j] || det_j.class_id != det_i.class_id ) continue;
-                    rs2::rect bj{ float( det_j.top_left_x ), float( det_j.top_left_y ),
-                                  float( det_j.bottom_right_x - det_j.top_left_x ),
-                                  float( det_j.bottom_right_y - det_j.top_left_y ) };
+                    if( suppressed[j] || raw_dets[j].class_id != raw_dets[i].class_id ) continue;
+                    rs2::rect bj{ float( raw_dets[j].top_left_x ), float( raw_dets[j].top_left_y ),
+                                  float( raw_dets[j].bottom_right_x - raw_dets[j].top_left_x ),
+                                  float( raw_dets[j].bottom_right_y - raw_dets[j].top_left_y ) };
                     float inter_area = bi.intersection( bj ).area();
                     float union_area = bi.area() + bj.area() - inter_area;
                     if( union_area > 0.f && inter_area / union_area > NMS_IOU_THRESHOLD )
@@ -4036,8 +4028,7 @@ namespace rs2
             for( size_t i = 0; i < count; ++i )
             {
                 if( suppressed[i] ) continue;
-                rs2_object_detection_3d const & det3d = raw_dets[i];
-                rs2_object_detection const & det = det3d.detection;
+                rs2_object_detection const & det = raw_dets[i];
 
                 // Pixel-coordinate bounding box in the color frame
                 rs2::rect color_bbox{ float( det.top_left_x ),
@@ -4045,77 +4036,77 @@ namespace rs2
                                       float( det.bottom_right_x - det.top_left_x ),
                                       float( det.bottom_right_y - det.top_left_y ) };
                 rs2::rect normalized_color_bbox = color_bbox.normalize( color_frame_rect );
-                rs2::rect normalized_depth_bbox = normalized_color_bbox;
+
+                // depth_bbox_full: simple resolution scaling of the color bbox.
+                // COM runs within this region for a stable, deterministic depth measurement.
+                // The depth-view dot position is corrected for sensor parallax separately
+                // by projecting the single COM pixel through rs2_project_color_pixel_to_depth_pixel.
+                float const depth_scale_x = float( depth_intrin.width  ) / float( color_intrin.width  );
+                float const depth_scale_y = float( depth_intrin.height ) / float( color_intrin.height );
+                // depth_bbox_full: unclipped scaled bbox — used for com_rel_u/v normalization.
+                // Clipping only affects the actual ROI sampled.
+                rs2::rect depth_bbox_full{
+                    color_bbox.x * depth_scale_x, color_bbox.y * depth_scale_y,
+                    color_bbox.w * depth_scale_x, color_bbox.h * depth_scale_y };
+                rs2::rect depth_bbox = depth_bbox_full.intersection( depth_frame_rect );
+                rs2::rect normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
 
                 float const hkr_depth_m = det.depth;
                 float viewer_depth_m = 0.f;
                 float com_rel_u = 0.5f, com_rel_v = 0.5f;
 
-                if( det3d.com_valid && color_bbox.w > 0.f && color_bbox.h > 0.f )
+                // TODO: temporary fallback — viewer-side COM runs only when HKR firmware
+                // returns 0 (XU command not supported or device not ready).
+                // Checked per-detection intentionally: firmware could return 0 for individual
+                // detections (e.g. out-of-range) even when HKR COM is otherwise working.
+                // Remove once HKR COM is fully implemented and reliable on all devices.
+                if( hkr_depth_m == 0.f )
                 {
-                    auto clamp01 = []( float v ) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; };
-                    com_rel_u = clamp01( ( det3d.image_x - color_bbox.x ) / color_bbox.w );
-                    com_rel_v = clamp01( ( det3d.image_y - color_bbox.y ) / color_bbox.h );
-                }
-
-                if( has_depth )
-                {
-                    // Keep the public Depth viewport mapping and use viewer-side COM only as
-                    // a fallback when the firmware does not provide a valid COM result.
-                    float const depth_scale_x = float( depth_intrin.width  ) / float( color_intrin.width  );
-                    float const depth_scale_y = float( depth_intrin.height ) / float( color_intrin.height );
-                    rs2::rect depth_bbox_full{
-                        color_bbox.x * depth_scale_x, color_bbox.y * depth_scale_y,
-                        color_bbox.w * depth_scale_x, color_bbox.h * depth_scale_y };
-                    rs2::rect depth_bbox = depth_bbox_full.intersection( depth_frame_rect );
-                    normalized_depth_bbox = depth_bbox.normalize( depth_frame_rect );
-
-                    if( ! det3d.com_valid && hkr_depth_m == 0.f )
+                    if( !depth8u_ready )
                     {
-                        if( !depth8u_ready )
+                        com::center_of_mass_calculator::create_depth_8u( com_raw, com_depth8u );
+                        depth8u_ready = true;
+                    }
+                    int const com_x = (int)depth_bbox.x;
+                    int const com_y = (int)depth_bbox.y;
+                    com::rect  com_bbox{ com_x, com_y,
+                                         (int)( depth_bbox.x + depth_bbox.w + 0.5f ) - com_x,
+                                         (int)( depth_bbox.y + depth_bbox.h + 0.5f ) - com_y };
+                    com::vec2f com_center{ depth_bbox.x + depth_bbox.w * 0.5f,
+                                           depth_bbox.y + depth_bbox.h * 0.5f };
+                    com::camera_intrinsics com_intrin{ depth_intrin.fx, depth_intrin.fy,
+                                                       depth_intrin.ppx, depth_intrin.ppy };
+                    // Project bbox center from color space to raw-depth space to get
+                    // the stereo-baseline pixel shift; keep {0,0} if no depth at bbox center.
+                    float shift_x = 0.f, shift_y = 0.f;
+                    float center_px[2] = { color_bbox.x + color_bbox.w * 0.5f,
+                                           color_bbox.y + color_bbox.h * 0.5f };
+                    float const depth_units = df.get_units();
+                    float depth_px[2]  = { -1.f, -1.f };
+                    rs2_project_color_pixel_to_depth_pixel( depth_px, depth_data, depth_units, 0.1f, 10.f,
+                        &depth_intrin, &color_intrin, &color_to_depth, &depth_to_color, center_px );
+                    if( depth_px[0] >= 0.f && depth_px[0] < float( depth_intrin.width ) &&
+                        depth_px[1] >= 0.f && depth_px[1] < float( depth_intrin.height ) )
+                    {
+                        uint16_t center_raw = depth_data[(int)depth_px[1] * depth_intrin.width + (int)depth_px[0]];
+                        float const center_m = center_raw * depth_units;
+                        if( center_m > 0.4f && center_m < 8.0f )
                         {
-                            com::center_of_mass_calculator::create_depth_8u( com_raw, com_depth8u );
-                            depth8u_ready = true;
+                            shift_x = depth_px[0] - center_px[0] * depth_scale_x;
+                            shift_y = depth_px[1] - center_px[1] * depth_scale_y;
                         }
-                        int const com_x = (int)depth_bbox.x;
-                        int const com_y = (int)depth_bbox.y;
-                        com::rect  com_bbox{ com_x, com_y,
-                                             (int)( depth_bbox.x + depth_bbox.w + 0.5f ) - com_x,
-                                             (int)( depth_bbox.y + depth_bbox.h + 0.5f ) - com_y };
-                        com::vec2f com_center{ depth_bbox.x + depth_bbox.w * 0.5f,
-                                               depth_bbox.y + depth_bbox.h * 0.5f };
-                        com::camera_intrinsics com_intrin{ depth_intrin.fx, depth_intrin.fy,
-                                                           depth_intrin.ppx, depth_intrin.ppy };
-                        float shift_x = 0.f, shift_y = 0.f;
-                        float center_px[2] = { color_bbox.x + color_bbox.w * 0.5f,
-                                               color_bbox.y + color_bbox.h * 0.5f };
-                        float const depth_units = df.get_units();
-                        float depth_px[2]  = { -1.f, -1.f };
-                        rs2_project_color_pixel_to_depth_pixel( depth_px, depth_data, depth_units, 0.1f, 10.f,
-                            &depth_intrin, &color_intrin, &color_to_depth, &depth_to_color, center_px );
-                        if( depth_px[0] >= 0.f && depth_px[0] < float( depth_intrin.width ) &&
-                            depth_px[1] >= 0.f && depth_px[1] < float( depth_intrin.height ) )
+                    }
+                    com::person_center_of_mass com_result{};
+                    com::center_of_mass_calculator::calculate( com_raw, com_depth8u, com_bbox, com_center,
+                                                               &com_intrin, com_result, { shift_x, shift_y } );
+                    if( com_result.mean_body_depth > 0.f )
+                    {
+                        viewer_depth_m = com_result.mean_body_depth / 1000.f;
+                        auto clamp01 = []( float v ) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; };
+                        if( depth_bbox_full.w > 0.f && depth_bbox_full.h > 0.f )
                         {
-                            uint16_t center_raw = depth_data[(int)depth_px[1] * depth_intrin.width + (int)depth_px[0]];
-                            float const center_m = center_raw * depth_units;
-                            if( center_m > 0.4f && center_m < 8.0f )
-                            {
-                                shift_x = depth_px[0] - center_px[0] * depth_scale_x;
-                                shift_y = depth_px[1] - center_px[1] * depth_scale_y;
-                            }
-                        }
-                        com::person_center_of_mass com_result{};
-                        com::center_of_mass_calculator::calculate( com_raw, com_depth8u, com_bbox, com_center,
-                                                                   &com_intrin, com_result, { shift_x, shift_y } );
-                        if( com_result.mean_body_depth > 0.f )
-                        {
-                            viewer_depth_m = com_result.mean_body_depth / 1000.f;
-                            auto clamp01 = []( float v ) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; };
-                            if( depth_bbox_full.w > 0.f && depth_bbox_full.h > 0.f )
-                            {
-                                com_rel_u = clamp01( ( com_result.image_pos.x - depth_bbox_full.x ) / depth_bbox_full.w );
-                                com_rel_v = clamp01( ( com_result.image_pos.y - depth_bbox_full.y ) / depth_bbox_full.h );
-                            }
+                            com_rel_u = clamp01( ( com_result.image_pos.x - depth_bbox_full.x ) / depth_bbox_full.w );
+                            com_rel_v = clamp01( ( com_result.image_pos.y - depth_bbox_full.y ) / depth_bbox_full.h );
                         }
                     }
                 }

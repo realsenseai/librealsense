@@ -121,7 +121,8 @@ object_detection_frame::object_detection_entry object_detection_frame::get_detec
     result.world_position = { wire.world_x, wire.world_y, wire.world_z };
     result.image_x = wire.image_x;
     result.image_y = wire.image_y;
-    result.com_valid = wire.detection.distance > 0.f && wire.world_z > 0.f;
+    // Firmware uses world_z == 0 to report an unavailable COM result.
+    result.com_valid = wire.world_z > 0.f;
     return result;
 }
 

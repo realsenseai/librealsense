@@ -371,7 +371,7 @@ namespace rs2
         bool show_advanced_mode_popup = false;
         
         bool subdevice_has_perception_stream_enabled( const subdevice_model & sub ) const;
-        void start_color_for_perception( viewer_model & viewer );
+        bool are_color_and_depth_streaming() const;
         void stop_perception_if_video_stopped( viewer_model & viewer );
         // Perception and the decimation/temporal embedded filters are mutually exclusive.
         bool is_perception_streaming() const;
