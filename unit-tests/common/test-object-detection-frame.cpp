@@ -46,36 +46,11 @@ object_detection_frame make_frame( uint16_t version, Entry const & entry, size_t
 }
 }
 
-TEST_CASE( "Object Detection v2 frame matches the firmware ABI", "[object-detection][frame]" )
+TEST_CASE( "Object Detection v3 frame exposes COM", "[object-detection][frame]" )
 {
     STATIC_REQUIRE( sizeof( object_detection_frame::object_detection_frame_header ) == 20 );
     STATIC_REQUIRE( sizeof( object_detection_frame::object_detection_payload_header ) == 23 );
-    STATIC_REQUIRE( sizeof( object_detection_frame::object_detection_entry_v2 ) == 16 );
-
-    object_detection_frame::object_detection_entry_v2 entry{};
-    entry.detection_id = 100;
-    entry.detection_type = 3;
-    entry.confidence = 90;
-    entry.top_left_x = 10;
-    entry.top_left_y = 20;
-    entry.bottom_right_x = 110;
-    entry.bottom_right_y = 220;
-    entry.distance = 1.25f;
-
-    auto frame = make_frame( object_detection_frame::VERSION_V2, entry );
-    REQUIRE( frame.get_detection_count() == 1 );
-    auto const detection = frame.get_detection( 0 );
-    CHECK( detection.detection_id == 100 );
-    CHECK( detection.detection_type == 3 );
-    CHECK( detection.confidence == 90 );
-    CHECK( detection.bottom_right_x == 110 );
-    CHECK( detection.distance == Catch::Approx( 1.25f ) );
-    CHECK_FALSE( detection.com_valid );
-    CHECK( detection.world_position.z == 0.f );
-}
-
-TEST_CASE( "Object Detection v3 frame exposes COM", "[object-detection][frame]" )
-{
+    STATIC_REQUIRE( sizeof( object_detection_frame::object_detection_entry_common ) == 16 );
     STATIC_REQUIRE( sizeof( object_detection_frame::object_detection_entry_v3 ) == 36 );
 
     object_detection_frame::object_detection_entry_v3 entry{};
@@ -97,6 +72,10 @@ TEST_CASE( "Object Detection v3 frame exposes COM", "[object-detection][frame]" 
     auto frame = make_frame( object_detection_frame::VERSION_V3, entry, 128 );
     REQUIRE( frame.get_detection_count() == 1 );
     auto const detection = frame.get_detection( 0 );
+    CHECK( detection.detection_id == 7 );
+    CHECK( detection.detection_type == 0 );
+    CHECK( detection.confidence == 92 );
+    CHECK( detection.bottom_right_x == 200 );
     CHECK( detection.com_valid );
     CHECK( detection.distance == Catch::Approx( 2.291f ) );
     CHECK( detection.world_position.x == Catch::Approx( 1.f ) );
@@ -108,11 +87,11 @@ TEST_CASE( "Object Detection v3 frame exposes COM", "[object-detection][frame]" 
 
 TEST_CASE( "Object Detection frame rejects malformed headers", "[object-detection][frame]" )
 {
-    object_detection_frame::object_detection_entry_v2 entry{};
+    object_detection_frame::object_detection_entry_v3 entry{};
 
     SECTION( "CRC mismatch" )
     {
-        auto frame = make_frame( object_detection_frame::VERSION_V2, entry );
+        auto frame = make_frame( object_detection_frame::VERSION_V3, entry );
         auto * header = reinterpret_cast< object_detection_frame::object_detection_frame_header * >(
             frame.data.data() );
         ++header->crc32;
@@ -128,7 +107,7 @@ TEST_CASE( "Object Detection frame rejects malformed headers", "[object-detectio
 
     SECTION( "size mismatch" )
     {
-        auto frame = make_frame( object_detection_frame::VERSION_V2, entry );
+        auto frame = make_frame( object_detection_frame::VERSION_V3, entry );
         auto * header = reinterpret_cast< object_detection_frame::object_detection_frame_header * >(
             frame.data.data() );
         ++header->size;

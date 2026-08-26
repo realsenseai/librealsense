@@ -51,8 +51,7 @@ bool object_detection_frame::validate_payload() const
         return false;
     }
 
-    size_t const wire_entry_size = entry_size();
-    if( ! wire_entry_size )
+    if( header->version != VERSION_V3 )
     {
         LOG_WARNING( "Unsupported Object Detection frame version: 0x" << std::hex << header->version );
         return false;
@@ -67,7 +66,7 @@ bool object_detection_frame::validate_payload() const
         return false;
     }
 
-    size_t const detections_size = wire_entry_size * count;
+    size_t const detections_size = V3_ENTRY_SIZE * count;
     size_t const expected_size_field = PAYLOAD_HEADER_SIZE + detections_size;
     size_t const expected_size = FRAME_HEADER_SIZE + expected_size_field;
 
@@ -108,37 +107,21 @@ object_detection_frame::object_detection_entry object_detection_frame::get_detec
         throw std::out_of_range(
             rsutils::string::from() << "Detection index " << index << " is out of range (count=" << count << ")" );
 
-    auto const * header = reinterpret_cast< const object_detection_frame_header * >( data.data() );
     auto const * entries = data.data() + FRAME_HEADER_SIZE + PAYLOAD_HEADER_SIZE;
     object_detection_entry result;
-    if( header->version == VERSION_V2 )
-    {
-        auto const & wire = reinterpret_cast< const object_detection_entry_v2 * >( entries )[index];
-        result.detection_id = wire.detection_id;
-        result.detection_type = wire.detection_type;
-        result.confidence = wire.confidence;
-        result.top_left_x = wire.top_left_x;
-        result.top_left_y = wire.top_left_y;
-        result.bottom_right_x = wire.bottom_right_x;
-        result.bottom_right_y = wire.bottom_right_y;
-        result.distance = wire.distance;
-    }
-    else
-    {
-        auto const & wire = reinterpret_cast< const object_detection_entry_v3 * >( entries )[index];
-        result.detection_id = wire.detection.detection_id;
-        result.detection_type = wire.detection.detection_type;
-        result.confidence = wire.detection.confidence;
-        result.top_left_x = wire.detection.top_left_x;
-        result.top_left_y = wire.detection.top_left_y;
-        result.bottom_right_x = wire.detection.bottom_right_x;
-        result.bottom_right_y = wire.detection.bottom_right_y;
-        result.distance = wire.detection.distance;
-        result.world_position = { wire.world_x, wire.world_y, wire.world_z };
-        result.image_x = wire.image_x;
-        result.image_y = wire.image_y;
-        result.com_valid = wire.detection.distance > 0.f && wire.world_z > 0.f;
-    }
+    auto const & wire = reinterpret_cast< const object_detection_entry_v3 * >( entries )[index];
+    result.detection_id = wire.detection.detection_id;
+    result.detection_type = wire.detection.detection_type;
+    result.confidence = wire.detection.confidence;
+    result.top_left_x = wire.detection.top_left_x;
+    result.top_left_y = wire.detection.top_left_y;
+    result.bottom_right_x = wire.detection.bottom_right_x;
+    result.bottom_right_y = wire.detection.bottom_right_y;
+    result.distance = wire.detection.distance;
+    result.world_position = { wire.world_x, wire.world_y, wire.world_z };
+    result.image_x = wire.image_x;
+    result.image_y = wire.image_y;
+    result.com_valid = wire.detection.distance > 0.f && wire.world_z > 0.f;
     return result;
 }
 
@@ -147,26 +130,6 @@ object_detection_frame::object_detection_payload_header object_detection_frame::
     if( data.size() < MIN_FRAME_SIZE )
         throw invalid_value_exception( "Object Detection frame is too small" );
     return *reinterpret_cast< const object_detection_payload_header * >( data.data() + FRAME_HEADER_SIZE );
-}
-
-uint16_t object_detection_frame::get_version() const
-{
-    if( data.size() < FRAME_HEADER_SIZE )
-        return 0;
-    return reinterpret_cast< const object_detection_frame_header * >( data.data() )->version;
-}
-
-size_t object_detection_frame::entry_size() const
-{
-    switch( get_version() )
-    {
-    case VERSION_V2:
-        return V2_ENTRY_SIZE;
-    case VERSION_V3:
-        return V3_ENTRY_SIZE;
-    default:
-        return 0;
-    }
 }
 
 }  // namespace librealsense

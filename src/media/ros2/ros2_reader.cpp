@@ -182,24 +182,9 @@ namespace librealsense
             auto n_detections = j.value( "number_of_detections", uint16_t(0) );
 
             auto dets_j = j.find( "detections" );
-            bool has_com = n_detections > 0 && dets_j != j.end() && dets_j->is_array()
-                        && dets_j->size() >= n_detections;
-            if( has_com )
-            {
-                for( uint16_t i = 0; i < n_detections; ++i )
-                {
-                    auto const & det = (*dets_j)[i];
-                    if( ! det.contains( "world_pos" ) || ! det["world_pos"].is_object()
-                        || ! det.contains( "image_pos" ) || ! det["image_pos"].is_object() )
-                    {
-                        has_com = false;
-                        break;
-                    }
-                }
-            }
-
-            size_t const entry_size = has_com ? sizeof( object_detection_frame::object_detection_entry_v3 )
-                                              : sizeof( object_detection_frame::object_detection_entry_v2 );
+            // Legacy ROS recordings did not include COM fields. Upgrade them at the
+            // recording boundary by creating v3 entries with zero COM coordinates.
+            size_t const entry_size = sizeof( object_detection_frame::object_detection_entry_v3 );
             size_t const base_size = sizeof( object_detection_frame::object_detection_frame_header )
                                    + sizeof( object_detection_frame::object_detection_payload_header );
             size_t const total_size = base_size + n_detections * entry_size;
@@ -221,38 +206,34 @@ namespace librealsense
                 for( uint16_t i = 0; i < n_detections && i < dets_j->size(); ++i )
                 {
                     auto const & det = (*dets_j)[i];
-                    object_detection_frame::object_detection_entry_v2 common{};
-                    common.detection_id   = i;
-                    common.detection_type = det.value( "class_id",    uint8_t(0) );
-                    common.confidence     = det.value( "confidence",  uint8_t(0) );
-                    common.top_left_x     = det.value( "x1",          uint16_t(0) );
-                    common.top_left_y     = det.value( "y1",          uint16_t(0) );
-                    common.bottom_right_x = det.value( "x2",          uint16_t(0) );
-                    common.bottom_right_y = det.value( "y2",          uint16_t(0) );
-                    common.distance       = det.value( "distance",    0.0f );
+                    object_detection_frame::object_detection_entry_v3 entry{};
+                    entry.detection.detection_id   = i;
+                    entry.detection.detection_type = det.value( "class_id",    uint8_t(0) );
+                    entry.detection.confidence     = det.value( "confidence",  uint8_t(0) );
+                    entry.detection.top_left_x     = det.value( "x1",          uint16_t(0) );
+                    entry.detection.top_left_y     = det.value( "y1",          uint16_t(0) );
+                    entry.detection.bottom_right_x = det.value( "x2",          uint16_t(0) );
+                    entry.detection.bottom_right_y = det.value( "y2",          uint16_t(0) );
+                    entry.detection.distance       = det.value( "distance",    0.0f );
 
-                    if( has_com )
+                    auto world = det.find( "world_pos" );
+                    auto image = det.find( "image_pos" );
+                    if( world != det.end() && world->is_object()
+                        && image != det.end() && image->is_object() )
                     {
-                        object_detection_frame::object_detection_entry_v3 entry{};
-                        entry.detection = common;
-                        auto const & world = det["world_pos"];
-                        auto const & image = det["image_pos"];
-                        entry.world_x = world.value( "x", 0.0f );
-                        entry.world_y = world.value( "y", 0.0f );
-                        entry.world_z = world.value( "z", 0.0f );
-                        entry.image_x = image.value( "x", 0.0f );
-                        entry.image_y = image.value( "y", 0.0f );
-                        memcpy( entries + i * entry_size, &entry, sizeof( entry ) );
+                        entry.world_x = world->value( "x", 0.0f );
+                        entry.world_y = world->value( "y", 0.0f );
+                        entry.world_z = world->value( "z", 0.0f );
+                        entry.image_x = image->value( "x", 0.0f );
+                        entry.image_y = image->value( "y", 0.0f );
                     }
-                    else
-                        memcpy( entries + i * entry_size, &common, sizeof( common ) );
+                    memcpy( entries + i * entry_size, &entry, sizeof( entry ) );
                 }
             }
 
             // Fill header so object_detection_frame::validate() passes
             header->magic_number = object_detection_frame::MAGIC_NUMBER;
-            header->version      = has_com ? object_detection_frame::VERSION_V3
-                                           : object_detection_frame::VERSION_V2;
+            header->version      = object_detection_frame::VERSION_V3;
             header->data_type    = static_cast< uint8_t >( perception_frame::type::OBJECT_DETECTION );
             header->flags        = 0;
             header->spare        = 0;

@@ -233,7 +233,6 @@ namespace librealsense
             auto od = As<object_detection_frame>(frame.frame);
             auto const payload = od->get_payload_header();
             auto const n = od->get_detection_count();
-            bool const has_com_fields = od->get_version() == object_detection_frame::VERSION_V3;
 
             std::ostringstream json;
             json << "{"
@@ -252,17 +251,13 @@ namespace librealsense
                      << "\"x2\":"          << e.bottom_right_x << ","
                      << "\"y2\":"          << e.bottom_right_y << ","
                      << "\"distance\":"    << e.distance;
-                // Preserve the frame's v3 layout even when an individual detection has
-                // an unavailable (all-zero) COM. Omitting one entry's fields would make
-                // the reader downgrade the entire frame to v2 and lose other valid COMs.
-                if( has_com_fields )
-                    json << ",\"world_pos\":{"
-                         << "\"x\":" << e.world_position.x << ","
-                         << "\"y\":" << e.world_position.y << ","
-                         << "\"z\":" << e.world_position.z << "},"
-                         << "\"image_pos\":{"
-                         << "\"x\":" << e.image_x << ","
-                         << "\"y\":" << e.image_y << "}";
+                json << ",\"world_pos\":{"
+                     << "\"x\":" << e.world_position.x << ","
+                     << "\"y\":" << e.world_position.y << ","
+                     << "\"z\":" << e.world_position.z << "},"
+                     << "\"image_pos\":{"
+                     << "\"x\":" << e.image_x << ","
+                     << "\"y\":" << e.image_y << "}";
                 json << "}";
             }
             json << "],"

@@ -15,10 +15,9 @@ namespace librealsense {
 class object_detection_frame : public perception_frame
 {
 public:
-    // Frames received over the object detection stream are binary blobs with a versioned ODET layout.
+    // Frames received over the object detection stream use the ODET v3 binary layout.
 
     static constexpr uint32_t MAGIC_NUMBER = 0x5445444F;  // ASCII "ODET" as a little-endian uint32
-    static constexpr uint16_t VERSION_V2 = 0x0200;
     static constexpr uint16_t VERSION_V3 = 0x0300;
     static constexpr uint32_t MAX_DETECTIONS = 64;
 
@@ -49,7 +48,7 @@ public:
         uint32_t source_frame_id;
     };
 
-    struct object_detection_entry_v2
+    struct object_detection_entry_common
     {
         uint16_t detection_id;
         uint8_t detection_type;
@@ -63,7 +62,7 @@ public:
 
     struct object_detection_entry_v3
     {
-        object_detection_entry_v2 detection;
+        object_detection_entry_common detection;
         float world_x;
         float world_y;
         float world_z;
@@ -90,13 +89,13 @@ public:
 
     static constexpr size_t FRAME_HEADER_SIZE = sizeof( object_detection_frame_header );
     static constexpr size_t PAYLOAD_HEADER_SIZE = sizeof( object_detection_payload_header );
-    static constexpr size_t V2_ENTRY_SIZE = sizeof( object_detection_entry_v2 );
     static constexpr size_t V3_ENTRY_SIZE = sizeof( object_detection_entry_v3 );
     static constexpr size_t MIN_FRAME_SIZE = FRAME_HEADER_SIZE + PAYLOAD_HEADER_SIZE;
 
     static_assert( FRAME_HEADER_SIZE == 20, "Object Detection frame header ABI must be 20 bytes" );
     static_assert( PAYLOAD_HEADER_SIZE == 23, "Object Detection payload header ABI must be 23 bytes" );
-    static_assert( V2_ENTRY_SIZE == 16, "Object Detection v2 entry ABI must be 16 bytes" );
+    static_assert( sizeof( object_detection_entry_common ) == 16,
+                   "Object Detection common entry ABI must be 16 bytes" );
     static_assert( V3_ENTRY_SIZE == 36, "Object Detection v3 entry ABI must be 36 bytes" );
     static_assert( MIN_FRAME_SIZE == 43, "Object Detection minimum frame ABI must be 43 bytes" );
 
@@ -107,13 +106,10 @@ public:
     size_t get_detection_count() const;
     object_detection_entry get_detection( size_t index ) const;
     object_detection_payload_header get_payload_header() const;
-    uint16_t get_version() const;
 
 private:
     bool validate() const;
     bool validate_payload() const;
-    size_t entry_size() const;
-
     mutable std::atomic_bool _validated{ false };
 };
 

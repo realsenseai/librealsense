@@ -536,21 +536,7 @@ void dds_sensor_proxy::handle_perception_data( realdds::topics::string_msg && ms
         return;
     }
     
-    bool has_com = n_detections > 0;
-    for( uint16_t idx = 0; idx < n_detections; ++idx )
-    {
-        auto const & det = detections_j[idx];
-        if( ! det.nested( "world_pos" ).is_object() || ! det.nested( "image_pos" ).is_object() )
-        {
-            has_com = false;
-            break;
-        }
-    }
-
-    uint16_t const wire_version = has_com ? object_detection_frame::VERSION_V3
-                                          : object_detection_frame::VERSION_V2;
-    size_t const entry_size = has_com ? sizeof( object_detection_frame::object_detection_entry_v3 )
-                                      : sizeof( object_detection_frame::object_detection_entry_v2 );
+    size_t const entry_size = sizeof( object_detection_frame::object_detection_entry_v3 );
     size_t const base_size = sizeof( object_detection_frame::object_detection_frame_header )
                            + sizeof( object_detection_frame::object_detection_payload_header );
     size_t const detections_size = n_detections * entry_size;
@@ -595,36 +581,32 @@ void dds_sensor_proxy::handle_perception_data( realdds::topics::string_msg && ms
     for( uint16_t idx = 0; idx < n_detections; ++idx )
     {
         auto const & det = detections_j[idx];
-        object_detection_frame::object_detection_entry_v2 common{};
-        common.detection_id = idx;
-        det.nested( "class_id" ).get_ex( common.detection_type );
-        det.nested( "confidence" ).get_ex( common.confidence );
-        det.nested( "x1" ).get_ex( common.top_left_x );
-        det.nested( "y1" ).get_ex( common.top_left_y );
-        det.nested( "x2" ).get_ex( common.bottom_right_x );
-        det.nested( "y2" ).get_ex( common.bottom_right_y );
-        det.nested( "distance" ).get_ex( common.distance );
+        object_detection_frame::object_detection_entry_v3 entry{};
+        entry.detection.detection_id = idx;
+        det.nested( "class_id" ).get_ex( entry.detection.detection_type );
+        det.nested( "confidence" ).get_ex( entry.detection.confidence );
+        det.nested( "x1" ).get_ex( entry.detection.top_left_x );
+        det.nested( "y1" ).get_ex( entry.detection.top_left_y );
+        det.nested( "x2" ).get_ex( entry.detection.bottom_right_x );
+        det.nested( "y2" ).get_ex( entry.detection.bottom_right_y );
+        det.nested( "distance" ).get_ex( entry.detection.distance );
 
-        if( has_com )
+        auto const world = det.nested( "world_pos" );
+        auto const image = det.nested( "image_pos" );
+        if( world.is_object() && image.is_object() )
         {
-            object_detection_frame::object_detection_entry_v3 entry{};
-            entry.detection = common;
-            auto const world = det.nested( "world_pos" );
-            auto const image = det.nested( "image_pos" );
             world.nested( "x" ).get_ex( entry.world_x );
             world.nested( "y" ).get_ex( entry.world_y );
             world.nested( "z" ).get_ex( entry.world_z );
             image.nested( "x" ).get_ex( entry.image_x );
             image.nested( "y" ).get_ex( entry.image_y );
-            memcpy( entries + idx * entry_size, &entry, sizeof( entry ) );
         }
-        else
-            memcpy( entries + idx * entry_size, &common, sizeof( common ) );
+        memcpy( entries + idx * entry_size, &entry, sizeof( entry ) );
     }
     
     // Fill header
     header->magic_number = object_detection_frame::MAGIC_NUMBER;
-    header->version = wire_version;
+    header->version = object_detection_frame::VERSION_V3;
     header->data_type = static_cast< uint8_t >( perception_frame::type::OBJECT_DETECTION );
     header->flags = 0;
     header->size  = static_cast< uint32_t >( total_size - sizeof( *header ) );
