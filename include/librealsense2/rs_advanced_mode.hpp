@@ -262,6 +262,17 @@ namespace rs400
 
             return group;
         }
+
+        /** Reads every control group and mode in one call; see STAdvancedModeControls */
+        STAdvancedModeControls get_all_controls() const
+        {
+            rs2_error* e = nullptr;
+            STAdvancedModeControls controls{};
+            rs2_get_all_advanced_controls(_dev.get(), &controls, &e);
+            rs2::error::handle(e);
+
+            return controls;
+        }
     };
 }
 

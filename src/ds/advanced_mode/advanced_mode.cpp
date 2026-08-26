@@ -318,6 +318,47 @@ namespace librealsense
             []() { STAFactor af; af.amplitude = 0.f; return af; }();
     }
 
+    void ds_advanced_mode_base::get_all_controls( STAdvancedModeControls * ptr ) const
+    {
+        // Every group and mode is read here, under one bulk operation, and not by a query per group:
+        // each standalone GET_ADV powers the depth sensor up and back down again
+        rsutils::deferred depth_bulk = _depth_sensor->bulk_operation();
+
+        // A group whose min/max FW does not report (hdad, and ae on some devices) fails the query;
+        // it gets the value in all three, which is what callers showed for such a group anyway.
+        // Only the FW rejection is caught - a transport failure must not pass as a min/max.
+        auto read = [this]( auto getter, auto * dst )
+        {
+            for( int mode = 0; mode < RS2_ADVANCED_MODE_MODES; ++mode )
+            {
+                try
+                {
+                    ( this->*getter )( &dst[mode], mode );
+                }
+                catch( std::runtime_error const & )
+                {
+                    if( ! mode )
+                        throw;
+                    dst[mode] = dst[0];
+                }
+            }
+        };
+
+        read( &ds_advanced_mode_base::get_depth_control_group, ptr->depth_control );
+        read( &ds_advanced_mode_base::get_rsm, ptr->rsm );
+        read( &ds_advanced_mode_base::get_rau_support_vector_control, ptr->rsvc );
+        read( &ds_advanced_mode_base::get_color_control, ptr->color_control );
+        read( &ds_advanced_mode_base::get_rau_color_thresholds_control, ptr->rctc );
+        read( &ds_advanced_mode_base::get_slo_color_thresholds_control, ptr->sctc );
+        read( &ds_advanced_mode_base::get_slo_penalty_control, ptr->spc );
+        read( &ds_advanced_mode_base::get_hdad, ptr->hdad );
+        read( &ds_advanced_mode_base::get_color_correction, ptr->cc );
+        read( &ds_advanced_mode_base::get_depth_table_control, ptr->depth_table );
+        read( &ds_advanced_mode_base::get_ae_control, ptr->ae );
+        read( &ds_advanced_mode_base::get_census_radius, ptr->census );
+        read( &ds_advanced_mode_base::get_amp_factor, ptr->amp_factor );
+    }
+
     bool ds_advanced_mode_base::supports_option( const sensor_base * sensor, rs2_option opt ) const
     {
         if( ! sensor )

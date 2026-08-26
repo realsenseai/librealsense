@@ -10,6 +10,9 @@
 
 namespace librealsense
 {
+    // Unlike the scalar/SIMD aligners, these overrides do not pre-clear the output frame: both
+    // align_cuda_helper entry points clear it on the GPU and then write every pixel of it, so a
+    // host-side memset of the whole image was dead work on every frame.
     class align_cuda : public align
     {
     public:
@@ -24,8 +27,6 @@ namespace librealsense
         void align_z_to_other(rs2::video_frame& aligned, const rs2::video_frame& depth, const rs2::video_stream_profile& other_profile, float z_scale) override
         {
             uint8_t * aligned_data = reinterpret_cast<uint8_t *>(const_cast<void*>(aligned.get_data()));
-            auto aligned_profile = aligned.get_profile().as<rs2::video_stream_profile>();
-            memset(aligned_data, 0, aligned_profile.height() * aligned_profile.width() * aligned.get_bytes_per_pixel());
 
             auto depth_profile = depth.get_profile().as<rs2::video_stream_profile>();
 
@@ -41,9 +42,7 @@ namespace librealsense
         void align_other_to_z(rs2::video_frame& aligned, const rs2::video_frame& depth, const rs2::video_frame& other, float z_scale) override
         {
             uint8_t * aligned_data = reinterpret_cast<uint8_t *>(const_cast<void*>(aligned.get_data()));
-            auto aligned_profile = aligned.get_profile().as<rs2::video_stream_profile>();
-            memset(aligned_data, 0, aligned_profile.height() * aligned_profile.width() * aligned.get_bytes_per_pixel());
-            
+
             auto depth_profile = depth.get_profile().as<rs2::video_stream_profile>();
             auto other_profile = other.get_profile().as<rs2::video_stream_profile>();
 

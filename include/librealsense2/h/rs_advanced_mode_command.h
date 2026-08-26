@@ -127,6 +127,26 @@ typedef struct
     float   amplitude;
 }STAFactor;
 
+/* Every control group, with an entry per mode: [0] the value, [1] the minimum, [2] the maximum */
+#define RS2_ADVANCED_MODE_MODES 3
+
+typedef struct
+{
+    STDepthControlGroup          depth_control[RS2_ADVANCED_MODE_MODES];
+    STRsm                        rsm[RS2_ADVANCED_MODE_MODES];
+    STRauSupportVectorControl    rsvc[RS2_ADVANCED_MODE_MODES];
+    STColorControl               color_control[RS2_ADVANCED_MODE_MODES];
+    STRauColorThresholdsControl  rctc[RS2_ADVANCED_MODE_MODES];
+    STSloColorThresholdsControl  sctc[RS2_ADVANCED_MODE_MODES];
+    STSloPenaltyControl          spc[RS2_ADVANCED_MODE_MODES];
+    STHdad                       hdad[RS2_ADVANCED_MODE_MODES];
+    STColorCorrection            cc[RS2_ADVANCED_MODE_MODES];
+    STDepthTableControl          depth_table[RS2_ADVANCED_MODE_MODES];
+    STAEControl                  ae[RS2_ADVANCED_MODE_MODES];
+    STCensusRadius               census[RS2_ADVANCED_MODE_MODES];
+    STAFactor                    amp_factor[RS2_ADVANCED_MODE_MODES];
+}STAdvancedModeControls;
+
 #ifdef __cplusplus
 extern "C"{
 #endif

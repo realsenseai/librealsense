@@ -164,16 +164,7 @@ export const handlers = [
     })
   }),
 
-  // Firmware status (bundled FW removed; recommended is always null)
-  http.get(`${API_BASE}/devices/:deviceId/firmware/`, ({ params }) => {
-    const device = mockDeviceList.find((d) => d.device_id === params.deviceId)
-    return HttpResponse.json({
-      device_id: params.deviceId,
-      current: device?.firmware_version || '5.16.0.1',
-      recommended: null,
-      status: 'unknown',
-      file_available: false,
-    })
-  }),
+  // Recommended firmware (none, unless a test says otherwise)
+  http.get(`${API_BASE}/devices/:deviceId/firmware/`, () => HttpResponse.json({ recommended: null })),
 ]
 

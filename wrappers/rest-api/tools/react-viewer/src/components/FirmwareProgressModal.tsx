@@ -1,17 +1,14 @@
 import { useEffect } from 'react'
 import { apiClient } from '../api/client'
-import type { FirmwareState } from '../api/types'
+import type { DeviceInfo, FirmwareState } from '../api/types'
 
 interface FirmwareProgressModalProps {
   isOpen: boolean
-  device: {
-    device_id: string
-    name: string
-  }
+  device: DeviceInfo
   firmware: FirmwareState
   fileName?: string
   onClose: () => void
-  onProgressUpdate: (progress: number) => void
+  onProgressUpdate: (progress: number, phase?: 'downloading' | 'installing') => void
   onSuccess: (firmwareVersion: string | null) => void
   onError: (error: string) => void
 }
@@ -29,9 +26,7 @@ export function FirmwareProgressModal({
   useEffect(() => {
     if (!isOpen) return
 
-    const unsubscribeProgress = apiClient.onFirmwareProgress(device.device_id, (progress: number) => {
-      onProgressUpdate(progress)
-    })
+    const unsubscribeProgress = apiClient.onFirmwareProgress(device.device_id, onProgressUpdate)
 
     const unsubscribeSuccess = apiClient.onFirmwareSuccess(device.device_id, (fwVersion: string | null) => {
       onSuccess(fwVersion)
@@ -50,7 +45,12 @@ export function FirmwareProgressModal({
 
   if (!isOpen) return null
 
-  const progress = Math.round((firmware.progress || 0) * 100)
+  // Download and install each report 0..1; give them one shared 0-20/20-100 scale so the
+  // bar never rewinds between the two phases.
+  const fraction = firmware.progress || 0
+  const progress = Math.round((firmware.phase === 'downloading' ? fraction * 0.2 : 0.2 + fraction * 0.8) * 100)
+  // Only a terminal event means done: the SDK hits 100% long before the camera is back.
+  const done = firmware.is_updating === false && !firmware.last_error
 
   return (
     <>
@@ -71,10 +71,15 @@ export function FirmwareProgressModal({
                 <div className="font-semibold mb-1">Update Failed</div>
                 <div>{firmware.last_error}</div>
               </div>
-            ) : progress === 100 ? (
+            ) : done ? (
               <div className="p-3 bg-green-900/50 border border-green-700 rounded text-green-200 text-sm">
                 <div className="font-semibold">✓ Update Complete</div>
                 <div className="text-sm mt-1">Firmware has been successfully installed</div>
+              </div>
+            ) : firmware.phase === 'downloading' ? (
+              <div className="text-gray-300 text-sm">
+                <div className="font-semibold mb-1">Downloading firmware…</div>
+                <div className="text-gray-400">Fetching the recommended image. This can be slow on some networks.</div>
               </div>
             ) : (
               <div className="text-gray-300 text-sm">
@@ -92,16 +97,16 @@ export function FirmwareProgressModal({
             <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
               <div
                 className={`h-full transition-all duration-300 ${
-                  firmware.last_error ? 'bg-red-500' : progress === 100 ? 'bg-green-500' : 'bg-rs-blue'
+                  firmware.last_error ? 'bg-red-500' : done ? 'bg-green-500' : 'bg-rs-blue'
                 }`}
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
 
-          {!firmware.last_error && firmware.current && (
+          {!firmware.last_error && device.firmware_version && (
             <div className="mb-6 p-3 bg-gray-800 rounded text-xs text-gray-300">
-              <div>Current: <span className="text-white">{firmware.current}</span></div>
+              <div>Current: <span className="text-white">{device.firmware_version}</span></div>
             </div>
           )}
 
@@ -113,7 +118,7 @@ export function FirmwareProgressModal({
               >
                 Close
               </button>
-            ) : progress === 100 ? (
+            ) : done ? (
               <button
                 onClick={onClose}
                 className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded font-medium transition-colors"

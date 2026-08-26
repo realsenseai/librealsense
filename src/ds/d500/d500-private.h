@@ -77,10 +77,8 @@ namespace librealsense
         };
 
         // D5x5 (non-safety, non-legacy) SKU family: D535 and D585 in their 2C/3C/F/proto variants.
-        // Used to gate features that are only exposed by the modern D5x5 FW branch — currently:
-        //   - interactive Triggered Calibration flow (D555 stays on the D400 OCC path;
-        //     D585S and D585_LEGACY_PID stay on the current D500 triggered-calibration flow)
-        //   - the DUAL_RGB_MODE XU (0x12) selector that toggles Dual-RGB (2C) vs Dedicated-Color (3C)
+        // Gates the DUAL_RGB_MODE XU (0x12) selector that toggles Dual-RGB (2C) vs Dedicated-Color (3C).
+        // D585S has no dual-RGB variant, so it stays out of this set — see uses_interactive_triggered_calibration below.
         static const std::set<std::uint16_t> d5x5_family_pids = {
             D535_2C_PID,
             D535_3C_PID,
@@ -92,9 +90,11 @@ namespace librealsense
             D585_3C_PROTO_PID
         };
 
+        // Interactive Triggered Calibration eligibility: D5x5 family + D585S safety.
+        // D555 stays on the D400 OCC path; D585_LEGACY_PID stays on the current D500 triggered-calibration flow.
         inline bool uses_interactive_triggered_calibration( uint16_t pid )
         {
-            return d5x5_family_pids.find( pid ) != d5x5_family_pids.end();
+            return d5x5_family_pids.count( pid ) || pid == D585S_PID;
         }
 
         static const std::map< std::uint16_t, std::string > rs500_sku_names = {

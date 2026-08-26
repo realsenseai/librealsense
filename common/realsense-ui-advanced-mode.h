@@ -210,27 +210,24 @@ inline void draw_advanced_mode_controls(rs400::advanced_mode& advanced,
 {
     if (get_curr_advanced_controls)
     {
+        // Get Current Algo Control Values
+        auto all = advanced.get_all_controls();
         for (int k = 0; k < 3; ++k)
         {
-            // Get Current Algo Control Values
-            amc.depth_controls.vals[k] = advanced.get_depth_control(k);
-            amc.rsm.vals[k] = advanced.get_rsm(k);
-            amc.rsvc.vals[k] = advanced.get_rau_support_vector_control(k);
-            amc.color_control.vals[k] = advanced.get_color_control(k);
-            amc.rctc.vals[k] = advanced.get_rau_thresholds_control(k);
-            amc.sctc.vals[k] = advanced.get_slo_color_thresholds_control(k);
-            amc.spc.vals[k] = advanced.get_slo_penalty_control(k);
-            amc.cc.vals[k] = advanced.get_color_correction(k);
-            amc.depth_table.vals[k] = advanced.get_depth_table(k);
-            amc.census.vals[k] = advanced.get_census(k);
-            amc.amp_factor.vals[k] = advanced.get_amp_factor(k);
+            amc.depth_controls.vals[k] = all.depth_control[k];
+            amc.rsm.vals[k] = all.rsm[k];
+            amc.rsvc.vals[k] = all.rsvc[k];
+            amc.color_control.vals[k] = all.color_control[k];
+            amc.rctc.vals[k] = all.rctc[k];
+            amc.sctc.vals[k] = all.sctc[k];
+            amc.spc.vals[k] = all.spc[k];
+            amc.cc.vals[k] = all.cc[k];
+            amc.depth_table.vals[k] = all.depth_table[k];
+            amc.census.vals[k] = all.census[k];
+            amc.amp_factor.vals[k] = all.amp_factor[k];
+            amc.hdad.vals[k] = all.hdad[k];
+            amc.ae.vals[k] = all.ae[k];
         }
-        amc.hdad.vals[0] = advanced.get_hdad();
-        amc.hdad.vals[1] = amc.hdad.vals[0]; //setting min/max to the same value
-        amc.hdad.vals[2] = amc.hdad.vals[0]; //setting min/max to the same value
-        amc.ae.vals[0] = advanced.get_ae_control();
-        amc.ae.vals[1] = amc.ae.vals[0]; //setting min/max to the same value
-        amc.ae.vals[2] = amc.ae.vals[0]; //setting min/max to the same value
         get_curr_advanced_controls = false;
     }
 

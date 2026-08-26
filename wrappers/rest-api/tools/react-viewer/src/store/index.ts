@@ -1,11 +1,10 @@
-import { create } from 'zustand'
+import { create, type StoreApi } from 'zustand'
 import type {
   DeviceInfo,
   SensorInfo,
   OptionInfo,
   StreamConfig,
   MetadataUpdate,
-  StreamMetadata,
   IMUData,
   ViewMode,
   DeviceState,
@@ -17,6 +16,9 @@ import type {
 // Map to track pending stop operations by "deviceId:sensorId" key
 // Used to await completion before allowing a new start
 const pendingStopPromises = new Map<string, Promise<void>>()
+
+// Enumerations are unordered across connections; only the newest response may be applied.
+let _fetchSeq = 0
 
 // Server sends point-cloud buffers as base64 strings over Socket.IO; the
 // ArrayBuffer branch is here for a future binary-attachment transport.
@@ -126,11 +128,11 @@ interface AppState {
   devices: DeviceInfo[]
   deviceStates: Record<string, DeviceState> // keyed by device_id
   isLoadingDevices: boolean
-  hasUserInteracted: boolean // Track if user manually toggled a device (skip auto-activate)
   fetchDevices: (forceRefresh?: boolean) => Promise<void>
   enableMetadata: () => Promise<{ status: string; note?: string }>
-  checkFirmwareUpdates: (deviceId: string) => Promise<void>
+  checkFirmwareUpdates: (deviceId: string) => Promise<string | undefined>
   updateFirmwareFromFile: (deviceId: string, file: File) => Promise<void>
+  updateFirmwareFromRecommended: (deviceId: string) => Promise<void>
 
   // Device activation (multi-select support)
   toggleDeviceActive: (device: DeviceInfo) => Promise<void>
@@ -143,7 +145,6 @@ interface AppState {
   fetchSensors: (deviceId: string) => Promise<void>
 
   // Per-device options
-  fetchOptions: (deviceId: string, sensorId: string) => Promise<void>
   setOption: (
     deviceId: string,
     sensorId: string,
@@ -158,10 +159,6 @@ interface AppState {
   // Per-device streaming
   startDeviceStreaming: (deviceId: string) => Promise<void>
   stopDeviceStreaming: (deviceId: string) => Promise<void>
-  startAllStreaming: () => Promise<void>
-  stopAllStreaming: () => Promise<void>
-  startStreaming: () => Promise<void>
-  stopStreaming: () => Promise<void>
 
   // Per-sensor streaming (sensor API)
   startSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
@@ -176,15 +173,9 @@ interface AppState {
   addIMUData: (type: 'accel' | 'gyro', data: IMUData) => void
   clearIMUHistory: () => void
 
-  // Point cloud (per device)
-  togglePointCloud: (deviceId?: string) => Promise<void>
-  setPointCloudVertices: (deviceIdOrVertices: string | Float32Array | null, vertices?: Float32Array | null) => void
-
   // UI state
   viewMode: ViewMode
   setViewMode: (mode: ViewMode) => Promise<void>
-  isIMUViewerExpanded: boolean
-  toggleIMUViewer: () => void
 
   // Chat/AI Assistant state
   isChatOpen: boolean
@@ -204,14 +195,46 @@ interface AppState {
   setError: (error: string | null) => void
   clearError: () => void
 
-  isStreaming: boolean
-  isPointCloudEnabled: boolean
   pointCloudVertices: Float32Array | null
   // Per-vertex RGB sampled from the live color frame on the server (1 Uint8 per
   // channel, 3 channels per vertex; aligned 1:1 with pointCloudVertices). Null
   // when the server didn't texture the cloud (no color stream / unsupported
   // format) — the 3D viewer falls back to a depth colormap in that case.
   pointCloudColors: Uint8Array | null
+}
+
+// Shared driver for both firmware-update paths (user file + recommended download):
+// flips is_updating, runs the API call (progress arrives via Socket.IO), refreshes
+// device info, and records any failure on the device's firmware state.
+async function performFirmwareUpdate(
+  set: StoreApi<AppState>['setState'],
+  get: StoreApi<AppState>['getState'],
+  deviceId: string,
+  apiCall: () => Promise<unknown>,
+): Promise<void> {
+  const setFirmwareState = (patch: Partial<FirmwareState>) =>
+    set((state) => {
+      const ds = state.deviceStates[deviceId]
+      if (!ds) return state
+      const prev = ds.firmware ?? {}
+      return { deviceStates: { ...state.deviceStates, [deviceId]: { ...ds, firmware: { ...prev, ...patch } } } }
+    })
+
+  setFirmwareState({ is_updating: true, progress: 0, last_error: null })
+
+  try {
+    await apiCall()
+    // The backend only responds once the flashed device has re-enumerated
+    // (_refresh_until_device_returns), so one forced fetch is enough to pick it up.
+    await get().fetchDevices(true)
+    setFirmwareState({ is_updating: false, progress: 1 })
+  } catch (error) {
+    const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+    const message = detail || (error instanceof Error ? error.message : 'Firmware update failed')
+    setFirmwareState({ is_updating: false, last_error: message })
+    // A request rejected outright emits no Socket.IO event, so only the caller can react.
+    throw new Error(message)
+  }
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -223,62 +246,31 @@ export const useAppStore = create<AppState>()((set, get) => ({
   devices: [],
   deviceStates: {},
   isLoadingDevices: false,
-  hasUserInteracted: false,
   
+  // Unguarded on purpose: dropping a concurrent call loses the post-flash refresh.
   fetchDevices: async (forceRefresh = false) => {
-    // Guard against concurrent fetches: a slow force-refresh must not be clobbered
-    // by a cache-hit poll that resolves after it.
-    if (get().isLoadingDevices) return
     set({ isLoadingDevices: true, error: null })
+    const seq = ++_fetchSeq
     try {
       const devices = await apiClient.getDevices(forceRefresh)
-      // Update devices list, preserve existing device states for known devices
-      set((state) => {
-        const newDeviceStates = { ...state.deviceStates }
-        // Remove states for devices that no longer exist
-        for (const deviceId of Object.keys(newDeviceStates)) {
-          if (!devices.find(d => d.device_id === deviceId)) {
-            delete newDeviceStates[deviceId]
-          }
-        }
+      // A newer enumeration already landed: this response is older than what we show.
+      if (seq !== _fetchSeq) return
+      const known = new Set(get().devices.map((d) => d.device_id))
+      // Carry over the UI state of devices that are still here; the rest drop out.
+      set((state) => ({
+        devices,
+        deviceStates: Object.fromEntries(
+          devices
+            .filter((d) => state.deviceStates[d.device_id])
+            .map((d) => [d.device_id, { ...state.deviceStates[d.device_id], device: d }]),
+        ),
+        isLoadingDevices: false,
+      }))
 
-        // Refresh device info + firmware metadata for existing device states
-        for (const device of devices) {
-          const existing = newDeviceStates[device.device_id]
-          if (existing) {
-            const baseFirmware: FirmwareState = existing.firmware || {
-              current: device.firmware_version,
-              recommended: device.recommended_firmware_version,
-              status: device.firmware_status || 'unknown',
-              file_available: device.firmware_file_available,
-              is_updating: false,
-              progress: undefined,
-              last_error: null,
-            }
-
-            const updatedFirmware: FirmwareState = {
-              ...baseFirmware,
-              current: device.firmware_version,
-              recommended: device.recommended_firmware_version,
-              status: device.firmware_status || baseFirmware.status || 'unknown',
-              file_available: device.firmware_file_available,
-            }
-
-            newDeviceStates[device.device_id] = {
-              ...existing,
-              device,
-              firmware: updatedFirmware,
-            }
-          }
-        }
-
-        return { devices, deviceStates: newDeviceStates, isLoadingDevices: false }
-      })
-      
-      // Auto-activate if exactly 1 device and user hasn't manually interacted
-      const currentState = get()
-      const activeDevices = Object.values(currentState.deviceStates).filter(ds => ds.isActive)
-      if (devices.length === 1 && activeDevices.length === 0 && !currentState.hasUserInteracted) {
+      // A camera just showed up and it is the only one: open it. Covers first load and a
+      // return from DFU alike, and leaves a camera the user closed closed.
+      const appeared = devices.filter((d) => !known.has(d.device_id))
+      if (devices.length === 1 && appeared.length === 1 && get().getActiveDevices().length === 0) {
         await get().toggleDeviceActive(devices[0])
       }
     } catch (error) {
@@ -289,74 +281,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }
   },
 
-  updateFirmwareFromFile: async (deviceId: string, file: File) => {
-    set((state) => {
-      const ds = state.deviceStates[deviceId]
-      if (!ds) return state
-      const prev = ds.firmware || {
-        status: 'unknown' as FirmwareState['status'],
-        current: ds.device.firmware_version,
-        recommended: ds.device.recommended_firmware_version,
-        file_available: ds.device.firmware_file_available,
-      }
-      const nextFirmware: FirmwareState = {
-        ...prev,
-        status: prev.status ?? 'unknown',
-        is_updating: true,
-        progress: 0,
-        last_error: null,
-      }
-      return {
-        deviceStates: {
-          ...state.deviceStates,
-          [deviceId]: { ...ds, firmware: nextFirmware },
-        },
-      }
-    })
+  updateFirmwareFromFile: (deviceId: string, file: File) =>
+    performFirmwareUpdate(set, get, deviceId, () => apiClient.updateFirmwareFromFile(deviceId, file)),
 
-    try {
-      await apiClient.updateFirmwareFromFile(deviceId, file)
-      await get().fetchDevices()
-      set((state) => {
-        const ds = state.deviceStates[deviceId]
-        if (!ds) return state
-        const prev = ds.firmware || { status: 'unknown' as FirmwareState['status'] }
-        const next: FirmwareState = { ...prev, status: prev.status ?? 'unknown', is_updating: false, progress: 1 }
-        return {
-          deviceStates: {
-            ...state.deviceStates,
-            [deviceId]: { ...ds, firmware: next },
-          },
-        }
-      })
-    } catch (error) {
-      // Prefer FastAPI's detail string when available.
-      const axiosDetail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      const message = typeof axiosDetail === 'string' && axiosDetail
-        ? axiosDetail
-        : error instanceof Error ? error.message : 'Firmware update failed'
-      // Surface the error only on the device's firmware state — the modal and
-      // toast (driven by the Socket.IO failure event) already inform the user;
-      // setting the global `error` banner here would triple-render the message.
-      set((state) => {
-        const ds = state.deviceStates[deviceId]
-        if (!ds) return state
-        const prev = ds.firmware || { status: 'unknown' as FirmwareState['status'] }
-        const next: FirmwareState = {
-          ...prev,
-          status: prev.status ?? 'unknown',
-          is_updating: false,
-          last_error: message,
-        }
-        return {
-          deviceStates: {
-            ...state.deviceStates,
-            [deviceId]: { ...ds, firmware: next },
-          },
-        }
-      })
-    }
-  },
+  updateFirmwareFromRecommended: (deviceId: string) =>
+    performFirmwareUpdate(set, get, deviceId, () => apiClient.updateFirmwareFromRecommended(deviceId)),
 
   enableMetadata: async () => {
     const result = await apiClient.enableMetadata()
@@ -364,44 +293,24 @@ export const useAppStore = create<AppState>()((set, get) => ({
     return result
   },
 
+  // Returns the recommendation too: a device that isn't activated has no state to store it
+  // in. Rejects on failure — reporting is the caller's business.
   checkFirmwareUpdates: async (deviceId: string) => {
-    try {
-      const firmwareStatus = await apiClient.getFirmwareStatus(deviceId)
-      set((state) => {
-        const ds = state.deviceStates[deviceId]
-        if (!ds) return state
-
-        const updatedFirmware: FirmwareState = {
-          current: firmwareStatus.current || ds.device.firmware_version,
-          recommended: firmwareStatus.recommended || ds.device.recommended_firmware_version,
-          status: (firmwareStatus.status as FirmwareState['status']) || 'unknown',
-          file_available: firmwareStatus.file_available,
-          is_updating: false,
-          progress: undefined,
-          last_error: null,
-        }
-
-        return {
-          deviceStates: {
-            ...state.deviceStates,
-            [deviceId]: {
-              ...ds,
-              firmware: updatedFirmware,
-            },
-          },
-        }
-      })
-    } catch (error) {
-      set({
-        error: `Failed to check firmware updates: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      })
-    }
+    const { recommended } = await apiClient.getRecommendedFirmware(deviceId)
+    set((state) => {
+      const ds = state.deviceStates[deviceId]
+      if (!ds) return state
+      return {
+        deviceStates: {
+          ...state.deviceStates,
+          [deviceId]: { ...ds, firmware: { ...ds.firmware, recommended } },
+        },
+      }
+    })
+    return recommended
   },
 
   toggleDeviceActive: async (device: DeviceInfo) => {
-    // Mark that user has interacted (skip future auto-activation)
-    set({ hasUserInteracted: true })
-    
     const state = get()
     const existing = state.deviceStates[device.device_id]
     
@@ -419,15 +328,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       // Activate: create device state and fetch sensors
       const deviceState: DeviceState = {
         device,
-        firmware: {
-          current: device.firmware_version,
-          recommended: device.recommended_firmware_version,
-          status: device.firmware_status || 'unknown',
-          file_available: device.firmware_file_available,
-          is_updating: false,
-          progress: undefined,
-          last_error: null,
-        },
+        firmware: { is_updating: false, progress: undefined, last_error: null },
         sensors: [],
         options: {},
         streamConfigs: [],
@@ -446,6 +347,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
       
       // Fetch sensors for this device
       await get().fetchSensors(device.device_id)
+      // Best-effort: a versions-DB outage shouldn't make opening a camera look like it failed.
+      get().checkFirmwareUpdates(device.device_id).catch(() => {})
     }
   },
 
@@ -522,26 +425,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   // Per-device options
-  fetchOptions: async (deviceId, sensorId) => {
-    try {
-      const options = await apiClient.getOptions(deviceId, sensorId)
-      set((state) => ({
-        deviceStates: {
-          ...state.deviceStates,
-          [deviceId]: {
-            ...state.deviceStates[deviceId],
-            options: {
-              ...state.deviceStates[deviceId]?.options,
-              [sensorId]: options,
-            },
-          },
-        },
-      }))
-    } catch (error) {
-      console.error(`Failed to fetch options for sensor ${sensorId}:`, error)
-    }
-  },
-
   setOption: async (deviceId, sensorId, optionId, value) => {
     try {
       await apiClient.setOption(deviceId, sensorId, optionId, value)
@@ -741,36 +624,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         },
       }))
     }
-  },
-
-  startAllStreaming: async () => {
-    const state = get()
-    const activeDevices = Object.values(state.deviceStates).filter(ds => ds.isActive)
-    
-    for (const deviceState of activeDevices) {
-      const enabledConfigs = deviceState.streamConfigs.filter(c => c.enable)
-      if (enabledConfigs.length > 0) {
-        await get().startDeviceStreaming(deviceState.device.device_id)
-      }
-    }
-  },
-
-  stopAllStreaming: async () => {
-    const state = get()
-    const streamingDevices = Object.values(state.deviceStates).filter(ds => ds.isStreaming)
-    
-    for (const deviceState of streamingDevices) {
-      await get().stopDeviceStreaming(deviceState.device.device_id)
-    }
-  },
-
-  // Legacy streaming methods
-  startStreaming: async () => {
-    await get().startAllStreaming()
-  },
-
-  stopStreaming: async () => {
-    await get().stopAllStreaming()
   },
 
   // Per-sensor streaming (sensor API)
@@ -1053,41 +906,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
   clearIMUHistory: () => set({ imuHistory: { accel: [], gyro: [] } }),
 
-  togglePointCloud: async (deviceId?: string) => {
-    const state = get()
-    // Fall back to the first active device when caller passes no id.
-    const targetDeviceId = deviceId || Object.values(state.deviceStates).find(ds => ds.isActive)?.device.device_id
-    if (!targetDeviceId) return
-
-    const deviceState = state.deviceStates[targetDeviceId]
-    if (!deviceState) return
-
-    // Check if point cloud is currently enabled by looking at vertices
-    const hasPointCloud = deviceState.streamMetadata?.['depth']?.point_cloud !== undefined
-
-    try {
-      if (hasPointCloud) {
-        await apiClient.disablePointCloud(targetDeviceId)
-      } else {
-        await apiClient.enablePointCloud(targetDeviceId)
-      }
-    } catch (error) {
-      set({
-        error: `Failed to toggle point cloud: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      })
-    }
-  },
-
-  setPointCloudVertices: (deviceIdOrVertices: string | Float32Array | null, vertices?: Float32Array | null) => {
-    // Legacy support: if first arg is Float32Array or null, use it directly
-    if (typeof deviceIdOrVertices !== 'string') {
-      set({ pointCloudVertices: deviceIdOrVertices })
-      return
-    }
-    // New signature: deviceId, vertices - store globally for now
-    set({ pointCloudVertices: vertices || null })
-  },
-
   // UI state
   viewMode: '2d',
   setViewMode: async (mode) => {
@@ -1121,8 +939,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       })
     }
   },
-  isIMUViewerExpanded: false,
-  toggleIMUViewer: () => set((state) => ({ isIMUViewerExpanded: !state.isIMUViewerExpanded })),
 
   // Chat/AI Assistant state
   isChatOpen: false,
@@ -1320,19 +1136,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
   error: null,
   setError: (error) => set({ error }),
   clearError: () => set({ error: null }),
-
-  get isStreaming() {
-    const state = get()
-    // Return true if any device is streaming
-    return Object.values(state.deviceStates).some(ds => ds.isStreaming)
-  },
-
-  get isPointCloudEnabled() {
-    const state = get()
-    return Object.values(state.deviceStates).some(
-      ds => ds.streamMetadata?.['depth']?.point_cloud !== undefined,
-    )
-  },
 
   pointCloudVertices: null,
   pointCloudColors: null,

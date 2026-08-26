@@ -272,6 +272,7 @@ EXPORTS
     rs2_get_census
     rs2_get_amp_factor
     rs2_set_amp_factor
+    rs2_get_all_advanced_controls
     rs2_rs400_visual_preset_to_string
     rs2_l500_visual_preset_to_string
     rs2_sensor_mode_to_string

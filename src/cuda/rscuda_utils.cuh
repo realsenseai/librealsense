@@ -14,7 +14,8 @@
 #pragma comment(lib, "cudart_static")
 #endif
 
-#include "cuda-compat.h"   // RS_CUDA_MEMTYPE — single definition shared across CUDA TUs
+#include "cuda-compat.h"        // RS_CUDA_MEMTYPE — single definition shared across CUDA TUs
+#include "cuda-frame-memory.h"  // rs_frame_zc_enabled — the one place zero-copy is switched on
 
 // Throws std::runtime_error with a descriptive message if a CUDA call returns non-success.
 #define RS_CUDA_CHECK(expr) do {                                                                     \
@@ -54,6 +55,16 @@ namespace rscuda
         //   - managed (frame pool, cudaMallocManaged) -> same ptr is device-usable
         //   - host-registered mapped (V4L2 capture buffers) -> attr.devicePointer
         // Unregistered (plain malloc / discrete GPU) -> nullptr -> caller copies.
+        //
+        // Gate on the same switch rs_frame_zc_alloc() uses, so this agrees with the contract
+        // documented on rs_frame_zc_device_ptr(): zero-copy only on an integrated GPU. Without
+        // the gate, a discrete-GPU host whose driver reports pageableMemoryAccess (HMM, common
+        // on recent Linux drivers) hands back a device pointer for ordinary malloc'd frame
+        // memory, and the kernels would stream a whole frame over PCIe every call instead of
+        // taking the staging copy that is much faster there.
+        if (!librealsense::rs_frame_zc_enabled())
+            return nullptr;
+
         cudaPointerAttributes attr{};
         if (host && cudaPointerGetAttributes(&attr, host) == cudaSuccess)
         {

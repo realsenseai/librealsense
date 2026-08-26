@@ -5,6 +5,13 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 #include <librealsense2/rs_advanced_mode.hpp>
 #include <librealsense2/hpp/rs_serializable_device.hpp>
 
+// Each control group in STAdvancedModeControls is an array, which python sees as a list
+template< typename T, size_t N >
+static std::vector< T > to_list( T const ( & a )[N] )
+{
+    return std::vector< T >( a, a + N );
+}
+
 void init_advanced_mode(py::module &m) {
     /** RS400 Advanced Mode commands **/
     py::class_<STDepthControlGroup> _STDepthControlGroup(m, "STDepthControlGroup");
@@ -221,6 +228,22 @@ void init_advanced_mode(py::module &m) {
             return ss.str();
     });
 
+    // Each group holds 3 entries - [0] value, [1] min, [2] max - exposed as a list
+    py::class_< STAdvancedModeControls > advanced_controls( m, "STAdvancedModeControls" );
+    advanced_controls.def_property_readonly( "depth_control", []( STAdvancedModeControls const & self ) { return to_list( self.depth_control ); } );
+    advanced_controls.def_property_readonly( "rsm", []( STAdvancedModeControls const & self ) { return to_list( self.rsm ); } );
+    advanced_controls.def_property_readonly( "rsvc", []( STAdvancedModeControls const & self ) { return to_list( self.rsvc ); } );
+    advanced_controls.def_property_readonly( "color_control", []( STAdvancedModeControls const & self ) { return to_list( self.color_control ); } );
+    advanced_controls.def_property_readonly( "rctc", []( STAdvancedModeControls const & self ) { return to_list( self.rctc ); } );
+    advanced_controls.def_property_readonly( "sctc", []( STAdvancedModeControls const & self ) { return to_list( self.sctc ); } );
+    advanced_controls.def_property_readonly( "spc", []( STAdvancedModeControls const & self ) { return to_list( self.spc ); } );
+    advanced_controls.def_property_readonly( "hdad", []( STAdvancedModeControls const & self ) { return to_list( self.hdad ); } );
+    advanced_controls.def_property_readonly( "cc", []( STAdvancedModeControls const & self ) { return to_list( self.cc ); } );
+    advanced_controls.def_property_readonly( "depth_table", []( STAdvancedModeControls const & self ) { return to_list( self.depth_table ); } );
+    advanced_controls.def_property_readonly( "ae", []( STAdvancedModeControls const & self ) { return to_list( self.ae ); } );
+    advanced_controls.def_property_readonly( "census", []( STAdvancedModeControls const & self ) { return to_list( self.census ); } );
+    advanced_controls.def_property_readonly( "amp_factor", []( STAdvancedModeControls const & self ) { return to_list( self.amp_factor ); } );
+
     py::class_<rs400::advanced_mode> rs400_advanced_mode(m, "rs400_advanced_mode");
     rs400_advanced_mode.def(py::init<rs2::device>(), "device"_a)
         .def("toggle_advanced_mode", &rs400::advanced_mode::toggle_advanced_mode, "enable"_a)
@@ -251,6 +274,8 @@ void init_advanced_mode(py::module &m) {
         .def("get_census", &rs400::advanced_mode::get_census, "mode"_a = 0) //STCensusRadius
         .def("set_amp_factor", &rs400::advanced_mode::set_amp_factor, "group"_a)    //STAFactor
         .def("get_amp_factor", &rs400::advanced_mode::get_amp_factor, "mode"_a = 0) //STAFactor
+        .def("get_all_controls", &rs400::advanced_mode::get_all_controls,
+             "Read every control group and mode at once, in a single bulk operation")
         .def("serialize_json", &rs400::advanced_mode::serialize_json)
         .def("load_json", &rs400::advanced_mode::load_json, "json_content"_a);
 }

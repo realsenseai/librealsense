@@ -28,7 +28,7 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase()
 
-type FirmwareProgressCallback = (progress: number) => void
+type FirmwareProgressCallback = (progress: number, phase?: 'downloading' | 'installing') => void
 type FirmwareErrorCallback = (error: string) => void
 type FirmwareSuccessCallback = (firmwareVersion: string | null) => void
 
@@ -49,7 +49,10 @@ class ApiClient {
 
   onFirmwareProgress(deviceId: string, callback: FirmwareProgressCallback): () => void {
     const eventName = `firmware_progress_${deviceId}`
-    const handler = (data: unknown) => callback((data as { progress: number }).progress)
+    const handler = (data: unknown) => {
+      const d = data as { progress: number; phase?: 'downloading' | 'installing' }
+      callback(d.progress, d.phase)
+    }
     socketService.on(eventName, handler as (...args: unknown[]) => void)
     return () => socketService.off(eventName, handler as (...args: unknown[]) => void)
   }
@@ -90,18 +93,8 @@ class ApiClient {
     return response.data
   }
 
-  async getDevice(deviceId: string): Promise<DeviceInfo> {
-    const response = await this.client.get<DeviceInfo>(`/devices/${deviceId}/`)
-    return response.data
-  }
-
-  async getFirmwareStatus(deviceId: string): Promise<{
-    device_id: string
-    current?: string
-    recommended?: string
-    status: string
-    file_available?: boolean
-  }> {
+  /** The firmware version the online DB recommends for this device, if any. */
+  async getRecommendedFirmware(deviceId: string): Promise<{ recommended?: string }> {
     const response = await this.client.get(`/devices/${deviceId}/firmware/`)
     return response.data
   }
@@ -128,15 +121,17 @@ class ApiClient {
     return response.data
   }
 
+  async updateFirmwareFromRecommended(
+    deviceId: string
+  ): Promise<{ status: string; firmware_version?: string | null; progress?: number }> {
+    const response = await this.client.post(`/devices/${deviceId}/firmware/update_from_recommended`)
+    return response.data
+  }
+
   // ============ Sensors ============
 
   async getSensors(deviceId: string): Promise<SensorInfo[]> {
     const response = await this.client.get<SensorInfo[]>(`/devices/${deviceId}/sensors/`)
-    return response.data
-  }
-
-  async getSensor(deviceId: string, sensorId: string): Promise<SensorInfo> {
-    const response = await this.client.get<SensorInfo>(`/devices/${deviceId}/sensors/${sensorId}/`)
     return response.data
   }
 
@@ -145,13 +140,6 @@ class ApiClient {
   async getOptions(deviceId: string, sensorId: string): Promise<OptionInfo[]> {
     const response = await this.client.get<OptionInfo[]>(
       `/devices/${deviceId}/sensors/${sensorId}/options/`
-    )
-    return response.data
-  }
-
-  async getOption(deviceId: string, sensorId: string, optionId: string): Promise<OptionInfo> {
-    const response = await this.client.get<OptionInfo>(
-      `/devices/${deviceId}/sensors/${sensorId}/options/${optionId}/`
     )
     return response.data
   }
@@ -231,13 +219,6 @@ class ApiClient {
     return response.data
   }
 
-  async getSensorStatus(deviceId: string, sensorId: string): Promise<SensorStreamStatus> {
-    const response = await this.client.get<SensorStreamStatus>(
-      `/devices/${deviceId}/sensors/${sensorId}/status`
-    )
-    return response.data
-  }
-
   // ============ Point Cloud ============
 
   async enablePointCloud(deviceId: string): Promise<void> {
@@ -246,13 +227,6 @@ class ApiClient {
 
   async disablePointCloud(deviceId: string): Promise<void> {
     await this.client.post(`/devices/${deviceId}/point_cloud/deactivate/`)
-  }
-
-  async getPointCloudStatus(deviceId: string): Promise<{ enabled: boolean }> {
-    const response = await this.client.get<{ enabled: boolean }>(
-      `/devices/${deviceId}/point_cloud/status/`
-    )
-    return response.data
   }
 
   // ============ WebRTC ============
@@ -281,11 +255,6 @@ class ApiClient {
 
   async getICECandidates(sessionId: string): Promise<ICECandidate[]> {
     const response = await this.client.get<ICECandidate[]>(`/webrtc/sessions/${sessionId}/ice-candidates/`)
-    return response.data
-  }
-
-  async getWebRTCStatus(sessionId: string): Promise<{ status: string }> {
-    const response = await this.client.get<{ status: string }>(`/webrtc/sessions/${sessionId}/`)
     return response.data
   }
 

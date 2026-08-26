@@ -295,6 +295,12 @@ void rs2_get_amp_factor(rs2_device* dev, STAFactor* group, int mode, rs2_error**
     advanced_mode->get_amp_factor(group, mode);
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, dev, group, mode)
-void rs2_set_amp_factor(rs2_device* dev, const  STAFactor* group, rs2_error** error);
 
-void rs2_get_amp_factor(rs2_device* dev, STAFactor* group, int mode, rs2_error** error);
+void rs2_get_all_advanced_controls(rs2_device* dev, STAdvancedModeControls* controls, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(dev);
+    VALIDATE_NOT_NULL(controls);
+    auto advanced_mode = VALIDATE_INTERFACE(dev->device, librealsense::ds_advanced_mode_interface);
+    advanced_mode->get_all_controls(controls);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, dev, controls)

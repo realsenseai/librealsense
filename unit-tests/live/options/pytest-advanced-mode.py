@@ -303,6 +303,43 @@ def test_set_amp_factor(test_device_wrapped):
     assert new_af.a_factor == pytest.approx(0.12, abs=0.005)
 
 
+# (attribute on advanced_controls, the getter that reads the same group by itself)
+_ALL_CONTROLS_GROUPS = [
+    ('depth_control', 'get_depth_control'),
+    ('rsm', 'get_rsm'),
+    ('rsvc', 'get_rau_support_vector_control'),
+    ('color_control', 'get_color_control'),
+    ('rctc', 'get_rau_thresholds_control'),
+    ('sctc', 'get_slo_color_thresholds_control'),
+    ('spc', 'get_slo_penalty_control'),
+    ('hdad', 'get_hdad'),
+    ('cc', 'get_color_correction'),
+    ('depth_table', 'get_depth_table'),
+    ('ae', 'get_ae_control'),
+    ('census', 'get_census'),
+    ('amp_factor', 'get_amp_factor'),
+]
+
+
+def test_get_all_controls_matches_individual_getters(test_device_wrapped):
+    """get_all_controls reads every group and mode in one bulk operation - the values must be the ones
+    the per-group getters return. A group whose min/max FW does not report gives its value instead."""
+    if not _module_state.get('preset_ok'):
+        pytest.skip("prerequisite test_visual_preset_support failed")
+    dev, ctx = test_device_wrapped
+    am_dev = get_am_dev(dev)
+    all_controls = am_dev.get_all_controls()
+    for attr, getter in _ALL_CONTROLS_GROUPS:
+        per_mode = getattr(all_controls, attr)
+        assert len(per_mode) == 3, f"{attr}: expected a value, a minimum and a maximum"
+        for mode in (0, 1, 2):
+            try:
+                expected = getattr(am_dev, getter)(mode)
+            except RuntimeError:  # FW has no min/max for this group, so the value is expected
+                expected = getattr(am_dev, getter)(0)
+            assert repr(per_mode[mode]) == repr(expected), f"{getter} mode {mode}"
+
+
 def test_return_to_default_visual_preset(test_device_wrapped):
     if not _module_state.get('preset_ok'):
         pytest.skip("prerequisite test_visual_preset_support failed")

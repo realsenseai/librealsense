@@ -5,9 +5,6 @@ export interface DeviceInfo {
   name: string
   serial_number: string
   firmware_version?: string
-  recommended_firmware_version?: string
-  firmware_status?: FirmwareStatus
-  firmware_file_available?: boolean
   physical_port?: string
   usb_type?: string
   product_id?: string
@@ -16,14 +13,24 @@ export interface DeviceInfo {
   metadata_enabled?: boolean | null
 }
 
-export type FirmwareStatus = 'up_to_date' | 'outdated' | 'missing_file' | 'unknown'
+export type FirmwareStatus = 'up_to_date' | 'outdated' | 'unknown'
 
+/** Numeric compare of dotted firmware versions. */
+export function firmwareStatus(current?: string, recommended?: string): FirmwareStatus {
+  const parse = (v?: string) => v?.split('.').map(Number)
+  const [cur, rec] = [parse(current), parse(recommended)]
+  if (!cur || !rec || cur.some(isNaN) || rec.some(isNaN)) return 'unknown'
+  for (let i = 0; i < Math.max(cur.length, rec.length); i++) {
+    if ((cur[i] ?? 0) !== (rec[i] ?? 0)) return (cur[i] ?? 0) < (rec[i] ?? 0) ? 'outdated' : 'up_to_date'
+  }
+  return 'up_to_date'
+}
+
+// No verdict stored: it would go stale as soon as the camera reports a different version.
 export interface FirmwareState {
-  current?: string
   recommended?: string
-  status: FirmwareStatus
-  file_available?: boolean
   is_updating?: boolean
+  phase?: 'downloading' | 'installing'  // one-click update: download then install
   progress?: number
   last_error?: string | null
 }
