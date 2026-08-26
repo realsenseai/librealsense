@@ -355,26 +355,44 @@ namespace rs2
         return false;
     }
 
-    bool device_model::are_color_and_depth_streaming() const
+    void device_model::start_color_for_perception( viewer_model & viewer )
     {
-        bool has_color = false, has_depth = false;
-        for( auto const & sub : subdevices )
+        if( is_color_streaming() )
+            return;
+
+        for( auto & sub : subdevices )
         {
-            if( ! sub->streaming ) continue;
-            for( auto const & p : sub->profiles )
+            if( sub->streaming )
+                continue;
+
+            auto profiles = sub->get_selected_profiles();
+            bool has_color = false;
+            for( auto const & profile : profiles )
             {
-                if( p.stream_type() == RS2_STREAM_COLOR ) has_color = true;
-                if( p.stream_type() == RS2_STREAM_DEPTH ) has_depth = true;
+                if( profile.stream_type() == RS2_STREAM_COLOR )
+                {
+                    has_color = true;
+                    break;
+                }
             }
-            if( has_color && has_depth ) return true;
+            if( ! has_color )
+                continue;
+
+            if( ! dev_syncer )
+                dev_syncer = viewer.syncer->create_syncer();
+            sub->play( profiles, viewer, dev_syncer );
+            for( auto const & profile : profiles )
+                viewer.begin_stream( sub, profile );
+            return;
         }
-        return false;
+
+        throw std::runtime_error( "Person Detection requires an available Color profile" );
     }
 
     void device_model::stop_perception_if_video_stopped( viewer_model & viewer )
     {
-        // If color or depth are no longer both streaming, stop any perception subdevice that is still running.
-        if( are_color_and_depth_streaming() )
+        // Public Depth is optional because the OD v3 payload carries distance and COM.
+        if( is_color_streaming() )
             return;
         for( auto & sub : subdevices )
         {
@@ -2628,11 +2646,11 @@ namespace rs2
                         }
                         if (can_stream)
                         {
-                            // Disable the start button for perception streams unless color and depth are already
-                            // streaming, and while a decimation/temporal embedded filter is enabled (mutually exclusive).
+                            // Perception owns an implicit Color dependency. Public Depth is optional because
+                            // distance and COM are carried in the OD v3 payload.
                             bool sub_has_perception = subdevice_has_perception_stream_enabled( *sub );
                             bool blocking_filter_enabled = sub_has_perception && is_perception_blocking_filter_enabled();
-                            bool disable_perception = ( sub_has_perception && ! are_color_and_depth_streaming() ) || blocking_filter_enabled;
+                            bool disable_perception = blocking_filter_enabled;
                             if( disable_perception )
                                 ImGui::BeginDisabled();
 
@@ -2653,6 +2671,8 @@ namespace rs2
                                         viewer.synchronization_enable = false;
                                     }
                                     _update_readonly_options_timer.set_expired();
+                                    if( sub_has_perception )
+                                        start_color_for_perception( viewer );
                                     sub->play(profiles, viewer, dev_syncer);
                                 }
                                 catch (const error& e)
@@ -2673,14 +2693,16 @@ namespace rs2
                             {
                                 ImGui::EndDisabled();
                                 if( ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
-                                    RsImGui::CustomTooltip( blocking_filter_enabled
-                                        ? "Disable the decimation/temporal embedded filter before starting perception (cannot run together)"
-                                        : "Color and Depth streams must be streaming before starting perception" );
+                                    RsImGui::CustomTooltip(
+                                        "Disable the decimation/temporal embedded filter before starting perception (cannot run together)" );
                             }
                             else if (ImGui::IsItemHovered())
                             {
                                 window.link_hovered();
-                                RsImGui::CustomTooltip("Start streaming data from this sensor");
+                                if( sub_has_perception )
+                                    RsImGui::CustomTooltip( "Start Person Detection and its Color dependency" );
+                                else
+                                    RsImGui::CustomTooltip("Start streaming data from this sensor");
                             }
                         }
                     }

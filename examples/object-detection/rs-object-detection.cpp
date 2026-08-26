@@ -13,6 +13,7 @@
 
 #include <librealsense2/rs.hpp>
 
+#include <csignal>
 #include <iomanip>
 #include <iostream>
 
@@ -20,6 +21,13 @@
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+static volatile std::sig_atomic_t stop_streaming = 0;
+
+static void on_signal( int )
+{
+    stop_streaming = 1;
+}
 
 // Human-readable label for a class_id reported by the detection engine.
 // Extend this table to match the model deployed on your device.
@@ -40,6 +48,8 @@ static const char * class_label( int class_id )
 
 int main( int /*argc*/, char * /*argv*/[] ) try
 {
+    std::signal( SIGINT, on_signal );
+
     rs2::pipeline pipe;
     rs2::config   cfg;
 
@@ -51,7 +61,7 @@ int main( int /*argc*/, char * /*argv*/[] ) try
 
     std::cout << "Streaming — press Ctrl+C to stop.\n\n";
 
-    while( true )
+    while( ! stop_streaming )
     {
         rs2::frameset frames = pipe.wait_for_frames();
 
@@ -92,6 +102,8 @@ int main( int /*argc*/, char * /*argv*/[] ) try
         }
         std::cout << "\n";
     }
+
+    pipe.stop();
 
     return EXIT_SUCCESS;
 }
