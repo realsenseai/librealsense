@@ -675,8 +675,9 @@ void dds_device_proxy::tag_default_profile_of_stream(
         // Superset = picked up in pipeline with enable_all_stream() config
         // We want color and depth to be default, and add infrared as superset
         int tag = PROFILE_TAG_SUPERSET;
-        if( ( strcmp( stream->type_string(), "color" ) == 0 && profile->get_stream_index() == 0 ) || // Now we have cameras with more then one color stream, take the first
-              strcmp( stream->type_string(), "depth" ) == 0 )
+        // Cameras may expose more than one color stream, and more than one depth stream, so take the first of each
+        if( ( strcmp( stream->type_string(), "color" ) == 0 || strcmp( stream->type_string(), "depth" ) == 0 )
+            && profile->get_stream_index() == 0 )
             tag |= PROFILE_TAG_DEFAULT;
         else if( strcmp( stream->type_string(), "ir" ) != 0 || profile->get_stream_index() >= 2 )
             return;  // leave untagged

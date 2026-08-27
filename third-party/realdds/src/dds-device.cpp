@@ -180,12 +180,13 @@ size_t dds_device::number_of_streams() const
 
 size_t dds_device::foreach_stream( std::function< void( std::shared_ptr< dds_stream > stream ) > fn ) const
 {
-    for ( auto const & stream : _impl->_streams )
+    // In declaration order: stream indices are derived from it, so it must not depend on the stream names
+    for( auto const & stream : _impl->_stream_order )
     {
-        fn( stream.second );
+        fn( stream );
     }
 
-    return _impl->_streams.size();
+    return _impl->_stream_order.size();
 }
 
 size_t dds_device::foreach_option( std::function< void( std::shared_ptr< dds_option > option ) > fn ) const

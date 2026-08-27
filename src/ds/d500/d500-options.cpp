@@ -137,6 +137,48 @@ namespace librealsense
         }
     }
 
+    d500_align_depth_option::d500_align_depth_option( const std::weak_ptr< uvc_sensor > & raw_ep )
+        : uvc_xu_option< uint8_t >( raw_ep,
+                                    ds::depth_xu,
+                                    ds::d500_xu_id::ALIGN_DEPTH,
+                                    "Device-side depth-to-color alignment. Returns Z16 in the color viewport.",
+                                    false ) // Not settable while streaming
+        , _sensor( raw_ep )
+        , _aligned( uvc_xu_option< uint8_t >::query() != 0.f )
+    {
+    }
+
+    void d500_align_depth_option::set( float value )
+    {
+        auto sensor = _sensor.lock();
+        if( sensor && sensor->is_opened() )
+            throw wrong_api_call_sequence_exception( "Align Depth cannot be changed while the sensor is open!" );
+
+        uvc_xu_option< uint8_t >::set( value );
+        update( value != 0.f );
+    }
+
+    float d500_align_depth_option::query() const
+    {
+        auto value = uvc_xu_option< uint8_t >::query();
+        update( value != 0.f );
+        return value;
+    }
+
+    bool d500_align_depth_option::is_read_only() const
+    {
+        auto sensor = _sensor.lock();
+        return sensor && sensor->is_opened();
+    }
+
+    void d500_align_depth_option::update( bool aligned ) const
+    {
+        if( _aligned.exchange( aligned ) == aligned )
+            return;
+        for( auto & observer : _observers )
+            observer( aligned );
+    }
+
     power_line_freq_option::power_line_freq_option(const std::weak_ptr< uvc_sensor >& ep, rs2_option id,
         const std::map< float, std::string >& description_per_value) :
         uvc_pu_option(ep, id, description_per_value) {}

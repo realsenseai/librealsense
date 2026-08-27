@@ -143,6 +143,7 @@ void dds_device::impl::reset()
     _server_guid = {};
     _n_streams_expected = 0;
     _streams.clear();
+    _stream_order.clear();
     _stream_header_received.clear();
     _stream_options_received.clear();
     _device_header_received = false;
@@ -887,6 +888,10 @@ void dds_device::impl::on_stream_header( json const & j, dds_sample const & samp
     DDS_THROW( runtime_error, "stream '" << stream_name << "' is of unknown type '" << stream_type << "'" );
 
 #undef TYPE2STREAM
+
+    // Streams are indexed in the order the device declares them, so remember it: the map above is sorted by
+    // name, which would hand index 0 to whichever of two same-type streams happens to sort first
+    _stream_order.push_back( stream );
 
     if( j.at( topics::notification::stream_header::key::metadata_enabled ).get< bool >() )
     {

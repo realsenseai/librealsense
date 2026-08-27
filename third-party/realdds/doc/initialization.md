@@ -135,6 +135,10 @@ Information about a specific stream:
 - `type` is one of `ir`, `depth`, `color`, `confidence`, `motion` - similar to the librealsense `rs2_stream` enum
 - `metadata-enabled` is `true` if a `metadata` topic for the device will be written to
 
+The order in which `stream-header` messages are sent is meaningful: a client assigns stream indices from it.
+Where a sensor has several streams of the same `type` and the names carry no explicit index, the first one
+declared gets index 0 and the rest follow - e.g. `Color`, then `Color/compressed` produce Color 0 and Color 1.
+
 
 ```JSON
 {
