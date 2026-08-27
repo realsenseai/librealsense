@@ -96,9 +96,14 @@ void on_open( device_interface & dev, std::vector< std::shared_ptr< stream_profi
 }
 
 
-void on_stream_duration( device_interface & dev, std::vector< std::shared_ptr< stream_profile_interface > > const & profiles, double seconds )
+std::string device_key( device_interface & dev )
 {
-    auto key = device_key_of( dev );
+    return device_key_of( dev );
+}
+
+
+void on_stream_duration( std::string const & key, std::vector< std::shared_ptr< stream_profile_interface > > const & profiles, double seconds )
+{
     for( auto const & p : profiles )
         if( p )
             rum_collector::instance().record_stream_duration( key, label_of( p ), seconds );

@@ -669,7 +669,7 @@ void log_callback_end( uint32_t fps,
         _raw_sensor->start(
             make_frame_callback( [&, this]( frame_holder f ) { _formats_converter.convert_frame( f ); } ) );
 
-        _rum_timer.restart();
+        _rum_timer.restart( get_device() );
     }
 
 
@@ -677,7 +677,7 @@ void log_callback_end( uint32_t fps,
     {
         // Call before the sensor actually stops/closes/starts, so is_streaming() still reflects
         // the interval being closed.
-        _rum_timer.record( is_streaming(), get_device(), get_active_streams() );
+        _rum_timer.record( is_streaming(), get_active_streams() );
     }
 
     void synthetic_sensor::stop()

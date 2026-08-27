@@ -227,7 +227,7 @@ void software_sensor::start( frame_callback_ptr callback )
     _source.set_sensor( this->shared_from_this() );
     _source.set_callback( callback );
     _is_streaming = true;
-    _rum_timer.restart();
+    _rum_timer.restart( get_device() );
     raise_on_before_streaming_changes( true );
 }
 
