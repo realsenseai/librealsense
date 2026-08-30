@@ -133,6 +133,8 @@ namespace librealsense
             , extended_firmware_logger_device( dev_info, d500_device::_hw_monitor, get_firmware_logs_command() )
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
+            if( get_pid() == ds::D585_2C_PROTO_PID )
+                register_stream_group_prepare();
 
             // Improved Close Range Depth - USB toggle
             register_feature( std::make_shared< close_range_filter_feature >(

@@ -3,6 +3,7 @@
 
 #include "d500-dual-color.h"
 #include "d500-info.h"
+#include "d500-private.h"
 #include "environment.h"
 #include "metadata.h"
 #include "proc/color-formats-converter.h"  // m420_converter, nv12_converter
@@ -11,11 +12,14 @@
 #include <src/platform/uvc-option.h>
 #include <src/metadata-parser.h>
 #include <src/ds/ds-color-common.h>
+#include <src/hw-monitor.h>
 
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
 
+#include <chrono>
 #include <set>
+#include <thread>
 
 
 namespace librealsense
@@ -88,6 +92,69 @@ namespace librealsense
                                                                                           options_map,
                                                                                           false ) ); // Not settable while streaming
                                                 
+    }
+
+    void d500_dual_color::register_stream_group_prepare()
+    {
+        auto raw_sensor = get_raw_depth_sensor();
+        raw_sensor->append_on_open(
+            [this]( std::vector< platform::stream_profile > configurations ) {
+                if( _stream_group_prepare_unsupported )
+                    return;
+
+                auto const & raw_profiles = get_raw_depth_sensor()->get_raw_stream_profiles();
+
+                uint8_t expected_mask = 0;
+                for( auto const & profile : configurations )
+                {
+                    uint8_t bit = 0;
+                    if( profile.format == rs_fourcc( 'Z', '1', '6', ' ' ) )
+                        bit = 0x01;
+                    else if( profile.format == rs_fourcc( 'Y', '8', 'I', ' ' )
+                             || profile.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) )
+                        bit = 0x02;
+                    else
+                    {
+                        for( auto const & raw_profile : raw_profiles )
+                        {
+                            auto backend = dynamic_cast< backend_stream_profile const * >( raw_profile.get() );
+                            if( raw_profile->get_stream_type() != RS2_STREAM_COLOR || ! backend
+                                || backend->get_backend_profile().pin_index != profile.pin_index )
+                                continue;
+                            if( raw_profile->get_stream_index() == 1 )
+                                bit = 0x04;  // EP4 / RGB left / public Color 1
+                            else if( raw_profile->get_stream_index() == 2 )
+                                bit = 0x08;  // EP8 / RGB right / public Color 2
+                            break;
+                        }
+                    }
+
+                    if( ! bit || ( expected_mask & bit ) )
+                        throw invalid_value_exception( "invalid stream-group profile" );
+                    expected_mask |= bit;
+                }
+
+                command cmd( 0xbd, 1 );
+                cmd.data = { 3, expected_mask, 0, 0 };
+                hwmon_response_type response = ds::d500_hwmon_response::SUCCESS;
+                for( unsigned retry = 0; retry < 30; ++retry )
+                {
+                    _hw_monitor->send( cmd, &response );
+                    if( response != ds::d500_hwmon_response::SW_NOT_READY )
+                        break;
+                    std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+                }
+                // Legacy firmware has an older handler for this opcode and rejects the V3 payload by size.
+                if( response == ds::d500_hwmon_response::INVALID_COMMAND
+                    || response == ds::d500_hwmon_response::COMMAND_NOT_SUPPORTED
+                    || response == ds::d500_hwmon_response::ILLEGAL_SIZE )
+                {
+                    LOG_INFO( "D500 stream-group PREPARE unsupported; using legacy flow" );
+                    _stream_group_prepare_unsupported = true;
+                }
+                else if( response != ds::d500_hwmon_response::SUCCESS )
+                    throw invalid_value_exception( "D500 stream-group PREPARE failed" );
+            } );
     }
 
     void d500_dual_color::register_color_metadata()

@@ -390,14 +390,13 @@ void uvc_sensor::open( const stream_profiles & requests )
 
     _internal_config = commited;
 
-    if( _on_open )
-        _on_open( _internal_config );
-
-    _power = std::move( on );
-    _is_opened = true;
-
     try
     {
+        if( _on_open )
+            _on_open( _internal_config );
+
+        _power = std::move( on );
+        _is_opened = true;
         _device->stream_on( [&]( const notification & n ) { _notifications_processor->raise_notification( n ); } );
     }
     catch( const backend_exception & )          // e.g. "Device or resource busy" - keep its type

@@ -20,8 +20,11 @@ namespace librealsense
         d500_dual_color( std::shared_ptr< const d500_info > const & dev_info );
 
     protected:
+        void register_stream_group_prepare();
+
         std::shared_ptr< stream_interface > _color_stream_1;
         std::shared_ptr< stream_interface > _color_stream_2;
+        bool _stream_group_prepare_unsupported = false;
 
     private:
         void register_color_extrinsics();
