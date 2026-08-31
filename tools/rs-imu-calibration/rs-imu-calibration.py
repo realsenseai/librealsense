@@ -672,8 +672,8 @@ def main():
 
         # Per-axis IMU noise variance (diagonal of a diagonal covariance matrix,
         # under the axis-independence assumption). Sensor-fusion filters (EKF/UKF
-        # for VIO, SLAM, robot_localization, imu_filter_madgwick, PX4, ...) take
-        # these as inputs to weight the IMU against other sensors.
+        # for VIO, SLAM, robot_localization, imu_filter_madgwick, ...) take these
+        # as inputs to weight the IMU against other sensors.
         #
         # Preconditions:
         #   - Accel: device is held reasonably still at each recorded pose.
@@ -686,7 +686,7 @@ def main():
         per_bucket_var = [np.var(np.array(m), axis=0) for m in measurements if len(m) > 0]
         accel_var = None
         if per_bucket_var:
-            accel_var = np.mean(np.stack(per_bucket_var), axis=0)
+            accel_var = np.mean(per_bucket_var, axis=0)
             print("\nLinear Acceleration Variance (per-axis, averaged over %d bucket(s)):" % len(per_bucket_var))
             print("  scientific: [%.6e, %.6e, %.6e]" % (accel_var[0], accel_var[1], accel_var[2]))
             print("  decimal:    [%.8f, %.8f, %.8f]" % (accel_var[0], accel_var[1], accel_var[2]))
@@ -695,7 +695,7 @@ def main():
 
         # Expected gyro shape is (N, 4): [timestamp, x, y, z]. File mode gets this
         # from np.loadtxt on the CSV; interactive mode gets it from imu_wrapper
-        # which appends timestamp + xyz per sample (see imu_callback L132).
+        # which appends timestamp + xyz per sample (see imu_wrapper.imu_callback).
         # Anything else - e.g. a malformed CSV with no timestamp column or with
         # extra columns - would silently compute variance over the wrong axes,
         # so bail out with an explicit message instead.
