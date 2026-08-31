@@ -581,6 +581,7 @@ def main():
         buckets_labels = ["Mounting screw pointing down, device facing out", "Mounting screw pointing left, device facing out", "Mounting screw pointing up, device facing out", "Mounting screw pointing right, device facing out", "Viewing direction facing down", "Viewing direction facing up"]
 
         gyro_bais = np.zeros(3, np.float32)
+        gyro = None
         old_settings = None
         if accel_file:
             if gyro_file:
@@ -669,24 +670,37 @@ def main():
         print("singular:", singular)
         check_X(X, w[:,:3], show_graph)
 
-        # Calculate Accelerometer Variance (using the first static bucket)
-        accel_data = np.array(measurements[0]) 
-        accel_var = np.var(accel_data, axis=0) 
+        # Per-axis IMU noise variance (diagonal of a diagonal covariance matrix,
+        # under the axis-independence assumption). Sensor-fusion filters (EKF/UKF
+        # for VIO, SLAM, robot_localization, imu_filter_madgwick, PX4, ...) take
+        # these as inputs to weight the IMU against other sensors.
+        #
+        # Preconditions:
+        #   - Accel: device is held reasonably still at each recorded pose.
+        #     Variance is averaged across all populated buckets so a single shaky
+        #     pose can't dominate the estimate.
+        #   - Gyro: the sample window used here is a still-hold portion. In file
+        #     mode this is the first ~4 s of the capture (already trimmed above
+        #     for gyro-bias). In interactive mode it is the last bucket's
+        #     stability window returned by imu_wrapper.get_measurements().
+        per_bucket_var = [np.var(np.array(m), axis=0) for m in measurements if len(m) > 0]
+        accel_var = None
+        if per_bucket_var:
+            accel_var = np.mean(np.stack(per_bucket_var), axis=0)
+            print("\nLinear Acceleration Variance (per-axis, averaged over %d bucket(s)):" % len(per_bucket_var))
+            print("  scientific: [%.6e, %.6e, %.6e]" % (accel_var[0], accel_var[1], accel_var[2]))
+            print("  decimal:    [%.8f, %.8f, %.8f]" % (accel_var[0], accel_var[1], accel_var[2]))
+        else:
+            print("\nLinear Acceleration Variance: no accelerometer samples collected in any bucket - skipping.")
 
-        print("\nLinear Acceleration Covariance (diagonal values):")
-        print("Scientific Notation:")
-        print(accel_var)
-        print("Basic Notation:")
-        print(f"[{accel_var[0]:.8f}, {accel_var[1]:.8f}, {accel_var[2]:.8f}]")
-
-        # Calculate Gyroscope Variance
-        gyro_var = np.var(gyro[:, 1:], axis=0) 
-
-        print("\nAngular Velocity Covariance (diagonal values):")
-        print("Scientific Notation:")
-        print(gyro_var)
-        print("Basic Notation:")
-        print(f"[{gyro_var[0]:.8f}, {gyro_var[1]:.8f}, {gyro_var[2]:.8f}]")
+        gyro_var = None
+        if gyro is not None and gyro.ndim == 2 and gyro.shape[0] > 0:
+            gyro_var = np.var(gyro[:, 1:], axis=0)
+            print("\nAngular Velocity Variance (per-axis, from still-hold window):")
+            print("  scientific: [%.6e, %.6e, %.6e]" % (gyro_var[0], gyro_var[1], gyro_var[2]))
+            print("  decimal:    [%.8f, %.8f, %.8f]" % (gyro_var[0], gyro_var[1], gyro_var[2]))
+        else:
+            print("\nAngular Velocity Variance: no gyro samples available - skipping.")
 
         calibration = {}
 
@@ -697,9 +711,13 @@ def main():
         calibration["imus"][0]["accelerometer"] = {}
         calibration["imus"][0]["accelerometer"]["scale_and_alignment"] = X.flatten()[:9].tolist()
         calibration["imus"][0]["accelerometer"]["bias"] = X.flatten()[9:].tolist()
+        if accel_var is not None:
+            calibration["imus"][0]["accelerometer"]["noise_variances"] = accel_var.tolist()
         calibration["imus"][0]["gyroscope"] = {}
         calibration["imus"][0]["gyroscope"]["scale_and_alignment"] = np.eye(3).flatten().tolist()
         calibration["imus"][0]["gyroscope"]["bias"] = gyro_bais.tolist()
+        if gyro_var is not None:
+            calibration["imus"][0]["gyroscope"]["noise_variances"] = gyro_var.tolist()
         json_data = json.dumps(calibration, indent=4, sort_keys=True)
 
         directory = os.path.dirname(accel_file) if accel_file else '.'
