@@ -693,14 +693,22 @@ def main():
         else:
             print("\nLinear Acceleration Variance: no accelerometer samples collected in any bucket - skipping.")
 
+        # Expected gyro shape is (N, 4): [timestamp, x, y, z]. File mode gets this
+        # from np.loadtxt on the CSV; interactive mode gets it from imu_wrapper
+        # which appends timestamp + xyz per sample (see imu_callback L132).
+        # Anything else - e.g. a malformed CSV with no timestamp column or with
+        # extra columns - would silently compute variance over the wrong axes,
+        # so bail out with an explicit message instead.
         gyro_var = None
-        if gyro is not None and gyro.ndim == 2 and gyro.shape[0] > 0:
+        if gyro is not None and gyro.ndim == 2 and gyro.shape[0] > 0 and gyro.shape[1] == 4:
             gyro_var = np.var(gyro[:, 1:], axis=0)
             print("\nAngular Velocity Variance (per-axis, from still-hold window):")
             print("  scientific: [%.6e, %.6e, %.6e]" % (gyro_var[0], gyro_var[1], gyro_var[2]))
             print("  decimal:    [%.8f, %.8f, %.8f]" % (gyro_var[0], gyro_var[1], gyro_var[2]))
-        else:
+        elif gyro is None or (hasattr(gyro, 'size') and gyro.size == 0):
             print("\nAngular Velocity Variance: no gyro samples available - skipping.")
+        else:
+            print("\nAngular Velocity Variance: unexpected gyro shape %s (expected (N, 4) with columns [timestamp, x, y, z]) - skipping." % (gyro.shape,))
 
         calibration = {}
 
