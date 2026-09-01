@@ -664,7 +664,7 @@ namespace librealsense
         p.rsm.diffThresh = 1.65625f;
         p.rsm.removeThresh = 136;
         p.rsm.rsmBypass = 0;
-        p.rsm.sloRauDiffThresh = 0.785714f;
+        p.rsm.sloRauDiffThresh = 0.78125f;
         p.rsvc.minEast = 6;
         p.rsvc.minNorth = 3;
         p.rsvc.minNSsum = 7;
