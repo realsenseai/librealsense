@@ -7,14 +7,44 @@ import pyrealsense2 as rs
 
 # device_each supplies the camera; the ENABLE_STATS gate lives in the rum_report fixture (conftest),
 # which skips when the build can't produce a report.
-pytestmark = [ pytest.mark.device_each( "D400*" ), pytest.mark.device_each( "D500*" ), pytest.mark.context( "nightly" ) ]
+pytestmark = [ pytest.mark.device_each( "D400*" ), pytest.mark.device_each( "D500*" ) ]
 
 
-def depth_z16_profile( sensor ):
-    profile = next( ( p for p in sensor.get_stream_profiles()
-                      if p.stream_type() == rs.stream.depth and p.format() == rs.format.z16 ), None )
-    assert profile is not None, "device exposes no Z16 depth profile"
+def streamable_depth_profile( sensor ):
+    # The device's default depth profile - the one it actually streams - rather than an arbitrary
+    # format/resolution that may exist but not deliver frames on every model (e.g. D585S).
+    depth = [ p for p in sensor.get_stream_profiles() if p.stream_type() == rs.stream.depth ]
+    profile = next( ( p for p in depth if p.is_default() ), depth[0] if depth else None )
+    assert profile is not None, "device exposes no depth profile"
     return profile
+
+
+def recorded_stream( entry, profile ):
+    # Match the report entry against the profile we actually opened, instead of a hardcoded label.
+    vp = profile.as_video_stream_profile()
+    res = f"{vp.width()}x{vp.height()}"
+    fps = f"@{profile.fps()}"
+    return next( ( s for lbl, s in ( entry or {} ).get( "streams", {} ).items()
+                   if lbl.startswith( "Depth-" ) and res in lbl and fps in lbl ), None )
+
+
+def change_an_option( sensor ):
+    # Set a non-default value on the first option the device actually accepts one for, instead of
+    # hardcoding a control that some models advertise as writable but reject on set (e.g. Laser Power
+    # on D585S). Returns (option, range, value_set).
+    for opt in sensor.get_supported_options():
+        if sensor.is_option_read_only( opt ):
+            continue
+        rng = sensor.get_option_range( opt )
+        if rng.min >= rng.max:
+            continue
+        newval = rng.min if rng.default != rng.min else rng.max
+        try:
+            sensor.set_option( opt, newval )
+        except Exception:
+            continue   # advertised writable but the device rejects the write - try the next
+        return opt, rng, newval
+    return None, None, None
 
 
 def device_entry( report, dev ):
@@ -35,14 +65,12 @@ def test_created_device_appears_in_report( test_device, rum_report ):
 def test_opened_stream_appears_in_report( test_device, rum_report ):
     dev, _ = test_device
     sensor = dev.first_depth_sensor()
-    sensor.open( depth_z16_profile( sensor ) )       # triggers the stream hook
+    profile = streamable_depth_profile( sensor )
+    sensor.open( profile )                            # triggers the stream hook
     try:
-        # streams is an object keyed by "<type>-<format>-<WxH>@<fps>"; type/format/res live in the label.
-        streams = ( device_entry( rum_report(), dev ) or {} ).get( "streams", {} )
-        label = next( ( lbl for lbl in streams if lbl.startswith( "Depth-Z16-" ) ), None )
-        assert label is not None
-        assert "x" in label and "@" in label         # resolution and fps encoded in the label
-        assert streams[ label ].get( "count", 0 ) >= 1
+        stream = recorded_stream( device_entry( rum_report(), dev ), profile )
+        assert stream is not None                     # the profile we opened is in the report
+        assert stream.get( "count", 0 ) >= 1
     finally:
         sensor.close()
 
@@ -52,7 +80,8 @@ def test_applied_filter_and_stream_duration( test_device, rum_report ):
     sensor = dev.first_depth_sensor()
     queue = rs.frame_queue( 8 )
     spatial = rs.spatial_filter()
-    sensor.open( depth_z16_profile( sensor ) )
+    profile = streamable_depth_profile( sensor )
+    sensor.open( profile )
     sensor.start( queue )
     try:
         for _ in range( 10 ):
@@ -64,8 +93,8 @@ def test_applied_filter_and_stream_duration( test_device, rum_report ):
     assert entry is not None
     # filters are tallied per device (name -> use count).
     assert entry.get( "filters", {} ).get( "Spatial Filter", 0 ) >= 1
-    # The depth stream above (start -> stop) accumulates duration on its stream config.
-    depth = next( ( s for lbl, s in entry.get( "streams", {} ).items() if lbl.startswith( "Depth-Z16-" ) ), None )
+    # The depth stream above (start -> stop) accumulates duration on the profile we streamed.
+    depth = recorded_stream( entry, profile )
     assert depth is not None
     assert depth.get( "duration_seconds", 0 ) > 0
 
@@ -73,16 +102,12 @@ def test_applied_filter_and_stream_duration( test_device, rum_report ):
 def test_non_default_option_in_options_changed( test_device, rum_report ):
     dev, _ = test_device
     sensor = dev.first_depth_sensor()
-    opt = rs.option.laser_power
-    if not sensor.supports( opt ):
-        pytest.skip( "device has no Laser Power option" )
-    rng = sensor.get_option_range( opt )
-    newval = rng.min if rng.default != rng.min else rng.max
-    sensor.set_option( opt, newval )
+    opt, rng, newval = change_an_option( sensor )
+    assert opt is not None, "device exposes no settable option"
     try:
-        # options_changed is per device, keyed by option name.
+        # options_changed is per device, keyed by option name (str(opt) == the report's key).
         changed = ( device_entry( rum_report(), dev ) or {} ).get( "options_changed", {} )
-        entry = changed.get( "Laser Power" )
+        entry = changed.get( str( opt ) )
         assert entry is not None
         assert entry.get( "set_count", 0 ) >= 1
         assert entry.get( "last_value" ) == newval
