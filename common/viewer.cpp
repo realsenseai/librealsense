@@ -4348,25 +4348,35 @@ namespace rs2
             draw_zone_3d(Zone::Diagnostic, labeled_points);
         }
 
-        glBegin(GL_POINTS);
+        const rs2::vertex* vertices = nullptr;
+        const uint8_t* labels = nullptr;
+        size_t vertices_size = 0;
+        try
         {
-            auto vertices = last_labeled_points.get_vertices();
-            auto vertices_size = last_labeled_points.size();
-            auto labels = last_labeled_points.get_labels();
-            auto label_to_color3f = labeled_point_cloud_utilities::get_label_to_color3f();
+            vertices = last_labeled_points.get_vertices();
+            labels = last_labeled_points.get_labels();
+            vertices_size = last_labeled_points.size();
+        }
+        catch (const std::exception& e)
+        {
+            LOG_ERROR("Failed to read labeled point cloud data: " << e.what());
+            return;
+        }
 
-            /* this segment actually renders the labeled pointcloud */
-            for (int i = 0; i < vertices_size; ++i)
-            {
-                // Set the vertex color from the label value
-                auto label = labels[i];
-                auto color = label_to_color3f[static_cast<rs2_point_cloud_label>(label)];
-                glColor3f(color.x, color.y, color.z);
+        auto label_to_color3f = labeled_point_cloud_utilities::get_label_to_color3f();
 
-                // Draw the vertex
-                rs2::vertex vtx = { vertices[i].x, vertices[i].y, vertices[i].z };
-                glVertex3fv(std::move(vtx));
-            }
+        glBegin(GL_POINTS);
+        /* this segment actually renders the labeled pointcloud */
+        for (size_t i = 0; i < vertices_size; ++i)
+        {
+            // Set the vertex color from the label value
+            auto label = labels[i];
+            auto color = label_to_color3f[static_cast<rs2_point_cloud_label>(label)];
+            glColor3f(color.x, color.y, color.z);
+
+            // Draw the vertex
+            rs2::vertex vtx = { vertices[i].x, vertices[i].y, vertices[i].z };
+            glVertex3fv(std::move(vtx));
         }
         glEnd();
 

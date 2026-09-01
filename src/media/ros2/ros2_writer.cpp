@@ -312,7 +312,7 @@ namespace librealsense
             img.is_bigendian(is_big_endian());
 
             auto data_size = static_cast<uint32_t>(lp->get_vertex_count() * lp->get_bpp() / 8);
-            auto raw = lp->get_frame_data();
+            auto raw = reinterpret_cast<const uint8_t*>(lp->get_vertices());
             img.data(std::vector<uint8_t>(raw, raw + data_size));
             img.encoding(rs2_format_to_string(lp->get_stream()->get_format()));
             img.width(data_size);

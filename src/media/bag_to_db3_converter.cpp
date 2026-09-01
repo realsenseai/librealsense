@@ -49,8 +49,15 @@ namespace librealsense
                     auto ts = frame->get_timestamp().count();
                     progress_callback(std::min(1.0f, static_cast<float>(ts) / duration_ns));
                 }
-                writer->write_frame(frame->stream_id, frame->get_timestamp(), std::move(frame->frame));
-                ++frame_count;
+                try
+                {
+                    writer->write_frame(frame->stream_id, frame->get_timestamp(), std::move(frame->frame));
+                    ++frame_count;
+                }
+                catch (const std::exception& e)
+                {
+                    LOG_WARNING("Skipping frame on stream " << frame->stream_id << ": " << e.what());
+                }
             }
             else if (auto notif = data->as<serialized_notification>())
             {
