@@ -14,7 +14,6 @@ pytestmark = [
     pytest.mark.context("nightly"),
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
-    pytest.mark.device_exclude("D585 Prototype"),  # RSDEV-12718: Permission denied on /dev/video0 after reset on Linux
     pytest.mark.timeout(60),
 ]
 

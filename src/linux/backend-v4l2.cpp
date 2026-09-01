@@ -2309,9 +2309,21 @@ namespace librealsense
             }
         }
 
+        static int open_v4l_node( const std::string & name )
+        {
+            auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds( 5 );
+            int fd;
+            // /run/udev/queue exists only while udev is still granting access to freshly created nodes.
+            while( ( fd = open( name.c_str(), O_RDWR | O_NONBLOCK, 0 ) ) < 0  &&  errno == EACCES
+                   &&  ! access( "/run/udev/queue", F_OK )
+                   &&  std::chrono::steady_clock::now() < deadline )
+                std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+            return fd;
+        }
+
         void v4l_uvc_device::map_device_descriptor()
         {
-            _fd = open(_name.c_str(), O_RDWR | O_NONBLOCK, 0);
+            _fd = open_v4l_node(_name);
             if(_fd < 0)
                 throw linux_backend_exception(rsutils::string::from() <<__FUNCTION__ << " Cannot open '" << _name);
 
@@ -2563,7 +2575,7 @@ namespace librealsense
             if (_md_fd>0)
                 throw linux_backend_exception(rsutils::string::from() << _md_name << " descriptor is already opened");
 
-            _md_fd = open(_md_name.c_str(), O_RDWR | O_NONBLOCK, 0);
+            _md_fd = open_v4l_node(_md_name);
             if(_md_fd < 0)
             {
                 return;  // Does not throw, MIPI device metadata not received through UVC, no metadata here may be valid
