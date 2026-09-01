@@ -61,6 +61,7 @@ namespace rs2
         static const textual_icon arrow_right{ u8"\uf061" };
         static const textual_icon arrow_up{ u8"\uf062" };
         static const textual_icon arrow_down{ u8"\uf063" };
+        static const textual_icon expand{ u8"\uf065" };
         static const textual_icon compress{ u8"\uf066" };
         static const textual_icon minus{ u8"\uf068" };
         static const textual_icon eye_slash{ u8"\uf070" };
@@ -69,6 +70,7 @@ namespace rs2
         static const textual_icon shopping_cart{ u8"\uf07a" };
         static const textual_icon folder_open{ u8"\uf07c" };
         static const textual_icon bar_chart{ u8"\uf080" };
+        static const textual_icon comments{ u8"\uf086" };
         static const textual_icon external_link{ u8"\uf08e" };
         static const textual_icon trophy{ u8"\uF091" };
         static const textual_icon upload{ u8"\uf093" };
@@ -76,6 +78,7 @@ namespace rs2
         static const textual_icon unlock{ u8"\uf09c" };
         static const textual_icon list_ul{ u8"\uf0ae" };
         static const textual_icon up_down_left_right{ u8"\uf0b2" };
+        static const textual_icon copy{ u8"\uf0c5" };
         static const textual_icon save{ u8"\uf0c7" };
         static const textual_icon check_square{ u8"\uf0c8" };
         static const textual_icon bars{ u8"\uf0c9" };
@@ -94,9 +97,12 @@ namespace rs2
         static const textual_icon circle_chevron_down{ u8"\uf13a" };
         static const textual_icon ellipsis_h{ u8"\uf141" };
         static const textual_icon check_square_o{ u8"\uf14a" };
+        static const textual_icon thumbs_up{ u8"\uf164" };
+        static const textual_icon thumbs_down{ u8"\uf165" };
         static const textual_icon cube{ u8"\uf1b2" };
         static const textual_icon cubes{ u8"\uf1b3" };
         static const textual_icon codepen{ u8"\uf1cb" };
+        static const textual_icon paper_plane{ u8"\uf1d8" };
         static const textual_icon wifi{ u8"\uf1eb" };
         static const textual_icon toggle_off{ u8"\uf204" };
         static const textual_icon toggle_on{ u8"\uf205" };

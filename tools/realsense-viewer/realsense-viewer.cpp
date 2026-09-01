@@ -656,6 +656,8 @@ int run_viewer( int argc, const char ** argv,
         // Fetch and process frames from queue
         viewer_model.handle_ready_frames(viewer_rect, window, static_cast<int>(device_models->size()), error_message);
 
+        viewer_model.assistant->draw(window, viewer_model.get_output_height());
+
         // Check if we need to close the window
         if( keep_alive && !keep_alive() )
             glfwSetWindowShouldClose( window, GLFW_TRUE );

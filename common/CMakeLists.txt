@@ -93,6 +93,32 @@ set(REFLECTIVITY_FILES
     "${CMAKE_CURRENT_LIST_DIR}/reflectivity/reflectivity.cpp"
     )
 
+set(ASSISTANT_FILES
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-sse-event.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-sse-parser.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-sse-parser.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-chat-config.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-chat-client.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-chat-client.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-chat-http.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-image-decoder.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-image-decoder.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-image-cache.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-image-cache.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-model.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-model.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-launcher.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-panel.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-messages.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-markdown.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-markdown-parser.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-markdown.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-ui-utils.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-ui-utils.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-text-sanitizer.h"
+    "${CMAKE_CURRENT_LIST_DIR}/assistant/assistant-text-sanitizer.cpp"
+    )
+
 set(UTILITIES_FILES
     "${CMAKE_CURRENT_LIST_DIR}/utilities/imgui/wrap.h"
     "${CMAKE_CURRENT_LIST_DIR}/utilities/imgui/wrap.cpp"
@@ -102,6 +128,7 @@ set(COMMON_SRC
     ${COMMON_SRC}
     ${SW_UPDATE_FILES}
     ${REFLECTIVITY_FILES}
+    ${ASSISTANT_FILES}
     ${UTILITIES_FILES}
     )
 
