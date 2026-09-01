@@ -2312,12 +2312,15 @@ namespace librealsense
         static int open_v4l_node( const std::string & name )
         {
             auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds( 5 );
-            int fd;
-            // /run/udev/queue exists only while udev is still granting access to freshly created nodes.
-            while( ( fd = open( name.c_str(), O_RDWR | O_NONBLOCK, 0 ) ) < 0  &&  errno == EACCES
+            int fd, open_errno = 0;
+            // /run/udev/queue exists while udev still has events pending, so a node it has not reached yet
+            // is not really ours to give up on.
+            while( ( fd = open( name.c_str(), O_RDWR | O_NONBLOCK, 0 ) ) < 0  &&  ( open_errno = errno ) == EACCES
                    &&  ! access( "/run/udev/queue", F_OK )
                    &&  std::chrono::steady_clock::now() < deadline )
                 std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+            if( fd < 0 )
+                errno = open_errno;  // access() above may have overwritten what the caller reports
             return fd;
         }
 
