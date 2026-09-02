@@ -842,11 +842,12 @@ namespace rs2
 
             // Three states, so three luminance levels -- free must stay distinguishable from
             // never-observed, which is the whole point of the -1 value.
+            // ROS map convention: free = white, occupied = black, unknown = mid-grey.
             auto level = []( uint8_t raw ) -> uint8_t {
                 const int8_t v = static_cast< int8_t >( raw );
-                return ( v < 0 ) ? 0x50           // unknown
-                     : ( v == 0 ) ? 0x00          // free
-                                  : 0xFF;         // occupied
+                return ( v < 0 ) ? 0x80           // unknown
+                     : ( v == 0 ) ? 0xFF          // free
+                                  : 0x00;         // occupied
             };
 
             std::vector< uint8_t > vec( cell_count );
