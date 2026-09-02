@@ -136,7 +136,7 @@ namespace librealsense
                        || ( pid >= 0x0C01 && pid <= 0x0C08 );    // D535 / D585 2C+3C
         if( ! d5xx )
             return false;
-        return ( pid == 0x0B6B ) ? ( mi == 13 ) : ( mi == 11 );
+        return ( pid == 0x0B6B || pid == 0x0B6A ) ? ( mi == 13 ) : ( mi == 11 );
     }
 
     namespace platform

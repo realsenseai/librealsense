@@ -1081,16 +1081,14 @@ namespace rs2
 
 
         //add_descriptions_for_d500_metadata_fields(descriptions);
-        std::string pid;
-        bool use_d585S_metadata_adaptations = false;
+        bool use_depth_mapping_metadata_adaptations = false;
         if (dev)
         {
-            pid = dev->dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
             // D555 shares the white-balance metadata quirk with the other depth-mapping
             // devices, so it rides along on the same check here.
-            use_d585S_metadata_adaptations = device_has_depth_mapping(pid);
-            if (use_d585S_metadata_adaptations)
-                add_d585S_metadata_descriptions(descriptions);
+            use_depth_mapping_metadata_adaptations = device_has_depth_mapping(dev->dev);
+            if (use_depth_mapping_metadata_adaptations)
+                add_depth_mapping_metadata_descriptions(descriptions);
 
             if (dev->dev.supports(RS2_CAMERA_INFO_CONNECTION_TYPE))
             {
@@ -1107,8 +1105,8 @@ namespace rs2
             {
                 auto val = (rs2_frame_metadata_value)i;
                 std::string name = rs2_frame_metadata_to_string(val);
-                if( use_d585S_metadata_adaptations )
-                    name = adapt_d585S_metadata_name( name );
+                if( use_depth_mapping_metadata_adaptations )
+                    name = adapt_depth_mapping_metadata_name( name );
                 std::string desc;
                 if( descriptions.find( val ) != descriptions.end() )
                     desc = descriptions[val];
@@ -1237,7 +1235,7 @@ namespace rs2
         ImGui::EndChild();
     }
 
-    void stream_model::add_d585S_metadata_descriptions(std::map<rs2_frame_metadata_value, std::string>& descriptions) const
+    void stream_model::add_depth_mapping_metadata_descriptions(std::map<rs2_frame_metadata_value, std::string>& descriptions) const
     {
         std::vector<std::string> meanings;
         descriptions[RS2_FRAME_METADATA_SAFETY_DEPTH_FRAME_COUNTER] = "Counter of the depth frame upon which the stream was calculated";
@@ -1393,7 +1391,7 @@ namespace rs2
         descriptions[RS2_FRAME_METADATA_SAFETY_SMCU_SW_MONITOR_STATUS] = "SMCU SW Monitor Status:" + get_meaning(RS2_FRAME_METADATA_SAFETY_SMCU_SW_MONITOR_STATUS, meanings, "None");
     }
 
-    std::string stream_model::adapt_d585S_metadata_name( const std::string & name ) const
+    std::string stream_model::adapt_depth_mapping_metadata_name( const std::string & name ) const
     {
         if( name == "Manual White Balance" )
             return "White Balance"; // D585S also outputs auto white balance values in this fields so the "manual" in the name is wrong

@@ -349,8 +349,8 @@ namespace librealsense
 
         convert(RS2_FORMAT_Y8, image.encoding);
         image.is_bigendian = is_big_endian();
-        auto size = labeled_points_frame->get_vertex_count() * labeled_points_frame->get_bpp() / 8;
-        auto p_data = reinterpret_cast<const uint8_t*>(labeled_points_frame->get_vertices());
+        auto size = frame->get_frame_data_size();
+        auto p_data = frame->get_frame_data();
         image.data.assign(p_data, p_data + size);
         image.header.seq = static_cast<uint32_t>(frame->get_frame_number());
         std::chrono::duration<double, std::milli> timestamp_ms(frame->get_frame_timestamp());

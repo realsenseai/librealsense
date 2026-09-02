@@ -12,9 +12,6 @@ namespace librealsense
     class d500_safety_sensor;
     class ds_advanced_mode_base;
 
-    // Reads the safety_interface_config flash table over the HW monitor. Shared by
-    // d500_safety_sensor and by d500_depth_mapping, which has no safety sensor of its
-    // own but still needs camera_position out of the same table.
     std::string read_safety_interface_config( std::shared_ptr< hw_monitor_extended_buffers > const & hw_monitor,
                                                rs2_calib_location loc = RS2_CALIB_LOCATION_RAM );
 

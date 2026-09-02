@@ -791,8 +791,7 @@ namespace rs2
             // Occupancy cells are one signed byte each: -1 unknown, 0 free, 100 occupied.
             // Two carriers exist. A MAP1 frame is self-describing -- the OCCG sub-header that
             // follows the 20-byte common header holds the geometry -- while the legacy stream
-            // reports it out-of-band in UVC metadata. Prefer the in-band form: it cannot
-            // disagree with the payload it travels with.
+            // reports it out-of-band in UVC metadata.
             int occup_cols = 0;
             int occup_rows = 0;
             const uint8_t * cells = static_cast< const uint8_t * >( data );
@@ -841,14 +840,20 @@ namespace rs2
                 return;
 
             // Three states, so three luminance levels -- free must stay distinguishable from
-            // never-observed, which is the whole point of the -1 value.
-            // ROS map convention: free = white, occupied = black, unknown = mid-grey.
-            auto level = []( uint8_t raw ) -> uint8_t {
-                const int8_t v = static_cast< int8_t >( raw );
-                return ( v < 0 ) ? 0x80           // unknown
-                     : ( v == 0 ) ? 0xFF          // free
-                                  : 0x00;         // occupied
-            };
+            // never-observed, which is the whole point of the -1 value. ROS map convention:
+            // free = white, occupied = black, unknown = mid-grey. LUT over all 256 byte values
+            // instead of a per-cell branch: this runs once per cell, per frame.
+            static const std::array< uint8_t, 256 > level_lut = []() {
+                std::array< uint8_t, 256 > lut{};
+                for( int raw = 0; raw < 256; ++raw )
+                {
+                    const int8_t v = static_cast< int8_t >( raw );
+                    lut[raw] = ( v < 0 ) ? 0x80           // unknown
+                             : ( v == 0 ) ? 0xFF          // free
+                                          : 0x00;         // occupied
+                }
+                return lut;
+            }();
 
             std::vector< uint8_t > vec( cell_count );
             int tex_cols = occup_cols;
@@ -871,14 +876,14 @@ namespace rs2
                     {
                         const int cy = occup_rows - 1 - c;              // +Y on the left
                         vec[static_cast< size_t >( r ) * tex_cols + c]
-                            = level( cells[static_cast< size_t >( cy ) * occup_cols + cx] );
+                            = level_lut[cells[static_cast< size_t >( cy ) * occup_cols + cx]];
                     }
                 }
             }
             else
             {
                 for( size_t i = 0; i < cell_count; ++i )
-                    vec[i] = level( cells[i] );
+                    vec[i] = level_lut[cells[i]];
             }
 
 

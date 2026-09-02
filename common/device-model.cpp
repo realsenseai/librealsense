@@ -3285,8 +3285,7 @@ namespace rs2
     //In order to record LPC and enable 3D we need to also record depth stereo sensor
     bool device_model::is_depth_mapping_camera_streaming_alone()
     {
-        std::string pid = dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID);
-        if (device_has_depth_mapping(pid))
+        if (device_has_depth_mapping(dev))
         {
             bool depth_mapping_sensor_streaming = false;
             bool depth_stereo_sensor_streaming = false;

@@ -51,11 +51,8 @@ namespace librealsense
         if( _is_mipi_device )
             return;
 
-        // Two transport layouts. D585S carries safety on MI 11 and mapping on MI 13; every
-        // other D5xx has no safety interface and carries mapping on MI 11 (EP12), at the
-        // smaller geometry. The layout decides the interface, the default profile and the
-        // profile filter below, so it is resolved once here.
-        _is_safety_layout = ( dev_info->get_group().uvc_devices.front().pid == D585S_PID );
+        const auto pid = dev_info->get_group().uvc_devices.front().pid;
+        _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
 
         const uint32_t mapping_stream_mi = _is_safety_layout ? 13 : 11;
         auto mapping_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, mapping_stream_mi);
@@ -122,20 +119,11 @@ namespace librealsense
         // is fully up (though it may not be the case in the device contructor's order, in ds500-factory)
         _depth_to_depth_mapping_extrinsics = std::make_shared< rsutils::lazy< rs2_extrinsics > > ( [this]()
             {
-                // The camera position lives in the safety interface config, and only the safety
-                // product answers that HW-monitor command - on every other D5xx it comes back
-                // "Invalid Command" and would throw out of rs2_get_extrinsics.
-                //
-                // Those products emit the mapping payloads already levelled, in ROS map axes:
-                // +X forward, +Y left, +Z up with the ground at Z=0 (measured: ground-labelled
-                // points sit at Z ~= 0, cliffs below it, overhead above). Consumers work in the
-                // depth/optical frame - +X right, +Y down, +Z forward - so report the fixed
-                // axis change between the two rather than identity, which would leave a ROS
-                // cloud drawn into an optical world lying on its side.
-                //
-                //   x_ros = z_opt      y_ros = -x_opt      z_ros = -y_opt
-                //
-                // stored column-major, depth -> mapping, as the extrinsics graph expects.
+                // Non-safety D5xx emit mapping payloads in ROS map axes (+X forward, +Y left,
+                // +Z up); consumers expect depth/optical axes (+X right, +Y down, +Z forward).
+                // Report the fixed conversion rather than identity:
+                //   x_ros = z_opt   y_ros = -x_opt   z_ros = -y_opt
+                // stored column-major, depth -> mapping.
                 if( ! _is_safety_layout )
                 {
                     rs2_extrinsics axes = {};
@@ -194,8 +182,7 @@ namespace librealsense
     {
         if( is_depth_mapping_active() )
         {
-            // The occupancy canvas is transposed between the two layouts, so the default
-            // profile has to follow the layout or nothing matches and no stream starts.
+            // The occupancy canvas is transposed between the two layouts.
             const int width  = _is_safety_layout ? 256 : 320;
             const int height = _is_safety_layout ? 320 : 256;
             tags.push_back( { RS2_STREAM_OCCUPANCY, -1, width, height, RS2_FORMAT_Y8, 30,
