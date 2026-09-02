@@ -1202,7 +1202,8 @@ namespace rs2
         }
 
         /**
-        * Get a specific detection by index
+        * Get a specific detection by index. The result includes center-of-mass camera and image
+        * coordinates when available; otherwise center_of_mass_valid is 0 and the COM fields are zero.
         * \param[in] index - zero-based index of the detection
         * \return rs2_object_detection - the detection at the specified index
         */

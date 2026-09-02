@@ -248,9 +248,11 @@ rs2_processing_block* rs2_create_decimation_filter_block(rs2_error** error);
 
 /**
  * Creates post-processing filter block. This block accepts frames and applies rotation filter
+ * \param[in] streams_to_rotate  array of stream types to rotate
+ * \param[in] stream_count       number of elements in the streams_to_rotate array
  * \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
  */
-rs2_processing_block * rs2_create_rotation_filter_block( rs2_streams_list streams_to_rotate, rs2_error ** error );
+rs2_processing_block * rs2_create_rotation_filter_block( const rs2_stream * streams_to_rotate, int stream_count, rs2_error ** error );
 
 /**
 * Creates Depth post-processing filter block. This block accepts depth frames, applies temporal filter

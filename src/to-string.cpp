@@ -243,6 +243,22 @@ const char * get_string( rs2_depth_auto_exposure_mode mode )
 #undef CASE
 }
 
+const char * get_string( rs2_colored_ir_auto_exposure_mode mode )
+{
+#define CASE( X ) STRCASE( COLORED_IR_AUTO_EXPOSURE, X )
+    switch( mode )
+    {
+    CASE( AUTO )
+    CASE( DEPTH_PRIORITY )
+    CASE( COLOR_PRIORITY )
+    CASE( HYBRID )
+    default:
+        assert( ! is_valid( mode ) );
+        return UNKNOWN_VALUE;
+    }
+#undef CASE
+}
+
 const char * get_string( rs2_safety_mode mode )
 {
 #define CASE( X ) STRCASE( SAFETY_MODE, X )
@@ -1037,6 +1053,7 @@ const char * rs2_calibration_status_to_string( rs2_calibration_status status ) {
 const char * rs2_host_perf_mode_to_string( rs2_host_perf_mode mode ) { return librealsense::get_string( mode ); }
 const char * rs2_emitter_frequency_mode_to_string( rs2_emitter_frequency_mode mode ) { return librealsense::get_string( mode ); }
 const char * rs2_depth_auto_exposure_mode_to_string( rs2_depth_auto_exposure_mode mode ) { return librealsense::get_string( mode ); }
+const char * rs2_colored_ir_auto_exposure_mode_to_string( rs2_colored_ir_auto_exposure_mode mode ) { return librealsense::get_string( mode ); }
 const char * rs2_safety_mode_to_string( rs2_safety_mode mode ) { return librealsense::get_string( mode ); }
 const char * rs2_d500_intercam_sync_mode_to_string( rs2_d500_intercam_sync_mode mode ) { return librealsense::get_string( mode ); }
 const char * rs2_point_cloud_label_to_string(rs2_point_cloud_label label) { return librealsense::get_string(label); }

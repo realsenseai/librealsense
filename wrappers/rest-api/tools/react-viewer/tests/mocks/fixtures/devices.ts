@@ -6,9 +6,6 @@ export const mockDevice: DeviceInfo = {
   name: 'RealSense D435',
   serial_number: '123456789',
   firmware_version: '5.16.0.1',
-  recommended_firmware_version: '5.16.0.1',
-  firmware_status: 'up_to_date',
-  firmware_file_available: true,
   physical_port: '2-3',
   usb_type: '3.2',
   product_id: '0B07',
@@ -21,9 +18,6 @@ export const mockDevice2: DeviceInfo = {
   name: 'RealSense D455',
   serial_number: '987654321',
   firmware_version: '5.15.0.0',
-  recommended_firmware_version: '5.16.0.1',
-  firmware_status: 'outdated',
-  firmware_file_available: true,
   physical_port: '2-4',
   usb_type: '3.2',
   product_id: '0B5C',
@@ -95,10 +89,7 @@ export const mockSensorConfigs: Record<string, SensorConfig> = {
 export const mockDeviceState: DeviceState = {
   device: mockDevice,
   firmware: {
-    current: '5.16.0.1',
     recommended: '5.16.0.1',
-    status: 'up_to_date',
-    file_available: true,
     is_updating: false,
     progress: undefined,
     last_error: null,
@@ -108,11 +99,9 @@ export const mockDeviceState: DeviceState = {
   streamConfigs: mockStreamConfigs,
   sensorConfigs: mockSensorConfigs,
   isStreaming: false,
-  isStopping: false,
   isActive: true,
   isLoading: false,
   streamMetadata: {},
-  streamingMode: 'idle',
   sensorStreamingStatus: {},
 }
 
@@ -124,7 +113,6 @@ export const mockDeviceStateInactive: DeviceState = {
 export const mockDeviceStateStreaming: DeviceState = {
   ...mockDeviceState,
   isStreaming: true,
-  streamingMode: 'pipeline',
   streamMetadata: {
     depth: {
       stream_type: 'depth',

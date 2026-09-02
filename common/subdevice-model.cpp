@@ -161,7 +161,7 @@ namespace rs2
         // Queue capacity is generous: even rapid slider drags coalesce into at most one
         // queued job per option (see option_model::set_option_async), so realistically
         // depth ≪ 16.
-        _set_dispatcher( std::make_shared< dispatcher >( 64u ) )
+        _set_dispatcher( std::make_shared< dispatcher >( 64u, "subdevice-set-option" ) )
     {
         // dispatcher's worker thread starts in _was_stopped=true; invoke() is a
         // silent no-op until start() is called. (The header comment claiming it
@@ -397,6 +397,32 @@ namespace rs2
         {
             auto option_value = depth_colorizer->get_option(RS2_OPTION_VISUAL_PRESET);
             depth_colorizer->set_option(RS2_OPTION_VISUAL_PRESET, option_value);
+        }
+
+        // Each preset also assigns color scheme, min/max and equalization, so the re-set above
+        // discards what restore_processing_block applied. Re-apply those, equalization last -
+        // setting min/max unsets it through the observers.
+        auto & cfg = config_file::instance();
+        for( auto opt : { RS2_OPTION_COLOR_SCHEME,
+                          RS2_OPTION_MIN_DISTANCE,
+                          RS2_OPTION_MAX_DISTANCE,
+                          RS2_OPTION_HISTOGRAM_EQUALIZATION_ENABLED } )
+        {
+            if( ! depth_colorizer->supports( opt ) )
+                continue;
+            auto key = std::string( "colorizer." ) + depth_colorizer->get_option_name( opt );
+            if( ! cfg.contains( key.c_str() ) )
+                continue;
+            try
+            {
+                float value = cfg.get( key.c_str() );
+                auto range = depth_colorizer->get_option_range( opt );
+                if( value >= range.min && value <= range.max )
+                    depth_colorizer->set_option( opt, value );
+            }
+            catch( ... )
+            {
+            }
         }
 
         std::stringstream ss;
@@ -806,6 +832,9 @@ namespace rs2
                 {
                     auto tmp = stream_enabled;
                     label = rsutils::string::from() << stream_display_names[f.first] << "##" << f.first;
+                    // Grey out streams invalid in the current D401 GMSL mode (see is_stream_mode_locked).
+                    const bool mode_locked = is_stream_mode_locked(f.first);
+                    if (mode_locked) ImGui::BeginDisabled();
                     if (ImGui::Checkbox(label.c_str(), &stream_enabled[f.first]))
                     {
                         prev_stream_enabled = tmp;
@@ -813,8 +842,7 @@ namespace rs2
 
                         if (stream_enabled[f.first])
                         {
-                            // The two imagers stream mono IR (Y8) OR Bayer color (BA81), not both,
-                            // so enabling a color stream disables IR and vice versa (depth is free).
+                            // D401 GMSL streams one mode at a time; reconcile the other streams.
                             if( is_dual_color_subdevice() )
                                 enforce_dual_color_ir_exclusion(f.first);
 
@@ -846,6 +874,7 @@ namespace rs2
                             }
                         }
                     }
+                    if (mode_locked) ImGui::EndDisabled();
                 }
             }
 
@@ -877,8 +906,13 @@ namespace rs2
                 {
                     ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 25); // Set the width for the combo box itself with a 25 buffer 
                     ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, { 1,1,1,1 });
-                    RsImGui::CustomComboBox(label.c_str(), &ui.selected_format_id[f.first], formats_chars.data(),
-                        static_cast<int>(formats_chars.size()));
+                    if (RsImGui::CustomComboBox(label.c_str(), &ui.selected_format_id[f.first], formats_chars.data(),
+                        static_cast<int>(formats_chars.size())))
+                    {
+                        // Setting Color 0 to an ISP format (non-RGB8) can't pair with raw Color 1; reconcile.
+                        if (is_dual_color_subdevice() && stream_enabled.count(f.first) && stream_enabled.at(f.first))
+                            enforce_dual_color_ir_exclusion(f.first);
+                    }
                     ImGui::PopStyleColor();
                     ImGui::PopItemWidth();
                 }
@@ -1045,10 +1079,15 @@ namespace rs2
                     res = true;
                     auto tmp = stream_enabled;
                     label = rsutils::string::from() << stream_display_names[f.first] << "##" << f.first;
+                    const bool mode_locked = is_stream_mode_locked(f.first);
+                    if (mode_locked) ImGui::BeginDisabled();
                     if (ImGui::Checkbox(label.c_str(), &stream_enabled[f.first]))
                     {
                         prev_stream_enabled = tmp;
+                        if (is_dual_color_subdevice() && stream_enabled.count(f.first) && stream_enabled.at(f.first))
+                            enforce_dual_color_ir_exclusion(f.first);
                     }
+                    if (mode_locked) ImGui::EndDisabled();
                 }
             }
 
@@ -1080,8 +1119,13 @@ namespace rs2
                 {
                     ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 25); // Set the width for the combo box itself with a 25 buffer 
                     ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, { 1,1,1,1 });
-                    RsImGui::CustomComboBox(label.c_str(), &ui.selected_format_id[f.first], formats_chars.data(),
-                        static_cast<int>(formats_chars.size()));
+                    if (RsImGui::CustomComboBox(label.c_str(), &ui.selected_format_id[f.first], formats_chars.data(),
+                        static_cast<int>(formats_chars.size())))
+                    {
+                        // Setting Color 0 to an ISP format (non-RGB8) can't pair with raw Color 1; reconcile.
+                        if (is_dual_color_subdevice() && stream_enabled.count(f.first) && stream_enabled.at(f.first))
+                            enforce_dual_color_ir_exclusion(f.first);
+                    }
                     ImGui::PopStyleColor();
                     ImGui::PopItemWidth();
                 }
@@ -1572,50 +1616,141 @@ namespace rs2
             || std::string(dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID)) != "ABCC")   // RS401_GMSL_PID
             return false;
 
-        // Structural sanity: this subdevice actually exposes the dual-RGB config (two color streams
-        // alongside the stereo streams) rather than, say, the plain depth sensor of the same device.
-        int color_streams = 0;
-        bool has_stereo = false;
+        // Treat this as a dual-RGB subdevice only when it actually exposes a second color stream
+        // (Color 1) alongside the stereo streams. This mirrors exactly what the device registers:
+        // raw dual-RGB - and therefore Color 1 - is exposed only on firmware that supports it, so on
+        // older firmware there is a single color stream and this returns false (no Color 1, no raw
+        // color format, no color<->IR gating). Distinct color stream indices, not profile count, are
+        // what separate a real second color stream from the many format/resolution profiles of a
+        // single ISP color stream.
+        bool has_color0 = false, has_second_color = false, has_stereo = false;
         for (auto&& p : profiles)
         {
             if (p.stream_type() == RS2_STREAM_COLOR)
-                ++color_streams;
+            {
+                if (p.stream_index() == 0) has_color0 = true;
+                else                       has_second_color = true;
+            }
             else if (p.stream_type() == RS2_STREAM_INFRARED || p.stream_type() == RS2_STREAM_DEPTH)
                 has_stereo = true;
         }
-        return color_streams >= 2 && has_stereo;
+        return has_color0 && has_second_color && has_stereo;
     }
 
-    void subdevice_model::enforce_dual_color_ir_exclusion(int just_enabled_unique_id)
+    bool subdevice_model::color_uid_is_raw(int unique_id) const
     {
-        // Caller gates this on is_dual_color_subdevice().
-        auto stream_type_of = [this](int unique_id) -> rs2_stream
+        // Pure format check: is this color stream currently set to RGB8. NOTE this alone does NOT mean
+        // "raw mode" - a lone Color 0 RGB8 is ISP color. Raw dual-RGB is decided by dual_rgb_active().
+        bool is_color = false;
+        for (auto&& p : profiles)
+            if (p.unique_id() == unique_id) { is_color = ( p.stream_type() == RS2_STREAM_COLOR ); break; }
+        if (!is_color)
+            return false;
+        auto fit = format_values.find(unique_id);
+        auto sit = ui.selected_format_id.find(unique_id);
+        if (fit == format_values.end() || sit == ui.selected_format_id.end())
+            return false;
+        int idx = sit->second;
+        if (idx < 0 || idx >= (int)fit->second.size())
+            return false;
+        return fit->second[idx] == RS2_FORMAT_RGB8;
+    }
+
+    rs2_stream subdevice_model::stream_type_of(int unique_id) const
+    {
+        for (auto&& p : profiles) if (p.unique_id() == unique_id) return p.stream_type();
+        return RS2_STREAM_ANY;
+    }
+
+    int subdevice_model::stream_index_of(int unique_id) const
+    {
+        for (auto&& p : profiles) if (p.unique_id() == unique_id) return p.stream_index();
+        return 0;
+    }
+
+    bool subdevice_model::dual_rgb_active() const
+    {
+        // Raw dual-RGB is active iff Color 1 (index >= 1) is enabled; a lone Color 0 (even RGB8) is ISP.
+        for (auto&& kv : stream_enabled)
+            if (kv.second && stream_type_of(kv.first) == RS2_STREAM_COLOR && stream_index_of(kv.first) >= 1)
+                return true;
+        return false;
+    }
+
+    void subdevice_model::enforce_dual_color_ir_exclusion(int changed_unique_id)
+    {
+        // Caller gates this on is_dual_color_subdevice(). Reconciles the single-mode invariant.
+        auto set_format = [this](int uid, rs2_format tgt)
         {
-            for (auto&& p : profiles)
-                if (p.unique_id() == unique_id)
-                    return p.stream_type();
-            return RS2_STREAM_ANY;
+            auto fit = format_values.find(uid);
+            if (fit == format_values.end()) return;
+            for (int i = 0; i < (int)fit->second.size(); ++i)
+                if (fit->second[i] == tgt) { ui.selected_format_id[uid] = i; return; }
         };
+        auto is_color = [this](int uid) { return stream_type_of(uid) == RS2_STREAM_COLOR; };
+        auto is_ir    = [this](int uid) { return stream_type_of(uid) == RS2_STREAM_INFRARED; };
 
-        auto is_color = [](rs2_stream st) { return st == RS2_STREAM_COLOR; };
-        auto is_ir    = [](rs2_stream st) { return st == RS2_STREAM_INFRARED; };
+        rs2_stream ct = stream_type_of(changed_unique_id);
+        if (ct != RS2_STREAM_COLOR && ct != RS2_STREAM_INFRARED)
+            return;   // depth etc. - no mode effect
 
-        rs2_stream enabled_type = stream_type_of(just_enabled_unique_id);
-        // Only color<->IR conflict (the two imagers stream mono IR OR Bayer color, not both). Depth
-        // is a separate node - enabling it clears nothing, and it survives enabling color or IR.
-        if (!is_color(enabled_type) && !is_ir(enabled_type))
-            return;
+        bool changed_on = stream_enabled.count(changed_unique_id) && stream_enabled[changed_unique_id];
+        if (!changed_on)
+            return;   // disabling a stream never forces another off
 
-        for (auto& other : stream_enabled)
+        const bool changed_is_color = is_color(changed_unique_id);
+        const int  changed_index    = stream_index_of(changed_unique_id);
+
+        if (changed_is_color && changed_index >= 1)
         {
-            if (other.first == just_enabled_unique_id || !other.second)
-                continue;
-
-            rs2_stream other_type = stream_type_of(other.first);
-            if ((is_color(enabled_type) && is_ir(other_type)) ||
-                (is_ir(enabled_type) && is_color(other_type)))
-                other.second = false;   // color and IR share the imagers -> mutually exclusive
+            // Enabling Color 1 -> raw dual-RGB: drop IR and force Color 0 to RGB8 (both pins must be raw).
+            for (auto& o : stream_enabled)
+            {
+                if (o.first == changed_unique_id || !o.second) continue;
+                if (is_ir(o.first))                                          o.second = false;
+                else if (is_color(o.first) && stream_index_of(o.first) == 0) set_format(o.first, RS2_FORMAT_RGB8);
+            }
         }
+        else if (is_ir(changed_unique_id))
+        {
+            // Enabling IR -> ISP/stereo: drop the raw-only Color 1 (Color 0 stays; RGB8 there is now ISP).
+            for (auto& o : stream_enabled)
+            {
+                if (o.first == changed_unique_id || !o.second) continue;
+                if (is_color(o.first) && stream_index_of(o.first) >= 1)
+                    o.second = false;
+            }
+        }
+        else if (changed_is_color && changed_index == 0 && !color_uid_is_raw(changed_unique_id))
+        {
+            // Color 0 on an ISP format can't pair with raw Color 1: drop Color 1.
+            for (auto& o : stream_enabled)
+            {
+                if (o.first == changed_unique_id || !o.second) continue;
+                if (is_color(o.first) && stream_index_of(o.first) >= 1)
+                    o.second = false;
+            }
+        }
+    }
+
+    bool subdevice_model::is_stream_mode_locked(int unique_id) const
+    {
+        if (!is_dual_color_subdevice())
+            return false;
+
+        const bool raw_active = dual_rgb_active();          // Color 1 enabled => raw dual-RGB
+        bool ir_active = false;
+        for (auto&& kv : stream_enabled)
+        {
+            if (kv.second && stream_type_of(kv.first) == RS2_STREAM_INFRARED) { ir_active = true; break; }
+        }
+
+        rs2_stream t = stream_type_of(unique_id);
+        if (t == RS2_STREAM_INFRARED)
+            return raw_active;                              // IR unavailable while raw dual-RGB (Color 1) streams
+        if (t == RS2_STREAM_COLOR && stream_index_of(unique_id) >= 1)
+            return ir_active;                              // Color 1 (raw) unavailable while IR streams
+        return false;                                       // depth and Color 0 work in both modes - never lock
     }
 
     bool subdevice_model::is_depth_calibration_profile() const

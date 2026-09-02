@@ -55,42 +55,6 @@ export const handlers = [
     return HttpResponse.json({ success: true, value: body.value })
   }),
 
-  // Start streaming (pipeline mode)
-  http.post(`${API_BASE}/devices/:deviceId/stream/start`, () => {
-    return HttpResponse.json({
-      is_streaming: true,
-      active_streams: ['depth'],
-      timings: {
-        refresh_devices: 0.0,
-        device_lookup: 0.001,
-        pipeline_config_init: 0.2,
-        stream_enable: 0.001,
-        pipeline_start: 0.5,
-        post_start_setup: 0.001,
-        thread_start: 0.001,
-        total: 0.7,
-      },
-    })
-  }),
-
-  // Stop streaming (pipeline mode)
-  http.post(`${API_BASE}/devices/:deviceId/stream/stop`, () => {
-    return HttpResponse.json({
-      is_streaming: false,
-      active_streams: [],
-      stopping: false,
-    })
-  }),
-
-  // Get stream status
-  http.get(`${API_BASE}/devices/:deviceId/stream/status`, () => {
-    return HttpResponse.json({
-      is_streaming: false,
-      active_streams: [],
-      stopping: false,
-    })
-  }),
-
   // Get depth range
   http.get(`${API_BASE}/devices/:deviceId/stream/depth-range`, () => {
     return HttpResponse.json({
@@ -164,16 +128,7 @@ export const handlers = [
     })
   }),
 
-  // Firmware status (bundled FW removed; recommended is always null)
-  http.get(`${API_BASE}/devices/:deviceId/firmware/`, ({ params }) => {
-    const device = mockDeviceList.find((d) => d.device_id === params.deviceId)
-    return HttpResponse.json({
-      device_id: params.deviceId,
-      current: device?.firmware_version || '5.16.0.1',
-      recommended: null,
-      status: 'unknown',
-      file_available: false,
-    })
-  }),
+  // Recommended firmware (none, unless a test says otherwise)
+  http.get(`${API_BASE}/devices/:deviceId/firmware/`, () => HttpResponse.json({ recommended: null })),
 ]
 

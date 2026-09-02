@@ -2264,17 +2264,17 @@ namespace rs2
                     if( fabs(object.mean_depth) > 0.f )
                     {
                         ImGui::PushFont( font2 );
-                        std::string str = rsutils::string::from() << std::setprecision( 2 ) << object.mean_depth << " m";
-                        auto size = ImGui::CalcTextSize( str.c_str() );
-                        if( size.y < h  &&  size.x < bbox.w )
+                        std::string const depth_str = rsutils::string::from() << std::setprecision( 2 ) << object.mean_depth << " m";
+                        auto const depth_size = ImGui::CalcTextSize( depth_str.c_str() );
+                        if( depth_size.y < h && depth_size.x < bbox.w )
                         {
                             ImGui::GetWindowDrawList()->AddRectFilled(
                                 { bbox.x + 1, bbox.y + 1 },
-                                { bbox.x + size.x + 20, bbox.y + size.y + 6 },
+                                { bbox.x + depth_size.x + 20, bbox.y + depth_size.y + 6 },
                                 bg );
                             ImGui::SetCursorScreenPos( { bbox.x + 10, bbox.y + 3 } );
-                            ImGui::Text("%s",  str.c_str() );
-                            h -= size.y;
+                            ImGui::Text( "%s", depth_str.c_str() );
+                            h -= depth_size.y;
                         }
                         ImGui::PopFont();
                     }
@@ -3019,7 +3019,7 @@ namespace rs2
 
                     ImGui::Text("ROS-bag Compression:");
                     int recording_compression = temp_cfg.get(configurations::record::compression_mode);
-                    if (ImGui::RadioButton("Always Compress (only playable using the SDK, might cause frame drops)", recording_compression == 0))
+                    if (ImGui::RadioButton("Always Compress (smaller file size, might cause frame drops)", recording_compression == 0))
                     {
                         recording_compression = 0;
                         temp_cfg.set(configurations::record::compression_mode, recording_compression);
@@ -4043,7 +4043,7 @@ namespace rs2
                 // by projecting the single COM pixel through rs2_project_color_pixel_to_depth_pixel.
                 float const depth_scale_x = float( depth_intrin.width  ) / float( color_intrin.width  );
                 float const depth_scale_y = float( depth_intrin.height ) / float( color_intrin.height );
-                // depth_bbox_full: unclipped scaled bbox — used for com_rel_u/v normalization.
+                // depth_bbox_full: unclipped scaled bbox, kept for the ROI intersection below.
                 // Clipping only affects the actual ROI sampled.
                 rs2::rect depth_bbox_full{
                     color_bbox.x * depth_scale_x, color_bbox.y * depth_scale_y,
@@ -4053,7 +4053,6 @@ namespace rs2
 
                 float const hkr_depth_m = det.depth;
                 float viewer_depth_m = 0.f;
-                float com_rel_u = 0.5f, com_rel_v = 0.5f;
 
                 // TODO: temporary fallback — viewer-side COM runs only when HKR firmware
                 // returns 0 (XU command not supported or device not ready).
@@ -4100,22 +4099,14 @@ namespace rs2
                     com::center_of_mass_calculator::calculate( com_raw, com_depth8u, com_bbox, com_center,
                                                                &com_intrin, com_result, { shift_x, shift_y } );
                     if( com_result.mean_body_depth > 0.f )
-                    {
                         viewer_depth_m = com_result.mean_body_depth / 1000.f;
-                        auto clamp01 = []( float v ) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; };
-                        if( depth_bbox_full.w > 0.f && depth_bbox_full.h > 0.f )
-                        {
-                            com_rel_u = clamp01( ( com_result.image_pos.x - depth_bbox_full.x ) / depth_bbox_full.w );
-                            com_rel_v = clamp01( ( com_result.image_pos.y - depth_bbox_full.y ) / depth_bbox_full.h );
-                        }
-                    }
                 }
 
                 float const mean_depth = hkr_depth_m > 0.f ? hkr_depth_m : viewer_depth_m;
 
                 std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
                 new_objects.emplace_back( obj_id++, name, normalized_color_bbox, normalized_depth_bbox, mean_depth,
-                                          hkr_depth_m, com_rel_u, com_rel_v, det.score,
+                                          hkr_depth_m, det.score,
                                           static_cast< object_type >( det.class_id ) );
             }
 

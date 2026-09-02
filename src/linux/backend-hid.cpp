@@ -463,7 +463,7 @@ namespace librealsense
               _sampling_frequency_name(""),
               _callback(nullptr),
               _is_capturing(false),
-              _pm_dispatcher(16)    // queue for async power management commands
+              _pm_dispatcher(16, "hid-power-mgmt")    // queue for async power management commands
         {
             init(frequency, sensitivity);
         }

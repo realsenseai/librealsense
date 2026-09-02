@@ -2,11 +2,48 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../mocks/server'
 import { useAppStore } from '@/store'
+import { firmwareStatus } from '@/api/types'
 import { resetStore, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 
 describe('AppStore', () => {
   beforeEach(() => {
     resetStore()
+  })
+
+  describe('Firmware recommendation across enumeration', () => {
+    // The device-list endpoint never consults the online versions DB, so it reports
+    // neither a recommendation nor a status for any device.
+    function enumerateWith(firmwareVersion: string) {
+      const device = createMockDevice({
+        device_id: 'fw-1',
+        serial_number: 'fw-1',
+        firmware_version: firmwareVersion,
+      })
+      server.use(http.get('/api/v1/devices/', () => HttpResponse.json([device])))
+      return device
+    }
+
+    it('keeps a learned recommendation when the device list re-enumerates', async () => {
+      const device = enumerateWith('5.17.0.10')
+      useAppStore.setState({
+        devices: [device],
+        deviceStates: {
+          'fw-1': createMockDeviceState(device, { firmware: { recommended: '5.17.3.10' } }),
+        },
+      })
+
+      await useAppStore.getState().fetchDevices()
+
+      expect(useAppStore.getState().deviceStates['fw-1'].firmware?.recommended).toBe('5.17.3.10')
+    })
+
+    it('the verdict follows the installed version without being recomputed', async () => {
+      expect(firmwareStatus('5.17.0.10', '5.17.3.10')).toBe('outdated')
+      expect(firmwareStatus('5.17.3.10', '5.17.3.10')).toBe('up_to_date')
+      expect(firmwareStatus('5.17.3.25', '5.17.3.10')).toBe('up_to_date')
+      expect(firmwareStatus(undefined, '5.17.3.10')).toBe('unknown')
+      expect(firmwareStatus('5.17.3.10', undefined)).toBe('unknown')
+    })
   })
 
   describe('Initial State', () => {
@@ -154,18 +191,6 @@ describe('AppStore', () => {
     })
   })
 
-  describe('IMU Viewer', () => {
-    it('toggles IMU viewer expanded state', () => {
-      expect(useAppStore.getState().isIMUViewerExpanded).toBe(false)
-      
-      useAppStore.getState().toggleIMUViewer()
-      expect(useAppStore.getState().isIMUViewerExpanded).toBe(true)
-      
-      useAppStore.getState().toggleIMUViewer()
-      expect(useAppStore.getState().isIMUViewerExpanded).toBe(false)
-    })
-  })
-
   describe('Device States', () => {
     it('stores device state by device_id', () => {
       const device = createMockDevice()
@@ -235,23 +260,43 @@ describe('AppStore', () => {
       )
     }
 
-    it('guards against concurrent fetches', async () => {
-      let calls = 0
+    it('never drops a caller: every fetch reaches the backend', async () => {
+      const seen: (string | null)[] = []
       server.use(
-        http.get('/api/v1/devices/', async () => {
-          calls += 1
-          // Hold the response so the second call overlaps the first.
+        http.get('/api/v1/devices/', async ({ request }) => {
+          seen.push(new URL(request.url).searchParams.get('force_refresh'))
           await new Promise((resolve) => setTimeout(resolve, 20))
           return HttpResponse.json([presentDevice])
         })
       )
 
-      const first = useAppStore.getState().fetchDevices(true)
-      // Second call starts while the first is still in flight → must short-circuit.
-      const second = useAppStore.getState().fetchDevices(true)
-      await Promise.all([first, second])
+      const cached = useAppStore.getState().fetchDevices(false)
+      await useAppStore.getState().fetchDevices(true)
+      await cached
 
-      expect(calls).toBe(1)
+      expect(seen).toEqual([null, 'true'])
+      expect(useAppStore.getState().devices.map((d) => d.device_id)).toEqual(['present-1'])
+    })
+
+    it('ignores a response older than one already applied', async () => {
+      let call = 0
+      server.use(
+        http.get('/api/v1/devices/', async () => {
+          call += 1
+          if (call === 1) {
+            // First request is slow and returns a list the second one supersedes.
+            await new Promise((resolve) => setTimeout(resolve, 40))
+            return HttpResponse.json([goneDevice])
+          }
+          return HttpResponse.json([presentDevice])
+        })
+      )
+
+      const stale = useAppStore.getState().fetchDevices()
+      await useAppStore.getState().fetchDevices()
+      await stale
+
+      expect(useAppStore.getState().devices.map((d) => d.device_id)).toEqual(['present-1'])
     })
   })
 
@@ -316,6 +361,21 @@ describe('AppStore', () => {
       const state = useAppStore.getState()
       const isAnyStreaming = Object.values(state.deviceStates).some(ds => ds.isStreaming)
       expect(isAnyStreaming).toBe(false)
+    })
+
+    it('isAnyDeviceStreaming tracks deviceStates after a state update', () => {
+      const device = createMockDevice()
+
+      expect(useAppStore.getState().isAnyDeviceStreaming()).toBe(false)
+
+      useAppStore.setState({
+        devices: [device],
+        deviceStates: {
+          [device.device_id]: createMockDeviceState(device, { isActive: true, isStreaming: true }),
+        },
+      })
+
+      expect(useAppStore.getState().isAnyDeviceStreaming()).toBe(true)
     })
   })
 })

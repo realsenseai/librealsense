@@ -9,6 +9,8 @@
 #include "usbhost.h"
 #include "../types.h"
 
+#include <rsutils/string/from.h>
+
 #include <string>
 #include <regex>
 #include <sstream>
@@ -100,13 +102,13 @@ namespace librealsense
                     auto type = e->get_type();
                     if(type == RS2_USB_ENDPOINT_INTERRUPT || type == RS2_USB_ENDPOINT_BULK)
                     {
-                        _dispatchers[e->get_address()] = std::make_shared<dispatcher>(10);
+                        _dispatchers[e->get_address()] = std::make_shared<dispatcher>(10, rsutils::string::from() << "usbhost-ep-" << (int)e->get_address());
                         auto d = _dispatchers.at(e->get_address());
                         d->start();
                     }
                 }
             }
-            _dispatcher = std::make_shared<dispatcher>(10);
+            _dispatcher = std::make_shared<dispatcher>(10, "usbhost-device");
             _dispatcher->start();
         }
 

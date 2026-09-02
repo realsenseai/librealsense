@@ -5,9 +5,6 @@ export interface DeviceInfo {
   name: string
   serial_number: string
   firmware_version?: string
-  recommended_firmware_version?: string
-  firmware_status?: FirmwareStatus
-  firmware_file_available?: boolean
   physical_port?: string
   usb_type?: string
   product_id?: string
@@ -16,14 +13,24 @@ export interface DeviceInfo {
   metadata_enabled?: boolean | null
 }
 
-export type FirmwareStatus = 'up_to_date' | 'outdated' | 'missing_file' | 'unknown'
+export type FirmwareStatus = 'up_to_date' | 'outdated' | 'unknown'
 
+/** Numeric compare of dotted firmware versions. */
+export function firmwareStatus(current?: string, recommended?: string): FirmwareStatus {
+  const parse = (v?: string) => v?.split('.').map(Number)
+  const [cur, rec] = [parse(current), parse(recommended)]
+  if (!cur || !rec || cur.some(isNaN) || rec.some(isNaN)) return 'unknown'
+  for (let i = 0; i < Math.max(cur.length, rec.length); i++) {
+    if ((cur[i] ?? 0) !== (rec[i] ?? 0)) return (cur[i] ?? 0) < (rec[i] ?? 0) ? 'outdated' : 'up_to_date'
+  }
+  return 'up_to_date'
+}
+
+// No verdict stored: it would go stale as soon as the camera reports a different version.
 export interface FirmwareState {
-  current?: string
   recommended?: string
-  status: FirmwareStatus
-  file_available?: boolean
   is_updating?: boolean
+  phase?: 'downloading' | 'installing'  // one-click update: download then install
   progress?: number
   last_error?: string | null
 }
@@ -66,20 +73,6 @@ export interface StreamConfig {
   resolution: { width: number; height: number }
   framerate: number
   enable: boolean
-}
-
-export interface StreamStartRequest {
-  configs: StreamConfig[]
-  align_to?: string
-  apply_filters: boolean
-  reuse_cache?: boolean
-}
-
-export interface StreamStatus {
-  device_id?: string
-  is_streaming: boolean
-  active_streams: string[]
-  stopping?: boolean
 }
 
 export interface WebRTCOffer {
@@ -167,12 +160,10 @@ export interface DeviceState {
   streamConfigs: StreamConfig[]
   sensorConfigs: Record<string, SensorConfig> // Per-sensor resolution/FPS, keyed by sensor_id
   isStreaming: boolean
-  isStopping?: boolean
   isActive: boolean // whether this device is shown in viewer
   isLoading: boolean // loading sensors/options
   streamMetadata: Record<string, StreamMetadata> // keyed by stream_type
   // Per-sensor streaming state (sensor API)
-  streamingMode: 'idle' | 'pipeline' | 'sensor' // which API is being used
   sensorStreamingStatus: Record<string, SensorStreamStatus> // keyed by sensor_id
 }
 

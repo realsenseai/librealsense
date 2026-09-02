@@ -26,6 +26,7 @@ namespace librealsense
     private:
         void register_color_extrinsics();
         void register_color_metadata();
+        void register_ae_policy_option();
 #if defined(_WIN32)
         void register_color_options();
 #endif

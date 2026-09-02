@@ -31,11 +31,6 @@ struct rs2_frame_callback
 };
 typedef std::shared_ptr<rs2_frame_callback> rs2_frame_callback_sptr;
 
-struct rs2_streams_list 
-{
-    std::vector< rs2_stream > list;
-};
-
 struct rs2_frame_processor_callback
 {
     virtual void                            on_frame(rs2_frame * f, rs2_source * source) = 0;

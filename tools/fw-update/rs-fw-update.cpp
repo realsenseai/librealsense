@@ -210,7 +210,7 @@ int update_recovery_device(rs2::context& ctx, rs2::cli::value<std::string>& file
     }
     try
     {
-        auto update_serial_number = recovery_device.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
+        std::string update_serial_number = recovery_device.get_info(RS2_CAMERA_INFO_FIRMWARE_UPDATE_ID);
         bool d457_recovery_device = rs2::fw_update::is_mipi_recovery_device(recovery_device);
         volatile bool recovery_device_found = false;
         ctx.set_devices_changed_callback([&](rs2::event_information& info) {
@@ -414,9 +414,7 @@ try
 
     // Recovery
     if (recover_arg.isSet())
-    {
-        update_recovery_device(ctx, file_arg);
-    }
+        return update_recovery_device(ctx, file_arg);
 
     // Update device
     ctx.set_devices_changed_callback([&](rs2::event_information& info)

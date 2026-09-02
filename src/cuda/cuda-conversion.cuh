@@ -4,7 +4,10 @@
 #ifndef CUDA_CONVERSION_CUH
 #define CUDA_CONVERSION_CUH
 
-#ifdef RS2_USE_CUDA
+// Guarded on either macro (not just RS2_USE_CUDA) so this compiles under HIP regardless of
+// whether global_config.cmake's BUILD_WITH_HIP branch also defines RS2_USE_CUDA (today, for
+// back-compat) or drops it in favor of RS2_USE_HIP alone.
+#if defined(RS2_USE_CUDA) || defined(RS2_USE_HIP)
 
 // Types
 #include <stdint.h>
@@ -12,8 +15,12 @@
 #include "assert.h"
 //#include "../types.h"
 
-// CUDA headers
+// GPU runtime headers
+#ifdef RS2_USE_HIP
+#include <hip/hip_runtime.h>
+#else
 #include <cuda_runtime.h>
+#endif
 
 //#ifdef _MSC_VER 
 // Add library dependencies if using VS
@@ -65,6 +72,6 @@ namespace rscuda
 }
 
 
-#endif // RS2_USE_CUDA
+#endif // RS2_USE_CUDA || RS2_USE_HIP
 
 #endif // LIBREALSENSE_CUDA_CONVERSION_H

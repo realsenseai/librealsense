@@ -57,6 +57,7 @@ namespace librealsense
 
             std::shared_ptr<watchdog> _watchdog;
             uint32_t _read_buff_length;
+            bool _allow_variable_length_payload = false;
             backend_frames_queue _queue;
             rs_usb_endpoint _read_endpoint;
             std::vector<rs_usb_request> _requests;

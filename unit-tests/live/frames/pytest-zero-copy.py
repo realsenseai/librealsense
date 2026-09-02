@@ -100,3 +100,63 @@ def test_zero_copy_gpu_frame_path(test_device):
             log.info("zero-copy fell back to upload (frame not GPU-resident); _or_upload address 0x%x", dev_addr)
     finally:
         pipe.stop()
+
+
+def test_capture_zero_copy_covers_depth(test_device):
+    """A zero-copy captured frame must stay GPU-resident regardless of which backend captured it.
+
+    Depth is passed through verbatim, so its frame borrows the backend capture buffer; color goes
+    through a format conversion and lands in an SDK-allocated pool frame. Both must resolve to a
+    device pointer with copied=False.
+
+    Color doubles as the capability probe: if color itself is uploaded then this build/platform has
+    no zero-copy at all (non-RS2_USE_CUDA_ZEROCOPY build, or a discrete GPU) and there is nothing to
+    assert, so the test skips. When color IS zero-copy, depth must be too - it is not if the backend
+    capture buffers are not GPU-visible.
+    """
+    dev, ctx = test_device
+    if not hasattr(rs.frame, "get_gpu_data_or_upload"):
+        pytest.skip("pyrealsense2 built without the GPU-frame API")
+
+    pipe = rs.pipeline(ctx)
+    cfg = rs.config()
+    cfg.enable_device(dev.get_info(rs.camera_info.serial_number))
+    cfg.enable_stream(rs.stream.depth, WIDTH, HEIGHT, rs.format.z16, FPS)
+    cfg.enable_stream(rs.stream.color, WIDTH, HEIGHT, rs.format.rgb8, FPS)
+    try:
+        pipe.start(cfg)
+    except RuntimeError as e:
+        pytest.skip("device cannot stream depth+color at {}x{}: {}".format(WIDTH, HEIGHT, e))
+    try:
+        for _ in range(WARMUP):
+            pipe.wait_for_frames()
+
+        copied_by_stream = {}
+        for _ in range(30):
+            frames = pipe.wait_for_frames()
+            for name, frame in (("depth", frames.get_depth_frame()),
+                                ("color", frames.get_color_frame())):
+                if not frame or name in copied_by_stream:
+                    continue
+                gpu_data = frame.get_gpu_data_or_upload()
+                if gpu_data is None:
+                    pytest.skip("no CUDA / RS2_USE_CUDA_ZEROCOPY build: GPU device pointer unavailable")
+                dev_addr, copied = gpu_data
+                assert isinstance(dev_addr, int) and dev_addr != 0, \
+                    "{}: expected a non-null CUDA device address".format(name)
+                copied_by_stream[name] = copied
+            if len(copied_by_stream) == 2:
+                break
+        assert len(copied_by_stream) == 2, \
+            "did not receive both a depth and a color frame: got {}".format(sorted(copied_by_stream))
+
+        if copied_by_stream["color"]:
+            pytest.skip("zero-copy is not active on this build/platform (color was uploaded too)")
+
+        assert not copied_by_stream["depth"], \
+            "depth was uploaded host->device while color was zero-copy, i.e. the frame borrowed a " \
+            "capture buffer the GPU cannot see. The backend capture buffers must be CUDA-visible " \
+            "(frame_data_allocator on the RSUSB path, rs_v4l2_zc_register on V4L2)."
+        log.info("zero-copy capture ACTIVE for both depth and color")
+    finally:
+        pipe.stop()

@@ -88,7 +88,13 @@ if rspy.log.nested is not None:
             "frame_id": 2,
             "number_of_detections": 1,
             "detections": [
-                { "class_id": 0, "confidence": 92, "x1": 50, "y1": 60, "x2": 200, "y2": 300, "distance": 0.0 }
+                {
+                    "class_id": 0, "confidence": 92,
+                    "x1": 50, "y1": 60, "x2": 200, "y2": 300,
+                    "distance": 2.291,
+                    "world_pos": { "x": 1.0, "y": -0.5, "z": 2.0 },
+                    "image_pos": { "x": 321.5, "y": 181.25 }
+                }
             ],
             "source_frame_id": 43,
             "version": 1
@@ -184,6 +190,8 @@ else:
                     check.equal( det0.top_left_y,     20 )
                     check.equal( det0.bottom_right_x, 100 )
                     check.equal( det0.bottom_right_y, 200 )
+                    check.equal( det0.center_of_mass_valid, 0 )
+                    check.equal( det0.world_position.z, 0.0 )
 
                     det1 = odf.get_detection( 1 )
                     check.equal( det1.class_id,       1  )
@@ -212,6 +220,13 @@ else:
                     check.equal( det.top_left_y,     60  )
                     check.equal( det.bottom_right_x, 200 )
                     check.equal( det.bottom_right_y, 300 )
+                    check.is_true( abs( det.depth - 2.291 ) < 1e-5 )
+                    check.equal( det.center_of_mass_valid, 1 )
+                    check.is_true( abs( det.world_position.x - 1.0 ) < 1e-5 )
+                    check.is_true( abs( det.world_position.y + 0.5 ) < 1e-5 )
+                    check.is_true( abs( det.world_position.z - 2.0 ) < 1e-5 )
+                    check.is_true( abs( det.center_of_mass_x - 321.5 ) < 1e-5 )
+                    check.is_true( abs( det.center_of_mass_y - 181.25 ) < 1e-5 )
 
     #
     #############################################################################################

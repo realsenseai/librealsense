@@ -6,7 +6,23 @@
 
 option(ENABLE_CCACHE "Build with ccache." ON)
 option(BUILD_WITH_CUDA "Enable CUDA" OFF)
+
+# Zero-copy GPU memory path (Jetson / integrated-GPU only). Requires BUILD_WITH_CUDA.
+# Eliminates the per-frame CPU->frame copy (capture) and the GPU host<->device round-trips.
+# Activates at runtime only on integrated GPUs; discrete GPUs keep the copy path. Default OFF
+# so a plain CUDA build is byte-for-byte identical to today.
 option(BUILD_WITH_CUDA_ZEROCOPY "Enable zero-copy GPU memory path (Jetson/integrated GPU only, requires BUILD_WITH_CUDA)" ${BUILD_WITH_CUDA})
+option(BUILD_WITH_HIP "Enable HIP/ROCm for AMD GPUs" OFF)
+# Zero-copy GPU memory path for HIP (unified-memory AMD APUs, e.g. Ryzen AI / MI300A,
+# only -- not applicable to discrete RDNA3/CDNA3 GPUs). Requires BUILD_WITH_HIP. Mirrors
+# BUILD_WITH_CUDA_ZEROCOPY: shares the same RS2_USE_CUDA_ZEROCOPY macro and the vendor-
+# neutral try_device_ptr() fast path in rscuda_utils.cuh/cuda-pointcloud.cu, which fall
+# back to the persistent-buffer copy path whenever a buffer is not pinned/mapped -- so
+# enabling this on discrete GPUs is safe (falls back every time) but pointless.
+option(BUILD_WITH_HIP_ZEROCOPY "Enable zero-copy GPU memory path (unified-memory AMD APUs only, requires BUILD_WITH_HIP)" OFF)
+
+
+
 option(BUILD_GLSL_EXTENSIONS "Build GLSL extensions API" ON)
 option(BUILD_WITH_OPENMP "Use OpenMP" OFF)
 option(BUILD_EASYLOGGINGPP "Build EasyLogging++ as a part of the build" ON)

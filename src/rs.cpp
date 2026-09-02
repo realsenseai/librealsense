@@ -3057,13 +3057,22 @@ rs2_processing_block* rs2_create_decimation_filter_block(rs2_error** error) BEGI
 }
 NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
 
-rs2_processing_block* rs2_create_rotation_filter_block( rs2_streams_list streams_to_rotate, rs2_error ** error ) BEGIN_API_CALL
+rs2_processing_block* rs2_create_rotation_filter_block( const rs2_stream * streams_to_rotate, int stream_count, rs2_error ** error ) BEGIN_API_CALL
 {
-    auto block = std::make_shared< librealsense::rotation_filter >( streams_to_rotate.list );
+    VALIDATE_LE( 0, stream_count );
+
+    std::vector< rs2_stream > streams;
+    if( stream_count > 0 )
+    {
+        VALIDATE_NOT_NULL( streams_to_rotate );
+        streams.assign( streams_to_rotate, streams_to_rotate + stream_count );
+    }
+
+    auto block = std::make_shared< librealsense::rotation_filter >( std::move( streams ) );
 
     return new rs2_processing_block{ block };
 }
-NOARGS_HANDLE_EXCEPTIONS_AND_RETURN( nullptr )
+HANDLE_EXCEPTIONS_AND_RETURN( nullptr, streams_to_rotate, stream_count )
 
 rs2_processing_block* rs2_create_temporal_filter_block(rs2_error** error) BEGIN_API_CALL
 {
@@ -5105,12 +5114,16 @@ void rs2_get_frame_object_detection(const rs2_frame* frame, unsigned int index, 
                                         std::to_string(od_frame->get_detection_count()) + ")" );
 
     const auto & entry = od_frame->get_detection( index );
-    detection->class_id       = entry.detection_type;
-    detection->score          = entry.confidence;
-    detection->top_left_x     = entry.top_left_x;
-    detection->top_left_y     = entry.top_left_y;
-    detection->bottom_right_x = entry.bottom_right_x;
-    detection->bottom_right_y = entry.bottom_right_y;
-    detection->depth          = entry.distance;
+    detection->class_id           = entry.detection_type;
+    detection->score              = entry.confidence;
+    detection->top_left_x         = entry.top_left_x;
+    detection->top_left_y         = entry.top_left_y;
+    detection->bottom_right_x     = entry.bottom_right_x;
+    detection->bottom_right_y     = entry.bottom_right_y;
+    detection->depth              = entry.distance;
+    detection->world_position     = entry.world_position;
+    detection->center_of_mass_x   = entry.image_x;
+    detection->center_of_mass_y   = entry.image_y;
+    detection->center_of_mass_valid = entry.com_valid ? 1 : 0;
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, frame, index, output_arg(detection))

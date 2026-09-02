@@ -354,8 +354,14 @@ namespace librealsense
             else
             {
                 //_length += (V4L2_BUF_TYPE_VIDEO_CAPTURE==type) ? MAX_META_DATA_SIZE : 0;
+#ifdef RS2_USE_CUDA_ZEROCOPY
+                // USERPTR: GPU-visible buffer so a zero-copy frame aliasing it stays GPU-resident (as MMAP/RSUSB do).
+                _start = static_cast<uint8_t*>(rs_frame_zc_alloc( _length ));
+                if (!_start) throw linux_backend_exception("rs_frame_zc_alloc for USERPTR buffer failed!");
+#else
                 _start = static_cast<uint8_t*>(malloc( _length));
                 if (!_start) throw linux_backend_exception("User_p allocation failed!");
+#endif
                 memset(_start, 0, _length);
             }
         }
@@ -395,7 +401,11 @@ namespace librealsense
             }
             else
             {
+#ifdef RS2_USE_CUDA_ZEROCOPY
+               rs_frame_zc_free( _start );
+#else
                free(_start);
+#endif
             }
         }
 
@@ -1258,12 +1268,17 @@ namespace librealsense
                 v4l2_fmtdesc pixel_format = {};
                 pixel_format.type = _dev.buf_type;
 
+                _variable_frame_size = false;
                 while (ioctl(_fd, VIDIOC_ENUM_FMT, &pixel_format) == 0)
                 {
                     v4l2_frmsizeenum frame_size = {};
                     frame_size.pixel_format = pixel_format.pixelformat;
 
                     uint32_t fourcc = (const big_endian<int> &)pixel_format.pixelformat;
+
+                    // V4L2_FMT_FLAG_COMPRESSED means in v4l2 if the frame size isn't fixed - sizeimage is a maximum, not exact
+                    if (fourcc == profile.format)
+                        _variable_frame_size = (pixel_format.flags & V4L2_FMT_FLAG_COMPRESSED) != 0;
 
                     if (pixel_format.pixelformat == 0)
                     {
@@ -1545,6 +1560,10 @@ namespace librealsense
                         // Relax the required frame size for compressed formats, i.e. MJPG, Z16H
                         bool compressed_format = val_in_range(_profile.format, { 0x4d4a5047U , 0x5a313648U});
 
+                        // Compressed and kernel-reported variable-size formats deliver frames shorter than the buffer,
+                        // so the size check doesn't apply - this covers the perception stream too.
+                        bool skip_partial_frame_check = compressed_format || _variable_frame_size;
+
                         // METADATA STREAM
                         // Read metadata. Metadata node performs a blocking call to ensure video and metadata sync
                         acquire_metadata(buf_mgr,fds,compressed_format);
@@ -1592,7 +1611,7 @@ namespace librealsense
                                 }
 
                                 // Drop partial and overflow frames (assumes D4XX metadata only)
-                                bool partial_frame = (!compressed_format && (buf.bytesused < buffer->get_full_length() - MAX_META_DATA_SIZE));
+                                bool partial_frame = (!skip_partial_frame_check && (buf.bytesused < buffer->get_full_length() - MAX_META_DATA_SIZE));
                                 bool overflow_frame = (buf.bytesused ==  buffer->get_length_frame_only() + MAX_META_DATA_SIZE);
                                 if (_dev.buf_type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
                                     /* metadata size is one line of profile, temporary disable validation */

@@ -8,7 +8,7 @@ In addition to streaming video and other data from devices and sensors, the Real
 
 The SDK records a single device to a single `.db3` file using the [ROS2 rosbag2](https://github.com/ros2/rosbag2) storage format (SQLite-based). The output file path must end with the `.db3` extension. This allows files recorded by the SDK to be inspected using standard ROS2-compatible tools.
 
-> **Note:** The SDK supports optional compression to reduce file size. Compressed recordings are only playable using the SDK. For compatibility with standard ROS2-compatible tools, disable compression in the viewer settings (Settings > Playback & Record > Never Compress).
+> **Note:** The SDK supports optional compression to reduce file size. Compressed recordings remain natively playable by standard ROS2 tools: video frames are stored as standard `sensor_msgs/CompressedImage` messages carrying PNG (lossless), decodable by the stock `compressed_image_transport` / `compressed_depth_image_transport` plugins. See [Playing Recordings with ROS2](#playing-recordings-with-ros2).
 
 > For example recording files, please see [Sample Data](./sample-data.md)
 
@@ -114,6 +114,33 @@ Once you select the file, the Viewer will automatically add it to the list of so
 After loading the file, you can start streaming its streams, view its controls (with the values at time of record), pause the playback, choose speed, and use the seek bar to navigate through frames.
 
 
+Playing Recordings with ROS2
+------
+
+Recordings are standard [rosbag2](https://github.com/ros2/rosbag2) files and play on a stock ROS2 installation — no librealsense required:
+
+```bash
+ros2 bag play --loop recording.db3
+```
+
+Topics published per stream (`<prefix>` = `/device_X/sensor_Y/<Stream>_<idx>`):
+
+| Topic | Type | Notes |
+|---|---|---|
+| `<prefix>/image/data` | `sensor_msgs/Image` | Uncompressed recordings |
+| `<prefix>/image/data/compressed` | `sensor_msgs/CompressedImage` | Compressed color/IR (PNG, lossless) |
+| `<prefix>/image/data/compressedDepth` | `sensor_msgs/CompressedImage` | Compressed depth (16-bit PNG, `compressedDepth` convention) |
+| `<prefix>/image/camera_info` | `sensor_msgs/CameraInfo` | Intrinsics, per frame (the legacy `<prefix>/camera_info` String topic remains for SDK playback compatibility) |
+| `/tf_static` | `tf2_msgs/TFMessage` | Extrinsics (latched); frames named per stream, rooted at `ref_N` |
+| `<prefix>/imu/data` | `sensor_msgs/Imu` | Motion streams |
+
+To view in **rviz2**, set *Global Options → Fixed Frame* to `ref_0` (camera recordings have no `map` frame), then add an Image display on the `/compressed` or `/compressedDepth` topic. The stock image_transport plugins decode the PNG payloads.
+
+Formats PNG cannot represent losslessly (e.g. YUYV) fall back to zstd payloads inside `CompressedImage` (`format: "<fmt>; zstd; ..."`): the bag still plays and all other topics behave the same, but image consumers must decompress with [zstd](https://github.com/facebook/zstd) themselves.
+
+RealSense-specific data (per-frame metadata, options, device info) travels in `std_msgs/String` topics with a `key=value;` payload — readable by any tool, interpreted by the SDK.
+
+
 Inspecting `.db3` Recordings
 ------
 
@@ -171,7 +198,7 @@ The same RealSense topics and message types are used as in the legacy format —
 
 #### Dependencies
 
-The SDK embeds the following third-party components under `third-party/realsense-file/rosbag2/` to provide `.db3` support. No external ROS2 installation is required. Note that `fastcdr` is fetched from GitHub at CMake configure time (requires internet access for first build).
+The SDK embeds the following third-party components under `third-party/realsense-file/rosbag2/` to provide `.db3` support. No external ROS2 installation is required. Note that `fastcdr` and `libdeflate` (PNG compression for compressed recordings) are fetched from GitHub at CMake configure time (requires internet access for first build).
 
 **Core storage:**
 - `rosbag2_storage` — Core rosbag2 storage interface and SQLite3-based `.db3` implementation

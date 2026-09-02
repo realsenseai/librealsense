@@ -100,11 +100,9 @@ namespace librealsense
             return;
         }
 
-        // White-patch auto white balance: balance the brightest *unclipped* surfaces (the white/
-        // light objects) to neutral, so white reads as white. Gray-world (scene average) leaves a
-        // cast on white objects that are cooler than the average; white-patch targets them directly.
-        // Two sparse passes over the packed source: (1) find the brightest unclipped green, (2)
-        // average R/G/B over the top brightness band. EMA-smoothed; feeds CPU + CUDA debayer.
+        // Hybrid auto white balance: white-patch (balance the brightest unclipped surfaces to neutral),
+        // falling back to gray-world when the bright band is a tiny fraction of the frame - i.e. isolated
+        // light sources, where white-patch would balance the whole scene to the lamp colour. EMA-smoothed.
         {
             const int bl = _isp.black_level;
             auto bval = [&]( int x, int y ) -> int {
@@ -121,8 +119,8 @@ namespace librealsense
                     if( g < hi && g > gmax ) gmax = g;
                 }
             const int gthr = ( gmax * 3 ) / 5;   // top ~40% brightness band = light/white surfaces
-            double sR = 0, sG = 0, sB = 0;
-            long n = 0;
+            double sR = 0, sG = 0, sB = 0;   long n = 0;    // white-patch (bright band)
+            double wR = 0, wG = 0, wB = 0;   long wn = 0;   // gray-world (all unclipped samples)
             for( int y = 0; y + 1 < height; y += step )
                 for( int x = 0; x + 1 < real_width; x += step )   // x,y even -> land on R sites
                 {
@@ -130,17 +128,30 @@ namespace librealsense
                     const int gg2 = ( bval( x + 1, y ) + bval( x, y + 1 ) ) >> 1;  // (Gr + Gb) / 2
                     int bb  = bval( x + 1, y + 1 );                        // B site (BGGR: this is R)
                     if( _isp.swap_rb ) { int t = rr; rr = bb; bb = t; }    // BGGR: real R/B are swapped
+                    if( rr < hi && gg2 < hi && bb < hi ) { wR += rr; wG += gg2; wB += bb; ++wn; }  // gray-world
                     if( gg2 < gthr )         continue;                     // not a bright surface
                     if( rr >= hi || gg2 >= hi || bb >= hi ) continue;      // any channel clipped
                     sR += rr;  sG += gg2;  sB += bb;  ++n;
                 }
-            if( n > 20 && sR > 1.0 && sB > 1.0 )   // enough bright-surface samples to trust it
+            auto clampg = []( float g ) { return g < 0.5f ? 0.5f : ( g > 4.f ? 4.f : g ); };
+            // Bright band under 10% of the sampled pixels => isolated light sources, not a white surface,
+            // so use gray-world; otherwise white-patch (a white surface or a colour-dominated scene).
+            const bool bright_isolated = ( wn > 20 ) && ( (double)n / (double)wn < 0.10 );
+            float tR = -1.f, tB = -1.f;
+            if( bright_isolated )                          // isolated light source -> gray-world
             {
-                const double mR = sR / n, mG = sG / n, mB = sB / n;
-                auto clampg = []( float g ) { return g < 0.5f ? 0.5f : ( g > 4.f ? 4.f : g ); };
-                // No warm bias: validated against the captured raw, the unbiased white-patch gains
-                // (gR~2.15, gB~1.72) land the bright surfaces neutral. A bias only re-introduces a tint.
-                const float tR = clampg( float( mG / mR ) ), tB = clampg( float( mG / mB ) );
+                if( wR > 1.0 && wB > 1.0 ) { tR = clampg( float( wG / wR ) ); tB = clampg( float( wG / wB ) ); }
+            }
+            else if( n > 20 && sR > 1.0 && sB > 1.0 )      // real bright/white surface -> white-patch
+            {
+                tR = clampg( float( sG / sR ) ); tB = clampg( float( sG / sB ) );
+            }
+            else if( wn > 20 && wR > 1.0 && wB > 1.0 )     // no trustworthy bright band -> gray-world
+            {
+                tR = clampg( float( wG / wR ) ); tB = clampg( float( wG / wB ) );
+            }
+            if( tR > 0.f )
+            {
                 const float a = 0.1f;                              // EMA: converges in ~30 frames
                 _awb_gain_r += a * ( tR - _awb_gain_r );
                 _awb_gain_b += a * ( tB - _awb_gain_b );

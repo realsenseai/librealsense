@@ -163,17 +163,8 @@ namespace librealsense
         return src_size >= 4 && src[0] == 0x28 && src[1] == 0xB5 && src[2] == 0x2F && src[3] == 0xFD;
     }
 
-    void ros2_reader_base::decompress_if_needed(std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg)
+    size_t ros2_reader_base::zstd_frame_content_size(const uint8_t* src, size_t src_size)
     {
-        if (!msg || !msg->serialized_data || !msg->serialized_data->buffer || msg->serialized_data->buffer_length == 0)
-            return;
-
-        auto src = msg->serialized_data->buffer;
-        auto src_size = msg->serialized_data->buffer_length;
-
-        if (!is_zstd_compressed(src, src_size))
-            return;
-
         auto frame_content_size = ZSTD_getFrameContentSize(src, src_size);
         if (frame_content_size == ZSTD_CONTENTSIZE_UNKNOWN || frame_content_size == ZSTD_CONTENTSIZE_ERROR)
             throw std::runtime_error("Failed to determine decompressed size for zstd-compressed message");
@@ -185,7 +176,21 @@ namespace librealsense
             throw std::runtime_error(rsutils::string::from()
                 << "Zstd decompressed size " << frame_content_size << " exceeds safety limit");
 
-        auto decompressed_size = static_cast<size_t>(frame_content_size);
+        return static_cast<size_t>(frame_content_size);
+    }
+
+    void ros2_reader_base::decompress_if_needed(std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg)
+    {
+        if (!msg || !msg->serialized_data || !msg->serialized_data->buffer || msg->serialized_data->buffer_length == 0)
+            return;
+
+        auto src = msg->serialized_data->buffer;
+        auto src_size = msg->serialized_data->buffer_length;
+
+        if (!is_zstd_compressed(src, src_size))
+            return;
+
+        auto decompressed_size = zstd_frame_content_size(src, src_size);
 
         // We create a new buffer for the decompressed data each time. We could use
         // a reusable member buffer like the writer does, but here the frame data may

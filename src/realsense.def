@@ -271,6 +271,7 @@ EXPORTS
     rs2_get_census
     rs2_get_amp_factor
     rs2_set_amp_factor
+    rs2_get_all_advanced_controls
     rs2_rs400_visual_preset_to_string
     rs2_l500_visual_preset_to_string
     rs2_sensor_mode_to_string
@@ -281,6 +282,7 @@ EXPORTS
     rs2_serialize_json
     rs2_emitter_frequency_mode_to_string
     rs2_depth_auto_exposure_mode_to_string
+    rs2_colored_ir_auto_exposure_mode_to_string
     rs2_gyro_sensitivity_to_string
 
     rs2_create_record_device

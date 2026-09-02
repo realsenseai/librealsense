@@ -10,6 +10,8 @@
 #include "usb/usb-enumerator.h"
 #include "types.h"
 
+#include <rsutils/string/from.h>
+
 #include <Windows.h>
 #include <Sddl.h>
 #include <string>
@@ -176,7 +178,7 @@ namespace librealsense
             std::lock_guard<std::mutex> lk(_mutex);
             if (_dispatchers.find(endpoint) == _dispatchers.end())
             {
-                _dispatchers[endpoint] = std::make_shared<dispatcher>(10);
+                _dispatchers[endpoint] = std::make_shared<dispatcher>(10, rsutils::string::from() << "winusb-ep-" << (int)endpoint);
                 _dispatchers[endpoint]->start();
             }
             return _dispatchers.at(endpoint);

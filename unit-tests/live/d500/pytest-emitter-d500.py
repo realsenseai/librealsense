@@ -33,6 +33,7 @@ def test_emitter_on_off_set_get(test_device):
 
         # ON: the emitter alternates on/off per frame
         depth_sensor.set_option(rs.option.emitter_on_off, 1)
+        time.sleep(0.1)  # laser/emitter is physical: let it settle before the next read/set
         check.equal(depth_sensor.get_option(rs.option.emitter_on_off), 1.0)
         modes = []
         for _ in range(16):
@@ -46,6 +47,7 @@ def test_emitter_on_off_set_get(test_device):
             check.is_true(rate > 0.6, f"emitter should alternate most frames, got rate {rate:.2f}: {modes}")
 
         depth_sensor.set_option(rs.option.emitter_on_off, 0)
+        time.sleep(0.1)  # laser/emitter is physical: let it settle before the next read/set
         check.equal(depth_sensor.get_option(rs.option.emitter_on_off), 0.0)
     finally:
         pipe.stop()
@@ -61,9 +63,11 @@ def test_emitter_always_on_set_get(test_device):
     original = depth_sensor.get_option(rs.option.emitter_always_on)
     try:
         depth_sensor.set_option(rs.option.emitter_always_on, 1)
+        time.sleep(0.1)  # laser/emitter is physical: let it settle before the next read/set
         check.equal(depth_sensor.get_option(rs.option.emitter_always_on), 1.0)
 
         depth_sensor.set_option(rs.option.emitter_always_on, 0)
+        time.sleep(0.1)  # laser/emitter is physical: let it settle before the next read/set
         check.equal(depth_sensor.get_option(rs.option.emitter_always_on), 0.0)
     finally:
         depth_sensor.set_option(rs.option.emitter_always_on, original)
@@ -90,14 +94,19 @@ def test_emitter_on_off_blocked_while_always_on(test_device):
         pipe.wait_for_frames()
 
         depth_sensor.set_option(rs.option.emitter_on_off, 0)
+        time.sleep(0.1)  # laser/emitter is physical: let it settle before the next read/set
         depth_sensor.set_option(rs.option.emitter_always_on, 1)
+        time.sleep(0.1)  # laser/emitter is physical: let it settle before the next read/set
 
         depth_sensor.set_option(rs.option.emitter_on_off, 1)
+        time.sleep(0.1)  # laser/emitter is physical: let it settle before the next read/set
         check.equal(depth_sensor.get_option(rs.option.emitter_on_off), 0.0)
 
         # with always on back off, the same set goes through
         depth_sensor.set_option(rs.option.emitter_always_on, 0)
+        time.sleep(0.1)  # laser/emitter is physical: let it settle before the next read/set
         depth_sensor.set_option(rs.option.emitter_on_off, 1)
+        time.sleep(0.1)  # laser/emitter is physical: let it settle before the next read/set
         check.equal(depth_sensor.get_option(rs.option.emitter_on_off), 1.0)
     finally:
         depth_sensor.set_option(rs.option.emitter_on_off, original_on_off)

@@ -79,8 +79,14 @@ int main( int /*argc*/, char * /*argv*/[] ) try
                       << std::left << std::setw( 8 ) << class_label( det.class_id )
                       << "  score=" << std::right << std::setw( 3 ) << det.score << "%"
                       << "  bbox=("  << det.top_left_x     << "," << det.top_left_y     << ")-"
-                      <<       "("   << det.bottom_right_x << "," << det.bottom_right_y << ")"
-                      << "\n";
+                      <<       "("   << det.bottom_right_x << "," << det.bottom_right_y << ")";
+            if( det.center_of_mass_valid )
+                std::cout << "  world=(" << det.world_position.x << ","
+                          << det.world_position.y << "," << det.world_position.z << ")m"
+                          << "  image=(" << det.center_of_mass_x << "," << det.center_of_mass_y << ")px";
+            else
+                std::cout << "  COM=unavailable";
+            std::cout << "\n";
         }
         std::cout << "\n";
     }

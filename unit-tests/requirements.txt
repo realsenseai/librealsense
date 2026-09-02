@@ -10,7 +10,6 @@ paramiko==3.5.1; platform_machine != "aarch64"
 # Common testing requirements
 opencv-python==4.11.0.86
 numpy==2.0.2 # max version currently working on Jetson
-zstandard==0.25.0 # for verifying ros2_writer's zstd-compressed .db3 frames
 
 # Pytest framework (cross-platform)
 pytest==8.3.5

@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { DevicePanel } from './components/DevicePanel'
 import { StreamViewer } from './components/StreamViewer'
 import { PointCloudViewer } from './components/PointCloudViewer'
-import { IMUViewer } from './components/IMUViewer'
 import { Header } from './components/Header'
 import { LoadingSplash } from './components/LoadingSplash'
 import { WhatsNew } from './components/WhatsNew'
@@ -69,9 +68,6 @@ function App() {
                   <PointCloudViewer />
                 </div>
               </div>
-
-              {/* IMU Viewer (collapsible) */}
-              <IMUViewer />
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-500">

@@ -77,6 +77,9 @@ namespace librealsense
         virtual void get_census_radius(STCensusRadius* ptr, int mode = 0) const = 0;
         virtual void get_amp_factor(STAFactor* ptr, int mode = 0) const = 0;
 
+        // Reads every group, for every mode, under a single bulk operation
+        virtual void get_all_controls( STAdvancedModeControls * ptr ) const = 0;
+
         virtual void set_depth_control_group(const STDepthControlGroup& val) = 0;
         virtual void set_rsm(const STRsm& val) = 0;
         virtual void set_rau_support_vector_control(const STRauSupportVectorControl& val) = 0;
@@ -122,6 +125,8 @@ namespace librealsense
         void get_ae_control(STAEControl* ptr, int mode = 0) const override;
         void get_census_radius(STCensusRadius* ptr, int mode = 0) const override;
         void get_amp_factor(STAFactor* ptr, int mode = 0) const override;
+
+        void get_all_controls( STAdvancedModeControls * ptr ) const override;
 
         void set_depth_control_group(const STDepthControlGroup& val) override;
         void set_rsm(const STRsm& val) override;

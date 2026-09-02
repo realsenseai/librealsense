@@ -12,7 +12,6 @@ export function resetStore() {
     devices: [],
     deviceStates: {},
     isLoadingDevices: false,
-    hasUserInteracted: false,
     error: null,
     viewMode: '2d',
     isChatOpen: false,
@@ -21,7 +20,6 @@ export function resetStore() {
     chatMessages: [],
     pendingSettings: null,
     imuHistory: { accel: [], gyro: [] },
-    isIMUViewerExpanded: false,
   })
 }
 
@@ -36,9 +34,6 @@ export function createMockDevice(overrides: Partial<DeviceInfo> = {}): DeviceInf
     firmware_version: '5.16.0.1',
     usb_type: '3.2',
     product_line: 'D400',
-    recommended_firmware_version: '5.16.0.1',
-    firmware_status: 'up_to_date',
-    firmware_file_available: true,
     sensors: ['sensor-0', 'sensor-1', 'sensor-2'],
     ...overrides,
   } as DeviceInfo
@@ -56,7 +51,6 @@ export function createMockDeviceState(device: DeviceInfo, overrides: Partial<Dev
     sensorConfigs: {},
     isActive: false,
     isStreaming: false,
-    streamingMode: 'idle',
     sensorStreamingStatus: {},
     isPointCloudEnabled: false,
     pointCloudVertices: null,

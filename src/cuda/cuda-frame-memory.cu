@@ -5,14 +5,41 @@
 
 #include <cstdlib>
 
-#ifdef RS2_USE_CUDA
+// Guarded on either macro (not just RS2_USE_CUDA) so this compiles under HIP regardless of
+// whether global_config.cmake's BUILD_WITH_HIP branch also defines RS2_USE_CUDA (today, for
+// back-compat) or drops it in favor of RS2_USE_HIP alone.
+#if defined(RS2_USE_CUDA) || defined(RS2_USE_HIP)
+#ifdef RS2_USE_HIP
+#include <hip/hip_runtime.h>
+#define cudaMalloc hipMalloc
+#define cudaFree hipFree
+#define cudaFreeHost hipHostFree
+#define cudaMemcpy hipMemcpy
+#define cudaMemcpyHostToDevice hipMemcpyHostToDevice
+#define cudaSuccess hipSuccess
+#define cudaGetLastError hipGetLastError
+#define cudaHostAlloc hipHostMalloc
+#define cudaHostAllocMapped hipHostMallocMapped
+#define cudaHostAllocPortable hipHostMallocPortable
+#define cudaHostRegister hipHostRegister
+#define cudaHostRegisterMapped hipHostRegisterMapped
+#define cudaHostUnregister hipHostUnregister
+#define cudaPointerAttributes hipPointerAttribute_t
+#define cudaPointerGetAttributes hipPointerGetAttributes
+#define cudaMemoryTypeManaged hipMemoryTypeManaged
+#define cudaMemoryTypeHost hipMemoryTypeHost
+#define cudaHostGetDevicePointer hipHostGetDevicePointer
+#else
 #include <cuda_runtime.h>
-#include <rsutils/accelerators/gpu.h>
-#include "cuda-compat.h"   // RS_CUDA_MEMTYPE — single definition shared across CUDA TUs
 #endif
+#include <rsutils/accelerators/gpu.h>
+#include "cuda-compat.h"   // RS_CUDA_MEMTYPE — single definition shared across CUDA and HIP TUs
+#endif // RS2_USE_CUDA || RS2_USE_HIP
 
 #ifdef _MSC_VER
+#ifndef RS2_USE_HIP
 #pragma comment(lib, "cudart_static")
+#endif
 #endif
 
 namespace librealsense {
@@ -29,11 +56,20 @@ static constexpr std::size_t RS_ZC_TAIL_PAD = 256;
 bool rs_frame_zc_enabled()
 {
 #ifdef RS2_USE_CUDA_ZEROCOPY
+#ifdef RS2_USE_HIP
+    // Mirrors the CUDA branch below, using the HIP-specific integrated-GPU probe
+    // (rsutils::rs2_is_hip_integrated(), third-party/rsutils/src/rsutilgpu.cpp). Only
+    // unified-memory AMD APUs (Ryzen AI / MI300A) report true here; discrete RDNA3/CDNA3
+    // GPUs correctly report false and keep the persistent-buffer copy path.
+    static bool const enabled = rsutils::rs2_is_hip_integrated();
+    return enabled;
+#else
     // Decide once: zero-copy only pays off on an integrated GPU (shared DRAM). On a
     // discrete GPU, mapped host memory is read per-element over PCIe and would be a
     // large regression, so we fall back to plain malloc + the existing copy path.
     static bool const enabled = rsutils::rs2_is_cuda_integrated();
     return enabled;
+#endif
 #else
     return false;
 #endif
@@ -154,7 +190,10 @@ void rs_v4l2_zc_unregister( void * ptr )
 
 void * rs_frame_gpu_upload( void ** cached, std::size_t * capacity, const void * host, std::size_t bytes )
 {
-#ifdef RS2_USE_CUDA
+// Guarded on either macro (not just RS2_USE_CUDA) so this stays functional under HIP
+// regardless of whether global_config.cmake's BUILD_WITH_HIP branch also defines
+// RS2_USE_CUDA (today, for back-compat) or drops it in favor of RS2_USE_HIP alone.
+#if defined(RS2_USE_CUDA) || defined(RS2_USE_HIP)
     if( ! host || ! bytes || ! cached || ! capacity )
         return nullptr;
     if( *capacity < bytes )  // (re)allocate only when the buffer must grow
@@ -174,14 +213,17 @@ void * rs_frame_gpu_upload( void ** cached, std::size_t * capacity, const void *
 #else
     (void)cached; (void)capacity; (void)host; (void)bytes;
     return nullptr;
-#endif
+#endif // RS2_USE_CUDA || RS2_USE_HIP
 }
 
 void rs_frame_gpu_free( void * buf )
 {
-#ifdef RS2_USE_CUDA
+// Guarded on either macro (not just RS2_USE_CUDA) so this stays functional under HIP
+// regardless of whether global_config.cmake's BUILD_WITH_HIP branch also defines
+// RS2_USE_CUDA (today, for back-compat) or drops it in favor of RS2_USE_HIP alone.
+#if defined(RS2_USE_CUDA) || defined(RS2_USE_HIP)
     if( buf ) { cudaFree( buf ); cudaGetLastError(); }
-#endif
+#endif // RS2_USE_CUDA || RS2_USE_HIP
     (void)buf;
 }
 

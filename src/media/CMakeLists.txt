@@ -30,6 +30,8 @@ if(BUILD_ROSBAG2)
     target_include_directories(${LRS_TARGET} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types")
     set(ROS2_SOURCE_FILES
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_file_format.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_image_codec.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_image_codec.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_writer.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2_reader_base.h"
@@ -55,7 +57,37 @@ if(BUILD_ROSBAG2)
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/RegionOfInterest.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/CameraInfo.h"
         "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/CameraInfo.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/CompressedImage.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/sensor_msgs/msg/CompressedImage.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/Transform.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/Transform.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/TransformStamped.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/geometry_msgs/msg/TransformStamped.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/tf2_msgs/msg/TFMessage.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ros2/ros2-msg-types/tf2_msgs/msg/TFMessage.cpp"
     )
+
+    # libdeflate: portable PNG (zlib) compression for CompressedImage topics —
+    # byte-identical output on every architecture
+    include(${PROJECT_SOURCE_DIR}/CMake/external_libdeflate.cmake)
+    set(LIBDEFLATE_DIR "${LIBDEFLATE_SOURCE_DIR}")
+    set(LIBDEFLATE_SOURCES
+        "${LIBDEFLATE_DIR}/lib/adler32.c"
+        "${LIBDEFLATE_DIR}/lib/crc32.c"
+        "${LIBDEFLATE_DIR}/lib/deflate_compress.c"
+        "${LIBDEFLATE_DIR}/lib/utils.c"
+        "${LIBDEFLATE_DIR}/lib/zlib_compress.c"
+        "${LIBDEFLATE_DIR}/lib/arm/cpu_features.c"
+        "${LIBDEFLATE_DIR}/lib/x86/cpu_features.c"
+        # "${LIBDEFLATE_DIR}/lib/x86/decompress_impl.h" # decode uses stb_image instead
+    )
+    target_include_directories(${LRS_TARGET} PRIVATE "${LIBDEFLATE_DIR}")
+    target_sources(${LRS_TARGET} PRIVATE ${LIBDEFLATE_SOURCES})
+    if(BUILD_SHARED_LIBS AND UNIX AND NOT APPLE)
+        # C sources: -fvisibility-inlines-hidden from hide_sources_symbols is C++-only
+        set_source_files_properties(${LIBDEFLATE_SOURCES} PROPERTIES COMPILE_FLAGS "-fvisibility=hidden")
+    endif()
+
     target_sources(${LRS_TARGET} PRIVATE ${ROS2_SOURCE_FILES})
     hide_sources_symbols( ${ROS2_SOURCE_FILES} )
 endif()

@@ -8,6 +8,7 @@ import numpy as np
 import cv2
 import logging
 import re
+import time
 from iq_helper import (find_roi_location, get_roi_from_frame, is_color_close, save_failure_snapshot,
                        WIDTH, HEIGHT, DEFAULT_CONFIGURATIONS, NIGHTLY_CONFIGURATIONS)
 
@@ -21,6 +22,10 @@ pytestmark = [
 
 NUM_FRAMES = 100 # Number of frames to check
 FRAMES_PASS_THRESHOLD =0.8 # Percentage of frames that needs to pass
+# Auto-exposure settles in a few frames, but a frame count alone scales badly: 60 frames is 1s
+# at 60fps and 12s at 5fps. Gate on both a frame count and a duration.
+WARMUP_SEC = 1.0
+WARMUP_MIN_FRAMES = 15
 DEBUG_MODE = False
 
 # expected colors (insertion order -> mapped row-major to 3x3 grid)
@@ -95,11 +100,16 @@ def run_test(dev, ctx, resolution, fps):
         log.info(f"Configuration {resolution[0]}x{resolution[1]}@{fps}fps is not supported by the device")
         return
     pipeline_profile = pipeline.start(cfg)
-    for i in range(60):  # skip initial frames
-        pipeline.wait_for_frames()
     last_frame_bgr = None
     last_roi = None
     try:
+        # let auto-exposure settle before sampling
+        warmup_start = time.time()
+        warmup_frames = 0
+        while warmup_frames < WARMUP_MIN_FRAMES or time.time() - warmup_start < WARMUP_SEC:
+            pipeline.wait_for_frames()
+            warmup_frames += 1
+
         # find region of interest (page) and get the transformation matrix
         find_roi_location(pipeline, (0, 1, 2, 3), DEBUG_MODE) # markers in the lab are 0,1,2,3
 

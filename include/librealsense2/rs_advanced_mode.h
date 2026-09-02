@@ -90,6 +90,9 @@ void rs2_set_amp_factor(rs2_device* dev, const  STAFactor* group, rs2_error** er
 /* Gets new values for STAFactor, returns 0 if success */
 void rs2_get_amp_factor(rs2_device* dev, STAFactor* group, int mode, rs2_error** error);
 
+/* Gets every control group and mode in one call; see STAdvancedModeControls */
+void rs2_get_all_advanced_controls(rs2_device* dev, STAdvancedModeControls* controls, rs2_error** error);
+
 #ifdef __cplusplus
 }
 #endif

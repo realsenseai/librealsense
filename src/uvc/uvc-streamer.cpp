@@ -16,7 +16,7 @@ namespace librealsense
     namespace platform
     {
         uvc_streamer::uvc_streamer(uvc_streamer_context context) :
-            _context(context), _action_dispatcher(10)
+            _context(context), _action_dispatcher(10, "uvc-streamer")
         {
             auto inf = context.usb_device->get_interface(context.control->bInterfaceNumber);
             if (inf == nullptr)
@@ -24,6 +24,13 @@ namespace librealsense
             _read_endpoint = inf->first_endpoint(platform::RS2_USB_ENDPOINT_DIRECTION_READ);
 
             _read_buff_length = UVC_PAYLOAD_MAX_HEADER_LENGTH + _context.control->dwMaxVideoFrameSize;
+            // Compressed streams have a variable payload length. Perception stream does too.
+            // Scope the exception to perception interface so regular Y8 images retain strict frame-size validation.
+            // Streaming MI is control MI + 1 (control MI 9, confirmed with the HKR firmware team).
+            constexpr uint8_t perception_streaming_mi = 10;
+            _allow_variable_length_payload
+                = val_in_range( _context.profile.format, { 0x4d4a5047U, 0x5a313648U } )  // MJPEG, Z16H
+               || context.control->bInterfaceNumber == perception_streaming_mi;
             LOG_INFO("endpoint " << (int)_read_endpoint->get_address() << " read buffer size: " << std::dec <<_read_buff_length);
 
             _action_dispatcher.start();
@@ -93,7 +100,7 @@ namespace librealsense
                     if(_publish_frames && running())
                         _context.user_cb(_context.profile, fp->fo, []() mutable {});
                 }
-            });
+            }, "uvc-publish-frame");
 
             _watchdog = std::make_shared<watchdog>([this]()
              {
@@ -118,9 +125,9 @@ namespace librealsense
                       return;
 
                     auto al = r->get_actual_length();
-                    // Relax the frame size constrain for compressed streams
-                    bool is_compressed = val_in_range(_context.profile.format, { 0x4d4a5047U , 0x5a313648U}); // MJPEG, Z16H
-                    if(al > 0L && ((al == r->get_buffer().data()[0] + _context.control->dwMaxVideoFrameSize) || is_compressed ))
+                    if( al > 0L
+                        && ( al == r->get_buffer().data()[0] + _context.control->dwMaxVideoFrameSize
+                             || _allow_variable_length_payload ) )
                     {
                         auto f = backend_frame_ptr(_frames_archive->allocate(), &cleanup_frame);
                         if(f)

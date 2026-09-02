@@ -14,6 +14,16 @@
  */
 
 import { test, expect, getTestMode, getApiUrl, dismissWhatsNewModal } from './fixtures'
+import type { Locator } from '@playwright/test'
+
+// Per-stream toggles only render inside an expanded sensor module
+async function expandSensorModules(deviceCard: Locator) {
+  const headers = deviceCard.locator('button[aria-expanded]')
+  for (let i = 0; i < await headers.count(); i++) {
+    const header = headers.nth(i)
+    if (await header.getAttribute('aria-expanded') === 'false') await header.click()
+  }
+}
 
 // Skip entire file in mock mode
 test.beforeEach(async ({ testMode, page }) => {
@@ -72,6 +82,9 @@ test.describe('@real-device Real Device Tests', () => {
       // Wait for device to finish loading sensors
       await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
       
+      // Sensor modules are collapsed by default; expand them to reveal the stream toggles
+      await expandSensorModules(deviceCard)
+
       // Enable depth stream
       const depthToggle = page.locator('[data-testid="toggle-stream-depth"]').first()
       await depthToggle.check()
@@ -102,6 +115,8 @@ test.describe('@real-device Real Device Tests', () => {
       // Wait for device to finish loading sensors
       await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
       
+      await expandSensorModules(deviceCard)
+
       const depthToggle = page.locator('[data-testid="toggle-stream-depth"]').first()
       await depthToggle.check()
       
@@ -196,6 +211,8 @@ test.describe('@real-device Performance Tests', () => {
     // Wait for device to finish loading sensors
     await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
     
+    await expandSensorModules(deviceCard)
+
     const depthToggle = page.locator('[data-testid="toggle-stream-depth"]').first()
     await depthToggle.check()
     

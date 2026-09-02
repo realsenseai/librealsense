@@ -11,12 +11,17 @@
 #include "proc/hdr-merge.h"
 #include "proc/sequence-id-filter.h"
 #include "ros2_writer.h"
+#include "ros2_image_codec.h"
+#include <sensor_msgs/msg/CompressedImage.h>
+#include <tf2_msgs/msg/TFMessage.h>
 #include <zstd.h>
 #include "media/ros_factory.h"
 #include "core/motion-frame.h"
 #include <sstream>
 #include <iomanip>
 #include <limits>
+#include <cmath>
+#include <cstring>
 #include <src/core/sensor-interface.h>
 #include <src/core/device-interface.h>
 #include <src/core/depth-frame.h>
@@ -66,7 +71,7 @@ namespace librealsense
         write_file_version();
     }
 
-    void ros2_writer::ensure_topic(const std::string& name, const std::string& type)
+    void ros2_writer::ensure_topic(const std::string& name, const std::string& type, const std::string& offered_qos)
     {
         if (_topics.find(name) != _topics.end())
             return;
@@ -74,21 +79,101 @@ namespace librealsense
         md.name = name;
         md.type = type;
         md.serialization_format = "cdr";
+        md.offered_qos_profiles = offered_qos;
         _storage->create_topic(md);
         _topics.emplace(name, md);
     }
 
-    std::shared_ptr<rcutils_uint8_array_t> ros2_writer::compress_buffer(const std::shared_ptr<rcutils_uint8_array_t>& input)
+    void ros2_writer::compress_zstd(const uint8_t* data, size_t size, std::vector<uint8_t>& out)
     {
-        auto bound = ZSTD_compressBound(input->buffer_length);
-        auto& out = ensure_buffer_capacity(_compress_buf, bound);
+        out.resize(ZSTD_compressBound(size));
 
         // Level 1 is the fastest zstd level with good-enough ratio; comparable in speed to LZ4 used by rosbag1
-        auto compressed_size = ZSTD_compress(out->buffer, out->buffer_capacity, input->buffer, input->buffer_length, 1);
+        auto compressed_size = ZSTD_compress(out.data(), out.size(), data, size, 1);
         if (ZSTD_isError(compressed_size))
             throw std::runtime_error(rsutils::string::from() << "Zstd compression failed: " << ZSTD_getErrorName(compressed_size));
-        out->buffer_length = compressed_size;
-        return out;
+        out.resize(compressed_size);
+    }
+
+    // Decoded PNGs surface as BGR-ordered mats on the ROS side (cv::imdecode); the format
+    // string's second encoding advertises that, per the compressed_image_transport convention.
+    static const char* decoded_png_encoding(const ros2_image_codec::png_layout& layout)
+    {
+        if (layout.num_channels == 3) return "bgr8";
+        if (layout.num_channels == 4) return "bgra8";
+        return layout.bytes_per_channel == 2 ? "mono16" : "mono8";
+    }
+
+    void ros2_writer::write_compressed_video_frame(const stream_identifier& stream_id,
+                                                   const nanoseconds& timestamp,
+                                                   frame_interface* frame)
+    {
+        const uint8_t* pixels;
+        uint32_t width, height, stride;
+        rs2_format format;
+        if (auto vid_frame = As<video_frame>(frame))
+        {
+            pixels = vid_frame->get_frame_data();
+            width = vid_frame->get_width();
+            height = vid_frame->get_height();
+            stride = vid_frame->get_stride();
+            format = vid_frame->get_stream()->get_format();
+        }
+        else if (auto lp = As<labeled_points>(frame))
+        {
+            // labeled points have no 2D geometry — encode as a single row of bytes
+            auto data_size = static_cast<uint32_t>(lp->get_vertex_count() * lp->get_bpp() / 8);
+            pixels = lp->get_frame_data();
+            width = stride = data_size;
+            height = 1;
+            format = lp->get_stream()->get_format();
+        }
+        else
+        {
+            throw invalid_value_exception("write_compressed_video_frame: unsupported frame type");
+        }
+
+        auto stream_name = ros2_topic::stream_name(stream_id.stream_type, stream_id.stream_index);
+        auto ns_count = timestamp.count();
+        sensor_msgs::msg::CompressedImage msg;
+        msg.header().stamp().sec(static_cast<int32_t>(ns_count / 1000000000LL));
+        msg.header().stamp().nanosec(static_cast<uint32_t>(ns_count % 1000000000LL));
+        msg.header().frame_id(stream_name);
+
+        ros2_image_codec::png_layout layout{};
+        bool png_ok = ros2_image_codec::png_layout_for_format(format, layout);
+        _frame_buf.clear();
+        if (png_ok)
+        {
+            if (layout.is_depth)
+            {
+                // compressed_depth_image_transport expects a ConfigHeader before the PNG
+                ros2_image_codec::config_header hdr;
+                _frame_buf.resize(sizeof(hdr));
+                std::memcpy(_frame_buf.data(), &hdr, sizeof(hdr));
+                msg.format(rsutils::string::from() << layout.ros_encoding << "; compressedDepth png");
+            }
+            else
+            {
+                msg.format(rsutils::string::from() << layout.ros_encoding << "; png compressed "
+                                                   << decoded_png_encoding(layout));
+            }
+            ros2_image_codec::encode_png(layout, pixels, width, height, stride, _frame_buf);
+        }
+        else
+        {
+            // Formats PNG can't represent losslessly (YUYV-class packed formats):
+            // zstd the raw pixels; the format string carries the layout for external consumers.
+            compress_zstd(pixels, size_t(stride) * height, _frame_buf);
+            msg.format(rsutils::string::from() << rs2_format_to_string(format) << "; zstd; "
+                                               << width << "x" << height << " step=" << stride);
+        }
+        msg.data(std::move(_frame_buf));
+
+        write_message(ros2_topic::compressed_frame_data_topic(stream_id, png_ok && layout.is_depth),
+                      "sensor_msgs/msg/CompressedImage", timestamp, msg);
+        _frame_buf = std::move(msg.data()); // reclaim the buffer's capacity for the next frame
+        write_additional_frame_messages(stream_id, timestamp, frame);
     }
 
     void ros2_writer::write_string(std::string const& topic, const nanoseconds& ts, std::string const& payload)
@@ -141,6 +226,11 @@ namespace librealsense
         if (Is<video_frame>(frame.frame))
         {
             auto vid_frame = As<video_frame>(frame.frame);
+            if (_compress)
+            {
+                write_compressed_video_frame(stream_id, timestamp, frame.frame);
+                return;
+            }
             sensor_msgs::msg::Image img;
             img.header().stamp().sec(stamp_sec);
             img.header().stamp().nanosec(stamp_nsec);
@@ -210,6 +300,11 @@ namespace librealsense
         else if (Is<labeled_points>(frame.frame))
         {
             auto lp = As<labeled_points>(frame.frame);
+            if (_compress)
+            {
+                write_compressed_video_frame(stream_id, timestamp, frame.frame);
+                return;
+            }
             sensor_msgs::msg::Image img;
             img.header().stamp().sec(stamp_sec);
             img.header().stamp().nanosec(stamp_nsec);
@@ -228,20 +323,20 @@ namespace librealsense
         }
         else if (Is<object_detection_frame>(frame.frame))
         {
-            // Re-encode the binary object_detection_payload back to the same JSON format the DDS server sends,
+            // Re-encode the binary object-detection payload back to the same JSON format the DDS server sends,
             // so that playback can reconstruct the frame using the same parse path.
             auto od = As<object_detection_frame>(frame.frame);
-            auto raw = reinterpret_cast<object_detection_frame::object_detection_payload const *>(od->get_frame_data());
-            auto n = raw->number_of_detections;
+            auto const payload = od->get_payload_header();
+            auto const n = od->get_detection_count();
 
             std::ostringstream json;
             json << "{"
-                 << "\"frame_id\":" << raw->frame_id << ","
+                 << "\"frame_id\":" << payload.frame_id << ","
                  << "\"number_of_detections\":" << n << ","
                  << "\"detections\":[";
             for (uint16_t i = 0; i < n; ++i)
             {
-                auto const & e = raw->detections[i];
+                auto const e = od->get_detection(i);
                 if (i) json << ",";
                 json << "{"
                      << "\"class_id\":"    << static_cast<int>(e.detection_type) << ","
@@ -250,13 +345,22 @@ namespace librealsense
                      << "\"y1\":"          << e.top_left_y << ","
                      << "\"x2\":"          << e.bottom_right_x << ","
                      << "\"y2\":"          << e.bottom_right_y << ","
-                     << "\"distance\":"    << e.distance
-                     << "}";
+                     << "\"distance\":"    << e.distance;
+                if( e.com_valid )
+                    json << ",\"world_pos\":{"
+                         << "\"x\":" << e.world_position.x << ","
+                         << "\"y\":" << e.world_position.y << ","
+                         << "\"z\":" << e.world_position.z << "},"
+                         << "\"image_pos\":{"
+                         << "\"x\":" << e.image_x << ","
+                         << "\"y\":" << e.image_y << "}";
+                json << "}";
             }
             json << "],"
-                 << "\"source_frame_id\":" << raw->source_frame_id << ","
-                 << "\"version\":"         << raw->header.version << ","
-                 << "\"timestamp_us\":"    << (raw->timestamp_ms * MILLISEC_TO_MICROSEC)
+                 << "\"source_frame_id\":" << payload.source_frame_id << ","
+                 << "\"version\":1,"
+                 << "\"od_version\":"      << od->get_version() << ","
+                 << "\"timestamp_us\":"    << (payload.timestamp_ms * MILLISEC_TO_MICROSEC)
                  << "}";
 
             write_string(ros2_topic::frame_data_topic(stream_id), timestamp, json.str());
@@ -327,13 +431,75 @@ namespace librealsense
         write_string(metadata_topic, timestamp, metadata_payload);
     }
 
+    // rs2_extrinsics rotation is a column-major 3x3 matrix; standard trace-based conversion
+    static geometry_msgs::msg::Quaternion rotation_matrix_to_quaternion(const float r[9])
+    {
+        auto R = [&](int row, int col) { return double(r[col * 3 + row]); };
+        double w, x, y, z;
+        double trace = R(0, 0) + R(1, 1) + R(2, 2);
+        if (trace > 0.0)
+        {
+            double s = std::sqrt(trace + 1.0) * 2.0;
+            w = 0.25 * s;
+            x = (R(2, 1) - R(1, 2)) / s;
+            y = (R(0, 2) - R(2, 0)) / s;
+            z = (R(1, 0) - R(0, 1)) / s;
+        }
+        else if (R(0, 0) > R(1, 1) && R(0, 0) > R(2, 2))
+        {
+            double s = std::sqrt(1.0 + R(0, 0) - R(1, 1) - R(2, 2)) * 2.0;
+            w = (R(2, 1) - R(1, 2)) / s;
+            x = 0.25 * s;
+            y = (R(0, 1) + R(1, 0)) / s;
+            z = (R(0, 2) + R(2, 0)) / s;
+        }
+        else if (R(1, 1) > R(2, 2))
+        {
+            double s = std::sqrt(1.0 + R(1, 1) - R(0, 0) - R(2, 2)) * 2.0;
+            w = (R(0, 2) - R(2, 0)) / s;
+            x = (R(0, 1) + R(1, 0)) / s;
+            y = 0.25 * s;
+            z = (R(1, 2) + R(2, 1)) / s;
+        }
+        else
+        {
+            double s = std::sqrt(1.0 + R(2, 2) - R(0, 0) - R(1, 1)) * 2.0;
+            w = (R(1, 0) - R(0, 1)) / s;
+            x = (R(0, 2) + R(2, 0)) / s;
+            y = (R(1, 2) + R(2, 1)) / s;
+            z = 0.25 * s;
+        }
+        geometry_msgs::msg::Quaternion q;
+        q.x(x); q.y(y); q.z(z); q.w(w);
+        return q;
+    }
+
+    // Matches rosbag2's Rosbag2QoS YAML (rosbag2_transport/src/rosbag2_transport/qos.cpp,
+    // enums are rmw integers): reliable + transient_local, so /tf_static replays latched
+    static const char* TF_STATIC_QOS_YAML =
+        "- history: 1\n"
+        "  depth: 1\n"
+        "  reliability: 1\n"
+        "  durability: 1\n"
+        "  deadline:\n"
+        "    sec: 0\n"
+        "    nsec: 0\n"
+        "  lifespan:\n"
+        "    sec: 0\n"
+        "    nsec: 0\n"
+        "  liveliness: 0\n"
+        "  liveliness_lease_duration:\n"
+        "    sec: 0\n"
+        "    nsec: 0\n"
+        "  avoid_ros_namespace_conventions: false";
+
     void ros2_writer::write_extrinsics(const stream_identifier& stream_id, uint32_t reference_id, const rs2_extrinsics& ext)
     {
         if (m_extrinsics_msgs.find(stream_id) != m_extrinsics_msgs.end())
         {
             return; //already wrote it
         }
-        
+
         // Serialize extrinsics as string: rotation (9 floats) and translation (3 floats)
         std::string payload = "rotation=";
         for (int i = 0; i < 9; ++i)
@@ -347,9 +513,40 @@ namespace librealsense
             payload += std::to_string(ext.translation[i]);
             if (i < 2) payload += ",";
         }
-        
+
         auto topic = ros2_topic::stream_extrinsic_topic(stream_id, reference_id);
         write_string(topic, get_static_file_info_timestamp(), payload);
+
+        // Also publish as a standard /tf_static transform so ROS2 tools resolve the frames
+        // natively. The stored extrinsics map reference->stream (device::get_extrinsics fetches
+        // from the pin stream), while TF parent->child needs the child pose in the parent frame
+        // (stream->reference) — so invert: R' = R^T, t' = -R^T * t.
+        float inv_rotation[9];
+        for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
+                inv_rotation[col * 3 + row] = ext.rotation[row * 3 + col];
+        float inv_translation[3];
+        for (int row = 0; row < 3; ++row)
+            inv_translation[row] = -(inv_rotation[0 * 3 + row] * ext.translation[0]
+                                   + inv_rotation[1 * 3 + row] * ext.translation[1]
+                                   + inv_rotation[2 * 3 + row] * ext.translation[2]);
+
+        geometry_msgs::msg::TransformStamped ts;
+        ts.header().frame_id("ref_" + std::to_string(reference_id));
+        ts.child_frame_id(ros2_topic::stream_name(stream_id.stream_type, stream_id.stream_index));
+        ts.transform().translation().x(inv_translation[0]);
+        ts.transform().translation().y(inv_translation[1]);
+        ts.transform().translation().z(inv_translation[2]);
+        ts.transform().rotation(rotation_matrix_to_quaternion(inv_rotation));
+
+        // Each message carries the cumulative transform set: the latch (transient_local,
+        // depth 1) delivers only the LAST message to late joiners like rviz, so every
+        // message must be self-sufficient — mirroring tf2's StaticTransformBroadcaster.
+        m_tf_transforms.push_back(std::move(ts));
+        tf2_msgs::msg::TFMessage tf_msg;
+        tf_msg.transforms(m_tf_transforms);
+        write_message("/tf_static", "tf2_msgs/msg/TFMessage", get_static_file_info_timestamp(), tf_msg, TF_STATIC_QOS_YAML);
+
         m_extrinsics_msgs.insert(stream_id);
     }
 
@@ -365,6 +562,38 @@ namespace librealsense
     }
 
 
+    void ros2_writer::write_camera_info(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame)
+    {
+        auto it = m_camera_info_msgs.find(stream_id);
+        if (it == m_camera_info_msgs.end())
+        {
+            auto profile = std::dynamic_pointer_cast<video_stream_profile_interface>(frame->get_stream());
+            if (!profile)
+                return;
+            auto intr = profile->get_intrinsics(); // may throw — caller logs and skips
+
+            sensor_msgs::msg::CameraInfo ci;
+            ci.header().frame_id(ros2_topic::stream_name(stream_id.stream_type, stream_id.stream_index));
+            ci.width(profile->get_width());
+            ci.height(profile->get_height());
+            ci.distortion_model(intr.model == RS2_DISTORTION_KANNALA_BRANDT4 ? "equidistant" : "plumb_bob");
+            size_t num_coeffs = intr.model == RS2_DISTORTION_KANNALA_BRANDT4 ? 4 : 5;
+            std::vector<double> d(num_coeffs, 0.0);
+            for (size_t i = 0; i < num_coeffs; ++i)
+                d[i] = intr.coeffs[i];
+            ci.d(std::move(d));
+            ci.k({ intr.fx, 0.0, intr.ppx, 0.0, intr.fy, intr.ppy, 0.0, 0.0, 1.0 });
+            ci.r({ 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 });
+            ci.p({ intr.fx, 0.0, intr.ppx, 0.0, 0.0, intr.fy, intr.ppy, 0.0, 0.0, 0.0, 1.0, 0.0 });
+            it = m_camera_info_msgs.emplace(stream_id, std::move(ci)).first;
+        }
+
+        auto ns_count = timestamp.count();
+        it->second.header().stamp().sec(static_cast<int32_t>(ns_count / 1000000000LL));
+        it->second.header().stamp().nanosec(static_cast<uint32_t>(ns_count % 1000000000LL));
+        write_message(ros2_topic::frame_camera_info_topic(stream_id), "sensor_msgs/msg/CameraInfo", timestamp, it->second);
+    }
+
     void ros2_writer::write_additional_frame_messages(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame)
     {
         try
@@ -374,6 +603,15 @@ namespace librealsense
         catch (std::exception const& e)
         {
             LOG_WARNING("Failed to write frame metadata for " << stream_id.stream_type << ". Exception: " << e.what());
+        }
+
+        try
+        {
+            write_camera_info(stream_id, timestamp, frame);
+        }
+        catch (std::exception const& e)
+        {
+            LOG_DEBUG("Failed to write camera info for " << stream_id.stream_type << ". Exception: " << e.what());
         }
 
         // Perception streams don't participate in the extrinsics map

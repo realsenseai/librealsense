@@ -25,20 +25,13 @@ export function StreamViewer() {
       if (!ds.isActive) return
       
       ds.streamConfigs.filter(c => c.enable).forEach(config => {
-        // Determine if this specific stream is actually streaming
-        let streamIsActive = false
-        if (ds.streamingMode === 'pipeline') {
-          // Pipeline mode: all enabled streams are active when isStreaming=true
-          streamIsActive = ds.isStreaming
-        } else if (ds.streamingMode === 'sensor') {
-          // Sensor mode: check if this specific stream type is running on its sensor
-          const sensorStatus = ds.sensorStreamingStatus?.[config.sensor_id]
-          // Check if stream type is in the list of active streams (new) or matches single stream (backward compat)
-          const activeTypes = sensorStatus?.stream_types || (sensorStatus?.stream_type ? [sensorStatus.stream_type] : [])
-          streamIsActive = sensorStatus?.is_streaming === true && 
-                          activeTypes.some(st => st.toLowerCase() === config.stream_type.toLowerCase())
-        }
-        
+        // Is this specific stream running on its sensor?
+        const sensorStatus = ds.sensorStreamingStatus?.[config.sensor_id]
+        // stream_types is the current shape; stream_type is the older single-stream one
+        const activeTypes = sensorStatus?.stream_types || (sensorStatus?.stream_type ? [sensorStatus.stream_type] : [])
+        const streamIsActive = sensorStatus?.is_streaming === true &&
+                        activeTypes.some(st => st.toLowerCase() === config.stream_type.toLowerCase())
+
         if (!streamIsActive) return
 
         streams.push({

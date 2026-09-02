@@ -33,6 +33,7 @@ namespace librealsense
         const std::string& get_file_name() const override;
 
         static bool is_zstd_compressed(const uint8_t* src, size_t src_size);
+        static size_t zstd_frame_content_size(const uint8_t* src, size_t src_size);
         static void decompress_if_needed(std::shared_ptr<rosbag2_storage::SerializedBagMessage>& msg);
 
         template<typename T>

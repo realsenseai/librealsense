@@ -6,6 +6,7 @@
 #include "types.h"
 #include "../small-heap.h"
 #include <src/platform/frame-object.h>
+#include <src/core/frame-data-allocator.h>
 
 #include <vector>
 #include <unordered_map>
@@ -431,7 +432,9 @@ struct backend_frame {
 
     backend_frame &operator=(const backend_frame &other) { return *this; }
 
-    std::vector<uint8_t> pixels;
+    // A zero-copy captured frame points straight at this buffer, so it must be GPU-visible or the
+    // GPU consumer pays a host-to-device upload (V4L2 does the same via rs_v4l2_zc_register).
+    std::vector< uint8_t, librealsense::frame_data_allocator > pixels;
     librealsense::platform::frame_object fo;
     backend_frames_archive *owner; // Keep pointer to owner for light-deleter
 };

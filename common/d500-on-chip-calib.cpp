@@ -170,10 +170,11 @@ namespace rs2
 
     bool d500_on_chip_calib_manager::uses_interactive_triggered_calibration() const
     {
-        // Mirrors ds::d5x5_family_pids in src/ds/d500/d500-private.h — the viewer cannot include
-        // SDK-internal headers. Keep the two lists in sync when adding new PIDs.
+        // Mirrors ds::uses_interactive_triggered_calibration in src/ds/d500/d500-private.h — the viewer cannot
+        // include SDK-internal headers. Keep the two lists in sync when adding new PIDs.
+        // 0C01-0C08: D5x5 family (D535/D585 2C/3C/F/proto). 0B6B: D585S safety.
         static const std::set< std::string > interactive_triggered_calibration_pids = {
-            "0C01", "0C02", "0C03", "0C04", "0C05", "0C06", "0C07", "0C08"
+            "0C01", "0C02", "0C03", "0C04", "0C05", "0C06", "0C07", "0C08", "0B6B"
         };
         return interactive_triggered_calibration_pids.count(get_device_pid()) > 0;
     }
@@ -265,7 +266,7 @@ namespace rs2
                 return;
             }
 
-            // Legacy D500 path (D585S / D585_LEGACY).
+            // Legacy D500 path (D585_LEGACY).
             if (_progress == 100.0)
                 _done = true;
             else

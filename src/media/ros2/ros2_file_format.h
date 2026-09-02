@@ -146,9 +146,22 @@ namespace librealsense
             return create_from({ stream_full_prefix(stream_id), stream_to_ros_type(stream_id.stream_type), "data" });
         }
 
+        // Compressed frame data lives on an image_transport-convention leaf under the
+        // frame data topic, so native ROS2 tools resolve the transport by suffix.
+        static std::string compressed_frame_data_topic(const device_serializer::stream_identifier& stream_id, bool is_depth)
+        {
+            return frame_data_topic(stream_id) + (is_depth ? "/compressedDepth" : "/compressed");
+        }
+
         static std::string frame_metadata_topic(const device_serializer::stream_identifier& stream_id)
         {
             return create_from({ stream_full_prefix(stream_id), stream_to_ros_type(stream_id.stream_type), "metadata" });
+        }
+
+        // Standard sensor_msgs/CameraInfo next to the image topic, per image_pipeline convention
+        static std::string frame_camera_info_topic(const device_serializer::stream_identifier& stream_id)
+        {
+            return create_from({ stream_full_prefix(stream_id), stream_to_ros_type(stream_id.stream_type), "camera_info" });
         }
 
         static std::string stream_extrinsic_topic(const device_serializer::stream_identifier& stream_id, uint32_t ref_id)

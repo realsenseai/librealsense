@@ -19,7 +19,6 @@ import pytest
 import sys
 import os
 import re
-import time
 import logging
 
 # Defense against ROS 2 launch.logging: when ROS is sourced, launch_testing's
@@ -74,11 +73,6 @@ from rspy.pytest.collection import filter_and_sort_items, assert_module_fixtures
 from rspy.pytest.plugins import check_required_plugins
 
 log = logging.getLogger('librealsense')
-
-# D585 Prototype FW accel bring-up window (RSDEV-13011): seconds to wait after powering the
-# device on before letting tests stream. Threshold measured at ~3s; +1s margin.
-# TODO(RSDEV-13011): remove once the FW fix is deployed (removal tracked in RSDSO-21766).
-D585_BRINGUP_SETTLE_SEC = 4
 
 # Bridge rspy.log → Python logging early, before any test output
 bridge_rspy_log()
@@ -807,15 +801,6 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
     disable_other_ports = no_reset
     teardown_disable = not no_reset
 
-    def _bringup_settle(serials):
-        # D585 Prototype FW: the accelerometer produces no data if streaming starts within the
-        # first ~5-7 seconds after power-on (RSDEV-13011), failing any test whose config
-        # includes it. Wait out the bring-up window after enabling such a device.
-        # Matches "D585 Prototype" / "D585 Proto Dual RGB" only — D585S is not affected.
-        if any('D585 Proto' in (getattr(devices.get(sn), 'name', '') or '') for sn in serials):
-            log.info(f"D585 bring-up settle: waiting {D585_BRINGUP_SETTLE_SEC}s before tests")
-            time.sleep(D585_BRINGUP_SETTLE_SEC)
-
     def _teardown(serials):
         # Log the teardown so the per-test file shows the module's cleanup -- not just
         # setup + test. Runs while this module+camera's log handler is still open.
@@ -845,7 +830,6 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         try:
             devices.enable_only(serial_number, recycle=recycle, disable_other_ports=disable_other_ports)
             log.debug(f"All {len(serial_number)} devices enabled and ready")
-            _bringup_settle(serial_number)
         except Exception as e:
             # Setup failed after possibly powering the port(s): teardown won't run (no yield),
             # so power off what we tried to enable here, lest it linger into the next module.
@@ -878,7 +862,6 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
         log.debug(f"{'Recycling' if recycle else 'Enabling'} device...")
         devices.enable_only([serial_number], recycle=recycle, disable_other_ports=disable_other_ports)
         log.debug(f"Device enabled and ready")
-        _bringup_settle([serial_number])
     except Exception as e:
         # Setup failed after possibly powering the port: teardown won't run (no yield), so power
         # off what we tried to enable here, lest it linger into the next module.

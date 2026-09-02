@@ -56,6 +56,20 @@ endfunction()
 
 
 if(BUILD_UNIT_TESTS)
+    # Unit tests such as test-algo-projection-distortion/-yuy2-conversion/-cuda-align
+    # #include the shared src/cuda/*.cuh headers directly (to exercise
+    # rscuda::pointcloud_cuda_helper etc.) and are compiled as plain C++ translation
+    # units, not through the HIP compiler -- so they do not automatically inherit the
+    # target-scoped `target_include_directories(${LRS_TARGET} PRIVATE ${HIP_INCLUDE_DIRS})`
+    # set up for the realsense2 library itself in CMake/global_config.cmake. Re-declaring
+    # it here with directory-scoped include_directories() only affects targets created in
+    # this subdirectory (the unit-tests tree) and below, so it does not reintroduce the
+    # whole-build include pollution that was previously flagged and removed from
+    # CMake/hip_config.cmake.
+    if(BUILD_WITH_HIP)
+        include_directories(${HIP_INCLUDE_DIRS})
+    endif()
+
     include(./unit-tests.cmake)
 endif()
 

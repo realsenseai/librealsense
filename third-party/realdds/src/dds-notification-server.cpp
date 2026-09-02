@@ -19,6 +19,7 @@
 #include <fastdds/dds/publisher/qos/PublisherQos.hpp>
 
 #include <rsutils/json.h>
+#include <rsutils/string/from.h>
 
 
 using namespace eprosima::fastdds::dds;
@@ -61,7 +62,8 @@ dds_notification_server::dds_notification_server( std::shared_ptr< dds_publisher
                       _new_instant_notification = false;
                   }
               }
-          } )
+          },
+          rsutils::string::from() << "dds-notify-" << topic_name )
 {
     auto topic = topics::flexible_msg::create_topic( publisher->get_participant(), topic_name.c_str() );
     _writer = std::make_shared< dds_topic_writer >( topic, publisher );

@@ -120,7 +120,7 @@ extern "C" {
         RS2_OPTION_AUTO_EXPOSURE_LIMIT_TOGGLE, /**< Enable / disable color image auto-exposure*/
         RS2_OPTION_AUTO_GAIN_LIMIT_TOGGLE, /**< Enable / disable color image auto-gain*/
         RS2_OPTION_EMITTER_FREQUENCY, /**< Select emitter (laser projector) frequency, see rs2_emitter_frequency for values */
-        RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE, /**< Select depth sensor auto exposure mode see rs2_depth_auto_exposure_mode for values  */
+        RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE, /**< Select depth sensor auto exposure mode, see rs2_depth_auto_exposure_mode for values - or rs2_colored_ir_auto_exposure_mode on colored-IR devices */
         RS2_OPTION_OHM_TEMPERATURE, /**< Temperature of the Optical Head Sensor */
         RS2_OPTION_SOC_PVT_TEMPERATURE, /**< Temperature of PVT SOC */
         RS2_OPTION_GYRO_SENSITIVITY,/**< Control of the gyro sensitivity level, see rs2_gyro_sensitivity for values */ 
@@ -317,6 +317,18 @@ extern "C" {
         RS2_DEPTH_AUTO_EXPOSURE_COUNT        /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
     } rs2_depth_auto_exposure_mode;
     const char* rs2_depth_auto_exposure_mode_to_string( rs2_depth_auto_exposure_mode mode );
+
+    /** \brief values for RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE option on colored-IR devices, where the same imagers
+        feed both the color and the depth pipeline so auto exposure has to be arbitrated between them. */
+    typedef enum rs2_colored_ir_auto_exposure_mode
+    {
+        RS2_COLORED_IR_AUTO_EXPOSURE_AUTO = 0,  /**< Let the firmware choose the policy */
+        RS2_COLORED_IR_AUTO_EXPOSURE_DEPTH_PRIORITY = 1,  /**< Favor the depth pipeline */
+        RS2_COLORED_IR_AUTO_EXPOSURE_COLOR_PRIORITY = 2,  /**< Favor the color pipeline */
+        RS2_COLORED_IR_AUTO_EXPOSURE_HYBRID = 3,  /**< Combine color and depth pipelines for best results on both */
+        RS2_COLORED_IR_AUTO_EXPOSURE_COUNT        /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
+    } rs2_colored_ir_auto_exposure_mode;
+    const char* rs2_colored_ir_auto_exposure_mode_to_string( rs2_colored_ir_auto_exposure_mode mode );
 
     /** \brief values for RS2_OPTION_SAFETY_MODE option. */
     typedef enum rs2_safety_mode

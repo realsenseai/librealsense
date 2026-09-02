@@ -30,6 +30,7 @@
 * Device specific topics:
   * [D400 at realsense.intel.com/](https://realsenseai.com/stereo-depth-cameras/) - Camera specifications
   * [D400 Advanced Mode](rs400/rs400_advanced_mode.md) - Overview of the Advanced Mode APIs
+  * [D401 GMSL Dual-RGB and ISP color](rs400/d401_dual_rgb_gmsl.md) - Using the D401 GMSL raw dual-RGB and legacy ISP color modes (SDK and Viewer)
   * [D400 cameras with Raspberry Pi](./RaspberryPi3.md) - Example of low-end system without USB3 interface
   * [D400 cameras on **rooted** Android devices](./android.md) - Instructions of how to build the RealSense SDK for Android OS.
   * [D435i depth camera with IMU](./d435i.md) - An introduction to the D435i depth camera and it's IMU

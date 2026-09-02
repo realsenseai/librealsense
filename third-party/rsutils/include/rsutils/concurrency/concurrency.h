@@ -11,6 +11,7 @@
 #include <memory>
 #include <cassert>
 #include <exception>
+#include <string>
 
 const int QUEUE_MAX_SIZE = 10;
 // Simplest implementation of a blocking concurrent queue for thread messaging
@@ -397,10 +398,15 @@ public:
     // and we're non-blocking. The on_drop_callback allows caputring of these instances, if we
     // want...
     //
+    // The name is logged alongside our address, which distinguishes the many same-named instances.
+    //
     dispatcher( unsigned int queue_capacity,
+                std::string name,
                 std::function< void( action ) > on_drop_callback = nullptr );
 
     ~dispatcher();
+
+    std::string const & name() const { return _name; }
 
     bool empty() const { return _queue.empty(); }
 
@@ -465,6 +471,7 @@ private:
 
     friend cancellable_timer;
 
+    std::string const _name;
     single_consumer_queue<std::function<void(cancellable_timer)>> _queue;
     std::thread _thread;
 
@@ -481,8 +488,8 @@ template<class T = std::function<void(dispatcher::cancellable_timer)>>
 class active_object
 {
 public:
-    active_object(T operation)
-        : _operation(std::move(operation)), _dispatcher(1), _stopped(true)
+    active_object( T operation, std::string name )
+        : _operation(std::move(operation)), _dispatcher(1, std::move(name)), _stopped(true)
     {
     }
 
@@ -544,7 +551,7 @@ public:
                 std::lock_guard<std::mutex> lk(_m);
                 _kicked = false;
             }
-        });
+        }, "watchdog" );
     }
 
     ~watchdog()

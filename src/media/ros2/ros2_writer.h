@@ -5,6 +5,8 @@
 #include <rosbag2_storage/serialized_bag_message.hpp>
 #include <rosbag2_storage/topic_metadata.hpp>
 #include <rosbag2_storage_default_plugins/sqlite/sqlite_storage.hpp>
+#include <sensor_msgs/msg/CameraInfo.h>
+#include <geometry_msgs/msg/TransformStamped.h>
 
 #include "ros2_file_format.h"
 
@@ -30,8 +32,9 @@ namespace librealsense
     private:
         void write_file_version();
         void write_frame_metadata(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
+        void write_camera_info(const stream_identifier& stream_id, const nanoseconds& timestamp, frame_interface* frame);
         void write_string( std::string const & topic, const device_serializer::nanoseconds & ts, std::string const & payload );
-        void ensure_topic( const std::string & name, const std::string & type );
+        void ensure_topic( const std::string & name, const std::string & type, const std::string & offered_qos = "" );
 
         void write_notification(const sensor_identifier& sensor_id, const nanoseconds& timestamp, const notification& n) override;
         void write_extrinsics(const stream_identifier& stream_id, uint32_t reference_id, const rs2_extrinsics& ext) override;
@@ -65,7 +68,8 @@ namespace librealsense
         static constexpr size_t CDR_HEADER_SIZE = 4;
 
         template<typename T>
-        void write_message(const std::string& topic, const std::string& msg_type, const nanoseconds& timestamp, const T& data)
+        void write_message(const std::string& topic, const std::string& msg_type, const nanoseconds& timestamp, const T& data,
+                           const std::string& offered_qos = "")
         {
             // Serialize into reusable CDR buffer — avoids per-message malloc on the hot path
             auto total_size = T::getCdrSerializedSize(data) + CDR_HEADER_SIZE;
@@ -77,15 +81,20 @@ namespace librealsense
             buffer->buffer_length = static_cast<size_t>(cdr.getSerializedDataLength());
 
             // Write to storage
-            ensure_topic(topic, msg_type);
+            ensure_topic(topic, msg_type, offered_qos);
             auto msg = std::make_shared<rosbag2_storage::SerializedBagMessage>();
-            msg->serialized_data = _compress ? compress_buffer(buffer) : buffer;
+            msg->serialized_data = buffer;
             msg->time_stamp = static_cast<rcutils_time_point_value_t>(timestamp.count());
             msg->topic_name = topic;
             _storage->write(msg);
         }
 
-        std::shared_ptr<rcutils_uint8_array_t> compress_buffer(const std::shared_ptr<rcutils_uint8_array_t>& input);
+        // Compression happens inside CompressedImage payloads (PNG or zstd) so the bag
+        // stays natively playable by ROS2; whole-CDR compression is playback-breaking.
+        void write_compressed_video_frame(const device_serializer::stream_identifier& stream_id,
+                                          const nanoseconds& timestamp,
+                                          frame_interface* frame);
+        void compress_zstd(const uint8_t* data, size_t size, std::vector<uint8_t>& out);
 
         static uint8_t is_big_endian();
         std::string m_file_path;
@@ -93,10 +102,14 @@ namespace librealsense
         // Reused across calls. Safe only while _storage->write() stays synchronous
         // (sqlite binds SQLITE_STATIC and drops the ref in execute_and_reset).
         std::shared_ptr<rcutils_uint8_array_t> _cdr_buf;
-        std::shared_ptr<rcutils_uint8_array_t> _compress_buf;
+        std::vector<uint8_t> _frame_buf;
         std::map< std::string, rosbag2_storage::TopicMetadata > _topics; // created topics cache
         std::shared_ptr< rosbag2_storage::storage_interfaces::ReadWriteInterface > _storage;
         std::map<uint32_t, std::set<rs2_option>> m_written_options_descriptions;
         std::set<device_serializer::stream_identifier> m_extrinsics_msgs;
+        // Per-stream CameraInfo templates — intrinsics are static, only the stamp changes per frame
+        std::map<device_serializer::stream_identifier, sensor_msgs::msg::CameraInfo> m_camera_info_msgs;
+        // All static transforms written so far; every /tf_static message republishes the full set
+        std::vector<geometry_msgs::msg::TransformStamped> m_tf_transforms;
     };
 }

@@ -56,7 +56,9 @@ describe('StreamViewer', () => {
         isActive: true,
         streamConfigs: [depthConfig],
         isStreaming: true,
-        streamingMode: 'pipeline',
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+        },
       })
       
       render(<StreamViewer />, {
@@ -84,7 +86,9 @@ describe('StreamViewer', () => {
         isActive: true,
         streamConfigs: [depthConfig, colorConfig],
         isStreaming: true,
-        streamingMode: 'pipeline',
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color'] },
+        },
       })
       
       render(<StreamViewer />, {
@@ -111,13 +115,17 @@ describe('StreamViewer', () => {
         isActive: true,
         streamConfigs: [config1],
         isStreaming: true,
-        streamingMode: 'pipeline',
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+        },
       })
       const state2 = createMockDeviceState(device2, {
         isActive: true,
         streamConfigs: [config2],
         isStreaming: true,
-        streamingMode: 'pipeline',
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+        },
       })
       
       render(<StreamViewer />, {
@@ -140,13 +148,17 @@ describe('StreamViewer', () => {
         isActive: true,
         streamConfigs: [createMockStreamConfig({ enable: true })],
         isStreaming: true,
-        streamingMode: 'pipeline',
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+        },
       })
       const inactiveState = createMockDeviceState(inactiveDevice, {
         isActive: false,
         streamConfigs: [createMockStreamConfig({ enable: true })],
         isStreaming: true,
-        streamingMode: 'pipeline',
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+        },
       })
       
       render(<StreamViewer />, {
@@ -170,7 +182,6 @@ describe('StreamViewer', () => {
       const notStreamingState = createMockDeviceState(device, {
         isActive: true,
         isStreaming: false,
-        streamingMode: 'idle',
         streamConfigs: [config],
       })
 
@@ -186,26 +197,7 @@ describe('StreamViewer', () => {
   })
 
   describe('Tile hiding until streaming', () => {
-    it('hides tile when stream is enabled but not actively streaming', () => {
-      const device = createMockDevice()
-      const config = createMockStreamConfig({ stream_type: 'depth', enable: true })
-      const deviceState = createMockDeviceState(device, {
-        isActive: true,
-        isStreaming: false,
-        streamingMode: 'pipeline',
-        streamConfigs: [config],
-      })
-
-      render(<StreamViewer />, {
-        initialStoreState: {
-          deviceStates: { [device.device_id]: deviceState },
-        },
-      })
-
-      expect(screen.getByText('Nothing is streaming!')).toBeInTheDocument()
-    })
-
-    it('sensor mode: renders tile when stream_type is in active list (case-insensitive)', () => {
+    it('renders tile when stream_type is in the active list (case-insensitive)', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({
         stream_type: 'INFRARED-1',
@@ -214,7 +206,6 @@ describe('StreamViewer', () => {
       })
       const deviceState = createMockDeviceState(device, {
         isActive: true,
-        streamingMode: 'sensor',
         streamConfigs: [config],
         sensorStreamingStatus: {
           'sensor-0': {
@@ -235,7 +226,7 @@ describe('StreamViewer', () => {
       expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
     })
 
-    it('sensor mode: hides tile when stream_type is not in active list', () => {
+    it('hides tile when stream_type is not in the active list', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({
         stream_type: 'color',
@@ -244,7 +235,6 @@ describe('StreamViewer', () => {
       })
       const deviceState = createMockDeviceState(device, {
         isActive: true,
-        streamingMode: 'sensor',
         streamConfigs: [config],
         sensorStreamingStatus: {
           'sensor-0': {
@@ -268,26 +258,6 @@ describe('StreamViewer', () => {
   })
 
   describe('Stream Types', () => {
-    it('handles depth stream type', () => {
-      const device = createMockDevice()
-      const config = createMockStreamConfig({ stream_type: 'depth', enable: true })
-      const deviceState = createMockDeviceState(device, {
-        isActive: true,
-        streamConfigs: [config],
-        isStreaming: true,
-        streamingMode: 'pipeline',
-      })
-      
-      render(<StreamViewer />, {
-        initialStoreState: {
-          deviceStates: { [device.device_id]: deviceState },
-        },
-      })
-      
-      expect(screen.getByText('DEPTH')).toBeInTheDocument()
-      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
-    })
-
     it('handles color stream type', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({ stream_type: 'color', format: 'RGB8', enable: true })
@@ -295,7 +265,9 @@ describe('StreamViewer', () => {
         isActive: true,
         streamConfigs: [config],
         isStreaming: true,
-        streamingMode: 'pipeline',
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+        },
       })
       
       render(<StreamViewer />, {
@@ -315,7 +287,9 @@ describe('StreamViewer', () => {
         isActive: true,
         streamConfigs: [config],
         isStreaming: true,
-        streamingMode: 'pipeline',
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+        },
       })
       
       render(<StreamViewer />, {

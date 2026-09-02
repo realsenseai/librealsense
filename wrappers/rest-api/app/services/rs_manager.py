@@ -22,11 +22,10 @@ import socketio
 from datetime import datetime
 
 from app.services.metadata_socket_server import MetadataSocketServer
+from app.services import firmware as fw
 
 
 _IS_WINDOWS = platform.system() == "Windows"
-
-FW_STATUS_UNKNOWN = "unknown"
 
 # Recent color frames retained per device for texturing the 3D point cloud.
 # Five frames at 30 fps covers the typical depth/color SDK-latency offset
@@ -212,9 +211,6 @@ class RealSenseManager:
             name=_info(rs.camera_info.name, "Unknown Device"),
             serial_number=device_id,
             firmware_version=_info(rs.camera_info.firmware_version),
-            recommended_firmware_version=None,
-            firmware_status=FW_STATUS_UNKNOWN,
-            firmware_file_available=False,
             physical_port=_info(rs.camera_info.physical_port),
             usb_type=_info(rs.camera_info.usb_type_descriptor),
             product_id=_info(rs.camera_info.product_id),
@@ -302,16 +298,48 @@ class RealSenseManager:
                 return device
         raise RealSenseError(status_code=404, detail=f"Device {device_id} not found")
 
-    def get_firmware_status(self, device_id: str) -> Dict[str, Any]:
-        """Return firmware status metadata for a device."""
+    def get_recommended_firmware(self, device_id: str) -> Dict[str, Any]:
+        """Return the firmware version the online DB recommends for a device, if any."""
         device = self.get_device(device_id)
-        return {
-            "device_id": device_id,
-            "current": device.firmware_version,
-            "recommended": None,
-            "status": device.firmware_status or FW_STATUS_UNKNOWN,
-            "file_available": False,
-        }
+        recommended, _link = fw.recommended_firmware(device.name)
+        return {"recommended": recommended}
+
+    def update_firmware_from_recommended(self, device_id: str) -> Dict[str, Any]:
+        """Download the device's recommended firmware image and flash it.
+
+        Looks up the recommended .bin from the online versions DB, downloads it into
+        memory, and reuses the standard DFU flash flow — so Socket.IO
+        progress/success/failure events are emitted exactly as for a user-supplied file.
+        """
+        device = self.get_device(device_id)
+        recommended, link = fw.recommended_firmware(device.name)
+        if not link:
+            raise RealSenseError(status_code=404, detail="No recommended firmware available for this device")
+        # Refuse before downloading ~2 MiB to flash a version the device already has or beats.
+        if fw.is_newer_or_same(device.firmware_version, recommended):
+            raise RealSenseError(
+                status_code=409,
+                detail=f"Device already runs firmware {device.firmware_version}; recommended is {recommended}",
+            )
+        # Claim before emitting: a duplicate request must not put events on this device's
+        # channel, where they would rewrite the modal of the update already running.
+        self._claim_fw_update_slot(device_id)
+        # Emit download progress under the "downloading" phase so the UI can show it
+        # before the (separate) install phase begins.
+        _holder, on_download = self._make_fw_progress_callback(device_id, phase="downloading")
+        try:
+            fw_bytes = fw.download_firmware(link, on_progress=on_download)
+        except Exception as exc:
+            # Surface download failures on the same channel as flash failures so the
+            # progress modal shows the error instead of hanging.
+            self._emit_socket_event(
+                f"firmware_update_failed_{device_id}",
+                {"device_id": device_id, "error": str(exc)},
+            )
+            with self.lock:
+                self._fw_updates_in_progress.discard(device_id)
+            raise
+        return self.update_firmware_from_bytes(device_id, fw_bytes, slot_held=True)
 
     @staticmethod
     def _is_update_device(dev: rs.device) -> bool:
@@ -327,14 +355,15 @@ class RealSenseManager:
         except Exception:
             return False
 
-    def update_firmware_from_bytes(self, device_id: str, fw_bytes: bytes) -> Dict[str, Any]:
+    def update_firmware_from_bytes(self, device_id: str, fw_bytes: bytes, slot_held: bool = False) -> Dict[str, Any]:
         """Run firmware update using a user-supplied image blob.
 
         Reuses the DFU flow: check_firmware_compatibility -> enter_update_state ->
         wait for DFU device -> update_dev.update(image, on_progress) -> wait for reconnect.
         Emits the same Socket.IO progress / success / failure events as a bundled-image update.
         """
-        self._claim_fw_update_slot(device_id)
+        if not slot_held:
+            self._claim_fw_update_slot(device_id)
         try:
             self._ensure_fw_update_allowed(device_id)
             # pyrealsense2 accepts bytes-like objects; bytearray keeps memory
@@ -356,11 +385,9 @@ class RealSenseManager:
             firmware_update_id = self._resolve_firmware_update_id(target_dev, device_id)
 
             progress_holder, on_progress = self._make_fw_progress_callback(device_id)
-            # Always emit a starting progress so the UI doesn't stay at 0% forever
-            self._emit_socket_event(
-                f"firmware_progress_{device_id}",
-                {"device_id": device_id, "progress": 0.0},
-            )
+            # Mark the install phase up front: the one-click path has been showing download
+            # progress, and the SDK's first flash tick only arrives after DFU re-enumeration.
+            on_progress(0.0)
 
             try:
                 update_dev = self._enter_dfu_and_get_update_dev(
@@ -399,23 +426,23 @@ class RealSenseManager:
                 raise RealSenseError(status_code=500, detail=f"Firmware update failed: {exc}")
 
             updated_info = self._refresh_until_device_returns(device_id)
+            if not updated_info:
+                # Written, but a device that never came back is not a success we can report.
+                raise RealSenseError(
+                    status_code=504,
+                    detail="Firmware written, but the device did not reconnect. "
+                           "Power-cycle it and check its version.",
+                )
 
             self._emit_socket_event(
-                f"firmware_progress_{device_id}",
-                {"device_id": device_id, "progress": 1.0},
-            )
-            self._emit_socket_event(
                 f"firmware_update_success_{device_id}",
-                {
-                    "device_id": device_id,
-                    "firmware_version": updated_info.firmware_version if updated_info else None,
-                },
+                {"device_id": device_id, "firmware_version": updated_info.firmware_version},
             )
 
             return {
                 "device_id": device_id,
                 "progress": progress_holder["value"],
-                "firmware_version": updated_info.firmware_version if updated_info else None,
+                "firmware_version": updated_info.firmware_version,
                 "status": "success",
             }
         except RealSenseError as exc:
@@ -495,11 +522,12 @@ class RealSenseManager:
         return firmware_update_id
 
     def _make_fw_progress_callback(
-        self, device_id: str,
+        self, device_id: str, phase: str = "installing",
     ) -> Tuple[Dict[str, float], Callable[[float], None]]:
         """Build the on_progress callback and a holder dict that records the latest value.
 
         Rate-limits emissions to ~10/sec but always lets the final 100% through.
+        `phase` ("downloading" | "installing") lets the UI label what's happening.
         """
         progress_holder = {"value": 0.0}
         last_emit_ts = {"value": 0.0}
@@ -512,7 +540,7 @@ class RealSenseManager:
             last_emit_ts["value"] = now
             self._emit_socket_event(
                 f"firmware_progress_{device_id}",
-                {"device_id": device_id, "progress": float(p)},
+                {"device_id": device_id, "progress": float(p), "phase": phase},
             )
 
         return progress_holder, _on_progress

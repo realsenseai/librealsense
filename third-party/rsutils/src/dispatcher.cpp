@@ -5,11 +5,14 @@
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <rsutils/time/waiting-on.h>
 
-dispatcher::dispatcher( unsigned int cap, std::function< void( action ) > on_drop_callback )
-    : _queue( cap, on_drop_callback )
+dispatcher::dispatcher( unsigned int cap, std::string name, std::function< void( action ) > on_drop_callback )
+    : _name( std::move( name ) )
+    , _queue( cap, on_drop_callback )
     , _was_stopped( true )
     , _is_alive( true )
 {
+    LOG_DEBUG( "Dispatcher [" << _name << " @ " << this << "] created" );
+
     // We keep a running thread that takes stuff off our queue and dispatches them
     _thread = std::thread([&]()
     {
@@ -31,11 +34,11 @@ dispatcher::dispatcher( unsigned int cap, std::function< void( action ) > on_dro
                     }
                     catch (const std::exception& e)
                     {
-                        LOG_ERROR("Dispatcher [" << this << "] exception caught: " << e.what());
+                        LOG_ERROR( "Dispatcher [" << _name << " @ " << this << "] exception caught: " << e.what() );
                     }
                     catch (...)
                     {
-                        LOG_ERROR("Dispatcher [" << this << "] unknown exception caught!");
+                        LOG_ERROR( "Dispatcher [" << _name << " @ " << this << "] unknown exception caught!" );
                     }
                 }
             }
@@ -46,6 +49,10 @@ dispatcher::dispatcher( unsigned int cap, std::function< void( action ) > on_dro
 
 dispatcher::~dispatcher()
 {
+    // The teardown path is deliberately unlogged: a dispatcher can be destroyed during static
+    // destruction -- e.g. by an app holding an rs2::device in a global -- when the logger is
+    // already gone, calling LOG_DEBUG will issue a segmentation fault.
+
     // Don't get into any more dispatches
     _is_alive = false;
 
@@ -60,14 +67,18 @@ dispatcher::~dispatcher()
 
 void dispatcher::start()
 {
+    bool was_stopped;
     {
         std::lock_guard< std::mutex > lock(_was_stopped_mutex);
-        _was_stopped = false;
+        was_stopped = _was_stopped.exchange( false );
     }
     _queue.start();
     // Wake up all threads that wait for the dispatcher to start
     _was_stopped_cv.notify_all();
 
+    // Only the actual transition, so repeated calls don't fill the log
+    if( was_stopped )
+        LOG_DEBUG( "Dispatcher [" << _name << " @ " << this << "] started" );
 }
 
 
@@ -96,6 +107,8 @@ void dispatcher::stop()
         _was_stopped = true;
     }
     _was_stopped_cv.notify_all();
+
+    // Stopping not logged: stop() is also reached from the destructor -- see the note there
 }
 
 

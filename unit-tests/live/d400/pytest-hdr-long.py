@@ -212,6 +212,7 @@ def _check_hdr_frame_counter(pipe, num_of_frames, merging_filter):
     :return: False if some metadata could not be read - otherwise, True
     """
     prev_depth_counter = -1
+    skipped = 0
     for i in range(num_of_frames):
         data = pipe.wait_for_frames()
         # get depth frame data
@@ -238,8 +239,21 @@ def _check_hdr_frame_counter(pipe, num_of_frames, merging_filter):
         log.info(f"prev_depth_counter: {prev_depth_counter}")
         log.info(f"depth_counter: {depth_counter}")
         log.info(f"hdr counter: {hdr_counter}")
-        check.is_true(depth_counter - 2 <= hdr_counter <= depth_counter)
+        # The pipeline holds a single frameset, so a slow consumer (this test) loses one and the depth
+        # counter jumps. hdr_merge emits only from a consecutive pair, so its counter cannot advance and
+        # the lag exceeds the 2 allowed below -- skip the whole check for that iteration.
+        if prev_depth_counter != -1 and depth_counter > prev_depth_counter + 1:
+            skipped += 1
+            log.info(f"frameset dropped ({prev_depth_counter}->{depth_counter}), skipping hdr lag check")
+        else:
+            check.is_true(depth_counter - 2 <= hdr_counter <= depth_counter)
         prev_depth_counter = depth_counter
+
+    # Skipping is only meant to absorb the occasional drop. Dropping this much means the rig or
+    # device is in a bad state and the lag went mostly unchecked, so fail rather than pass silently.
+    max_skips = max(1, num_of_frames // 2)
+    check.is_true(skipped < max_skips,
+                  f"{skipped}/{num_of_frames} iterations dropped a frameset")
 
 
 def _hdr_running_hdr_merge_after_hdr_restart(dev, ctx):

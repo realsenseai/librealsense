@@ -249,6 +249,81 @@ describe('DevicePanel', () => {
     })
   })
 
+  describe('Firmware Update Proposal', () => {
+    const outdated = (overrides = {}) => {
+      const device = createMockDevice({
+        serial_number: '123456789012',
+        firmware_version: '5.17.0.10',
+        ...overrides,
+      })
+      const ds = createMockDeviceState(device, { firmware: { recommended: '5.17.3.10' } })
+      return { device, ds }
+    }
+
+    it('toasts an update proposal naming the device and serial when firmware is outdated', async () => {
+      const { device, ds } = outdated()
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
+      })
+
+      const toast = await screen.findByText(/firmware 5\.17\.0\.10 → 5\.17\.3\.10 is available/)
+      expect(toast).toHaveTextContent(`S/N ${device.serial_number}`)
+      expect(toast).toHaveTextContent(device.name)
+      expect(screen.getByRole('button', { name: 'Update' })).toBeInTheDocument()
+    })
+
+    it('the toast Update action starts the recommended update for that device', async () => {
+      const updateFirmwareFromRecommended = vi.fn().mockResolvedValue(undefined)
+      useAppStore.setState({ updateFirmwareFromRecommended })
+      const { device, ds } = outdated()
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
+      })
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Update' }))
+      expect(updateFirmwareFromRecommended).toHaveBeenCalledWith(device.device_id)
+    })
+
+    it('does not toast when firmware is up to date', async () => {
+      const device = createMockDevice({ firmware_version: '5.17.3.10' })
+      const ds = createMockDeviceState(device, { firmware: { recommended: '5.17.3.10' } })
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
+      })
+
+      await waitFor(() => expect(screen.getByText('Devices')).toBeInTheDocument())
+      expect(screen.queryByText(/is available/)).not.toBeInTheDocument()
+    })
+
+    it('toasts only once per recommended version', async () => {
+      const { device, ds } = outdated()
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
+      })
+      await screen.findByText(/is available/)
+
+      // A re-enumeration that reports the same recommendation must not re-prompt.
+      useAppStore.setState({
+        deviceStates: { [device.device_id]: { ...ds, firmware: { ...ds.firmware! } } },
+      })
+
+      await waitFor(() => expect(screen.getAllByText(/is available/)).toHaveLength(1))
+    })
+
+    it('keeps firmware state off the card entirely — the toast owns it', () => {
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, {
+        firmware: { current: '5.17.3.10', recommended: '5.17.3.10', status: 'up_to_date' },
+      })
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } },
+      })
+
+      expect(screen.queryByText(/up to date/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Download firmware/)).not.toBeInTheDocument()
+    })
+  })
+
   describe('Control Search', () => {
     function renderWithControls(overrides: {
       options?: ReturnType<typeof createMockOption>[]

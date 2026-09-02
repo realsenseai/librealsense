@@ -22,7 +22,7 @@ int fibo( int num )
 
 TEST_CASE( "dispatcher main flow" )
 {
-    dispatcher d(3);
+    dispatcher d( 3, "test" );
     std::atomic_bool run = { false };
     auto func = [&](dispatcher::cancellable_timer c) 
     {
@@ -45,7 +45,7 @@ TEST_CASE( "dispatcher main flow" )
 
 TEST_CASE( "invoke and wait" )
 {
-    dispatcher d(2);
+    dispatcher d( 2, "test" );
 
     std::atomic_bool run = { false };
     auto func = [&](dispatcher::cancellable_timer c)
@@ -68,7 +68,7 @@ TEST_CASE( "invoke and wait is blocking by default" )
     std::atomic_bool queued_action_dropped{ false };
     std::atomic_bool invocation_started{ false };
     std::atomic_bool invoked_action_ran{ false };
-    dispatcher d( 1, [&]( dispatcher::action const & ) { queued_action_dropped = true; } );
+    dispatcher d( 1, "test", [&]( dispatcher::action const & ) { queued_action_dropped = true; } );
     d.start();
 
     d.invoke( [&]( dispatcher::cancellable_timer ) {
@@ -100,7 +100,7 @@ TEST_CASE( "invoke and wait is blocking by default" )
 
 TEST_CASE( "invoke and wait propagates action errors" )
 {
-    dispatcher d( 1 );
+    dispatcher d( 1, "test" );
     d.start();
 
 #if defined( _WIN32 )
@@ -128,7 +128,7 @@ TEST_CASE("verify stop() not consuming high CPU usage")
 
     for (int i = 0 ; i < 32; ++i)
     {
-        dispatchers.push_back(std::make_shared<dispatcher>(10));
+        dispatchers.push_back(std::make_shared<dispatcher>( 10, "test" ));
     }
 
     for (auto &&dispatcher : dispatchers)
@@ -160,7 +160,7 @@ TEST_CASE("stop() notify flush to finish")
 {
     // On this test we check that if during a flush() another thread call stop(),
     // than the flush CV will be triggered to exit and not wait a full timeout
-    dispatcher dispatcher( 10 );
+    dispatcher dispatcher( 10, "test" );
     dispatcher.start();
 
     stopwatch sw;
@@ -190,4 +190,9 @@ TEST_CASE("stop() notify flush to finish")
     //std::cout << "Flushing is done" << std::endl;
     CHECK( sw.get_elapsed() < timeout );
     stop_thread.join();
+}
+
+TEST_CASE( "dispatcher name" )
+{
+    CHECK( dispatcher( 10, "my-dispatcher" ).name() == "my-dispatcher" );
 }

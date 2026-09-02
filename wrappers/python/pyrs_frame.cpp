@@ -263,10 +263,16 @@ void init_frame(py::module &m) {
         .def_readwrite("bottom_right_x", &rs2_object_detection::bottom_right_x)
         .def_readwrite("bottom_right_y", &rs2_object_detection::bottom_right_y)
         .def_readwrite( "depth", &rs2_object_detection::depth )
+        .def_readwrite("world_position", &rs2_object_detection::world_position)
+        .def_readwrite("center_of_mass_x", &rs2_object_detection::center_of_mass_x)
+        .def_readwrite("center_of_mass_y", &rs2_object_detection::center_of_mass_y)
+        .def_readwrite("center_of_mass_valid", &rs2_object_detection::center_of_mass_valid)
         .def("__repr__", [](const rs2_object_detection& d) {
                 std::ostringstream oss;
                 oss << "class_id: " << d.class_id << ", score: " << d.score << ", top_left: [" << d.top_left_x << ", "
-                    << d.top_left_y << "], bottom_right: [" << d.bottom_right_x << ", " << d.bottom_right_y << "], depth: " << d.depth;
+                    << d.top_left_y << "], bottom_right: [" << d.bottom_right_x << ", " << d.bottom_right_y << "], depth: " << d.depth
+                    << ", world_position: [" << d.world_position.x << ", " << d.world_position.y << ", " << d.world_position.z
+                    << "], center_of_mass: [" << d.center_of_mass_x << ", " << d.center_of_mass_y << "], center_of_mass_valid: " << d.center_of_mass_valid;
             return oss.str();
         });
 

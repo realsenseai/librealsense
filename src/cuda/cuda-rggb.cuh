@@ -4,7 +4,10 @@
 #ifndef CUDA_RGGB_CUH
 #define CUDA_RGGB_CUH
 
-#ifdef RS2_USE_CUDA
+// Guarded on either macro (not just RS2_USE_CUDA) so this compiles under HIP regardless of
+// whether global_config.cmake's BUILD_WITH_HIP branch also defines RS2_USE_CUDA (today, for
+// back-compat) or drops it in favor of RS2_USE_HIP alone.
+#if defined(RS2_USE_CUDA) || defined(RS2_USE_HIP)
 
 // CUDA path for the D401 GMSL dual-RGB pipeline (mirrors src/proc/rggb-debayer.cpp and the remap
 // in src/proc/stereo-rectify.cpp). Two fused kernels:
@@ -62,5 +65,5 @@ namespace rscuda
     void   rggb_cuda_free( void * dev_ptr );
 }
 
-#endif // RS2_USE_CUDA
+#endif // RS2_USE_CUDA || RS2_USE_HIP
 #endif // CUDA_RGGB_CUH

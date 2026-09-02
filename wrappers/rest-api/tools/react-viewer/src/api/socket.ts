@@ -57,8 +57,9 @@ class SocketService {
 
     this.socket.on('devices_changed', (data: { added?: string[]; removed?: string[] }) => {
       if (import.meta.env.DEV) console.log('Socket.IO devices_changed:', data)
-      // Refresh device list. fetchDevices itself handles first-load auto-activate.
-      useAppStore.getState().fetchDevices()
+      // Force a re-enumeration: a device returning after a FW flash must not be
+      // served from the cached list. fetchDevices handles first-load auto-activate.
+      useAppStore.getState().fetchDevices(true)
     })
 
     this.socket.on('welcome', (data) => {

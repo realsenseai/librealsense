@@ -43,12 +43,6 @@ export interface TestFixtures {
   
   /** Check if a specific device is connected */
   isDeviceConnected: (serial_number?: string) => Promise<boolean>
-  
-  /** Start streaming for a device */
-  startStreaming: (page: Page, deviceId?: string) => Promise<void>
-  
-  /** Stop streaming for a device */
-  stopStreaming: (page: Page, deviceId?: string) => Promise<void>
 }
 
 /**
@@ -153,29 +147,6 @@ export const test = base.extend<TestFixtures>({
       }
     }
     await use(checkFn)
-  },
-
-  startStreaming: async ({ page }, use) => {
-    const startFn = async (p: Page, deviceId?: string) => {
-      // Click the start streaming button for the device
-      const streamButton = p.locator('[data-testid="start-streaming-button"], button:has-text("Start")').first()
-      await streamButton.click()
-      
-      // Wait for streaming to start
-      await p.waitForSelector('video, [data-testid="stream-tile"]', { timeout: 10000 })
-    }
-    await use(startFn)
-  },
-
-  stopStreaming: async ({ page }, use) => {
-    const stopFn = async (p: Page, deviceId?: string) => {
-      // Click the stop streaming button
-      const stopButton = p.locator('[data-testid="stop-streaming-button"], button:has-text("Stop")').first()
-      if (await stopButton.isVisible()) {
-        await stopButton.click()
-      }
-    }
-    await use(stopFn)
   },
 })
 

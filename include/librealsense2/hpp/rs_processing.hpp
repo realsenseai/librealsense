@@ -950,11 +950,11 @@ namespace rs2
         {
             rs2_error * e = nullptr;
 
-            rs2_streams_list streams_list;
-            streams_list.list = std::move( streams_to_rotate ); 
-
-            auto block = std::shared_ptr< rs2_processing_block >( rs2_create_rotation_filter_block( streams_list, &e ),
-                                                                  rs2_delete_processing_block );
+            auto block = std::shared_ptr< rs2_processing_block >(
+                rs2_create_rotation_filter_block( streams_to_rotate.data(),
+                                                  static_cast< int >( streams_to_rotate.size() ),
+                                                  &e ),
+                rs2_delete_processing_block );
             error::handle( e );
             return block;
         }

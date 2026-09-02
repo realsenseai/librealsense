@@ -2,7 +2,7 @@
 # Copyright(c) 2019 RealSense, Inc. All Rights Reserved.
 string(REPLACE ${PROJECT_SOURCE_DIR}/ "" _proc_rel_path ${CMAKE_CURRENT_LIST_DIR})
 
-if (BUILD_WITH_CUDA)
+if (BUILD_WITH_CUDA OR BUILD_WITH_HIP)
     include(${_proc_rel_path}/cuda/CMakeLists.txt)
 endif()
 

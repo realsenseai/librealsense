@@ -49,7 +49,7 @@ if(${BACKEND} STREQUAL RS2_USE_LIBUVC_BACKEND)
     include(${_rel_path}/libuvc/CMakeLists.txt)
 endif()
 
-if(BUILD_WITH_CUDA)
+if(BUILD_WITH_CUDA OR BUILD_WITH_HIP)
     include(${_rel_path}/cuda/CMakeLists.txt)
 endif()
 

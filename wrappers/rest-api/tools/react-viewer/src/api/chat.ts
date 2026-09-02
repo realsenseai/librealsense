@@ -16,7 +16,7 @@ interface ProviderConfig {
 const PROVIDERS: Record<Provider, ProviderConfig> = {
   groq: {
     url: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile', // Fast and capable, free tier
+    model: 'openai/gpt-oss-120b', // Groq retires models; check /models if this 404s
     modelsEndpoint: 'https://api.groq.com/openai/v1/models',
   },
   openai: {

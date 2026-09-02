@@ -22,6 +22,8 @@ using rs_fourcc = rsutils::type::fourcc;
 
 namespace librealsense
 {
+    // 'Y8  ' is not listed here: uvc-types.h's fourcc_map already normalizes it to 'GREY'
+    // in the mf-uvc and uvc-device backends before it ever reaches this map.
     const std::map< uint32_t, rs2_format > od_fourcc_to_rs2_format = {
         { rs_fourcc( 'G', 'R', 'E', 'Y' ), RS2_FORMAT_Y8 },
     };
@@ -34,8 +36,10 @@ namespace librealsense
         , d500_device( dev_info )
         , _object_detection_stream( new stream( RS2_STREAM_OBJECT_DETECTION ) )
     {
-        static const uint32_t od_stream_mi = 9; // UVC interface index of the object-detection stream.
-        auto od_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, od_stream_mi );
+        // OD VideoControl is MI 9 on all currently supported layouts (D555/D555e,
+        // D585 0x0C08 and legacy 0x0B6A) - confirmed with the HKR firmware team.
+        constexpr uint32_t od_control_mi = 9;
+        auto od_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, od_control_mi );
 
         // Skip if the device does not expose the stream; the rest of the device enumerates normally.
         if( od_devs_info.empty() )

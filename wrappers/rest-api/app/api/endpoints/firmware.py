@@ -17,18 +17,19 @@ MAX_FW_UPLOAD_BYTES = 64 * 1024 * 1024
 
 
 @router.get("/", response_model=dict)
-async def get_firmware_status(
+async def get_recommended_firmware(
     device_id: str,
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
 ):
-    """Get firmware status for a specific device."""
+    """Get the firmware version the online versions DB recommends for a device."""
     try:
-        return rs_manager.get_firmware_status(device_id)
+        # Off the event loop: an unreachable versions DB would stall every other request.
+        return await run_in_threadpool(rs_manager.get_recommended_firmware, device_id)
     except RealSenseError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
     except Exception:
-        logging.exception("Unexpected error fetching firmware status for %s", device_id)
-        raise HTTPException(status_code=500, detail="Unexpected error while fetching firmware status")
+        logging.exception("Unexpected error fetching recommended firmware for %s", device_id)
+        raise HTTPException(status_code=500, detail="Unexpected error while fetching recommended firmware")
 
 
 _FW_UPLOAD_CHUNK = 1024 * 1024  # 1 MiB
@@ -83,4 +84,23 @@ async def update_firmware_from_file(
         raise HTTPException(status_code=e.status_code, detail=e.detail)
     except Exception:
         logging.exception("Unexpected error updating firmware for %s", device_id)
+        raise HTTPException(status_code=500, detail="Unexpected error while updating firmware")
+
+
+@router.post("/update_from_recommended", response_model=dict)
+async def update_firmware_from_recommended(
+    device_id: str,
+    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+):
+    """Download the device's recommended firmware (from the online versions DB) and flash it.
+
+    One-click alternative to update_from_file: no upload — the backend fetches the .bin
+    and reuses the same DFU flow (and Socket.IO progress events).
+    """
+    try:
+        return await run_in_threadpool(rs_manager.update_firmware_from_recommended, device_id)
+    except RealSenseError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    except Exception:
+        logging.exception("Unexpected error updating firmware from recommended for %s", device_id)
         raise HTTPException(status_code=500, detail="Unexpected error while updating firmware")
