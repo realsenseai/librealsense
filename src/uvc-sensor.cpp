@@ -13,6 +13,7 @@
 #include <src/metadata-parser.h>
 #include <src/core/time-service.h>
 #include <src/core/frame-continuation.h>
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -204,7 +205,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                     auto && msp = As< motion_stream_profile, stream_profile_interface >( req_profile );
                     if( msp )
                     {
-                        expected_size = 64;  // 32; // D457 - WORKAROUND - SHOULD BE REMOVED AFTER CORRECTION IN DRIVER
+                        expected_size = std::min< size_t >( 64, f.frame_size );
                         //Motion stream on uvc is used only for mipi. Stream frame number counts gyro and accel together.
                         //We override it using 2 seperate counters.
                         auto stream_type = ((uint8_t *)f.pixels)[0];
@@ -329,7 +330,8 @@ void uvc_sensor::open( const stream_profiles & requests )
                                 if( ( ( expected_size >> 2 ) * 3 ) == sizeof( uint8_t ) * f.frame_size )
                                     expected_size = sizeof( uint8_t ) * f.frame_size;
 
-                            assert( is_perception || expected_size == sizeof( uint8_t ) * f.frame_size );
+                            assert( is_perception || msp
+                                    || expected_size == sizeof( uint8_t ) * f.frame_size );
                             memcpy( (void *)fh->get_frame_data(), f.pixels, expected_size );
                         }
 

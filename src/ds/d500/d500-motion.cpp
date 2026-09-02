@@ -18,6 +18,7 @@
 #include "ds/ds-options.h"
 #include "ds/ds-private.h"
 #include "d500-info.h"
+#include "d500-options.h"
 #include "stream.h"
 #include "proc/motion-transform.h"
 #include "proc/auto-exposure-processor.h"
@@ -35,6 +36,18 @@ namespace librealsense
     namespace
     {
         constexpr double RAW_TO_DPS_SCALE = 10000.0;
+
+        double gyro_scale_from_sensitivity( const option & sensitivity )
+        {
+            static constexpr double full_scale_dps[] = { 2000., 1000., 500., 250., 125. };
+            const float value = sensitivity.query();
+            if( value != value || value < 0.f || value > 4.f )
+                throw invalid_value_exception( "Invalid MIPI gyro sensitivity value" );
+            const auto index = static_cast< size_t >( value );
+            if( value != static_cast< float >( index ) )
+                throw invalid_value_exception( "Invalid MIPI gyro sensitivity value" );
+            return full_scale_dps[index] / 32768.;
+        }
     }
 
     const std::map<fourcc::value_type, rs2_format> d500_motion_fourcc_to_rs2_format = {
@@ -167,6 +180,32 @@ namespace librealsense
 
         motion_ep->register_option(RS2_OPTION_GLOBAL_TIME_ENABLED, enable_global_time_option);
 
+        std::shared_ptr< option > gyro_sensitivity_option;
+        try
+        {
+            const std::map< float, std::string > descriptions = {
+                { 0.f, "61.0 mDeg/Sec" },
+                { 1.f, "30.5 mDeg/Sec" },
+                { 2.f, "15.3 mDeg/Sec" },
+                { 3.f, "7.6 mDeg/Sec" },
+                { 4.f, "3.8 mDeg/Sec" },
+            };
+            auto candidate = std::make_shared< d500_mipi_gyro_sensitivity_option >(
+                raw_motion_ep, descriptions );
+            const auto range = candidate->get_range();
+            if( range.min == 0.f && range.max == 4.f && range.step == 1.f
+                && range.def == 4.f )
+            {
+                (void)gyro_scale_from_sensitivity( *candidate );
+                gyro_sensitivity_option = candidate;
+                motion_ep->register_option( RS2_OPTION_GYRO_SENSITIVITY, candidate );
+            }
+        }
+        catch( const std::exception & e )
+        {
+            LOG_DEBUG( "MIPI gyro sensitivity control is unavailable: " << e.what() );
+        }
+
         // register pre-processing
         std::shared_ptr<enable_motion_correction> mm_correct_opt = nullptr;
 
@@ -188,8 +227,12 @@ namespace librealsense
         motion_ep->register_processing_block(
             { {RS2_FORMAT_MOTION_XYZ32F} },
             { {RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_ACCEL}, {RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_GYRO} },
-            [&, mm_calib, high_accuracy, mm_correct_opt, gyro_scale_factor]()
-            { return std::make_shared< motion_to_accel_gyro >( mm_calib, mm_correct_opt, gyro_scale_factor, high_accuracy );
+            [mm_calib, high_accuracy, mm_correct_opt, gyro_scale_factor, gyro_sensitivity_option]()
+            {
+                const double scale = gyro_sensitivity_option
+                    ? gyro_scale_from_sensitivity( *gyro_sensitivity_option )
+                    : gyro_scale_factor;
+                return std::make_shared< motion_to_accel_gyro >( mm_calib, mm_correct_opt, scale, high_accuracy );
         });
 
         return motion_ep;

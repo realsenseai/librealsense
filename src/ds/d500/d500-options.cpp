@@ -7,6 +7,38 @@
 
 namespace librealsense
 {
+    d500_mipi_gyro_sensitivity_option::d500_mipi_gyro_sensitivity_option(
+        const std::weak_ptr< uvc_sensor > & ep,
+        const std::map< float, std::string > & description_per_value )
+        : uvc_pu_option( ep, RS2_OPTION_GYRO_SENSITIVITY, description_per_value )
+        , _sensor( ep )
+    {
+    }
+
+    void d500_mipi_gyro_sensitivity_option::set( float value )
+    {
+        auto sensor = _sensor.lock();
+        if( ! sensor )
+            throw invalid_value_exception( "MIPI IMU sensor is not alive for setting" );
+        const auto range = get_range();
+        if( value != value || value < range.min || value > range.max
+            || value != static_cast< float >( static_cast< int >( value ) ) )
+            throw invalid_value_exception( "Invalid MIPI gyro sensitivity value" );
+        sensor->invoke_if_closed( [this, value]() { uvc_pu_option::set( value ); } );
+    }
+
+    bool d500_mipi_gyro_sensitivity_option::is_read_only() const
+    {
+        if( auto sensor = _sensor.lock() )
+            return sensor->is_opened();
+        return false;
+    }
+
+    const char * d500_mipi_gyro_sensitivity_option::get_description() const
+    {
+        return "gyro sensitivity resolutions, lowers the dynamic range for a more accurate readings";
+    }
+
     rgb_tnr_option::rgb_tnr_option(std::shared_ptr<hw_monitor> hwm, const std::weak_ptr< sensor_base > & ep)
         : _hwm(hwm), _sensor(ep)
     {
