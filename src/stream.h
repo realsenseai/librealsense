@@ -94,6 +94,10 @@ namespace librealsense
         void create_snapshot(std::shared_ptr<stream_profile_interface>& snapshot) const override;
         void enable_recording(std::function<void(const stream_profile_interface&)> record_action) override;
 
+    protected:
+        // clone() lives in the derived classes and has to carry the name over
+        std::string const & name() const { return _name; }
+
     private:
         int _index = 1;
         int _uid = 0;
@@ -142,6 +146,7 @@ namespace librealsense
             std::function<rs2_intrinsics()> int_func = _calc_intrinsics;
             res->set_intrinsics([int_func]() { return int_func(); });
             res->set_framerate(get_framerate());
+            res->set_name( name() );
             environment::get_instance().get_extrinsics_graph().register_same_extrinsics(*res, *this);
             return res;
         }
@@ -193,6 +198,7 @@ namespace librealsense
             std::function<rs2_motion_device_intrinsic()> init_func = _calc_intrinsics;
             res->set_intrinsics([init_func]() { return init_func(); });
             res->set_framerate(get_framerate());
+            res->set_name( name() );
             environment::get_instance().get_extrinsics_graph().register_same_extrinsics(*res, *this);
             return res;
         }
@@ -215,6 +221,7 @@ namespace librealsense
             auto res = std::make_shared< pose_stream_profile >();
             res->set_unique_id( environment::get_instance().generate_stream_id() );
             res->set_framerate( get_framerate() );
+            res->set_name( name() );
             return res;
         }
 
@@ -234,6 +241,7 @@ namespace librealsense
             auto res = std::make_shared< perception_stream_profile >();
             res->set_unique_id( environment::get_instance().generate_stream_id() );
             res->set_framerate( get_framerate() );
+            res->set_name( name() );
             return res;
         }
     };

@@ -108,9 +108,25 @@ void post_processing_filters::map_id(rs2::frame new_frame, rs2::frame old_frame)
         map_id_frame_to_frame(new_frame, old_frame);
 }
 
+// A set may hold more than one stream of a type - two infrareds, dual color, raw depth next to
+// device-aligned depth - so streams are told apart by index too. Matching on type alone maps them all
+// onto the first, leaving the others without a window of their own.
+static rs2::frame find_stream( rs2::frameset const & set, rs2::stream_profile const & profile )
+{
+    rs2::frame found;
+    set.foreach_rs( [&]( rs2::frame const & f ) {
+        if( ! found && f.get_profile().stream_type() == profile.stream_type()
+            && f.get_profile().stream_index() == profile.stream_index() )
+            found = f;
+    } );
+
+    return found ? found : set.first_or_default( profile.stream_type() );
+}
+
+
 void post_processing_filters::map_id_frameset_to_frame(rs2::frameset first, rs2::frame second)
 {
-    if (auto f = first.first_or_default(second.get_profile().stream_type()))
+    if (auto f = find_stream( first, second.get_profile() ))
     {
         auto first_uid = f.get_profile().unique_id();
         auto second_uid = second.get_profile().unique_id();
@@ -126,19 +142,7 @@ void post_processing_filters::map_id_frameset_to_frameset(rs2::frameset first, r
     {
         auto first_uid = f.get_profile().unique_id();
 
-        frame second_f;
-        if (f.get_profile().stream_type() == RS2_STREAM_INFRARED)
-        {
-            second_f = second.get_infrared_frame(f.get_profile().stream_index());
-        }
-        else if( f.get_profile().stream_type() == RS2_STREAM_COLOR )
-        {
-            second_f = second.get_color_frame( f.get_profile().stream_index() );
-        }
-        else
-        {
-            second_f = second.first_or_default(f.get_profile().stream_type());
-        }
+        frame second_f = find_stream( second, f.get_profile() );
         if (second_f)
         {
             auto second_uid = second_f.get_profile().unique_id();
@@ -151,7 +155,9 @@ void post_processing_filters::map_id_frameset_to_frameset(rs2::frameset first, r
 
 void rs2::post_processing_filters::map_id_frame_to_frame(rs2::frame first, rs2::frame second)
 {
-    if (first.get_profile().stream_type() == second.get_profile().stream_type())
+    // Index too: two streams of a type (raw and device-aligned depth) must not map onto each other
+    if (first.get_profile().stream_type() == second.get_profile().stream_type()
+        && first.get_profile().stream_index() == second.get_profile().stream_index())
     {
         auto first_uid = first.get_profile().unique_id();
         auto second_uid = second.get_profile().unique_id();
