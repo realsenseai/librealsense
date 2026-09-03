@@ -94,7 +94,11 @@ namespace librealsense
     {
         // We use a special index for extensions, like GPU accelerated frames. See add_extension.
         if( std::get< rs2_extension >( id ) >= RS2_EXTENSION_COUNT )
+        {
+            // add_extension registers these under index 0, so a non-zero stream index would miss it
             std::get< rs2_stream >( id ) = RS2_STREAM_COUNT;  // For added extensions like GPU accelerated frames
+            std::get< int >( id ) = 0;
+        }
 
         std::lock_guard< std::recursive_mutex > lock( _mutex );
 
@@ -121,7 +125,11 @@ namespace librealsense
     {
         // We use a special index for extensions, like GPU accelerated frames. See add_extension.
         if( std::get< rs2_extension>( id ) >= RS2_EXTENSION_COUNT )
+        {
+            // add_extension registers these under index 0, so a non-zero stream index would miss it
             std::get< rs2_stream >( id ) = RS2_STREAM_COUNT;  // For added extensions like GPU accelerated frames
+            std::get< int >( id ) = 0;
+        }
 
         std::lock_guard< std::recursive_mutex > lock( _mutex );
 

@@ -4,6 +4,9 @@
 #pragma once
 #include "types.h"
 
+#include <map>
+#include <utility>
+
 namespace librealsense
 {
     const size_t PRESISTENCY_LUT_SIZE = 256;
@@ -20,7 +23,7 @@ namespace librealsense
         rs2::frame prepare_target_frame(const rs2::frame& f, const rs2::frame_source& source);
 
         template<typename T>
-        void temp_jw_smooth(void* frame_data, void * _last_frame_data, uint8_t *history)
+        void temp_jw_smooth(void* frame_data, void * _last_frame_data, uint8_t *history, uint8_t & cur_frame_index)
         {
             static_assert((std::is_arithmetic<T>::value), "temporal filter assumes numeric types");
 
@@ -31,7 +34,7 @@ namespace librealsense
             auto frame          = reinterpret_cast<T*>(frame_data);
             auto _last_frame    = reinterpret_cast<T*>(_last_frame_data);
 
-            unsigned char mask = 1 << _cur_frame_index;
+            unsigned char mask = 1 << cur_frame_index;
 
             // Copy locally, to remove need for a lock.
             float alpha = _alpha_param;
@@ -83,10 +86,24 @@ namespace librealsense
                 }
             }
 
-            _cur_frame_index = (_cur_frame_index + 1) % 8;  // at end of cycle
+            cur_frame_index = (cur_frame_index + 1) % 8;  // at end of cycle
         }
 
     private:
+        // What the filter carries from one frame to the next. A sensor can send more than one depth
+        // stream through the same filter - raw depth next to device-aligned depth - and a single
+        // history would mix them, so each stream keeps its own.
+        struct stream_state
+        {
+            std::vector< uint8_t > last_frame;  // last frame received for this stream
+            std::vector< uint8_t > history;     // the last 8 frames, 1 bit per frame
+            uint8_t cur_frame_index = 0;
+        };
+
+        void reset_history();
+        // The history that belongs to the frame's own stream, sized for it
+        stream_state & state_of( const rs2::frame & f );
+
         void on_set_persistence_control(uint8_t val);
         void on_set_alpha(float val);
         void on_set_delta(float val);
@@ -102,9 +119,9 @@ namespace librealsense
         size_t                  _current_frm_size_pixels;
         rs2::stream_profile     _source_stream_profile;
         rs2::stream_profile     _target_stream_profile;
-        std::vector<uint8_t>    _last_frame;                // Hold the last frame received for the current profile
-        std::vector<uint8_t>    _history;                   // represents the history over the last 8 frames, 1 bit per frame
-        uint8_t                 _cur_frame_index;
+        // Keyed by stream type and index, which stay the same down a processing chain - unlike the
+        // profile, which every block re-clones
+        std::map< std::pair< rs2_stream, int >, stream_state > _states;
         // encodes whether a particular 8 bit history is good enough for all 8 phases of storage
         std::array<uint8_t, PRESISTENCY_LUT_SIZE> _persistence_map;
     };

@@ -49,6 +49,8 @@ public:
     std::shared_ptr< dds_subscriber > _subscriber;
 
     std::map< std::string, std::shared_ptr< dds_stream > > _streams;
+    // The same streams, in the order the device declared them: stream indices are assigned from it
+    std::vector< std::shared_ptr< dds_stream > > _stream_order;
     // Flags to indicate received discovery messages
     std::map< std::string, bool > _stream_header_received;
     std::map< std::string, bool > _stream_options_received;

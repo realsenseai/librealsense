@@ -11,6 +11,8 @@
 
 #include <rsutils/lazy.h>
 
+#include <atomic>
+
 
 namespace librealsense
 {
@@ -139,6 +141,30 @@ namespace librealsense
         std::weak_ptr< hw_monitor > _hwm;
     };
     
+    // Device-side depth-to-color alignment. Enabling it replaces the raw depth payload (over USB) with Z16 projected into the color viewport,
+    // so the mode may only change while the sensor is closed. Last known value is cached because intrinsics lookups consult it per frame.
+    class d500_align_depth_option : public uvc_xu_option< uint8_t >
+    {
+    public:
+        explicit d500_align_depth_option( const std::weak_ptr< uvc_sensor > & raw_ep );
+
+        void set( float value ) override;
+        float query() const override;
+        option_range get_range() const override { return { 0.f, 1.f, 1.f, 0.f }; }
+        bool is_read_only() const override;
+
+        // Cached state, free of a firmware round-trip
+        bool is_aligned() const { return _aligned; }
+        void add_observer( std::function< void( bool ) > observer ) { _observers.push_back( std::move( observer ) ); }
+
+    private:
+        void update( bool aligned ) const;
+
+        std::weak_ptr< sensor_base > _sensor;
+        mutable std::atomic< bool > _aligned;
+        std::vector< std::function< void( bool ) > > _observers;
+    };
+
     class power_line_freq_option : public uvc_pu_option
     {
     public:
