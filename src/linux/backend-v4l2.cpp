@@ -2174,18 +2174,18 @@ namespace librealsense
 
                                 // The device reports GREY for both mapping streams, so the
                                 // labeled point cloud is re-tagged here to keep them apart.
-                                // Two layouts: D585S (0x0B6B) carries them on MI 13 at
-                                // 2880-wide payloads; every other D5xx carries them on MI 11
-                                // with LPCL at 640x360. The MI test matters -- 640x360 GREY
-                                // also exists on the depth interface as infrared.
+                                // Two layouts: D585S / D585 legacy (0x0B6B / 0x0B6A) carry them
+                                // on MI 13 at 2880-wide payloads; every other D5xx carries them
+                                // on MI 11 with LPCL at 640x360. The MI test matters -- 640x360
+                                // GREY also exists on the depth interface as infrared.
                                 const bool d585s_layout
-                                    = ( this->_info.pid == 0X0B6B )
+                                    = ( this->_info.pid == 0X0B6B || this->_info.pid == 0X0B6A )
                                    && frame_size.discrete.width == 2880
                                    && ( frame_size.discrete.height == 1040
                                      || frame_size.discrete.height == 260
                                      || frame_size.discrete.height == 32 );
                                 const bool d5xx_mapping_layout
-                                    = ( this->_info.pid != 0X0B6B )
+                                    = ( this->_info.pid != 0X0B6B && this->_info.pid != 0X0B6A )
                                    && is_d5xx_mapping_interface( this->_info.pid, this->_info.mi )
                                    && frame_size.discrete.width == 640
                                    && frame_size.discrete.height == 360;
