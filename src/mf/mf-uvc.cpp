@@ -1029,7 +1029,8 @@ namespace librealsense
                     const bool d585s_layout = ( this->_info.pid == 0x0b6b || this->_info.pid == 0x0b6a )
                                            && width == 2880
                                            && ( height == 1040 || height == 260 || height == 32 );
-                    const bool d5xx_mapping_layout = ( this->_info.pid != 0x0b6b && this->_info.pid != 0x0b6a )
+                    const bool d5xx_mapping_layout = ( this->_info.pid == 0x0b56
+                                                     || ( this->_info.pid >= 0x0c01 && this->_info.pid <= 0x0c08 ) )
                                                   && ( this->_info.mi == 11 )
                                                   && width == 640 && height == 360;
                     if (d585s_layout || d5xx_mapping_layout)
