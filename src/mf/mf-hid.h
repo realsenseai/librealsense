@@ -68,6 +68,7 @@ namespace librealsense
             std::vector<hid_sensor> get_sensors() override; // Get opened sensors
             std::vector<uint8_t> get_custom_report_data(const std::string& custom_sensor_name, const std::string& report_name, custom_sensor_report_field report_field) override;
             void set_gyro_scale_factor( double scale_factor ) override;
+            void set_accel_scale_factor( double scale_factor ) override;
 
         private:
             // Don't move the position of wmf_backend member. This object must be destroyed only after COM objects.
@@ -81,6 +82,7 @@ namespace librealsense
             std::vector<hid_profile> _hid_profiles;
             //10.0 was used for D400 before FW support to gyro sensitivity control
             double _gyro_scale_factor = 10.0;
+            double _accel_scale_factor = 1000.0;
         };
     }
 }

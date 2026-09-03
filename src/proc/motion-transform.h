@@ -54,13 +54,15 @@ namespace librealsense
     public:
         motion_to_accel_gyro( std::shared_ptr< mm_calib_handler > mm_calib,
                               std::shared_ptr< enable_motion_correction > mm_correct_opt,
-                              double gyro_scale_factor, bool high_accuracy );
+                              double gyro_scale_factor, double accel_scale_factor,
+                              bool high_accuracy );
 
     protected:
         motion_to_accel_gyro( const char * name,
                               std::shared_ptr< mm_calib_handler > mm_calib,
                               std::shared_ptr< enable_motion_correction > mm_correct_opt,
-                              double gyro_scale_factor, bool high_accuracy );
+                              double gyro_scale_factor, double accel_scale_factor,
+                              bool high_accuracy );
         void configure_processing_callback();
         void process_function( uint8_t * const dest[], const uint8_t * source, int, int, int, int ) override;
         void correct_motion(float3* xyz) const;
@@ -75,13 +77,13 @@ namespace librealsense
     public:
         acceleration_transform( std::shared_ptr< mm_calib_handler > mm_calib,
                                 std::shared_ptr< enable_motion_correction > mm_correct_opt,
-                                bool high_accuracy );
+                                double accel_scale_factor, bool high_accuracy );
 
     protected:
         acceleration_transform( const char * name,
                                 std::shared_ptr< mm_calib_handler > mm_calib,
                                 std::shared_ptr< enable_motion_correction > mm_correct_opt,
-                                bool high_accuracy );
+                                double accel_scale_factor, bool high_accuracy );
         void process_function( uint8_t * const dest[], const uint8_t * source, int, int, int, int) override;
     };
 

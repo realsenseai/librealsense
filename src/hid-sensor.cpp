@@ -363,6 +363,11 @@ void hid_sensor::set_gyro_scale_factor(double scale_factor)
     _hid_device->set_gyro_scale_factor( scale_factor );
 }
 
+void hid_sensor::set_accel_scale_factor(double scale_factor)
+{
+    _hid_device->set_accel_scale_factor( scale_factor );
+}
+
 double hid_sensor::get_imu_sensitivity_values( rs2_stream stream )
 {
     if( _imu_sensitivity_per_rs2_stream.find( stream ) != _imu_sensitivity_per_rs2_stream.end() )

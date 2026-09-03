@@ -59,6 +59,14 @@ namespace librealsense
         return _fw_version >= firmware_version( 5, 16, 0, 0 ) ? 0.0001 : 0.1;
     }
 
+    double d400_motion_base::get_accel_default_scale() const
+    {
+        // FW accel unit changed from integer milli-g (HID exponent -3) to 10 micro-g
+        // (exponent -5) when the FW accel conversion moved to float.
+        // The gate must equal the first FW version that carries that change.
+        return _fw_version >= firmware_version( 5, 17, 5, 0 ) ? 0.00001 : 0.001;
+    }
+
     std::shared_ptr<synthetic_sensor> d400_motion_uvc::create_uvc_device(std::shared_ptr<context> ctx,
                                                   const std::vector<platform::uvc_device_info>& all_uvc_infos,
                                                   const firmware_version& camera_fw_version)
@@ -103,12 +111,13 @@ namespace librealsense
         catch (...) {}
 
         double gyro_scale_factor = get_gyro_default_scale();
+        double accel_scale_factor = get_accel_default_scale();
         bool high_accuracy = is_imu_high_accuracy();
         motion_ep->register_processing_block(
             { {RS2_FORMAT_MOTION_XYZ32F} },
             { {RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_ACCEL}, {RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_GYRO} },
-            [&, mm_calib, high_accuracy, mm_correct_opt, gyro_scale_factor]()
-            { return std::make_shared< motion_to_accel_gyro >( mm_calib, mm_correct_opt, gyro_scale_factor, high_accuracy );
+            [&, mm_calib, high_accuracy, mm_correct_opt, gyro_scale_factor, accel_scale_factor]()
+            { return std::make_shared< motion_to_accel_gyro >( mm_calib, mm_correct_opt, gyro_scale_factor, accel_scale_factor, high_accuracy );
         });
 
         return motion_ep;
@@ -184,6 +193,10 @@ namespace librealsense
             //for FW >=5.16 the scale factor changes to 1000.0 since FW sends 32bit
             if (_fw_version >= firmware_version( 5, 16, 0, 0))
                 get_raw_motion_sensor()->set_gyro_scale_factor( 10000.0 );
+            // newer FW sends accel in 10 micro-g units instead of milli-g (100x more counts per g);
+            // this gate must stay identical to the one in get_accel_default_scale()
+            if (_fw_version >= firmware_version( 5, 17, 5, 0 ))
+                get_raw_motion_sensor()->set_accel_scale_factor( 100000.0 );
 #endif
         }
         catch (const std::exception& e)

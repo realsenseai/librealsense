@@ -58,6 +58,7 @@ public:
     // Other devices retain the D400 conversion to FW tokens 0/0.1/0.2/0.3/0.4.
     void enable_gyro_sensitivity_range_index() { _gyro_sensitivity_uses_range_index = true; }
     void set_gyro_scale_factor(double scale_factor);
+    void set_accel_scale_factor(double scale_factor);
     std::vector< uint8_t > get_custom_report_data( const std::string & custom_sensor_name,
                                                    const std::string & report_name,
                                                    platform::custom_sensor_report_field report_field ) const;

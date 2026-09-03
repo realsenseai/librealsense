@@ -217,6 +217,7 @@ namespace librealsense
             static void foreach_hid_device(std::function<void(const hid_device_info&)> action);
 
             void set_gyro_scale_factor( double scale_factor ) override{};
+            void set_accel_scale_factor( double scale_factor ) override{};
 
         private:
             static bool get_hid_device_info(const char* dev_path, hid_device_info& device_info);
