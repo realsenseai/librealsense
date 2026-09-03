@@ -81,7 +81,16 @@ namespace librealsense
             } );
         environment::get_instance().get_extrinsics_graph().register_extrinsics(*_color_stream, *_depth_stream, _color_extrinsic);
         if( _align_depth_option )
-            _align_depth_option->add_observer( [this]( bool ) { _color_extrinsic->reset(); } );
+        {
+            // The option holds the observer for as long as it lives, so keep the sensor out of it
+            std::weak_ptr< rsutils::lazy< rs2_extrinsics > > extrinsic = _color_extrinsic;
+            _align_depth_option->add_observer(
+                [extrinsic]( bool )
+                {
+                    if( auto lazy = extrinsic.lock() )
+                        lazy->reset();
+                } );
+        }
         register_stream_to_extrinsic_group(*_color_stream, 0);
 
         std::vector<platform::uvc_device_info> color_devs_info;
