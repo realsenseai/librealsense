@@ -103,6 +103,7 @@ typedef enum rs2_format
     RS2_FORMAT_M420            , /**< YUV 4:2:0: y for each pixel, and u,v data for every four pixels - packed as 2 lines of y, 1 line of u,v. 12 bits per pixel on average. */
     RS2_FORMAT_COMBINED_MOTION , /**< Combined motion data, as in the combined_motion structure */
     RS2_FORMAT_NV12            , /**< Semi-planar YUV 4:2:0: full-resolution Y plane followed by interleaved half-resolution U,V plane. 12 bits per pixel. */
+    RS2_FORMAT_H264            , /**< H.264 compressed video bitstream; each frame is an access unit of variable length. */
     RS2_FORMAT_COUNT             /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
 } rs2_format;
 const char* rs2_format_to_string(rs2_format format);

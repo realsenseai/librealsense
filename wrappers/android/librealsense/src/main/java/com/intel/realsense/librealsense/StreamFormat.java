@@ -34,7 +34,9 @@ public enum StreamFormat {
     Y411(30),
     Y16I(31),
     M420(32),
-    COMBINED_MOTION(33);
+    COMBINED_MOTION(33),
+    NV12(34),
+    H264(35);
     private final int mValue;
 
     private StreamFormat(int value) { mValue = value; }

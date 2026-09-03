@@ -45,6 +45,7 @@ namespace librealsense
         case RS2_FORMAT_MOTION_XYZ32F: return 1;
         case RS2_FORMAT_6DOF: return 1;
         case RS2_FORMAT_MJPEG: return 8;
+        case RS2_FORMAT_H264: return 8;
         case RS2_FORMAT_Y8I: return 16;
         case RS2_FORMAT_Y12I: return 32;  // bpp for Y12i format was 24, but since D457 GMSL SerDes required 32, it had been increased to 32 for both
         case RS2_FORMAT_INZI: return 32;

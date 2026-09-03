@@ -71,6 +71,7 @@ enum rs2_format  // copy from rs2_sensor.h
     RS2_FORMAT_M420,  /**< YUV 4:2:0: y for each pixel, and u,v for every four pixels - packed as 2 lines of y, 1 line of u,v. 12 bits per pixel on average. */
     RS2_FORMAT_COMBINED_MOTION, /**< Combined motion data, as in the combined_motion structure */
     RS2_FORMAT_NV12,  /**< Semi-planar YUV 4:2:0: full-resolution Y plane followed by interleaved half-resolution U,V plane. 12 bits per pixel. */
+    RS2_FORMAT_H264,  /**< H.264 compressed video bitstream; each frame is an access unit of variable length. */
     RS2_FORMAT_COUNT  /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
 };
 
@@ -98,6 +99,7 @@ int dds_video_encoding::to_rs2() const
         { "Y10B", RS2_FORMAT_Y10BPACK },
         { "M420", RS2_FORMAT_M420 },  // Used by D500 color streams
         { "NV12", RS2_FORMAT_NV12 },
+        { "h264", RS2_FORMAT_H264 },  // ROS2-compatible for compressed video
     };
 
     std::string s = to_string();
@@ -133,6 +135,7 @@ dds_video_encoding dds_video_encoding::from_rs2( int rs2_format )
     case RS2_FORMAT_Y10BPACK: encoding = "Y10B"; break;
     case RS2_FORMAT_M420: encoding = "M420"; break;  // Used by D500 color streams
     case RS2_FORMAT_NV12: encoding = "NV12"; break;
+    case RS2_FORMAT_H264: encoding = "h264"; break;
     default:
         DDS_THROW( runtime_error, "cannot translate rs2_format " + std::to_string( rs2_format ) + " to any known dds_video_encoding" );
     };
@@ -209,7 +212,8 @@ dds_video_stream_profile::dds_video_stream_profile( rsutils::json const & j, int
 
 bool dds_video_stream_profile::is_compressed_encoding() const
 {
-    return _encoding.to_rs2() == RS2_FORMAT_MJPEG;
+    int const format = _encoding.to_rs2();
+    return format == RS2_FORMAT_MJPEG || format == RS2_FORMAT_H264;
 }
 
 
