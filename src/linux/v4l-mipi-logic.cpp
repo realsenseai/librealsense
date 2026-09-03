@@ -91,11 +91,24 @@ namespace librealsense
                 if( *fd < 0 )
                     throw linux_backend_exception( "Mipi device GVD could not be read" );
 
+                // IPU6/IPU7 upstream expose the GVD control on the subdev rather than the video node.
+                // Derive the subdev path from the depth node ("/dev/video-rs-depth-0" -> "/dev/video-rs-depth-sd-0").
+                std::string sub_path = dev_name;
+                auto dash = sub_path.rfind( '-' );
+                if( dash != std::string::npos )
+                    sub_path.insert( dash, "-sd" );
+                std::unique_ptr< int, std::function< void( int * ) > > sub_fd(
+                    new int( sub_path != dev_name ? open( sub_path.c_str(), O_RDWR ) : -1 ),
+                    []( int * d ) { if( d && *d >= 0 ) ::close( *d ); delete d; } );
+
                 // GVD payload has different size depending on product line. Query the control's size so the full struct is read.
                 struct v4l2_query_ext_ctrl qctrl = {};
                 qctrl.id = RS_CAMERA_CID_GVD;
                 if( xioctl( *fd, VIDIOC_QUERY_EXT_CTRL, &qctrl ) != 0 || qctrl.elems == 0 )
-                    throw linux_backend_exception( "Mipi device GVD size could not be queried" );
+                {
+                    if( *sub_fd < 0 || xioctl( *sub_fd, VIDIOC_QUERY_EXT_CTRL, &qctrl ) != 0 || qctrl.elems == 0 )
+                        throw linux_backend_exception( "Mipi device GVD size could not be queried" );
+                }
 
                 std::vector< uint8_t > gvd( qctrl.elems * qctrl.elem_size, 0 );
                 struct v4l2_ext_control ctrl;
@@ -114,7 +127,10 @@ namespace librealsense
                 bool opcode_ok = false;
                 while( ! opcode_ok && retries-- )
                 {
-                    if( xioctl( *fd, VIDIOC_G_EXT_CTRLS, &ext ) == 0 )
+                    int rc = xioctl( *fd, VIDIOC_G_EXT_CTRLS, &ext );
+                    if( rc != 0 && *sub_fd >= 0 )
+                        rc = xioctl( *sub_fd, VIDIOC_G_EXT_CTRLS, &ext );
+                    if( rc == 0 )
                     {
                         auto opcode = gvd[0];
                         if( opcode != GVD_VALID_OPCODE )
@@ -263,6 +279,11 @@ namespace librealsense
             std::string rs_enum_video_node_name( const std::string & sensor, int cam_idx, bool metadata )
             {
                 return "video-rs-" + sensor + ( metadata ? "-md-" : "-" ) + std::to_string( cam_idx );
+            }
+
+            std::string rs_enum_subdev_node_name( const std::string & sensor, int cam_idx )
+            {
+                return "video-rs-" + sensor + "-sd-" + std::to_string( cam_idx );
             }
 
             std::string rs_enum_dfu_node_path( int cam_idx )
