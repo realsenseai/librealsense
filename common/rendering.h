@@ -834,9 +834,12 @@ namespace rs2
             if( occup_cols <= 0 || occup_rows <= 0 )
                 return;
 
+            if( ! data )
+                return;
+
             const size_t cell_count = static_cast< size_t >( occup_cols ) * occup_rows;
             const size_t available = frame_bytes - static_cast< size_t >( cells - static_cast< const uint8_t * >( data ) );
-            if( ! data || available < cell_count )
+            if( available < cell_count )
                 return;
 
             // Three states, so three luminance levels -- free must stay distinguishable from

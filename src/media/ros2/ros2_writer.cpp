@@ -122,7 +122,7 @@ namespace librealsense
         else if (auto lp = As<labeled_points>(frame))
         {
             // labeled points have no 2D geometry — encode as a single row of bytes
-            auto data_size = static_cast<uint32_t>(lp->get_vertex_count() * lp->get_bpp() / 8);
+            auto data_size = static_cast<uint32_t>(lp->get_frame_data_size());
             pixels = lp->get_frame_data();
             width = stride = data_size;
             height = 1;
