@@ -2838,7 +2838,13 @@ namespace librealsense
             // Extract the control group from the underlying control query
             v4l2_ext_controls ctrls_block { control.id&0xffff0000, 1, 0, 0, 0, &control};
 
-            if (xioctl(_fd, VIDIOC_G_EXT_CTRLS, &ctrls_block) < 0)
+            int rc = xioctl(_fd, VIDIOC_G_EXT_CTRLS, &ctrls_block);
+            // On Intel IPU6/IPU7 upstream pipelines V4L2 controls live on the subdev,
+            // not the capture (video) node. Fall back to the subdev when available.
+            if (rc < 0 && _sub_fd > 0)
+                rc = xioctl(_sub_fd, VIDIOC_G_EXT_CTRLS, &ctrls_block);
+
+            if (rc < 0)
             {
                 if (errno == EIO || errno == EAGAIN) // TODO: Log?
                     return false;
@@ -2863,7 +2869,13 @@ namespace librealsense
 
             // Extract the control group from the underlying control query
             v4l2_ext_controls ctrls_block{ control.id & 0xffff0000, 1, 0, 0, 0, &control };
-            if (xioctl(_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block) < 0)
+            int rc = xioctl(_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
+            // On Intel IPU6/IPU7 upstream pipelines V4L2 controls live on the subdev,
+            // not the capture (video) node. Fall back to the subdev when available.
+            if (rc < 0 && _sub_fd > 0)
+                rc = xioctl(_sub_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
+
+            if (rc < 0)
             {
                 if (errno == EIO || errno == EAGAIN) // TODO: Log?
                     return false;
@@ -2993,7 +3005,12 @@ namespace librealsense
 
             struct v4l2_query_ext_ctrl query = {};
             query.id = v4l_mipi_logic::option_to_cid(option);
-            if (xioctl(_fd, VIDIOC_QUERY_EXT_CTRL, &query) < 0)
+            int rc = xioctl(_fd, VIDIOC_QUERY_EXT_CTRL, &query);
+            // On Intel IPU6/IPU7 upstream pipelines V4L2 controls live on the subdev,
+            // not the capture (video) node. Fall back to the subdev when available.
+            if (rc < 0 && _sub_fd > 0)
+                rc = xioctl(_sub_fd, VIDIOC_QUERY_EXT_CTRL, &query);
+            if (rc < 0)
             {
                 // Some controls (exposure, auto exposure, auto hue) do not seem to work on V4L2
                 // Instead of throwing an error, return an empty range. This will cause this control to be omitted on our UI sample.
