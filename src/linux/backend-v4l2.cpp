@@ -1647,9 +1647,14 @@ namespace librealsense
                                 }
 
                                 // Drop partial and overflow frames (assumes D4XX metadata only)
-                                // IPU6/IPU7 upstream pads the queued buffer for ISYS/DMA alignment, so bytesused is one
-                                // stride short of the full length; relax the partial check by a stride to avoid false 99% drops.
-                                bool partial_frame = (!skip_partial_frame_check && (buf.bytesused < buffer->get_full_length() - MAX_META_DATA_SIZE - buffer->get_stride()));
+                                // The V4L2 buffer length reflects sizeimage, which on IPU7 ISYS includes a fixed DMA
+                                // over-allocation (IPU_ISYS_OVERALLOC_MIN, 1024 bytes) unrelated to the payload. For tiny
+                                // frames (e.g. the D457 IMU node, 38x1 -> 64 bytes) it dominates and made every complete
+                                // frame look partial. Base the check on the real payload (stride * height), keeping one
+                                // stride of slack for the IPU line-padding workaround.
+                                uint32_t expected_frame_size = buffer->get_stride() * _profile.height;
+                                bool partial_frame = (!skip_partial_frame_check && expected_frame_size > buffer->get_stride() &&
+                                                      (buf.bytesused < expected_frame_size - buffer->get_stride()));
                                 bool overflow_frame = (buf.bytesused ==  buffer->get_length_frame_only() + MAX_META_DATA_SIZE);
                                 if (_dev.buf_type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
                                     /* metadata size is one line of profile, temporary disable validation */
