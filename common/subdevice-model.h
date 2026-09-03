@@ -101,9 +101,6 @@ namespace rs2
         void play(const std::vector<stream_profile>& profiles, viewer_model& viewer, std::shared_ptr<rs2::asynchronous_syncer>);
         bool is_synchronized_frame(viewer_model& viewer, const frame& f);
         void update(std::string& error_message, notifications_model& model);
-        void draw_options(const std::vector<rs2_option>& drawing_order,
-            bool update_read_only_options, std::string& error_message,
-            notifications_model& model);
         uint64_t num_supported_non_default_options() const;
         bool draw_option(rs2_option opt, bool update_read_only_options,
             std::string& error_message, notifications_model& model)
@@ -167,7 +164,7 @@ namespace rs2
         std::shared_ptr< atomic_objects_in_frame > detected_objects;
 
         std::map< rs2_option, option_model > options_metadata;
-        std::string options_filter;  // live search text filtering the Controls option list by name
+        std::string options_filter;  // live search text filtering this sensor's controls by name
         std::vector<std::string> resolutions;
         std::map<int, std::vector<std::string>> fpses_per_stream;
         std::vector<std::string> shared_fpses;

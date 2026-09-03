@@ -42,18 +42,13 @@ namespace rs2
         }
     }
 
-    void embedded_filter_model::draw_options( viewer_model & viewer,
-                                               bool update_read_only_options,
-                                               bool is_streaming,
-                                               std::string & error_message )
+    std::vector< option_model * > embedded_filter_model::drawable_options()
     {
-        for (auto& id_and_model : _options_id_to_model)
-        {
-            if( id_and_model.first == RS2_OPTION_EMBEDDED_FILTER_ENABLED )
-                continue;
-
-            id_and_model.second.draw_option( update_read_only_options, is_streaming, error_message, *viewer.not_model );
-        }
+        std::vector< option_model * > options;
+        for( auto & id_model : _options_id_to_model )
+            if( id_model.first != RS2_OPTION_EMBEDDED_FILTER_ENABLED )
+                options.push_back( &id_model.second );
+        return options;
     }
 
     void embedded_filter_model::embedded_filter_enable_disable(bool actual)

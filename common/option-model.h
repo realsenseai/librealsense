@@ -4,6 +4,7 @@
 #pragma once
 #include <librealsense2/rs.hpp>
 #include <rsutils/time/stopwatch.h>
+#include "control-model.h"
 #include <atomic>
 #include <mutex>
 namespace rs2
@@ -64,6 +65,7 @@ namespace rs2
 
         rs2_option opt;
         option_range range;
+        std::string name;        // what the user reads; label is this plus ImGui's "##id"
         std::shared_ptr<options> endpoint;
         rsutils::time::stopwatch last_set_stopwatch;
         rsutils::time::stopwatch last_slider_hold_stopwatch;
@@ -159,10 +161,46 @@ namespace rs2
         std::shared_ptr< option_async_state > _async_state = std::make_shared< option_async_state >();
     };
 
+    // Holes Filling is titled by its description rather than its name, to match the 3rd-party tools;
+    // null for every other option, which is titled by its name
+    inline char const * alternative_option_title( rs2_option opt )
+    {
+        return opt == RS2_OPTION_HOLES_FILL ? "Persistency mode" : nullptr;
+    }
+
     option_model create_option_model(option_value const & opt,
         const std::string& opt_base_label,
         subdevice_model* model,
         std::shared_ptr<options> options,
         bool* options_invalidated,
         std::string& error_message);
+
+    // Draws one option through its option_model. Non-owning: the model lives in the sensor's or
+    // the filter's map, which outlives the panel.
+    class option_control : public control_model
+    {
+    public:
+        // A processing block re-reads value and range every frame: its options are written behind
+        // the panel's back, by the block itself and by the depth-visualization controls
+        explicit option_control( option_model & om, bool refresh_every_frame = false )
+            : _om( &om ), _refresh_every_frame( refresh_every_frame ) {}
+
+        std::string const & name() const override { return _om->name; }
+        bool drawable() const override
+        {
+            return _om->endpoint && _om->endpoint->supports( _om->opt );
+        }
+        void draw( control_draw_context & ctx ) override
+        {
+            if( _refresh_every_frame )
+                _om->update_all_fields( ctx.error_message, ctx.notifications );
+            if( _om->draw_option( ctx.update_read_only_options, ctx.is_streaming,
+                                  ctx.error_message, ctx.notifications ) )
+                ctx.changed = true;
+        }
+
+    private:
+        option_model * _om;
+        bool _refresh_every_frame;
+    };
 }

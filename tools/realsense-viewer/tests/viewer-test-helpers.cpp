@@ -77,8 +77,10 @@ void viewer_test::collapse_sensor_panel( rs2::device_model & model,
 void viewer_test::expand_controls( rs2::device_model & model,
                                    std::shared_ptr< rs2::subdevice_model > sub )
 {
-    if( !sub->num_supported_non_default_options() )
-        return; // no options to show — controls section doesn't exist in the UI
+    // Whether a sensor has a Controls list at all is the viewer's call - ask the panel rather
+    // than re-deriving the rule here, where it would drift
+    if( ! node_shown( model, sub, { controls_label( model, sub ) } ) )
+        return;
     imgui->SetRef( "Control Panel" );
     std::string path = sensor_label( model, sub ) + "/" + controls_label( model, sub );
     imgui->ItemOpen( path.c_str() );
@@ -88,8 +90,8 @@ void viewer_test::expand_controls( rs2::device_model & model,
 void viewer_test::collapse_controls( rs2::device_model & model,
                                      std::shared_ptr< rs2::subdevice_model > sub )
 {
-    if( !sub->num_supported_non_default_options() )
-        return; // no options to show — controls section doesn't exist in the UI
+    if( ! node_shown( model, sub, { controls_label( model, sub ) } ) )
+        return;
     imgui->SetRef( "Control Panel" );
     std::string path = sensor_label( model, sub ) + "/" + controls_label( model, sub );
     imgui->ItemClose( path.c_str() );
@@ -221,9 +223,83 @@ void viewer_test::set_controls_filter( rs2::device_model & model,
                                        const std::string & text )
 {
     imgui->SetRef( "Control Panel" );
-    imgui->ItemInput( ImHashStr( "##options_filter", 0, controls_id_seed( model, sub ) ) );
+    // the box sits at the sensor level, above the Controls section, so it covers every group
+    imgui->ItemInput( ImHashStr( "##options_filter", 0, sensor_id_seed( model, sub ) ) );
     imgui->KeyCharsReplaceEnter( text.c_str() );
     imgui->SleepNoSkip( 0.3f, 0.1f );
+}
+
+void viewer_test::click_controls_filter_clear( rs2::device_model & model,
+                                               std::shared_ptr< rs2::subdevice_model > sub )
+{
+    imgui->SetRef( "Control Panel" );
+    std::string label = rsutils::string::from()
+        << rs2::textual_icons::times_circle << "##clear_options_filter,"
+        << sub->s->get_info( RS2_CAMERA_INFO_NAME ) << "," << model.id;
+    imgui->ItemClick( ImHashStr( label.c_str(), 0, sensor_id_seed( model, sub ) ) );
+    imgui->SleepNoSkip( 0.3f, 0.1f );
+}
+
+std::string viewer_test::post_processing_label( rs2::device_model & model )
+{
+    return rsutils::string::from() << "Post-Processing##" << model.id;
+}
+
+std::string viewer_test::embedded_filters_label( rs2::device_model & model )
+{
+    return rsutils::string::from() << "Embedded-Filters##" << model.id;
+}
+
+std::string viewer_test::filter_label( rs2::device_model & model, std::string const & name )
+{
+    return rsutils::string::from() << name << "##" << model.id;
+}
+
+float viewer_test::post_processing_toggle_inset( rs2::device_model & model,
+                                                std::shared_ptr< rs2::subdevice_model > sub,
+                                                std::shared_ptr< rs2::processing_block_model > pb )
+{
+    imgui->SetRef( "Control Panel" );
+    std::string label = rsutils::string::from()
+        << " " << ( pb->is_enabled() ? rs2::textual_icons::toggle_on : rs2::textual_icons::toggle_off )
+        << "##" << model.id << "," << sub->s->get_info( RS2_CAMERA_INFO_NAME ) << "," << pb->get_name();
+
+    ImGuiWindow * panel = ImGui::FindWindowByName( "Control Panel" );
+    if( ! panel )
+        return -1.f;
+    auto info = imgui->ItemInfo( ImHashStr( label.c_str(), 0, panel->ID ) );
+    if( info.ID == 0 )
+        return -1.f;
+    return panel->Pos.x + panel->Size.x - info.RectFull.Min.x;
+}
+
+ImGuiID viewer_test::node_id( rs2::device_model & model,
+                              std::shared_ptr< rs2::subdevice_model > sub,
+                              std::vector< std::string > const & path )
+{
+    imgui->SetRef( "Control Panel" );
+    ImGuiID seed = sensor_id_seed( model, sub );
+    for( auto const & step : path )
+        seed = ImHashStr( step.c_str(), 0, seed );
+    return seed;
+}
+
+bool viewer_test::node_shown( rs2::device_model & model,
+                              std::shared_ptr< rs2::subdevice_model > sub,
+                              std::vector< std::string > const & path )
+{
+    return imgui->ItemExists( node_id( model, sub, path ) );
+}
+
+bool viewer_test::post_processing_option_visible( rs2::device_model & model,
+                                                 std::shared_ptr< rs2::subdevice_model > sub,
+                                                 std::shared_ptr< rs2::processing_block_model > pb,
+                                                 rs2_option option )
+{
+    auto * opt = pb->get_option_model( option );
+    return opt && node_shown( model, sub, { post_processing_label( model ),
+                                            filter_label( model, pb->get_name() ),
+                                            opt->is_checkbox() ? opt->label : opt->id } );
 }
 
 std::vector< rs2_option > viewer_test::controls_options( rs2::device_model & model,

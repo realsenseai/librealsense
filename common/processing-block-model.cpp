@@ -45,27 +45,13 @@ namespace rs2
         save_processing_block_to_config_file(_full_name.c_str(), _block, _enabled);
     }
 
-    void processing_block_model::draw_options( viewer_model & viewer,
-                                               bool update_read_only_options,
-                                               bool is_streaming,
-                                               std::string & error_message )
+    std::vector< option_model * > processing_block_model::drawable_options( viewer_model & viewer )
     {
+        std::vector< option_model * > options;
         for( auto & id_model : _options_id_to_model )
-        {
-            if( viewer.is_option_skipped( id_model.first ) )
-                continue;
-            
-            switch( id_model.first )
-            {
-            case RS2_OPTION_MIN_DISTANCE:
-            case RS2_OPTION_MAX_DISTANCE:
-            case RS2_OPTION_HISTOGRAM_EQUALIZATION_ENABLED:
-                id_model.second.update_all_fields( error_message, *viewer.not_model );
-                break;
-            }
-
-            id_model.second.draw_option( update_read_only_options, is_streaming, error_message, *viewer.not_model );
-        }
+            if( ! viewer.is_option_skipped( id_model.first ) )
+                options.push_back( &id_model.second );
+        return options;
     }
 
 

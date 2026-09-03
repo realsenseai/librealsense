@@ -36,6 +36,7 @@ namespace RsImGui
     void          PushNewFrame();
     void          PopNewFrame();
     void          RsImButton(const std::function<void()> &f, bool disable_button = false);
+    bool          TreeNode(const char* label, bool should_be_open);
     void          CustomTooltip( const char * fmt, const char * label );
     void          CustomTooltip( const char * label );
     void          CustomTooltip(const char* fmt, float value);

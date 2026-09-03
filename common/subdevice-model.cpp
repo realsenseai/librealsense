@@ -2327,26 +2327,6 @@ namespace rs2
         }
     }
 
-    void subdevice_model::draw_options(const std::vector<rs2_option>& drawing_order,
-        bool update_read_only_options, std::string& error_message,
-        notifications_model& notifications)
-    {
-        for (auto& opt : drawing_order)
-        {
-            draw_option(opt, update_read_only_options, error_message, notifications);
-        }
-
-        for (auto i = 0; i < RS2_OPTION_COUNT; i++)
-        {
-            auto opt = static_cast<rs2_option>(i);
-            if (viewer.is_option_skipped(opt)) continue;
-            if (std::find(drawing_order.begin(), drawing_order.end(), opt) == drawing_order.end())
-            {
-                draw_option(opt, update_read_only_options, error_message, notifications);
-            }
-        }
-    }
-
     uint64_t subdevice_model::num_supported_non_default_options() const
     {
         return (uint64_t)std::count_if(

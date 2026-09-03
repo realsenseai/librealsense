@@ -36,24 +36,29 @@ namespace rs2
             bool* options_invalidated,
             std::string& error_message );
 
-        void draw_options( viewer_model & viewer,
-                           bool update_read_only_options,
-                           bool is_streaming,
-                           std::string & error_message );
-
         std::shared_ptr<rs2::filter> get_block() { return _block; }
 
         // Access the UI model for one of this block's options (nullptr if not present).
         // Used by the viewer UI tests to drive/read post-processing filter controls.
         option_model * get_option_model( rs2_option opt );
 
+        // The options this block draws, in map order - the ones the viewer hides are left out
+        std::vector< option_model * > drawable_options( viewer_model & viewer );
+
+        // Written behind the panel's back - by the block itself, and by the depth-visualization
+        // controls - so these are the ones re-read on every frame they draw
+        static bool refreshed_every_frame( rs2_option opt )
+        {
+            return opt == RS2_OPTION_MIN_DISTANCE
+                || opt == RS2_OPTION_MAX_DISTANCE
+                || opt == RS2_OPTION_HISTOGRAM_EQUALIZATION_ENABLED;
+        }
+
         void enable( bool e = true )
         {
             processing_block_enable_disable( _enabled = e );
         }
         bool is_enabled() const { return _enabled; }
-
-        bool visible = true;
 
         // Optional predicate; null means always available.
         // When it returns false the toggle is grayed out in the UI.
