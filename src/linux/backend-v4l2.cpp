@@ -2477,6 +2477,14 @@ namespace librealsense
             if(::close(_fd) < 0)
                 throw linux_backend_exception("v4l_uvc_device: close(_fd) failed");
 
+            // _sub_fd is opened in map_device_descriptor(); close it here too, otherwise it
+            // leaks and keeps the sensor sub-device busy, blocking the mutually-exclusive DFU node.
+            if (_sub_fd >= 0)
+            {
+                ::close(_sub_fd);
+                _sub_fd = -1;
+            }
+
             if(::close(_stop_pipe_fd[0]) < 0)
                throw linux_backend_exception("v4l_uvc_device: close(_stop_pipe_fd[0]) failed");
             if(::close(_stop_pipe_fd[1]) < 0)
