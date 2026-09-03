@@ -97,6 +97,8 @@ namespace librealsense
                 auto dash = sub_path.rfind( '-' );
                 if( dash != std::string::npos )
                     sub_path.insert( dash, "-sd" );
+                else
+                    LOG_WARNING( "Could not derive subdev path from " << dev_name );
                 std::unique_ptr< int, std::function< void( int * ) > > sub_fd(
                     new int( sub_path != dev_name ? open( sub_path.c_str(), O_RDWR ) : -1 ),
                     []( int * d ) { if( d && *d >= 0 ) ::close( *d ); delete d; } );

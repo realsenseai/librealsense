@@ -1288,7 +1288,7 @@ namespace librealsense
 
                 _variable_frame_size = false;
                 // IPU6/IPU7 upstream video node reports no formats; it is validated via the subdev instead
-                if (_sub_fd <= 0)
+                if (_sub_fd < 0)
                 while (ioctl(_fd, VIDIOC_ENUM_FMT, &pixel_format) == 0)
                 {
                     v4l2_frmsizeenum frame_size = {};
@@ -1348,6 +1348,8 @@ namespace librealsense
                 {
                     v4l2_subdev_frame_interval frame_interval = {};
                     frame_interval.pad = 0;
+                    if (_sub_fd < 0)
+                        throw linux_backend_exception("xioctl(VIDIOC_G_PARM) failed and no subdev to query frame interval");
                     if(xioctl(_sub_fd, VIDIOC_SUBDEV_G_FRAME_INTERVAL, &frame_interval) < 0)
                         throw linux_backend_exception("xioctl(VIDIOC_G_PARM) and xioctl(VIDIOC_SUBDEV_G_FRAME_INTERVAL) failed");
 
@@ -1645,6 +1647,8 @@ namespace librealsense
                                 }
 
                                 // Drop partial and overflow frames (assumes D4XX metadata only)
+                                // IPU6/IPU7 upstream pads the queued buffer for ISYS/DMA alignment, so bytesused is one
+                                // stride short of the full length; relax the partial check by a stride to avoid false 99% drops.
                                 bool partial_frame = (!skip_partial_frame_check && (buf.bytesused < buffer->get_full_length() - MAX_META_DATA_SIZE - buffer->get_stride()));
                                 bool overflow_frame = (buf.bytesused ==  buffer->get_length_frame_only() + MAX_META_DATA_SIZE);
                                 if (_dev.buf_type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
@@ -2125,7 +2129,7 @@ namespace librealsense
                 case MEDIA_BUS_FMT_RGB888_1X24:   return V4L2_PIX_FMT_RGB24;
                 case MEDIA_BUS_FMT_BGR888_1X24:   return V4L2_PIX_FMT_BGR24;
                 case MEDIA_BUS_FMT_YUYV8_2X8:
-                case MEDIA_BUS_FMT_YUYV8_1X16:    return 0x59555956; // 'YUYV' as consumed by librealsense
+                case MEDIA_BUS_FMT_YUYV8_1X16:    return V4L2_PIX_FMT_YUYV;
                 case MEDIA_BUS_FMT_UYVY8_2X8:
                 case MEDIA_BUS_FMT_UYVY8_1X16:    return V4L2_PIX_FMT_UYVY;
                 case MEDIA_BUS_FMT_VYUY8_1X16:    return V4L2_PIX_FMT_VYUY;
@@ -2140,7 +2144,7 @@ namespace librealsense
                 case MEDIA_BUS_FMT_Y8_1X8:        return V4L2_PIX_FMT_GREY;
                 case MEDIA_BUS_FMT_Y10_1X10:      return V4L2_PIX_FMT_Y10;
                 case MEDIA_BUS_FMT_Y12_1X12:      return V4L2_PIX_FMT_Y12;
-                case MEDIA_BUS_FMT_FIXED:         return 0x5A313620; // 'Z16 '
+                case MEDIA_BUS_FMT_FIXED:         return V4L2_PIX_FMT_Z16;
                 default:                          return 0;
             }
         }
@@ -2150,14 +2154,16 @@ namespace librealsense
             std::vector<stream_profile> results;
 
             // On IPU6/IPU7 upstream the video node exposes no formats; enumerate them from the subdev instead
-            if (_sub_fd > 0)
+            if (_sub_fd >= 0)
             {
                 v4l2_subdev_mbus_code_enum pixel_format_subdev = {};
                 pixel_format_subdev.pad = 0;
                 pixel_format_subdev.index = 0;
                 while (ioctl(_sub_fd, VIDIOC_SUBDEV_ENUM_MBUS_CODE, &pixel_format_subdev) == 0)
                 {
-                    uint32_t fourcc = mbus_code_to_fourcc(pixel_format_subdev.code);
+                    // subdev returns an mbus code in little-endian; convert to fourcc then to big_endian as results expect
+                    uint32_t temp_fourcc = mbus_code_to_fourcc(pixel_format_subdev.code);
+                    uint32_t fourcc = (const big_endian<int> &)temp_fourcc;
 
                     v4l2_subdev_frame_size_enum frame_size = {};
                     frame_size.pad = 0;
@@ -2400,7 +2406,8 @@ namespace librealsense
             {
                 _sub_fd = open(_subdev_name.c_str(), O_RDWR | O_NONBLOCK, 0);
                 if (_sub_fd < 0)
-                    LOG_WARNING(__FUNCTION__ << ": Failed to open subdev " << _subdev_name);
+                    LOG_WARNING(__FUNCTION__ << ": Failed to open subdev '" << _subdev_name
+                                << "' (non-fatal, subdev controls will be unavailable)");
             }
 
             if (pipe(_stop_pipe_fd) < 0)
@@ -2841,8 +2848,11 @@ namespace librealsense
             int rc = xioctl(_fd, VIDIOC_G_EXT_CTRLS, &ctrls_block);
             // On Intel IPU6/IPU7 upstream pipelines V4L2 controls live on the subdev,
             // not the capture (video) node. Fall back to the subdev when available.
-            if (rc < 0 && _sub_fd > 0)
+            if (rc < 0) {
+                if (_sub_fd < 0)
+                    throw linux_backend_exception("xioctl(VIDIOC_G_EXT_CTRLS) failed and no subdev to get ext_ctrls from");
                 rc = xioctl(_sub_fd, VIDIOC_G_EXT_CTRLS, &ctrls_block);
+            }
 
             if (rc < 0)
             {
@@ -2872,8 +2882,11 @@ namespace librealsense
             int rc = xioctl(_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
             // On Intel IPU6/IPU7 upstream pipelines V4L2 controls live on the subdev,
             // not the capture (video) node. Fall back to the subdev when available.
-            if (rc < 0 && _sub_fd > 0)
+            if (rc < 0) {
+                if (_sub_fd < 0)
+                    throw linux_backend_exception("xioctl(VIDIOC_S_EXT_CTRLS) failed and no subdev to set ext_ctrls");
                 rc = xioctl(_sub_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
+            }
 
             if (rc < 0)
             {
@@ -2910,6 +2923,8 @@ namespace librealsense
             int retVal = xioctl(_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
             if (retVal < 0)
             {
+                if (_sub_fd < 0)
+                    throw linux_backend_exception("xioctl(VIDIOC_S_EXT_CTRLS) failed and no subdev to set ext_ctrls");
                 // IPU6/IPU7 upstream: controls are not propagated to the video node, retry on the subdev
                 retVal = xioctl(_sub_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
                 if (retVal < 0)
@@ -2940,6 +2955,10 @@ namespace librealsense
                 int ret = xioctl(_fd, VIDIOC_G_EXT_CTRLS, &ext);
                 if (ret < 0)
                 {
+                    if (_sub_fd < 0) {
+                        LOG_WARNING("xioctl(VIDIOC_G_EXT_CTRLS) failed and no subdev to get ext_ctrls from");
+                        continue;
+                    }
                     // IPU6/IPU7 upstream: controls are not propagated to the video node, retry on the subdev
                     ret = xioctl(_sub_fd, VIDIOC_G_EXT_CTRLS, &ext);
                     if (ret < 0)
@@ -2972,6 +2991,9 @@ namespace librealsense
             xctrl_query.id = v4l_mipi_logic::xu_to_cid(xu,control);
 
             if(0 > ioctl(_fd,VIDIOC_QUERY_EXT_CTRL,&xctrl_query)){
+                if (_sub_fd < 0)
+                    throw linux_backend_exception(rsutils::string::from() <<
+                        "xioctl(VIDIOC_QUERY_EXT_CTRL) failed, errno=" << errno << " and no subdev to query ext_ctrls from");
                 // IPU6/IPU7 upstream: controls are not propagated to the video node, retry on the subdev
                 if(0 > ioctl(_sub_fd,VIDIOC_QUERY_EXT_CTRL,&xctrl_query))
                     throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_QUERY_EXT_CTRL) failed, errno=" << errno);
@@ -3008,8 +3030,11 @@ namespace librealsense
             int rc = xioctl(_fd, VIDIOC_QUERY_EXT_CTRL, &query);
             // On Intel IPU6/IPU7 upstream pipelines V4L2 controls live on the subdev,
             // not the capture (video) node. Fall back to the subdev when available.
-            if (rc < 0 && _sub_fd > 0)
+            if (rc < 0) {
+                if (_sub_fd < 0)
+                    throw linux_backend_exception("xioctl(VIDIOC_QUERY_EXT_CTRL) failed and no subdev to query ext_ctrls from");
                 rc = xioctl(_sub_fd, VIDIOC_QUERY_EXT_CTRL, &query);
+            }
             if (rc < 0)
             {
                 // Some controls (exposure, auto exposure, auto hue) do not seem to work on V4L2
