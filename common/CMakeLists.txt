@@ -11,6 +11,7 @@ set(COMMON_SRC
     "${CMAKE_CURRENT_LIST_DIR}/plane.h"
     "${CMAKE_CURRENT_LIST_DIR}/rect.h"
     "${CMAKE_CURRENT_LIST_DIR}/rendering.h"
+    "${CMAKE_CURRENT_LIST_DIR}/rendering.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/model-views.h"
     "${CMAKE_CURRENT_LIST_DIR}/model-views.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/notifications.h"

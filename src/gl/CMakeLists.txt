@@ -25,6 +25,8 @@ set(REALSENSE_GL_CPP
     ../../third-party/glad/glad.c
     ../../common/opengl3.cpp
     ../../common/opengl3.h
+    ../../common/rendering.cpp
+    ../../common/rendering.h
     pc-shader.cpp
     pc-shader.h
     camera-shader.cpp
