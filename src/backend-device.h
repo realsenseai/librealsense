@@ -36,6 +36,9 @@ public:
     // Gyro scale factor (raw to physical) can be different between product lines and FW versions.
     virtual double get_gyro_default_scale() const { return 0.1; }
 
+    // FW accel unit in g per count: legacy FW sends integer milli-g (0.001 g)
+    virtual double get_accel_default_scale() const { return 0.001; }
+
 protected:
     uint16_t _pid = 0;
 };

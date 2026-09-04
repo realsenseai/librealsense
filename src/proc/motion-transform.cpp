@@ -155,19 +155,23 @@ namespace librealsense
     motion_to_accel_gyro::motion_to_accel_gyro( std::shared_ptr< mm_calib_handler > mm_calib,
                                                 std::shared_ptr< enable_motion_correction > mm_correct_opt,
                                                 double gyro_scale_factor,
+                                                double accel_scale_factor,
                                                 bool high_accuracy )
-        : motion_to_accel_gyro( "Accel_Gyro Transform", mm_calib, mm_correct_opt, gyro_scale_factor, high_accuracy )
+        : motion_to_accel_gyro( "Accel_Gyro Transform", mm_calib, mm_correct_opt, gyro_scale_factor,
+                                accel_scale_factor, high_accuracy )
     {}
 
     motion_to_accel_gyro::motion_to_accel_gyro( const char * name,
                                                 std::shared_ptr< mm_calib_handler > mm_calib,
                                                 std::shared_ptr< enable_motion_correction > mm_correct_opt,
                                                 double gyro_scale_factor,
+                                                double accel_scale_factor,
                                                 bool high_accuracy )
         : motion_transform(name, RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_ANY, mm_calib, mm_correct_opt)
     {
         static constexpr float gravity = 9.80665f;  // Standard Gravitation Acceleration
-        static constexpr double accelerator_scale_factor = 0.001 * gravity;
+        // accel_scale_factor is the FW accel unit in g per count (see get_accel_default_scale)
+        const double accelerator_scale_factor = accel_scale_factor * gravity;
 
         if( high_accuracy )
         {
@@ -258,18 +262,22 @@ namespace librealsense
 
     acceleration_transform::acceleration_transform( std::shared_ptr< mm_calib_handler > mm_calib,
                                                     std::shared_ptr< enable_motion_correction > mm_correct_opt,
+                                                    double accel_scale_factor,
                                                     bool high_accuracy )
-        : acceleration_transform( "Acceleration Transform", mm_calib, mm_correct_opt, high_accuracy )
+        : acceleration_transform( "Acceleration Transform", mm_calib, mm_correct_opt,
+                                  accel_scale_factor, high_accuracy )
     {}
 
     acceleration_transform::acceleration_transform( const char * name,
                                                     std::shared_ptr< mm_calib_handler > mm_calib,
                                                     std::shared_ptr< enable_motion_correction > mm_correct_opt,
+                                                    double accel_scale_factor,
                                                     bool high_accuracy )
         : motion_transform( name, RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_ACCEL, mm_calib, mm_correct_opt )
     {
         static constexpr float gravity = 9.80665f;  // Standard Gravitation Acceleration
-        static constexpr double accelerator_scale_factor = 0.001 * gravity;
+        // accel_scale_factor is the FW accel unit in g per count (see get_accel_default_scale)
+        const double accelerator_scale_factor = accel_scale_factor * gravity;
 
         if( high_accuracy )
             _converter = std::make_unique< converter_32_bit >( accelerator_scale_factor );

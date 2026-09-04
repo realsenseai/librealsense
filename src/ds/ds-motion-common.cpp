@@ -512,11 +512,12 @@ namespace librealsense
         catch (...) {}
 
         bool high_accuracy = _owner->is_imu_high_accuracy();    
+        double accel_scale_factor = _owner->get_accel_default_scale();
         hid_ep->register_processing_block(
             { {RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_ACCEL} },
             { {RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_ACCEL} },
-            [&, mm_correct_opt, high_accuracy]()
-            { return std::make_shared< acceleration_transform >( _mm_calib, mm_correct_opt, high_accuracy );
+            [&, mm_correct_opt, accel_scale_factor, high_accuracy]()
+            { return std::make_shared< acceleration_transform >( _mm_calib, mm_correct_opt, accel_scale_factor, high_accuracy );
             });
 
         double gyro_scale_factor = _owner->get_gyro_default_scale();

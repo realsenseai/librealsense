@@ -41,7 +41,7 @@ namespace librealsense
         public:
             virtual ~sensor_events() = default;
 
-            explicit sensor_events(hid_callback callback, double gyro_scale_factor = 10.0) : m_cRef(0), _callback(callback), _gyro_scale_factor(gyro_scale_factor) {}
+            explicit sensor_events(hid_callback callback, double gyro_scale_factor = 10.0, double accel_scale_factor = 1000.0) : m_cRef(0), _callback(callback), _gyro_scale_factor(gyro_scale_factor), _accel_scale_factor(accel_scale_factor) {}
 
             STDMETHODIMP QueryInterface(REFIID iid, void** ppv)
             {
@@ -147,11 +147,12 @@ namespace librealsense
                     CHECK_HR(report->GetSensorValue(SENSOR_DATA_TYPE_ACCELERATION_Z_G, &var));
                     rawZ = var.dblVal;
 
-                    static constexpr double accelerator_transform_factor = 1000.0;
-
-                    rawX *= accelerator_transform_factor;
-                    rawY *= accelerator_transform_factor;
-                    rawZ *= accelerator_transform_factor;
+                    // Windows Sensor API reports accel in G (unit exponent already applied);
+                    // reconstruct FW counts: 1000.0 for legacy milli-g FW, 100000.0 for 10 micro-g FW
+                    // (selected per FW version via set_accel_scale_factor, like the gyro)
+                    rawX *= _accel_scale_factor;
+                    rawY *= _accel_scale_factor;
+                    rawZ *= _accel_scale_factor;
                 }
                 else if (type == SENSOR_TYPE_GYROMETER_3D)
                 {
@@ -264,6 +265,7 @@ namespace librealsense
             long m_cRef;
             hid_callback _callback;
             double _gyro_scale_factor = 10.0;
+            double _accel_scale_factor = 1000.0;
         };
 
         void wmf_hid_device::open(const std::vector<hid_profile>&iio_profiles)
@@ -371,7 +373,7 @@ namespace librealsense
         void wmf_hid_device::start_capture(hid_callback callback)
         {
             // Hack, start default profile
-            _cb = new sensor_events(callback, _gyro_scale_factor);
+            _cb = new sensor_events(callback, _gyro_scale_factor, _accel_scale_factor);
             ISensorEvents* sensorEvents = nullptr;
             CHECK_HR(_cb->QueryInterface(IID_PPV_ARGS(&sensorEvents)));
 
@@ -408,6 +410,11 @@ namespace librealsense
         void wmf_hid_device::set_gyro_scale_factor(double scale_factor) 
         {
             _gyro_scale_factor = scale_factor;
+        }
+
+        void wmf_hid_device::set_accel_scale_factor(double scale_factor)
+        {
+            _accel_scale_factor = scale_factor;
         }
 
         void wmf_hid_device::foreach_hid_device(std::function<void(hid_device_info, CComPtr<ISensor>)> action)

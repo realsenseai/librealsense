@@ -44,6 +44,8 @@ namespace librealsense
                                                                 const std::string& report_name,
                                                                 custom_sensor_report_field report_field) override { return {}; }
             void set_gyro_scale_factor( double scale_factor ) override;
+            // accel raw counts pass through unscaled on this backend
+            void set_accel_scale_factor( double scale_factor ) override {}
 
         private:
             void handle_interrupt();

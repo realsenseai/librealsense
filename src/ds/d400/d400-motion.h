@@ -15,6 +15,7 @@ namespace librealsense
         rs2_motion_device_intrinsic get_motion_intrinsics(rs2_stream) const;
         bool is_imu_high_accuracy() const override;
         double get_gyro_default_scale() const override;
+        double get_accel_default_scale() const override;
 
         std::shared_ptr<auto_exposure_mechanism> register_auto_exposure_options(synthetic_sensor* ep,
             const platform::extension_unit* fisheye_xu);

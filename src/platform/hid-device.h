@@ -84,6 +84,7 @@ public:
                                                            custom_sensor_report_field report_field )
         = 0;
     virtual void set_gyro_scale_factor( double scale_factor ) = 0;
+    virtual void set_accel_scale_factor( double scale_factor ) = 0;
 };
 
 
@@ -122,6 +123,7 @@ public:
     }
 
     void set_gyro_scale_factor( double scale_factor ) override {};
+    void set_accel_scale_factor( double scale_factor ) override {};
 
 private:
     std::vector< std::shared_ptr< hid_device > > _dev;
