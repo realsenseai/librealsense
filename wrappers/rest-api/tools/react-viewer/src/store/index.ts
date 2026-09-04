@@ -133,6 +133,8 @@ interface AppState {
   checkFirmwareUpdates: (deviceId: string) => Promise<string | undefined>
   updateFirmwareFromFile: (deviceId: string, file: File) => Promise<void>
   updateFirmwareFromRecommended: (deviceId: string) => Promise<void>
+  fetchAdvancedMode: (deviceId: string) => Promise<void>
+  toggleAdvancedMode: (deviceId: string, enable: boolean) => Promise<void>
 
   // Device activation (multi-select support)
   toggleDeviceActive: (device: DeviceInfo) => Promise<void>
@@ -289,6 +291,36 @@ export const useAppStore = create<AppState>()((set, get) => ({
     return result
   },
 
+  fetchAdvancedMode: async (deviceId: string) => {
+    try {
+      const status = await apiClient.getAdvancedMode(deviceId)
+      set((state) => {
+        const ds = state.deviceStates[deviceId]
+        if (!ds) return state
+        return {
+          deviceStates: {
+            ...state.deviceStates,
+            [deviceId]: { ...ds, advancedMode: { supported: !!status.supported, enabled: !!status.enabled } },
+          },
+        }
+      })
+    } catch {
+      // best-effort; advanced mode may be unsupported (e.g. D500) or backend unreachable
+    }
+  },
+
+  toggleAdvancedMode: async (deviceId: string, enable: boolean) => {
+    try {
+      // Restarts the device on the backend; wait, then refresh device + sensors + status.
+      await apiClient.setAdvancedMode(deviceId, enable)
+      await get().fetchDevices(true)
+      await get().fetchSensors(deviceId)
+      await get().fetchAdvancedMode(deviceId)
+    } catch (error) {
+      set({ error: `Failed to ${enable ? 'enable' : 'disable'} advanced mode: ${error instanceof Error ? error.message : 'unknown error'}` })
+    }
+  },
+
   // Returns the recommendation too: a device that isn't activated has no state to store it
   // in. Rejects on failure — reporting is the caller's business.
   checkFirmwareUpdates: async (deviceId: string) => {
@@ -343,6 +375,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
       await get().fetchSensors(device.device_id)
       // Best-effort: a versions-DB outage shouldn't make opening a camera look like it failed.
       get().checkFirmwareUpdates(device.device_id).catch(() => {})
+      // Advanced-mode status drives the Enable/Disable menu item (best-effort)
+      get().fetchAdvancedMode(device.device_id)
     }
   },
 

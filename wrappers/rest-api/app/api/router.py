@@ -4,7 +4,7 @@
 from typing import List
 
 from fastapi import APIRouter
-from app.api.endpoints import devices, firmware, hwm, options, point_cloud, sensors, streams, system, webrtc
+from app.api.endpoints import advanced_mode, devices, firmware, hwm, options, point_cloud, sensors, streams, system, webrtc
 
 
 def _get_sdk_version() -> str:
@@ -86,6 +86,7 @@ async def health_check():
     }
 
 api_router.include_router(devices.router, prefix="/devices", tags=["devices"])
+api_router.include_router(advanced_mode.router, prefix="/devices/{device_id}/advanced_mode", tags=["advanced_mode"])
 api_router.include_router(firmware.router, prefix="/devices/{device_id}/firmware", tags=["firmware"])
 api_router.include_router(hwm.router, prefix="/devices/{device_id}/hwm", tags=["hwm"])
 api_router.include_router(point_cloud.router, prefix="/devices/{device_id}/point_cloud", tags=["point_cloud"])

@@ -35,6 +35,13 @@ export interface FirmwareState {
   last_error?: string | null
 }
 
+// Wire shape of GET/POST /devices/{id}/advanced_mode/
+export interface AdvancedModeStatus {
+  device_id: string
+  supported: boolean
+  enabled: boolean
+}
+
 export interface SensorInfo {
   sensor_id: string
   name: string
@@ -155,6 +162,7 @@ export interface SensorConfig {
 export interface DeviceState {
   device: DeviceInfo
   firmware?: FirmwareState
+  advancedMode?: { supported: boolean; enabled: boolean }
   sensors: SensorInfo[]
   options: Record<string, OptionInfo[]> // keyed by sensor_id
   streamConfigs: StreamConfig[]

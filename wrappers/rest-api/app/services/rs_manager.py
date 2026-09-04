@@ -13,6 +13,7 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 from app.core.errors import RealSenseError
+from app.services import advanced_mode
 from app.models.device import Device, DeviceInfo
 from app.models.sensor import Sensor, SensorInfo, SupportedStreamProfile
 from app.models.option import Option, OptionInfo
@@ -123,6 +124,9 @@ class RealSenseManager:
         # Stores filter instances per device/sensor: device_id -> sensor_id -> list of filter dicts
         # Each filter dict: { "filter": rs.filter, "name": str, "enabled": bool }
         self.processing_blocks: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+        # One colorizer per device so depth-visualization options (color scheme,
+        # min/max distance, histogram eq) set on it affect the streamed depth image.
+        self.colorizers: Dict[str, "rs.colorizer"] = {}
         self.sensor_metadata_queues: Dict[str, Dict[str, List[Dict]]] = {}
         # Per-sensor rs.frame_queue objects: device_id -> sensor_id -> rs.frame_queue
         self.sensor_rs_queues: Dict[str, Dict[str, Any]] = {}
@@ -172,6 +176,7 @@ class RealSenseManager:
         # doesn't silently resume emitting PC metadata that the UI thinks is
         # off (frontend resets to off on disconnect).
         self.is_pointcloud_enabled.pop(serial, None)
+        self.colorizers.pop(serial, None)
         self.devices.pop(serial, None)
         self.device_infos.pop(serial, None)
         self._supported_md_by_profile.pop(serial, None)
@@ -902,6 +907,59 @@ class RealSenseManager:
                 return sensor
         raise RealSenseError(status_code=404, detail=f"Sensor {sensor_id} not found")
 
+    # Options exposed by processing blocks that are plumbing, not user controls.
+    _HIDDEN_BLOCK_OPTIONS = {
+        "frames_queue_size", "stream_filter", "stream_format_filter",
+        "stream_index_filter", "noise_estimation", "region_of_interest",
+    }
+
+    def _get_or_create_colorizer(self, device_id: str) -> "rs.colorizer":
+        """Return the device's cached colorizer, creating it on first use."""
+        colorizer = self.colorizers.get(device_id)
+        if colorizer is None:
+            colorizer = rs.colorizer()
+            self.colorizers[device_id] = colorizer
+        return colorizer
+
+    @staticmethod
+    def _get_advanced_mode(dev):
+        """Return an rs400_advanced_mode wrapper for the device, or None if unsupported."""
+        try:
+            return rs.rs400_advanced_mode(dev)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _enum_value_descriptions(obj, opt, rng):
+        """Return {value: description} when an option is a full enum, else None.
+
+        Mirrors the legacy viewer's is_enum: integer range with step 1 where EVERY
+        value carries a description. Early-exits on the first value without one (so a
+        slider like exposure bails immediately) and skips wide ranges to avoid a
+        pathological number of probes.
+        """
+        if rng.step != 1.0 or rng.min != int(rng.min) or rng.max != int(rng.max):
+            return None
+        # Not every option-bearing object exposes the description API (older
+        # pyrealsense2, processing blocks). Missing it just means "no enum" - it must
+        # not take down the whole option list.
+        describe = getattr(obj, "get_option_value_description", None)
+        if describe is None:
+            return None
+        lo, hi = int(rng.min), int(rng.max)
+        if hi - lo > 256:
+            return None
+        descs = {}
+        for val in range(lo, hi + 1):
+            try:
+                desc = describe(opt, float(val))
+            except Exception:
+                desc = None
+            if not desc:
+                return None
+            descs[str(val)] = desc
+        return descs or None
+
     def get_sensor_options(self, device_id: str, sensor_id: str) -> List[OptionInfo]:
         """Get all options for a sensor"""
         if device_id not in self.devices:
@@ -946,6 +1004,8 @@ class RealSenseManager:
                     step=option_range.step,
                     read_only=sensor.is_option_read_only(option),
                     category="Basic Controls",
+                    # Enum native options (e.g. Visual Preset) → dropdown in the UI.
+                    value_descriptions=self._enum_value_descriptions(sensor, option, option_range),
                 )
                 options.append(option_info)
             except RuntimeError as e:
@@ -976,22 +1036,12 @@ class RealSenseManager:
                 filter_name=filter_name,
             ))
             
-            # Hidden options that shouldn't be shown to users (same as legacy viewer)
-            hidden_options = {
-                'frames_queue_size',
-                'stream_filter', 
-                'stream_format_filter',
-                'stream_index_filter',
-                'noise_estimation',
-                'region_of_interest',
-            }
-            
-            # Add filter-specific options (excluding hidden ones)
+            # Add filter-specific options (excluding hidden plumbing options)
             for opt in filter_obj.get_supported_options():
                 try:
                     opt_name = opt.name
-                    # Skip hidden options
-                    if opt_name in hidden_options:
+                    # Skip hidden options (same as legacy viewer)
+                    if opt_name in self._HIDDEN_BLOCK_OPTIONS:
                         continue
                         
                     current_value = filter_obj.get_option(opt)
@@ -1041,6 +1091,47 @@ class RealSenseManager:
                 except RuntimeError:
                     pass
 
+        # 3. Depth Visualization (colorizer) — only on the depth sensor
+        try:
+            is_depth_sensor = any(
+                p.stream_type() == rs.stream.depth for p in sensor.get_stream_profiles()
+            )
+        except RuntimeError:
+            is_depth_sensor = False
+        if is_depth_sensor:
+            colorizer = self._get_or_create_colorizer(device_id)
+            for opt in colorizer.get_supported_options():
+                try:
+                    opt_name = opt.name
+                    if opt_name in self._HIDDEN_BLOCK_OPTIONS:
+                        continue
+                    rng = colorizer.get_option_range(opt)
+                    options.append(OptionInfo(
+                        option_id=f"VIZ_{opt_name}",
+                        name=opt_name.replace("_", " ").title(),
+                        description=colorizer.get_option_description(opt),
+                        current_value=colorizer.get_option(opt),
+                        default_value=rng.default,
+                        min_value=rng.min,
+                        max_value=rng.max,
+                        step=rng.step,
+                        read_only=colorizer.is_option_read_only(opt),
+                        category="Depth Visualization",
+                        value_descriptions=self._enum_value_descriptions(colorizer, opt, rng),
+                    ))
+                except RuntimeError:
+                    pass
+
+            # 4. RS400 Advanced Controls (only when advanced mode is enabled)
+            am = self._get_advanced_mode(dev)
+            if am is not None:
+                try:
+                    if am.is_enabled():
+                        dev_name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
+                        options.extend(advanced_mode.build_advanced_options(am, skip_ae="D457" in dev_name))
+                except Exception:
+                    pass
+
         return options
 
     def _get_or_create_processing_blocks(self, device_id: str, sensor_id: str, sensor) -> List[Dict[str, Any]]:
@@ -1079,6 +1170,53 @@ class RealSenseManager:
             self.processing_blocks[device_id][sensor_id] = filters
         
         return self.processing_blocks[device_id][sensor_id]
+
+    def _set_colorizer_option(self, device_id: str, option_id: str, value: Any) -> bool:
+        """Set a colorizer (Depth Visualization) option; option_id is 'VIZ_<opt_name>'."""
+        colorizer = self._get_or_create_colorizer(device_id)
+        opt_name = option_id[len("VIZ_"):]
+        for opt in colorizer.get_supported_options():
+            if opt.name == opt_name:
+                rng = colorizer.get_option_range(opt)
+                v = max(rng.min, min(rng.max, float(value)))
+                colorizer.set_option(opt, v)
+                return True
+        raise RealSenseError(
+            status_code=404, detail=f"Depth visualization option {option_id} not found"
+        )
+
+    def get_advanced_mode_status(self, device_id: str) -> Dict[str, Any]:
+        """Return {supported, enabled} for RS400 advanced mode."""
+        if device_id not in self.devices:
+            self.refresh_devices()
+        dev = self.devices.get(device_id)
+        if dev is None:
+            raise RealSenseError(status_code=404, detail=f"Device {device_id} not found")
+        am = self._get_advanced_mode(dev)
+        if am is None:
+            return {"device_id": device_id, "supported": False, "enabled": False}
+        try:
+            return {"device_id": device_id, "supported": True, "enabled": bool(am.is_enabled())}
+        except Exception:
+            return {"device_id": device_id, "supported": False, "enabled": False}
+
+    def set_advanced_mode(self, device_id: str, enable: bool) -> Dict[str, Any]:
+        """Enable/disable advanced mode. This RESTARTS the device; wait for it to return."""
+        if device_id not in self.devices:
+            self.refresh_devices()
+        dev = self.devices.get(device_id)
+        if dev is None:
+            raise RealSenseError(status_code=404, detail=f"Device {device_id} not found")
+        am = self._get_advanced_mode(dev)
+        if am is None:
+            raise RealSenseError(status_code=400, detail="Advanced mode not supported on this device")
+        try:
+            am.toggle_advanced_mode(bool(enable))
+        except Exception as e:
+            raise RealSenseError(status_code=500, detail=f"Failed to toggle advanced mode: {e}")
+        # Device re-enumerates after the toggle — re-resolve it before returning.
+        self._refresh_until_device_returns(device_id)
+        return {"device_id": device_id, "supported": True, "enabled": bool(enable)}
 
     def get_sensor_option(
         self, device_id: str, sensor_id: str, option_id: str
@@ -1120,6 +1258,26 @@ class RealSenseManager:
         # Check if this is a post-processing filter option (starts with "PP_")
         if option_id.startswith("PP_"):
             return self._set_filter_option(device_id, sensor_id, sensor, option_id, value)
+
+        # Depth-visualization (colorizer) option
+        if option_id.startswith("VIZ_"):
+            return self._set_colorizer_option(device_id, option_id, value)
+
+        # RS400 advanced-mode control
+        if option_id.startswith("ADV_"):
+            am = self._get_advanced_mode(dev)
+            if am is None:
+                raise RealSenseError(status_code=400, detail="Advanced mode not supported on this device")
+            # The advanced-mode getters/setters throw when advanced mode is off, which would
+            # surface as an opaque 500. A client can only get here with a stale option list
+            # (they are published only while enabled), so say what is actually wrong.
+            try:
+                enabled = bool(am.is_enabled())
+            except Exception:
+                enabled = False
+            if not enabled:
+                raise RealSenseError(status_code=400, detail="Advanced mode is disabled on this device")
+            return advanced_mode.set_advanced_option(am, option_id, value)
 
         # Find the option by name (case-insensitive comparison)
         # Match against both raw option name and display name
@@ -1990,9 +2148,9 @@ class RealSenseManager:
                 ir_index = int(stream_name_list[1]) if len(stream_name_list) > 1 else 1
                 stream_mappings[active_stream] = (rs_stream, ir_index)
         
-        # Create a single colorizer instance for depth (reuse for performance)
-        colorizer = rs.colorizer()
-        
+        # Cached per-device colorizer so Depth Visualization options apply live
+        colorizer = self._get_or_create_colorizer(device_id)
+
         try:
             while device_id in self.pipelines:
                 try:
@@ -2462,9 +2620,9 @@ class RealSenseManager:
             stream_types: List of stream types this sensor is producing
         """
         logging.info(f"[SENSOR] Frame collection thread started for {device_id}/{sensor_id} streams: {stream_types}")
-        
-        colorizer = rs.colorizer()
-        
+
+        colorizer = self._get_or_create_colorizer(device_id)
+
         try:
             while True:
                 # Check if we should stop
