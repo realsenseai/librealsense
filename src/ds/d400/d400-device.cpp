@@ -66,8 +66,8 @@ namespace librealsense
         {fourcc('R','G','B','2'), RS2_FORMAT_BGR8},
         {fourcc('M','J','P','G'), RS2_FORMAT_MJPEG},
         {fourcc('B','Y','R','2'), RS2_FORMAT_RAW16},
-        {fourcc('B','A','8','1'), RS2_FORMAT_RAW8}   // D401 GMSL dual-RGB: SBGGR8 8-bit Bayer (RAW8 CSI passthrough, driver PR #459)
-
+        {fourcc('B','A','8','1'), RS2_FORMAT_RAW8},   // D401 GMSL dual-RGB: SBGGR8 (older MIPI driver)
+        {fourcc('p','B','A','A'), RS2_FORMAT_RAW10}   // D401 GMSL dual-RGB: SBGGR10P (MIPI driver 1.0.6.10+)
     };
     std::map<fourcc::value_type, rs2_stream> d400_depth_fourcc_to_rs2_stream = {
         {fourcc('Y','U','Y','2'), RS2_STREAM_COLOR},
@@ -83,23 +83,25 @@ namespace librealsense
         {fourcc('Z','1','6','H'), RS2_STREAM_DEPTH},
         {fourcc('B','Y','R','2'), RS2_STREAM_COLOR},
         {fourcc('M','J','P','G'), RS2_STREAM_COLOR},
-        {fourcc('B','A','8','1'), RS2_STREAM_COLOR}   // D401 GMSL dual-RGB: SBGGR8, expose each OV9782 imager as color
+        {fourcc('B','A','8','1'), RS2_STREAM_COLOR},   // D401 GMSL dual-RGB: SBGGR8 (older MIPI driver)
+        {fourcc('p','B','A','A'), RS2_STREAM_COLOR}    // D401 GMSL dual-RGB: SBGGR10P (MIPI driver 1.0.6.10+)
     };
 
-    // D401 GMSL dual-RGB stream-id resolver. The two OV9782 imagers each arrive on a separate backend pin,
-    // both advertising identical SBGGR8 (fourcc BA81). Rank the BA81 color pins by ascending pin_index and
-    // route them to Color 0 / Color 1 (distinct streams), mirroring the IR1/IR2 split. Uses the upstream
-    // per-pin _stream_id_resolver mechanism (cf. d500_dual_rgb::resolve_color_stream).
+    // D401 GMSL dual-RGB stream-id resolver: the two imagers arrive on separate backend pins with the same
+    // raw Bayer fourcc (SBGGR8/BA81 on older drivers, SBGGR10P/pBAA on 1.0.6.10+). Rank those pins by
+    // ascending pin_index -> Color 0 / Color 1 (cf. d500_dual_rgb::resolve_color_stream).
     static void resolve_d401_color_stream( const std::vector< platform::stream_profile > & all,
                                            const platform::stream_profile & p, rs2_stream & type, int & index )
     {
-        const auto ba81 = fourcc( 'B', 'A', '8', '1' );
-        if( p.format != ba81 )
+        const auto ba81 = fourcc( 'B', 'A', '8', '1' );   // SBGGR8  (older MIPI driver)
+        const auto pbaa = fourcc( 'p', 'B', 'A', 'A' );   // SBGGR10P (MIPI driver 1.0.6.10+)
+        auto is_raw_color = [&]( uint32_t f ) { return f == ba81 || f == pbaa; };
+        if( ! is_raw_color( p.format ) )
             return;  // not a D401 color pin - leave type/index as resolved by the fourcc map
 
         std::set< uint32_t > color_pins;
         for( auto & q : all )
-            if( q.format == ba81 )
+            if( is_raw_color( q.format ) )
                 color_pins.insert( q.pin_index );
 
         int rank = 0;
@@ -777,11 +779,9 @@ namespace librealsense
                     []() {return std::make_shared<y12i_to_y16y16_mipi>(); }
                 );
 
-                // D401 GMSL dual-RGB: the two OV9782 imagers stream 8-bit RGGB Bayer via the FW RAW8
-                // CSI passthrough, routed to Color 0 / Color 1. Only firmware with that passthrough
-                // supports it; older firmware exposes the ISP color path only. Keep this guard identical
-                // to the block registration guard in d400_color::register_processing_blocks() - the
-                // resolver armed here and the RAW8->RGB8 blocks there must be enabled together.
+                // D401 GMSL dual-RGB: arm the raw-Bayer -> Color 0 / Color 1 routing (raw payload supported
+                // only on firmware with the RAW8/RAW10 CSI passthrough). Keep this guard identical to the
+                // block-registration guard in d400_color::register_processing_blocks().
                 if( _is_mipi_device && _pid == RS401_GMSL_PID && _fw_version >= firmware_version( "5.17.4.13" ) )
                 {
                     // Route the two identical BGGR color pins to Color 0 / Color 1 (ascending pin order).
