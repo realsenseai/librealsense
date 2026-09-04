@@ -343,7 +343,14 @@ void uvc_sensor::open( const stream_profiles & requests )
                         auto && video = dynamic_cast< video_frame * >( fh.frame );
                         if( video )
                         {
-                            video->assign( width, height, width * bpp / 8, bpp );
+                            auto stride = width * bpp / 8;
+                            // NV12 and M420 are 12-bpp semi-planar formats. Their average bits per
+                            // pixel includes the chroma plane, while each plane's row stride remains
+                            // one byte per pixel.
+                            if( req_profile_base->get_format() == RS2_FORMAT_NV12
+                                || req_profile_base->get_format() == RS2_FORMAT_M420 )
+                                stride = width;
+                            video->assign( width, height, stride, bpp );
                         }
 
                         fh->set_timestamp_domain( timestamp_domain );

@@ -7,6 +7,7 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 #include <cstdint>
 #include <rsutils/string/from.h>
 #include <src/image.cpp>  // bad idea? for get_image_bpp
+#include <src/log.h>
 
 
 namespace {
@@ -59,6 +60,26 @@ void init_frame(py::module &m) {
                     { static_cast<size_t>(vf.get_height()), static_cast<size_t>(vf.get_width()), 4 },
                     { static_cast<size_t>(vf.get_stride_in_bytes()), static_cast<size_t>(vf.get_bytes_per_pixel()), 1 });
                 break;
+            case RS2_FORMAT_NV12: case RS2_FORMAT_M420:
+            {
+                auto const data_size = static_cast<size_t>( self.get_data_size() );
+                auto const stride = static_cast<size_t>( vf.get_stride_in_bytes() );
+                if( data_size && stride && data_size % stride == 0 )
+                    return BufData( const_cast<void *>( vf.get_data() ), 1, std::string( "@B" ), 2,
+                                    { data_size / stride, stride },
+                                    { stride, 1 } );
+                LOG_WARNING( "Invalid NV12/M420 buffer layout: data size " << data_size << ", row stride " << stride
+                            << "; using a compatibility buffer view" );
+                if( ! data_size && stride )
+                    return BufData( const_cast<void *>( vf.get_data() ), 1, std::string( "@B" ), 2,
+                                    { static_cast< size_t >( vf.get_height() ),
+                                      static_cast< size_t >( vf.get_width() ) },
+                                    { stride, 1 } );
+                return BufData( const_cast<void *>( vf.get_data() ),
+                                1,
+                                std::string( "@B" ),
+                                data_size );
+            }
             default:
                 return BufData(const_cast<void*>(vf.get_data()), static_cast<size_t>(vf.get_bytes_per_pixel()), bytes_per_pixel_to_format[vf.get_bytes_per_pixel()], 2,
                     { static_cast<size_t>(vf.get_height()), static_cast<size_t>(vf.get_width()) },
