@@ -141,6 +141,26 @@ void init_c_files(py::module &m) {
     py::class_< rs2_combined_motion > combined_motion( m, "combined_motion", "IMU combined GYRO & ACCEL data" );
     combined_motion.def( py::init<>() )
         .def_property(
+            "orientation",
+            []( rs2_combined_motion const & self )
+            {
+                return py::make_tuple( self.orientation.x,
+                                       self.orientation.y,
+                                       self.orientation.z,
+                                       self.orientation.w );
+            },
+            []( rs2_combined_motion & self, py::sequence const & value )
+            {
+                if( py::len( value ) != 4 )
+                    throw py::value_error( "orientation must contain four values" );
+
+                self.orientation = { value[0].cast< double >(),
+                                     value[1].cast< double >(),
+                                     value[2].cast< double >(),
+                                     value[3].cast< double >() };
+            },
+            "Quaternion represented as (x, y, z, w)." )
+        .def_property(
             "angular_velocity",
             []( rs2_combined_motion const & self )
             {
@@ -168,7 +188,9 @@ void init_c_files(py::module &m) {
                   std::ostringstream ss;
                   ss << "gyro[" << self.angular_velocity.x << "," << self.angular_velocity.y << ","
                       << self.angular_velocity.z << "] accel[" << self.linear_acceleration.x << ","
-                      << self.linear_acceleration.y << "," << self.linear_acceleration.z << "]";
+                      << self.linear_acceleration.y << "," << self.linear_acceleration.z << "] orientation["
+                      << self.orientation.x << "," << self.orientation.y << "," << self.orientation.z << ","
+                      << self.orientation.w << "]";
                   return ss.str();
               } );
 
