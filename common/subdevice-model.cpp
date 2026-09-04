@@ -460,6 +460,9 @@ namespace rs2
             std::map<int, rs2_format> def_format{ {0, RS2_FORMAT_ANY} };
             auto default_resolution = std::make_pair(1280, 720);
             auto default_fps = 30;
+            auto const use_rw16_label = dev.supports( RS2_CAMERA_INFO_PRODUCT_LINE )
+                && std::string( dev.get_info( RS2_CAMERA_INFO_PRODUCT_LINE ) ) == "D500"
+                && dev.supports( RS2_CAMERA_INFO_MIPI_DRIVER_VERSION );
             std::map<int, int> def_fps_per_stream;   // per-stream default-profile FPS (by unique_id)
             for (auto&& profile : sensor_profiles)
             {
@@ -505,6 +508,9 @@ namespace rs2
 
                 std::string format = rs2_format_to_string(profile.format());
 
+                // D500 MIPI exposes the RAW16 SDK format through the RW16 V4L2 fourcc.
+                if( use_rw16_label && profile.format() == RS2_FORMAT_RAW16 )
+                    format = "RW16";
                 push_back_if_not_exists(formats[profile.unique_id()], format);
                 push_back_if_not_exists(format_values[profile.unique_id()], profile.format());
 

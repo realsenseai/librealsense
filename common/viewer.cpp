@@ -2072,7 +2072,9 @@ namespace rs2
             stream_mv.show_stream_footer(font1, stream_rect, active_mouse, streams, *this);
 
 
-            if (val_in_range(stream_mv.profile.format(), { RS2_FORMAT_RAW10 , RS2_FORMAT_RAW16, RS2_FORMAT_MJPEG }))
+            auto const format = stream_mv.profile.format();
+            if( val_in_range( format, { RS2_FORMAT_RAW10, RS2_FORMAT_MJPEG } )
+                || ( format == RS2_FORMAT_RAW16 && ! stream_mv.texture->raw16_grbg10 ) )
             {
                 show_rendering_not_supported(font2, static_cast<int>(stream_rect.x), static_cast<int>(stream_rect.y), static_cast<int>(stream_rect.w),
                     static_cast<int>(stream_rect.h), stream_mv.profile.format());
