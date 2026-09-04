@@ -27,6 +27,9 @@ namespace librealsense
         void register_color_extrinsics();
         void register_color_metadata();
         void register_ae_policy_option();
+#if defined(_WIN32)
+        void register_color_options();
+#endif
 
         // Stream-id resolver: route color pins (NV12/M420/YUY2) to Color 1 / Color 2 streams
         static void resolve_color_stream( const std::vector< platform::stream_profile > & all,
