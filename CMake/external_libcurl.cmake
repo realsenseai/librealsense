@@ -5,7 +5,7 @@ if(CHECK_FOR_UPDATES OR ENABLE_STATS)
     include(ExternalProject)
     message(STATUS "Building libcurl enabled")
     
-    set(CURL_FLAGS -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DUSE_WIN32_LDAP=OFF -DHTTP_ONLY=ON -DCURL_ZLIB=OFF -DCURL_DISABLE_CRYPTO_AUTH=ON -DCURL_USE_LIBSSH2=OFF -DBUILD_TESTING=OFF -DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF -DCURL_USE_LIBPSL=OFF )
+    set(CURL_FLAGS -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DUSE_WIN32_LDAP=OFF -DHTTP_ONLY=ON -DCURL_ZLIB=OFF -DCURL_DISABLE_CRYPTO_AUTH=ON -DCURL_USE_LIBSSH2=OFF -DBUILD_TESTING=OFF -DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF -DCURL_USE_LIBPSL=OFF -DUSE_LIBIDN2=OFF )
     if (WIN32)
         set(CURL_FLAGS ${CURL_FLAGS} -DCURL_STATIC_CRT=ON )
     endif()
@@ -17,6 +17,10 @@ if(CHECK_FOR_UPDATES OR ENABLE_STATS)
         set(CURL_FLAGS ${CURL_FLAGS} -DCURL_USE_OPENSSL=ON )
     endif()
     
+    set(CURL_DEBUG_TARGET_NAME "libcurl-d")
+    set(CURL_RELEASE_TARGET_NAME "libcurl")
+    set(CURL_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/libcurl/libcurl_install)
+
     ExternalProject_Add(
         libcurl
         PREFIX libcurl
@@ -32,7 +36,7 @@ if(CHECK_FOR_UPDATES OR ENABLE_STATS)
                     -DCMAKE_C_FLAGS_RELEASE=${CMAKE_C_FLAGS_RELEASE}
                     -DCMAKE_C_FLAGS_RELWITHDEBINFO=${CMAKE_C_FLAGS_RELWITHDEBINFO}
                     -DCMAKE_CXX_STANDARD_LIBRARIES=${CMAKE_CXX_STANDARD_LIBRARIES}
-                    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/libcurl/libcurl_install
+                    -DCMAKE_INSTALL_PREFIX=${CURL_INSTALL_DIR}
                     -DCMAKE_INSTALL_LIBDIR=lib
                     -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                     -DANDROID_ABI=${ANDROID_ABI}
@@ -40,17 +44,18 @@ if(CHECK_FOR_UPDATES OR ENABLE_STATS)
         UPDATE_COMMAND ""
         PATCH_COMMAND ""
         TEST_COMMAND ""
+        # Ninja needs to know these are generated; we link them by path, below
+        BUILD_BYPRODUCTS ${CURL_INSTALL_DIR}/lib/${CURL_DEBUG_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}
+                         ${CURL_INSTALL_DIR}/lib/${CURL_RELEASE_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}
     )
 
-    set(CURL_DEBUG_TARGET_NAME "libcurl-d")
-    set(CURL_RELEASE_TARGET_NAME "libcurl")
     add_library(curl INTERFACE)
     add_definitions(-DCURL_STATICLIB) # Mandatory for building libcurl as static lib
 
-    target_include_directories(curl INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/libcurl/libcurl_install/include>)
+    target_include_directories(curl INTERFACE $<BUILD_INTERFACE:${CURL_INSTALL_DIR}/include>)
         
-    target_link_libraries(curl INTERFACE debug ${CMAKE_CURRENT_BINARY_DIR}/libcurl/libcurl_install/lib/${CURL_DEBUG_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX})
-    target_link_libraries(curl INTERFACE optimized ${CMAKE_CURRENT_BINARY_DIR}/libcurl/libcurl_install/lib/${CURL_RELEASE_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX})
+    target_link_libraries(curl INTERFACE debug ${CURL_INSTALL_DIR}/lib/${CURL_DEBUG_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX})
+    target_link_libraries(curl INTERFACE optimized ${CURL_INSTALL_DIR}/lib/${CURL_RELEASE_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX})
     
    # libcurl required libs per OS 
    # (Linux require that the link dependency will be added after the libcurl link target that use it)
