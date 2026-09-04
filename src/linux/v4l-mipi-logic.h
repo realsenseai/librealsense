@@ -44,6 +44,7 @@ namespace librealsense
 
             // rs-enum link naming conventions
             std::string rs_enum_video_node_name( const std::string & sensor, int cam_idx, bool metadata );
+            std::string rs_enum_subdev_node_name( const std::string & sensor, int cam_idx );
             std::string rs_enum_dfu_node_path( int cam_idx );
         }  // namespace v4l_mipi_logic
     }  // namespace platform
