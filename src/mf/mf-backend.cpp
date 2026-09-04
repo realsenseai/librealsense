@@ -15,7 +15,9 @@
 #include "usb/usb-enumerator.h"
 #include "../types.h"
 #include <mfapi.h>
+#include <algorithm>
 #include <chrono>
+#include <map>
 #include <set>
 #include <Windows.h>
 #include <dbt.h>
@@ -195,43 +197,76 @@ namespace librealsense
             return std::vector<mipi_device_info>();
         }
 
-        // Returns true if any USB composite device referenced by the current
-        // enumeration has an HID-class interface that hasn't been fully
-        // surfaced yet - either the CM tree hasn't attached a child device-
-        // instance under the HID interface, OR the Sensor API hasn't yet
-        // returned a hid_device_info matching that composite's unique_id.
-        // This is a generic signal that the OS is still in the middle of
-        // binding HID drivers for the composite (e.g., the HID Sensor
-        // Collection of a D4xx/D5xx IMU camera, which on Windows binds
-        // noticeably after the UVC interfaces of the same composite device).
-        // When this is true, the watcher defers its "device added" callback
-        // so that the SDK doesn't see a half-enumerated device (which would
-        // otherwise come up as a UVC device with no Motion Module and
-        // produce "No HID info provided, IMU is disabled" / "HID Motion
-        // Sensor Failure! bad optional access" before a second supersede
-        // event fixes it).
-        //
-        // This intentionally does NOT depend on PID lists - it asks the OS
-        // and the Sensor API "is there an HID-class interface here that
-        // hasn't been fully enumerated yet?" which is the underlying truth
-        // we are waiting on.
-        static bool hid_binding_in_progress( platform::backend_device_group const & curr )
+        // A device interface path ("\\?\USB#VID_x&PID_y&MI_00#inst#{guid}") and the
+        // WM_DEVICECHANGE broadcast for the same interface carry different interface
+        // GUIDs, so they only compare equal on the device-instance part. Lowercased
+        // because Windows is not consistent about case.
+        static std::string instance_id_key( LPCWSTR device_path )
         {
-            // Collect the composite unique_ids that the Sensor API has
-            // already surfaced HID entries for. query_hid_devices() returns
-            // hid_device_info with unique_id == composite parent UID (see
-            // mf-hid.cpp foreach_hid_device), the same key UVC interfaces
-            // use, so a direct set lookup is enough.
+            std::string key = utf8_from_wchar( instance_id_from_device_path( device_path ).c_str() );
+            std::transform( key.begin(), key.end(), key.begin(),
+                            []( unsigned char c ) { return (char)std::tolower( c ); } );
+            return key;
+        }
+
+        static std::string instance_id_key( std::string const & device_path )
+        {
+            std::wstring wide( device_path.begin(), device_path.end() );
+            return instance_id_key( wide.c_str() );
+        }
+
+        // Drops the composites whose camera interfaces Windows reported as removed,
+        // taking their UVC and HID entries with them. Returns true if anything was
+        // dropped.
+        //
+        // Composite granularity on purpose: a camera that goes away always takes its
+        // camera interfaces with it, so those are the reliable signal. Acting on a lone
+        // HID removal instead would drop just the IMU and republish the very partial
+        // device this watcher exists to avoid.
+        //
+        // USB entries are deliberately left alone here - see the caller, which re-reads
+        // them instead of trying to match them by id.
+        static bool drop_removed_composites( platform::backend_device_group & group,
+                                             std::set< std::string > const & removed_instance_ids )
+        {
+            std::set< std::string > gone_uids;
+            for( auto && uvc : group.uvc_devices )
+                if( removed_instance_ids.count( instance_id_key( uvc.device_path ) ) )
+                    gone_uids.insert( uvc.unique_id );
+            if( gone_uids.empty() )
+                return false;
+
+            auto drop_from = [&]( auto & devices )
+            {
+                devices.erase( std::remove_if( devices.begin(), devices.end(),
+                                               [&]( auto const & device )
+                                               { return gone_uids.count( device.unique_id ) > 0; } ),
+                               devices.end() );
+            };
+            drop_from( group.uvc_devices );
+            drop_from( group.hid_devices );
+            return true;
+        }
+
+        // Returns the unique_ids of USB composites still mid-enumeration, so an arrival
+        // can wait rather than publish a device that comes up missing sensors. The
+        // composite's device-tree children come from its USB configuration descriptor,
+        // which makes them the authoritative set to expect.
+        static std::set< std::string > incomplete_composites( platform::backend_device_group const & curr )
+        {
             std::set< std::string > sensor_api_uids;
             for( auto && h : curr.hid_devices )
                 sensor_api_uids.insert( h.unique_id );
 
-            // Each USB composite device shows up as the PARENT of any of its
-            // MI_xx interfaces. We discover composites via the UVC entries
-            // (every IMU-bearing camera also exposes UVC), walk up one node,
-            // then enumerate the composite's children looking for HID-class
-            // children.
-            std::set< DEVINST > visited_composites;
+            // Each USB composite shows up as the PARENT of any of its MI_xx interfaces.
+            // We discover composites via the UVC entries and remember which of their
+            // interface nodes Media Foundation has already given us.
+            struct composite_info
+            {
+                std::string unique_id;
+                std::set< DEVINST > surfaced_uvc_nodes;
+            };
+            std::map< DEVINST, composite_info > composites;
             for( auto && uvc : curr.uvc_devices )
             {
                 std::wstring path( uvc.device_path.begin(), uvc.device_path.end() );
@@ -241,39 +276,63 @@ namespace librealsense
                 cm_node composite = iface.get_parent();
                 if( ! composite.valid() )
                     continue;
-                if( ! visited_composites.insert( composite.get() ).second )
-                    continue;  // already checked this composite
+                composite_info & info = composites[composite.get()];
+                info.unique_id = uvc.unique_id;
+                info.surfaced_uvc_nodes.insert( iface.get() );
+            }
 
-                bool has_hid_class_child = false;
-                cm_node child = composite.get_child();
+            std::set< std::string > incomplete;
+            for( auto const & entry : composites )
+            {
+                composite_info const & info = entry.second;
+                cm_node child = cm_node( entry.first ).get_child();
                 while( child.valid() )
                 {
-                    // DEVPKEY_Device_Class is the human-readable class name
-                    // assigned by Windows ("HIDClass", "Camera", "USB", ...).
-                    // We only care about HID-class interface children of the
-                    // composite - those are where HID Sensor Collections (or
-                    // other HID device-instances) get instantiated.
-                    if( child.get_property( DEVPKEY_Device_Class ) == "HIDClass" )
+                    // DEVPKEY_Device_Class is the human-readable class name assigned by
+                    // Windows ("Camera", "HIDClass", "Ports", ...).
+                    std::string const device_class = child.get_property( DEVPKEY_Device_Class );
+                    if( device_class == "Camera" )
                     {
-                        has_hid_class_child = true;
-                        // No grandchild => no HID device-instance attached
-                        // yet at the CM-tree level => still binding.
-                        if( ! child.get_child().valid() )
-                            return true;
+                        if( ! info.surfaced_uvc_nodes.count( child.get() ) )
+                        {
+                            incomplete.insert( info.unique_id );
+                            break;
+                        }
+                    }
+                    else if( device_class == "HIDClass" )
+                    {
+                        cm_node hid_instance = child.get_child();
+                        if( ! hid_instance.valid() )
+                        {
+                            // Nothing attached under the HID interface yet - the OS is
+                            // still binding a driver to it.
+                            incomplete.insert( info.unique_id );
+                            break;
+                        }
+                        // Only a HID Sensor Collection surfaces through the Sensor API,
+                        // and Windows gives it its own "Sensor" device class. Other HID
+                        // interfaces - vendor-defined controls on unrelated cameras, for
+                        // instance - never appear there, so waiting on them would defer
+                        // every device on the machine.
+                        bool is_sensor_collection = false;
+                        for( cm_node node = hid_instance; node.valid(); node = node.get_sibling() )
+                        {
+                            if( node.get_property( DEVPKEY_Device_Class ) == "Sensor" )
+                            {
+                                is_sensor_collection = true;
+                                break;
+                            }
+                        }
+                        if( is_sensor_collection && ! sensor_api_uids.count( info.unique_id ) )
+                        {
+                            incomplete.insert( info.unique_id );
+                            break;
+                        }
                     }
                     child = child.get_sibling();
                 }
-
-                // CM tree shows all HID-class children have grandchildren,
-                // but the Sensor API runs on its own thread and may not have
-                // re-enumerated yet. If the composite has HID-class
-                // interfaces but the Sensor API still returns no HID entry
-                // for this composite's unique_id, we're between "CM tree
-                // ready" and "Sensor API ready" - keep waiting.
-                if( has_hid_class_child && sensor_api_uids.count( uvc.unique_id ) == 0 )
-                    return true;
             }
-            return false;
+            return incomplete;
         }
 
         class win_event_device_watcher : public device_watcher
@@ -294,8 +353,8 @@ namespace librealsense
                 LOG_DEBUG( "starting win_event_device_watcher" );
                 _data._stopped = false;
                 _data._changed = false;
-                _data._arrival_pending = false;
-                _data._first_event = {};
+                _data._incomplete_since.clear();
+                _data._removed_instance_ids.clear();
                 _callback = std::move(callback);
                 _last = backend_device_group( _backend->query_uvc_devices(),
                                               _backend->query_usb_devices(),
@@ -328,14 +387,16 @@ namespace librealsense
 
             struct extra_data {
                 rsutils::time::timer _timer{ std::chrono::milliseconds( 100 ) };
-                // Set when an arrival/removal event has triggered _changed; used
-                // to enforce a maximum total deferral while waiting for HID
-                // drivers to finish binding (see hid_binding_in_progress).
-                std::chrono::steady_clock::time_point _first_event;
+                // When each still-enumerating composite was first seen that way, so a
+                // composite that never finishes binding is waited on once, not forever
+                // (see incomplete_composites).
+                std::map< std::string, std::chrono::steady_clock::time_point > _incomplete_since;
+                // Device interfaces Windows reported removed since the last callback. Only
+                // touched from the watcher thread, which is also the one pumping messages.
+                std::set< std::string > _removed_instance_ids;
 
                 bool _stopped = true;
                 bool _changed = false;
-                bool _arrival_pending = false;  // gate only applies to arrivals
                 HWND hWnd;
                 HDEVNOTIFY hdevnotifyHW, hdevnotifyUVC, hdevnotify_sensor, hdevnotifyUSB;
             } _data;
@@ -368,40 +429,99 @@ namespace librealsense
                     {
                         if( _data._changed && _data._timer.has_expired() )
                         {
-                            platform::backend_device_group curr( _backend->query_uvc_devices(),
-                                                                 _backend->query_usb_devices(),
-                                                                 _backend->query_hid_devices() );
+                            auto changed = []( platform::backend_device_group const & from,
+                                               platform::backend_device_group const & to )
+                            {
+                                return list_changed( from.uvc_devices, to.uvc_devices )
+                                    || list_changed( from.usb_devices, to.usb_devices )
+                                    || list_changed( from.hid_devices, to.hid_devices );
+                            };
 
-                            // Generic "wait for HID to finish binding" gate: if the
-                            // OS shows an HID-class USB interface that hasn't been
-                            // populated with a child device-instance yet, the bus
-                            // is still "settling" - re-arm the debounce and check
-                            // again on the next tick. Bounded by MAX_DEFERRAL so a
-                            // misbehaving HID driver (HID class advertised but
-                            // never bound) doesn't make the device invisible
-                            // forever.
-                            static constexpr auto MAX_DEFERRAL = std::chrono::milliseconds( 15000 );
-                            auto since_first = std::chrono::steady_clock::now() - _data._first_event;
-                            const bool may_defer = _data._arrival_pending
-                                && _last.is_contained_in( curr )
-                                && since_first < MAX_DEFERRAL
-                                && hid_binding_in_progress( curr );
+                            // Removals first, computed from what we already know: the
+                            // notification names the interface and _last says which device
+                            // owned it, so no enumeration is needed. That matters - a full
+                            // enumeration costs several seconds while a camera is missing,
+                            // because the Sensor API stalls on the device that just left, and
+                            // the application should not keep a device with dead handles for
+                            // that long.
+                            //
+                            // It is also the only way to notice a camera that reboots - after
+                            // a firmware update or a hardware reset it returns on the same
+                            // device paths, so comparing snapshots cannot tell it apart from
+                            // one that never left.
+                            if( ! _data._removed_instance_ids.empty() )
+                            {
+                                platform::backend_device_group without_removed = _last;
+                                if( drop_removed_composites( without_removed, _data._removed_instance_ids ) )
+                                {
+                                    // The USB list is re-read rather than filtered. A composite
+                                    // contributes USB entries under two different ids - its MI_xx
+                                    // interfaces share the instance token the UVC entries use,
+                                    // while its own entry is parsed from a path with no MI_ part
+                                    // and carries an unrelated id - so matching them by id leaves
+                                    // some behind, and a leftover would show up as a change on the
+                                    // next tick and fire a second, spurious callback. Unlike the
+                                    // HID query, this one costs about a millisecond even while a
+                                    // camera is missing, so asking the OS is cheaper than guessing.
+                                    without_removed.usb_devices = _backend->query_usb_devices();
+                                    _callback( _last, without_removed );
+                                    _last = without_removed;
+                                }
+                                _data._removed_instance_ids.clear();
+                            }
+
+                            // Arrivals do need a snapshot. Queried in explicit statements,
+                            // not as constructor arguments: argument evaluation order is
+                            // unspecified and MSVC picks right-to-left, which left the UVC
+                            // list - the one carrying device identity - enumerated last.
+                            auto uvc_devices = _backend->query_uvc_devices();
+                            auto usb_devices = _backend->query_usb_devices();
+                            auto hid_devices = _backend->query_hid_devices();
+                            platform::backend_device_group curr( uvc_devices, usb_devices, hid_devices );
+
+                            // Arrivals, on the other hand, wait: a composite still growing
+                            // camera/HID interfaces is not ready to be published, so re-arm
+                            // the debounce and look again on the next tick. Each composite
+                            // gets its own budget, so one that advertises an interface it
+                            // never binds delays us once instead of blocking every later
+                            // event on the machine - and once the budget is spent we publish
+                            // whatever exists, which is what lets a genuinely partial device
+                            // through.
+                            //
+                            // 8s covers the widest interface spread measured on a D585 (4.6s
+                            // cold plug, 6.5s from a premature publish to the complete one
+                            // after a firmware update) without making a real partial device
+                            // wait any longer than it has to.
+                            static constexpr auto MAX_DEFERRAL = std::chrono::seconds( 8 );
+                            auto const now = std::chrono::steady_clock::now();
+                            auto const incomplete = incomplete_composites( curr );
+                            for( auto it = _data._incomplete_since.begin(); it != _data._incomplete_since.end(); )
+                            {
+                                if( incomplete.count( it->first ) )
+                                    ++it;
+                                else
+                                    it = _data._incomplete_since.erase( it );
+                            }
+                            bool may_defer = false;
+                            for( auto && unique_id : incomplete )
+                            {
+                                auto inserted = _data._incomplete_since.emplace( unique_id, now );
+                                if( now - inserted.first->second < MAX_DEFERRAL )
+                                    may_defer = true;
+                            }
                             if( may_defer )
                             {
                                 _data._timer.start();
-                                // Don't fire yet; fall through to sleep.
+                                // Don't publish yet; fall through to sleep.
                             }
                             else
                             {
-                                if( list_changed( _last.uvc_devices, curr.uvc_devices )
-                                    || list_changed( _last.usb_devices, curr.usb_devices )
-                                    || list_changed( _last.hid_devices, curr.hid_devices ) )
+                                if( changed( _last, curr ) )
                                 {
                                     _callback( _last, curr );
                                     _last = curr;
                                 }
                                 _data._changed = false;
-                                _data._arrival_pending = false;
                             }
                         }
                         // Yield CPU resources, as this is required for connect/disconnect events only
@@ -445,10 +565,7 @@ namespace librealsense
                             break;
                         auto data = reinterpret_cast< extra_data * >(
                             GetWindowLongPtr( hWnd, GWLP_USERDATA ) );
-                        if( ! data->_changed )
-                            data->_first_event = std::chrono::steady_clock::now();
                         data->_changed = true;
-                        data->_arrival_pending = true;
                         data->_timer.start();
                         break;
                     }
@@ -459,8 +576,10 @@ namespace librealsense
                         if( p_hdr->dbch_devicetype != DBT_DEVTYP_DEVICEINTERFACE )
                             break;
                         auto data = reinterpret_cast<extra_data*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-                        if( ! data->_changed )
-                            data->_first_event = std::chrono::steady_clock::now();
+                        auto p_iface = reinterpret_cast< DEV_BROADCAST_DEVICEINTERFACE const * >( lParam );
+                        auto instance_id = instance_id_key( p_iface->dbcc_name );
+                        if( ! instance_id.empty() )
+                            data->_removed_instance_ids.insert( std::move( instance_id ) );
                         data->_changed = true;
                         data->_timer.start();
                     }

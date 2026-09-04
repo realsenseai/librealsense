@@ -23,9 +23,15 @@ device_removed = False
 device_added = False
 device_removed_time = 0
 device_added_time = 0
+added_sensors = None   # sensor set of the re-added device, as the callback saw it
+
+
+def sensor_names( device ):
+    return sorted( s.get_info( rs.camera_info.name ) for s in device.query_sensors() )
+
 
 def device_changed( info ):
-    global dev, device_removed, device_added, device_removed_time, device_added_time
+    global dev, device_removed, device_added, device_removed_time, device_added_time, added_sensors
     if dev and info.was_removed( dev ):
         device_removed_time = time.perf_counter()
         device_removed = True
@@ -33,18 +39,26 @@ def device_changed( info ):
         if new_dev.get_info( rs.camera_info.serial_number ) == target_sn:
             device_added_time = time.perf_counter()
             device_added = True
+            # Sampled here, not after the test wakes up: a device published before all
+            # of its interfaces have enumerated is repaired by a later event, so polling
+            # for it afterwards would not see the partial one the application got.
+            if added_sensors is None:
+                added_sensors = sensor_names( new_dev )
 
 
 def test_hw_reset_sanity( test_device ):
-    global dev, target_sn, device_removed, device_added, device_removed_time, device_added_time
+    global dev, target_sn, device_removed, device_added, device_removed_time, device_added_time, added_sensors
     device_removed = False
     device_added = False
     device_removed_time = 0
     device_added_time = 0
+    added_sensors = None
 
     t = Timer( 10 )
     dev, ctx = test_device
     target_sn = dev.get_info( rs.camera_info.serial_number )
+    expected_sensors = sensor_names( dev )
+    log.info( "Sensors before reset: %s", expected_sensors )
     connection_type = dev.get_info( rs.camera_info.connection_type ) if dev.supports( rs.camera_info.connection_type ) else None
     ctx.set_devices_changed_callback( device_changed )
     time.sleep(1)
@@ -84,3 +98,9 @@ def test_hw_reset_sanity( test_device ):
         log.info( "Querying there are %s devices", len( ctx.query_devices() ) )
 
     assert device_added, "device did not re-appear within MAX_ENUMERATION_TIME"
+
+    # The device must come back whole. A re-enumeration that publishes the device
+    # before all its interfaces are up surfaces here as a missing sensor - typically
+    # the Motion Module, leaving the application with a camera that has no IMU.
+    log.info( "Sensors after reset: %s", added_sensors )
+    assert added_sensors == expected_sensors, f"device re-enumerated with {added_sensors}, expected {expected_sensors}"
