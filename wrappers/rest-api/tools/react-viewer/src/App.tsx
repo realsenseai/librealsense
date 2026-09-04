@@ -50,7 +50,7 @@ function App() {
 
       <div className="flex-1 flex min-h-0">
         {/* Left Sidebar - Device Panel with Controls */}
-        <aside className="w-80 flex-shrink-0 bg-rs-dark border-r border-gray-700 overflow-y-auto">
+        <aside className="w-80 flex-shrink-0 bg-rs-dark border-r border-rs-border overflow-y-auto">
           <DevicePanel />
         </aside>
 
@@ -70,7 +70,7 @@ function App() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="flex-1 flex items-center justify-center text-rs-dim">
               <div className="text-center">
                 <svg className="w-24 h-24 mx-auto mb-4 opacity-50" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2"/>
@@ -87,8 +87,10 @@ function App() {
       </div>
 
       {/* Connection Status */}
-      <div className={`fixed bottom-4 left-4 px-3 py-1 rounded-full text-sm ${
-        isConnected ? 'bg-green-600' : 'bg-red-600'
+      <div className={`fixed bottom-4 left-4 px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-sm ${
+        isConnected
+          ? 'border-rs-ok/30 bg-rs-ok/10 text-rs-ok'
+          : 'border-rs-err/30 bg-rs-err/10 text-rs-err'
       }`}>
         {isConnected ? '● Connected' : '○ Disconnected'}
       </div>

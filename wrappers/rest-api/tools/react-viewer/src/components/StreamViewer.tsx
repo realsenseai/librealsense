@@ -1,9 +1,28 @@
-import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react'
-import { useAppStore } from '../store'
+import { useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense, type ReactNode } from 'react'
+import { useAppStore, type DeviceIMUHistory } from '../store'
 import { WebRTCHandler } from '../api/webrtc'
 import { apiClient } from '../api/client'
 import { DepthLegend } from './DepthLegend'
+import { toIMUChartSeries } from '../utils/imuChart'
 import type { DeviceState, StreamConfig, StreamMetadata } from '../api/types'
+
+import IMUOrientation from './IMUOrientation'
+
+const IMUChart = lazy(() => import('./IMUChart'))
+
+const NO_SAMPLES: DeviceIMUHistory['accel'] = []
+
+// Muted hue per stream type, used only as an edge accent on the video stream label
+// so tiles stay identifiable without the panel turning into a rainbow. Motion
+// streams render as IMUStreamTile and never reach that label.
+const STREAM_HUES: Record<string, string> = {
+  depth: '#4f9cf0',
+  color: '#35c07a',
+  infrared: '#9b8cf5',
+  fisheye: '#d9a13b',
+}
+
+const streamHue = (type: string) => STREAM_HUES[type.toLowerCase()] ?? '#bcc4d4'
 
 // A stream with its device context
 interface DeviceStream {
@@ -86,6 +105,7 @@ export function StreamViewer() {
               return (
                 <IMUStreamTile
                   key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
+                  deviceId={stream.deviceId}
                   streamType={stream.config.stream_type}
                   showDeviceName={activeDeviceCount > 1}
                   deviceName={stream.deviceName}
@@ -309,18 +329,6 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
     }
   }, [deviceId, streamType, handleTrack, handleConnectionStateChange])
 
-  const getStreamColor = (type: string) => {
-    const colors: Record<string, string> = {
-      depth: 'bg-blue-600',
-      color: 'bg-green-600',
-      infrared: 'bg-purple-600',
-      fisheye: 'bg-yellow-600',
-      gyro: 'bg-red-600',
-      accel: 'bg-orange-600',
-    }
-    return colors[type.toLowerCase()] || 'bg-gray-600'
-  }
-
   return (
     <div 
       ref={containerRef}
@@ -343,23 +351,23 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
       {showDeviceName && (
         <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent px-2 py-1">
           <div className="text-xs text-white font-medium truncate">
-            {deviceName} <span className="text-gray-400">({serialNumber})</span>
+            {deviceName} <span className="text-white/60 nums">({serialNumber})</span>
           </div>
         </div>
       )}
 
-      {/* Stream Label */}
+      {/* Stream Label — hue on the edge only, so it reads over any video content */}
       <div
-        className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} left-2 px-2 py-1 rounded text-xs font-semibold text-white ${getStreamColor(
-          streamType
-        )}`}
+        className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} left-2 px-2 py-0.5 rounded-md border-l-2
+                    bg-black/55 backdrop-blur-sm text-[11px] font-semibold uppercase tracking-[0.06em] text-white/90`}
+        style={{ borderLeftColor: streamHue(streamType) }}
       >
         {streamType.toUpperCase()}
       </div>
 
       {/* Connection Status */}
       {connectionState && connectionState !== 'connected' && (
-        <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 px-2 py-1 bg-yellow-600 rounded text-xs text-white`}>
+        <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 px-2 py-0.5 rounded-md border border-rs-warn/40 bg-rs-warn/15 backdrop-blur-sm text-[11px] text-rs-warn`}>
           {connectionState}
         </div>
       )}
@@ -398,6 +406,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
 
 // IMU Stream Tile - specialized visualization for gyro/accel streams
 interface IMUStreamTileProps {
+  deviceId: string
   streamType: string
   showDeviceName?: boolean
   deviceName: string
@@ -405,8 +414,11 @@ interface IMUStreamTileProps {
   metadata?: StreamMetadata
 }
 
-function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, metadata }: IMUStreamTileProps) {
-  const { imuHistory } = useAppStore()
+function IMUStreamTile({ deviceId, streamType, showDeviceName, deviceName, serialNumber, metadata }: IMUStreamTileProps) {
+  // Selector, not the whole store: this tile re-renders on every IMU sample, and no
+  // other consumer needs to follow along.
+  const deviceHistory = useAppStore((s) => s.imuHistory[deviceId])
+  const [showGraph, setShowGraph] = useState(false)
   const [fps, setFps] = useState(0)
   const [showMetadata, setShowMetadata] = useState(false)
   const lastFrameTime = useRef(0)
@@ -427,42 +439,39 @@ function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, m
   const isGyro = streamType.toLowerCase() === 'gyro'
   const isAccel = streamType.toLowerCase() === 'accel'
   
-  const data = isGyro ? imuHistory.gyro : isAccel ? imuHistory.accel : []
+  // NO_SAMPLES, not a fresh [], so the identity is stable while the device has no
+  // history yet and the memo below is not invalidated on every render.
+  const data = (isGyro ? deviceHistory?.gyro : isAccel ? deviceHistory?.accel : undefined) ?? NO_SAMPLES
   const latest = data[data.length - 1]
-  
-  // Calculate magnitude
-  const magnitude = latest 
-    ? Math.sqrt(latest.x ** 2 + latest.y ** 2 + latest.z ** 2)
-    : null
-  
-  const getStreamColor = () => {
-    if (isGyro) return { bg: 'bg-red-900/50', border: 'border-red-500', text: 'text-red-400' }
-    if (isAccel) return { bg: 'bg-orange-900/50', border: 'border-orange-500', text: 'text-orange-400' }
-    return { bg: 'bg-gray-900/50', border: 'border-gray-500', text: 'text-gray-400' }
-  }
-  
-  const colors = getStreamColor()
+
   const unit = isGyro ? 'rad/s' : 'm/s²'
-  
-  // Calculate bar widths based on value (normalized to max expected range)
-  const maxRange = isGyro ? 10 : 20  // rad/s for gyro, m/s² for accel
-  const getBarWidth = (value: number) => {
-    const normalized = Math.min(Math.abs(value) / maxRange, 1) * 100
-    return `${normalized}%`
-  }
-  
+  const chartSeries = useMemo(() => (showGraph ? toIMUChartSeries(data) : []), [showGraph, data])
+  // Resting noise floor per stream: gyro drift is milli-rad/s, accel carries 1g.
+  const axisFloor = isGyro ? 0.5 : 10
+
   return (
-    <div className={`relative rounded-lg overflow-hidden ${colors.bg} border ${colors.border} flex flex-col`}>
+    <div className="relative rounded-lg overflow-hidden bg-rs-dark border border-rs-border flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 bg-black/30">
+      <div className="flex items-center justify-between px-3 py-2 bg-rs-inset/70 border-b border-rs-border">
         <div className="flex items-center gap-2">
-          <span className={`font-semibold ${colors.text}`}>
+          <span className="font-semibold text-[11px] uppercase tracking-[0.06em] text-rs-text">
             {streamType.toUpperCase()}
           </span>
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          <span className="w-1.5 h-1.5 bg-rs-ok rounded-full animate-pulse" />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">{unit}</span>
+          {/* Numeric readout / graph switch, as in the C++ viewer's motion tiles. */}
+          <button
+            onClick={() => setShowGraph((v) => !v)}
+            aria-pressed={showGraph}
+            title={showGraph ? 'Close graph view' : 'Open graph view'}
+            className={`transition-colors ${showGraph ? 'text-rs-accent' : 'text-rs-dim hover:text-rs-text'}`}
+          >
+            <span className="sr-only">{showGraph ? 'Close graph view' : 'Open graph view'}</span>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 15v3m5-9v9m5-13v13" />
+            </svg>
+          </button>
           <MetadataPanel
             metadata={metadata}
             streamType={streamType}
@@ -474,96 +483,46 @@ function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, m
       </div>
       
       {showDeviceName && (
-        <div className="px-3 py-1 text-xs text-gray-400 bg-black/20">
+        <div className="px-3 py-1 text-xs text-rs-muted bg-rs-darker/40 nums">
           {deviceName} ({serialNumber})
         </div>
       )}
       
-      {/* Content */}
-      <div className="flex-1 flex flex-col justify-center p-4">
-        {!latest ? (
-          <div className="text-center text-gray-500">
-            <p>Waiting for data...</p>
-          </div>
+      {/* Content, centred: the wireframe and the graph are both a fixed height, so
+          in a sparse stream grid the tile is taller than they are. */}
+      <div className="flex-1 min-h-0 flex flex-col justify-center p-4">
+        {showGraph ? (
+          // Lazy: recharts is a 384 kB chunk, and a tile only needs it once the user
+          // opens the graph. Numeric-only sessions never download it.
+          <Suspense
+            fallback={
+              <div className="h-44 max-h-full flex items-center justify-center text-xs text-rs-dim">
+                Loading graph…
+              </div>
+            }
+          >
+            <IMUChart data={chartSeries} axisFloor={axisFloor} />
+          </Suspense>
         ) : (
           <>
-            {/* X/Y/Z Values with visual bars */}
-            <div className="space-y-3">
-              {/* X */}
-              <div className="flex items-center gap-3">
-                <span className="text-red-400 font-bold w-4">X</span>
-                <div className="flex-1 h-4 bg-gray-800 rounded overflow-hidden relative">
-                  <div 
-                    className="absolute top-0 h-full bg-red-500/70 transition-all duration-75"
-                    style={{ 
-                      width: getBarWidth(latest.x),
-                      left: latest.x >= 0 ? '50%' : `calc(50% - ${getBarWidth(latest.x)})`,
-                    }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xs font-mono text-white drop-shadow">
-                      {latest.x.toFixed(3)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Y */}
-              <div className="flex items-center gap-3">
-                <span className="text-green-400 font-bold w-4">Y</span>
-                <div className="flex-1 h-4 bg-gray-800 rounded overflow-hidden relative">
-                  <div 
-                    className="absolute top-0 h-full bg-green-500/70 transition-all duration-75"
-                    style={{ 
-                      width: getBarWidth(latest.y),
-                      left: latest.y >= 0 ? '50%' : `calc(50% - ${getBarWidth(latest.y)})`,
-                    }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xs font-mono text-white drop-shadow">
-                      {latest.y.toFixed(3)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Z */}
-              <div className="flex items-center gap-3">
-                <span className="text-blue-400 font-bold w-4">Z</span>
-                <div className="flex-1 h-4 bg-gray-800 rounded overflow-hidden relative">
-                  <div 
-                    className="absolute top-0 h-full bg-blue-500/70 transition-all duration-75"
-                    style={{ 
-                      width: getBarWidth(latest.z),
-                      left: latest.z >= 0 ? '50%' : `calc(50% - ${getBarWidth(latest.z)})`,
-                    }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xs font-mono text-white drop-shadow">
-                      {latest.z.toFixed(3)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Magnitude */}
-            {magnitude !== null && (
-              <div className="mt-4 pt-3 border-t border-gray-700 flex items-center justify-between">
-                <span className="text-purple-400 font-semibold">‖{isGyro ? 'ω' : 'a'}‖</span>
-                <span className="font-mono font-bold text-lg">
-                  {magnitude.toFixed(3)}
-                  <span className="text-xs text-gray-400 ml-1">{unit}</span>
-                </span>
-                {isAccel && Math.abs(magnitude - 9.81) < 0.5 && (
-                  <span className="text-xs text-green-400">(≈1g)</span>
-                )}
-              </div>
-            )}
-            
-            {/* Sample count */}
-            <div className="mt-2 text-xs text-gray-500 text-center">
-              {data.length} samples
+            <IMUOrientation sample={latest ?? null} unit={unit} />
+            {/* Exact per-axis values, which the wireframe alone cannot give. */}
+            <div className="mt-2 flex items-center justify-center gap-4 text-xs nums">
+              {latest ? (
+                <>
+                  <span className="text-red-400">
+                    X {latest.x.toFixed(3)} <span className="text-rs-dim">{unit}</span>
+                  </span>
+                  <span className="text-green-400">
+                    Y {latest.y.toFixed(3)} <span className="text-rs-dim">{unit}</span>
+                  </span>
+                  <span className="text-blue-400">
+                    Z {latest.z.toFixed(3)} <span className="text-rs-dim">{unit}</span>
+                  </span>
+                </>
+              ) : (
+                <span className="text-rs-dim">Waiting for data…</span>
+              )}
             </div>
           </>
         )}

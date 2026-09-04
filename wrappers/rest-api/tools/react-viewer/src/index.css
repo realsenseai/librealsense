@@ -3,13 +3,18 @@
 @tailwind utilities;
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  /* Inter is not bundled; the rest of the stack is the platform UI font. */
+  font-family: 'Inter var', Inter, 'Segoe UI Variable Text', 'Segoe UI', -apple-system,
+    BlinkMacSystemFont, system-ui, Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Themes native checkboxes, radios and range thumbs in one shot. */
+  accent-color: #2f97e3;
+  color-scheme: dark;
 }
 
 body {
@@ -21,6 +26,13 @@ body {
   min-height: 100vh;
 }
 
+/* Digits in resolutions, FPS, serials and metadata must not shift width. */
+.nums,
+input[type='text'],
+select {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -28,16 +40,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1a2e;
+  background: #0e1220;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4a4a6a;
+  background: #29314a;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #5a5a7a;
+  background: #3b4664;
 }
 
 /* Stream viewer video */
@@ -52,36 +64,75 @@ body {
 }
 
 .panel-header {
-  @apply text-lg font-semibold mb-3 text-rs-blue;
+  @apply text-lg font-semibold mb-3 text-rs-accent;
+}
+
+/* Section label above a group of rows: reads as structure, not content. */
+.section-label {
+  @apply text-[11px] font-bold uppercase tracking-[0.09em] text-rs-muted;
 }
 
 /* Control inputs */
 .control-slider {
-  @apply w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer;
+  @apply w-full h-2 bg-rs-inset rounded-lg appearance-none cursor-pointer;
 }
 
 .control-slider::-webkit-slider-thumb {
-  @apply appearance-none w-4 h-4 bg-rs-blue rounded-full cursor-pointer;
+  @apply appearance-none w-4 h-4 bg-rs-accent rounded-full cursor-pointer;
 }
 
 .control-button {
-  @apply px-4 py-2 bg-rs-blue text-white rounded-lg hover:bg-blue-600 
+  @apply px-4 py-2 bg-rs-blue text-white rounded-lg hover:bg-rs-accent
          transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
 }
 
 .control-button-secondary {
-  @apply px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 
+  @apply px-4 py-2 bg-rs-inset text-rs-text border border-rs-border rounded-lg
+         hover:border-rs-dim hover:bg-rs-border/60
          transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
 }
 
+/* Fully custom checkbox: a native one keeps the platform's light box. */
 .control-checkbox {
-  @apply w-4 h-4 text-rs-blue bg-gray-700 border-gray-600 rounded 
-         focus:ring-rs-blue focus:ring-2;
+  @apply appearance-none w-4 h-4 rounded-[3px] border bg-rs-inset border-rs-border
+         cursor-pointer transition-colors hover:border-rs-dim
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rs-accent/50
+         disabled:opacity-40 disabled:cursor-not-allowed;
+}
+
+.control-checkbox:checked {
+  @apply bg-rs-blue border-rs-blue;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 78%;
+}
+
+/* Themed <select>: closed state, chevron and focus ring are ours. The open
+   popup is still drawn by the OS — that is the limit of a native select. */
+/* Recessed well: darker and translucent against the surface it sits on, so it
+   reads as an input rather than a flat label. */
+.select-rs,
+.control-select {
+  @apply appearance-none bg-rs-darker/70 text-rs-text border border-rs-border rounded-md
+         pl-2 pr-6 py-1 font-medium shadow-inner
+         hover:border-rs-dim hover:bg-rs-darker/85 focus:border-rs-accent focus:outline-none
+         focus:ring-1 focus:ring-rs-accent/40
+         disabled:opacity-40 disabled:cursor-not-allowed transition-colors;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23949db3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 5px center;
+  background-size: 11px;
+}
+
+.select-rs option,
+.control-select option {
+  background-color: #1b2233;
+  color: #e7eaf1;
 }
 
 .control-select {
-  @apply bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 
-         focus:border-rs-blue focus:outline-none;
+  @apply pl-3 pr-7 py-2;
 }
 
 /* Loading animation */
