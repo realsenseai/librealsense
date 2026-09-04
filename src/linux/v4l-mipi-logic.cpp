@@ -54,6 +54,7 @@ namespace librealsense
             static constexpr uint32_t RS_CAMERA_CID_HWMC                    = ( RS_CAMERA_CID_BASE + 0x20 );
             static constexpr uint32_t RS_CAMERA_CID_READOUT_SHAPING         = ( RS_CAMERA_CID_BASE + 0x22 );
             static constexpr uint32_t RS_CAMERA_CID_AE_MODE                 = ( RS_CAMERA_CID_BASE + 0x23 );
+            static constexpr uint32_t RS_CAMERA_CID_GYRO_SENSITIVITY       = ( RS_CAMERA_CID_BASE + 0x26 );
 
             static constexpr uint8_t GVD_VALID_OPCODE = 0x10;
 
@@ -290,6 +291,7 @@ namespace librealsense
                 case RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE: return V4L2_CID_AUTO_WHITE_BALANCE;
                 case RS2_OPTION_POWER_LINE_FREQUENCY : return V4L2_CID_POWER_LINE_FREQUENCY;
                 case RS2_OPTION_AUTO_EXPOSURE_PRIORITY: return V4L2_CID_EXPOSURE_AUTO_PRIORITY;
+                case RS2_OPTION_GYRO_SENSITIVITY: return RS_CAMERA_CID_GYRO_SENSITIVITY;
                 default: throw linux_backend_exception( rsutils::string::from() << "no v4l2 mipi mapping cid for option " << option );
                 }
             }

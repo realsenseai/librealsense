@@ -63,6 +63,15 @@ public:
         return action( *_device );
     }
 
+    template< class T >
+    auto invoke_if_closed( T action ) -> decltype( action() )
+    {
+        std::lock_guard< std::mutex > lock( _configure_lock );
+        if( _is_opened )
+            throw wrong_api_call_sequence_exception( "Operation is not allowed while the UVC sensor is open" );
+        return action();
+    }
+
     
     void power_for_duration( std::chrono::steady_clock::duration timeout = std::chrono::milliseconds( 500 ) )
     {
