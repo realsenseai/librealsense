@@ -23,6 +23,7 @@ namespace librealsense
         // devices under RealSense VID
         const uint16_t D500_RECOVERY_PID      = 0x0CFD; // Shared across the D500 family
         const uint16_t D500_USB2_RECOVERY_PID = 0x0CFE; // Fallback for USB2 hosts
+        const uint16_t D500_MIPI_RECOVERY_PID = 0xBBDD; // D500 MIPI/GMSL DFU recovery (synthetic; no USB enumeration)
         const uint16_t D535_2C_PID            = 0x0C01;
         const uint16_t D535_3C_PID            = 0x0C02;
         const uint16_t D535F_PID              = 0x0C03; // 3C with IR only L/R cover
@@ -106,6 +107,7 @@ namespace librealsense
             { D585S_RECOVERY_PID,     "RealSense D585S Recovery"},
             { D500_RECOVERY_PID,      "RealSense D500 Recovery"},
             { D500_USB2_RECOVERY_PID, "RealSense D500 Recovery"},
+            { D500_MIPI_RECOVERY_PID, "RealSense D5xx MIPI Recovery"},
             { D535_2C_PID,            "RealSense D535 Dual RGB" },
             { D535_3C_PID,            "RealSense D535" },
             { D535F_PID,              "RealSense D535F" },

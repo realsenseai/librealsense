@@ -15,8 +15,17 @@ ds_d500_update_device::ds_d500_update_device( std::shared_ptr< const device_info
     : update_device( dev_info, usb_device, "D500" )
     {
         auto info = usb_device->get_info();
-        _name = ds::rs500_sku_names.find(info.pid) != ds::rs500_sku_names.end() ? ds::rs500_sku_names.at(info.pid) : "unknown";  
+        _name = ds::rs500_sku_names.find(info.pid) != ds::rs500_sku_names.end() ? ds::rs500_sku_names.at(info.pid) : "unknown";
         _serial_number = parse_serial_number(_serial_number_buffer);
+    }
+
+    ds_d500_update_device::ds_d500_update_device( std::shared_ptr< const device_info > const & dev_info,
+                                    std::shared_ptr< platform::mipi_device > const & mipi_device )
+    : update_device( dev_info, mipi_device, "D500" )
+    {
+        auto info = mipi_device->get_info();
+        _name = ds::rs500_sku_names.find(info.pid) != ds::rs500_sku_names.end() ? ds::rs500_sku_names.at(info.pid) : "unknown";
+        _serial_number = info.serial_number;
     }
 
 
@@ -29,6 +38,15 @@ ds_d500_update_device::ds_d500_update_device( std::shared_ptr< const device_info
     void ds_d500_update_device::update(const void* fw_image, int fw_image_size, rs2_update_progress_callback_sptr update_progress_callback) const
     {
         update_device::update( fw_image, fw_image_size, update_progress_callback );
+
+        // On GMSL the DFU chardev write blocks until the manifest transition, so the
+        // fw-burn wait below is neither needed nor useful — update_mipi() has already
+        // completed the download when we get here. The USB path relies on
+        // _is_dfu_monitoring_enabled being cleared by wait_for_manifest_completion()
+        // (USB-only) to fall through to the wait; making the GMSL case an explicit
+        // early-return keeps the two families from getting entangled.
+        if (_connection_type == "GMSL")
+            return;
 
         if (!_is_dfu_monitoring_enabled)
         {

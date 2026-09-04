@@ -25,8 +25,10 @@ namespace fw_update
 
     inline bool is_mipi_recovery_device( const rs2::device & dev )
     {
-        return dev.supports( RS2_CAMERA_INFO_PRODUCT_ID )
-            && std::string( dev.get_info( RS2_CAMERA_INFO_PRODUCT_ID ) ) == "BBCD";
+        if( ! dev.supports( RS2_CAMERA_INFO_PRODUCT_ID ) )
+            return false;
+        std::string pid = dev.get_info( RS2_CAMERA_INFO_PRODUCT_ID );
+        return pid == "BBCD" || pid == "BBDD"; // D4xx / D5xx MIPI recovery
     }
 
     // Returns false when firmware is not compatible, true otherwise.

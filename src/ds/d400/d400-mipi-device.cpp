@@ -3,8 +3,8 @@
 
 #include "context.h"
 #include <string>
-#include <fstream>
 #include "d400-mipi-device.h"
+#include "ds/ds-mipi-device.h"
 #include "librealsense-exception.h"
 
 namespace librealsense
@@ -29,47 +29,12 @@ namespace librealsense
         rs2_camera_info _dfu_port_info = (is_mipi_recovery)?
                     (RS2_CAMERA_INFO_PHYSICAL_PORT):(RS2_CAMERA_INFO_DFU_DEVICE_PATH);
 
-        // Write signed firmware to appropriate file descriptor
+        // Delegate the DFU chardev write + options-watcher pause to the shared
+        // helper at src/ds/ds-mipi-device.cpp. D457 burn is ~95 s.
         std::string dfu_path = get_info(_dfu_port_info);
-        std::ofstream fw_path_in_device(dfu_path, std::ios::binary);
-        if (fw_path_in_device)
-        {
-            // Progress thread runs for the full ~95 seconds to give the device
-            // time to process the firmware. The write may return instantly (OS
-            // buffering) but the device still needs time to burn.
-            std::thread show_progress_thread(
-                [&]()
-                {
-                    for( int i = 0; i < 95; ++i ) // Show percentage [0-95]
-                    {
-                        if (callback)
-                            callback->on_update_progress(static_cast<float>(i) / 100.f);
-                        // needed a little more than 1 second * num of iterations to complete the burning
-                        std::this_thread::sleep_for( std::chrono::milliseconds( 1020 ) );
-                    }
-                } );
+        ds_mipi_device( _ds_device_common ).perform_dfu_write(
+            dfu_path, image.data(), image.size(), callback, 95 );
 
-            fw_path_in_device.write(reinterpret_cast<const char*>(image.data()), image.size());
-            fw_path_in_device.flush();
-            show_progress_thread.join();
-
-            if( ! fw_path_in_device.good() )
-                throw librealsense::io_exception( "Firmware write to DFU path failed: " + dfu_path );
-        }
-        else
-        {
-            throw librealsense::io_exception("Firmware Update failed - DFU path: " + dfu_path
-                + " - wrong path or permissions missing");
-        }
-
-        fw_path_in_device.close();
-        if( ! fw_path_in_device )
-            throw librealsense::io_exception( "Firmware flush/close failed on DFU path: " + dfu_path );
-
-        LOG_INFO("FW update process completed successfully.");
-
-        if (callback)
-            callback->on_update_progress(0.95f);
         if (is_mipi_recovery)
         {
             LOG_INFO("For GMSL MIPI device please reboot, or reload d4xx driver\n"\
@@ -87,13 +52,14 @@ namespace librealsense
     void d400_mipi_device::update( const void * fw_image, int fw_image_size, rs2_update_progress_callback_sptr progress_callback) const
     {
         // fw update usually do not change any data member in the sdk
-        // but here we need to pause the options watchers which are non-const methods
+        // but here we call a non-const method to keep _pid usage explicit.
         const_cast<d400_mipi_device*>(this)->update_non_const(fw_image, fw_image_size, progress_callback);
     }
 
     void d400_mipi_device::update_non_const( const void * fw_image, int fw_image_size, rs2_update_progress_callback_sptr progress_callback )
     {
-        options_watcher_pause_guard guard(*_ds_device_common);
+        // ds_mipi_device::perform_dfu_write() and hardware_reset() each pause the
+        // options watchers over their own critical section; no outer guard needed.
         std::vector<uint8_t> fw_image_vec (static_cast<const uint8_t*>(fw_image), static_cast<const uint8_t*>(fw_image) + fw_image_size);
         update_signed_firmware(fw_image_vec, progress_callback);
     }

@@ -12,6 +12,8 @@ namespace librealsense
     public:
         ds_d500_update_device( std::shared_ptr< const device_info > const &,
                           std::shared_ptr< platform::usb_device > const & usb_device );
+        ds_d500_update_device( std::shared_ptr< const device_info > const &,
+                          std::shared_ptr< platform::mipi_device > const & mipi_device );
         virtual ~ds_d500_update_device() = default;
 
         virtual bool check_fw_compatibility(const std::vector<uint8_t>& image) const override;

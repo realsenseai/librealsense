@@ -333,7 +333,7 @@ namespace librealsense
         std::ofstream fw_path_in_device(_physical_port.c_str(), std::ios::binary);
         if (!fw_path_in_device)
         {
-            throw std::runtime_error("Firmware Update failed - wrong path or permissions missing");
+            throw io_exception("Firmware Update failed - wrong path or permissions missing");
             return;
         }
         while (remaining_bytes > 0)
@@ -343,6 +343,9 @@ namespace librealsense
             auto curr_block = ((uint8_t*)fw_image + offset);
 
             fw_path_in_device.write(reinterpret_cast<const char*>(curr_block), chunk_size);
+            if (!fw_path_in_device)
+                throw io_exception("Firmware Update failed - DFU chardev write error at offset "
+                                   + std::to_string(offset));
 
             block_number++;
             remaining_bytes -= chunk_size;
@@ -353,21 +356,19 @@ namespace librealsense
             if (update_progress_callback)
                 update_progress_callback->on_update_progress(progress);
         }
-        LOG_INFO("Firmware Update for MIPI device done.");
         fw_path_in_device.close();
+        if (!fw_path_in_device)
+            throw io_exception("Firmware Update failed - DFU chardev flush/close error");
+        LOG_INFO("Firmware Update for MIPI device done.");
     }
 
     void update_device::update(const void* fw_image, int fw_image_size, rs2_update_progress_callback_sptr update_progress_callback) const
     {
         LOG_INFO( "Uploading FW image ..." );
-        if(_pid == "ABCD" || _pid == "BBCD" || _pid == "ABCE")
-        {
+        if (_connection_type == "GMSL")
             update_mipi(fw_image, fw_image_size, update_progress_callback);
-        }
         else
-        {
             update_usb(fw_image, fw_image_size, update_progress_callback);
-        }
     }
 
     sensor_interface& update_device::get_sensor(size_t i)

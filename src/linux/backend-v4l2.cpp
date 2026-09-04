@@ -829,6 +829,70 @@ namespace librealsense
             return dfu_paths;
         }
 
+        // Resolve the sysfs realpath of a DFU chardev's owning i2c client, via
+        // /sys/class/d4xx-class/<devname>/device — the driver-registered symlink.
+        // Returns "" if the symlink is missing (older driver without d4xx-class).
+        static std::string mipi_dfu_devname_i2c_client_realpath(const std::string& dfu_devname)
+        {
+            std::string link = "/sys/class/d4xx-class/" + dfu_devname + "/device";
+            char real[PATH_MAX] = {0};
+            if (realpath(link.c_str(), real) == nullptr)
+                return {};
+            return std::string(real);
+        }
+
+        // Resolve the sysfs realpath of a video node's owning i2c client, via
+        // /sys/class/video4linux/<devname>/device. Returns "" on failure.
+        static std::string mipi_video_path_i2c_client_realpath(const std::string& video_path)
+        {
+            auto slash = video_path.find_last_of('/');
+            if (slash == std::string::npos) return {};
+            std::string devname = video_path.substr(slash + 1);
+            std::string link = "/sys/class/video4linux/" + devname + "/device";
+            char real[PATH_MAX] = {0};
+            if (realpath(link.c_str(), real) == nullptr)
+                return {};
+            return std::string(real);
+        }
+
+        // Read the DT `compatible` of the parent I2C client for a d4xx DFU chardev.
+        // Works for both chardev naming schemes present in-tree
+        // (`d4xx-dfu-<adapter>-<addr>` and the shorter `d4xx-dfu-<index>` from
+        // rs_enum_dfu_node_path()). Returns true when any entry of the compatible
+        // list equals "realsense,d5xx". DT `compatible` is a concatenation of
+        // NUL-terminated strings, so we walk tokens rather than substring-search
+        // (avoids matching a hypothetical "realsense,d5xxfoo").
+        static bool mipi_dfu_devname_is_d5xx(const std::string& dfu_devname)
+        {
+            std::string parent_real = mipi_dfu_devname_i2c_client_realpath(dfu_devname);
+            if (parent_real.empty())
+            {
+                LOG_DEBUG("MIPI DFU family detection: cannot resolve /sys/class/d4xx-class/"
+                          << dfu_devname << "/device, defaulting to D4xx");
+                return false;
+            }
+            std::string compat_path = parent_real + "/of_node/compatible";
+            std::ifstream compat_in(compat_path, std::ios::binary);
+            if (!compat_in)
+            {
+                LOG_DEBUG("MIPI DFU family detection: cannot open " << compat_path
+                          << ", defaulting to D4xx");
+                return false;
+            }
+            std::string compat((std::istreambuf_iterator<char>(compat_in)), std::istreambuf_iterator<char>());
+            static const std::string target = "realsense,d5xx";
+            for (size_t pos = 0; pos < compat.size(); )
+            {
+                size_t end = compat.find('\0', pos);
+                if (end == std::string::npos)
+                    end = compat.size();
+                if (compat.compare(pos, end - pos, target) == 0)
+                    return true;
+                pos = end + 1;
+            }
+            return false;
+        }
+
         void v4l_mipi_device::foreach_mipi_device(
                 std::function<void(const mipi_device_info&,
                                    const std::string&)> action)
@@ -854,8 +918,11 @@ namespace librealsense
                 if (dfu_ver.find("recovery") == std::string::npos)
                     continue;
                 mipi_device_info info{};
-                info.pid = 0xbbcd; // D400 MIPI recovery device ID
-                info.vid = 0x8086; // D400 Intel VID
+                // The DFU chardev read format is identical for D4xx and D5xx in recovery
+                // ("DFU info: recovery: <serial>"); derive the family from the DT compatible.
+                const bool is_d5xx = mipi_dfu_devname_is_d5xx(*it);
+                info.pid = is_d5xx ? 0xbbdd : 0xbbcd;   // D500_MIPI_RECOVERY_PID / RS400_MIPI_RECOVERY_PID
+                info.vid = is_d5xx ? 0x38e5 : 0x8086;   // VID_REALSENSE_CAMERA (D5xx) / VID_INTEL_CAMERA (D4xx)
                 info.id = *it;
                 info.device_path = mipi_dfu_path;
                 info.unique_id = *it;
@@ -1004,16 +1071,22 @@ namespace librealsense
             // Note - jetson can use only bus_info, as card is different for each sensor and metadata node.
             info.unique_id = bus_info + "-" + std::to_string(cam_id);
 
-            // Get DFU node for MIPI camera
+            // Get DFU node for MIPI camera. Match by owning i2c client via sysfs
+            // so a multi-camera rig picks the correct DFU chardev per camera;
+            // fall back to the first-opened chardev when sysfs resolution fails
+            // (older driver without /sys/class/d4xx-class).
+            std::string video_i2c = mipi_video_path_i2c_client_realpath(video_path);
             for (const auto& dfu_device_path : get_mipi_dfu_paths())
             {
+                std::string dfu_i2c = mipi_dfu_devname_i2c_client_realpath(dfu_device_path);
+                if (! video_i2c.empty() && ! dfu_i2c.empty() && video_i2c != dfu_i2c)
+                    continue;
                 auto mipi_dfu_chardev = "/dev/" + dfu_device_path;
                 int vfd = open(mipi_dfu_chardev.c_str(), O_RDONLY | O_NONBLOCK);
                 if (vfd >= 0)
                 {
-                    // Use legacy DFU device node used in firmware_update_manager
                     info.dfu_device_path = mipi_dfu_chardev;
-                    ::close(vfd); // file exists, close file and continue to assign it
+                    ::close(vfd);
                     break;
                 }
             }

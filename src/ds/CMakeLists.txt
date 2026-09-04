@@ -7,6 +7,7 @@ include(${_rel_path}/ds/d500/CMakeLists.txt)
 target_sources(${LRS_TARGET}
     PRIVATE
         "${CMAKE_CURRENT_LIST_DIR}/ds-device-common.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/ds-mipi-device.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ds-motion-common.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ds-color-common.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ds-active-common.cpp"
@@ -21,6 +22,7 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/ds-calib-common.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ds-thermal-monitor.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/ds-device-common.h"
+        "${CMAKE_CURRENT_LIST_DIR}/ds-mipi-device.h"
         "${CMAKE_CURRENT_LIST_DIR}/ds-motion-common.h"
         "${CMAKE_CURRENT_LIST_DIR}/ds-color-common.h"
         "${CMAKE_CURRENT_LIST_DIR}/ds-active-common.h"

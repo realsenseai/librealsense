@@ -109,6 +109,8 @@ namespace librealsense
                 {
                 case ds::RS400_MIPI_RECOVERY_PID:
                     return std::make_shared< ds_d400_update_device >(shared_from_this(), mipi);
+                case ds::D500_MIPI_RECOVERY_PID:
+                    return std::make_shared< ds_d500_update_device >(shared_from_this(), mipi);
                 default:
                     // Do nothing
                     break;

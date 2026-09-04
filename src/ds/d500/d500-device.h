@@ -6,9 +6,11 @@
 #include "d500-private.h"
 
 #include <atomic>
+#include <memory>
 #include "hw_monitor_extended_buffers.h"
 
 #include "core/debug.h"
+#include "core/extension.h"
 #include "global_timestamp_reader.h"
 #include "fw-update/fw-update-device-interface.h"
 
@@ -72,6 +74,7 @@ namespace librealsense
     class ds_thermal_monitor;
     class ds_devices_common;
     class d500_info;
+    class d500_mipi_device;
 
     namespace platform {
         struct backend_device_group;
@@ -83,6 +86,7 @@ namespace librealsense
         , public global_time_interface
         , public d500_auto_calibrated
         , public updatable
+        , public extendable_interface
     {
     public:
         std::shared_ptr<synthetic_sensor> create_depth_device(std::shared_ptr<context> ctx,
@@ -124,6 +128,9 @@ namespace librealsense
         void update_flash(const std::vector<uint8_t>& image, rs2_update_progress_callback_sptr callback, int update_mode) override;
         bool check_fw_compatibility( const std::vector<uint8_t>& image ) const override { return true; };
         std::string get_opcode_string(int opcode) const override;
+
+        // Runtime opt-in for update_device_interface on GMSL only (see d500_mipi_device).
+        bool extend_to( rs2_extension extension_type, void ** ptr ) override;
 
     protected:
         std::shared_ptr<ds_device_common> _ds_device_common;
@@ -171,5 +178,8 @@ namespace librealsense
         bool _is_locked = true;
         bool _is_symmetrization_enabled = true;
         bool _is_mipi_device = false;
+
+        // Populated in init() only when _is_mipi_device is true.
+        std::unique_ptr< d500_mipi_device > _mipi_device;
     };
 }

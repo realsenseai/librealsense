@@ -28,6 +28,7 @@ namespace librealsense
         polling_error_handler & operator=(const polling_error_handler &) = delete;
 
         unsigned int get_polling_interval() const { return _poll_intervals_ms; }
+        bool is_active() const { return _active_object->is_active(); }
 
         void start( unsigned int poll_intervals_ms = 0 );
         void stop();
