@@ -685,6 +685,18 @@ void dds_device::impl::write_control_message( json const & j, json * reply )
     }
 }
 
+std::shared_ptr< dds_device::impl > dds_device::impl::shared_from_this_if_owned()
+{
+    try
+    {
+        return shared_from_this();
+    }
+    catch( std::bad_weak_ptr const & )
+    {
+        return {};
+    }
+}
+
 void dds_device::impl::create_notifications_reader()
 {
     if( _notifications_reader )
@@ -708,7 +720,10 @@ void dds_device::impl::create_notifications_reader()
         {
             // Keep the impl alive for the duration of the dispatch, so it can't be freed mid-loop
             // if a notification handler drops the device's last reference.
-            auto self = weak_from_this().lock();
+            // weak_from_this() requires C++17. This reader is created from the
+            // constructor, so shared ownership may not exist yet; preserve the
+            // old empty-weak-pointer behavior in that window.
+            auto self = shared_from_this_if_owned();
             if( ! self )
                 return;
             topics::flexible_msg notification;
@@ -745,7 +760,7 @@ void dds_device::impl::create_metadata_reader()
         {
             // Keep the impl alive for the duration of the dispatch, so it can't be freed mid-loop
             // if a metadata handler drops the device's last reference.
-            auto self = weak_from_this().lock();
+            auto self = shared_from_this_if_owned();
             if( ! self )
                 return;
             topics::flexible_msg message;

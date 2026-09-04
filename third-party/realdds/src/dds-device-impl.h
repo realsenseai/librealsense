@@ -128,6 +128,7 @@ public:
     }
 
 private:
+    std::shared_ptr< impl > shared_from_this_if_owned();
     void create_notifications_reader();
     void create_metadata_reader();
     void create_control_writer();
