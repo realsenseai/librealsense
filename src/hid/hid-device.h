@@ -17,10 +17,6 @@
 #include <thread>
 #include "../types.h"
 
-#ifdef __APPLE__
-#include <hidapi.h>
-#endif
-
 namespace librealsense
 {
     namespace platform
@@ -51,22 +47,14 @@ namespace librealsense
             rs_usb_interface get_hid_interface();
             //for gyro sensitivity the default value we set in feature report is 0.1, which is mapped in FW to 30.5 millideg/sec
             usb_status set_feature_report( unsigned char power, int report_id, int fps = 0, double sensitivity = 0.1 );
-#ifdef __APPLE__
-           int hidapi_PowerDevice(unsigned char reportId);
-#endif
-
             bool _running = false;
             dispatcher _action_dispatcher;
 
             hid_callback _callback;
             rs_usb_device _usb_device;
-#ifdef __APPLE__
-            hidapi_device* _hidapi_device = nullptr;
-#else
             rs_usb_messenger _messenger;
             std::vector<rs_usb_request> _requests;
             std::shared_ptr<platform::usb_request_callback> _request_callback;
-#endif
 
             std::vector<hid_profile> _hid_profiles;
             std::map<int, std::string> _id_to_sensor;
