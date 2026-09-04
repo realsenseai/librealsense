@@ -264,7 +264,9 @@ namespace librealsense
 
             data.fo.pixels = &(hid.x);
             data.fo.metadata = &(report.timeStamp);
-            data.fo.frame_size = sizeof(REALSENSE_HID_REPORT);
+            // pixels points at hid, which is 12 bytes; REALSENSE_HID_REPORT is
+            // 38. hid_sensor::start copies frame_size bytes from pixels.
+            data.fo.frame_size = sizeof(hid);
             data.fo.metadata_size = sizeof(report.timeStamp);
 
             _callback(data);
@@ -287,7 +289,8 @@ namespace librealsense
 
                     data.fo.pixels = &(hid.x);
                     data.fo.metadata = &(report.timeStamp);
-                    data.fo.frame_size = sizeof(REALSENSE_HID_REPORT);
+                    // See above: pixels is a hid_data, not a whole report.
+                    data.fo.frame_size = sizeof(hid);
                     data.fo.metadata_size = sizeof(report.timeStamp);
 
                     _callback(data);
