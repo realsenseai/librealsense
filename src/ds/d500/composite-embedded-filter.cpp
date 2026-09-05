@@ -5,6 +5,7 @@
 #include "hdrd-embedded-filter.h"
 #include "ds/ds-private.h"
 #include <src/proc/temporal-embedded-filter.h>
+#include <src/proc/decimation-embedded-filter.h>
 #include <src/ds/composite-xu-option.h>
 
 namespace librealsense {
@@ -21,9 +22,10 @@ composite_embedded_filter< Base, Type >::composite_embedded_filter(
     this->register_composite_option( option_id, opt );
 }
 
-// The only two composite-option embedded filters that exist today. Adding another one means
+// The only three composite-option embedded filters that exist today. Adding another one means
 // adding its own explicit instantiation line here, never a hand-written subclass body.
 template class composite_embedded_filter< temporal_embedded_filter, RS2_EMBEDDED_FILTER_TYPE_TEMPORAL >;
 template class composite_embedded_filter< close_range_embedded_filter, RS2_EMBEDDED_FILTER_TYPE_CLOSE_RANGE >;
+template class composite_embedded_filter< decimation_embedded_filter, RS2_EMBEDDED_FILTER_TYPE_DECIMATION >;
 
 }  // namespace librealsense

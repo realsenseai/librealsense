@@ -6,6 +6,7 @@
 // typed Get/Set/Get/Range/metadata sequence, in its own try/catch so one broken control doesn't abort the rest.
 
 #include <librealsense2/rs.hpp>
+#include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
 #include <librealsense2/h/rs_hdrd_control.h>
 
@@ -24,8 +25,9 @@ namespace
     {
         switch( id )
         {
-        case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP: return "TEMPORAL_FILTER_DPP";
-        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:        return "HDRD_CONTROL";
+        case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  return "DECIMATION_FILTER_DPP";
+        case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    return "TEMPORAL_FILTER_DPP";
+        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:           return "HDRD_CONTROL";
         default:                                           return "UNKNOWN";
         }
     }
@@ -173,21 +175,16 @@ namespace
         }
     }
 
-    const std::vector< std::shared_ptr< field_printer_base > > & hdrd_fields()
+    const std::vector< std::shared_ptr< field_printer_base > > & decimation_filter_dpp_fields()
     {
         static const std::vector< std::shared_ptr< field_printer_base > > fields = {
-            make_field_printer( "version", &rs2_hdrd_control::header, &dpp_header::version ),
-            make_field_printer( "flags", &rs2_hdrd_control::header, &dpp_header::flags ),
-            make_field_printer( "ctl_id", &rs2_hdrd_control::header, &dpp_header::ctl_id ),
-            make_field_printer( "param_count", &rs2_hdrd_control::header, &dpp_header::param_count ),
-            make_field_printer( "param_type", &rs2_hdrd_control::header, &dpp_header::param_type ),
-            make_field_printer( "enable", &rs2_hdrd_control::enable ),
-            make_field_printer( "filter_type", &rs2_hdrd_control::filter_type ),
-            make_field_printer( "downscale_ratio", &rs2_hdrd_control::downscale_ratio ),
-            make_field_printer( "shift_mode", &rs2_hdrd_control::shift_mode ),
-            make_field_printer( "shift_pixels", &rs2_hdrd_control::shift_pixels ),
-            make_field_printer( "threshold_mode", &rs2_hdrd_control::threshold_mode ),
-            make_field_printer( "threshold_mm", &rs2_hdrd_control::threshold_mm ),
+            make_field_printer( "version", &rs2_decimation_filter_dpp_config::header, &dpp_header::version ),
+            make_field_printer( "flags", &rs2_decimation_filter_dpp_config::header, &dpp_header::flags ),
+            make_field_printer( "ctl_id", &rs2_decimation_filter_dpp_config::header, &dpp_header::ctl_id ),
+            make_field_printer( "param_count", &rs2_decimation_filter_dpp_config::header, &dpp_header::param_count ),
+            make_field_printer( "param_type", &rs2_decimation_filter_dpp_config::header, &dpp_header::param_type ),
+            make_field_printer( "enabled", &rs2_decimation_filter_dpp_config::enabled ),
+            make_field_printer( "magnitude", &rs2_decimation_filter_dpp_config::magnitude ),
         };
         return fields;
     }
@@ -207,7 +204,69 @@ namespace
         };
         return fields;
     }
+
+    const std::vector< std::shared_ptr< field_printer_base > > & hdrd_fields()
+    {
+        static const std::vector< std::shared_ptr< field_printer_base > > fields = {
+            make_field_printer( "version", &rs2_hdrd_control::header, &dpp_header::version ),
+            make_field_printer( "flags", &rs2_hdrd_control::header, &dpp_header::flags ),
+            make_field_printer( "ctl_id", &rs2_hdrd_control::header, &dpp_header::ctl_id ),
+            make_field_printer( "param_count", &rs2_hdrd_control::header, &dpp_header::param_count ),
+            make_field_printer( "param_type", &rs2_hdrd_control::header, &dpp_header::param_type ),
+            make_field_printer( "enable", &rs2_hdrd_control::enable ),
+            make_field_printer( "filter_type", &rs2_hdrd_control::filter_type ),
+            make_field_printer( "downscale_ratio", &rs2_hdrd_control::downscale_ratio ),
+            make_field_printer( "shift_mode", &rs2_hdrd_control::shift_mode ),
+            make_field_printer( "shift_pixels", &rs2_hdrd_control::shift_pixels ),
+            make_field_printer( "threshold_mode", &rs2_hdrd_control::threshold_mode ),
+            make_field_printer( "threshold_mm", &rs2_hdrd_control::threshold_mm ),
+        };
+        return fields;
+    }
     // ---- end generic struct-printing machinery ---------------------------------------------
+
+    // Full read-modify-write + range + metadata sequence for RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP.
+    // Sends the FW-reported default rather than a hardcoded literal - the documented range was a
+    // fixed [2,2] at design time but real firmware may report a wider one (confirmed: [2,4]).
+    void exercise_decimation_filter_dpp( rs2::options & opts, rs2_composite_option_id id )
+    {
+        print_bytes( "Get (before)", opts.get_composite_option( id ) );
+        auto current = opts.get_composite_option_as< rs2_decimation_filter_dpp_config >( id );
+        std::cout << "      Get (before):\n";
+        print_struct( std::cout, decimation_filter_dpp_fields(), current );
+
+        auto range = opts.get_composite_option_range_as< rs2_decimation_filter_dpp_range >( id );
+
+        rs2_decimation_filter_dpp_config cfg_to_send = current;
+        cfg_to_send.enabled = 1;
+        cfg_to_send.magnitude = range.def.magnitude;
+        opts.set_composite_option_from( id, cfg_to_send );
+        std::cout << "      Set (read-modify-write): enabled=1 magnitude=" << cfg_to_send.magnitude << '\n';
+
+        print_bytes( "Get (after)", opts.get_composite_option( id ) );
+        auto cfg = opts.get_composite_option_as< rs2_decimation_filter_dpp_config >( id );
+        std::cout << "      Get (after):\n";
+        print_struct( std::cout, decimation_filter_dpp_fields(), cfg );
+        bool matches = cfg.enabled == cfg_to_send.enabled && cfg.magnitude == cfg_to_send.magnitude;
+        std::cout << "      All fields (" << ( matches ? "match what was sent" : "differ - FW may quantize/clamp on write" )
+                  << ")\n";
+
+        print_bytes( "Get Range", opts.get_composite_option_range( id ) );
+        std::cout << "      Range:\n";
+        print_range( std::cout, decimation_filter_dpp_fields(), range.min, range.max, range.def, range.step );
+
+        std::cout << "      Read-only: " << ( opts.is_composite_option_read_only( id ) ? "true" : "false" ) << '\n';
+        std::cout << "      Description: \"" << opts.get_composite_option_description( id ) << "\"\n";
+
+        // Restore the original value read at the very start - same discipline as the other
+        // controls, even though this one also reverts on its own once Depth/IR starts streaming.
+        opts.set_composite_option_from( id, current );
+        auto restored = opts.get_composite_option_as< rs2_decimation_filter_dpp_config >( id );
+        std::cout << "      Restore original value: "
+                  << ( restored.enabled == current.enabled && restored.magnitude == current.magnitude
+                       ? "ok" : "FAILED to restore - device may be left in the sample's last test state" )
+                  << '\n';
+    }
 
     // Full read-modify-write + range + metadata sequence for RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP.
     void exercise_temporal_filter_dpp( rs2::options & opts, rs2_composite_option_id id )
@@ -240,11 +299,8 @@ namespace
 
         print_bytes( "Get Range", opts.get_composite_option_range( id ) );
         auto range = opts.get_composite_option_range_as< rs2_temporal_filter_dpp_range >( id );
-        std::cout << "      Range: enabled[" << range.min.enabled << ".."
-                  << range.max.enabled << "] smooth_alpha[" << range.min.smooth_alpha << ".." << range.max.smooth_alpha
-                  << "] smooth_delta[" << range.min.smooth_delta << ".." << range.max.smooth_delta
-                  << "] persistency_index[" << range.min.persistency_index << ".." << range.max.persistency_index
-                  << "]\n";
+        std::cout << "      Range:\n";
+        print_range( std::cout, temporal_filter_dpp_fields(), range.min, range.max, range.def, range.step );
 
         std::cout << "      Read-only: " << ( opts.is_composite_option_read_only( id ) ? "true" : "false" ) << '\n';
         std::cout << "      Description: \"" << opts.get_composite_option_description( id ) << "\"\n";
@@ -348,8 +404,9 @@ namespace
     {
         switch( id )
         {
-        case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP: exercise_temporal_filter_dpp( opts, id ); return true;
-        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:        exercise_hdrd_control( opts, id ); return true;
+        case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  exercise_decimation_filter_dpp( opts, id ); return true;
+        case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    exercise_temporal_filter_dpp( opts, id ); return true;
+        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:           exercise_hdrd_control( opts, id ); return true;
         default:
             std::cout << "      (no typed handler registered for this composite option id)\n";
             return false;

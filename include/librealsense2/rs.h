@@ -28,6 +28,7 @@ extern "C" {
 #include "h/rs_composite_option.h"
 #include "h/rs_temporal_filter_dpp.h"
 #include "h/rs_hdrd_control.h"
+#include "h/rs_decimation_filter_dpp.h"
 
 #define RS2_API_MAJOR_VERSION    2
 #define RS2_API_MINOR_VERSION    58

@@ -429,7 +429,9 @@ namespace librealsense
         uint32_t    exposure_roi_bottom;
         uint32_t    preset;
         uint8_t     emitterMode;
-        uint8_t     embedded_filters;
+        uint8_t     embedded_filters;   // Bitmask of DPP filters applied: decimation=(1u<<0),
+                                         // spatial=(1u<<1), temporal=(1u<<2), holes_filling=(1u<<3),
+                                         // HDRD/ICR=(1u<<5, undocumented).
         uint16_t    ledPower;
     };
 

@@ -30,6 +30,7 @@ def list_embedded_filter_options(embedded_filter):
 _COMPOSITE_OPTION_ACCESSORS = {
     rs.composite_option_id.hdrd_control: 'get_hdrd_control',
     rs.composite_option_id.temporal_filter_dpp: 'get_temporal_filter_dpp_config',
+    rs.composite_option_id.decimation_filter_dpp: 'get_decimation_filter_dpp_config',
 }
 
 

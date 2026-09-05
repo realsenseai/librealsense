@@ -60,6 +60,7 @@ add_subdirectory(eth-config)
 add_subdirectory(embedded-filters)
 add_subdirectory(object-detection)
 add_subdirectory(temporal-filter-dpp-mock)
+add_subdirectory(decimation-filter-dpp-mock)
 add_subdirectory(composite-option)
 
 unset_security_flags_for_executable()

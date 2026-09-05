@@ -51,4 +51,6 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/features/temporal-filter-feature.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/features/hdrd-filter-feature.h"
         "${CMAKE_CURRENT_LIST_DIR}/features/hdrd-filter-feature.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/features/decimation-filter-feature.h"
+        "${CMAKE_CURRENT_LIST_DIR}/features/decimation-filter-feature.cpp"
 )

@@ -2151,7 +2151,10 @@ namespace rs2
                     break;
                 }
             }
+            // The USB/composite-option Decimation filter never registers this scalar option - its
+            // enable lives in the composite struct instead.
             if (embedded_decimation &&
+                embedded_decimation->get_filter()->supports(RS2_OPTION_EMBEDDED_FILTER_ENABLED) &&
                 embedded_decimation->get_filter()->get_option(RS2_OPTION_EMBEDDED_FILTER_ENABLED))
             {
                 // check if resolution is different from 640 X 360

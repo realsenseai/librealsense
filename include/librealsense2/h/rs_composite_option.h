@@ -22,6 +22,8 @@ extern "C" {
 * scalar options. */
 typedef enum rs2_composite_option_id
 {
+    /** HKR Depth Post-Processing "Decimation Filter" - see rs_decimation_filter_dpp.h. */
+    RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP,
     /** HKR Depth Post-Processing "Temporal Filter" - see rs_temporal_filter_dpp.h. */
     RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP,
     /** HKR/D5X5 Improved Close Range control - see rs_hdrd_control.h. */

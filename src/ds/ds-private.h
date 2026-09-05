@@ -60,9 +60,13 @@ namespace librealsense
         const uint8_t DS5_LED_PWR                           = 0xE;
         const uint8_t DS5_THERMAL_COMPENSATION              = 0xF;
         const uint8_t DS5_EMITTER_FREQUENCY                 = 0x10;
-        const uint8_t DS5_DEPTH_AUTO_EXPOSURE_MODE          = 0x11;
+        const uint8_t DS5_DEPTH_AUTO_EXPOSURE_MODE          = 0x11;   // D400 only (see d400-device.cpp) - not on the D500/HKR depth XU below
         const uint8_t DS5_EXTERNAL_SYNC                     = 0x12;
         const uint8_t DS5_READOUT_SHAPING                   = 0x13;   // D400 only (see d400-device.cpp) - not on the D500/HKR depth XU below
+        // Backs RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP - see decimation-filter-feature.cpp.
+        // D500/HKR-only, on ds::depth_xu - shares the numeric value with
+        // DS5_DEPTH_AUTO_EXPOSURE_MODE above only because that one is D400-only.
+        const uint8_t DS5_HKR_DECIMATION_FILTER_DPP         = 0x11;
         // Backs RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP - see temporal-filter-feature.cpp.
         // D500/HKR-only, on ds::depth_xu - shares the numeric value with DS5_READOUT_SHAPING
         // above only because that one is D400-only and never reaches this XU.

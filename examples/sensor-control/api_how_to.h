@@ -9,8 +9,9 @@
 #include <utility>
 #include <vector>
 #include <librealsense2/rs.hpp>
-#include <librealsense2/h/rs_hdrd_control.h>
+#include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
+#include <librealsense2/h/rs_hdrd_control.h>
 #include "helper.h"
 
 using namespace helper;
@@ -416,6 +417,22 @@ public:
         {
             switch (id)
             {
+            case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:
+            {
+                rs2_decimation_filter_dpp_config v = filter.get_composite_option_as<rs2_decimation_filter_dpp_config>(id);
+                std::cout << "  enabled   : " << v.enabled << std::endl;
+                std::cout << "  magnitude : " << v.magnitude << std::endl;
+                break;
+            }
+            case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:
+            {
+                rs2_temporal_filter_dpp_config v = filter.get_composite_option_as<rs2_temporal_filter_dpp_config>(id);
+                std::cout << "  enabled           : " << v.enabled << std::endl;
+                std::cout << "  smooth_alpha      : " << v.smooth_alpha << std::endl;
+                std::cout << "  smooth_delta      : " << v.smooth_delta << std::endl;
+                std::cout << "  persistency_index : " << v.persistency_index << std::endl;
+                break;
+            }
             case RS2_COMPOSITE_OPTION_HDRD_CONTROL:
             {
                 rs2_hdrd_control v = filter.get_composite_option_as<rs2_hdrd_control>(id);
@@ -426,15 +443,6 @@ public:
                 std::cout << "  shift_pixels    : " << v.shift_pixels << std::endl;
                 std::cout << "  threshold_mode  : " << v.threshold_mode << std::endl;
                 std::cout << "  threshold_mm    : " << v.threshold_mm << std::endl;
-                break;
-            }
-            case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:
-            {
-                rs2_temporal_filter_dpp_config v = filter.get_composite_option_as<rs2_temporal_filter_dpp_config>(id);
-                std::cout << "  enabled           : " << v.enabled << std::endl;
-                std::cout << "  smooth_alpha      : " << v.smooth_alpha << std::endl;
-                std::cout << "  smooth_delta      : " << v.smooth_delta << std::endl;
-                std::cout << "  persistency_index : " << v.persistency_index << std::endl;
                 break;
             }
             default:
@@ -464,12 +472,12 @@ public:
 
         switch (id)
         {
-        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:
+        case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:
         {
-            rs2_hdrd_control cfg;
+            rs2_decimation_filter_dpp_config cfg;
             try
             {
-                cfg = filter.get_composite_option_as<rs2_hdrd_control>(id);
+                cfg = filter.get_composite_option_as<rs2_decimation_filter_dpp_config>(id);
             }
             catch (const rs2::error& e)
             {
@@ -477,10 +485,10 @@ public:
                 return;
             }
 
-            rs2_hdrd_control_range range;
+            rs2_decimation_filter_dpp_range range;
             try
             {
-                range = filter.get_composite_option_range_as<rs2_hdrd_control_range>(id);
+                range = filter.get_composite_option_range_as<rs2_decimation_filter_dpp_range>(id);
             }
             catch (const rs2::error& e)
             {
@@ -488,33 +496,22 @@ public:
                 return;
             }
             std::cout << "Supported range:" << std::endl;
-            std::cout << "  enable          : [" << range.min.enable << ", " << range.max.enable << "]" << std::endl;
-            std::cout << "  filter_type     : [" << range.min.filter_type << ", " << range.max.filter_type << "]" << std::endl;
-            std::cout << "  downscale_ratio : [" << range.min.downscale_ratio << ", " << range.max.downscale_ratio << "]" << std::endl;
-            std::cout << "  shift_mode      : [" << range.min.shift_mode << ", " << range.max.shift_mode << "]" << std::endl;
-            std::cout << "  shift_pixels    : [" << range.min.shift_pixels << ", " << range.max.shift_pixels << "]" << std::endl;
-            std::cout << "  threshold_mode  : [" << range.min.threshold_mode << ", " << range.max.threshold_mode << "]" << std::endl;
-            std::cout << "  threshold_mm    : [" << range.min.threshold_mm << ", " << range.max.threshold_mm << "]" << std::endl;
+            std::cout << "  enabled   : [" << range.min.enabled << ", " << range.max.enabled << "]" << std::endl;
+            std::cout << "  magnitude : [" << range.min.magnitude << ", " << range.max.magnitude << "]" << std::endl;
 
             std::cout << "\nWhich field would you like to change?\n" << std::endl;
-            std::cout << "  0 : enable\n  1 : filter_type\n  2 : downscale_ratio\n  3 : shift_mode\n"
-                          "  4 : shift_pixels\n  5 : threshold_mode\n  6 : threshold_mm" << std::endl;
+            std::cout << "  0 : enabled\n  1 : magnitude" << std::endl;
             uint32_t field_index = get_user_selection("Select a field by index: ");
 
             std::cout << "Enter the new value for this field: ";
-            int requested_value;
+            int32_t requested_value;
             std::cin >> requested_value;
             std::cout << std::endl;
 
             switch (field_index)
             {
-            case 0: cfg.enable = requested_value; break;
-            case 1: cfg.filter_type = requested_value; break;
-            case 2: cfg.downscale_ratio = requested_value; break;
-            case 3: cfg.shift_mode = requested_value; break;
-            case 4: cfg.shift_pixels = requested_value; break;
-            case 5: cfg.threshold_mode = requested_value; break;
-            case 6: cfg.threshold_mm = requested_value; break;
+            case 0: cfg.enabled = requested_value; break;
+            case 1: cfg.magnitude = requested_value; break;
             default:
                 std::cerr << "Selected field is out of range" << std::endl;
                 return;
@@ -575,6 +572,72 @@ public:
             case 1: cfg.smooth_alpha = requested_value; break;
             case 2: cfg.smooth_delta = requested_value; break;
             case 3: cfg.persistency_index = requested_value; break;
+            default:
+                std::cerr << "Selected field is out of range" << std::endl;
+                return;
+            }
+
+            try
+            {
+                filter.set_composite_option_from(id, cfg);
+            }
+            catch (const rs2::error& e)
+            {
+                std::cerr << "Failed to set composite option " << rs2_composite_option_id_to_string(id) << ". (" << e.what() << ")" << std::endl;
+            }
+            break;
+        }
+        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:
+        {
+            rs2_hdrd_control cfg;
+            try
+            {
+                cfg = filter.get_composite_option_as<rs2_hdrd_control>(id);
+            }
+            catch (const rs2::error& e)
+            {
+                std::cerr << "Failed to read current value: " << e.what() << std::endl;
+                return;
+            }
+
+            rs2_hdrd_control_range range;
+            try
+            {
+                range = filter.get_composite_option_range_as<rs2_hdrd_control_range>(id);
+            }
+            catch (const rs2::error& e)
+            {
+                std::cerr << "Failed to read supported range: " << e.what() << std::endl;
+                return;
+            }
+            std::cout << "Supported range:" << std::endl;
+            std::cout << "  enable          : [" << range.min.enable << ", " << range.max.enable << "]" << std::endl;
+            std::cout << "  filter_type     : [" << range.min.filter_type << ", " << range.max.filter_type << "]" << std::endl;
+            std::cout << "  downscale_ratio : [" << range.min.downscale_ratio << ", " << range.max.downscale_ratio << "]" << std::endl;
+            std::cout << "  shift_mode      : [" << range.min.shift_mode << ", " << range.max.shift_mode << "]" << std::endl;
+            std::cout << "  shift_pixels    : [" << range.min.shift_pixels << ", " << range.max.shift_pixels << "]" << std::endl;
+            std::cout << "  threshold_mode  : [" << range.min.threshold_mode << ", " << range.max.threshold_mode << "]" << std::endl;
+            std::cout << "  threshold_mm    : [" << range.min.threshold_mm << ", " << range.max.threshold_mm << "]" << std::endl;
+
+            std::cout << "\nWhich field would you like to change?\n" << std::endl;
+            std::cout << "  0 : enable\n  1 : filter_type\n  2 : downscale_ratio\n  3 : shift_mode\n"
+                          "  4 : shift_pixels\n  5 : threshold_mode\n  6 : threshold_mm" << std::endl;
+            uint32_t field_index = get_user_selection("Select a field by index: ");
+
+            std::cout << "Enter the new value for this field: ";
+            int requested_value;
+            std::cin >> requested_value;
+            std::cout << std::endl;
+
+            switch (field_index)
+            {
+            case 0: cfg.enable = requested_value; break;
+            case 1: cfg.filter_type = requested_value; break;
+            case 2: cfg.downscale_ratio = requested_value; break;
+            case 3: cfg.shift_mode = requested_value; break;
+            case 4: cfg.shift_pixels = requested_value; break;
+            case 5: cfg.threshold_mode = requested_value; break;
+            case 6: cfg.threshold_mm = requested_value; break;
             default:
                 std::cerr << "Selected field is out of range" << std::endl;
                 return;

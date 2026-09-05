@@ -3,8 +3,9 @@
 
 #include "pyrealsense2.h"
 #include <librealsense2/hpp/rs_options.hpp>
-#include <librealsense2/h/rs_hdrd_control.h>
+#include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
+#include <librealsense2/h/rs_hdrd_control.h>
 
 using rsutils::json;
 
@@ -23,6 +24,53 @@ void init_options(py::module &m) {
         .def_readwrite( "ctl_id", &dpp_header::ctl_id )
         .def_readwrite( "param_count", &dpp_header::param_count )
         .def_readwrite( "param_type", &dpp_header::param_type );
+
+    py::class_< rs2_decimation_filter_dpp_config >(
+        m, "decimation_filter_dpp_config", "Decimation Filter DPP composite option payload - see rs_decimation_filter_dpp.h." )
+        .def( py::init<>() )
+        .def_readwrite( "header", &rs2_decimation_filter_dpp_config::header )
+        .def_readwrite( "enabled", &rs2_decimation_filter_dpp_config::enabled )
+        .def_readwrite( "magnitude", &rs2_decimation_filter_dpp_config::magnitude )
+        .def( "__repr__",
+              []( rs2_decimation_filter_dpp_config const & v )
+              {
+                  std::ostringstream ss;
+                  ss << "<decimation_filter_dpp_config enabled=" << v.enabled << " magnitude=" << v.magnitude << ">";
+                  return ss.str();
+              } );
+
+    py::class_< rs2_decimation_filter_dpp_range >(
+        m, "decimation_filter_dpp_range", "Supported {min,max,step,default} bounds for decimation_filter_dpp_config - see rs_decimation_filter_dpp.h." )
+        .def( py::init<>() )
+        .def_readwrite( "min", &rs2_decimation_filter_dpp_range::min )
+        .def_readwrite( "max", &rs2_decimation_filter_dpp_range::max )
+        .def_readwrite( "step", &rs2_decimation_filter_dpp_range::step )
+        .def_readwrite( "default", &rs2_decimation_filter_dpp_range::def );
+
+    py::class_< rs2_temporal_filter_dpp_config >(
+        m, "temporal_filter_dpp_config", "Temporal Filter DPP composite option payload - see rs_temporal_filter_dpp.h." )
+        .def( py::init<>() )
+        .def_readwrite( "header", &rs2_temporal_filter_dpp_config::header )
+        .def_readwrite( "enabled", &rs2_temporal_filter_dpp_config::enabled )
+        .def_readwrite( "smooth_alpha", &rs2_temporal_filter_dpp_config::smooth_alpha )
+        .def_readwrite( "smooth_delta", &rs2_temporal_filter_dpp_config::smooth_delta )
+        .def_readwrite( "persistency_index", &rs2_temporal_filter_dpp_config::persistency_index )
+        .def( "__repr__",
+              []( rs2_temporal_filter_dpp_config const & v )
+              {
+                  std::ostringstream ss;
+                  ss << "<temporal_filter_dpp_config enabled=" << v.enabled << " smooth_alpha=" << v.smooth_alpha
+                     << " smooth_delta=" << v.smooth_delta << " persistency_index=" << v.persistency_index << ">";
+                  return ss.str();
+              } );
+
+    py::class_< rs2_temporal_filter_dpp_range >(
+        m, "temporal_filter_dpp_range", "Supported {min,max,step,default} bounds for temporal_filter_dpp_config - see rs_temporal_filter_dpp.h." )
+        .def( py::init<>() )
+        .def_readwrite( "min", &rs2_temporal_filter_dpp_range::min )
+        .def_readwrite( "max", &rs2_temporal_filter_dpp_range::max )
+        .def_readwrite( "step", &rs2_temporal_filter_dpp_range::step )
+        .def_readwrite( "default", &rs2_temporal_filter_dpp_range::def );
 
     py::class_< rs2_hdrd_control >(
         m, "hdrd_control", "Improved Close Range Control composite option payload - see rs_hdrd_control.h." )
@@ -56,23 +104,6 @@ void init_options(py::module &m) {
         // error) - exposed as "default" instead, the one place this binding's naming has to
         // diverge from the C++ field it mirrors.
         .def_readwrite( "default", &rs2_hdrd_control_range::def );
-
-    py::class_< rs2_temporal_filter_dpp_config >(
-        m, "temporal_filter_dpp_config", "Temporal Filter DPP composite option payload - see rs_temporal_filter_dpp.h." )
-        .def( py::init<>() )
-        .def_readwrite( "header", &rs2_temporal_filter_dpp_config::header )
-        .def_readwrite( "enabled", &rs2_temporal_filter_dpp_config::enabled )
-        .def_readwrite( "smooth_alpha", &rs2_temporal_filter_dpp_config::smooth_alpha )
-        .def_readwrite( "smooth_delta", &rs2_temporal_filter_dpp_config::smooth_delta )
-        .def_readwrite( "persistency_index", &rs2_temporal_filter_dpp_config::persistency_index )
-        .def( "__repr__",
-              []( rs2_temporal_filter_dpp_config const & v )
-              {
-                  std::ostringstream ss;
-                  ss << "<temporal_filter_dpp_config enabled=" << v.enabled << " smooth_alpha=" << v.smooth_alpha
-                     << " smooth_delta=" << v.smooth_delta << " persistency_index=" << v.persistency_index << ">";
-                  return ss.str();
-              } );
 
     // Expose option values as a custom struct rather than 'rs2_option_value*'
     struct option_value
@@ -253,6 +284,62 @@ void init_options(py::module &m) {
         // C++ wrapper's own get_composite_option_as<T>() templates. Python has no templates, so
         // each known struct gets its own named method rather than one generic one.
         .def(
+            "get_decimation_filter_dpp_config",
+            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_decimation_filter_dpp_config
+            {
+                py::gil_scoped_release release;
+                return self.get_composite_option_as< rs2_decimation_filter_dpp_config >( id );
+            },
+            "Typed counterpart to get_composite_option() for Decimation Filter DPP.",
+            "option"_a )
+        .def(
+            "set_decimation_filter_dpp_config",
+            []( rs2::options const & self, rs2_composite_option_id id, rs2_decimation_filter_dpp_config const & value )
+            {
+                py::gil_scoped_release release;
+                self.set_composite_option_from( id, value );
+            },
+            "Typed counterpart to set_composite_option() for Decimation Filter DPP.",
+            "option"_a,
+            "value"_a )
+        .def(
+            "get_decimation_filter_dpp_range",
+            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_decimation_filter_dpp_range
+            {
+                py::gil_scoped_release release;
+                return self.get_composite_option_range_as< rs2_decimation_filter_dpp_range >( id );
+            },
+            "Typed counterpart to get_composite_option_range() for Decimation Filter DPP.",
+            "option"_a )
+        .def(
+            "get_temporal_filter_dpp_config",
+            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_temporal_filter_dpp_config
+            {
+                py::gil_scoped_release release;
+                return self.get_composite_option_as< rs2_temporal_filter_dpp_config >( id );
+            },
+            "Typed counterpart to get_composite_option() for Temporal Filter DPP.",
+            "option"_a )
+        .def(
+            "set_temporal_filter_dpp_config",
+            []( rs2::options const & self, rs2_composite_option_id id, rs2_temporal_filter_dpp_config const & value )
+            {
+                py::gil_scoped_release release;
+                self.set_composite_option_from( id, value );
+            },
+            "Typed counterpart to set_composite_option() for Temporal Filter DPP.",
+            "option"_a,
+            "value"_a )
+        .def(
+            "get_temporal_filter_dpp_range",
+            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_temporal_filter_dpp_range
+            {
+                py::gil_scoped_release release;
+                return self.get_composite_option_range_as< rs2_temporal_filter_dpp_range >( id );
+            },
+            "Typed counterpart to get_composite_option_range() for Temporal Filter DPP.",
+            "option"_a )
+        .def(
             "get_hdrd_control",
             []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_hdrd_control
             {
@@ -280,26 +367,7 @@ void init_options(py::module &m) {
                 return self.get_composite_option_range_as< rs2_hdrd_control_range >( id );
             },
             "Typed counterpart to get_composite_option_range() for Improved Close Range Control.",
-            "option"_a )
-        .def(
-            "get_temporal_filter_dpp_config",
-            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_temporal_filter_dpp_config
-            {
-                py::gil_scoped_release release;
-                return self.get_composite_option_as< rs2_temporal_filter_dpp_config >( id );
-            },
-            "Typed counterpart to get_composite_option() for Temporal Filter DPP.",
-            "option"_a )
-        .def(
-            "set_temporal_filter_dpp_config",
-            []( rs2::options const & self, rs2_composite_option_id id, rs2_temporal_filter_dpp_config const & value )
-            {
-                py::gil_scoped_release release;
-                self.set_composite_option_from( id, value );
-            },
-            "Typed counterpart to set_composite_option() for Temporal Filter DPP.",
-            "option"_a,
-            "value"_a );
+            "option"_a );
 
     /** end rs_options.hpp **/
 }

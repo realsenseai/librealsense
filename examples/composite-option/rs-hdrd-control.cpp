@@ -6,6 +6,7 @@
 // value, through the public C++ wrapper (rs2::options), a thin pass-through to the C API.
 
 #include <librealsense2/rs.hpp>
+#include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
 #include <librealsense2/h/rs_hdrd_control.h>
 
@@ -18,10 +19,22 @@ namespace
     {
         switch( id )
         {
-        case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP: return "TEMPORAL_FILTER_DPP";
-        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:        return "HDRD_CONTROL";
+        case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  return "DECIMATION_FILTER_DPP";
+        case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    return "TEMPORAL_FILTER_DPP";
+        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:           return "HDRD_CONTROL";
         default:                                           return "UNKNOWN";
         }
+    }
+
+    void print_decimation_filter_dpp( const rs2_decimation_filter_dpp_config & v )
+    {
+        std::cout << "        version=" << (int)v.header.version
+                   << " flags=" << (int)v.header.flags
+                   << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
+                   << " param_count=" << (int)v.header.param_count
+                   << " param_type=" << (int)v.header.param_type
+                   << " enabled=" << v.enabled
+                   << " magnitude=" << v.magnitude << '\n';
     }
 
     void print_temporal_filter_dpp( const rs2_temporal_filter_dpp_config & v )
@@ -61,6 +74,9 @@ namespace
         {
             switch( id )
             {
+            case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:
+                print_decimation_filter_dpp( opts.get_composite_option_as< rs2_decimation_filter_dpp_config >( id ) );
+                break;
             case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:
                 print_temporal_filter_dpp( opts.get_composite_option_as< rs2_temporal_filter_dpp_config >( id ) );
                 break;

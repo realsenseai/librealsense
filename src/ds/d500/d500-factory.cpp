@@ -25,6 +25,7 @@
 #include <src/ds/ds-thermal-monitor.h>
 #include <src/ds/d500/d500-options.h>
 #include <src/ds/d500/d500-auto-calibration.h>
+#include <src/ds/features/decimation-filter-feature.h>
 #include <src/ds/features/temporal-filter-feature.h>
 #include <src/ds/features/hdrd-filter-feature.h>
 
@@ -139,9 +140,14 @@ namespace librealsense
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
 
-            // Temporal Filter DPP composite option - reuses the same FW gate Improved Close
-            // Range uses just below, as a reasonable proxy for "same SKU/FW scope" (both are
-            // depth-XU controls introduced together on this SKU).
+            // Decimation Filter DPP composite option - USB-only, alongside the DDS-connected
+            // path's own independent scalar-option decimation filter.
+            if( d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
+                register_feature( std::make_shared< decimation_filter_feature >(
+                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
+
+            // Temporal Filter DPP composite option - reuses the same FW gate as Decimation
+            // above (same protocol family, introduced together on this SKU).
             if( d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
                 register_feature( std::make_shared< temporal_filter_feature >(
                         dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
@@ -230,9 +236,13 @@ namespace librealsense
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
 
-            // Temporal Filter DPP composite option - reuses the same FW/MIPI gate Improved
-            // Close Range uses just below, as a reasonable proxy for "same SKU/FW scope" (both are
-            // depth-XU controls introduced together on this SKU).
+            // Decimation Filter DPP composite option - USB-only, skipped on MIPI (no V4L2 CID
+            // for the depth-XU selector 0x11).
+            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
+                register_feature( std::make_shared< decimation_filter_feature >( dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
+
+            // Temporal Filter DPP composite option - reuses the same FW/MIPI gate as Decimation
+            // above (same protocol family, introduced together on this SKU).
             if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
                 register_feature( std::make_shared< temporal_filter_feature >( dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
 
@@ -298,9 +308,13 @@ namespace librealsense
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
 
-            // Temporal Filter DPP composite option - reuses the same FW gate Improved Close
-            // Range uses just below, as a reasonable proxy for "same SKU/FW scope" (both are
-            // depth-XU controls introduced together on this SKU).
+            // Decimation Filter DPP composite option - USB toggle.
+            if( d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
+                register_feature( std::make_shared< decimation_filter_feature >(
+                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
+
+            // Temporal Filter DPP composite option - reuses the same FW gate as Decimation
+            // above (same protocol family, introduced together on this SKU).
             if( d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
                 register_feature( std::make_shared< temporal_filter_feature >(
                         dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
@@ -457,9 +471,15 @@ namespace librealsense
                                               std::make_shared< thermal_compensation >( _thermal_monitor, thermal_compensation_toggle ) );
             } );  // group_multiple_fw_calls
 
-            // Temporal Filter DPP composite option - D555 only. Reuses the same FW gate
-            // Improved Close Range Depth uses, as a reasonable proxy for "same SKU/FW scope"
-            // (both are depth-XU controls introduced together on this SKU).
+            // Decimation Filter DPP composite option - D555 only.
+            if( d500_device::_fw_version >= firmware_version( "7.58.39807.10573" ) )
+            {
+                register_feature( std::make_shared< decimation_filter_feature >(
+                    dynamic_cast< d500_depth_sensor & >( depth_sensor ) ) );
+            }
+
+            // Temporal Filter DPP composite option - D555 only, same FW gate as Decimation
+            // above (same protocol family, introduced together on this SKU).
             if( d500_device::_fw_version >= firmware_version( "7.58.39807.10573" ) )
             {
                 register_feature( std::make_shared< temporal_filter_feature >(
