@@ -80,3 +80,8 @@ def test_snapshot_downloads_a_zip_of_the_newest_frame(setup_mock_managers):
 
 def test_snapshot_without_a_frame_is_404(setup_mock_managers):
     assert client.get(URL, params={"stream": "color"}).status_code == 404
+
+
+def test_max_usable_range_reports_unsupported_on_a_plain_depth_sensor(setup_mock_managers):
+    body = client.get("/api/v1/devices/device1/stream/max-usable-range").json()
+    assert body == {"supported": False, "enabled": False, "range_m": None}

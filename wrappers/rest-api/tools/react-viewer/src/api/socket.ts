@@ -85,6 +85,21 @@ class SocketService {
     }
   }
 
+  /**
+   * Ask the server a question and await its acknowledgement. Rejects when the socket is
+   * down so callers can fall back to REST.
+   */
+  request<T>(event: string, data: unknown, timeoutMs = 1000): Promise<T> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket?.connected) return reject(new Error('socket not connected'))
+      const timer = setTimeout(() => reject(new Error(`${event}: no reply`)), timeoutMs)
+      this.socket.emit(event, data, (reply: T) => {
+        clearTimeout(timer)
+        resolve(reply)
+      })
+    })
+  }
+
   emit(event: string, data: unknown): void {
     if (this.socket?.connected) {
       this.socket.emit(event, data)

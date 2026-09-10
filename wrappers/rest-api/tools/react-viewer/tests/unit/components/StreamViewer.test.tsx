@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
+import { server } from '../../mocks/server'
 import { render, createMockDevice, createMockDeviceState, createMockStreamConfig } from '../../utils/test-utils'
 import { StreamViewer } from '@/components/StreamViewer'
 
@@ -177,6 +179,14 @@ describe('StreamViewer', () => {
       const link = screen.getByRole('link', { name: 'Save snapshot' })
       expect(link).toHaveAttribute('href', `/api/v1/devices/${device.device_id}/stream/snapshot?stream=depth`)
       expect(link).toHaveAttribute('download')
+    })
+
+    it('shows the max usable range while the depth sensor estimates it', async () => {
+      server.use(http.get('/api/v1/devices/:deviceId/stream/max-usable-range', () =>
+        HttpResponse.json({ supported: true, enabled: true, range_m: 4.5 })))
+      const device = createMockDevice()
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: streamingState(device) } } })
+      await waitFor(() => expect(screen.getByText('Max usable range: 4.500 m')).toBeInTheDocument())
     })
 
     it('says so for a format the viewer cannot render', () => {

@@ -83,6 +83,12 @@ async def snapshot(
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+@router.get("/max-usable-range")
+async def get_max_usable_range(device_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
+    """Whether the depth sensor estimates its max usable range, and the estimate when it does."""
+    return await run_in_threadpool(rs_manager.get_max_usable_range, device_id)
+
+
 @router.get("/depth-at-pixel")
 async def get_depth_at_pixel(
     device_id: str,

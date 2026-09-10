@@ -199,12 +199,23 @@ class ApiClient {
     x: number,
     y: number
   ): Promise<{ depth: number | null; x: number; y: number; units: string }> {
+    // Mouse-rate query: the open socket answers faster than an HTTP round trip.
+    try {
+      return await socketService.request('depth_at_pixel', { device_id: deviceId, x, y })
+    } catch {
+      // socket down: REST below
+    }
     const response = await this.client.get<{
       depth: number | null
       x: number
       y: number
       units: string
     }>(`/devices/${deviceId}/stream/depth-at-pixel`, { params: { x, y } })
+    return response.data
+  }
+
+  async getMaxUsableRange(deviceId: string): Promise<{ supported: boolean; enabled: boolean; range_m: number | null }> {
+    const response = await this.client.get(`/devices/${deviceId}/stream/max-usable-range`)
     return response.data
   }
 

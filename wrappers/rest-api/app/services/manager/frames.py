@@ -445,6 +445,22 @@ class FramesMixin:
         )
         return f"{device_id}_{base}.zip", data
 
+    def get_max_usable_range(self, device_id: str) -> Dict[str, Any]:
+        """The depth sensor's max-usable-range estimate, when the option is on (D400).
+
+        Legacy readout (stream-model.cpp): shown clamped to 1.5-9 m in 1.5 m steps.
+        """
+        dev = self._require_device(device_id)
+        depth = next((s for s in dev.sensors if s.is_depth_sensor()), None)
+        if depth is None or not depth.supports(rs.option.enable_max_usable_range):
+            return {"supported": False, "enabled": False, "range_m": None}
+        enabled = depth.get_option(rs.option.enable_max_usable_range) == 1.0
+        range_m = None
+        if enabled and depth.is_max_usable_range_sensor():
+            raw = depth.as_max_usable_range_sensor().get_max_usable_depth_range()
+            range_m = int(min(max(raw, 1.5), 9.0) / 1.5) * 1.5
+        return {"supported": True, "enabled": enabled, "range_m": range_m}
+
     def get_depth_at_pixel(self, device_id: str, x: int, y: int) -> Optional[float]:
         """Get depth value (in meters) at specific pixel coordinates."""
         with self.lock:

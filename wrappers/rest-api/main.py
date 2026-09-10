@@ -66,6 +66,8 @@ from config import settings
 import socketio
 from app.services.socketio import sio
 from app.services.rs_manager import RealSenseManager
+from app.services import socket_handlers
+from app.api.dependencies import get_realsense_manager
 
 
 # --- Create FastAPI App ---
@@ -103,6 +105,9 @@ async def startup_event():
     """Store the main event loop for use in synchronous callbacks."""
     loop = asyncio.get_running_loop()
     RealSenseManager.set_event_loop(loop)
+
+
+socket_handlers.register(sio, get_realsense_manager)
 
 
 # --- Combine FastAPI and Socket.IO into a single ASGI App ---

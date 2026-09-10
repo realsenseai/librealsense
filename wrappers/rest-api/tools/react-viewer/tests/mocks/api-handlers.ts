@@ -101,6 +101,8 @@ export const handlers = [
   ),
 
   // Get depth range
+  http.get(`${API_BASE}/devices/:deviceId/stream/max-usable-range`, () =>
+    HttpResponse.json({ supported: false, enabled: false, range_m: null })),
   http.get(`${API_BASE}/devices/:deviceId/stream/depth-range`, () => {
     return HttpResponse.json({
       min_depth: 0.3,

@@ -196,6 +196,8 @@ function StreamTile({
     mouseY: number
   } | null>(null)
   const [depthRange, setDepthRange] = useState<{ min: number; max: number }>({ min: 0, max: 6 })
+  // Max usable range (stream-model.cpp): shown while the depth sensor has the option on.
+  const [maxUsableRange, setMaxUsableRange] = useState<number | null>(null)
 
   const isDepthStream = streamType.toLowerCase() === 'depth'
   const metric = useMetric()
@@ -223,6 +225,22 @@ function StreamTile({
       cancelled = true
       clearInterval(interval)
     }
+  }, [isDepthStream, deviceId])
+
+  useEffect(() => {
+    if (!isDepthStream) return
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const r = await apiClient.getMaxUsableRange(deviceId)
+        if (!cancelled) setMaxUsableRange(r.enabled ? r.range_m : null)
+      } catch {
+        if (!cancelled) setMaxUsableRange(null)
+      }
+    }
+    void poll()
+    const interval = setInterval(poll, 1000)
+    return () => { cancelled = true; clearInterval(interval) }
   }, [isDepthStream, deviceId])
 
   // Calculate FPS from metadata updates
@@ -471,6 +489,11 @@ function StreamTile({
             <span className="text-gray-400">Depth:</span>{' '}
             {hoverDepth.depth !== null ? formatDistance(hoverDepth.depth, metric) : 'N/A'}
           </div>
+        </div>
+      )}
+      {isDepthStream && maxUsableRange !== null && !showMetadata && (
+        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded shadow pointer-events-none font-mono">
+          Max usable range: {formatDistance(maxUsableRange, metric)}
         </div>
       )}
     </div>
