@@ -230,6 +230,7 @@ class FramesMixin:
             except Exception as exc:
                 logging.debug("[METADATA] failed to read %s: %s", actual_fps_key.name, exc)
         info: Dict[str, Any] = {
+            "received_at": time.time(),
             "timestamp": frame_data.get_timestamp(),
             "frame_number": frame_data.get_frame_number(),
             "clock_domain": frame_data.get_frame_timestamp_domain().name,

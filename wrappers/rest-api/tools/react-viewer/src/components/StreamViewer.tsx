@@ -9,6 +9,8 @@ import type { DeviceState, StreamConfig, StreamMetadata } from '../api/types'
 
 // A stream with its device context
 interface DeviceStream {
+  paused: boolean
+  metadataServerTime?: number
   deviceId: string
   deviceName: string
   serialNumber: string
@@ -24,8 +26,6 @@ export function StreamViewer() {
     const streams: DeviceStream[] = []
     
     Object.values(deviceStates).forEach((ds: DeviceState) => {
-      if (!ds.isActive) return
-      
       ds.streamConfigs.filter(c => c.enable).forEach(config => {
         // Is this specific stream running on its sensor?
         const sensorStatus = ds.sensorStreamingStatus?.[config.sensor_id]
@@ -42,6 +42,8 @@ export function StreamViewer() {
           serialNumber: ds.device.serial_number,
           config,
           metadata: ds.streamMetadata[config.stream_type],
+          paused: !!sensorStatus?.paused,
+          metadataServerTime: ds.metadataServerTime,
         })
       })
     })
@@ -49,7 +51,7 @@ export function StreamViewer() {
     return streams
   }, [deviceStates])
 
-  const activeDeviceCount = Object.values(deviceStates).filter(ds => ds.isActive).length
+  const activeDeviceCount = Object.keys(deviceStates).length
 
   return (
     <div className="h-full">
@@ -93,10 +95,11 @@ export function StreamViewer() {
                   deviceName={stream.deviceName}
                   serialNumber={stream.serialNumber}
                   metadata={stream.metadata}
+                  pause={{ deviceId: stream.deviceId, sensorId: stream.config.sensor_id, paused: stream.paused }}
                 />
               )
             }
-            
+
             return (
               <StreamTile
                 key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
@@ -104,8 +107,11 @@ export function StreamViewer() {
                 deviceName={stream.deviceName}
                 serialNumber={stream.serialNumber}
                 streamType={stream.config.stream_type}
+                format={stream.config.format}
                 metadata={stream.metadata}
                 showDeviceName={activeDeviceCount > 1}
+                pause={{ deviceId: stream.deviceId, sensorId: stream.config.sensor_id, paused: stream.paused }}
+                metadataServerTime={stream.metadataServerTime}
               />
             )
           })}
@@ -115,16 +121,48 @@ export function StreamViewer() {
   )
 }
 
+interface PauseState {
+  deviceId: string
+  sensorId: string
+  paused: boolean
+}
+
+/** The legacy stream-header pause/resume button; pausing holds the whole sensor. */
+function PauseButton({ pause, className = '' }: { pause: PauseState; className?: string }) {
+  const setSensorPaused = useAppStore((s) => s.setSensorPaused)
+  return (
+    <button
+      type="button"
+      onClick={() => void setSensorPaused(pause.deviceId, pause.sensorId, !pause.paused)}
+      title={pause.paused ? 'Resume sensor' : 'Pause sensor'}
+      aria-label={pause.paused ? 'Resume sensor' : 'Pause sensor'}
+      className={`px-2 py-0.5 bg-black/60 hover:bg-black/80 rounded text-xs text-white border border-gray-600 z-20 ${className}`}
+    >
+      {pause.paused ? '▶' : '❚❚'}
+    </button>
+  )
+}
+
+// The legacy viewer cannot draw these either ("Rendering not supported", viewer.cpp).
+const UNRENDERABLE_FORMATS = new Set(['raw10', 'raw16', 'mjpeg'])
+// A stream whose newest frame is older than this on the server clock has stalled.
+const STALE_AFTER_S = 2
+
 interface StreamTileProps {
   deviceId: string
   deviceName: string
   serialNumber: string
   streamType: string
+  format?: string
   showDeviceName?: boolean
   metadata?: StreamMetadata
+  pause?: PauseState
+  metadataServerTime?: number
 }
 
-function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDeviceName, metadata }: StreamTileProps) {
+function StreamTile({
+  deviceId, deviceName, serialNumber, streamType, format, showDeviceName, metadata, pause, metadataServerTime,
+}: StreamTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const webrtcHandlerRef = useRef<WebRTCHandler | null>(null)
@@ -145,6 +183,9 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
 
   const isDepthStream = streamType.toLowerCase() === 'depth'
   const metric = useMetric()
+  const unrenderable = !!format && UNRENDERABLE_FORMATS.has(format.toLowerCase())
+  const stalled = !pause?.paused && metadata?.received_at !== undefined && metadataServerTime !== undefined
+    && metadataServerTime - metadata.received_at > STALE_AFTER_S
 
   // Fetch dynamic depth range periodically for depth streams
   useEffect(() => {
@@ -367,14 +408,34 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
         </div>
       )}
 
-      <MetadataPanel
-        metadata={metadata}
-        streamType={streamType}
-        fps={fps}
-        show={showMetadata}
-        onToggle={setShowMetadata}
-        buttonClassName={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 py-1`}
-      />
+      <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 flex items-center gap-1`}>
+        {pause && <PauseButton pause={pause} className="py-1" />}
+        <MetadataPanel
+          metadata={metadata}
+          streamType={streamType}
+          fps={fps}
+          show={showMetadata}
+          onToggle={setShowMetadata}
+          buttonClassName="py-1"
+        />
+      </div>
+
+      {/* Stream state overlays, as the legacy viewer draws over a tile */}
+      {pause?.paused && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="px-3 py-1 bg-black/70 rounded text-white text-sm font-semibold animate-pulse">❚❚ Paused</span>
+        </div>
+      )}
+      {unrenderable && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="px-3 py-1 bg-black/70 rounded text-yellow-300 text-sm">Rendering not supported for {format?.toUpperCase()}</span>
+        </div>
+      )}
+      {stalled && !unrenderable && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="px-3 py-1 bg-black/70 rounded text-red-300 text-sm font-semibold animate-pulse">No frames received!</span>
+        </div>
+      )}
 
       {/* Depth Legend (for depth streams) */}
       {isDepthStream && (
@@ -406,9 +467,10 @@ interface IMUStreamTileProps {
   deviceName: string
   serialNumber: string
   metadata?: StreamMetadata
+  pause?: PauseState
 }
 
-function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, metadata }: IMUStreamTileProps) {
+function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, metadata, pause }: IMUStreamTileProps) {
   const { imuHistory } = useAppStore()
   const [fps, setFps] = useState(0)
   const [showMetadata, setShowMetadata] = useState(false)
@@ -466,6 +528,7 @@ function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, m
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">{unit}</span>
+          {pause && <PauseButton pause={pause} />}
           <MetadataPanel
             metadata={metadata}
             streamType={streamType}

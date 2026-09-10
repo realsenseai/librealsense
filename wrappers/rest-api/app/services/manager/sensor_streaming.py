@@ -277,7 +277,7 @@ class SensorStreamingMixin:
                 try:
                     # Wait for frame with timeout
                     frame = rs_queue.wait_for_frame(timeout_ms=1000)
-                    if not frame:
+                    if not frame or sensor_info.get("paused"):
                         continue
                     
                     # Determine frame's stream type from the frame itself
@@ -459,6 +459,7 @@ class SensorStreamingMixin:
                 
                 self.sensor_streams[device_id][sensor_id] = {
                     "is_streaming": True,
+                    "paused": False,
                     "stream_types": stream_types,  # List of stream types
                     "configs": configs,  # All configs
                     "started_at": datetime.now(),
@@ -665,6 +666,7 @@ class SensorStreamingMixin:
                 sensor_id=sensor_id,
                 name=info.get("name", sensor_name),
                 is_streaming=info.get("is_streaming", False),
+                paused=info.get("paused", False),
                 stream_type=info.get("stream_type"),
                 resolution=Resolution(width=resolution[0], height=resolution[1]) if resolution else None,
                 framerate=info.get("framerate"),
@@ -672,6 +674,15 @@ class SensorStreamingMixin:
                 error=info.get("error"),
                 started_at=info.get("started_at"),
             )
+
+    def set_sensor_paused(self, device_id: str, sensor_id: str, paused: bool) -> SensorStreamStatus:
+        """Hold back (or release) a streaming sensor's frames; the sensor itself keeps running."""
+        with self.lock:
+            info = self.sensor_streams.get(device_id, {}).get(sensor_id)
+            if not info or not info.get("is_streaming"):
+                raise RealSenseError(status_code=409, detail=f"Sensor {sensor_id} is not streaming")
+            info["paused"] = paused
+        return self.get_sensor_status(device_id, sensor_id)
 
     def get_sensor_frame(
         self,

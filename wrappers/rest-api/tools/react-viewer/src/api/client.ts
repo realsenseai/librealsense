@@ -228,6 +228,14 @@ class ApiClient {
     return response.data
   }
 
+  /** Hold back (or release) a streaming sensor's frames; the tile keeps its last image. */
+  async setSensorPaused(deviceId: string, sensorId: string, paused: boolean): Promise<SensorStreamStatus> {
+    const response = await this.client.post<SensorStreamStatus>(
+      `/devices/${deviceId}/sensors/${sensorId}/${paused ? 'pause' : 'resume'}`
+    )
+    return response.data
+  }
+
   async stopSensor(deviceId: string, sensorId: string): Promise<SensorStreamStatus> {
     const response = await this.client.post<SensorStreamStatus>(
       `/devices/${deviceId}/sensors/${sensorId}/stop`

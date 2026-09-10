@@ -180,6 +180,7 @@ export interface ICECandidate {
 // Metadata from Socket.IO
 export interface StreamMetadata {
   stream_type: string
+  received_at?: number  // server clock, seconds; compare with MetadataUpdate.timestamp_server
   timestamp: number
   frame_number: number
   // frame dims after post processing
@@ -253,9 +254,9 @@ export interface DeviceState {
   streamConfigs: StreamConfig[]
   sensorConfigs: Record<string, SensorConfig> // Per-sensor resolution/FPS, keyed by sensor_id
   isStreaming: boolean
-  isActive: boolean // whether this device is shown in viewer
   isLoading: boolean // loading sensors/options
   streamMetadata: Record<string, StreamMetadata> // keyed by stream_type
+  metadataServerTime?: number // timestamp_server of the last metadata_update
   // Per-sensor streaming state (sensor API)
   sensorStreamingStatus: Record<string, SensorStreamStatus> // keyed by sensor_id
 }
@@ -276,6 +277,7 @@ export interface SensorStreamStatus {
   sensor_id: string
   name: string
   is_streaming: boolean
+  paused?: boolean
   // Single stream_type for backward compatibility (first stream)
   stream_type?: string | null
   resolution?: { width: number; height: number } | null

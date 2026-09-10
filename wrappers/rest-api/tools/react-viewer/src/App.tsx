@@ -3,7 +3,6 @@ import { DevicePanel } from './components/DevicePanel'
 import { StreamViewer } from './components/StreamViewer'
 import { PointCloudViewer } from './components/PointCloudViewer'
 import { Header } from './components/Header'
-import { LoadingSplash } from './components/LoadingSplash'
 import { WhatsNew } from './components/WhatsNew'
 import { ChatButton, ChatPanel } from './components/ChatBot'
 import { ApiDiagnostics } from './components/ApiDiagnostics'
@@ -11,27 +10,27 @@ import { ServerWarnings } from './components/ServerWarnings'
 import { useAppStore } from './store'
 import { useSettingsStore } from './store/settings'
 import { socketService } from './api/socket'
+import { installShortcuts } from './utils/shortcuts'
 
 function App() {
-  const { viewMode, isConnected, getActiveDevices } = useAppStore()
+  const { viewMode, isConnected, getDeviceStates } = useAppStore()
 
-  const activeDevices = getActiveDevices()
-  const hasActiveDevices = activeDevices.length > 0
-  
-  // Check if any device is loading
-  const isAnyDeviceLoading = activeDevices.some(ds => ds.isLoading)
-  const loadingDeviceName = activeDevices.find(ds => ds.isLoading)?.device.name
+  const hasActiveDevices = getDeviceStates().length > 0
 
   useEffect(() => {
     // Connect to Socket.IO on mount
     socketService.connect()
     void useSettingsStore.getState().fetchSettings()
+    const uninstallShortcuts = installShortcuts({
+      Space: () => void useAppStore.getState().togglePauseAll(),
+    })
     
     // Don't disconnect on cleanup in dev mode (React strict mode double-mounts)
     // The socket service handles reconnection gracefully
     return () => {
-      // Only disconnect if we're actually unmounting the app
-      // In development with strict mode, this fires twice
+      // The socket stays up: React strict mode double-mounts in development and the
+      // service reconnects on its own. Shortcuts are cheap to re-install.
+      uninstallShortcuts()
     }
   }, [])
 
@@ -39,11 +38,6 @@ function App() {
     <div className="h-screen bg-rs-darker flex flex-col overflow-hidden">
       {/* What's New Modal */}
       <WhatsNew />
-      
-      {/* Loading Splash Screen */}
-      {isAnyDeviceLoading && (
-        <LoadingSplash message={`Initializing ${loadingDeviceName || 'device'} sensors...`} />
-      )}
       
       <Header />
 
@@ -80,8 +74,8 @@ function App() {
                   <circle cx="65" cy="40" r="8" fill="currentColor" opacity="0.5"/>
                   <circle cx="50" cy="60" r="6" fill="currentColor" opacity="0.3"/>
                 </svg>
-                <p className="text-xl">No Device Activated</p>
-                <p className="text-sm mt-2">Connect a RealSense device and toggle it on from the sidebar</p>
+                <p className="text-xl">No Device Connected</p>
+                <p className="text-sm mt-2">Connect a RealSense device to start streaming</p>
               </div>
             </div>
           )}

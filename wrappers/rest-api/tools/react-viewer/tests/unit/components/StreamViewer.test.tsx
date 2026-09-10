@@ -28,7 +28,6 @@ describe('StreamViewer', () => {
     it('shows the same empty state when device is active but no streams enabled', () => {
       const device = createMockDevice()
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         // Use `enable` (singular) — the actual StreamConfig field name. The
         // mock factory defaults `enable: true`, so the wrong field name leaves
         // the stream enabled and the empty-state branch never renders.
@@ -53,7 +52,6 @@ describe('StreamViewer', () => {
         enable: true, // Component uses 'enable' property
       })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [depthConfig],
         isStreaming: true,
         sensorStreamingStatus: {
@@ -83,7 +81,6 @@ describe('StreamViewer', () => {
         format: 'RGB8',
       })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [depthConfig, colorConfig],
         isStreaming: true,
         sensorStreamingStatus: {
@@ -112,7 +109,6 @@ describe('StreamViewer', () => {
       const config2 = createMockStreamConfig({ stream_type: 'depth', enable: true })
       
       const state1 = createMockDeviceState(device1, {
-        isActive: true,
         streamConfigs: [config1],
         isStreaming: true,
         sensorStreamingStatus: {
@@ -120,7 +116,6 @@ describe('StreamViewer', () => {
         },
       })
       const state2 = createMockDeviceState(device2, {
-        isActive: true,
         streamConfigs: [config2],
         isStreaming: true,
         sensorStreamingStatus: {
@@ -139,38 +134,47 @@ describe('StreamViewer', () => {
       
       expect(document.querySelectorAll('video.stream-video')).toHaveLength(2)
     })
+  })
 
-    it('only shows streams from active devices, not inactive ones', () => {
-      const activeDevice = createMockDevice({ device_id: 'active-1', name: 'Active Device' })
-      const inactiveDevice = createMockDevice({ device_id: 'inactive-1', name: 'Inactive Device' })
-      
-      const activeState = createMockDeviceState(activeDevice, {
-        isActive: true,
-        streamConfigs: [createMockStreamConfig({ enable: true })],
+  describe('Tile overlays', () => {
+    const streamingState = (device: ReturnType<typeof createMockDevice>, over: Record<string, unknown> = {}, config: Record<string, unknown> = {}) =>
+      createMockDeviceState(device, {
+        streamConfigs: [createMockStreamConfig({ enable: true, ...config })],
         isStreaming: true,
         sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth'], ...over },
         },
       })
-      const inactiveState = createMockDeviceState(inactiveDevice, {
-        isActive: false,
-        streamConfigs: [createMockStreamConfig({ enable: true })],
-        isStreaming: true,
-        sensorStreamingStatus: {
-          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color', 'infrared'] },
-        },
-      })
-      
-      render(<StreamViewer />, {
-        initialStoreState: {
-          deviceStates: {
-            [activeDevice.device_id]: activeState,
-            [inactiveDevice.device_id]: inactiveState,
-          },
-        },
-      })
-      
-      expect(document.querySelectorAll('video.stream-video')).toHaveLength(1)
+
+    it('shows the pause button and a Paused overlay while the sensor is paused', () => {
+      const device = createMockDevice()
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: streamingState(device, { paused: true }) } } })
+      expect(screen.getByText(/Paused/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Resume sensor' })).toBeInTheDocument()
+    })
+
+    it('flags a stalled stream from the server clocks', () => {
+      const device = createMockDevice()
+      const ds = streamingState(device)
+      ds.streamMetadata = { depth: { stream_type: 'depth', timestamp: 0, frame_number: 1, width: 640, height: 480, received_at: 100 } }
+      ds.metadataServerTime = 105
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: ds } } })
+      expect(screen.getByText('No frames received!')).toBeInTheDocument()
+    })
+
+    it('does not flag a fresh stream', () => {
+      const device = createMockDevice()
+      const ds = streamingState(device)
+      ds.streamMetadata = { depth: { stream_type: 'depth', timestamp: 0, frame_number: 1, width: 640, height: 480, received_at: 104.5 } }
+      ds.metadataServerTime = 105
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: ds } } })
+      expect(screen.queryByText('No frames received!')).not.toBeInTheDocument()
+    })
+
+    it('says so for a format the viewer cannot render', () => {
+      const device = createMockDevice()
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: streamingState(device, {}, { format: 'RAW16' }) } } })
+      expect(screen.getByText(/Rendering not supported for RAW16/)).toBeInTheDocument()
     })
   })
 
@@ -180,7 +184,6 @@ describe('StreamViewer', () => {
       const config = createMockStreamConfig({ enable: true })
 
       const notStreamingState = createMockDeviceState(device, {
-        isActive: true,
         isStreaming: false,
         streamConfigs: [config],
       })
@@ -205,7 +208,6 @@ describe('StreamViewer', () => {
         enable: true,
       })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [config],
         sensorStreamingStatus: {
           'sensor-0': {
@@ -234,7 +236,6 @@ describe('StreamViewer', () => {
         enable: true,
       })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [config],
         sensorStreamingStatus: {
           'sensor-0': {
@@ -262,7 +263,6 @@ describe('StreamViewer', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({ stream_type: 'color', format: 'RGB8', enable: true })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [config],
         isStreaming: true,
         sensorStreamingStatus: {
@@ -284,7 +284,6 @@ describe('StreamViewer', () => {
       const device = createMockDevice()
       const config = createMockStreamConfig({ stream_type: 'infrared', format: 'Y8', enable: true })
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [config],
         isStreaming: true,
         sensorStreamingStatus: {

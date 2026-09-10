@@ -194,7 +194,7 @@ describe('AppStore', () => {
   describe('Device States', () => {
     it('stores device state by device_id', () => {
       const device = createMockDevice()
-      const deviceState = createMockDeviceState(device, { isActive: true })
+      const deviceState = createMockDeviceState(device)
       
       useAppStore.setState({
         devices: [device],
@@ -205,29 +205,32 @@ describe('AppStore', () => {
       expect(state.deviceStates[device.device_id]).toEqual(deviceState)
     })
 
-    it('getActiveDevices returns only active devices', () => {
+    it('getDeviceStates returns every connected device', () => {
       const device1 = createMockDevice({ device_id: 'device-1' })
       const device2 = createMockDevice({ device_id: 'device-2' })
-      
-      const state1 = createMockDeviceState(device1, { isActive: true })
-      const state2 = createMockDeviceState(device2, { isActive: false })
-      
+
       useAppStore.setState({
         devices: [device1, device2],
         deviceStates: {
-          [device1.device_id]: state1,
-          [device2.device_id]: state2,
+          [device1.device_id]: createMockDeviceState(device1),
+          [device2.device_id]: createMockDeviceState(device2),
         },
       })
-      
-      const activeDevices = useAppStore.getState().getActiveDevices()
-      expect(activeDevices).toHaveLength(1)
-      expect(activeDevices[0].device.device_id).toBe('device-1')
+
+      expect(useAppStore.getState().getDeviceStates().map((ds) => ds.device.device_id)).toEqual(['device-1', 'device-2'])
+    })
+
+    it('fetchDevices opens every newly connected device', async () => {
+      await useAppStore.getState().fetchDevices()
+
+      const states = useAppStore.getState().deviceStates
+      expect(Object.keys(states)).toEqual(useAppStore.getState().devices.map((d) => d.device_id))
+      expect(Object.values(states).every((ds) => ds.sensors.length > 0 && !ds.isLoading)).toBe(true)
     })
 
     it('isAnyDeviceStreaming returns true when a device is streaming', () => {
       const device = createMockDevice()
-      const deviceState = createMockDeviceState(device, { isActive: true, isStreaming: true })
+      const deviceState = createMockDeviceState(device, { isStreaming: true })
       
       useAppStore.setState({
         devices: [device],
@@ -239,7 +242,7 @@ describe('AppStore', () => {
 
     it('isAnyDeviceStreaming returns false when no devices are streaming', () => {
       const device = createMockDevice()
-      const deviceState = createMockDeviceState(device, { isActive: true, isStreaming: false })
+      const deviceState = createMockDeviceState(device, { isStreaming: false })
       
       useAppStore.setState({
         devices: [device],
@@ -300,12 +303,44 @@ describe('AppStore', () => {
     })
   })
 
+  describe('Pause', () => {
+    const streaming = (paused = false) => ({
+      'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, paused, stream_types: ['depth'] },
+    })
+
+    it('setSensorPaused stores the status the server answers', async () => {
+      const device = createMockDevice()
+      useAppStore.setState({ deviceStates: { [device.device_id]: createMockDeviceState(device, { sensorStreamingStatus: streaming() }) } })
+
+      await useAppStore.getState().setSensorPaused(device.device_id, 'test-device-1-sensor-0', true)
+
+      expect(useAppStore.getState().deviceStates[device.device_id].sensorStreamingStatus['test-device-1-sensor-0'].paused).toBe(true)
+    })
+
+    it('togglePauseAll pauses every running sensor, then resumes them all', async () => {
+      const a = createMockDevice({ device_id: 'a' })
+      const b = createMockDevice({ device_id: 'b' })
+      useAppStore.setState({ deviceStates: {
+        a: createMockDeviceState(a, { sensorStreamingStatus: streaming(false) }),
+        b: createMockDeviceState(b, { sensorStreamingStatus: streaming(true) }),
+      } })
+
+      await useAppStore.getState().togglePauseAll()
+      let states = useAppStore.getState().deviceStates
+      expect([states.a, states.b].map((ds) => ds.sensorStreamingStatus['test-device-1-sensor-0'].paused)).toEqual([true, true])
+
+      await useAppStore.getState().togglePauseAll()
+      states = useAppStore.getState().deviceStates
+      expect([states.a, states.b].map((ds) => ds.sensorStreamingStatus['test-device-1-sensor-0'].paused)).toEqual([false, false])
+    })
+  })
+
   describe('Stream Configuration', () => {
     it('starts a sensor with the profiles the SDK marks default', async () => {
       const device = createMockDevice({ device_id: '123456789' })
       useAppStore.setState({
         devices: [device],
-        deviceStates: { [device.device_id]: createMockDeviceState(device, { isActive: true }) },
+        deviceStates: { [device.device_id]: createMockDeviceState(device) },
       })
 
       await useAppStore.getState().fetchSensors(device.device_id)
@@ -328,7 +363,7 @@ describe('AppStore', () => {
       ])))
       useAppStore.setState({
         devices: [device],
-        deviceStates: { [device.device_id]: createMockDeviceState(device, { isActive: true }) },
+        deviceStates: { [device.device_id]: createMockDeviceState(device) },
       })
 
       await useAppStore.getState().fetchSensors(device.device_id)
@@ -349,7 +384,6 @@ describe('AppStore', () => {
         framerate: 30,
       }
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         streamConfigs: [config],
       })
       
@@ -368,7 +402,6 @@ describe('AppStore', () => {
     it('isStreaming reflects device streaming state', () => {
       const device = createMockDevice()
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         isStreaming: true,
       })
       
@@ -386,7 +419,6 @@ describe('AppStore', () => {
     it('isStreaming getter returns false when no devices are streaming', () => {
       const device = createMockDevice()
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         isStreaming: false,
       })
       
@@ -408,7 +440,7 @@ describe('AppStore', () => {
       useAppStore.setState({
         devices: [device],
         deviceStates: {
-          [device.device_id]: createMockDeviceState(device, { isActive: true, isStreaming: true }),
+          [device.device_id]: createMockDeviceState(device, { isStreaming: true }),
         },
       })
 

@@ -38,6 +38,7 @@ class SensorStreamStatus(BaseModel):
     sensor_id: str
     name: str = ""
     is_streaming: bool
+    paused: bool = False  # streaming, but frames are held back so the viewer shows the last one
     # Single stream_type for backward compatibility (first stream)
     stream_type: Optional[str] = None
     resolution: Optional[Resolution] = None

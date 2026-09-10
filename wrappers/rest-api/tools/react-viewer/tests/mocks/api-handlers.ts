@@ -154,6 +154,10 @@ export const handlers = [
   }),
 
   // Per-sensor streaming: stop sensor
+  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/pause`, ({ params }) =>
+    HttpResponse.json({ sensor_id: params.sensorId, name: '', is_streaming: true, paused: true, stream_types: ['depth'] })),
+  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/resume`, ({ params }) =>
+    HttpResponse.json({ sensor_id: params.sensorId, name: '', is_streaming: true, paused: false, stream_types: ['depth'] })),
   http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/stop`, async ({ params }) => {
     const sensorId = params.sensorId as string
     return HttpResponse.json({

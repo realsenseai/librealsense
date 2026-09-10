@@ -118,6 +118,27 @@ async def stop_sensor(
     return rs_manager.stop_sensor(device_id, sensor_id)
 
 
+@router.post("/{sensor_id}/pause", response_model=SensorStreamStatus)
+@rs_exception_handler()
+async def pause_sensor(
+    device_id: str,
+    sensor_id: str,
+    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+):
+    """Freeze a streaming sensor's output: the last frame stays on screen until resume."""
+    return rs_manager.set_sensor_paused(device_id, sensor_id, True)
+
+
+@router.post("/{sensor_id}/resume", response_model=SensorStreamStatus)
+@rs_exception_handler()
+async def resume_sensor(
+    device_id: str,
+    sensor_id: str,
+    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+):
+    return rs_manager.set_sensor_paused(device_id, sensor_id, False)
+
+
 @router.get("/{sensor_id}/status", response_model=SensorStreamStatus)
 @rs_exception_handler(default_status=404)
 async def get_sensor_status(

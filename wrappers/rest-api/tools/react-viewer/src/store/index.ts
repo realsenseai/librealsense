@@ -168,9 +168,9 @@ interface AppState {
   setControlEnabled: (deviceId: string, key: string, enabled: boolean) => Promise<void>
   setPostProcessing: (deviceId: string, sensorId: string, enabled: boolean) => Promise<void>
 
-  // Device activation (multi-select support)
-  toggleDeviceActive: (device: DeviceInfo) => Promise<void>
-  getActiveDevices: () => DeviceState[]
+  /** Load a newly connected device's sensors and controls; every device is open. */
+  openDevice: (device: DeviceInfo) => Promise<void>
+  getDeviceStates: () => DeviceState[]
   isAnyDeviceStreaming: () => boolean
   
   resetDevice: (deviceId: string) => Promise<void>
@@ -185,6 +185,9 @@ interface AppState {
   // Per-sensor streaming (sensor API)
   startSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
   stopSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
+  setSensorPaused: (deviceId: string, sensorId: string, paused: boolean) => Promise<void>
+  /** Space in the legacy viewer: pause every streaming sensor, or resume them all. */
+  togglePauseAll: () => Promise<void>
 
   // Metadata from Socket.IO
   updateMetadata: (metadata: MetadataUpdate) => void
@@ -277,7 +280,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const devices = await apiClient.getDevices(forceRefresh)
       // A newer enumeration already landed: this response is older than what we show.
       if (seq !== _fetchSeq) return
-      const known = new Set(get().devices.map((d) => d.device_id))
       // Carry over the UI state of devices that are still here; the rest drop out.
       set((state) => ({
         devices,
@@ -289,12 +291,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
         isLoadingDevices: false,
       }))
 
-      // A camera just showed up and it is the only one: open it. Covers first load and a
-      // return from DFU alike, and leaves a camera the user closed closed.
-      const appeared = devices.filter((d) => !known.has(d.device_id))
-      if (devices.length === 1 && appeared.length === 1 && get().getActiveDevices().length === 0) {
-        await get().toggleDeviceActive(devices[0])
-      }
+      // Like the legacy viewer, a camera is ready to use the moment it shows up: open
+      // every one we have not seen (first load and a return from DFU alike).
+      const appeared = devices.filter((d) => !get().deviceStates[d.device_id])
+      await Promise.all(appeared.map((d) => get().openDevice(d)))
     } catch (error) {
       set({
         error: `Failed to fetch devices: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -430,51 +430,30 @@ export const useAppStore = create<AppState>()((set, get) => ({
     return recommended
   },
 
-  toggleDeviceActive: async (device: DeviceInfo) => {
-    const state = get()
-    const existing = state.deviceStates[device.device_id]
-    
-    if (existing?.isActive) {
-      // Deactivate: stop streaming if active, then remove
-      for (const [sensorId, status] of Object.entries(existing.sensorStreamingStatus)) {
-        if (status.is_streaming) await get().stopSensorStreaming(device.device_id, sensorId)
-      }
-      set((s) => {
-        const newStates = { ...s.deviceStates }
-        delete newStates[device.device_id]
-        return { deviceStates: newStates }
-      })
-    } else {
-      // Activate: create device state and fetch sensors
-      const deviceState: DeviceState = {
-        device,
-        firmware: { is_updating: false, progress: undefined, last_error: null },
-        sensors: [],
-        controls: {},
-        streamConfigs: [],
-        sensorConfigs: {},
-        isStreaming: false,
-        isActive: true,
-        isLoading: true,
-        streamMetadata: {},
-        sensorStreamingStatus: {},
-      }
-      set((s) => ({
-        deviceStates: { ...s.deviceStates, [device.device_id]: deviceState },
-      }))
-      
-      // Fetch sensors for this device
-      await get().fetchSensors(device.device_id)
-      // Best-effort: a versions-DB outage shouldn't make opening a camera look like it failed.
-      get().checkFirmwareUpdates(device.device_id).catch(() => {})
-      get().fetchDeviceControls(device.device_id)
+  openDevice: async (device: DeviceInfo) => {
+    const deviceState: DeviceState = {
+      device,
+      firmware: { is_updating: false, progress: undefined, last_error: null },
+      sensors: [],
+      controls: {},
+      streamConfigs: [],
+      sensorConfigs: {},
+      isStreaming: false,
+      isLoading: true,
+      streamMetadata: {},
+      sensorStreamingStatus: {},
     }
+    set((s) => ({
+      deviceStates: { ...s.deviceStates, [device.device_id]: deviceState },
+    }))
+
+    await get().fetchSensors(device.device_id)
+    // Best-effort: a versions-DB outage shouldn't make opening a camera look like it failed.
+    get().checkFirmwareUpdates(device.device_id).catch(() => {})
+    get().fetchDeviceControls(device.device_id)
   },
 
-  getActiveDevices: () => {
-    const state = get()
-    return Object.values(state.deviceStates).filter(ds => ds.isActive)
-  },
+  getDeviceStates: () => Object.values(get().deviceStates),
 
   isAnyDeviceStreaming: () => {
     const state = get()
@@ -658,6 +637,29 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }
   },
 
+  setSensorPaused: async (deviceId, sensorId, paused) => {
+    try {
+      const status = await apiClient.setSensorPaused(deviceId, sensorId, paused)
+      set((s) => patchDevice(s, deviceId, (ds) =>
+        ({ sensorStreamingStatus: { ...ds.sensorStreamingStatus, [sensorId]: status } })))
+    } catch (error) {
+      set({ error: `Failed to ${paused ? 'pause' : 'resume'} sensor: ${error instanceof Error ? error.message : 'unknown error'}` })
+    }
+  },
+
+  togglePauseAll: async () => {
+    const streaming: [string, string, boolean][] = []
+    for (const ds of Object.values(get().deviceStates)) {
+      for (const [sensorId, status] of Object.entries(ds.sensorStreamingStatus)) {
+        if (status.is_streaming) streaming.push([ds.device.device_id, sensorId, !!status.paused])
+      }
+    }
+    if (streaming.length === 0) return
+    // Any sensor still running means "pause everything"; only when all are paused, resume.
+    const pause = streaming.some(([, , paused]) => !paused)
+    await Promise.all(streaming.map(([d, s]) => get().setSensorPaused(d, s, pause)))
+  },
+
   stopSensorStreaming: async (deviceId, sensorId) => {
     const pendingKey = `${deviceId}:${sensorId}`
 
@@ -781,6 +783,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           [deviceId]: {
             ...deviceState,
             streamMetadata: metadata.metadata_streams,
+            metadataServerTime: metadata.timestamp_server,
           },
         },
       }
@@ -847,7 +850,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     if (prev === mode) return
     set({ viewMode: mode })
 
-    const activeDevices = Object.values(get().deviceStates).filter(ds => ds.isActive)
+    const activeDevices = Object.values(get().deviceStates)
     try {
       if (mode === '3d') {
         await Promise.all(

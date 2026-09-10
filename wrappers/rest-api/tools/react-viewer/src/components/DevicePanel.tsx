@@ -127,7 +127,6 @@ export function DevicePanel() {
     isLoadingDevices,
     fetchDevices,
     enableMetadata,
-    toggleDeviceActive,
     resetDevice,
     error,
     clearError,
@@ -318,7 +317,6 @@ export function DevicePanel() {
                 key={device.device_id}
                 device={device}
                 deviceState={deviceState}
-                onToggle={() => toggleDeviceActive(device)}
                 onReset={() => resetDevice(device.device_id)}
                 onUpdateStreamConfig={(config) => updateStreamConfig(device.device_id, config)}
                 onUpdateSensorConfig={(sensorId, config) => updateSensorConfig(device.device_id, sensorId, config)}
@@ -356,7 +354,6 @@ export function DevicePanel() {
 interface DeviceCardProps {
   device: DeviceInfo
   deviceState?: DeviceState
-  onToggle: () => void
   onReset: () => void
   onUpdateStreamConfig: (config: StreamConfig) => void
   onUpdateSensorConfig: (sensorId: string, config: Partial<SensorConfig>) => void
@@ -371,7 +368,6 @@ interface DeviceCardProps {
 function DeviceCard({
   device,
   deviceState,
-  onToggle,
   onReset,
   onUpdateStreamConfig,
   onUpdateSensorConfig,
@@ -385,7 +381,6 @@ function DeviceCard({
   const [showMenu, setShowMenu] = useState(false)
   const fwPicker = useFilePicker(onUpdateFirmwareFromFile, '.bin')
 
-  const isActive = deviceState?.isActive || false
   const isLoading = deviceState?.isLoading || false
   const isStreaming = deviceState?.isStreaming || false
   const sensors = deviceState?.sensors || []
@@ -408,15 +403,7 @@ function DeviceCard({
   }
 
   return (
-    <div
-      className={`device-card rounded-lg transition-all ${
-        isActive
-          ? 'bg-rs-blue/10 border border-rs-blue'
-          : 'bg-gray-800 border border-gray-700 hover:border-gray-600 cursor-pointer'
-      }`}
-      data-testid="device-card"
-      onClick={!isActive && !isLoading ? onToggle : undefined}
-    >
+    <div className="device-card rounded-lg bg-rs-blue/10 border border-rs-blue" data-testid="device-card">
       {/* Hidden file input — rendered at card root so it persists when the
           hamburger menu closes; otherwise the OS file picker resolves into
           an unmounted input and onChange never fires. */}
@@ -552,22 +539,6 @@ function DeviceCard({
                 </>
               )}
             </div>
-            
-            {/* Toggle switch */}
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggle(); }}
-              disabled={isLoading || isStreaming}
-              className={`relative w-10 h-5 rounded-full transition-colors ${
-                isActive ? 'bg-rs-blue' : 'bg-gray-600'
-              } ${isLoading || isStreaming ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
-              title={isActive ? 'Deactivate device' : 'Activate device'}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                  isActive ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
           </div>
         </div>
 
@@ -579,8 +550,8 @@ function DeviceCard({
           {device.usb_type && <span>USB: {device.usb_type}</span>}
         </div>
 
-        {/* Sensors Tags */}
-        {device.sensors.length > 0 && !isActive && (
+        {/* Sensor names, until the sensors themselves are loaded */}
+        {device.sensors.length > 0 && isLoading && (
           <div className="mt-2 flex flex-wrap gap-1">
             {device.sensors.map((sensor) => (
               <span
@@ -594,8 +565,7 @@ function DeviceCard({
         )}
       </div>
 
-      {/* Device Controls - shown when active */}
-      {isActive && !isLoading && (
+      {!isLoading && (
         <div className="border-t border-gray-700 p-3 space-y-1.5">
           {sensors.map((sensor) => (
             <SensorPanel

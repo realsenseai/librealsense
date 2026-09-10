@@ -16,7 +16,6 @@ describe('DevicePanel', () => {
       error: null,
       fetchDevices: vi.fn().mockResolvedValue(undefined),
       clearError: vi.fn(),
-      toggleDeviceActive: vi.fn().mockResolvedValue(undefined),
       resetDevice: vi.fn().mockResolvedValue(undefined),
       isAnyDeviceStreaming: () => false,
       updateStreamConfig: vi.fn(),
@@ -224,9 +223,9 @@ describe('DevicePanel', () => {
       expect(screen.getByText('RealSense D435')).toBeInTheDocument()
     })
 
-    it('shows device as active when deviceState.isActive is true', () => {
+    it('shows a device with state without any activate control', () => {
       const mockDevice = createMockDevice()
-      const mockDeviceState = createMockDeviceState(mockDevice, { isActive: true })
+      const mockDeviceState = createMockDeviceState(mockDevice)
       
       render(<DevicePanel />, {
         initialStoreState: {
@@ -235,9 +234,8 @@ describe('DevicePanel', () => {
         },
       })
       
-      // When active, the device card should have active styling
-      // The exact check depends on component implementation
       expect(screen.getByText('RealSense D435')).toBeInTheDocument()
+      expect(screen.queryByTitle(/Activate device|Deactivate device/)).not.toBeInTheDocument()
     })
   })
 
@@ -328,7 +326,6 @@ describe('DevicePanel', () => {
     const withAdvancedMode = (overrides: Partial<ReturnType<typeof createMockDeviceState>> = {}) => {
       const device = createMockDevice()
       const ds = createMockDeviceState(device, {
-        isActive: true,
         advancedMode: { supported: true, enabled: false },
         ...overrides,
       })
@@ -410,7 +407,6 @@ describe('DevicePanel', () => {
         createMockOption({ option_id: 'Laser_Power', name: 'Laser Power' }),
       ]
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         sensors: [sensor],
         controls: {
           'sensors/sensor-a/options': {

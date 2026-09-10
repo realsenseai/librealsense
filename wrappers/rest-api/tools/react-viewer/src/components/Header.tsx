@@ -91,13 +91,12 @@ export function Header() {
   const { 
     viewMode, 
     setViewMode, 
-    getActiveDevices,
+    getDeviceStates,
   } = useAppStore()
   const [showAbout, setShowAbout] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
-  const activeDevices = getActiveDevices()
-  const hasActiveDevices = activeDevices.length > 0
+  const hasActiveDevices = getDeviceStates().length > 0
 
   return (
     <>
