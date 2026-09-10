@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { render, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 import { DevicePanel } from '@/components/DevicePanel'
@@ -492,6 +492,40 @@ describe('DevicePanel', () => {
       // The search force-opened the Controls section; clearing it returns the section to
       // the state the user left it in, which is closed.
       expect(screen.queryByText('Exposure')).not.toBeInTheDocument()
+    })
+
+    it('types an exact value in text-edit mode and clamps it to the range', async () => {
+      const setControl = vi.fn().mockResolvedValue(undefined)
+      await renderWithControls({
+        setControl,
+        options: [createMockOption({ option_id: 'Exposure', current_value: 100, default_value: 50, min_value: 1, max_value: 10000, step: 1 })],
+      })
+      await userEvent.type(screen.getByPlaceholderText('Search controls…'), 'expo')
+      await waitFor(() => expect(screen.getByText('Exposure')).toBeInTheDocument())
+
+      await userEvent.click(screen.getByTitle('Enter text-edit mode'))
+      const input = screen.getByLabelText('Exposure value')
+      await userEvent.clear(input)
+      await userEvent.type(input, '20000{Enter}')
+
+      await waitFor(() => expect(setControl).toHaveBeenCalledWith('test-device-1', 'sensors/sensor-a/options', 'Exposure', 10000))
+      expect(screen.queryByLabelText('Exposure value')).not.toBeInTheDocument()
+    })
+
+    it('writes a dragged slider value once the interval has passed', async () => {
+      const setControl = vi.fn().mockResolvedValue(undefined)
+      await renderWithControls({
+        setControl,
+        options: [createMockOption({ option_id: 'Gain', current_value: 16, default_value: 16, min_value: 0, max_value: 128, step: 1 })],
+      })
+      await userEvent.type(screen.getByPlaceholderText('Search controls…'), 'gain')
+      const slider = await screen.findByRole('slider')
+
+      fireEvent.change(slider, { target: { value: '40' } })
+      fireEvent.change(slider, { target: { value: '64' } })
+
+      await waitFor(() => expect(setControl).toHaveBeenCalledTimes(1))
+      expect(setControl).toHaveBeenCalledWith('test-device-1', 'sensors/sensor-a/options', 'Gain', 64)
     })
 
     // Firmware reports no range for some advanced-mode groups, so a flag in one arrives

@@ -1004,13 +1004,24 @@ interface OptionControlProps {
   onSet: (optionId: string, value: number | boolean | string) => Promise<void>
 }
 
+// Firmware writes take time; while a slider is dragged, send at most one value per interval
+// and always the newest one, as the legacy viewer's option dispatcher does (option-model.h).
+const SLIDER_WRITE_INTERVAL_MS = 200
+
 function OptionControl({ option, onSet }: OptionControlProps) {
   const [localValue, setLocalValue] = useState(option.current_value)
+  // Text-edit mode: the legacy pencil button that turns a slider into a typed value.
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+  const lastSentAt = useRef(0)
+  const pendingWrite = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Sync with external changes (e.g., from chatbot)
   useEffect(() => {
     setLocalValue(option.current_value)
   }, [option.current_value])
+
+  useEffect(() => () => { if (pendingWrite.current) clearTimeout(pendingWrite.current) }, [])
 
   const handleChange = async (value: number | boolean | string) => {
     setLocalValue(value)
@@ -1019,6 +1030,25 @@ function OptionControl({ option, onSet }: OptionControlProps) {
     } catch (error) {
       setLocalValue(option.current_value)
     }
+  }
+
+  const handleDrag = (value: number) => {
+    setLocalValue(value)
+    if (pendingWrite.current) clearTimeout(pendingWrite.current)
+    const wait = Math.max(0, SLIDER_WRITE_INTERVAL_MS - (Date.now() - lastSentAt.current))
+    pendingWrite.current = setTimeout(() => {
+      pendingWrite.current = null
+      lastSentAt.current = Date.now()
+      void handleChange(value)
+    }, wait)
+  }
+
+  const commitEdit = () => {
+    setEditing(false)
+    const parsed = Number(editText)
+    if (editText.trim() === '' || Number.isNaN(parsed)) return
+    const clamped = Math.min(option.max_value, Math.max(option.min_value, parsed))
+    void handleChange(clamped)
   }
 
   const handleRestoreDefault = async () => {
@@ -1092,22 +1122,49 @@ function OptionControl({ option, onSet }: OptionControlProps) {
         </label>
       ) : isSlider ? (
         <div className="flex items-center gap-1">
-          <input
-            type="range"
-            min={option.min_value}
-            max={option.max_value}
-            step={option.step ?? 'any'}
-            value={Number(localValue)}
-            onChange={(e) => setLocalValue(Number(e.target.value))}
-            onMouseUp={() => handleChange(Number(localValue))}
-            onTouchEnd={() => handleChange(Number(localValue))}
-            className="flex-1 h-1"
-          />
-          <span className="text-gray-400 w-10 text-right">
-            {typeof localValue === 'number'
-              ? localValue.toFixed((option.step ?? 0) >= 1 ? 0 : 2)
-              : localValue}
-          </span>
+          {editing ? (
+            <input
+              type="number"
+              autoFocus
+              aria-label={`${optionLabel(option.option_id)} value`}
+              min={option.min_value}
+              max={option.max_value}
+              step={option.step ?? 'any'}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitEdit()
+                if (e.key === 'Escape') setEditing(false)
+              }}
+              className="flex-1 bg-gray-700 text-white rounded px-1 py-0.5 border border-rs-blue focus:outline-none"
+            />
+          ) : (
+            <>
+              <input
+                type="range"
+                min={option.min_value}
+                max={option.max_value}
+                step={option.step ?? 'any'}
+                value={Number(localValue)}
+                onChange={(e) => handleDrag(Number(e.target.value))}
+                className="flex-1 h-1"
+              />
+              <span className="text-gray-400 w-10 text-right">
+                {typeof localValue === 'number'
+                  ? localValue.toFixed((option.step ?? 0) >= 1 ? 0 : 2)
+                  : localValue}
+              </span>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => { setEditText(String(localValue)); setEditing((e) => !e) }}
+            title={editing ? 'Exit text-edit mode' : 'Enter text-edit mode'}
+            className={`px-1 ${editing ? 'text-rs-blue' : 'text-gray-500 hover:text-gray-300'}`}
+          >
+            ✎
+          </button>
         </div>
       ) : (
         <input

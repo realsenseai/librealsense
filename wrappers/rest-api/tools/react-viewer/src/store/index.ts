@@ -142,6 +142,7 @@ import {
   type ChatResponse,
 } from '../api/chat'
 import type { ProposedSettings } from '../utils/chatPrompt'
+import { orderOptions } from '../utils/optionOrder'
 
 interface IMUHistory {
   accel: { timestamp: number; x: number; y: number; z: number }[]
@@ -364,7 +365,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }
     sensors.forEach((s, i) => {
       groups[`sensors/${s.sensor_id}/options`] =
-        { section: 'Controls', sensorId: s.sensor_id, name: '', options: s.options }
+        { section: 'Controls', sensorId: s.sensor_id, name: '', options: orderOptions(s.options) }
       for (const [name, filter] of Object.entries(perSensor[i])) {
         groups[`sensors/${s.sensor_id}/filters/${name}`] =
           { section: 'Post-Processing', sensorId: s.sensor_id, name, ...filter }
