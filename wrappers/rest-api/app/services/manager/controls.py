@@ -69,6 +69,11 @@ class ControlsMixin:
                         "resolutions": [],
                         "fps": [],
                         "formats": [],
+                        "default": None,
+                    }
+                if profile.is_default():
+                    supported_stream_profiles[stream_type]["default"] = {
+                        "resolution": (width, height), "fps": fps, "format": fmt,
                     }
 
                 # Add resolution if not already in the list
@@ -97,6 +102,7 @@ class ControlsMixin:
                     resolutions=stream_data["resolutions"],
                     fps=stream_data["fps"],
                     formats=stream_data["formats"],
+                    default=stream_data["default"],
                 )
                 stream_profiles_list.append(stream_profile)
 

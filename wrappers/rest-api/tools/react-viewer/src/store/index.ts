@@ -51,26 +51,31 @@ function decodeFloat32Payload(raw: ArrayBuffer | string): Float32Array {
   return new Float32Array(u8.buffer, u8.byteOffset, u8.byteLength >> 2)
 }
 
+/**
+ * Initial stream selection. Like the legacy viewer, a sensor starts with the profiles the
+ * SDK marks default; a sensor that reports none falls back to depth/color/IMU at the
+ * first listed mode.
+ */
 function buildStreamConfigs(sensors: SensorInfo[]): StreamConfig[] {
   const configs: StreamConfig[] = []
   for (const sensor of sensors) {
     const profiles = sensor.supported_stream_profiles.filter(
       p => p.resolutions.length > 0 && p.fps.length > 0
     )
+    const hasDefaults = profiles.some(p => p.default)
     for (const profile of profiles) {
       const streamTypeLower = profile.stream_type.toLowerCase()
-      const enableByDefault =
-        streamTypeLower === 'depth' || streamTypeLower === 'color' ||
-        streamTypeLower === 'gyro' || streamTypeLower === 'accel'
+      const enableByDefault = hasDefaults
+        ? profile.default !== undefined
+        : streamTypeLower === 'depth' || streamTypeLower === 'color' ||
+          streamTypeLower === 'gyro' || streamTypeLower === 'accel'
+      const [width, height] = profile.default?.resolution ?? profile.resolutions[0]
       configs.push({
         sensor_id: sensor.sensor_id,
         stream_type: profile.stream_type,
-        format: profile.formats[0] || 'rgb8',
-        resolution: {
-          width: profile.resolutions[0][0],
-          height: profile.resolutions[0][1],
-        },
-        framerate: profile.fps[0],
+        format: profile.default?.format ?? profile.formats[0] ?? 'rgb8',
+        resolution: { width, height },
+        framerate: profile.default?.fps ?? profile.fps[0],
         enable: enableByDefault,
       })
     }
@@ -103,7 +108,13 @@ function buildSensorConfigs(sensors: SensorInfo[]): Record<string, SensorConfig>
       }
     }
 
-    if (commonResolutions.size > 0 && commonFps.size > 0) {
+    // The SDK default of a video stream on this sensor wins over the first common mode.
+    const preferred = isMotionSensor ? undefined : profiles.find(p => p.default)?.default
+    const preferredRes = preferred && `${preferred.resolution[0]}x${preferred.resolution[1]}`
+    if (preferred && preferredRes && commonResolutions.has(preferredRes) && commonFps.has(preferred.fps)) {
+      const [width, height] = preferred.resolution
+      sensorConfigs[sensor.sensor_id] = { resolution: { width, height }, framerate: preferred.fps, isMotionSensor }
+    } else if (commonResolutions.size > 0 && commonFps.size > 0) {
       const firstCommonRes = [...commonResolutions][0]
       const [width, height] = firstCommonRes.split('x').map(Number)
       const sortedFps = [...commonFps].sort((a, b) => b - a)

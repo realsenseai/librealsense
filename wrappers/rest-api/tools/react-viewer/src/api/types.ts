@@ -76,6 +76,8 @@ export interface SupportedStreamProfile {
   resolutions: [number, number][]
   fps: number[]
   formats: string[]
+  /** The profile the SDK marks default for this stream, when it has one. */
+  default?: { resolution: [number, number]; fps: number; format: string }
 }
 
 export interface OptionInfo {

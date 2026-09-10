@@ -6,10 +6,11 @@ export const mockDepthSensorProfiles: SupportedStreamProfile[] = [
     resolutions: [[640, 480], [1280, 720], [848, 480]],
     fps: [30, 15, 6],
     formats: ['Z16'],
+    default: { resolution: [848, 480], fps: 30, format: 'Z16' },
   },
   {
     stream_type: 'Infrared',
-    resolutions: [[640, 480], [1280, 720]],
+    resolutions: [[640, 480], [1280, 720], [848, 480]],
     fps: [30, 15],
     formats: ['Y8', 'Y16'],
   },
@@ -21,6 +22,7 @@ export const mockColorSensorProfiles: SupportedStreamProfile[] = [
     resolutions: [[640, 480], [1280, 720], [1920, 1080]],
     fps: [30, 15, 6],
     formats: ['RGB8', 'YUYV', 'BGR8'],
+    default: { resolution: [1280, 720], fps: 30, format: 'RGB8' },
   },
 ]
 
@@ -30,12 +32,14 @@ export const mockMotionSensorProfiles: SupportedStreamProfile[] = [
     resolutions: [[1, 1]],
     fps: [100, 200, 400],
     formats: ['MOTION_XYZ32F'],
+    default: { resolution: [1, 1], fps: 100, format: 'MOTION_XYZ32F' },
   },
   {
     stream_type: 'Gyro',
     resolutions: [[1, 1]],
     fps: [200, 400],
     formats: ['MOTION_XYZ32F'],
+    default: { resolution: [1, 1], fps: 200, format: 'MOTION_XYZ32F' },
   },
 ]
 

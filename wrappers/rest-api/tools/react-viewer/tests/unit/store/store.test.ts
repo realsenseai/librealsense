@@ -301,6 +301,43 @@ describe('AppStore', () => {
   })
 
   describe('Stream Configuration', () => {
+    it('starts a sensor with the profiles the SDK marks default', async () => {
+      const device = createMockDevice({ device_id: '123456789' })
+      useAppStore.setState({
+        devices: [device],
+        deviceStates: { [device.device_id]: createMockDeviceState(device, { isActive: true }) },
+      })
+
+      await useAppStore.getState().fetchSensors(device.device_id)
+
+      const ds = useAppStore.getState().deviceStates[device.device_id]
+      const depth = ds.streamConfigs.find((c) => c.stream_type === 'Depth')
+      expect(depth).toMatchObject({ enable: true, format: 'Z16', resolution: { width: 848, height: 480 }, framerate: 30 })
+      expect(ds.streamConfigs.find((c) => c.stream_type === 'Infrared')?.enable).toBe(false)
+      expect(ds.sensorConfigs['123456789-sensor-0']).toMatchObject({ resolution: { width: 848, height: 480 }, framerate: 30 })
+      expect(ds.streamConfigs.find((c) => c.stream_type === 'Accel')?.framerate).toBe(100)
+    })
+
+    it('falls back to depth/color/IMU at the first mode when no profile is default', async () => {
+      const device = createMockDevice({ device_id: '123456789' })
+      server.use(http.get('/api/v1/devices/:deviceId/sensors/', () => HttpResponse.json([
+        createMockSensor({ sensor_id: '123456789-sensor-0', options: [], supported_stream_profiles: [
+          { stream_type: 'Depth', resolutions: [[640, 480]], fps: [30], formats: ['Z16'] },
+          { stream_type: 'Infrared', resolutions: [[640, 480]], fps: [30], formats: ['Y8'] },
+        ] }),
+      ])))
+      useAppStore.setState({
+        devices: [device],
+        deviceStates: { [device.device_id]: createMockDeviceState(device, { isActive: true }) },
+      })
+
+      await useAppStore.getState().fetchSensors(device.device_id)
+
+      const configs = useAppStore.getState().deviceStates[device.device_id].streamConfigs
+      expect(configs.find((c) => c.stream_type === 'Depth')?.enable).toBe(true)
+      expect(configs.find((c) => c.stream_type === 'Infrared')?.enable).toBe(false)
+    })
+
     it('can set stream configs directly via setState', () => {
       const device = createMockDevice()
       const config = {

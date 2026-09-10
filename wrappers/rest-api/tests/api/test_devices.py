@@ -35,6 +35,14 @@ def test_get_sensors(setup_mock_managers):
     assert sensors[1]["type"] in ["Depth Sensor", "RGB Camera"]
 
 
+def test_sensor_profiles_carry_the_sdk_default(setup_mock_managers):
+    by_type = {s["type"]: s for s in client.get("/api/v1/devices/device1/sensors").json()}
+    depth = by_type["Depth Sensor"]["supported_stream_profiles"][0]
+    assert depth["default"] == {"resolution": [640, 480], "fps": 30, "format": "z16"}
+    color = by_type["RGB Camera"]["supported_stream_profiles"][0]
+    assert color["default"] == {"resolution": [1280, 720], "fps": 30, "format": "rgb8"}
+
+
 def test_get_sensor_by_id(setup_mock_managers):
     response = client.get("/api/v1/devices/device1/sensors/device1-sensor-0")
     assert response.status_code == 200

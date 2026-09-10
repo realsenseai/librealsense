@@ -272,10 +272,14 @@ class fisheye_sensor(sensor):
 
 # Mock for stream profile
 class stream_profile:
-    def __init__(self, stream_type=stream.depth, format=format.z16, index=0):
+    def __init__(self, stream_type=stream.depth, format=format.z16, index=0, is_default=False):
         self._stream_type = stream_type
         self._format = format
         self._index = index
+        self._is_default = is_default
+
+    def is_default(self):
+        return self._is_default
 
     def stream_type(self):
         return self._stream_type
@@ -296,8 +300,8 @@ class stream_profile:
 
 # Mock for video stream profile
 class video_stream_profile(stream_profile):
-    def __init__(self, stream_type=stream.depth, format=format.z16, width=640, height=480, fps=30, index=0):
-        super().__init__(stream_type, format, index)
+    def __init__(self, stream_type=stream.depth, format=format.z16, width=640, height=480, fps=30, index=0, is_default=False):
+        super().__init__(stream_type, format, index, is_default)
         self._width = width
         self._height = height
         self._fps = fps
@@ -313,8 +317,8 @@ class video_stream_profile(stream_profile):
 
 # Mock for motion stream profile
 class motion_stream_profile(stream_profile):
-    def __init__(self, stream_type=stream.gyro, format=format.motion_xyz32f, fps=200, index=0):
-        super().__init__(stream_type, format, index)
+    def __init__(self, stream_type=stream.gyro, format=format.motion_xyz32f, fps=200, index=0, is_default=False):
+        super().__init__(stream_type, format, index, is_default)
         self._fps = fps
 
     def fps(self):
@@ -692,7 +696,7 @@ def create_mock_device(serial_number, name, with_depth=True, with_color=True, wi
         for res in [(640, 480), (1280, 720)]:
             for fps in [30, 60]:
                 depth_sensor_obj.add_profile(video_stream_profile(
-                    stream.depth, format.z16, res[0], res[1], fps
+                    stream.depth, format.z16, res[0], res[1], fps, is_default=(res, fps) == ((640, 480), 30)
                 ))
         mock_device.add_sensor(depth_sensor_obj)
 
@@ -703,7 +707,8 @@ def create_mock_device(serial_number, name, with_depth=True, with_color=True, wi
             for fps in [30, 60]:
                 for fmt in [format.rgb8, format.bgr8]:
                     color_sensor_obj.add_profile(video_stream_profile(
-                        stream.color, fmt, res[0], res[1], fps
+                        stream.color, fmt, res[0], res[1], fps,
+                        is_default=(res, fps, fmt) == ((1280, 720), 30, format.rgb8),
                     ))
         mock_device.add_sensor(color_sensor_obj)
 
@@ -711,8 +716,8 @@ def create_mock_device(serial_number, name, with_depth=True, with_color=True, wi
         motion_sensor_obj = motion_sensor("Motion Module")
         # Add motion stream profiles
         for fps in [200, 400]:
-            motion_sensor_obj.add_profile(motion_stream_profile(stream.gyro, format.motion_xyz32f, fps))
-            motion_sensor_obj.add_profile(motion_stream_profile(stream.accel, format.motion_xyz32f, fps))
+            motion_sensor_obj.add_profile(motion_stream_profile(stream.gyro, format.motion_xyz32f, fps, is_default=fps == 200))
+            motion_sensor_obj.add_profile(motion_stream_profile(stream.accel, format.motion_xyz32f, fps, is_default=fps == 200))
         mock_device.add_sensor(motion_sensor_obj)
 
     if with_fisheye:
