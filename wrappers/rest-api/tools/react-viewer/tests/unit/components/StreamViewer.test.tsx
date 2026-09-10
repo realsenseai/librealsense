@@ -171,6 +171,14 @@ describe('StreamViewer', () => {
       expect(screen.queryByText('No frames received!')).not.toBeInTheDocument()
     })
 
+    it('offers a snapshot download for the stream', () => {
+      const device = createMockDevice()
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: streamingState(device) } } })
+      const link = screen.getByRole('link', { name: 'Save snapshot' })
+      expect(link).toHaveAttribute('href', `/api/v1/devices/${device.device_id}/stream/snapshot?stream=depth`)
+      expect(link).toHaveAttribute('download')
+    })
+
     it('says so for a format the viewer cannot render', () => {
       const device = createMockDevice()
       render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: streamingState(device, {}, { format: 'RAW16' }) } } })

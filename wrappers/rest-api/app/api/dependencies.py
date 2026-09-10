@@ -22,7 +22,7 @@ _settings_store = None
 def get_realsense_manager() -> RealSenseManager:
     global _realsense_manager
     if _realsense_manager is None:
-        _realsense_manager = RealSenseManager(sio)
+        _realsense_manager = RealSenseManager(sio, get_settings_store())
     return _realsense_manager
 
 def get_webrtc_manager() -> WebRTCManager:

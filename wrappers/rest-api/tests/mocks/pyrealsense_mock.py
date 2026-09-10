@@ -81,7 +81,11 @@ class option(enum.Enum):
     error_polling_enabled = 25
     projector_temperature = 26
     output_trigger_enabled = 27
-    count = 28
+    sequence_id = 28
+    min_distance = 29
+    max_distance = 30
+    filter_magnitude = 31
+    count = 32
 
     # Override name property for string representation
     @property
@@ -120,8 +124,11 @@ class device:
         }
 
     def get_info(self, info_type):
-        if info_type in self._info:
-            return self._info[info_type]
+        # str(), not .name: rs.camera_info has a member called "name" that shadows the property.
+        wanted = str(info_type).rsplit(".", 1)[-1]
+        for key, value in self._info.items():
+            if str(key).rsplit(".", 1)[-1] == wanted:
+                return value
         raise RuntimeError(f"Info {info_type} not available")
 
     def add_sensor(self, sensor):
@@ -164,35 +171,44 @@ class sensor:
         self._profiles = []
 
     def get_info(self, info_type):
-        value = next(iter(self._info.values()))
-        for key in self._info:
-            if key.name == info_type.name:
-                value = self._info[key]
-                break
-        return value
+        wanted = str(info_type).rsplit(".", 1)[-1]
+        for key, value in self._info.items():
+            if str(key).rsplit(".", 1)[-1] == wanted:
+                return value
+        raise RuntimeError(f"Info {info_type} not available")
 
     def get_supported_options(self):
         return list(self._options.keys())
 
+    def _key(self, option_type):
+        """Services pass real rs.option members; match them to the mock's by name."""
+        for key in self._options:
+            if key is option_type or key.name == getattr(option_type, "name", None):
+                return key
+        return None
+
     def get_option(self, option_type):
-        if option_type in self._options:
-            return self._options[option_type]
+        key = self._key(option_type)
+        if key is not None:
+            return self._options[key]
         raise RuntimeError(f"Option {option_type} not supported")
 
     def set_option(self, option_type, value):
-        if option_type in self._option_read_only:
+        key = self._key(option_type)
+        if key in self._option_read_only:
             raise RuntimeError(f"Option {option_type} is read-only")
-        if option_type in self._options:
-            opt_range = self._option_ranges[option_type]
+        if key is not None:
+            opt_range = self._option_ranges[key]
             if value < opt_range.min or value > opt_range.max:
                 raise RuntimeError(f"Value {value} out of range [{opt_range.min}, {opt_range.max}]")
-            self._options[option_type] = value
+            self._options[key] = value
         else:
             raise RuntimeError(f"Option {option_type} not supported")
 
     def get_option_range(self, option_type):
-        if option_type in self._option_ranges:
-            return self._option_ranges[option_type]
+        key = self._key(option_type)
+        if key is not None:
+            return self._option_ranges[key]
         raise RuntimeError(f"Option range {option_type} not available")
 
     def get_option_description(self, option_type):
@@ -209,6 +225,12 @@ class sensor:
 
     def add_profile(self, profile):
         self._profiles.append(profile)
+
+    def supports(self, option_type):
+        return self._key(option_type) is not None
+
+    def on_options_changed(self, callback):
+        self._options_changed_callback = callback
 
     def is_depth_sensor(self):
         return False
@@ -237,6 +259,25 @@ class depth_sensor(sensor):
 
     def is_depth_sensor(self):
         return True
+
+    def get_recommended_filters(self):
+        return [processing_block(name) for name in
+                ("Decimation Filter", "HDR Merge", "Threshold Filter", "Spatial Filter", "Temporal Filter", "Hole Filling Filter")]
+
+
+class processing_block(sensor):
+    """A post-processing filter: same options surface as a sensor, plus process()."""
+    def __init__(self, name):
+        super().__init__(name)
+        self._options = {option.filter_magnitude: 2}
+        self._option_ranges = {option.filter_magnitude: option_range(1, 8, 2, 1)}
+        if name == "Threshold Filter":
+            self._options = {option.min_distance: 0.1, option.max_distance: 4.0}
+            self._option_ranges = {option.min_distance: option_range(0.0, 16.0, 0.1, 0.0),
+                                   option.max_distance: option_range(0.0, 16.0, 4.0, 0.1)}
+
+    def process(self, frame):
+        return frame
 
 # Mock for color sensor
 class color_sensor(sensor):

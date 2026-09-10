@@ -118,8 +118,9 @@ test.describe('@real-device Real Device Tests', () => {
       // Wait for frames
       await page.waitForTimeout(3000)
       
-      // Check frame counter is incrementing
-      const frameCounter = page.locator('text=/frame.*[0-9]+/i').first()
+      // The frame counter lives in the tile's metadata overlay; open it first
+      await page.locator('[title="Show frame metadata"]').first().click()
+      const frameCounter = page.getByText('Frame Number').locator('..').first()
       const firstValue = await frameCounter.textContent()
       
       await page.waitForTimeout(1000)

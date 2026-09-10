@@ -7,7 +7,7 @@ The groups and keys follow the legacy viewer's configurations namespace (common/
 where a setting has a counterpart there, so a user of both finds the same names.
 """
 
-from typing import Literal
+from typing import Dict, Literal
 
 from pydantic import BaseModel, Field
 
@@ -47,6 +47,8 @@ class CalibrationSettings(BaseModel):
 
 class PostProcessingSettings(BaseModel):
     performance_mode: bool = False  # on: every filter starts disabled to spare the server CPU
+    # "<serial>/<sensor index>" -> filter name -> enabled, remembered like the legacy viewer does
+    filter_state: Dict[str, Dict[str, bool]] = {}
 
 
 class ViewerPrefs(BaseModel):

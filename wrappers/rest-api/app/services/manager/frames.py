@@ -10,6 +10,7 @@ from typing import Callable, Deque, Dict, List, Optional, Any, Tuple, Set
 import pyrealsense2 as rs
 import numpy as np
 from app.core.errors import RealSenseError
+from app.services import snapshot
 from app.models.stream import PointCloudStatus, StreamConfig, StreamStatus, Resolution
 
 
@@ -427,6 +428,22 @@ class FramesMixin:
         if color_format == rs.format.bgr8:
             sampled = sampled[:, ::-1]  # BGR -> RGB so the client doesn't need to swap
         return sampled
+
+    def snapshot(self, device_id: str, stream_type: str) -> Tuple[str, bytes]:
+        """Zip of the newest frame of a stream: PNG as shown, raw pixels, attributes CSV."""
+        entry = self.last_frames.get(device_id, {}).get(stream_type.lower())
+        if entry is None:
+            raise RealSenseError(status_code=404, detail=f"No frame captured yet for stream {stream_type}")
+        frame = entry["frame"]
+        info = self._build_viewer_info(frame)
+        info.pop("received_at", None)
+        metadata = {**info, **self._get_frame_metadata(frame, device_id)}
+        raw = None if entry["motion"] else np.asanyarray(frame.get_data())
+        base, data = snapshot.build_snapshot(
+            stream_type.lower(), int(info["frame_number"]), raw, str(info["pixel_format"]),
+            entry["shown"], metadata, entry["motion"],
+        )
+        return f"{device_id}_{base}.zip", data
 
     def get_depth_at_pixel(self, device_id: str, x: int, y: int) -> Optional[float]:
         """Get depth value (in meters) at specific pixel coordinates."""

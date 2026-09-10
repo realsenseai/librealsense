@@ -303,6 +303,26 @@ describe('AppStore', () => {
     })
   })
 
+  describe('Option changes pushed by the camera', () => {
+    it('patches the current values of the sensor controls it names', () => {
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, {
+        controls: {
+          'sensors/s0/options': { section: 'Controls', sensorId: 's0', name: '', options: [
+            createMockOption({ option_id: 'exposure', current_value: 100 }),
+            createMockOption({ option_id: 'gain', current_value: 16 }),
+          ] },
+        },
+      })
+      useAppStore.setState({ deviceStates: { [device.device_id]: ds } })
+
+      useAppStore.getState().applyOptionChanges(device.device_id, 's0', [{ option_id: 'Exposure', current_value: 8500 }])
+
+      const options = useAppStore.getState().deviceStates[device.device_id].controls['sensors/s0/options'].options
+      expect(options.map((o) => o.current_value)).toEqual([8500, 16])
+    })
+  })
+
   describe('Pause', () => {
     const streaming = (paused = false) => ({
       'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, paused, stream_types: ['depth'] },

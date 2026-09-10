@@ -144,31 +144,58 @@ class ControlsMixin:
         
         if sensor_id not in self.processing_blocks[device_id]:
             filters = []
+            remembered = self.settings.get().post_processing.filter_state.get(self._filter_state_key(device_id, sensor_id), {})
             try:
                 recommended = sensor.get_recommended_filters()
-                for f in recommended:
-                    try:
-                        filter_name = f.get_info(rs.camera_info.name)
-                    except RuntimeError:
-                        filter_name = "Unknown Filter"
-                    
-                    # All filters disabled by default for performance
-                    # User can enable specific filters as needed
-                    default_enabled = 0.0
-                    
-                    filters.append({
-                        "filter": f,
-                        "name": filter_name,
-                        "enabled": bool(default_enabled),
-                        "default_enabled": default_enabled,
-                    })
             except RuntimeError:
-                # Sensor doesn't support get_recommended_filters
-                pass
-            
+                recommended = []  # sensor doesn't support get_recommended_filters
+            for f in recommended:
+                try:
+                    filter_name = f.get_info(rs.camera_info.name)
+                except RuntimeError:
+                    filter_name = "Unknown Filter"
+                if filter_name == "HDR Merge" and not sensor.supports(rs.option.sequence_id):
+                    continue  # the legacy viewer skips it too: nothing to merge without sequence ids
+                self._apply_filter_presets(device_id, filter_name, f)
+                default_enabled = self._default_filter_enabled(sensor, filter_name)
+                filters.append({
+                    "filter": f,
+                    "name": filter_name,
+                    "enabled": remembered.get(filter_name, default_enabled),
+                    "default_enabled": float(default_enabled),
+                })
+
             self.processing_blocks[device_id][sensor_id] = filters
         
         return self.processing_blocks[device_id][sensor_id]
+
+    @staticmethod
+    def _filter_state_key(device_id: str, sensor_id: str) -> str:
+        return f"{device_id}/{sensor_id.split('-')[-1]}"
+
+    def _default_filter_enabled(self, sensor, filter_name: str) -> bool:
+        """The legacy viewer's defaults (subdevice-model.cpp): hole filling, sequence id, rotation
+        and threshold start off, decimation only on depth; performance mode turns everything off."""
+        if self.settings.get().post_processing.performance_mode:
+            return False
+        off = {"Hole Filling Filter", "Filter By Sequence id", "Rotation Filter", "Threshold Filter"}
+        if filter_name in off:
+            return False
+        if filter_name == "Decimation Filter" and sensor.is_color_sensor():
+            return False
+        return True
+
+    def _apply_filter_presets(self, device_id: str, filter_name: str, f) -> None:
+        """D405 is a short-range camera: its threshold filter starts at 5 cm - 4 m."""
+        if filter_name != "Threshold Filter":
+            return
+        dev = self.devices.get(device_id)
+        try:
+            if dev is not None and dev.get_info(rs.camera_info.product_id) == "0B5B":
+                f.set_option(rs.option.min_distance, 0.05)
+                f.set_option(rs.option.max_distance, 4.0)
+        except RuntimeError:
+            pass
 
     def get_sensor_filters(self, device_id: str, sensor_id: str) -> Dict[str, Any]:
         """The sensor's post-processing filters, keyed by filter name.
@@ -200,8 +227,10 @@ class ControlsMixin:
     def set_filter_enabled(
         self, device_id: str, sensor_id: str, filter_name: str, enabled: float
     ) -> None:
-        """Bypass or apply one filter of the sensor."""
+        """Bypass or apply one filter of the sensor, and remember the choice across runs."""
         self._filters_by_name(device_id, sensor_id)[filter_name]["enabled"] = bool(enabled)
+        key = self._filter_state_key(device_id, sensor_id)
+        self.settings.update({"post_processing": {"filter_state": {key: {filter_name: bool(enabled)}}}})
 
     def get_colorizer_options(self, device_id: str) -> List[OptionInfo]:
         """The device colorizer's controls."""

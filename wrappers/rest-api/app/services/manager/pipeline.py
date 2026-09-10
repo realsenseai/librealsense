@@ -430,6 +430,11 @@ class PipelineStreamingMixin:
                             # Store processed frame and metadata
                             processed_frames[active_stream] = frame
                             processed_metadata[active_stream] = metadata
+                            self.last_frames.setdefault(device_id, {})[active_stream.lower()] = {
+                                "frame": frame_data,
+                                "shown": frame if rs_stream == rs.stream.depth else None,
+                                "motion": metadata.get("motion_data"),
+                            }
                             
                         except Exception as e:
                             if not isinstance(e, RuntimeError):

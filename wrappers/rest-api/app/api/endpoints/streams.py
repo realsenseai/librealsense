@@ -1,13 +1,15 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Response, Depends, HTTPException
 from typing import List, Optional
 
 
 from app.models.stream import StreamStatus, StreamStart, StreamStartTiming
 from app.services.rs_manager import RealSenseManager
 from app.api.dependencies import get_realsense_manager
+
+from starlette.concurrency import run_in_threadpool
 
 router = APIRouter()
 
@@ -67,6 +69,19 @@ async def get_stream_status(
         return rs_manager.get_stream_status(device_id)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/snapshot")
+async def snapshot(
+    device_id: str,
+    stream: str,
+    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+):
+    """Download the newest frame of a stream as a zip: PNG, raw pixels and attributes CSV
+    (motion streams: the sample as CSV) - the legacy viewer's snapshot button."""
+    filename, data = await run_in_threadpool(rs_manager.snapshot, device_id, stream)
+    return Response(content=data, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
 
 @router.get("/depth-at-pixel")
 async def get_depth_at_pixel(

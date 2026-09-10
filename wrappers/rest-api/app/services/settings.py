@@ -8,7 +8,7 @@ import logging
 import os
 import threading
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from pydantic import ValidationError
 
@@ -26,12 +26,14 @@ def _merge(base: Dict[str, Any], patch: Dict[str, Any]) -> Dict[str, Any]:
 
 
 class SettingsStore:
-    def __init__(self, path: Path = DEFAULT_PATH):
-        self._path = Path(path)
+    def __init__(self, path: Optional[Path] = DEFAULT_PATH):
+        self._path = Path(path) if path else None  # None: never persisted
         self._lock = threading.Lock()
         self._settings = self._load()
 
     def _load(self) -> ViewerSettings:
+        if self._path is None:
+            return ViewerSettings()
         try:
             return ViewerSettings.model_validate(json.loads(self._path.read_text(encoding="utf-8")))
         except FileNotFoundError:
@@ -57,6 +59,8 @@ class SettingsStore:
             return merged
 
     def _save(self) -> None:
+        if self._path is None:
+            return
         self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(self._settings.model_dump_json(indent=2), encoding="utf-8")

@@ -239,6 +239,11 @@ class SensorStreamingMixin:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1)
 
         metadata.update(self._build_viewer_info(info_source))
+        self.last_frames.setdefault(device_id, {})[frame_stream_name] = {
+            "frame": info_source,
+            "shown": processed_frame if "depth" in frame_stream_name else None,
+            "motion": metadata.get("motion_data"),
+        }
         return processed_frame, metadata
 
     def _collect_sensor_frames(
@@ -613,6 +618,8 @@ class SensorStreamingMixin:
             if last_sensor_stopped:
                 # Per-device rs.pointcloud is only needed while depth runs.
                 self.point_clouds.pop(device_id, None)
+            for st in stopped_stream_types:
+                self.last_frames.get(device_id, {}).pop(st.lower(), None)
 
         # Stop the per-device metadata broadcaster once the last sensor on this
         # device has stopped.

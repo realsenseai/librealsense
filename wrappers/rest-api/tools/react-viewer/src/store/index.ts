@@ -166,6 +166,8 @@ interface AppState {
   fetchDeviceControls: (deviceId: string) => Promise<void>
   setControl: (deviceId: string, key: string, optionId: string, value: number | boolean | string) => Promise<void>
   setControlEnabled: (deviceId: string, key: string, enabled: boolean) => Promise<void>
+  /** Values the SDK reports changed on a sensor (a preset rewriting exposure, AE toggles). */
+  applyOptionChanges: (deviceId: string, sensorId: string, changes: { option_id: string; current_value: number }[]) => void
   setPostProcessing: (deviceId: string, sensorId: string, enabled: boolean) => Promise<void>
 
   /** Load a newly connected device's sensors and controls; every device is open. */
@@ -399,6 +401,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
       await apiClient.setFilterEnabled(deviceId, key, enabled)
     }
     set((state) => patchGroup(state, deviceId, key, (g) => ({ ...g, enabled })))
+  },
+
+  applyOptionChanges: (deviceId, sensorId, changes) => {
+    const byId = new Map(changes.map((c) => [c.option_id.toLowerCase(), c.current_value]))
+    set((state) => patchGroup(state, deviceId, `sensors/${sensorId}/options`, (group) => ({
+      ...group,
+      options: group.options.map((o) => {
+        const value = byId.get(o.option_id.toLowerCase())
+        return value === undefined ? o : { ...o, current_value: value }
+      }),
+    })))
   },
 
   setPostProcessing: async (deviceId, sensorId, enabled) => {

@@ -11,6 +11,7 @@ from app.models.device import DeviceInfo
 import socketio
 from app.services.metadata_socket_server import MetadataSocketServer
 from app.services.jobs import JobRegistry
+from app.services.settings import SettingsStore
 from app.services.manager import (
     devices,
     fw_update,
@@ -37,8 +38,9 @@ class RealSenseManager(
         """Store reference to main event loop for use in sync callbacks."""
         cls._main_loop = loop
     
-    def __init__(self, sio: socketio.AsyncServer):
+    def __init__(self, sio: socketio.AsyncServer, settings: Optional[SettingsStore] = None):
         self.ctx = rs.context()
+        self.settings = settings or SettingsStore(None)
         self.devices: Dict[str, rs.device] = {}
         self.device_infos: Dict[str, DeviceInfo] = {}
         self.pipelines: Dict[str, rs.pipeline] = {}
@@ -77,6 +79,8 @@ class RealSenseManager(
 
         # Store latest raw depth frames for pixel depth queries
         self.depth_frames: Dict[str, Any] = {}  # device_id -> rs.depth_frame
+        # Newest frame per stream for snapshots: device_id -> stream -> {frame, shown, motion}
+        self.last_frames: Dict[str, Dict[str, Dict[str, Any]]] = {}
 
         # Short history of recent color frames per device for texturing the
         # 3D point cloud. Sensor-mode runs depth/color on independent threads

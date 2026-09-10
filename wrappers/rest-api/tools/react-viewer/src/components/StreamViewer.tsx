@@ -90,6 +90,7 @@ export function StreamViewer() {
               return (
                 <IMUStreamTile
                   key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
+                  deviceId={stream.deviceId}
                   streamType={stream.config.stream_type}
                   showDeviceName={activeDeviceCount > 1}
                   deviceName={stream.deviceName}
@@ -140,6 +141,21 @@ function PauseButton({ pause, className = '' }: { pause: PauseState; className?:
     >
       {pause.paused ? '▶' : '❚❚'}
     </button>
+  )
+}
+
+/** The legacy stream-header save button: downloads PNG + raw + metadata CSV as one zip. */
+function SnapshotButton({ deviceId, streamType, className = '' }: { deviceId: string; streamType: string; className?: string }) {
+  return (
+    <a
+      href={apiClient.snapshotUrl(deviceId, streamType)}
+      download
+      title="Save snapshot (PNG, raw, metadata)"
+      aria-label="Save snapshot"
+      className={`px-2 py-0.5 bg-black/60 hover:bg-black/80 rounded text-xs text-white border border-gray-600 z-20 ${className}`}
+    >
+      📷
+    </a>
   )
 }
 
@@ -409,6 +425,7 @@ function StreamTile({
       )}
 
       <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 flex items-center gap-1`}>
+        <SnapshotButton deviceId={deviceId} streamType={streamType} className="py-1" />
         {pause && <PauseButton pause={pause} className="py-1" />}
         <MetadataPanel
           metadata={metadata}
@@ -462,6 +479,7 @@ function StreamTile({
 
 // IMU Stream Tile - specialized visualization for gyro/accel streams
 interface IMUStreamTileProps {
+  deviceId: string
   streamType: string
   showDeviceName?: boolean
   deviceName: string
@@ -470,7 +488,7 @@ interface IMUStreamTileProps {
   pause?: PauseState
 }
 
-function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, metadata, pause }: IMUStreamTileProps) {
+function IMUStreamTile({ deviceId, streamType, showDeviceName, deviceName, serialNumber, metadata, pause }: IMUStreamTileProps) {
   const { imuHistory } = useAppStore()
   const [fps, setFps] = useState(0)
   const [showMetadata, setShowMetadata] = useState(false)
@@ -528,6 +546,7 @@ function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, m
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">{unit}</span>
+          <SnapshotButton deviceId={deviceId} streamType={streamType} />
           {pause && <PauseButton pause={pause} />}
           <MetadataPanel
             metadata={metadata}

@@ -189,6 +189,11 @@ class ApiClient {
     return response.data.map((s) => ({ ...s, options: visibleOptions(s.options) }))
   }
 
+  /** Download link for the newest frame of a stream: PNG + raw + metadata CSV, zipped. */
+  snapshotUrl(deviceId: string, streamType: string): string {
+    return `${API_BASE}/devices/${deviceId}/stream/snapshot?stream=${encodeURIComponent(streamType)}`
+  }
+
   async getDepthAtPixel(
     deviceId: string,
     x: number,

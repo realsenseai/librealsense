@@ -63,6 +63,10 @@ class SocketService {
       useAppStore.getState().fetchDevices(true)
     })
 
+    this.socket.on('options_changed', (data: { device_id: string; sensor_id: string; options: { option_id: string; current_value: number }[] }) => {
+      useAppStore.getState().applyOptionChanges(data.device_id, data.sensor_id, data.options)
+    })
+
     this.socket.on('job', (job: JobInfo) => {
       useJobsStore.getState().upsert(job)
     })
