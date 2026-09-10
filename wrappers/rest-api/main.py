@@ -90,6 +90,13 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 # Set up exception handlers
 setup_exception_handlers(app)
 
+# Serve the bundled React viewer (tools/react-viewer: `npm run build && npm run bundle`) from
+# the same port. Mounted after the API routes so /api/v1 and /docs keep precedence.
+_static_dir = Path(__file__).resolve().parent / "static"
+if _static_dir.is_dir():
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="viewer")
+
 
 @app.on_event("startup")
 async def startup_event():

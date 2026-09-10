@@ -196,7 +196,7 @@ class ApiClient {
       x: number
       y: number
       units: string
-    }>(`/devices/${deviceId}/stream/depth-at-pixel/`, { params: { x, y } })
+    }>(`/devices/${deviceId}/stream/depth-at-pixel`, { params: { x, y } })
     return response.data
   }
 
@@ -207,7 +207,7 @@ class ApiClient {
       min_depth: number
       max_depth: number
       units: string
-    }>(`/devices/${deviceId}/stream/depth-range/`)
+    }>(`/devices/${deviceId}/stream/depth-range`)
     return response.data
   }
 
@@ -235,22 +235,22 @@ class ApiClient {
   // ============ Point Cloud ============
 
   async enablePointCloud(deviceId: string): Promise<void> {
-    await this.client.post(`/devices/${deviceId}/point_cloud/activate/`)
+    await this.client.post(`/devices/${deviceId}/point_cloud/activate`)
   }
 
   async disablePointCloud(deviceId: string): Promise<void> {
-    await this.client.post(`/devices/${deviceId}/point_cloud/deactivate/`)
+    await this.client.post(`/devices/${deviceId}/point_cloud/deactivate`)
   }
 
   // ============ WebRTC ============
 
   async createWebRTCOffer(offer: WebRTCOffer): Promise<WebRTCSession> {
-    const response = await this.client.post<WebRTCSession>('/webrtc/offer/', offer)
+    const response = await this.client.post<WebRTCSession>('/webrtc/offer', offer)
     return response.data
   }
 
   async sendWebRTCAnswer(sessionId: string, answer: RTCSessionDescriptionInit): Promise<void> {
-    await this.client.post('/webrtc/answer/', {
+    await this.client.post('/webrtc/answer', {
       session_id: sessionId,
       sdp: answer.sdp,
       type: answer.type,
@@ -258,7 +258,7 @@ class ApiClient {
   }
 
   async addICECandidate(sessionId: string, candidate: ICECandidate): Promise<void> {
-    await this.client.post('/webrtc/ice-candidates/', {
+    await this.client.post('/webrtc/ice-candidates', {
       session_id: sessionId,
       candidate: candidate.candidate,
       sdpMid: candidate.sdpMid,
@@ -267,12 +267,12 @@ class ApiClient {
   }
 
   async getICECandidates(sessionId: string): Promise<ICECandidate[]> {
-    const response = await this.client.get<ICECandidate[]>(`/webrtc/sessions/${sessionId}/ice-candidates/`)
+    const response = await this.client.get<ICECandidate[]>(`/webrtc/sessions/${sessionId}/ice-candidates`)
     return response.data
   }
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
-    await this.client.delete(`/webrtc/sessions/${sessionId}/`)
+    await this.client.delete(`/webrtc/sessions/${sessionId}`)
   }
 
   // ============ System ============
