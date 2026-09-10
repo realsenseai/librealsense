@@ -28,10 +28,7 @@ export const useJobsStore = create<JobsState>((set) => ({
   },
 
   dismiss: (id) =>
-    set((s) => {
-      const { [id]: _dropped, ...rest } = s.jobs
-      return { jobs: rest }
-    }),
+    set((s) => ({ jobs: Object.fromEntries(Object.entries(s.jobs).filter(([jobId]) => jobId !== id)) })),
 }))
 
 export function useRunningJobs(kind?: string): JobInfo[] {
