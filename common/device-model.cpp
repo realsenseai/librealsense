@@ -2777,7 +2777,7 @@ namespace rs2
                 if (show_stream_selection)
                     sub->draw_stream_selection(error_message);
 
-                static const std::vector<rs2_option> drawing_order = serialize ?
+                const std::vector<rs2_option> drawing_order = serialize ?
                     std::vector<rs2_option>{                           RS2_OPTION_EMITTER_ENABLED, RS2_OPTION_ENABLE_AUTO_EXPOSURE, RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE }
                 : std::vector<rs2_option>{ RS2_OPTION_VISUAL_PRESET, RS2_OPTION_EMITTER_ENABLED, RS2_OPTION_ENABLE_AUTO_EXPOSURE, RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE };
 
@@ -3040,8 +3040,6 @@ namespace rs2
                                 sub->post_processing_enabled);
                             for (auto&& pb : sub->post_processing)
                             {
-                                if (!pb->visible)
-                                    continue;
                                 if (pb->is_enabled())
                                     pb->processing_block_enable_disable(true);
                             }
@@ -3067,8 +3065,6 @@ namespace rs2
                                 sub->post_processing_enabled);
                             for (auto&& pb : sub->post_processing)
                             {
-                                if (!pb->visible)
-                                    continue;
                                 if (pb->is_enabled())
                                     pb->processing_block_enable_disable(false);
                             }
@@ -3095,7 +3091,6 @@ namespace rs2
             {
                 for (auto&& pb : sub->post_processing)
                 {
-                    if (!pb->visible) continue;
 
                     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5);
 
@@ -3235,7 +3230,6 @@ namespace rs2
             {
                 for (auto&& pb : sub->embedded_filters)
                 {
-                    if (!pb->_is_visible) continue;
 
                     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5);
 

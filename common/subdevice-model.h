@@ -101,9 +101,6 @@ namespace rs2
         void play(const std::vector<stream_profile>& profiles, viewer_model& viewer, std::shared_ptr<rs2::asynchronous_syncer>);
         bool is_synchronized_frame(viewer_model& viewer, const frame& f);
         void update(std::string& error_message, notifications_model& model);
-        void draw_options(const std::vector<rs2_option>& drawing_order,
-            bool update_read_only_options, std::string& error_message,
-            notifications_model& model);
         uint64_t num_supported_non_default_options() const;
         bool draw_option(rs2_option opt, bool update_read_only_options,
             std::string& error_message, notifications_model& model)

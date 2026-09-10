@@ -90,8 +90,6 @@ namespace rs2
                 _embedded_filter, RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP, error_message );
         }
 
-        bool _is_visible = true;
-
         // Optional predicate; null means always available. When false the enable toggle is
         // grayed out (e.g. must be off while color streams), showing unavailable_tooltip (empty = none) on hover.
         std::function<bool()> available_predicate;
