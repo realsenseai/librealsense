@@ -9,6 +9,7 @@ from typing import Generator
 from app.services.rs_manager import RealSenseManager
 from app.services.webrtc_manager import WebRTCManager
 from app.services.socketio import sio
+from app.services.settings import SettingsStore
 
 # OAuth2 setup
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -16,6 +17,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # Singleton instances
 _realsense_manager = None
 _webrtc_manager = None
+_settings_store = None
 
 def get_realsense_manager() -> RealSenseManager:
     global _realsense_manager
@@ -28,3 +30,9 @@ def get_webrtc_manager() -> WebRTCManager:
     if _webrtc_manager is None:
         _webrtc_manager = WebRTCManager(get_realsense_manager())
     return _webrtc_manager
+
+def get_settings_store() -> SettingsStore:
+    global _settings_store
+    if _settings_store is None:
+        _settings_store = SettingsStore()
+    return _settings_store

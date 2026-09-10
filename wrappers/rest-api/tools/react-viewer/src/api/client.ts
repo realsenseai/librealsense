@@ -13,6 +13,8 @@ import type {
   ICECandidate,
   SensorStreamConfig,
   SensorStreamStatus,
+  ViewerSettings,
+  ViewerSettingsPatch,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -273,6 +275,19 @@ class ApiClient {
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
     await this.client.delete(`/webrtc/sessions/${sessionId}`)
+  }
+
+  // ============ Settings ============
+
+  async getSettings(): Promise<ViewerSettings> {
+    const response = await this.client.get<ViewerSettings>('/settings/')
+    return response.data
+  }
+
+  /** Merge a partial update server-side; the whole resulting settings come back. */
+  async updateSettings(patch: ViewerSettingsPatch): Promise<ViewerSettings> {
+    const response = await this.client.put<ViewerSettings>('/settings/', patch)
+    return response.data
   }
 
   // ============ System ============

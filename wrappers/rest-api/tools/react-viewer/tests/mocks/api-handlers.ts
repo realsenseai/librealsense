@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { mockDeviceList, mockDevice } from './fixtures/devices'
 import { mockSensors, mockDepthOptions, mockColorOptions, mockMotionOptions, mockFilters } from './fixtures/sensors'
+import { mockSettings } from './fixtures/settings'
 
 const API_BASE = '/api/v1'
 
@@ -12,6 +13,13 @@ const sensorOptionsMap: Record<string, any[]> = {
 }
 
 export const handlers = [
+  http.get(`${API_BASE}/settings/`, () => HttpResponse.json(mockSettings)),
+  http.put(`${API_BASE}/settings/`, async ({ request }) => {
+    const patch = (await request.json()) as Record<string, Record<string, unknown>>
+    const merged = structuredClone(mockSettings) as unknown as Record<string, Record<string, unknown>>
+    for (const [group, values] of Object.entries(patch)) merged[group] = { ...merged[group], ...values }
+    return HttpResponse.json(merged)
+  }),
   // Health check
   http.get(`${API_BASE}/health`, () => {
     return HttpResponse.json({ status: 'ok', service: 'realsense-api' })

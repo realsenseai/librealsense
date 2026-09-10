@@ -3,6 +3,8 @@ import { useAppStore } from '../store'
 import { WebRTCHandler } from '../api/webrtc'
 import { apiClient } from '../api/client'
 import { DepthLegend } from './DepthLegend'
+import { useMetric } from '../store/settings'
+import { formatDistance } from '../utils/units'
 import type { DeviceState, StreamConfig, StreamMetadata } from '../api/types'
 
 // A stream with its device context
@@ -142,6 +144,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
   const [depthRange, setDepthRange] = useState<{ min: number; max: number }>({ min: 0, max: 6 })
 
   const isDepthStream = streamType.toLowerCase() === 'depth'
+  const metric = useMetric()
 
   // Fetch dynamic depth range periodically for depth streams
   useEffect(() => {
@@ -388,7 +391,7 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
           </div>
           <div className="font-bold">
             <span className="text-gray-400">Depth:</span>{' '}
-            {hoverDepth.depth !== null ? `${hoverDepth.depth.toFixed(3)} m` : 'N/A'}
+            {hoverDepth.depth !== null ? formatDistance(hoverDepth.depth, metric) : 'N/A'}
           </div>
         </div>
       )}

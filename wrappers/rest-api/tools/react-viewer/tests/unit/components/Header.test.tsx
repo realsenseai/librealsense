@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { render } from '../../utils/test-utils'
 import { Header } from '@/components/Header'
 
@@ -40,6 +41,12 @@ describe('Header', () => {
 
     const button = screen.getByText(/3D View/i).closest('button')
     expect(button).not.toBeDisabled()
+  })
+
+  it('opens the settings dialog from the gear button', async () => {
+    render(<Header />)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument()
   })
 
   it('does not show view toggle when no active devices', () => {

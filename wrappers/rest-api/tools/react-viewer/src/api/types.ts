@@ -35,6 +35,21 @@ export function visibleOptions(options: OptionInfo[]): OptionInfo[] {
   return options.filter((o) => !HIDDEN_OPTIONS.includes(o.option_id.toLowerCase()))
 }
 
+// Wire shape of GET/PUT /settings/ (app/models/settings.py)
+export interface ViewerSettings {
+  record: { file_save_mode: 'auto' | 'ask'; default_path: string; compression: 'auto' | 'always' | 'never' }
+  update: { sw_update_official_server: boolean; sw_update_url: string; recommend_calibration: boolean }
+  console: { max_entries: number; log_to_file: boolean; log_filename: string; log_severity: 'debug' | 'info' | 'warn' | 'error' }
+  paths: { hwlogger_xml: string; commands_xml: string }
+  context: { dds_enabled: boolean; dds_domain: number }
+  calibration: { enable_writing: boolean }
+  post_processing: { performance_mode: boolean }
+  viewer: { metric_system: boolean }
+}
+
+/** Any subset of the settings groups, each with any subset of its keys. */
+export type ViewerSettingsPatch = { [G in keyof ViewerSettings]?: Partial<ViewerSettings[G]> }
+
 export type FirmwareStatus = 'up_to_date' | 'outdated' | 'unknown'
 
 /** Numeric compare of dotted firmware versions. */

@@ -9,6 +9,7 @@ import { ChatButton, ChatPanel } from './components/ChatBot'
 import { ApiDiagnostics } from './components/ApiDiagnostics'
 import { ServerWarnings } from './components/ServerWarnings'
 import { useAppStore } from './store'
+import { useSettingsStore } from './store/settings'
 import { socketService } from './api/socket'
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
   useEffect(() => {
     // Connect to Socket.IO on mount
     socketService.connect()
+    void useSettingsStore.getState().fetchSettings()
     
     // Don't disconnect on cleanup in dev mode (React strict mode double-mounts)
     // The socket service handles reconnection gracefully
