@@ -10,6 +10,7 @@ from app.core.errors import RealSenseError  # noqa: F401  re-exported for the en
 from app.models.device import DeviceInfo
 import socketio
 from app.services.metadata_socket_server import MetadataSocketServer
+from app.services.jobs import JobRegistry
 from app.services.manager import (
     devices,
     fw_update,
@@ -96,9 +97,12 @@ class RealSenseManager(
 
         # Firmware update tracking (one update at a time per device)
         self._fw_updates_in_progress: Set[str] = set()
+        self._fw_jobs: Dict[str, Any] = {}  # device_id -> the update's Job
 
         self.sio = sio
         self.metadata_socket_server = MetadataSocketServer(sio, self)
+        # Long operations (firmware, calibration, export) report through here.
+        self.jobs = JobRegistry(self._emit_socket_event)
 
         # Device discovery cache metadata
         self._last_refresh_time: float = 0.0

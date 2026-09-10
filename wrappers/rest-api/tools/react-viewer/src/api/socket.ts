@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client'
-import type { MetadataUpdate } from './types'
+import type { JobInfo, MetadataUpdate } from './types'
 import { useAppStore } from '../store'
+import { useJobsStore } from '../store/jobs'
 
 class SocketService {
   private socket: Socket | null = null
@@ -60,6 +61,10 @@ class SocketService {
       // Force a re-enumeration: a device returning after a FW flash must not be
       // served from the cached list. fetchDevices handles first-load auto-activate.
       useAppStore.getState().fetchDevices(true)
+    })
+
+    this.socket.on('job', (job: JobInfo) => {
+      useJobsStore.getState().upsert(job)
     })
 
     this.socket.on('welcome', (data) => {

@@ -13,6 +13,7 @@ const sensorOptionsMap: Record<string, any[]> = {
 }
 
 export const handlers = [
+  http.get(`${API_BASE}/jobs/`, () => HttpResponse.json([])),
   http.get(`${API_BASE}/settings/`, () => HttpResponse.json(mockSettings)),
   http.put(`${API_BASE}/settings/`, async ({ request }) => {
     const patch = (await request.json()) as Record<string, Record<string, unknown>>

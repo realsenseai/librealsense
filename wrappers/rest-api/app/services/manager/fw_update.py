@@ -48,10 +48,7 @@ class FirmwareUpdateMixin:
         except Exception as exc:
             # Surface download failures on the same channel as flash failures so the
             # progress modal shows the error instead of hanging.
-            self._emit_socket_event(
-                f"firmware_update_failed_{device_id}",
-                {"device_id": device_id, "error": str(exc)},
-            )
+            self._fail_fw_update(device_id, str(exc))
             with self.lock:
                 self._fw_updates_in_progress.discard(device_id)
             raise
@@ -135,10 +132,7 @@ class FirmwareUpdateMixin:
                 raise
             except Exception as exc:
                 logging.exception("Firmware update failed for %s", device_id)
-                self._emit_socket_event(
-                    f"firmware_update_failed_{device_id}",
-                    {"device_id": device_id, "error": str(exc)},
-                )
+                self._fail_fw_update(device_id, str(exc))
                 raise RealSenseError(status_code=500, detail=f"Firmware update failed: {exc}")
 
             updated_info = self._refresh_until_device_returns(device_id)
@@ -154,22 +148,24 @@ class FirmwareUpdateMixin:
                 f"firmware_update_success_{device_id}",
                 {"device_id": device_id, "firmware_version": updated_info.firmware_version},
             )
+            job = self._fw_jobs.get(device_id)
+            if job:
+                job.done({"firmware_version": updated_info.firmware_version})
 
             return {
                 "device_id": device_id,
+                "job_id": job.id if job else None,
                 "progress": progress_holder["value"],
                 "firmware_version": updated_info.firmware_version,
                 "status": "success",
             }
         except RealSenseError as exc:
-            self._emit_socket_event(
-                f"firmware_update_failed_{device_id}",
-                {"device_id": device_id, "error": exc.detail},
-            )
+            self._fail_fw_update(device_id, str(exc.detail))
             raise
         finally:
             with self.lock:
                 self._fw_updates_in_progress.discard(device_id)
+                self._fw_jobs.pop(device_id, None)
 
     # ---- update_firmware_from_bytes helpers ---------------------------------
     # Split out so the orchestrator above reads as a sequence of named steps
@@ -182,6 +178,14 @@ class FirmwareUpdateMixin:
             if device_id in self._fw_updates_in_progress:
                 raise RealSenseError(status_code=409, detail="Firmware update already in progress")
             self._fw_updates_in_progress.add(device_id)
+            self._fw_jobs[device_id] = self.jobs.create("firmware_update", device_id)
+
+    def _fail_fw_update(self, device_id: str, error: str) -> None:
+        """Report a failed update on the legacy per-device channel and on its job."""
+        self._emit_socket_event(f"firmware_update_failed_{device_id}", {"device_id": device_id, "error": error})
+        job = self._fw_jobs.get(device_id)
+        if job:
+            job.fail(error)
 
     def _ensure_fw_update_allowed(self, device_id: str) -> None:
         """Reject the update if the device is unknown or if anything is streaming."""
@@ -228,6 +232,9 @@ class FirmwareUpdateMixin:
 
         def _on_progress(p: float) -> None:
             progress_holder["value"] = p
+            job = self._fw_jobs.get(device_id)
+            if job:
+                job.progress(p, phase)
             now = time.time()
             if now - last_emit_ts["value"] < 0.1 and p < 1.0:
                 return
@@ -421,9 +428,6 @@ class FirmwareUpdateMixin:
                 "Please physically disconnect and reconnect the device, then try again "
                 "with a known-good firmware image."
             )
-            self._emit_socket_event(
-                f"firmware_update_failed_{device_id}",
-                {"device_id": device_id, "error": msg},
-            )
+            self._fail_fw_update(device_id, msg)
             raise RealSenseError(status_code=500, detail=msg)
         logging.warning("Device did not reconnect within timeout, but update may have succeeded")

@@ -35,6 +35,21 @@ export function visibleOptions(options: OptionInfo[]): OptionInfo[] {
   return options.filter((o) => !HIDDEN_OPTIONS.includes(o.option_id.toLowerCase()))
 }
 
+// Wire shape of /jobs/ and the `job` Socket.IO event (app/models/job.py)
+export type JobState = 'running' | 'done' | 'failed' | 'cancelled'
+export interface JobInfo {
+  id: string
+  kind: string
+  device_id: string | null
+  state: JobState
+  progress: number  // 0..1
+  message: string | null
+  result: unknown
+  error: string | null
+  created_at: number
+  updated_at: number
+}
+
 // Wire shape of GET/PUT /settings/ (app/models/settings.py)
 export interface ViewerSettings {
   record: { file_save_mode: 'auto' | 'ask'; default_path: string; compression: 'auto' | 'always' | 'never' }

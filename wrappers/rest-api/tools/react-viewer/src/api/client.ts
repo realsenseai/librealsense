@@ -15,6 +15,7 @@ import type {
   SensorStreamStatus,
   ViewerSettings,
   ViewerSettingsPatch,
+  JobInfo,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -275,6 +276,18 @@ class ApiClient {
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
     await this.client.delete(`/webrtc/sessions/${sessionId}`)
+  }
+
+  // ============ Jobs ============
+
+  async getJobs(deviceId?: string): Promise<JobInfo[]> {
+    const response = await this.client.get<JobInfo[]>('/jobs/', { params: { device_id: deviceId } })
+    return response.data
+  }
+
+  async cancelJob(jobId: string): Promise<JobInfo> {
+    const response = await this.client.post<JobInfo>(`/jobs/${jobId}/cancel`)
+    return response.data
   }
 
   // ============ Settings ============
