@@ -13,7 +13,7 @@
  *   REAL_DEVICE=true npx playwright test --project=real-device
  */
 
-import { test, expect, getTestMode, getApiUrl, dismissWhatsNewModal } from './fixtures'
+import { test, expect, getTestMode, getApiUrl, dismissWhatsNewModal, suppressWhatsNew } from './fixtures'
 import type { Locator } from '@playwright/test'
 
 // Per-stream toggles only render inside an expanded sensor module
@@ -29,11 +29,7 @@ async function expandSensorModules(deviceCard: Locator) {
 test.beforeEach(async ({ testMode, page }) => {
   test.skip(testMode !== 'real', 'Real device tests require REAL_DEVICE=true')
   
-  // Clear localStorage to ensure consistent test state, but also set version
-  // to prevent What's New modal from appearing
-  await page.addInitScript(() => {
-    localStorage.setItem('realsense-viewer-last-version', '0.5.0')
-  })
+  await suppressWhatsNew(page)
 })
 
 test.describe('@real-device Real Device Tests', () => {
@@ -75,9 +71,7 @@ test.describe('@real-device Real Device Tests', () => {
       await page.goto('/')
       await waitForDevice(page)
       
-      // Activate device
       const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-      await deviceCard.click()
       
       // Wait for device to finish loading sensors
       await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
@@ -108,9 +102,7 @@ test.describe('@real-device Real Device Tests', () => {
       await page.goto('/')
       await waitForDevice(page)
       
-      // Activate and start streaming
       const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-      await deviceCard.click()
       
       // Wait for device to finish loading sensors
       await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
@@ -147,9 +139,7 @@ test.describe('@real-device Real Device Tests', () => {
       await page.goto('/')
       await waitForDevice(page)
       
-      // Activate device
       const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-      await deviceCard.click()
       
       // Wait for options to load
       await page.waitForTimeout(1000)
@@ -194,19 +184,14 @@ test.describe('@real-device Performance Tests', () => {
   test.beforeEach(async ({ testMode, page }) => {
     test.skip(testMode !== 'real', 'Real device tests require REAL_DEVICE=true')
     
-    // Set version in localStorage to prevent What's New modal
-    await page.addInitScript(() => {
-      localStorage.setItem('realsense-viewer-last-version', '0.5.0')
-    })
+    await suppressWhatsNew(page)
   })
 
   test('streaming maintains acceptable frame rate', async ({ page, waitForDevice }) => {
     await page.goto('/')
     await waitForDevice(page)
     
-    // Activate and start streaming
     const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-    await deviceCard.click()
     
     // Wait for device to finish loading sensors
     await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })

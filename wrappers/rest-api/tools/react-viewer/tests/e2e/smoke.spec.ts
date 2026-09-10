@@ -1,12 +1,9 @@
 import { test, expect } from '@playwright/test'
-import { dismissWhatsNewModal } from './fixtures'
+import { dismissWhatsNewModal, suppressWhatsNew } from './fixtures'
 
 test.describe('Smoke Tests', () => {
-  // Set localStorage to prevent What's New modal from appearing
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem('realsense-viewer-last-version', '0.5.0')
-    })
+    await suppressWhatsNew(page)
   })
 
   test('application loads successfully', async ({ page }) => {

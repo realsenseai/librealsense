@@ -60,6 +60,21 @@ export const getApiUrl = (): string => {
 }
 
 /**
+ * Keep the "What's New" modal from opening: it shows whenever the stored SDK version differs
+ * from the running one, so store the running one before the page loads.
+ */
+export async function suppressWhatsNew(page: Page): Promise<void> {
+  let version = 'unknown'
+  try {
+    const response = await fetch(`${getApiUrl()}/api/v1/health`)
+    if (response.ok) version = (await response.json()).sdk_version ?? version
+  } catch {
+    // no backend: the modal cannot open without a version either
+  }
+  await page.addInitScript((v) => localStorage.setItem('rs-sdk-last-shown', v), version)
+}
+
+/**
  * Internal helper to dismiss "What's New" modal - used by fixtures
  */
 async function dismissWhatsNewModalInternal(page: Page): Promise<void> {
