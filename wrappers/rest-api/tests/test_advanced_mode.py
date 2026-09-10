@@ -2,6 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 import pytest
+from app.core.errors import RealSenseError
 from app.services import advanced_mode
 
 
@@ -145,3 +146,13 @@ def test_status_reports_supported_and_enabled(device_for):
     assert advanced_mode.status(device_for(_Unsupported())) == {
         "supported": False, "enabled": False
     }
+
+
+def test_controls_refused_while_advanced_mode_is_off(device_for):
+    dev = device_for(_FakeAM(enabled=False))
+    with pytest.raises(RealSenseError) as exc:
+        advanced_mode.controls(dev)
+    assert exc.value.status_code == 409
+    with pytest.raises(RealSenseError) as exc:
+        advanced_mode.set_control(dev, "depth_control", "deepSeaSecondPeakThreshold", 1)
+    assert exc.value.status_code == 409
