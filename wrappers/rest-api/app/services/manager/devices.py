@@ -6,6 +6,7 @@
 import asyncio
 import platform
 import time
+import contextlib
 import logging
 from typing import Callable, Deque, Dict, List, Optional, Any, Tuple, Set
 import pyrealsense2 as rs
@@ -187,9 +188,15 @@ class DeviceRegistryMixin:
                 return list(self.device_infos.values())
         return self._refresh_devices_locked()
 
+    def _enumeration(self):
+        """Context for ctx enumeration: pauses the options poller (see OptionsPoller.paused).
+        Lock order everywhere: poller sweep lock -> device option lock -> manager lock."""
+        poller = getattr(self, "options_poller", None)
+        return poller.paused() if poller is not None else contextlib.nullcontext()
+
     def _refresh_devices_locked(self) -> List[DeviceInfo]:
         """Actual device enumeration (no FW-in-progress guard)."""
-        with self.lock:
+        with self._enumeration(), self.lock:
             # Clear existing devices (that aren't streaming); loaded recordings stay.
             for device_id in list(self.devices.keys()):
                 if device_id not in self.pipelines and device_id not in self._playbacks:
@@ -228,7 +235,9 @@ class DeviceRegistryMixin:
         polling loop), leaving a truthy Python object backed by a null C++
         pointer. Raises 404 if the device is no longer visible.
         """
-        for dev in self.ctx.query_devices():
+        with self._enumeration():
+            devs = list(self.ctx.query_devices())
+        for dev in devs:
             try:
                 if not dev.supports(rs.camera_info.serial_number):
                     continue

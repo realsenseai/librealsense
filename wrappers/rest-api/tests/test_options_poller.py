@@ -53,6 +53,39 @@ def test_a_sensor_that_fails_to_read_is_skipped_not_fatal():
     assert [p["sensor_id"] for _, p in emitted] == ["d1-sensor-0"]
 
 
+def test_paused_keeps_the_poller_off_the_device_until_released():
+    dev = create_mock_device("d1", "cam")
+    poller, emitted = _poller({"d1": dev})
+    poller.poll_once()
+    dev.sensors[0]._options[option.laser_power] = 90
+
+    started = threading.Event()
+    with poller.paused():
+        t = threading.Thread(target=lambda: (started.set(), poller.poll_once()))
+        t.start()
+        started.wait(1)
+        t.join(0.3)
+        assert t.is_alive() and emitted == []  # blocked behind the pause
+    t.join(2)
+    assert not t.is_alive() and len(emitted) == 1
+
+
+def test_the_device_lock_is_taken_per_option_not_per_sweep():
+    dev = create_mock_device("d1", "cam")
+    acquisitions = []
+
+    class CountingLock:
+        def __enter__(self):
+            acquisitions.append(1)
+        def __exit__(self, *exc):
+            return False
+
+    poller = OptionsPoller(lambda: {"d1": dev}.items(), lambda _d: CountingLock(), lambda ev, p: None)
+    poller.poll_once()
+    options = sum(len(s.get_supported_options()) for s in dev.sensors)
+    assert len(acquisitions) == options > 1
+
+
 def test_forget_drops_a_device_so_a_replug_starts_fresh():
     dev = create_mock_device("d1", "cam")
     poller, emitted = _poller({"d1": dev})

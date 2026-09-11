@@ -103,7 +103,7 @@ Enables everything after it. No user-visible parity except settings and multi-ca
   20 cm; batch hover via socket instead of REST per move; max-usable-range readout
   (`max_usable_range_sensor`) when option on; colormap ruler ticks (`DepthLegend`) sampled
   from colorizer min/max. 2 d.
-- [ ] **WP2.5 Zoom/pan + grid overlay.** Wheel zoom about cursor, drag pan, preview inset;
+- [x] **WP2.5 Zoom/pan + grid overlay.** Wheel zoom about cursor, drag pan, preview inset;
   configurable crosshair/grid (lines, width, color) persisted. Client-only. 2 d.
 - [x] **WP2.6 Metadata table parity.** Per-attribute descriptions, hex for bitmask
   fields, DDS/safety decoders ported from `stream-model.cpp:1238-1470` into
@@ -211,10 +211,10 @@ Enables everything after it. No user-visible parity except settings and multi-ca
 - [ ] **WP7.2 Unsigned FW.** `POST /firmware/update_unsigned` for unlocked D400;
   menu item only when `updatable.check_firmware_compatibility` allows. HW: unlocked
   D400. 1 d.
-- [ ] **WP7.3 Updates service.** `services/updates.py` parses SW + FW from versions DB,
+- [x] **WP7.3 Updates service.** `services/updates.py` parses SW + FW from versions DB,
   essential/recommended; custom URL / `file://` from settings; `GET /updates/{d}`;
   `components/updates/UpdatesDialog.tsx`; up-to-date + recommended notifications. 2.5 d.
-- [ ] **WP7.4 Notification center.** Server `services/notifications.py` subscribes
+- [x] **WP7.4 Notification center.** Server `services/notifications.py` subscribes
   `set_notifications_callback` → socket `notification`; client
   `NotificationCenter.tsx` with expand/dismiss/snooze (once / N days / never) persisted;
   error dialog with "don't show again"; Report Issue prefilled GitHub link; RS Store link;
@@ -323,3 +323,16 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   D455 lacks `hdr-preset`; UI pending), WP8.1-8.3 console/firmware logs/terminal
   (live-verified: ~670 raw FW lines/s on the D455, hence batched socket emits; 49 flash
   messages recovered). Playwright real-device suite green after each phase.
+- 2026-09-11 (later): WP7.3 updates (live: official DB reachable, D455 FW 5.17.3.10 and
+  SDK 2.59.0.0 both `up_to_date`) and WP7.4 notifications (SDK notifications forwarded from
+  `manager/devices.py` as the `notification` socket event; snooze persisted in
+  localStorage; Report Issue / Store / release-notes help menu; license text in About).
+  WP7.1/7.2 need a recovery-mode or unlocked device and stay open.
+- Finding: after a long Playwright run the server froze with the event loop inside
+  `ctx.devices` and the options poller inside `get_option`, both in SDK native code; the
+  camera itself was fine once the process died (a fresh process enumerated and read all
+  options at once). A standalone enumerate/read/stream stress run did not reproduce it in
+  45 s. Hardening: enumeration now pauses the poller, the poller takes the device lock per
+  option rather than per sweep, device/sensor endpoints run the SDK off the event loop, and
+  `RS_REST_LOG_FILE` mirrors the server log to a file. Note the legacy viewer never polls
+  options (its 6 s read-only refresh is compiled out); the SDK's own watcher does, at 1 s.

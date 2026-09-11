@@ -108,6 +108,16 @@ async def startup_event():
     # Started here, not in the manager: tests build managers by the dozen against real hardware.
     manager = get_realsense_manager()
     manager.options_poller.start()
+    # RS_REST_LOG_FILE=<path>: mirror the server's Python log at INFO into a file, for the
+    # cases where the process itself is what needs debugging.
+    import logging
+    import os
+    log_file = os.environ.get("RS_REST_LOG_FILE")
+    if log_file:
+        handler = logging.FileHandler(log_file, encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(threadName)s %(name)s: %(message)s"))
+        logging.getLogger().addHandler(handler)
+        logging.getLogger().setLevel(min(logging.getLogger().level or logging.INFO, logging.INFO))
     console_settings = manager.settings.get().console
     manager.console.install_sdk_logging(console_settings.log_severity,
                                         console_settings.log_filename if console_settings.log_to_file else None)

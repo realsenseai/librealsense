@@ -2,6 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.concurrency import run_in_threadpool
 from typing import List
 
 
@@ -20,7 +21,7 @@ async def get_devices(
     """
     Get a list of all connected RealSense devices. Set force_refresh=true to re-enumerate.
     """
-    return rs_manager.get_devices(force_refresh=force_refresh)
+    return await run_in_threadpool(rs_manager.get_devices, force_refresh=force_refresh)
 
 @router.get("/{device_id}", response_model=DeviceInfo)
 async def get_device(
@@ -33,7 +34,7 @@ async def get_device(
     Get details of a specific RealSense device.
     """
     try:
-        return rs_manager.get_device(device_id, force_refresh=force_refresh)
+        return await run_in_threadpool(rs_manager.get_device, device_id, force_refresh=force_refresh)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -58,4 +59,4 @@ async def hw_reset_device(
     """
     Perform a hardware reset on a specific RealSense device.
     """
-    return rs_manager.reset_device(device_id)
+    return await run_in_threadpool(rs_manager.reset_device, device_id)

@@ -10,9 +10,10 @@ on the Windows backend its concurrent reads across sensors were measured to leav
 unable to accept option writes until a hardware reset.
 """
 
+import contextlib
 import logging
 import threading
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Tuple
 
 import pyrealsense2 as rs
 
@@ -34,6 +35,8 @@ class OptionsPoller:
         self._known: Dict[str, Dict[str, Values]] = {}  # device -> sensor -> option -> value
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        # Held while a sensor is being read; paused() takes it to keep the poller off the bus.
+        self._sweep_lock = threading.Lock()
 
     def start(self) -> None:
         if self._thread is None:
@@ -43,6 +46,13 @@ class OptionsPoller:
 
     def stop(self) -> None:
         self._stop.set()
+
+    @contextlib.contextmanager
+    def paused(self) -> Iterator[None]:
+        """No option reads while the body runs. Device enumeration uses this: on the Windows
+        backend, enumerating while another thread reads a control was seen to hang both."""
+        with self._sweep_lock:
+            yield
 
     def forget(self, device_id: str) -> None:
         self._known.pop(device_id, None)
@@ -67,8 +77,8 @@ class OptionsPoller:
             for index, sensor in enumerate(sensors):
                 sensor_id = f"{device_id}-sensor-{index}"
                 try:
-                    with self._lock_for(device_id):
-                        values = self._read(sensor)
+                    with self._sweep_lock:
+                        values = self._read(sensor, self._lock_for(device_id))
                 except Exception as exc:
                     logging.debug("options poll skipped %s: %s", sensor_id, exc)
                     continue
@@ -83,11 +93,14 @@ class OptionsPoller:
                     self._emit("options_changed", {"device_id": device_id, "sensor_id": sensor_id, "options": changed})
 
     @staticmethod
-    def _read(sensor) -> Values:
+    def _read(sensor, lock: threading.Lock) -> Values:
+        """Read every option, taking the device lock per option so a user's write never waits
+        for a whole sweep (tens of controls, each a USB round trip)."""
         values: Values = {}
         for opt in sensor.get_supported_options():
             try:
-                values[opt.name] = sensor.get_option(opt)
+                with lock:
+                    values[opt.name] = sensor.get_option(opt)
             except RuntimeError:
                 continue  # an option the firmware refuses right now
         return values

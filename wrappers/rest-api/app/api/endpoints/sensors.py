@@ -60,7 +60,7 @@ async def get_sensors(
     """
     Get a list of all sensors for a specific RealSense device.
     """
-    return rs_manager.get_sensors(device_id)
+    return await run_in_threadpool(rs_manager.get_sensors, device_id)
 
 
 @router.get("/{sensor_id}", response_model=SensorInfo)
@@ -73,7 +73,7 @@ async def get_sensor(
     """
     Get details of a specific sensor for a RealSense device.
     """
-    return rs_manager.get_sensor(device_id, sensor_id)
+    return await run_in_threadpool(rs_manager.get_sensor, device_id, sensor_id)
 
 
 @router.post("/{sensor_id}/start", response_model=SensorStreamStatus)
@@ -101,7 +101,7 @@ async def start_sensor(
     else:
         raise HTTPException(status_code=400, detail="config or configs required")
 
-    return rs_manager.start_sensor(device_id, sensor_id, configs)
+    return await run_in_threadpool(rs_manager.start_sensor, device_id, sensor_id, configs)
 
 
 @router.post("/{sensor_id}/stop", response_model=SensorStreamStatus)
@@ -117,7 +117,7 @@ async def stop_sensor(
     The sensor will be stopped and closed, freeing its resources.
     Other sensors on the same device will continue streaming.
     """
-    return rs_manager.stop_sensor(device_id, sensor_id)
+    return await run_in_threadpool(rs_manager.stop_sensor, device_id, sensor_id)
 
 
 class RegionOfInterest(BaseModel):
@@ -150,7 +150,7 @@ async def pause_sensor(
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
 ):
     """Freeze a streaming sensor's output: the last frame stays on screen until resume."""
-    return rs_manager.set_sensor_paused(device_id, sensor_id, True)
+    return await run_in_threadpool(rs_manager.set_sensor_paused, device_id, sensor_id, True)
 
 
 @router.post("/{sensor_id}/resume", response_model=SensorStreamStatus)
@@ -160,7 +160,7 @@ async def resume_sensor(
     sensor_id: str,
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
 ):
-    return rs_manager.set_sensor_paused(device_id, sensor_id, False)
+    return await run_in_threadpool(rs_manager.set_sensor_paused, device_id, sensor_id, False)
 
 
 @router.get("/{sensor_id}/status", response_model=SensorStreamStatus)
@@ -176,4 +176,4 @@ async def get_sensor_status(
     Returns information about whether the sensor is streaming,
     and if so, what configuration it is using.
     """
-    return rs_manager.get_sensor_status(device_id, sensor_id)
+    return await run_in_threadpool(rs_manager.get_sensor_status, device_id, sensor_id)
