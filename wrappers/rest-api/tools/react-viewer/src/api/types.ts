@@ -67,6 +67,12 @@ export function visibleOptions(options: OptionInfo[]): OptionInfo[] {
   return options.filter((o) => !HIDDEN_OPTIONS.includes(o.option_id.toLowerCase()))
 }
 
+// A preset file in the server's presets folder (GET /devices/{d}/presets/)
+export interface PresetFile {
+  path: string
+  name: string
+}
+
 // Wire shape of /devices/{d}/sensors/{s}/roi
 export interface RegionOfInterest {
   supported: boolean
@@ -96,7 +102,7 @@ export interface ViewerSettings {
   record: { file_save_mode: 'auto' | 'ask'; default_path: string; compression: 'auto' | 'always' | 'never' }
   update: { sw_update_official_server: boolean; sw_update_url: string; recommend_calibration: boolean }
   console: { max_entries: number; log_to_file: boolean; log_filename: string; log_severity: 'debug' | 'info' | 'warn' | 'error' }
-  paths: { hwlogger_xml: string; commands_xml: string }
+  paths: { hwlogger_xml: string; commands_xml: string; presets_folder: string }
   context: { dds_enabled: boolean; dds_domain: number }
   calibration: { enable_writing: boolean }
   post_processing: { performance_mode: boolean }
@@ -306,6 +312,7 @@ export interface DeviceState {
   metadataServerTime?: number // timestamp_server of the last metadata_update
   record?: RecordStatus
   playback?: PlaybackStatus // loaded recordings only
+  presetFiles?: PresetFile[] // JSON presets in the server's folder for this model
   // Per-sensor streaming state (sensor API)
   sensorStreamingStatus: Record<string, SensorStreamStatus> // keyed by sensor_id
 }

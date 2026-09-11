@@ -14,6 +14,12 @@ const sensorOptionsMap: Record<string, any[]> = {
 
 export const handlers = [
   http.get(`${API_BASE}/jobs/`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/devices/:deviceId/presets/`, () => HttpResponse.json([])),
+  http.post(`${API_BASE}/devices/:deviceId/presets/load`, () => HttpResponse.json({ loaded: 'x' })),
+  http.post(`${API_BASE}/devices/:deviceId/presets/save`, async ({ request }) => {
+    const { name } = (await request.json()) as { name: string }
+    return HttpResponse.json([{ path: `C:/presets/D455 ${name}.preset`, name }])
+  }),
   http.get(`${API_BASE}/devices/:deviceId/record/`, ({ params }) =>
     HttpResponse.json({ device_id: params.deviceId, recording: false, paused: false, file: null })),
   http.post(`${API_BASE}/devices/:deviceId/record/start`, ({ params }) =>

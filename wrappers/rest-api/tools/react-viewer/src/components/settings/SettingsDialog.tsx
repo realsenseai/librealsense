@@ -165,6 +165,10 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                 <input className={input} value={draft.paths.commands_xml}
                   onChange={(e) => patch('paths', { commands_xml: e.target.value })} />
               </Field>
+              <Field label="Presets folder" hint="Empty: ~/librealsense2/presets (under Documents on Windows)">
+                <input className={input} value={draft.paths.presets_folder}
+                  onChange={(e) => patch('paths', { presets_folder: e.target.value })} />
+              </Field>
               <Check label="Enable DDS (Ethernet cameras) — takes effect after the server restarts"
                 checked={draft.context.dds_enabled} onChange={(v) => patch('context', { dds_enabled: v })} />
               <Field label="DDS domain ID">

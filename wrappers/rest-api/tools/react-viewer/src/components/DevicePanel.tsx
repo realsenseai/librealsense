@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MutableRefObject, ReactElement } from 'react'
 import { useAppStore } from '../store'
+import { apiClient } from '../api/client'
 import type { ControlGroup, DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState, SensorConfig } from '../api/types'
 import { SECTIONS, firmwareStatus, optionLabel } from '../api/types'
 import { RefreshCcw, Search, X } from 'lucide-react'
@@ -143,6 +144,8 @@ export function DevicePanel() {
     updateFirmwareFromRecommended,
     toggleAdvancedMode,
     uploadRecording,
+    uploadPreset,
+    savePreset,
   } = useAppStore()
   const recordingPicker = useFilePicker((file) => void uploadRecording(file), '.bag,.db3')
 
@@ -344,6 +347,8 @@ export function DevicePanel() {
                 onCheckFirmwareUpdates={() => handleCheckFirmwareUpdates(device.device_id)}
                 onUpdateFirmwareFromFile={(file) => handleUpdateFirmwareFromFile(device, file)}
                 onToggleAdvancedMode={(enable) => toggleAdvancedMode(device.device_id, enable)}
+                onUploadPreset={(file) => uploadPreset(device.device_id, file)}
+                onSavePreset={(name) => savePreset(device.device_id, name)}
                 onShowToast={addToast}
               />
             )
@@ -381,6 +386,8 @@ interface DeviceCardProps {
   onCheckFirmwareUpdates: () => void
   onUpdateFirmwareFromFile: (file: File) => void
   onToggleAdvancedMode: (enable: boolean) => void
+  onUploadPreset: (file: File) => void
+  onSavePreset: (name: string) => void
   onShowToast: (type: ToastType, message: string) => void
 }
 
@@ -395,11 +402,15 @@ function DeviceCard({
   onCheckFirmwareUpdates,
   onUpdateFirmwareFromFile,
   onToggleAdvancedMode,
+  onUploadPreset,
+  onSavePreset,
   onShowToast,
 }: DeviceCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
   const fwPicker = useFilePicker(onUpdateFirmwareFromFile, '.bin')
+  const presetPicker = useFilePicker(onUploadPreset, '.json,.preset')
+  const advancedOn = deviceState?.advancedMode?.enabled === true
 
   const isLoading = deviceState?.isLoading || false
   const isStreaming = deviceState?.isStreaming || false
@@ -428,6 +439,7 @@ function DeviceCard({
           hamburger menu closes; otherwise the OS file picker resolves into
           an unmounted input and onChange never fires. */}
       {fwPicker.input}
+      {presetPicker.input}
       {/* Device Header */}
       <div className="p-3">
         <div className="flex items-start justify-between">
@@ -489,6 +501,40 @@ function DeviceCard({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
                       </svg>
                       Tare Calibration
+                    </button>
+                    <div className="border-t border-gray-600 my-1" />
+                    <button
+                      onClick={() => { setShowMenu(false); setTimeout(() => presetPicker.open(), 0) }}
+                      disabled={!advancedOn}
+                      title={advancedOn ? 'Apply a JSON preset from a file' : 'Requires Advanced Mode'}
+                      className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${advancedOn ? 'hover:bg-gray-700' : 'text-gray-500 cursor-not-allowed'}`}
+                    >
+                      <span className="w-4 text-center">⤒</span>
+                      Load Preset (JSON)…
+                    </button>
+                    <a
+                      href={advancedOn ? apiClient.presetDownloadUrl(device.device_id) : undefined}
+                      download
+                      onClick={() => setShowMenu(false)}
+                      aria-disabled={!advancedOn}
+                      title={advancedOn ? 'Download the current settings as a JSON preset' : 'Requires Advanced Mode'}
+                      className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${advancedOn ? 'hover:bg-gray-700' : 'text-gray-500 cursor-not-allowed pointer-events-none'}`}
+                    >
+                      <span className="w-4 text-center">⤓</span>
+                      Save Preset (JSON)…
+                    </a>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false)
+                        const name = window.prompt('Preset name (stored in the presets folder as "<model> <name>.preset")')
+                        if (name?.trim()) onSavePreset(name.trim())
+                      }}
+                      disabled={!advancedOn}
+                      title={advancedOn ? 'Store the current settings in the presets folder' : 'Requires Advanced Mode'}
+                      className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${advancedOn ? 'hover:bg-gray-700' : 'text-gray-500 cursor-not-allowed'}`}
+                    >
+                      <span className="w-4 text-center">★</span>
+                      Save to Presets Folder…
                     </button>
                     <div className="border-t border-gray-600 my-1" />
                     <button
@@ -830,6 +876,7 @@ function SensorPanel({
           return (
             <ControlSection
               key={title}
+              deviceId={deviceId}
               title={title}
               groups={mine}
               // Post-processing is the one section the viewer can bypass wholesale.
@@ -983,6 +1030,7 @@ function ControlsSearchBox({ value, onChange }: ControlsSearchBoxProps) {
 }
 
 interface ControlSectionProps {
+  deviceId: string
   title: string
   /** The section's groups, each with the key its writes go to. */
   groups: [string, ControlGroup][]
@@ -1000,6 +1048,7 @@ interface ControlSectionProps {
  * and whether a group can be switched off, so they are all this component.
  */
 function ControlSection({
+  deviceId,
   title, groups, sectionSwitch, searchQuery, onSet, onToggleGroup, onRestoreDefaults,
 }: ControlSectionProps) {
   const searching = searchQuery.trim().length > 0
@@ -1042,11 +1091,13 @@ function ControlSection({
       <div className="p-1.5 space-y-1 bg-gray-800/30">
         {matching.map(({ key, group, options }) => {
           const controls = options.map(option => (
-            <OptionControl
-              key={option.option_id}
-              option={option}
-              onSet={(optionId, value) => onSet(key, optionId, value)}
-            />
+            <div key={option.option_id}>
+              <OptionControl
+                option={option}
+                onSet={(optionId, value) => onSet(key, optionId, value)}
+              />
+              {option.option_id.toLowerCase() === 'visual_preset' && <VisualPresetFiles deviceId={deviceId} />}
+            </div>
           ))
           return !group.name ? controls : (
             <Collapsible
@@ -1083,6 +1134,25 @@ interface OptionControlProps {
 // Firmware writes take time; while a slider is dragged, send at most one value per interval
 // and always the newest one, as the legacy viewer's option dispatcher does (option-model.h).
 const SLIDER_WRITE_INTERVAL_MS = 200
+
+/** The Visual Preset dropdown with the folder presets the legacy viewer appends to it. */
+function VisualPresetFiles({ deviceId }: { deviceId: string }) {
+  const files = useAppStore((s) => s.deviceStates[deviceId]?.presetFiles ?? [])
+  const { fetchPresets, loadPresetFile } = useAppStore()
+  useEffect(() => { void fetchPresets(deviceId) }, [deviceId, fetchPresets])
+  if (files.length === 0) return null
+  return (
+    <select
+      className="mt-1 w-full bg-gray-700 text-white rounded px-1 py-0.5 border border-gray-600 text-xs"
+      value=""
+      onChange={(e) => { if (e.target.value) void loadPresetFile(deviceId, e.target.value) }}
+      aria-label="Presets from folder"
+    >
+      <option value="">Load from presets folder…</option>
+      {files.map((f) => <option key={f.path} value={f.path}>{f.name}</option>)}
+    </select>
+  )
+}
 
 function OptionControl({ option, onSet }: OptionControlProps) {
   const [localValue, setLocalValue] = useState(option.current_value)

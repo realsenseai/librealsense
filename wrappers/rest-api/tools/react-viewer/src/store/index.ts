@@ -208,6 +208,12 @@ interface AppState {
   stopSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
   setSensorPaused: (deviceId: string, sensorId: string, paused: boolean) => Promise<void>
 
+  // JSON presets (need advanced mode; the server answers 409 otherwise)
+  fetchPresets: (deviceId: string) => Promise<void>
+  loadPresetFile: (deviceId: string, path: string) => Promise<void>
+  uploadPreset: (deviceId: string, file: File) => Promise<void>
+  savePreset: (deviceId: string, name: string) => Promise<void>
+
   // Record / playback
   startRecording: (deviceId: string) => Promise<void>
   setRecordingPaused: (deviceId: string, paused: boolean) => Promise<void>
@@ -686,6 +692,45 @@ export const useAppStore = create<AppState>()((set, get) => ({
         ({ sensorStreamingStatus: { ...ds.sensorStreamingStatus, [sensorId]: status } })))
     } catch (error) {
       set({ error: `Failed to ${paused ? 'pause' : 'resume'} sensor: ${error instanceof Error ? error.message : 'unknown error'}` })
+    }
+  },
+
+  fetchPresets: async (deviceId) => {
+    try {
+      const presetFiles = await apiClient.listPresets(deviceId)
+      set((s) => patchDevice(s, deviceId, () => ({ presetFiles })))
+    } catch {
+      // no folder yet: nothing to list
+    }
+  },
+
+  loadPresetFile: async (deviceId, path) => {
+    try {
+      await apiClient.loadPresetFile(deviceId, path)
+      await get().fetchDeviceControls(deviceId) // a preset rewrites many controls
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to load preset: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  uploadPreset: async (deviceId, file) => {
+    try {
+      await apiClient.uploadPreset(deviceId, file)
+      await get().fetchDeviceControls(deviceId)
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to load preset: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  savePreset: async (deviceId, name) => {
+    try {
+      const presetFiles = await apiClient.savePreset(deviceId, name)
+      set((s) => patchDevice(s, deviceId, () => ({ presetFiles })))
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to save preset: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
     }
   },
 

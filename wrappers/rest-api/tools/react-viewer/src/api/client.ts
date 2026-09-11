@@ -21,6 +21,7 @@ import type {
   PlaybackStatus,
   RecordStatus,
   RecordingFile,
+  PresetFile,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -316,6 +317,31 @@ class ApiClient {
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
     await this.client.delete(`/webrtc/sessions/${sessionId}`)
+  }
+
+  // ============ Presets ============
+
+  async listPresets(deviceId: string): Promise<PresetFile[]> {
+    return (await this.client.get<PresetFile[]>(`/devices/${deviceId}/presets/`)).data
+  }
+
+  /** Download link for the device's current settings as a JSON preset. */
+  presetDownloadUrl(deviceId: string): string {
+    return `${API_BASE}/devices/${deviceId}/presets/current`
+  }
+
+  async loadPresetFile(deviceId: string, path: string): Promise<void> {
+    await this.client.post(`/devices/${deviceId}/presets/load`, { path })
+  }
+
+  async uploadPreset(deviceId: string, file: File): Promise<void> {
+    const form = new FormData()
+    form.append('file', file)
+    await this.client.post(`/devices/${deviceId}/presets/upload`, form, { headers: { 'Content-Type': undefined as unknown as string } })
+  }
+
+  async savePreset(deviceId: string, name: string): Promise<PresetFile[]> {
+    return (await this.client.post<PresetFile[]>(`/devices/${deviceId}/presets/save`, { name })).data
   }
 
   // ============ Record / playback ============

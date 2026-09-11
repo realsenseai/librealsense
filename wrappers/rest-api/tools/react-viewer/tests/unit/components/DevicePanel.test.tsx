@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { render, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 import { DevicePanel } from '@/components/DevicePanel'
 import { useAppStore } from '@/store'
+import { http, HttpResponse } from 'msw'
+import { server } from '../../mocks/server'
 
 describe('DevicePanel', () => {
   beforeEach(() => {
@@ -269,6 +271,58 @@ describe('DevicePanel', () => {
     it('has a Load Recorded Sequence button in the header', () => {
       render(<DevicePanel />)
       expect(screen.getByRole('button', { name: 'Load recorded sequence' })).toBeInTheDocument()
+    })
+  })
+
+  describe('JSON presets', () => {
+    const withAdvanced = (enabled: boolean) => {
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, { advancedMode: { supported: true, enabled } })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } } })
+      return device
+    }
+
+    it('offers Load / Save Preset only with advanced mode on', async () => {
+      withAdvanced(false)
+      await userEvent.click(await screen.findByTitle('Device actions'))
+      expect(screen.getByText('Load Preset (JSON)…').closest('button')).toBeDisabled()
+      expect(screen.getByText('Save Preset (JSON)…').closest('a')).toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('links the preset download to the device and saves to the folder by name', async () => {
+      const device = withAdvanced(true)
+      await userEvent.click(await screen.findByTitle('Device actions'))
+      expect(screen.getByText('Save Preset (JSON)…').closest('a')).toHaveAttribute('href', `/api/v1/devices/${device.device_id}/presets/current`)
+
+      vi.spyOn(window, 'prompt').mockReturnValue('Max Range')
+      await userEvent.click(screen.getByText('Save to Presets Folder…'))
+      await waitFor(() => expect(useAppStore.getState().deviceStates[device.device_id].presetFiles).toEqual([
+        { path: 'C:/presets/D455 Max Range.preset', name: 'Max Range' },
+      ]))
+    })
+
+    it('lists folder presets under the Visual Preset control and loads one', async () => {
+      let loaded: unknown = null
+      server.use(
+        http.get('/api/v1/devices/:deviceId/presets/', () => HttpResponse.json([{ path: 'C:/p/D455 Fast.preset', name: 'Fast' }])),
+        http.post('/api/v1/devices/:deviceId/presets/load', async ({ request }) => { loaded = await request.json(); return HttpResponse.json({}) }),
+      )
+      const device = createMockDevice()
+      const sensor = createMockSensor({ sensor_id: 'sensor-a', name: 'Stereo Module' })
+      const ds = createMockDeviceState(device, {
+        sensors: [sensor],
+        controls: { 'sensors/sensor-a/options': { section: 'Controls', sensorId: 'sensor-a', name: '', options: [
+          createMockOption({ option_id: 'visual_preset', current_value: 0, default_value: 0, min_value: 0, max_value: 6, step: 1,
+            value_descriptions: { '0': 'Custom', '1': 'Default', '2': 'Hand', '3': 'High Accuracy', '4': 'High Density', '5': 'Medium Density', '6': 'Remove IR' } }),
+        ] } },
+      })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } } })
+      await userEvent.click(screen.getByText('Stereo Module'))
+      await userEvent.type(screen.getByPlaceholderText('Search controls…'), 'visual')
+
+      const folder = await screen.findByLabelText('Presets from folder')
+      await userEvent.selectOptions(folder, 'C:/p/D455 Fast.preset')
+      await waitFor(() => expect(loaded).toEqual({ path: 'C:/p/D455 Fast.preset' }))
     })
   })
 
