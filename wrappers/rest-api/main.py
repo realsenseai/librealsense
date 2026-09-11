@@ -117,7 +117,8 @@ async def startup_event():
         handler = logging.FileHandler(log_file, encoding="utf-8")
         handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(threadName)s %(name)s: %(message)s"))
         logging.getLogger().addHandler(handler)
-        logging.getLogger().setLevel(min(logging.getLogger().level or logging.INFO, logging.INFO))
+        level = getattr(logging, os.environ.get("RS_REST_LOG_LEVEL", "INFO").upper(), logging.INFO)
+        logging.getLogger().setLevel(min(logging.getLogger().level or level, level))
     console_settings = manager.settings.get().console
     manager.console.install_sdk_logging(console_settings.log_severity,
                                         console_settings.log_filename if console_settings.log_to_file else None)

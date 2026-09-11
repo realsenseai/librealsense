@@ -5,6 +5,9 @@
 and firmware logs pulled from a device, kept in one bounded buffer and streamed as ``log``."""
 
 import logging
+import os
+import re
+import tempfile
 import threading
 import time
 from collections import deque
@@ -15,9 +18,58 @@ import pyrealsense2 as rs
 SEVERITIES = {"debug": rs.log_severity.debug, "info": rs.log_severity.info,
               "warn": rs.log_severity.warn, "error": rs.log_severity.error, "fatal": rs.log_severity.fatal}
 _SEVERITY_NAMES = {v: k for k, v in SEVERITIES.items()}
+SEVERITY_RANK = {"debug": 0, "info": 1, "warn": 2, "error": 3, "fatal": 4}
 
 
 FLUSH_INTERVAL = 0.1  # firmware logs arrive by the hundreds per second; clients get batches
+
+
+# The SDK's file sink writes " dd/MM HH:mm:ss,ms LEVEL [thread] (file.cpp:123) message" (src/log.h)
+_SDK_LINE = re.compile(r"^\s*(\d\d/\d\d \d\d:\d\d:\d\d,\d+)\s+(\w+)\s+\[(\d+)\]\s+\(([^:()]+):(\d+)\)\s?(.*)$")
+_SDK_LEVELS = {"INFO": "info", "WARNING": "warn", "WARN": "warn", "ERROR": "error", "FATAL": "fatal",
+               "DEBUG": "debug", "VERBOSE": "debug", "TRACE": "debug"}
+TAIL_INTERVAL = 0.2
+
+
+def parse_sdk_line(line: str) -> Optional[Dict[str, Any]]:
+    """One line of the SDK log file as (severity, message, file, line), or None for a continuation."""
+    m = _SDK_LINE.match(line.rstrip("\r\n"))
+    if not m:
+        return None
+    return {"severity": _SDK_LEVELS.get(m.group(2).upper(), "info"), "message": m.group(6),
+            "file": m.group(4), "line": int(m.group(5))}
+
+
+class SdkLogTail:
+    """Reads what the SDK appended to its log file since the last poll.
+
+    The SDK logs from its own threads while holding its own locks; a Python callback there
+    (rs.log_to_callback) needs the GIL, which a Python thread blocked inside an SDK call may
+    hold - a deadlock seen in the wild. Tailing the file keeps the SDK's threads out of Python.
+    """
+
+    def __init__(self, path: str):
+        self.path = path
+        self._pos = 0
+
+    def poll(self) -> List[str]:
+        try:
+            size = os.path.getsize(self.path)
+        except OSError:
+            return []
+        if size < self._pos:  # rolled over
+            self._pos = 0
+        if size == self._pos:
+            return []
+        with open(self.path, "r", encoding="utf-8", errors="replace") as f:
+            f.seek(self._pos)
+            chunk = f.read()
+            self._pos = f.tell()
+        lines = chunk.split("\n")
+        if not chunk.endswith("\n"):  # a partial last line: read it next time
+            self._pos -= len(lines[-1].encode("utf-8", errors="replace"))
+            lines = lines[:-1]
+        return [l for l in lines if l.strip()]
 
 
 class LogConsole:
@@ -28,7 +80,12 @@ class LogConsole:
         self._lock = threading.Lock()
         self._next_id = 1
         self._sdk_installed = False
-        self._flusher: Optional[threading.Timer] = None
+        # One flusher thread for the life of the console: `add` only sets an event, so callers
+        # never block on thread creation while holding the console lock.
+        self._dirty = threading.Event()
+        self._flusher = threading.Thread(target=self._flush_loop, name="console-flusher", daemon=True)
+        self._flusher.start()
+        self._tail_thread: Optional[threading.Thread] = None
 
     def add(self, severity: str, message: str, source: str = "sdk", file: Optional[str] = None,
             line: Optional[int] = None, **extra: Any) -> Dict[str, Any]:
@@ -38,17 +95,20 @@ class LogConsole:
             self._next_id += 1
             self._entries.append(entry)
             self._pending.append(entry)
-            if self._flusher is None:
-                self._flusher = threading.Timer(FLUSH_INTERVAL, self.flush)
-                self._flusher.daemon = True
-                self._flusher.start()
+        self._dirty.set()
         return entry
+
+    def _flush_loop(self) -> None:
+        while True:
+            self._dirty.wait()
+            time.sleep(FLUSH_INTERVAL)  # let a burst accumulate
+            self._dirty.clear()
+            self.flush()
 
     def flush(self) -> None:
         """Send what accumulated since the last flush as one ``log_batch`` event."""
         with self._lock:
             batch, self._pending = self._pending, []
-            self._flusher = None
         if batch:
             self._emit("log_batch", batch)
 
@@ -65,21 +125,44 @@ class LogConsole:
             self._entries = deque(self._entries, maxlen=max_entries)
 
     def install_sdk_logging(self, min_severity: str = "info", log_file: Optional[str] = None) -> None:
-        """Route librealsense log lines here (once per process; the SDK keeps every callback)."""
+        """Route librealsense log lines here, via the SDK's file sink and a tailing thread."""
         if self._sdk_installed:
             return
         severity = SEVERITIES.get(min_severity, rs.log_severity.info)
-
-        def on_log(sev, msg):
-            self.add(_SEVERITY_NAMES.get(sev, "info"), msg.raw(), "sdk", msg.filename(), msg.line_number())
-
+        path = log_file or os.path.join(tempfile.gettempdir(), f"realsense-rest-api-{os.getpid()}.log")
+        # The SDK's file sink flushes every 10 lines (src/log.h LogFlushThreshold). The scratch
+        # file therefore takes everything at debug so lines reach the console promptly, and the
+        # console keeps only what the configured severity asks for. A user-chosen file gets the
+        # configured severity as is.
+        min_rank = SEVERITY_RANK.get(min_severity, 1)
         try:
-            rs.log_to_callback(severity, on_log)
-            if log_file:
-                rs.log_to_file(severity, log_file)
-            self._sdk_installed = True
+            rs.log_to_file(rs.log_severity.debug if not log_file else severity, path)
+            if not log_file:
+                rs.enable_rolling_log_file(20)  # MB; the scratch file must not grow without bound
         except RuntimeError as exc:
             logging.warning("SDK log capture unavailable: %s", exc)
+            return
+        self._sdk_installed = True
+        tail = SdkLogTail(path)
+
+        def run() -> None:
+            last: Optional[Dict[str, Any]] = None
+            while True:
+                for line in tail.poll():
+                    parsed = parse_sdk_line(line)
+                    if parsed is None:
+                        if last is not None:  # continuation of a multi-line message
+                            with self._lock:
+                                last["message"] += "\n" + line.strip()
+                        continue
+                    if SEVERITY_RANK.get(parsed["severity"], 1) < min_rank:
+                        last = None
+                        continue
+                    last = self.add(parsed["severity"], parsed["message"], "sdk", parsed["file"], parsed["line"])
+                time.sleep(TAIL_INTERVAL)
+
+        self._tail_thread = threading.Thread(target=run, name="sdk-log-tail", daemon=True)
+        self._tail_thread.start()
 
     def attach_python_logging(self, level: int = logging.WARNING) -> logging.Handler:
         """The server's own warnings and errors belong in the console too."""

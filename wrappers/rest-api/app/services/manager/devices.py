@@ -165,7 +165,9 @@ class DeviceRegistryMixin:
             logging.warning("Socket emit skipped (no main loop): %s", event)
             return
         try:
-            asyncio.run_coroutine_threadsafe(self.sio.emit(event, payload), loop)
+            future = asyncio.run_coroutine_threadsafe(self.sio.emit(event, payload), loop)
+            future.add_done_callback(lambda f, event=event: f.exception() and logging.warning(
+                "Socket emit failed (%s): %s", event, f.exception()))
         except Exception as exc:
             logging.warning("Socket emit failed (%s): %s", event, exc)
 

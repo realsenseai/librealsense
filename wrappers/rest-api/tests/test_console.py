@@ -196,3 +196,25 @@ def test_command_names_come_from_the_xml():
     xml = '<Commands><Command Name="GVD" Opcode="0x10"/><Command Name="GLD" Opcode="0x0F"/><Other Name="x"/></Commands>'
     assert terminal.command_names(xml) == ["GLD", "GVD"]
     assert terminal.command_names(None) == [] and terminal.command_names("<broken") == []
+
+
+def test_sdk_log_lines_are_parsed_and_continuations_recognised():
+    from app.services.logs import parse_sdk_line
+    entry = parse_sdk_line(" 11/09 21:00:59,305 WARNING [1234] (rs.cpp:305) object doesn't support option")
+    assert entry == {"severity": "warn", "message": "object doesn't support option", "file": "rs.cpp", "line": 305}
+    assert parse_sdk_line("    at some continuation") is None
+    assert parse_sdk_line(" 11/09 21:00:59,305 ERROR [1] (uvc.cpp:12) ")["severity"] == "error"
+
+
+def test_sdk_log_tail_returns_only_new_complete_lines(tmp_path):
+    from app.services.logs import SdkLogTail
+    path = tmp_path / "sdk.log"
+    tail = SdkLogTail(str(path))
+    assert tail.poll() == []  # no file yet
+    path.write_text(" 11/09 21:00:59,305 INFO [1] (a.cpp:1) first\n 11/09 21:00:59,306 INFO [1] (a.cpp:2) part", encoding="utf-8")
+    assert tail.poll() == [" 11/09 21:00:59,305 INFO [1] (a.cpp:1) first"]
+    with path.open("a", encoding="utf-8") as f:
+        f.write("ial\n")
+    assert tail.poll() == [" 11/09 21:00:59,306 INFO [1] (a.cpp:2) partial"]
+    path.write_text(" 11/09 21:01:00,000 INFO [1] (a.cpp:3) rolled\n", encoding="utf-8")  # file rolled over
+    assert tail.poll() == [" 11/09 21:01:00,000 INFO [1] (a.cpp:3) rolled"]
