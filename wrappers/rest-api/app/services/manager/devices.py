@@ -190,9 +190,15 @@ class DeviceRegistryMixin:
             # (WMF activates a media source per device, including the one in use), and the
             # devices-changed callback keeps the registry current anyway - the legacy viewer
             # never enumerates outside that callback either.
-            streaming = [d for d, m in self.streaming_mode.items() if m != "idle"] + list(self.pipelines)
-            if streaming:
-                logging.debug("refresh_devices: skipping ctx enumeration while streaming: %s", streaming)
+            # Likewise with a recording loaded: enumerating a context that holds a playback
+            # device deadlocked inside the SDK against that device's stop.
+            busy = ([d for d, m in self.streaming_mode.items() if m != "idle"] + list(self.pipelines)
+                    + list(self._playbacks)
+                    + [s for s, t in self._collector_threads.items() if t.is_alive()])
+            if time.monotonic() < self._enumeration_hold_until:
+                busy.append("recording just unloaded")
+            if busy:
+                logging.debug("refresh_devices: skipping ctx enumeration while busy: %s", busy)
                 return list(self.device_infos.values())
         return self._refresh_devices_locked()
 
@@ -204,11 +210,15 @@ class DeviceRegistryMixin:
 
     def _refresh_devices_locked(self) -> List[DeviceInfo]:
         """Actual device enumeration (no FW-in-progress guard)."""
-        with self._enumeration(), self.lock:
+        # Enumerate outside the manager lock: the SDK raises the devices-changed callback from
+        # its watcher thread, and that callback takes the manager lock.
+        with self._enumeration():
+            enumerated = list(self.ctx.devices)
+        with self.lock:
             # Register what is there, then drop what is gone. Known devices keep their
             # handles, so readers never see a device vanish and reappear mid-refresh.
             present = set()
-            for dev in self.ctx.devices:
+            for dev in enumerated:
                 serial = dev.get_info(rs.camera_info.serial_number) if dev.supports(rs.camera_info.serial_number) else None
                 if serial is not None:
                     present.add(serial)

@@ -138,6 +138,10 @@ class RealSenseManager(
         self.sensor_rs_queues: Dict[str, Dict[str, Any]] = {}
         # Track sensor stopping state
         self.sensor_stopping: Dict[str, Set[str]] = {}  # device_id -> set of sensor_ids
+        # Frame collector threads by sensor_id; while one is alive the SDK has a frame queue
+        # wait in flight, which enumeration must not overlap (see refresh_devices).
+        self._collector_threads: Dict[str, threading.Thread] = {}
+        self._enumeration_hold_until = 0.0  # monotonic time; set after a recording is unloaded
         # One lock per device around option reads and writes: concurrent option access from
         # several threads was measured to wedge the D455 on the Windows backend.
         self._option_locks: Dict[str, threading.Lock] = defaultdict(threading.Lock)

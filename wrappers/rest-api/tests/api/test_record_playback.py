@@ -166,6 +166,23 @@ def test_transport_actions_drive_the_playback(recording):
     assert client.post(url, json={"action": "stop"}).json() == {**client.get(url).json(), "state": "stopped", "position_ns": 0}
 
 
+def test_play_after_the_end_reopens_the_streaming_sensors(recording):
+    rs_manager = recording["rs_manager"]
+    client.post("/api/v1/playback/load", json={"path": str(recording["bag"])})
+    pid = "playback-walk.bag"
+    calls = []
+    rs_manager.sensor_streams[pid] = {f"{pid}-sensor-0": {"is_streaming": True, "configs": ["depth-cfg"]}}
+    rs_manager.stop_sensor = lambda d, s: calls.append(("stop", d, s))
+    rs_manager.start_sensor = lambda d, s, c: calls.append(("start", d, s, c))
+
+    client.post(f"/api/v1/playback/{pid}", json={"action": "pause"})
+    client.post(f"/api/v1/playback/{pid}", json={"action": "play"})
+    assert calls == []  # paused, not stopped: a plain resume
+    client.post(f"/api/v1/playback/{pid}", json={"action": "stop"})
+    client.post(f"/api/v1/playback/{pid}", json={"action": "play"})
+    assert calls == [("stop", pid, f"{pid}-sensor-0"), ("start", pid, f"{pid}-sensor-0", ["depth-cfg"])]
+
+
 def test_status_callback_is_forwarded_and_unload_removes_the_device(recording):
     rs_manager = recording["rs_manager"]
     emitted = []

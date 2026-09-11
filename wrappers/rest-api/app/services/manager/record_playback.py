@@ -133,6 +133,9 @@ class RecordPlaybackMixin:
             self._remove_device(device_id)
         try:
             self.ctx.unload_device(entry["path"])
+            # Enumerating right after an unload deadlocked inside the SDK against the
+            # playback device's teardown; keep enumeration off while it settles.
+            self._enumeration_hold_until = time.monotonic() + 3.0
         except RuntimeError as exc:
             logging.warning("unload_device(%s): %s", entry["path"], exc)
         self._emit_socket_event("devices_changed", {"added": [], "removed": [device_id]})
@@ -156,7 +159,12 @@ class RecordPlaybackMixin:
         pb = self._playback(device_id)
         entry = self._playbacks[device_id]
         if action == "play":
-            pb.resume()
+            if pb.current_status() == rs.playback_status.stopped and self._playback_streams(device_id):
+                # A recording that ran to its end only plays again once its sensors are
+                # reopened (the legacy play button does the same); resume() alone stays stopped.
+                self._restart_playback(device_id, settle=0.0)
+            else:
+                pb.resume()
         elif action == "pause":
             pb.pause()
         elif action == "stop":
@@ -184,13 +192,16 @@ class RecordPlaybackMixin:
         if name == "stopped" and entry and entry["repeat"]:
             threading.Thread(target=self._restart_playback, args=(device_id,), daemon=True).start()
 
-    def _restart_playback(self, device_id: str) -> None:
+    def _playback_streams(self, device_id: str):
+        """(sensor_id, configs) of the recording's sensors that are streaming."""
+        return [(sensor_id, info["configs"]) for sensor_id, info in self.sensor_streams.get(device_id, {}).items()
+                if info.get("configs")]
+
+    def _restart_playback(self, device_id: str, settle: float = 0.2) -> None:
         """Restart every sensor that was streaming so the recording plays again from the top."""
-        time.sleep(0.2)  # let the SDK finish stopping before reopening
-        for sensor_id, info in list(self.sensor_streams.get(device_id, {}).items()):
-            configs = info.get("configs")
-            if not configs:
-                continue
+        if settle:
+            time.sleep(settle)  # let the SDK finish stopping before reopening
+        for sensor_id, configs in self._playback_streams(device_id):
             try:
                 self.stop_sensor(device_id, sensor_id)
                 self.start_sensor(device_id, sensor_id, configs)

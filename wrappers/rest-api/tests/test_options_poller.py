@@ -86,6 +86,26 @@ def test_the_device_lock_is_taken_per_option_not_per_sweep():
     assert len(acquisitions) == options > 1
 
 
+def test_an_option_the_sensor_refuses_is_asked_only_once():
+    dev = create_mock_device("d1", "cam")
+    poller, emitted = _poller({"d1": dev})
+    sensor = dev.sensors[0]
+    asked = []
+    original = sensor.get_option
+
+    def get_option(opt):
+        asked.append(opt.name)
+        if opt.name == "laser_power":
+            raise RuntimeError("object doesn't support option")
+        return original(opt)
+
+    sensor.get_option = get_option
+    poller.poll_once()
+    poller.poll_once()
+    assert asked.count("laser_power") == 1
+    assert emitted == []
+
+
 def test_forget_drops_a_device_so_a_replug_starts_fresh():
     dev = create_mock_device("d1", "cam")
     poller, emitted = _poller({"d1": dev})

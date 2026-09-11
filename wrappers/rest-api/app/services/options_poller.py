@@ -33,6 +33,10 @@ class OptionsPoller:
         self._emit = emit
         self._interval = interval
         self._known: Dict[str, Dict[str, Values]] = {}  # device -> sensor -> option -> value
+        # Options a sensor lists but refuses to read (the D455 lists both temperatures on every
+        # sensor): asked once, then left alone - each refusal is a USB round trip and an SDK
+        # error line in the console.
+        self._unreadable: Dict[str, set] = {}
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         # Held while a sensor is being read; paused() takes it to keep the poller off the bus.
@@ -56,6 +60,8 @@ class OptionsPoller:
 
     def forget(self, device_id: str) -> None:
         self._known.pop(device_id, None)
+        for key in [k for k in self._unreadable if k.startswith(f"{device_id}-sensor-")]:
+            del self._unreadable[key]
 
     def note_written(self, device_id: str, sensor_id: str, option: str, value: float) -> None:
         """A value the server itself wrote is not a change worth reporting."""
@@ -78,7 +84,7 @@ class OptionsPoller:
                 sensor_id = f"{device_id}-sensor-{index}"
                 try:
                     with self._sweep_lock:
-                        values = self._read(sensor, self._lock_for(device_id))
+                        values = self._read(sensor, self._lock_for(device_id), self._unreadable.setdefault(sensor_id, set()))
                 except Exception as exc:
                     logging.debug("options poll skipped %s: %s", sensor_id, exc)
                     continue
@@ -93,14 +99,16 @@ class OptionsPoller:
                     self._emit("options_changed", {"device_id": device_id, "sensor_id": sensor_id, "options": changed})
 
     @staticmethod
-    def _read(sensor, lock: threading.Lock) -> Values:
+    def _read(sensor, lock: threading.Lock, unreadable: set) -> Values:
         """Read every option, taking the device lock per option so a user's write never waits
         for a whole sweep (tens of controls, each a USB round trip)."""
         values: Values = {}
         for opt in sensor.get_supported_options():
+            if opt.name in unreadable:
+                continue
             try:
                 with lock:
                     values[opt.name] = sensor.get_option(opt)
             except RuntimeError:
-                continue  # an option the firmware refuses right now
+                unreadable.add(opt.name)  # an option the firmware refuses: do not ask again
         return values

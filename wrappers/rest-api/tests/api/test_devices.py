@@ -119,6 +119,23 @@ def test_no_enumeration_while_a_camera_streams(setup_mock_managers):
     real_refresh(rs_manager)
     assert ctx.enumerations == 1
 
+    rs_manager._playbacks["playback-x.db3"] = {"speed": 1.0, "repeat": False, "path": "x.db3"}
+    real_refresh(rs_manager)
+    assert ctx.enumerations == 1  # a loaded recording also keeps enumeration off
+    rs_manager._playbacks.clear()
+
+    import threading
+    done = threading.Event()
+    collector = threading.Thread(target=done.wait, daemon=True)
+    collector.start()
+    rs_manager._collector_threads["device1-sensor-0"] = collector
+    real_refresh(rs_manager)
+    assert ctx.enumerations == 1  # a frame collector still waiting on the SDK, too
+    done.set()
+    collector.join(1)
+    real_refresh(rs_manager)
+    assert ctx.enumerations == 2
+
 
 def test_refresh_keeps_known_handles_and_drops_the_unplugged(setup_mock_managers):
     rs_manager = setup_mock_managers["rs_manager"]

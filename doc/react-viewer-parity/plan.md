@@ -117,7 +117,7 @@ Enables everything after it. No user-visible parity except settings and multi-ca
   HW: D455. 1 d.
 - [x] **WP2.9 AE ROI.** `GET/PUT /sensors/{s}/roi` via `roi_sensor`; drag rectangle on
   tile, reset to full frame, default centre 3/4; algo ROI overlay toggle. HW: D455. 1.5 d.
-- [ ] **WP2.10 HDR tool.** `GET/PUT /devices/{d}/hdr` exposing sequence size, per-item
+- [x] **WP2.10 HDR tool.** `GET/PUT /devices/{d}/hdr` exposing sequence size, per-item
   exposure/gain, enable; UI dialog mirroring `hdr-model.*` (load/save JSON, load from
   device, apply). HW: D455 with HDR FW. 2.5 d.
 - [x] **WP2.11 Stream config parity.** Per-stream FPS when no common FPS; mixed
@@ -144,7 +144,7 @@ Enables everything after it. No user-visible parity except settings and multi-ca
   `set_status_changed_callback` → socket `playback_status`; server-side repeat like
   `realsense-viewer.cpp:59-115`; `components/playback/Transport.tsx` (step buttons, seek
   bar with hh:mm:ss.mmm, speed combo x0.25–x2, repeat, info). 3 d.
-- [ ] **WP3.4 Playback E2E.** Record 5 s on D455 → load → play → seek → step → loop, in
+- [x] **WP3.4 Playback E2E.** Record 5 s on D455 → load → play → seek → step → loop, in
   `real-device.spec.ts` and `tests/live/test_playback.py`. 1 d.
 - [ ] **WP3.5 (stretch) Legacy .bag conversion.** Detect ROS1 bag, offer conversion via
   `rs-convert` subprocess if found on PATH. 1 d.
@@ -336,3 +336,13 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   option rather than per sweep, device/sensor endpoints run the SDK off the event loop, and
   `RS_REST_LOG_FILE` mirrors the server log to a file. Note the legacy viewer never polls
   options (its 6 s read-only refresh is compiled out); the SDK's own watcher does, at 1 s.
+- Finding (root cause of the freezes above): the `rs.context.query_devices` / `.devices` /
+  `load_device` / `unload_device` bindings did not release the GIL. Enumeration blocks on the
+  same SDK lock the device-watcher thread holds while it waits for the GIL to run the
+  Python devices-changed callback, so every Python thread in the process stalls (the event
+  loop included, which is why `/health` stopped answering). Fixed in
+  `wrappers/python/pyrs_context.cpp` (`py::call_guard<py::gil_scoped_release>()`); the server
+  additionally enumerates outside its own lock and never while a camera streams.
+- WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
+  `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
+  once its sensors are reopened; `play` now does that (the legacy play button does too).
