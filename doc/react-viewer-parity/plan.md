@@ -199,7 +199,7 @@ Enables everything after it. No user-visible parity except settings and multi-ca
   3 d.
 - [ ] **WP6.5 D500 OCC interactive.** `POST /calibration/d500 {action: run|dry_run|abort|
   try_new|try_old|commit}` with the `rect_health` screen. HW: D555/D585. 2.5 d.
-- [ ] **WP6.6 Calibration tables.** `GET/PUT /calibration/table`, `POST
+- [x] **WP6.6 Calibration tables.** `GET/PUT /calibration/table`, `POST
   /calibration/reset_factory`, write gate from settings; `CalibrationTableEditor.tsx`
   (intrinsics, 3×3, distortion, per-resolution). 2.5 d.
 - [ ] **WP6.7 Recommend-calibration notice** with snooze (WP7.4 dependency). 0.5 d.
@@ -378,6 +378,11 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   legacy colour bands, Use new / Use old / Keep / Recalibrate) from the device menu, live in
   `tests/e2e/calibration.spec.ts`. Dry-run (scan only) is exposed as host assistance but
   the host-assisted frame loop is not implemented.
+- WP6.6 calibration table: `services/calibration_table.py` parses the D400 coefficients
+  table (header, four 3x3 matrices, baseline, per-resolution rectified fx/fy/ppx/ppy) and
+  rewrites edited fields with a fresh CRC-32; `GET/PUT /calibration/table` plus the editor
+  dialog from the device menu. Finding: the D455 returns 512 bytes (no trailing reserved
+  block), version 3.1, baseline -94.69 mm; `set_calibration_table` takes a list of ints.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).

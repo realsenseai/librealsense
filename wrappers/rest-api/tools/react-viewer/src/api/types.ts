@@ -94,6 +94,36 @@ export interface CalibrationStatus {
   error: string | null
   started_at: number | null
 }
+// The D400 coefficients table (GET/PUT /devices/{d}/calibration/table)
+export interface RectParams {
+  resolution: string
+  fx: number
+  fy: number
+  ppx: number
+  ppy: number
+}
+export interface CalibrationTable {
+  version: string
+  table_type: number
+  table_size: number
+  crc_valid: boolean
+  intrinsic_left: number[][]
+  intrinsic_right: number[][]
+  world2left_rot: number[][]
+  world2right_rot: number[][]
+  baseline: number
+  brown_model: number
+  rect_params: RectParams[]
+}
+export interface CalibrationTablePatch {
+  baseline?: number
+  intrinsic_left?: number[][]
+  intrinsic_right?: number[][]
+  world2left_rot?: number[][]
+  world2right_rot?: number[][]
+  rect_params?: { index: number; fx?: number; fy?: number; ppx?: number; ppy?: number }[]
+  write: boolean
+}
 export interface OccParams {
   speed: number // 0 very fast .. 3 slow, 4 white wall
   average_step_count: number

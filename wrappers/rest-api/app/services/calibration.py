@@ -272,6 +272,29 @@ class CalibrationMixin:
         session.written = True
         return session.to_dict()
 
+    def get_calibration_table(self, device_id: str) -> Dict[str, Any]:
+        """The device's coefficients table, parsed (calibration-model.cpp)."""
+        from app.services import calibration_table
+        dev = self._require_device(device_id)
+        with self.option_lock(device_id):
+            raw = bytes(rs.auto_calibrated_device(dev).get_calibration_table())
+        return calibration_table.parse(raw)
+
+    def set_calibration_table(self, device_id: str, patch: Dict[str, Any], write: bool) -> Dict[str, Any]:
+        """Edit fields of the table, make it active and optionally write it to flash."""
+        from app.services import calibration_table
+        if write and not self.settings.get().calibration.enable_writing:
+            raise RealSenseError(status_code=403, detail="Writing calibration to the device is disabled in Settings")
+        dev = self._require_device(device_id)
+        calib_dev = rs.auto_calibrated_device(dev)
+        with self.option_lock(device_id):
+            raw = bytes(calib_dev.get_calibration_table())
+            edited = calibration_table.apply_patch(raw, patch)
+            calib_dev.set_calibration_table(list(edited))  # the binding takes a list of bytes
+            if write:
+                calib_dev.write_calibration()
+        return calibration_table.parse(edited)
+
     def reset_factory_calibration(self, device_id: str) -> Dict[str, Any]:
         if not self.settings.get().calibration.enable_writing:
             raise RealSenseError(status_code=403, detail="Writing calibration to the device is disabled in Settings")

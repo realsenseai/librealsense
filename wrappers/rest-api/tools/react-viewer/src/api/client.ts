@@ -27,6 +27,8 @@ import type {
   HdrStatus,
   PointCloudGeometry,
   CalibrationStatus,
+  CalibrationTable,
+  CalibrationTablePatch,
   OccParams,
   TareParams,
   JobInfo,
@@ -347,6 +349,14 @@ class ApiClient {
 
   async keepCalibration(deviceId: string): Promise<CalibrationStatus> {
     return (await this.client.post<CalibrationStatus>(`/devices/${deviceId}/calibration/keep`)).data
+  }
+
+  async getCalibrationTable(deviceId: string): Promise<CalibrationTable> {
+    return (await this.client.get<CalibrationTable>(`/devices/${deviceId}/calibration/table`)).data
+  }
+
+  async setCalibrationTable(deviceId: string, patch: CalibrationTablePatch): Promise<CalibrationTable> {
+    return (await this.client.put<CalibrationTable>(`/devices/${deviceId}/calibration/table`, patch)).data
   }
 
   async resetFactoryCalibration(deviceId: string): Promise<CalibrationStatus> {

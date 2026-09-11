@@ -12,12 +12,29 @@ const sensorOptionsMap: Record<string, any[]> = {
   'sensor-2': mockMotionOptions,
 }
 
+
+export function mockCalibrationTable() {
+  const eye = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+  const res = ['1920x1080', '1280x720', '640x480', '848x480', '640x360', '424x240', '320x240', '480x270', '1280x800', '960x540', 'reserved', 'reserved', '640x400', '576x576', '720x720', '1152x1152']
+  return {
+    version: '2.1', table_type: 25, table_size: 576, crc_valid: true,
+    intrinsic_left: [[0.5, 0, 0.5], [0, 0.9, 0.5], [0, 0, 1]], intrinsic_right: [[0.5, 0, 0.5], [0, 0.9, 0.5], [0, 0, 1]],
+    world2left_rot: eye, world2right_rot: eye, baseline: 95, brown_model: 1,
+    rect_params: res.map((resolution, i) => ({ resolution, fx: 400 + i, fy: 400 + i, ppx: 320, ppy: 240 })),
+  }
+}
+
 export const handlers = [
   http.get(`${API_BASE}/jobs/`, () => HttpResponse.json([])),
   http.get(`${API_BASE}/logs/`, () => HttpResponse.json([])),
   http.get(`${API_BASE}/devices/:deviceId/calibration/`, () => HttpResponse.json({
     kind: null, state: 'idle', health: null, verdict: null, has_new_table: false, active: 'old', written: false, error: null, started_at: null,
   })),
+  http.get(`${API_BASE}/devices/:deviceId/calibration/table`, () => HttpResponse.json(mockCalibrationTable())),
+  http.put(`${API_BASE}/devices/:deviceId/calibration/table`, async ({ request }) => {
+    const patch = (await request.json()) as { baseline?: number }
+    return HttpResponse.json({ ...mockCalibrationTable(), baseline: patch.baseline ?? 95 })
+  }),
   http.post(`${API_BASE}/devices/:deviceId/calibration/occ`, () => HttpResponse.json({
     id: 'calib1', kind: 'calibration_occ', device_id: 'test-device-1', state: 'running', progress: 0.05, message: 'Calibrating', result: null, error: null, created_at: 1, updated_at: 1,
   })),

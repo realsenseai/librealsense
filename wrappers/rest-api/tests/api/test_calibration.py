@@ -130,3 +130,35 @@ def test_tare_reports_health_in_percent(setup_mock_managers, monkeypatch):
     assert done["result"]["health"] == [1.0, -2.0]
     tare = next(c for c in _FakeCalibDevice.calls if c[0] == "tare")
     assert tare[1] == 1000.0
+
+
+def test_table_read_and_edit_through_the_api(setup_mock_managers, monkeypatch):
+    import struct
+    import zlib
+    from app.services import calibration_table as ct
+    rs_manager, _ = _arm(setup_mock_managers, monkeypatch)
+    data = bytearray(ct.TABLE_SIZE)
+    struct.pack_into("<f", data, ct.OFF_BASELINE, 50.0)
+    struct.pack_into("<I", data, 12, zlib.crc32(bytes(data[ct.HEADER_SIZE:])) & 0xFFFFFFFF)
+    store = {"table": bytes(data)}
+
+    class _TableDevice(_FakeCalibDevice):
+        def get_calibration_table(self):
+            return store["table"]
+
+        def set_calibration_table(self, table):
+            store["table"] = bytes(table)
+            _FakeCalibDevice.calls.append(("set",))
+
+    monkeypatch.setattr(calibration.rs, "auto_calibrated_device", _TableDevice)
+
+    assert client.get(URL + "/table").json()["baseline"] == 50.0
+    edited = client.put(URL + "/table", json={"baseline": 55.0, "write": False}).json()
+    assert edited["baseline"] == 55.0 and edited["crc_valid"] is True
+    assert ("set",) in _FakeCalibDevice.calls and ("write",) not in _FakeCalibDevice.calls
+
+    rs_manager.settings.update({"calibration": {"enable_writing": False}})
+    assert client.put(URL + "/table", json={"baseline": 56.0, "write": True}).status_code == 403
+    rs_manager.settings.update({"calibration": {"enable_writing": True}})
+    assert client.put(URL + "/table", json={"baseline": 56.0, "write": True}).json()["baseline"] == 56.0
+    assert ("write",) in _FakeCalibDevice.calls

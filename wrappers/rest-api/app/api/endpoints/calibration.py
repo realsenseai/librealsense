@@ -38,6 +38,26 @@ class ApplyRequest(BaseModel):
     use_new: bool = True
 
 
+class RectParamsPatch(BaseModel):
+    index: Optional[int] = Field(None, ge=0, le=15)
+    resolution: Optional[str] = None
+    fx: Optional[float] = None
+    fy: Optional[float] = None
+    ppx: Optional[float] = None
+    ppy: Optional[float] = None
+
+
+class TablePatch(BaseModel):
+    """Fields of the D400 coefficients table the legacy editor lets the user change."""
+    baseline: Optional[float] = None
+    intrinsic_left: Optional[list] = None
+    intrinsic_right: Optional[list] = None
+    world2left_rot: Optional[list] = None
+    world2right_rot: Optional[list] = None
+    rect_params: Optional[list[RectParamsPatch]] = None
+    write: bool = False
+
+
 @router.get("/", response_model=dict)
 async def get_calibration(device_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
     """The device's calibration session: state, health, which table is active."""
@@ -68,6 +88,20 @@ async def apply_calibration(device_id: str, body: ApplyRequest = ApplyRequest(),
 async def keep_calibration(device_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
     """Write the active table to the device's flash (gated by Settings > calibration)."""
     return await run_in_threadpool(rs_manager.keep_calibration, device_id)
+
+
+@router.get("/table", response_model=dict)
+async def get_table(device_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
+    """The D400 coefficients table: intrinsics, rotations, baseline, rectified parameters."""
+    return await run_in_threadpool(rs_manager.get_calibration_table, device_id)
+
+
+@router.put("/table", response_model=dict)
+async def set_table(device_id: str, body: TablePatch, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
+    """Edit table fields; the table becomes active, and with `write` it is stored in flash."""
+    patch = body.model_dump(exclude_none=True)
+    write = patch.pop("write", False)
+    return await run_in_threadpool(rs_manager.set_calibration_table, device_id, patch, write)
 
 
 @router.post("/reset_factory", response_model=dict)

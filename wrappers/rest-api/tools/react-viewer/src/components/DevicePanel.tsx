@@ -14,6 +14,7 @@ import { RecordButton } from './record/RecordButton'
 import { UpdatesDialog } from './updates/UpdatesDialog'
 import { HdrDialog } from './hdr/HdrDialog'
 import { CalibrationDialog } from './calibration/CalibrationDialog'
+import { CalibrationTableEditor } from './calibration/CalibrationTableEditor'
 import { lessScreamy } from '../utils/metadataDecoders'
 import { Collapsible, ToggleSwitch } from './Collapsible'
 
@@ -161,6 +162,7 @@ export function DevicePanel() {
   const [updatesFor, setUpdatesFor] = useState<DeviceInfo | null>(null)
   const [hdrFor, setHdrFor] = useState<DeviceInfo | null>(null)
   const [calibrationFor, setCalibrationFor] = useState<{ device: DeviceInfo; mode: 'occ' | 'tare' } | null>(null)
+  const [tableFor, setTableFor] = useState<DeviceInfo | null>(null)
 
   useEffect(() => {
     // The server keeps its registry current from the SDK's devices-changed callback;
@@ -356,6 +358,7 @@ export function DevicePanel() {
                 onShowUpdates={() => setUpdatesFor(device)}
                 onShowHdr={() => setHdrFor(device)}
                 onShowCalibration={(mode) => setCalibrationFor({ device, mode })}
+                onShowCalibrationTable={() => setTableFor(device)}
                 onUpdateFirmwareFromFile={(file) => handleUpdateFirmwareFromFile(device, file)}
                 onToggleAdvancedMode={(enable) => toggleAdvancedMode(device.device_id, enable)}
                 onUploadPreset={(file) => uploadPreset(device.device_id, file)}
@@ -369,6 +372,10 @@ export function DevicePanel() {
 
       {hdrFor && (
         <HdrDialog deviceId={hdrFor.device_id} deviceName={hdrFor.name} onClose={() => setHdrFor(null)} />
+      )}
+
+      {tableFor && (
+        <CalibrationTableEditor deviceId={tableFor.device_id} deviceName={tableFor.name} onClose={() => setTableFor(null)} />
       )}
 
       {calibrationFor && (
@@ -416,6 +423,7 @@ interface DeviceCardProps {
   onShowUpdates: () => void
   onShowHdr: () => void
   onShowCalibration: (mode: 'occ' | 'tare') => void
+  onShowCalibrationTable: () => void
   onUpdateFirmwareFromFile: (file: File) => void
   onToggleAdvancedMode: (enable: boolean) => void
   onUploadPreset: (file: File) => void
@@ -435,6 +443,7 @@ function DeviceCard({
   onShowUpdates,
   onShowHdr,
   onShowCalibration,
+  onShowCalibrationTable,
   onUpdateFirmwareFromFile,
   onToggleAdvancedMode,
   onUploadPreset,
@@ -586,6 +595,13 @@ function DeviceCard({
                         >
                           <span className="w-4 text-center">⊚</span>
                           Tare Calibration…
+                        </button>
+                        <button
+                          onClick={() => { setShowMenu(false); onShowCalibrationTable() }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                        >
+                          <span className="w-4 text-center">▦</span>
+                          Calibration Table…
                         </button>
                       </>
                     )}
