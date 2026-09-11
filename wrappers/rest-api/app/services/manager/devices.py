@@ -92,6 +92,15 @@ class DeviceRegistryMixin:
             except RuntimeError:
                 pass
 
+        # rs.camera_info has a member called "name", so the members are walked by key.
+        all_info = {}
+        for key, member in rs.camera_info.__members__.items():
+            try:
+                if dev.supports(member):
+                    all_info[key] = dev.get_info(member)
+            except RuntimeError:
+                pass
+
         info = DeviceInfo(
             device_id=device_id,
             name=_info(rs.camera_info.name, "Unknown Device"),
@@ -103,6 +112,7 @@ class DeviceRegistryMixin:
             sensors=sensors,
             is_streaming=device_id in self.pipelines,
             metadata_enabled=metadata_enabled,
+            info=all_info,
         )
         # Publish atomically at the end — if anything above raises, no partial
         # cache entry is left behind. Keep new work above this block.

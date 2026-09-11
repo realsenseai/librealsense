@@ -131,6 +131,13 @@ class device:
                 return value
         raise RuntimeError(f"Info {info_type} not available")
 
+    def supports(self, info_type):
+        wanted = str(info_type).rsplit(".", 1)[-1]
+        return any(str(key).rsplit(".", 1)[-1] == wanted for key in self._info)
+
+    def is_metadata_enabled(self):
+        return True
+
     def add_sensor(self, sensor):
         self.sensors.append(sensor)
 

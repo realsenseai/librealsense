@@ -11,6 +11,8 @@ export interface DeviceInfo {
   sensors: string[]
   is_streaming: boolean
   metadata_enabled?: boolean | null
+  /** Every RS2_CAMERA_INFO field the device reports, by field name. */
+  info?: Record<string, string>
 }
 
 /** Display label for an SDK name: "deepSeaMedianThreshold" -> "Deep Sea Median Threshold". */
@@ -117,6 +119,8 @@ export interface SupportedStreamProfile {
   formats: string[]
   /** The profile the SDK marks default for this stream, when it has one. */
   default?: { resolution: [number, number]; fps: number; format: string }
+  /** Every exact (width, height, fps, format) the SDK lists. */
+  modes?: [number, number, number, string][]
 }
 
 export interface OptionInfo {
@@ -244,6 +248,10 @@ export interface SensorConfig {
   resolution: { width: number; height: number }
   framerate: number
   isMotionSensor?: boolean // Motion sensors use per-stream FPS instead of shared
+  // Set when the sensor's streams share no resolution / no frame rate (legacy: depth and IR
+  // at different sizes, or no common FPS), so each stream picks its own.
+  perStreamResolution?: boolean
+  perStreamFps?: boolean
 }
 
 // Per-device state for multi-camera support

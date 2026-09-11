@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from app.models.option import OptionInfo
 
@@ -33,6 +33,7 @@ class SupportedStreamProfile(BaseModel):
     fps: List[int] # List of frames per second
     formats: List[str] # List of supported formats
     default: Optional[DefaultProfile] = None
+    modes: List[Tuple[int, int, int, str]] = []  # every (width, height, fps, format) the SDK lists
 
 class SensorInfo(BaseModel):
     sensor_id: str

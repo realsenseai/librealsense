@@ -7,6 +7,8 @@ import { RefreshCcw, Search, X } from 'lucide-react'
 import { FirmwareProgressModal } from './FirmwareProgressModal'
 import { ToastContainer, type ToastType, type ToastAction } from './Toast'
 import { searchGroup } from '../utils/optionSearch'
+import { unsupportedStreams } from '../utils/streamModes'
+import { lessScreamy } from '../utils/metadataDecoders'
 import { Collapsible, ToggleSwitch } from './Collapsible'
 
 interface Toast {
@@ -379,6 +381,7 @@ function DeviceCard({
   onShowToast,
 }: DeviceCardProps) {
   const [showMenu, setShowMenu] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
   const fwPicker = useFilePicker(onUpdateFirmwareFromFile, '.bin')
 
   const isLoading = deviceState?.isLoading || false
@@ -549,6 +552,29 @@ function DeviceCard({
           )}
           {device.usb_type && <span>USB: {device.usb_type}</span>}
         </div>
+        {device.info && Object.keys(device.info).length > 0 && (
+          <div className="mt-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              className="text-gray-400 hover:text-white"
+            >
+              {showDetails ? 'Hide Device Details' : 'Show Device Details'}
+            </button>
+            {showDetails && (
+              <table className="mt-1 w-full text-[11px] text-gray-300" data-testid="device-details">
+                <tbody>
+                  {Object.entries(device.info).map(([key, value]) => (
+                    <tr key={key} className="border-t border-gray-700/60">
+                      <td className="py-0.5 pr-2 text-gray-500 whitespace-nowrap">{lessScreamy(key)}</td>
+                      <td className="py-0.5 break-all">{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
 
         {/* Sensor names, until the sensors themselves are loaded */}
         {device.sensors.length > 0 && isLoading && (
@@ -632,7 +658,9 @@ function SensorPanel({
   const isSensorStreaming = status?.is_streaming || false
   const isSensorPending = status?.pendingOp === 'stopping'
   const sensorError = status?.error
-  const canStartSensor = streams.some(c => c.enable)
+  // The legacy viewer refuses to start a mode the SDK does not list ("Selected value is not supported").
+  const unsupported = unsupportedStreams(streams, sensor.supported_stream_profiles, sensorConfig)
+  const canStartSensor = streams.some(c => c.enable) && unsupported.length === 0
 
   const modifiedCount = groups.flatMap(([, g]) => g.options).filter(isModified).length
 
@@ -681,7 +709,8 @@ function SensorPanel({
           onClick={() => isSensorStreaming ? onStopStreaming() : onStartStreaming()}
           disabled={isSensorPending || (!canStartSensor && !isSensorStreaming)}
           data-testid={isSensorStreaming ? "stop-streaming" : "start-streaming"}
-          title={isSensorPending ? 'Stopping...' : isSensorStreaming ? 'Stop' : 'Start'}
+          title={isSensorPending ? 'Stopping...' : isSensorStreaming ? 'Stop'
+            : unsupported.length ? `Selected mode is not supported: ${unsupported.join(', ')}` : 'Start'}
           className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
             isSensorPending
               ? 'bg-yellow-600 text-white cursor-wait'
@@ -696,15 +725,16 @@ function SensorPanel({
           {isSensorPending ? '⏳' : isSensorStreaming ? '■' : '▶'}
         </button>
       }
-      belowHeader={sensorError && (
+      belowHeader={(sensorError || (unsupported.length > 0 && !isSensorStreaming)) && (
         <div className="mb-2 text-xs text-red-400 bg-red-900/30 rounded px-2 py-1">
-          {sensorError}
+          {sensorError ?? `Selected mode is not supported: ${unsupported.join(', ')}`}
         </div>
       )}
     >
       <div className="mt-2 space-y-1">
-            {sensorConfig && !sensorConfig.isMotionSensor && (
+            {sensorConfig && !sensorConfig.isMotionSensor && !(sensorConfig.perStreamResolution && sensorConfig.perStreamFps) && (
               <div className="mb-2 flex items-center gap-2 text-xs">
+                {!sensorConfig.perStreamResolution && (
                 <div className="flex items-center gap-1">
                   <label className="text-gray-500">Res:</label>
                   <select
@@ -723,6 +753,8 @@ function SensorPanel({
                     ))}
                   </select>
                 </div>
+                )}
+                {!sensorConfig.perStreamFps && (
                 <div className="flex items-center gap-1">
                   <label className="text-gray-500">FPS:</label>
                   <select
@@ -738,6 +770,7 @@ function SensorPanel({
                     ))}
                   </select>
                 </div>
+                )}
               </div>
             )}
 
@@ -750,6 +783,8 @@ function SensorPanel({
                   onUpdate={onUpdateStreamConfig}
                   disabled={isSensorStreaming}
                   isMotionSensor={sensorConfig?.isMotionSensor ?? false}
+                  perStreamResolution={sensorConfig?.perStreamResolution ?? false}
+                  perStreamFps={sensorConfig?.perStreamFps ?? false}
                 />
               ))}
             </div>
@@ -803,9 +838,11 @@ interface StreamConfigItemProps {
   onUpdate: (config: StreamConfig) => void
   disabled: boolean
   isMotionSensor: boolean
+  perStreamResolution?: boolean
+  perStreamFps?: boolean
 }
 
-function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor }: StreamConfigItemProps) {
+function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor, perStreamResolution, perStreamFps }: StreamConfigItemProps) {
   const profile = sensor.supported_stream_profiles.find((p) =>
     p.stream_type.toLowerCase() === config.stream_type.toLowerCase()
   )
@@ -858,8 +895,24 @@ function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor }
           ))}
         </select>
       )}
-      {/* Per-stream FPS selector for motion sensors */}
-      {config.enable && isMotionSensor && (
+      {config.enable && perStreamResolution && !isMotionSensor && (
+        <select
+          value={`${config.resolution.width}x${config.resolution.height}`}
+          onChange={(e) => {
+            const [width, height] = e.target.value.split('x').map(Number)
+            onUpdate({ ...config, resolution: { width, height } })
+          }}
+          disabled={disabled}
+          className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+          aria-label={`${config.stream_type} resolution`}
+        >
+          {profile.resolutions.map(([w, h]) => (
+            <option key={`${w}x${h}`} value={`${w}x${h}`}>{w}×{h}</option>
+          ))}
+        </select>
+      )}
+      {/* Per-stream FPS: motion sensors always, video sensors when no frame rate is shared */}
+      {config.enable && (isMotionSensor || perStreamFps) && (
         <select
           value={config.framerate}
           onChange={(e) => onUpdate({ ...config, framerate: Number(e.target.value) })}

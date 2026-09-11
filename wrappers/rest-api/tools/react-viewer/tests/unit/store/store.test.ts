@@ -373,6 +373,22 @@ describe('AppStore', () => {
       expect(ds.streamConfigs.find((c) => c.stream_type === 'Accel')?.framerate).toBe(100)
     })
 
+    it('lets each stream pick its own mode when the sensor shares no resolution or frame rate', async () => {
+      const device = createMockDevice({ device_id: '123456789' })
+      server.use(http.get('/api/v1/devices/:deviceId/sensors/', () => HttpResponse.json([
+        createMockSensor({ sensor_id: '123456789-sensor-0', options: [], supported_stream_profiles: [
+          { stream_type: 'Depth', resolutions: [[640, 480]], fps: [30], formats: ['Z16'] },
+          { stream_type: 'Infrared', resolutions: [[1280, 720]], fps: [15], formats: ['Y8'] },
+        ] }),
+      ])))
+      useAppStore.setState({ devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } })
+
+      await useAppStore.getState().fetchSensors(device.device_id)
+
+      expect(useAppStore.getState().deviceStates[device.device_id].sensorConfigs['123456789-sensor-0'])
+        .toMatchObject({ perStreamResolution: true, perStreamFps: true })
+    })
+
     it('falls back to depth/color/IMU at the first mode when no profile is default', async () => {
       const device = createMockDevice({ device_id: '123456789' })
       server.use(http.get('/api/v1/devices/:deviceId/sensors/', () => HttpResponse.json([

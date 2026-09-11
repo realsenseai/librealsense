@@ -108,6 +108,18 @@ function buildSensorConfigs(sensors: SensorInfo[]): Record<string, SensorConfig>
       }
     }
 
+    // Nothing shared: like the legacy viewer (subdevice-model.h), each stream picks its own.
+    const perStreamResolution = commonResolutions.size === 0 && profiles.length > 0
+    const perStreamFps = commonFps.size === 0 && profiles.length > 0
+    if ((perStreamResolution || perStreamFps) && !isMotionSensor) {
+      const first = profiles[0].default ?? { resolution: profiles[0].resolutions[0], fps: profiles[0].fps[0] }
+      sensorConfigs[sensor.sensor_id] = {
+        resolution: { width: first.resolution[0], height: first.resolution[1] }, framerate: first.fps,
+        isMotionSensor, perStreamResolution, perStreamFps,
+      }
+      continue
+    }
+
     // The SDK default of a video stream on this sensor wins over the first common mode.
     const preferred = isMotionSensor ? undefined : profiles.find(p => p.default)?.default
     const preferredRes = preferred && `${preferred.resolution[0]}x${preferred.resolution[1]}`
@@ -597,8 +609,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const configs: SensorStreamConfig[] = enabledStreamConfigs.map(c => ({
       stream_type: c.stream_type,
       format: c.format,
-      resolution: sensorConfig.isMotionSensor ? c.resolution : sensorConfig.resolution,
-      framerate: sensorConfig.isMotionSensor ? c.framerate : sensorConfig.framerate,
+      resolution: sensorConfig.isMotionSensor || sensorConfig.perStreamResolution ? c.resolution : sensorConfig.resolution,
+      framerate: sensorConfig.isMotionSensor || sensorConfig.perStreamFps ? c.framerate : sensorConfig.framerate,
     }))
 
     try {

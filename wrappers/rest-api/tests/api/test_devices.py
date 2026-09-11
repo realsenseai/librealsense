@@ -70,3 +70,19 @@ def test_set_option(setup_mock_managers):
 
     response = client.put(f"{OPTIONS_URL}/{option_id}", json={"value": 0.5})
     assert response.status_code == 200
+
+
+def test_device_carries_every_camera_info_field(setup_mock_managers):
+    rs_manager = setup_mock_managers["rs_manager"]
+    from ..mocks.setup_fake_devices import setup_fake_devices
+    rs_manager.devices.clear(); rs_manager.device_infos.clear()
+    with rs_manager.lock:
+        rs_manager._register_new_device(setup_fake_devices()[0])
+    info = rs_manager.device_infos["device1"].info
+    assert info["serial_number"] == "device1" and info["product_id"] == "0123" and info["usb_type_descriptor"] == "3.0"
+
+
+def test_stream_profiles_list_every_exact_mode(setup_mock_managers):
+    depth = next(s for s in client.get("/api/v1/devices/device1/sensors").json() if s["type"] == "Depth Sensor")
+    modes = depth["supported_stream_profiles"][0]["modes"]
+    assert [640, 480, 30, "z16"] in modes and [1280, 720, 60, "z16"] in modes and len(modes) == 4

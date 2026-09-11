@@ -239,6 +239,20 @@ describe('DevicePanel', () => {
     })
   })
 
+  describe('Device details', () => {
+    it('lists every camera info field behind a toggle', async () => {
+      const device = createMockDevice({ info: { name: 'RealSense D455', serial_number: '123', usb_type_descriptor: '3.2', product_line: 'D400' } })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } } })
+
+      expect(screen.queryByTestId('device-details')).not.toBeInTheDocument()
+      await userEvent.click(screen.getByText('Show Device Details'))
+      const table = screen.getByTestId('device-details')
+      expect(table).toHaveTextContent('Usb Type Descriptor')
+      expect(table).toHaveTextContent('3.2')
+      expect(table).toHaveTextContent('Product Line')
+    })
+  })
+
   describe('Header', () => {
     it('renders "Devices" header', () => {
       render(<DevicePanel />)
