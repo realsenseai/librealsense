@@ -47,6 +47,7 @@ test.describe('@real-device 3D view', () => {
     }
     await expect(page.locator('video').first()).toBeVisible({ timeout: 15000 })
 
+    try {
     await page.getByRole('button', { name: '3D View' }).click()
     const toolbar = page.getByTestId('3d-toolbar')
     await expect(toolbar).toBeVisible()
@@ -64,11 +65,17 @@ test.describe('@real-device 3D view', () => {
     await texture.selectOption('')
     await expect(page.locator('canvas').first()).toBeVisible()
 
-    // Measurement: two clicks on the cloud draw a ruler with a distance label; Z undoes
+    // Measurement: clicks on the cloud add points; the second one draws a ruler with a
+    // distance label. The scene is whatever the camera sees, so probe a grid of spots.
     const canvas = page.locator('canvas').first()
     const box = (await canvas.boundingBox())!
-    await page.mouse.click(box.x + box.width * 0.45, box.y + box.height * 0.5)
-    await page.mouse.click(box.x + box.width * 0.55, box.y + box.height * 0.5)
+    outer: for (const fy of [0.5, 0.4, 0.6, 0.3, 0.7]) {
+      for (const fx of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8]) {
+        await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy)
+        await page.waitForTimeout(150)
+        if (await page.getByTestId('ruler-label').count()) break outer
+      }
+    }
     await expect(page.getByTestId('ruler-label').first()).toBeVisible({ timeout: 10000 })
     await page.keyboard.press('z')
     await expect(page.getByTestId('ruler-label')).toHaveCount(0)
@@ -80,12 +87,15 @@ test.describe('@real-device 3D view', () => {
     await page.getByTestId('ply-export-menu').getByRole('button', { name: 'Export' }).click()
     expect((await download).suggestedFilename()).toMatch(/\.ply$/)
 
-    await page.getByRole('button', { name: '2D View' }).click()
-    while (await deviceCard.locator('button:has-text("Stop")').count()) {
-      await deviceCard.locator('button:has-text("Stop")').first().click()
-      await page.waitForTimeout(1000)
-    }
     const shaderErrors = errors.filter((e) => /shader|webgl|program/i.test(e))
     expect(shaderErrors, shaderErrors.join(' | ')).toEqual([])
+    } finally {
+      // Leave the camera idle for the next test even when an assertion failed
+      await page.getByRole('button', { name: '2D View' }).click().catch(() => undefined)
+      for (let i = 0; i < 4 && await deviceCard.locator('button:has-text("Stop")').count(); i++) {
+        await deviceCard.locator('button:has-text("Stop")').first().click().catch(() => undefined)
+        await page.waitForTimeout(1000)
+      }
+    }
   })
 })

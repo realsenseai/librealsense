@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, type ThreeEvent } from '@react-three/fiber'
+import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { apiClient } from '../api/client'
@@ -9,8 +9,9 @@ import { pickTextureSource, usePointCloudStore, type Shading } from '../store/po
 import { DepthCloud } from './pointcloud/DepthCloud'
 import { Axes, FloorGrid, Frustum } from './pointcloud/Furniture'
 import { Measurement } from './pointcloud/Measurement'
+import { ClickPicker } from './pointcloud/ClickPicker'
 import { TextureFeed } from './pointcloud/TextureFeed'
-import { pickPoint } from '../utils/measurement'
+import { pickPoint, type Ray } from '../utils/measurement'
 import type { Vec3 } from '../utils/camera'
 
 const SHADINGS: [Shading, string][] = [
@@ -82,18 +83,14 @@ export function PointCloudViewer() {
   }, [viewMode, undoMeasurement])
 
   // A click (not a drag) on the cloud adds an interest point; Shift chains it.
-  const pointerDown = useRef<{ x: number; y: number } | null>(null)
-  const onPointerDown = (e: ThreeEvent<PointerEvent>) => { pointerDown.current = { x: e.clientX, y: e.clientY } }
-  const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
-    const start = pointerDown.current
-    pointerDown.current = null
-    if (!start || Math.hypot(e.clientX - start.x, e.clientY - start.y) > 4 || e.button !== 0) return
-    if (!frame || !geo?.depth) return
-    const origin = e.ray.origin
-    const dir = e.ray.direction
-    const picked = pickPoint(frame, geo.depth, { origin: [origin.x, origin.y, origin.z], direction: [dir.x, dir.y, dir.z] })
-    if (picked) addMeasurementPoint(picked as Vec3, e.nativeEvent.shiftKey)
-  }
+  const latest = useRef({ frame, depth: geo?.depth ?? null })
+  latest.current = { frame, depth: geo?.depth ?? null }
+  const onCanvasClick = useCallback((ray: Ray, shift: boolean) => {
+    const { frame: f, depth } = latest.current
+    if (!f || !depth) return
+    const picked = pickPoint(f, depth, ray)
+    if (picked) addMeasurementPoint(picked as Vec3, shift)
+  }, [addMeasurementPoint])
 
   // The legacy export dialog: mesh / normals / binary, written by the server's rs.save_to_ply
   const exportPly = async () => {
@@ -163,10 +160,9 @@ export function PointCloudViewer() {
           <Canvas frameloop={viewMode === '3d' ? 'always' : 'never'} gl={{ antialias: false }}>
             <PerspectiveCamera makeDefault position={[0, 0, 1]} fov={45} />
             <OrbitControls ref={controls} enablePan enableZoom enableRotate target={[0, 0, -1]} />
-            <group onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
-              <DepthCloud frame={frame} geometry={geo} video={texture ? video : null} shading={shading}
-                occlusionInvalidation={occlusionInvalidation} depthRange={depthRange} />
-            </group>
+            <DepthCloud frame={frame} geometry={geo} video={texture ? video : null} shading={shading}
+              occlusionInvalidation={occlusionInvalidation} depthRange={depthRange} />
+            <ClickPicker onClick={onCanvasClick} />
             <Measurement points={measurement} metric={metric} />
             <FloorGrid metric={metric} />
             <Axes />

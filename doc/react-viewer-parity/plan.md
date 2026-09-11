@@ -164,7 +164,7 @@ Enables everything after it. No user-visible parity except settings and multi-ca
   intrinsics at 1/3/5 m, reset viewport (R), WASD fly, camera model mesh optional. 2 d.
 - [x] **WP4.5 Shading modes + occlusion.** Points / flat mesh (index buffer from depth
   grid) / diffuse; `PUT /point_cloud/occlusion`. 2 d.
-- [ ] **WP4.6 Measurement.** Raycast pick on the unprojected mesh; click-click distance;
+- [x] **WP4.6 Measurement.** Raycast pick on the unprojected mesh; click-click distance;
   Shift chains polygon with area; Z undo; labels in units setting. 2.5 d.
 - [x] **WP4.7 Export PLY (server).** `POST /point_cloud/export {mesh, normals, binary}` →
   job → download via `rs.save_to_ply`; remove client ASCII exporter. 1.5 d.
@@ -360,8 +360,12 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   frustum. Live on the D455 in `tests/e2e/pointcloud.spec.ts`. WP4.3 texture source
   selection is in (sync lock not). WP4.7: `POST /point_cloud/export` writes the newest
   depth frame through `rs.save_to_ply` (mesh / normals / binary), depth only - the SDK
-  block textures only from a frameset, which Python cannot assemble. WP4.6 measurement
-  remains.
+  block textures only from a frameset, which Python cannot assemble. WP4.6: click picks
+  the nearest cloud point to the camera ray (CPU, from the depth image), Shift chains,
+  Z undoes, labels per segment plus total and polygon area. Finding: starting a sensor that
+  already streams used to stop/close the SDK sensor under the manager lock ("stale state
+  recovery") and left the SDK unable to reopen it; start is now a no-op for the same
+  configuration and a proper stop_sensor + start for a different one.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).

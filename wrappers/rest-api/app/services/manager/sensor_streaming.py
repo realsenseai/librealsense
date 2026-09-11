@@ -387,34 +387,23 @@ class SensorStreamingMixin:
         # Get sensor
         sensor, sensor_index = self._get_sensor_by_id(device_id, sensor_id)
         
-        # Check if already streaming - with recovery mechanism
+        # Already streaming? The same configuration is a no-op; a different one restarts the
+        # sensor through stop_sensor so its collector thread and queues wind down first.
+        # (Stopping and closing the SDK sensor from here, under the manager lock and with the
+        # collector still waiting on its queue, left the SDK convinced the sensor was still
+        # open: "UVC device is already opened!" on the next open().)
         with self.lock:
-            if (device_id in self.sensor_streams and 
-                sensor_id in self.sensor_streams[device_id] and
-                self.sensor_streams[device_id][sensor_id].get("is_streaming", False)):
-                # State says streaming - try to recover by stopping first
-                logging.warning(f"[SENSOR] {sensor_id} has stale streaming state - attempting recovery")
-                try:
-                    sensor.stop()
-                except:
-                    pass
-                try:
-                    sensor.close()
-                except:
-                    pass
-                # Clean up stale state
-                self.sensor_streams[device_id].pop(sensor_id, None)
-                if not self.sensor_streams[device_id]:
-                    del self.sensor_streams[device_id]
-                    self.streaming_mode[device_id] = "idle"
-                if device_id in self.sensor_frame_queues:
-                    self.sensor_frame_queues[device_id].pop(sensor_id, None)
-                if device_id in self.sensor_metadata_queues:
-                    self.sensor_metadata_queues[device_id].pop(sensor_id, None)
-                if device_id in self.sensor_rs_queues:
-                    self.sensor_rs_queues[device_id].pop(sensor_id, None)
-                logging.info(f"[SENSOR] {sensor_id} stale state cleaned up - proceeding with start")
-        
+            info = self.sensor_streams.get(device_id, {}).get(sensor_id)
+            running = list(info.get("configs", [])) if info and info.get("is_streaming") else None
+        if running is not None:
+            wanted = [c.model_dump() for c in configs]
+            current = [c.model_dump() if hasattr(c, "model_dump") else c for c in running]
+            if current == wanted:
+                logging.info(f"[SENSOR] {sensor_id} already streams the requested configuration")
+                return self.get_sensor_status(device_id, sensor_id)
+            logging.info(f"[SENSOR] {sensor_id} streams a different configuration - restarting")
+            self.stop_sensor(device_id, sensor_id)
+
         try:
             # Get sensor name
             try:

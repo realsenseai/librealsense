@@ -100,3 +100,24 @@ def test_roi_roundtrip_normalizes_corners(setup_mock_managers, monkeypatch):
     assert client.get(ROI).json() == {"supported": True, "min_x": 0, "min_y": 0, "max_x": 639, "max_y": 479}
     body = client.put(ROI, json={"min_x": 300, "min_y": 200, "max_x": 100, "max_y": 50}).json()
     assert body == {"supported": True, "min_x": 100, "min_y": 50, "max_x": 300, "max_y": 200}
+
+
+def test_starting_an_already_streaming_sensor_is_a_no_op_or_a_restart(setup_mock_managers):
+    from app.models.sensor_streaming import SensorStreamConfig
+    from app.models.stream import Resolution
+    rs_manager = setup_mock_managers["rs_manager"]
+    cfg = SensorStreamConfig(stream_type="depth", format="z16", resolution=Resolution(width=640, height=480), framerate=30)
+    rs_manager.streaming_mode["device1"] = "sensor"
+    rs_manager.sensor_streams["device1"] = {
+        "device1-sensor-0": {"is_streaming": True, "paused": False, "stream_types": ["depth"], "name": "Depth Sensor", "configs": [cfg]},
+    }
+    calls = []
+    rs_manager.stop_sensor = lambda d, s: calls.append(("stop", s))
+
+    same = client.post(f"{SENSOR}/start", json={"configs": [cfg.model_dump()]})
+    assert same.status_code == 200 and same.json()["is_streaming"] is True
+    assert calls == []  # the same configuration: nothing to do
+
+    other = cfg.model_copy(update={"framerate": 15})
+    client.post(f"{SENSOR}/start", json={"configs": [other.model_dump()]})
+    assert calls == [("stop", "device1-sensor-0")]  # a different one restarts through stop_sensor

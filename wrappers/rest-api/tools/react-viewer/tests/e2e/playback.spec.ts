@@ -41,6 +41,7 @@ test.describe('@real-device Record and playback', () => {
     await page.locator('button:has-text("Start")').first().click()
     await expect(page.locator('video').first()).toBeVisible({ timeout: 15000 })
 
+    try {
     // Record for a few seconds
     await deviceCard.getByRole('button', { name: 'Record', exact: true }).click()
     const stopRecording = deviceCard.getByRole('button', { name: 'Stop recording' })
@@ -104,6 +105,14 @@ test.describe('@real-device Record and playback', () => {
       await expect(playbackCard).not.toBeVisible({ timeout: 15000 })
     } finally {
       await fetch(`${api}/playback/${playback.device_id}`, { method: 'DELETE' }).catch(() => undefined)
+    }
+    } finally {
+      // Leave the camera idle for the next test even when an assertion failed
+      await fetch(`${api}/devices/${device.device_id}/record/stop`, { method: 'POST' }).catch(() => undefined)
+      for (let i = 0; i < 4 && await deviceCard.locator('button:has-text("Stop")').count(); i++) {
+        await deviceCard.locator('button:has-text("Stop")').first().click().catch(() => undefined)
+        await page.waitForTimeout(1000)
+      }
     }
   })
 })
