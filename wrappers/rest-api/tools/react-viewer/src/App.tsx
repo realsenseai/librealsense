@@ -7,6 +7,7 @@ import { WhatsNew } from './components/WhatsNew'
 import { ChatButton, ChatPanel } from './components/ChatBot'
 import { ApiDiagnostics } from './components/ApiDiagnostics'
 import { ServerWarnings } from './components/ServerWarnings'
+import { OutputConsole } from './components/console/OutputConsole'
 import { useAppStore } from './store'
 import { useSettingsStore } from './store/settings'
 import { socketService } from './api/socket'
@@ -63,6 +64,7 @@ function App() {
 
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0">
           {hasActiveDevices ? (
             <>
               {/* Stream/PointCloud View — keep both mounted so WebRTC stays alive
@@ -90,6 +92,8 @@ function App() {
               </div>
             </div>
           )}
+          </div>
+          <OutputConsole />
         </main>
       </div>
 

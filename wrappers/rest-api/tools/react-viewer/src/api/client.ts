@@ -22,6 +22,7 @@ import type {
   RecordStatus,
   RecordingFile,
   PresetFile,
+  LogEntry,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -317,6 +318,36 @@ class ApiClient {
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
     await this.client.delete(`/webrtc/sessions/${sessionId}`)
+  }
+
+  // ============ Console ============
+
+  async getLogs(after = 0, limit = 1000): Promise<LogEntry[]> {
+    return (await this.client.get<LogEntry[]>('/logs/', { params: { after, limit } })).data
+  }
+
+  async clearLogs(): Promise<void> {
+    await this.client.delete('/logs/')
+  }
+
+  async startFwLogs(deviceId: string): Promise<{ running: boolean; parsed: boolean }> {
+    return (await this.client.post(`/devices/${deviceId}/fw_logs/start`)).data
+  }
+
+  async stopFwLogs(deviceId: string): Promise<{ running: boolean; parsed: boolean }> {
+    return (await this.client.post(`/devices/${deviceId}/fw_logs/stop`)).data
+  }
+
+  async recoverFlashLogs(deviceId: string): Promise<{ messages: number }> {
+    return (await this.client.post(`/devices/${deviceId}/fw_logs/flash`)).data
+  }
+
+  async runTerminal(deviceId: string, line: string): Promise<{ output: string }> {
+    return (await this.client.post(`/devices/${deviceId}/terminal`, { line })).data
+  }
+
+  async getTerminalCommands(): Promise<string[]> {
+    return (await this.client.get<string[]>('/terminal/commands')).data
   }
 
   // ============ Presets ============

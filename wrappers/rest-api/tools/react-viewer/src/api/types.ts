@@ -67,6 +67,21 @@ export function visibleOptions(options: OptionInfo[]): OptionInfo[] {
   return options.filter((o) => !HIDDEN_OPTIONS.includes(o.option_id.toLowerCase()))
 }
 
+// One output-console line (GET /logs/, `log_batch` Socket.IO event)
+export interface LogEntry {
+  id: number
+  ts: number  // server clock, seconds
+  severity: string  // debug | info | warn | error | fatal (firmware: its own words, lower-cased)
+  message: string
+  source: string  // sdk | server | fw | fw-flash | terminal
+  file?: string | null
+  line?: number | null
+  device_id?: string
+  command?: string
+  thread?: string
+  module?: string | null
+}
+
 // A preset file in the server's presets folder (GET /devices/{d}/presets/)
 export interface PresetFile {
   path: string

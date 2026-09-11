@@ -1,7 +1,8 @@
 import { io, Socket } from 'socket.io-client'
-import type { JobInfo, MetadataUpdate } from './types'
+import type { JobInfo, LogEntry, MetadataUpdate } from './types'
 import { useAppStore } from '../store'
 import { useJobsStore } from '../store/jobs'
+import { useConsoleStore } from '../store/console'
 
 class SocketService {
   private socket: Socket | null = null
@@ -65,6 +66,11 @@ class SocketService {
 
     this.socket.on('options_changed', (data: { device_id: string; sensor_id: string; options: { option_id: string; current_value: number }[] }) => {
       useAppStore.getState().applyOptionChanges(data.device_id, data.sensor_id, data.options)
+    })
+
+    this.socket.on('log_batch', (entries: LogEntry[]) => {
+      const append = useConsoleStore.getState().append
+      entries.forEach(append)
     })
 
     this.socket.on('playback_status', (data: { device_id: string; state: string }) => {

@@ -14,6 +14,13 @@ const sensorOptionsMap: Record<string, any[]> = {
 
 export const handlers = [
   http.get(`${API_BASE}/jobs/`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/logs/`, () => HttpResponse.json([])),
+  http.delete(`${API_BASE}/logs/`, () => HttpResponse.json({ cleared: true })),
+  http.get(`${API_BASE}/terminal/commands`, () => HttpResponse.json(['GVD', 'GLD'])),
+  http.post(`${API_BASE}/devices/:deviceId/terminal`, () => HttpResponse.json({ output: '10 00 00 00' })),
+  http.post(`${API_BASE}/devices/:deviceId/fw_logs/start`, () => HttpResponse.json({ running: true, parsed: false })),
+  http.post(`${API_BASE}/devices/:deviceId/fw_logs/stop`, () => HttpResponse.json({ running: false, parsed: false })),
+  http.post(`${API_BASE}/devices/:deviceId/fw_logs/flash`, () => HttpResponse.json({ messages: 3 })),
   http.get(`${API_BASE}/devices/:deviceId/presets/`, () => HttpResponse.json([])),
   http.post(`${API_BASE}/devices/:deviceId/presets/load`, () => HttpResponse.json({ loaded: 'x' })),
   http.post(`${API_BASE}/devices/:deviceId/presets/save`, async ({ request }) => {
