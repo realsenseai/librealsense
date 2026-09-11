@@ -23,5 +23,5 @@ def versions_db_url(rs_manager: RealSenseManager) -> str:
 async def check_updates(device_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
     """Firmware and librealsense update candidates for a device, with an up-to-date /
     recommended / essential verdict for each."""
-    device = rs_manager.get_device(device_id)
+    device = await run_in_threadpool(rs_manager.get_device, device_id)
     return await run_in_threadpool(updates.check, versions_db_url(rs_manager), device.name, device.firmware_version, sdk_version())

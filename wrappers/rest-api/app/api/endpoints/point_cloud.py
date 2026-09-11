@@ -1,6 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
+from starlette.concurrency import run_in_threadpool
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 
@@ -17,7 +18,7 @@ async def activate_point_cloud(
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
 ):
     try:
-        return rs_manager.activate_point_cloud(device_id, True)
+        return await run_in_threadpool(rs_manager.activate_point_cloud, device_id, True)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -27,7 +28,7 @@ async def deactivate_point_cloud(
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
 ):
     try:
-        return rs_manager.activate_point_cloud(device_id, False)
+        return await run_in_threadpool(rs_manager.activate_point_cloud, device_id, False)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -37,6 +38,6 @@ async def get_stream_status(
     rs_manager: RealSenseManager = Depends(get_realsense_manager)
 ):
     try:
-        return rs_manager.get_point_cloud_status(device_id)
+        return await run_in_threadpool(rs_manager.get_point_cloud_status, device_id)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))

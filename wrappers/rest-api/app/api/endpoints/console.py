@@ -29,7 +29,7 @@ async def clear_logs(rs_manager: RealSenseManager = Depends(get_realsense_manage
 
 @device_router.get("/fw_logs")
 async def fw_logs_status(device_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
-    return rs_manager.fw_logs_status(device_id)
+    return await run_in_threadpool(rs_manager.fw_logs_status, device_id)
 
 
 @device_router.post("/fw_logs/start")
@@ -63,4 +63,4 @@ async def run_terminal(device_id: str, body: TerminalLine, rs_manager: RealSense
 @terminal_router.get("/commands", response_model=List[str])
 async def terminal_commands(rs_manager: RealSenseManager = Depends(get_realsense_manager)):
     """Named commands from the configured Commands.xml, for autocompletion."""
-    return rs_manager.terminal_commands()
+    return await run_in_threadpool(rs_manager.terminal_commands)

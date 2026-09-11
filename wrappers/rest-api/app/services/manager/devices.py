@@ -186,6 +186,14 @@ class DeviceRegistryMixin:
                     self._fw_updates_in_progress,
                 )
                 return list(self.device_infos.values())
+            # Enumerating while a camera streams was seen to hang inside the Windows backend
+            # (WMF activates a media source per device, including the one in use), and the
+            # devices-changed callback keeps the registry current anyway - the legacy viewer
+            # never enumerates outside that callback either.
+            streaming = [d for d, m in self.streaming_mode.items() if m != "idle"] + list(self.pipelines)
+            if streaming:
+                logging.debug("refresh_devices: skipping ctx enumeration while streaming: %s", streaming)
+                return list(self.device_infos.values())
         return self._refresh_devices_locked()
 
     def _enumeration(self):
@@ -197,15 +205,22 @@ class DeviceRegistryMixin:
     def _refresh_devices_locked(self) -> List[DeviceInfo]:
         """Actual device enumeration (no FW-in-progress guard)."""
         with self._enumeration(), self.lock:
-            # Clear existing devices (that aren't streaming); loaded recordings stay.
-            for device_id in list(self.devices.keys()):
-                if device_id not in self.pipelines and device_id not in self._playbacks:
-                    del self.devices[device_id]
-                    self.device_infos.pop(device_id, None)
-                    self._supported_md_by_profile.pop(device_id, None)
-
+            # Register what is there, then drop what is gone. Known devices keep their
+            # handles, so readers never see a device vanish and reappear mid-refresh.
+            present = set()
             for dev in self.ctx.devices:
+                serial = dev.get_info(rs.camera_info.serial_number) if dev.supports(rs.camera_info.serial_number) else None
+                if serial is not None:
+                    present.add(serial)
                 self._register_new_device(dev)
+            for device_id in list(self.devices.keys()):
+                if device_id in present or device_id in self.pipelines or device_id in self._playbacks:
+                    continue
+                if self.streaming_mode.get(device_id, "idle") != "idle":
+                    continue
+                del self.devices[device_id]
+                self.device_infos.pop(device_id, None)
+                self._supported_md_by_profile.pop(device_id, None)
 
             # Update cache timestamp after a successful refresh
             import time

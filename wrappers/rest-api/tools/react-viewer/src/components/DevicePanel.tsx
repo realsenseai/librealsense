@@ -159,7 +159,9 @@ export function DevicePanel() {
   const [updatesFor, setUpdatesFor] = useState<DeviceInfo | null>(null)
 
   useEffect(() => {
-    fetchDevices(true)
+    // The server keeps its registry current from the SDK's devices-changed callback;
+    // forcing an enumeration here would run ctx enumeration on every page load.
+    fetchDevices()
   }, [fetchDevices])
 
   // Counter, not just Date.now(): several cameras can raise a firmware proposal in the

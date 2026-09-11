@@ -32,14 +32,14 @@ def _folder(rs_manager: RealSenseManager) -> Path:
 @router.get("/", response_model=List[dict])
 async def list_presets(device_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
     """Preset files in the presets folder that match this camera model."""
-    device = rs_manager.get_device(device_id)
+    device = await run_in_threadpool(rs_manager.get_device, device_id)
     return presets.list_folder(_folder(rs_manager), device.name)
 
 
 @router.get("/current")
 async def download_current(device_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
     """The device's current settings as the JSON preset the legacy viewer saves."""
-    device = rs_manager.get_device(device_id)
+    device = await run_in_threadpool(rs_manager.get_device, device_id)
     text = await run_in_threadpool(rs_manager.serialize_preset, device_id)
     name = f"{presets.model_name(device.name)} preset.json"
     return Response(content=text, media_type="application/json",
@@ -72,7 +72,7 @@ async def upload_preset(device_id: str, file: UploadFile = File(...), rs_manager
 @router.post("/save", response_model=List[dict])
 async def save_preset(device_id: str, body: SavePreset, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
     """Store the current settings in the presets folder as '<model> <name>.preset'."""
-    device = rs_manager.get_device(device_id)
+    device = await run_in_threadpool(rs_manager.get_device, device_id)
     text = await run_in_threadpool(rs_manager.serialize_preset, device_id)
     folder = _folder(rs_manager)
     folder.mkdir(parents=True, exist_ok=True)

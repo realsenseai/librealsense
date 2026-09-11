@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.get("/", response_model=RecordStatus)
 async def record_status(device_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
-    return rs_manager.get_record_status(device_id)
+    return await run_in_threadpool(rs_manager.get_record_status, device_id)
 
 
 @router.post("/start", response_model=RecordStatus)

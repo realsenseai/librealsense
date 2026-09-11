@@ -28,7 +28,8 @@ async def start_stream(
     import traceback
     t0 = time.perf_counter()
     try:
-        result = rs_manager.start_stream(
+        result = await run_in_threadpool(
+            rs_manager.start_stream,
             device_id,
             stream_config.configs,
             stream_config.align_to,
@@ -53,7 +54,7 @@ async def stop_stream(
     Stop streaming from a RealSense device.
     """
     try:
-        return rs_manager.stop_stream(device_id)
+        return await run_in_threadpool(rs_manager.stop_stream, device_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -66,7 +67,7 @@ async def get_stream_status(
     Get the streaming status for a RealSense device.
     """
     try:
-        return rs_manager.get_stream_status(device_id)
+        return await run_in_threadpool(rs_manager.get_stream_status, device_id)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -101,7 +102,7 @@ async def get_depth_at_pixel(
     Returns null if no depth frame is available or coordinates are out of bounds.
     """
     try:
-        depth = rs_manager.get_depth_at_pixel(device_id, x, y)
+        depth = await run_in_threadpool(rs_manager.get_depth_at_pixel, device_id, x, y)
         return {"depth": depth, "x": x, "y": y, "units": "meters"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -116,7 +117,7 @@ async def get_depth_range(
     Uses the same algorithm as the legacy viewer (mean + 1.5*stddev, rounded to nearest 4m).
     """
     try:
-        result = rs_manager.get_depth_range(device_id)
+        result = await run_in_threadpool(rs_manager.get_depth_range, device_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

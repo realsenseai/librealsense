@@ -25,7 +25,7 @@ async def get_advanced_mode(
 ):
     """Return {supported, enabled} for RS400 advanced mode on a device."""
     try:
-        return rs_manager.get_advanced_mode_status(device_id)
+        return await run_in_threadpool(rs_manager.get_advanced_mode_status, device_id)
     except RealSenseError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
     except Exception:
