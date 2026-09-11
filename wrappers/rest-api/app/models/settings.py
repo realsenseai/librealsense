@@ -34,6 +34,7 @@ class ConsoleSettings(BaseModel):
 class PathSettings(BaseModel):
     hwlogger_xml: str = ""  # firmware-log parser definitions
     commands_xml: str = ""  # terminal command definitions
+    presets_folder: str = ""  # empty: ~/librealsense2/presets (under Documents on Windows), as the legacy viewer
 
 
 class ContextSettings(BaseModel):

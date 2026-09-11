@@ -8,7 +8,7 @@ import logging
 from typing import Callable, Deque, Dict, List, Optional, Any, Tuple, Set
 import pyrealsense2 as rs
 from app.core.errors import RealSenseError
-from app.services import advanced_mode, options
+from app.services import advanced_mode, options, presets
 from app.models.sensor import Sensor, SensorInfo, SupportedStreamProfile
 from app.models.option import Option, OptionInfo
 
@@ -285,6 +285,15 @@ class ControlsMixin:
         with self.option_lock(device_id):
             sensor.as_roi_sensor().set_region_of_interest(roi)
         return self.get_roi(device_id, sensor_id)
+
+    def serialize_preset(self, device_id: str) -> str:
+        """The device's settings as a JSON preset (needs advanced mode)."""
+        with self.option_lock(device_id):
+            return presets.serialize(self._require_device(device_id))
+
+    def load_preset(self, device_id: str, text: str) -> None:
+        with self.option_lock(device_id):
+            presets.load(self._require_device(device_id), text)
 
     def get_sensor_option(
         self, device_id: str, sensor_id: str, option_id: str

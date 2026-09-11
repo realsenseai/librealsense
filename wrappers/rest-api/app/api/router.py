@@ -4,7 +4,7 @@
 from typing import List
 
 from fastapi import APIRouter
-from app.api.endpoints import advanced_mode, colorizer, devices, filters, firmware, hwm, jobs, options, playback, point_cloud, record, sensors, settings, streams, system, webrtc
+from app.api.endpoints import advanced_mode, colorizer, devices, filters, firmware, hwm, jobs, options, playback, point_cloud, presets, record, sensors, settings, streams, system, webrtc
 
 
 def _get_sdk_version() -> str:
@@ -100,4 +100,5 @@ api_router.include_router(settings.router, prefix="/settings", tags=["settings"]
 api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 api_router.include_router(record.router, prefix="/devices/{device_id}/record", tags=["record"])
 api_router.include_router(playback.router, prefix="/playback", tags=["playback"])
+api_router.include_router(presets.router, prefix="/devices/{device_id}/presets", tags=["presets"])
 api_router.include_router(webrtc.router, prefix="/webrtc", tags=["webrtc"])
