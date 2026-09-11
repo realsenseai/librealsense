@@ -8,6 +8,7 @@ import logging
 from collections import defaultdict, deque
 from typing import Callable, Deque, Dict, List, Optional, Any, Tuple, Set
 import pyrealsense2 as rs
+import time
 import numpy as np
 import cv2
 from app.core.errors import RealSenseError
@@ -166,6 +167,27 @@ class SensorStreamingMixin:
                        f"Requested: {', '.join(profile_details)}"
             )
 
+    DEPTH_FRAME_MIN_INTERVAL_S = 1.0 / 15  # the 3D view does not need more than this
+
+    def _emit_depth_frame(self, device_id: str, depth_frame) -> None:
+        """Binary ``depth_frame`` socket event with the z16 pixels of a (filtered) depth frame."""
+        now = time.monotonic()
+        last = getattr(self, "_last_depth_emit", {})
+        if now - last.get(device_id, 0.0) < self.DEPTH_FRAME_MIN_INTERVAL_S:
+            return
+        last[device_id] = now
+        self._last_depth_emit = last
+        profile = depth_frame.get_profile().as_video_stream_profile()
+        self._emit_socket_event("depth_frame", {
+            "device_id": device_id,
+            "width": profile.width(),
+            "height": profile.height(),
+            "frame_number": depth_frame.get_frame_number(),
+            "units": float(depth_frame.get_units()) if hasattr(depth_frame, "get_units") else 0.001,
+            "format": "z16",
+            "data": np.ascontiguousarray(np.asanyarray(depth_frame.get_data()), dtype=np.uint16).tobytes(),
+        })
+
     def _process_sensor_frame(
         self,
         frame: Any,
@@ -189,21 +211,9 @@ class SensorStreamingMixin:
             info_source = depth_frame
 
             if self.is_pointcloud_enabled.get(device_id, False):
-                # Sensor mode runs depth/color on separate threads so there is
-                # no frameset — pick the cached color frame whose timestamp is
-                # closest to this depth frame's, otherwise rotations show
-                # colors leading the geometry (color has lower SDK latency).
-                # Only do this if color is still streaming; without that check
-                # the depth thread would keep texturing with a stale frame
-                # after the user disables color.
-                color_for_texture = (
-                    self._pick_color_for_depth(device_id, depth_frame)
-                    if self._is_color_streaming(device_id)
-                    else None
-                )
-                pc_meta = self._build_point_cloud_metadata(device_id, depth_frame, color_for_texture)
-                if pc_meta:
-                    metadata["point_cloud"] = pc_meta
+                # The 3D view unprojects on the GPU from the raw depth image (like the
+                # legacy viewer's pointcloud-gl); ship the z16 frame itself, throttled.
+                self._emit_depth_frame(device_id, depth_frame)
 
         elif "color" in frame_stream_name:
             color_frame = frame.as_video_frame()
@@ -333,7 +343,16 @@ class SensorStreamingMixin:
 
                 except Exception as e:
                     if "timeout" not in str(e).lower():
-                        logging.debug(f"[SENSOR] Frame collection error: {e}")
+                        # First occurrence per sensor and message at WARNING, repeats at DEBUG
+                        seen = getattr(self, "_frame_errors_seen", None)
+                        if seen is None:
+                            seen = self._frame_errors_seen = set()
+                        key = (sensor_id, str(e)[:120])
+                        if key not in seen:
+                            seen.add(key)
+                            logging.warning(f"[SENSOR] Frame collection error on {sensor_id}: {e!r}")
+                        else:
+                            logging.debug(f"[SENSOR] Frame collection error: {e}")
                     continue
                     
         except Exception as e:
@@ -481,11 +500,13 @@ class SensorStreamingMixin:
             self._get_or_create_processing_blocks(device_id, sensor_id, sensor)
             
             # Start frame collection thread
-            threading.Thread(
+            collector = threading.Thread(
                 target=self._collect_sensor_frames,
                 args=(device_id, sensor_id, rs_queue, stream_types),
                 daemon=True
-            ).start()
+            )
+            collector.start()
+            self._collector_threads[sensor_id] = collector
             
             # Start per-device metadata broadcast (no-op if already running for this device).
             self.metadata_socket_server.start_broadcast(device_id)

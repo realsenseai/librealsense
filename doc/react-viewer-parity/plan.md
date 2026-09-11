@@ -151,22 +151,22 @@ Enables everything after it. No user-visible parity except settings and multi-ca
 
 ## Phase 4 — 3D parity (~16 d, RSDEV-11580)
 
-- [ ] **WP4.1 Intrinsics + depth transport.** `GET /devices/{d}/intrinsics?stream=`;
+- [x] **WP4.1 Intrinsics + depth transport.** `GET /devices/{d}/intrinsics?stream=`;
   lossless Z16 delivery (spike: 16-bit-in-RGB over WebRTC vs binary WebSocket; pick by
   measured latency and fidelity on D455). 3 d.
-- [ ] **WP4.2 GPU unprojection.** Fragment/vertex shader unprojects depth texture with
+- [x] **WP4.2 GPU unprojection.** Fragment/vertex shader unprojects depth texture with
   intrinsics + depth units; removes base64 point cloud path (kept behind a flag one
   release). Target: 30 fps at 1280×720. 3 d.
 - [ ] **WP4.3 Texture + depth source, sync lock.** `PUT /point_cloud/texture {stream}`;
   client maps selected WebRTC track as texture; auto-switch on new non-Y8 stream; depth
   source picker for multi-cam; lock/unlock. 2 d.
-- [ ] **WP4.4 Scene furniture.** Ground grid (metric/imperial), axes, frustum from
+- [x] **WP4.4 Scene furniture.** Ground grid (metric/imperial), axes, frustum from
   intrinsics at 1/3/5 m, reset viewport (R), WASD fly, camera model mesh optional. 2 d.
-- [ ] **WP4.5 Shading modes + occlusion.** Points / flat mesh (index buffer from depth
+- [x] **WP4.5 Shading modes + occlusion.** Points / flat mesh (index buffer from depth
   grid) / diffuse; `PUT /point_cloud/occlusion`. 2 d.
 - [ ] **WP4.6 Measurement.** Raycast pick on the unprojected mesh; click-click distance;
   Shift chains polygon with area; Z undo; labels in units setting. 2.5 d.
-- [ ] **WP4.7 Export PLY (server).** `POST /point_cloud/export {mesh, normals, binary}` →
+- [x] **WP4.7 Export PLY (server).** `POST /point_cloud/export {mesh, normals, binary}` →
   job → download via `rs.save_to_ply`; remove client ASCII exporter. 1.5 d.
 
 ## Phase 5 — Presets and device modes (~5 d)
@@ -343,6 +343,25 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   loop included, which is why `/health` stopped answering). Fixed in
   `wrappers/python/pyrs_context.cpp` (`py::call_guard<py::gil_scoped_release>()`); the server
   additionally enumerates outside its own lock and never while a camera streams.
+- Finding: the same GIL inversion exists for every SDK->Python callback. `rs.log_to_callback`
+  runs on whichever SDK thread logs, often while that thread holds an SDK lock; a Python
+  thread blocked inside a binding that keeps the GIL (get_supported_options,
+  get_option_range, get_stream_profiles, filter process, frame_queue enqueue) then deadlocks
+  the process. Those bindings now release the GIL, and the server reads the SDK log through
+  `rs.log_to_file` plus a tailing thread instead of a callback. The notifications and
+  devices-changed callbacks stay (rare events); the console flushes from one long-lived
+  thread instead of a Timer started under its lock.
+- 2026-09-11 (later): Phase 4 core. The server ships the filtered z16 depth image as a
+  binary `depth_frame` socket event (at most 15 Hz) plus `GET /point_cloud/geometry`
+  (depth intrinsics and units, texture intrinsics and depth->texture extrinsics); the
+  browser unprojects on the GPU (a port of src/gl/pc-shader.cpp: occlusion invalidation,
+  per-vertex normals, Brown-Conrady texture mapping, three-light diffuse), textures from
+  its own WebRTC session of the chosen stream, and draws the legacy floor grid, axes and
+  frustum. Live on the D455 in `tests/e2e/pointcloud.spec.ts`. WP4.3 texture source
+  selection is in (sync lock not). WP4.7: `POST /point_cloud/export` writes the newest
+  depth frame through `rs.save_to_ply` (mesh / normals / binary), depth only - the SDK
+  block textures only from a frameset, which Python cannot assemble. WP4.6 measurement
+  remains.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).

@@ -276,6 +276,9 @@ class depth_sensor(sensor):
     def is_depth_sensor(self):
         return True
 
+    def get_depth_scale(self):
+        return 0.001
+
     def get_recommended_filters(self):
         return [processing_block(name) for name in
                 ("Decimation Filter", "HDR Merge", "Threshold Filter", "Spatial Filter", "Temporal Filter", "Hole Filling Filter")]
@@ -347,6 +350,12 @@ class stream_profile:
     def index(self):
         return self._index
 
+    def stream_index(self):
+        return self._index
+
+    def get_extrinsics_to(self, _other):
+        return extrinsics()
+
     def is_video_stream_profile(self):
         return isinstance(self, video_stream_profile)
 
@@ -371,6 +380,25 @@ class video_stream_profile(stream_profile):
 
     def fps(self):
         return self._fps
+
+    def get_intrinsics(self):
+        return intrinsics(self._width, self._height)
+
+
+class intrinsics:
+    """rs.intrinsics: a pinhole at the image centre, no distortion."""
+    def __init__(self, width, height):
+        self.width, self.height = width, height
+        self.fx = self.fy = float(width)  # ~90 degree FOV
+        self.ppx, self.ppy = width / 2.0, height / 2.0
+        self.model = "distortion.brown_conrady"
+        self.coeffs = [0.0, 0.0, 0.0, 0.0, 0.0]
+
+
+class extrinsics:
+    """rs.extrinsics: identity rotation, a 15 mm baseline along x."""
+    rotation = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    translation = [0.015, 0.0, 0.0]
 
 # Mock for motion stream profile
 class motion_stream_profile(stream_profile):

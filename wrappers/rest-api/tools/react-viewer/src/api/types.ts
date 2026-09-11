@@ -82,6 +82,36 @@ export interface LogEntry {
   module?: string | null
 }
 
+// Camera geometry for the client-side point cloud (GET /devices/{d}/point_cloud/geometry)
+export interface CameraIntrinsics {
+  width: number
+  height: number
+  fx: number
+  fy: number
+  ppx: number
+  ppy: number
+  model: string // 'brown_conrady' | 'inverse_brown_conrady' | 'modified_brown_conrady' | ...
+  coeffs: number[]
+}
+export interface Extrinsics {
+  rotation: number[] // 3x3, column-major (rs2_extrinsics)
+  translation: number[]
+}
+export interface PointCloudGeometry {
+  depth: (CameraIntrinsics & { stream: string; units: number }) | null
+  texture: (CameraIntrinsics & { stream: string; extrinsics: Extrinsics }) | null
+}
+// The binary `depth_frame` Socket.IO event
+export interface DepthFrameEvent {
+  device_id: string
+  width: number
+  height: number
+  frame_number: number
+  units: number
+  format: string
+  data: ArrayBuffer | Uint8Array
+}
+
 // HDR sequence editor (app/services/hdr.py, a port of common/hdr-model.*)
 export interface HdrControls {
   depth_gain: number

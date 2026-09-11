@@ -26,6 +26,7 @@ import type {
   UpdatesReport,
   HdrPreset,
   HdrStatus,
+  PointCloudGeometry,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -321,6 +322,18 @@ class ApiClient {
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
     await this.client.delete(`/webrtc/sessions/${sessionId}`)
+  }
+
+  // ============ Point cloud geometry ============
+
+  async exportPointCloud(deviceId: string, options: { mesh: boolean; normals: boolean; binary: boolean }): Promise<Blob> {
+    return (await this.client.post<Blob>(`/devices/${deviceId}/point_cloud/export`, options, { responseType: 'blob' })).data
+  }
+
+  async getPointCloudGeometry(deviceId: string, texture: string | null): Promise<PointCloudGeometry> {
+    return (await this.client.get<PointCloudGeometry>(`/devices/${deviceId}/point_cloud/geometry`, {
+      params: { texture: texture ?? '' },
+    })).data
   }
 
   // ============ HDR ============

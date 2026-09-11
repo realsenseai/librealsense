@@ -46,6 +46,25 @@ class FramesMixin:
             device_id=device_id, is_active=self.is_pointcloud_enabled[device_id]
         )
 
+    def get_point_cloud_geometry(self, device_id: str, texture: Optional[str]) -> Dict[str, Any]:
+        """Camera geometry of the running streams for the client-side point cloud."""
+        from app.services import point_cloud_geometry
+        dev = self._require_device(device_id)
+        streaming = []
+        with self.lock:
+            entries = [(sid, list(info.get("configs", []))) for sid, info in self.sensor_streams.get(device_id, {}).items()
+                       if info.get("is_streaming")]
+        for sensor_id, configs in entries:
+            sensor, _ = self._get_sensor_by_id(device_id, sensor_id)
+            streaming.extend((sensor, config) for config in configs)
+        return point_cloud_geometry.geometry(dev, streaming, texture)
+
+    def export_point_cloud(self, device_id: str, mesh: bool, normals: bool, binary: bool) -> bytes:
+        """The newest depth frame as PLY (viewer.cpp export_to_ply through rs.save_to_ply)."""
+        from app.services import ply_export
+        self._require_device(device_id)
+        return ply_export.export_depth_to_ply(self.depth_frames.get(device_id), mesh, normals, binary)
+
     def get_stream_status(self, device_id: str) -> StreamStatus:
         """Get the streaming status for a device (supports both pipeline and sensor modes)"""
         if device_id not in self.devices:
