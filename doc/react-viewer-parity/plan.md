@@ -33,7 +33,7 @@ needed for the live test.
 
 ## Phase 0 — Land in-flight work (prereq, ~3 d)
 
-- [ ] **WP0.1 Finish PR #15402** (`origin/react-viewer-control-parity`). Live test
+- [x] **WP0.1 Finish PR #15402** (`origin/react-viewer-control-parity`). Live test
   advanced-mode toggle off→on (device restart, controls refetch). Address review from
   RSDSO-21748. Merge. HW: D455. 1 d.
 - [ ] **WP0.2 Merge PR #15559** (theme + IMU history graphs + orientation wireframe).
@@ -46,20 +46,20 @@ needed for the live test.
 
 Enables everything after it. No user-visible parity except settings and multi-cam fixes.
 
-- [ ] **WP1.1 Split `rs_manager.py`** (RSDEV-12009). Move code into
+- [x] **WP1.1 Split `rs_manager.py`** (RSDEV-12009). Move code into
   `services/devices.py` (registry, hot-plug, info, reset, DFU wait helpers),
   `services/streaming.py` (per-sensor open/start/stop, frame queues, colorizer, filter
   chain, `wait_for_frame_after`), leave `rs_manager.py` as a façade that composes them so
   endpoints keep working. Pure move + tests green; no behaviour change. Delete the
   pipeline-based `/stream/*` code path only if WP1.5 confirms the viewer never uses it
   (it does not today; tests do). 4 d.
-- [ ] **WP1.2 Jobs service.** `services/jobs.py`: `create(kind, device_id) -> Job`,
+- [x] **WP1.2 Jobs service.** `services/jobs.py`: `create(kind, device_id) -> Job`,
   `Job.progress(pct, msg)`, `Job.done(result)`, `Job.fail(err)`, `cancel()`; emits socket
   `job_<id>` `{state, progress, message, result}`; `GET /jobs/{id}`, `GET /jobs?device=`.
   Migrate firmware update to it (keep old event names as aliases for one release).
   Frontend `store/jobs.ts` + `components/jobs/JobProgressModal.tsx` generalising
   `FirmwareProgressModal.tsx`. 2 d.
-- [ ] **WP1.3 Settings service.** `services/settings.py` reading/writing
+- [x] **WP1.3 Settings service.** `services/settings.py` reading/writing
   `~/.realsense/rest-api-settings.json` with defaults; `GET/PUT /settings` (partial merge);
   keys defined in a pydantic model (`record.*`, `update.sw_update_url`,
   `update.sw_update_official_server`, `console.max_entries`, `viewer.hwlogger_xml`,
@@ -72,16 +72,16 @@ Enables everything after it. No user-visible parity except settings and multi-ca
   `store/{devices,streaming,controls,view,jobs,settings,chat}.ts`; add `persist` for
   `viewMode`, expanded sections, tile order per serial (used in WP2.2), snoozed
   notifications (WP7.4). Tests moved with the slices. 2 d.
-- [ ] **WP1.5 Remove "Activate device"** (RSDEV-12007). All connected devices show
+- [x] **WP1.5 Remove "Activate device"** (RSDEV-12007). All connected devices show
   sensors immediately as in legacy; auto-open first device; `LoadingSplash` per device.
   Requires WP1.1. 1.5 d.
 - [ ] **WP1.6 Multi-camera hardening** (RSDEV-12011). Reproduce black second stream, fix
   WebRTC session/track lifecycle per device, metadata keyed by device; live test with two
   D4xx. HW: 2× D4xx. 1.5 d.
-- [ ] **WP1.7 Default profiles** (RSDEV-14130). Server marks `is_default` on profiles
+- [x] **WP1.7 Default profiles** (RSDEV-14130). Server marks `is_default` on profiles
   (`stream_profile.is_default()`); client initial selection uses them; fall back to
   current heuristic. 0.5 d.
-- [ ] **WP1.8 Single-port serve + trailing-slash cleanup.** Mount `static/` (from
+- [x] **WP1.8 Single-port serve + trailing-slash cleanup.** Mount `static/` (from
   `scripts/bundle-for-prod.js`) with `StaticFiles(html=True)` when present; fix the nine
   client paths that rely on 307 redirects (`client.ts:199-275`). 0.5 d.
 - [ ] **WP1.9 Live E2E harness on LibCI** (RSDEV-13683). Jenkins job runs
@@ -90,57 +90,57 @@ Enables everything after it. No user-visible parity except settings and multi-ca
 
 ## Phase 2 — 2D streaming and controls parity (~22 d)
 
-- [ ] **WP2.1 Stream pause + overlays.** `POST /sensors/{s}/pause|resume` (server holds
+- [x] **WP2.1 Stream pause + overlays.** `POST /sensors/{s}/pause|resume` (server holds
   last frame, WebRTC keeps sending it); Space pauses all incl. playback; tile overlays for
   Paused, "No frames received" (server `last_frame_ts` stale >2 s), unsupported format.
   `utils/shortcuts.ts` created here. 2 d.
-- [ ] **WP2.2 Tile layout parity.** Default order depth→color→IR→motion; drag-to-swap;
+- [x] **WP2.2 Tile layout parity.** Default order depth→color→IR→motion; drag-to-swap;
   maximize/restore single tile; F8 fullscreen; order persisted per serial (WP1.4). 2 d.
-- [ ] **WP2.3 Snapshot.** `services/snapshot.py`, `POST /sensors/{s}/snapshot?stream=`
+- [x] **WP2.3 Snapshot.** `services/snapshot.py`, `POST /sensors/{s}/snapshot?stream=`
   returning a zip (PNG colorized via cached colorizer, `.raw`, `_metadata.csv`; motion/pose
   `.csv`) matching `stream-model.cpp:1927-2038` naming. Tile header button. 1.5 d.
-- [ ] **WP2.4 Depth readouts.** Hover readout in m/mm/ft per units setting, mm under
+- [x] **WP2.4 Depth readouts.** Hover readout in m/mm/ft per units setting, mm under
   20 cm; batch hover via socket instead of REST per move; max-usable-range readout
   (`max_usable_range_sensor`) when option on; colormap ruler ticks (`DepthLegend`) sampled
   from colorizer min/max. 2 d.
 - [ ] **WP2.5 Zoom/pan + grid overlay.** Wheel zoom about cursor, drag pan, preview inset;
   configurable crosshair/grid (lines, width, color) persisted. Client-only. 2 d.
-- [ ] **WP2.6 Metadata table parity.** Per-attribute descriptions, hex for bitmask
+- [x] **WP2.6 Metadata table parity.** Per-attribute descriptions, hex for bitmask
   fields, DDS/safety decoders ported from `stream-model.cpp:1238-1470` into
   `utils/metadataDecoders.ts` with unit tests. 1.5 d.
-- [ ] **WP2.7 Option UX parity.** Tooltips from `description`; click-to-type exact value
+- [x] **WP2.7 Option UX parity.** Tooltips from `description`; click-to-type exact value
   on sliders; legacy control ordering (`device-model.cpp:2776-2832`) in `ControlSection`;
   drag coalescing (send latest value at most every 200 ms, last-wins) matching
   `option-model.h` dispatcher. 2 d.
-- [ ] **WP2.8 Device-pushed option changes.** Server registers `sensor.on_options_changed`
+- [x] **WP2.8 Device-pushed option changes.** Server registers `sensor.on_options_changed`
   per sensor → socket `options_changed {device, sensor, options[]}`; store patches groups.
   HW: D455. 1 d.
-- [ ] **WP2.9 AE ROI.** `GET/PUT /sensors/{s}/roi` via `roi_sensor`; drag rectangle on
+- [x] **WP2.9 AE ROI.** `GET/PUT /sensors/{s}/roi` via `roi_sensor`; drag rectangle on
   tile, reset to full frame, default centre 3/4; algo ROI overlay toggle. HW: D455. 1.5 d.
 - [ ] **WP2.10 HDR tool.** `GET/PUT /devices/{d}/hdr` exposing sequence size, per-item
   exposure/gain, enable; UI dialog mirroring `hdr-model.*` (load/save JSON, load from
   device, apply). HW: D455 with HDR FW. 2.5 d.
-- [ ] **WP2.11 Stream config parity.** Per-stream FPS when no common FPS; mixed
+- [x] **WP2.11 Stream config parity.** Per-stream FPS when no common FPS; mixed
   depth/IR resolutions; client-side unsupported-combination guard using profile list;
   device-info panel shows all `RS2_CAMERA_INFO_*`. 2 d.
 - [ ] **WP2.12 Sync toggle + align.** `PUT /devices/{d}/sync {bool}` builds `rs.syncer`
   across streaming sensors in `streaming.py`; `PUT /devices/{d}/align {stream|none}`
   applies `rs.align` in the per-sensor path. UI device toggle + 2D align selector. 2 d.
-- [ ] **WP2.13 Filter defaults parity.** Match `subdevice-model.cpp:285-321` (default-on
+- [x] **WP2.13 Filter defaults parity.** Match `subdevice-model.cpp:285-321` (default-on
   set, D405 threshold 0.05–4 m, HDR merge only with `SEQUENCE_ID`), honouring
   `post_processing.performance_mode`; persist filter state server-side per serial. 1 d.
 
 ## Phase 3 — Record & playback (~10 d, RSDEV-9242)
 
-- [ ] **WP3.1 Record.** `services/record.py`; `POST /devices/{d}/record/start {path?}`,
+- [x] **WP3.1 Record.** `services/record.py`; `POST /devices/{d}/record/start {path?}`,
   `pause`, `resume`, `stop`, `GET status`; auto-name vs ask + default folder + compression
   from settings; gated on streaming; REC overlay on tiles; device-card button. HW: D455.
   2.5 d.
-- [ ] **WP3.2 Playback load/unload.** `services/playback.py`; `POST /playback/load`
+- [x] **WP3.2 Playback load/unload.** `services/playback.py`; `POST /playback/load`
   (multipart or `{path}`) → `context.load_device`; playback device listed with
   `is_playback`, `file_name`; `DELETE /playback/{d}`; drag-and-drop onto the app; Tauri
   native open dialog. HW: none (uses recorded file). 2.5 d.
-- [ ] **WP3.3 Transport.** `play|pause|stop|seek|speed|step|repeat` + `GET status`;
+- [x] **WP3.3 Transport.** `play|pause|stop|seek|speed|step|repeat` + `GET status`;
   `set_status_changed_callback` → socket `playback_status`; server-side repeat like
   `realsense-viewer.cpp:59-115`; `components/playback/Transport.tsx` (step buttons, seek
   bar with hh:mm:ss.mmm, speed combo x0.25–x2, repeat, info). 3 d.
@@ -303,3 +303,18 @@ Run with a D455 connected, server from `wrappers/rest-api` using the repo-built
 3. Two D4xx: reproduce RSDEV-12011 for WP1.6.
 
 D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
+
+## Progress log
+
+- 2026-09-11: Phase 0 (WP0.1 live-verified; #15559/#15662 are other people's PRs), Phase 1
+  except WP1.4 (store slices deferred: new features already land as separate stores under
+  `src/store/*.ts`; the legacy `store/index.ts` split waits for PR #15559 to merge), WP1.6
+  (needs a second camera) and WP1.9 (Jenkins/LibCI infrastructure). Phase 2 done except
+  WP2.5 (zoom/pan/grid), WP2.10 (HDR tool: the D455 firmware here has no `hdr-preset`
+  section, so it can only be mock-tested), WP2.12 (sync/align needs the frame pump to
+  route through `rs.syncer`; deferred). Phase 3 WP3.1-3.3 done and live-verified on the
+  D455 (WP3.4 E2E scenario pending; WP3.5 stretch not started).
+- Finding: the SDK's `on_options_changed` watcher wedges the D455 on Windows when more than
+  one thread touches options; the server polls options itself (see design §7).
+- Finding: recording in SDK 2.59 writes ROS2 `.db3`; `.bag` files play back but cannot be
+  written.
