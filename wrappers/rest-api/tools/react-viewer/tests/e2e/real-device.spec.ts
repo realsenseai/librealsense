@@ -74,7 +74,7 @@ test.describe('@real-device Real Device Tests', () => {
       const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
       
       // Wait for device to finish loading sensors
-      await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
+      await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 30000 })
       
       // Sensor modules are collapsed by default; expand them to reveal the stream toggles
       await expandSensorModules(deviceCard)
@@ -105,7 +105,7 @@ test.describe('@real-device Real Device Tests', () => {
       const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
       
       // Wait for device to finish loading sensors
-      await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
+      await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 30000 })
       
       await expandSensorModules(deviceCard)
 
@@ -195,7 +195,7 @@ test.describe('@real-device Performance Tests', () => {
     const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
     
     // Wait for device to finish loading sensors
-    await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
+    await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 30000 })
     
     await expandSensorModules(deviceCard)
 

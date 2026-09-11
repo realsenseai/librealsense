@@ -1,9 +1,10 @@
 import { io, Socket } from 'socket.io-client'
-import type { JobInfo, LogEntry, MetadataUpdate, SdkNotification } from './types'
+import type { DepthFrameEvent, JobInfo, LogEntry, MetadataUpdate, SdkNotification } from './types'
 import { useAppStore } from '../store'
 import { useJobsStore } from '../store/jobs'
 import { useConsoleStore } from '../store/console'
 import { useNotificationsStore } from '../store/notifications'
+import { usePointCloudStore } from '../store/pointcloud'
 
 class SocketService {
   private socket: Socket | null = null
@@ -58,11 +59,22 @@ class SocketService {
       useAppStore.getState().updateMetadata(data)
     })
 
+    this.socket.on('depth_frame', (f: DepthFrameEvent) => {
+      // Frames still in flight after a stop must not repopulate the cleared cloud
+      if (!useAppStore.getState().deviceStates[f.device_id]?.isStreaming) return
+      const bytes = f.data instanceof ArrayBuffer ? new Uint8Array(f.data) : new Uint8Array(f.data.buffer, f.data.byteOffset, f.data.byteLength)
+      const aligned = bytes.byteOffset % 2 === 0 ? bytes : bytes.slice()
+      usePointCloudStore.getState().pushFrame(f.device_id, {
+        width: f.width, height: f.height, units: f.units, frameNumber: f.frame_number,
+        data: new Uint16Array(aligned.buffer, aligned.byteOffset, aligned.byteLength >> 1),
+      })
+    })
+
     this.socket.on('devices_changed', (data: { added?: string[]; removed?: string[] }) => {
       if (import.meta.env.DEV) console.log('Socket.IO devices_changed:', data)
-      // Force a re-enumeration: a device returning after a FW flash must not be
-      // served from the cached list. fetchDevices handles first-load auto-activate.
-      useAppStore.getState().fetchDevices(true)
+      // The server's registry already reflects the change (this event comes from it);
+      // fetchDevices handles first-load auto-activate.
+      useAppStore.getState().fetchDevices()
     })
 
     this.socket.on('options_changed', (data: { device_id: string; sensor_id: string; options: { option_id: string; current_value: number }[] }) => {

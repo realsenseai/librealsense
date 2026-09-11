@@ -15,6 +15,8 @@ import type { DeviceState, StreamConfig, StreamMetadata } from '../api/types'
 // A stream with its device context
 interface DeviceStream {
   paused: boolean
+  /** A recording that is paused or stopped legitimately delivers no frames. */
+  playbackIdle?: boolean
   recording?: boolean
   metadataServerTime?: number
   deviceId: string
@@ -51,6 +53,7 @@ export function StreamViewer() {
           config,
           metadata: ds.streamMetadata[config.stream_type],
           paused: !!sensorStatus?.paused,
+          playbackIdle: !!ds.playback && ds.playback.state !== 'playing',
           metadataServerTime: ds.metadataServerTime,
           recording: !!ds.record?.recording && !ds.record.paused,
         })
@@ -153,6 +156,7 @@ export function StreamViewer() {
                 showDeviceName={activeDeviceCount > 1}
                 pause={{ deviceId: stream.deviceId, sensorId: stream.config.sensor_id, paused: stream.paused }}
                 metadataServerTime={stream.metadataServerTime}
+                playbackIdle={stream.playbackIdle}
                 maximize={maximize}
                 recording={stream.recording}
               />
@@ -237,12 +241,13 @@ interface StreamTileProps {
   metadata?: StreamMetadata
   pause?: PauseState
   metadataServerTime?: number
+  playbackIdle?: boolean
   maximize?: MaximizeState
   recording?: boolean
 }
 
 function StreamTile({
-  deviceId, sensorId, deviceName, serialNumber, streamType, format, showDeviceName, metadata, pause, metadataServerTime, maximize, recording,
+  deviceId, sensorId, deviceName, serialNumber, streamType, format, showDeviceName, metadata, pause, metadataServerTime, playbackIdle, maximize, recording,
 }: StreamTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -278,7 +283,7 @@ function StreamTile({
   const isDepthStream = streamType.toLowerCase() === 'depth'
   const metric = useMetric()
   const unrenderable = !!format && UNRENDERABLE_FORMATS.has(format.toLowerCase())
-  const stalled = !pause?.paused && metadata?.received_at !== undefined && metadataServerTime !== undefined
+  const stalled = !pause?.paused && !playbackIdle && metadata?.received_at !== undefined && metadataServerTime !== undefined
     && metadataServerTime - metadata.received_at > STALE_AFTER_S
 
   useEffect(() => {

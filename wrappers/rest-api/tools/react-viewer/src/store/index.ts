@@ -757,7 +757,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   loadRecording: async (path) => {
     try {
       await apiClient.loadRecording(path)
-      await get().fetchDevices(true) // the recording shows up as a device
+      await get().fetchDevices() // the server registered the recording as a device already
     } catch (error) {
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       set({ error: `Failed to load recording: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
@@ -767,7 +767,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   uploadRecording: async (file) => {
     try {
       await apiClient.uploadRecording(file)
-      await get().fetchDevices(true)
+      await get().fetchDevices()
     } catch (error) {
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       set({ error: `Failed to load recording: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
@@ -776,7 +776,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   unloadRecording: async (deviceId) => {
     await apiClient.unloadRecording(deviceId)
-    await get().fetchDevices(true)
+    await get().fetchDevices()
   },
 
   refreshPlayback: async (deviceId) => {

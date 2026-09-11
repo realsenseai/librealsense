@@ -327,6 +327,16 @@ describe('StreamViewer', () => {
       expect(screen.getByText('No frames received!')).toBeInTheDocument()
     })
 
+    it('does not flag a paused recording', () => {
+      const device = createMockDevice()
+      const ds = streamingState(device)
+      ds.streamMetadata = { depth: { stream_type: 'depth', timestamp: 0, frame_number: 1, width: 640, height: 480, received_at: 100 } }
+      ds.metadataServerTime = 105
+      ds.playback = { device_id: device.device_id, file_name: 'clip.db3', state: 'paused', position_ns: 0, duration_ns: 1, speed: 1, repeat: false }
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: ds } } })
+      expect(screen.queryByText('No frames received!')).not.toBeInTheDocument()
+    })
+
     it('does not flag a fresh stream', () => {
       const device = createMockDevice()
       const ds = streamingState(device)
