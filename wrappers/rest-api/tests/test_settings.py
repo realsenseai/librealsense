@@ -39,3 +39,15 @@ def test_damaged_file_falls_back_to_defaults(tmp_path):
     path = tmp_path / "settings.json"
     path.write_text("{not json")
     assert SettingsStore(path).get().context.dds_domain == 0
+
+
+def test_grid_overlay_prefs_are_bounded(tmp_path):
+    store = SettingsStore(tmp_path / "s.json")
+    assert store.get().viewer.grid_horizontal_lines == 1
+    assert store.get().viewer.grid_line_color == "#ffffff"
+    updated = store.update({"viewer": {"grid_horizontal_lines": 3, "grid_line_color": "#00ff00"}})
+    assert (updated.viewer.grid_horizontal_lines, updated.viewer.grid_line_color) == (3, "#00ff00")
+    with pytest.raises(RealSenseError):
+        store.update({"viewer": {"grid_vertical_lines": 6}})
+    with pytest.raises(RealSenseError):
+        store.update({"viewer": {"grid_line_color": "green"}})

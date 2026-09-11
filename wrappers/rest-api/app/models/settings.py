@@ -54,6 +54,11 @@ class PostProcessingSettings(BaseModel):
 
 class ViewerPrefs(BaseModel):
     metric_system: bool = True
+    # Crosshair / grid overlay on video tiles (legacy viewport_grid_overlay): 1..5 lines each way
+    grid_horizontal_lines: int = Field(1, ge=1, le=5)
+    grid_vertical_lines: int = Field(1, ge=1, le=5)
+    grid_line_width: int = Field(1, ge=1, le=10)
+    grid_line_color: str = Field("#ffffff", pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class ViewerSettings(BaseModel):

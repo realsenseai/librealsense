@@ -6,6 +6,8 @@ import { server } from '../../mocks/server'
 import { render, createMockDevice, createMockDeviceState, createMockStreamConfig } from '../../utils/test-utils'
 import { StreamViewer } from '@/components/StreamViewer'
 import { useLayoutStore } from '@/store/layout'
+import { useSettingsStore } from '@/store/settings'
+import { mockSettings } from '../../mocks/fixtures/settings'
 
 describe('StreamViewer', () => {
   describe('Empty State', () => {
@@ -237,6 +239,64 @@ describe('StreamViewer', () => {
         expect(button).toHaveAttribute('aria-pressed', 'false')
       } finally {
         HTMLElement.prototype.getBoundingClientRect = original
+      }
+    })
+  })
+
+  describe('Zoom and grid', () => {
+    const rect640 = () => ({ left: 0, top: 0, width: 640, height: 480, right: 640, bottom: 480, x: 0, y: 0, toJSON: () => ({}) })
+    const streaming = () => {
+      const device = createMockDevice()
+      return createMockDeviceState(device, {
+        streamConfigs: [createMockStreamConfig({ enable: true })],
+        isStreaming: true,
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth'] },
+        },
+        streamMetadata: { depth: { stream_type: 'depth', timestamp: 0, frame_number: 1, width: 640, height: 480 } },
+      })
+    }
+
+    it('zooms with the wheel, shows a preview inset and pans by dragging', async () => {
+      const original = HTMLElement.prototype.getBoundingClientRect
+      HTMLElement.prototype.getBoundingClientRect = rect640
+      try {
+        const ds = streaming()
+        render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+        const tile = (await screen.findByRole('button', { name: 'Show crosshair/grid overlay' })).closest('[data-testid="stream-tile"]')!.firstElementChild as HTMLElement
+        const video = tile.querySelector('video.stream-video') as HTMLVideoElement
+        expect(video.style.transform).toBe('')
+
+        fireEvent.wheel(tile, { deltaY: -100, clientX: 320, clientY: 240 })
+        await waitFor(() => expect(video.style.transform).toContain('scale(1.1'))
+        expect(screen.getByTestId('zoom-preview')).toBeInTheDocument()
+
+        const before = video.style.transform
+        fireEvent.mouseDown(tile, { clientX: 320, clientY: 240, button: 0 })
+        fireEvent.mouseMove(tile, { clientX: 300, clientY: 240 })
+        fireEvent.mouseUp(tile)
+        await waitFor(() => expect(video.style.transform).not.toBe(before))
+
+        fireEvent.wheel(tile, { deltaY: 100, clientX: 320, clientY: 240 })
+        await waitFor(() => expect(video.style.transform).toBe(''))
+        expect(screen.queryByTestId('zoom-preview')).not.toBeInTheDocument()
+      } finally {
+        HTMLElement.prototype.getBoundingClientRect = original
+      }
+    })
+
+    it('draws the grid overlay from the settings', async () => {
+      const original = HTMLElement.prototype.getBoundingClientRect
+      HTMLElement.prototype.getBoundingClientRect = rect640
+      useSettingsStore.setState({ settings: { ...structuredClone(mockSettings), viewer: { ...mockSettings.viewer, grid_horizontal_lines: 2, grid_vertical_lines: 3 } } })
+      try {
+        const ds = streaming()
+        render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+        await userEvent.click(await screen.findByRole('button', { name: 'Show crosshair/grid overlay' }))
+        await waitFor(() => expect(screen.getByTestId('grid-overlay').querySelectorAll('line')).toHaveLength(5))
+      } finally {
+        HTMLElement.prototype.getBoundingClientRect = original
+        useSettingsStore.setState({ settings: null })
       }
     })
   })

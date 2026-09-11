@@ -152,7 +152,13 @@ export interface ViewerSettings {
   context: { dds_enabled: boolean; dds_domain: number }
   calibration: { enable_writing: boolean }
   post_processing: { performance_mode: boolean }
-  viewer: { metric_system: boolean }
+  viewer: {
+    metric_system: boolean
+    grid_horizontal_lines: number
+    grid_vertical_lines: number
+    grid_line_width: number
+    grid_line_color: string
+  }
 }
 
 /** Any subset of the settings groups, each with any subset of its keys. */

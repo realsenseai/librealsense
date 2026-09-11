@@ -136,6 +136,22 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                   <option value="imperial">Imperial</option>
                 </select>
               </Field>
+              <Field label="Grid overlay lines (horizontal / vertical)">
+                <div className="flex gap-2">
+                  <input className={input} type="number" min={1} max={5} aria-label="Grid horizontal lines" value={draft.viewer.grid_horizontal_lines}
+                    onChange={(e) => patch('viewer', { grid_horizontal_lines: Number(e.target.value) })} />
+                  <input className={input} type="number" min={1} max={5} aria-label="Grid vertical lines" value={draft.viewer.grid_vertical_lines}
+                    onChange={(e) => patch('viewer', { grid_vertical_lines: Number(e.target.value) })} />
+                </div>
+              </Field>
+              <Field label="Grid line width / color">
+                <div className="flex gap-2 items-center">
+                  <input className={input} type="number" min={1} max={10} aria-label="Grid line width" value={draft.viewer.grid_line_width}
+                    onChange={(e) => patch('viewer', { grid_line_width: Number(e.target.value) })} />
+                  <input type="color" aria-label="Grid line color" value={draft.viewer.grid_line_color}
+                    onChange={(e) => patch('viewer', { grid_line_color: e.target.value })} className="h-8 w-12 bg-transparent" />
+                </div>
+              </Field>
               <Field label="Output console max entries">
                 <input className={input} type="number" min={10} max={100000} value={draft.console.max_entries}
                   onChange={(e) => patch('console', { max_entries: Number(e.target.value) })} />

@@ -3,10 +3,11 @@ import { useAppStore } from '../store'
 import { WebRTCHandler } from '../api/webrtc'
 import { apiClient } from '../api/client'
 import { DepthLegend } from './DepthLegend'
-import { useMetric } from '../store/settings'
+import { useMetric, useSettingsStore } from '../store/settings'
 import { orderKeys, tileKey, useLayoutStore } from '../store/layout'
 import { describeMetadata, formatMetadataValue, isDepthMappingDevice, lessScreamy, metadataLabel } from '../utils/metadataDecoders'
-import { boxFromPixels, pixelFromMouse } from '../utils/tileGeometry'
+import { boxFromPixels, displayRect, pixelFromMouse } from '../utils/tileGeometry'
+import { FULL_FRAME, WHEEL_STEP, isZoomed, pan, zoomAt, zoomTransform, type Zoom } from '../utils/zoom'
 import type { RegionOfInterest } from '../api/types'
 import { formatDistance } from '../utils/units'
 import type { DeviceState, StreamConfig, StreamMetadata } from '../api/types'
@@ -266,6 +267,13 @@ function StreamTile({
   const [roi, setRoi] = useState<RegionOfInterest | null>(null)
   const [roiMode, setRoiMode] = useState(false)
   const [roiDrag, setRoiDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
+  // Wheel zoom / drag pan (stream-model.cpp show_frame) and the crosshair grid overlay
+  const [zoom, setZoom] = useState<Zoom>(FULL_FRAME)
+  const panStart = useRef<{ x: number; y: number } | null>(null)
+  const previewRef = useRef<HTMLVideoElement>(null)
+  const [tileRect, setTileRect] = useState<{ w: number; h: number } | null>(null)
+  const [showGrid, setShowGrid] = useState(false)
+  const gridPrefs = useSettingsStore((s) => s.settings?.viewer)
 
   const isDepthStream = streamType.toLowerCase() === 'depth'
   const metric = useMetric()
@@ -286,11 +294,67 @@ function StreamTile({
     return rect ? { w: rect.width, h: rect.height, left: rect.left, top: rect.top } : null
   }
 
+  // Track the tile size so the zoomed <video> and the overlays stay aligned with the frame.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const measure = () => { const r = el.getBoundingClientRect(); setTileRect({ w: r.width, h: r.height }) }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // The displayed frame area (letterboxed) and where a mouse position falls in it, as fractions.
+  const display = tileRect && metadata ? displayRect(tileRect.w, tileRect.h, metadata.width, metadata.height) : null
+  const fractionAt = (clientX: number, clientY: number) => {
+    const t = tileSize()
+    if (!t || !display) return null
+    return { fx: (clientX - t.left - display.offsetX) / display.width, fy: (clientY - t.top - display.offsetY) / display.height }
+  }
+
+  // Wheel zoom needs a non-passive listener to keep the page from scrolling.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (showMetadata || roiMode) return
+      const f = fractionAt(e.clientX, e.clientY)
+      if (!f || f.fx < 0 || f.fx > 1 || f.fy < 0 || f.fy > 1) return
+      e.preventDefault()
+      setZoom((z) => zoomAt(z, f.fx, f.fy, e.deltaY < 0 ? 1 / (1 + WHEEL_STEP) : 1 + WHEEL_STEP))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  })
+
+  const zoomed = isZoomed(zoom)
+  useEffect(() => {
+    if (zoomed && previewRef.current && videoRef.current) previewRef.current.srcObject = videoRef.current.srcObject
+  }, [zoomed])
+
+  const panMouse = {
+    onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!zoomed || (e.button !== 0 && e.button !== 1)) return
+      e.preventDefault() // no tile drag-to-swap, no text selection
+      panStart.current = { x: e.clientX, y: e.clientY }
+    },
+    onMouseMove: (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!panStart.current || !display) return
+      const dx = (e.clientX - panStart.current.x) / display.width
+      const dy = (e.clientY - panStart.current.y) / display.height
+      panStart.current = { x: e.clientX, y: e.clientY }
+      setZoom((z) => pan(z, dx, dy))
+    },
+    onMouseUp: () => { panStart.current = null },
+  }
+
   const commitRoi = (drag: { x0: number; y0: number; x1: number; y1: number }) => {
     const t = tileSize()
     if (!t || !metadata) return
-    const a = pixelFromMouse(drag.x0, drag.y0, t.w, t.h, metadata.width, metadata.height)
-    const b = pixelFromMouse(drag.x1, drag.y1, t.w, t.h, metadata.width, metadata.height)
+    const a = pixelFromMouse(drag.x0, drag.y0, t.w, t.h, metadata.width, metadata.height, zoom)
+    const b = pixelFromMouse(drag.x1, drag.y1, t.w, t.h, metadata.width, metadata.height, zoom)
     if (!a || !b || a.x === b.x || a.y === b.y) return
     apiClient.setRoi(deviceId, sensorId, { min_x: a.x, min_y: a.y, max_x: b.x, max_y: b.y })
       .then(setRoi)
@@ -326,7 +390,7 @@ function StreamTile({
   const roiBox = (() => {
     const t = tileSize()
     if (!roiMode || !t || !metadata || !roi?.supported || roi.min_x === undefined) return null
-    return boxFromPixels({ x: roi.min_x, y: roi.min_y! }, { x: roi.max_x!, y: roi.max_y! }, t.w, t.h, metadata.width, metadata.height)
+    return boxFromPixels({ x: roi.min_x, y: roi.min_y! }, { x: roi.max_x!, y: roi.max_y! }, t.w, t.h, metadata.width, metadata.height, zoom)
   })()
 
   // Fetch dynamic depth range periodically for depth streams
@@ -404,7 +468,7 @@ function StreamTile({
       const mouseY = e.clientY - rect.top
 
       // The <video> is letterboxed (object-contain); the bars map to no pixel.
-      const pixel = pixelFromMouse(mouseX, mouseY, rect.width, rect.height, metadata.width, metadata.height)
+      const pixel = pixelFromMouse(mouseX, mouseY, rect.width, rect.height, metadata.width, metadata.height, zoom)
       if (!pixel) {
         setHoverDepth(null)
         return
@@ -436,7 +500,7 @@ function StreamTile({
         console.error('Error getting depth at pixel:', error)
       })
     },
-    [isDepthStream, showMetadata, deviceId, metadata]
+    [isDepthStream, showMetadata, deviceId, metadata, zoom]
   )
 
   const handleMouseLeave = useCallback(() => {
@@ -513,22 +577,59 @@ function StreamTile({
     <div 
       ref={containerRef}
       className="relative bg-black rounded-lg overflow-hidden"
-      onMouseMove={roiMode ? roiMouse.onMouseMove : isDepthStream ? handleMouseMove : undefined}
-      onMouseLeave={isDepthStream ? handleMouseLeave : undefined}
-      onMouseDown={roiMode ? roiMouse.onMouseDown : undefined}
-      onMouseUp={roiMode ? roiMouse.onMouseUp : undefined}
-      style={roiMode ? { cursor: 'crosshair' } : undefined}
+      onMouseMove={(e) => {
+        if (roiMode) roiMouse.onMouseMove(e)
+        else { panMouse.onMouseMove(e); if (isDepthStream) handleMouseMove(e) }
+      }}
+      onMouseLeave={() => { panMouse.onMouseUp(); if (isDepthStream) handleMouseLeave() }}
+      onMouseDown={roiMode ? roiMouse.onMouseDown : panMouse.onMouseDown}
+      onMouseUp={roiMode ? roiMouse.onMouseUp : panMouse.onMouseUp}
+      style={roiMode ? { cursor: 'crosshair' } : zoomed ? { cursor: 'grab' } : undefined}
     >
-      {/* Video Element */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        disablePictureInPicture
-        controlsList="nodownload nofullscreen noremoteplayback"
-        className="w-full h-full object-contain stream-video"
-      />
+      {/* Video Element: zoomed by transforming it inside a clip box the size of the displayed frame */}
+      <div
+        className="absolute overflow-hidden"
+        style={display && zoomed
+          ? { left: display.offsetX, top: display.offsetY, width: display.width, height: display.height }
+          : { inset: 0 }}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          disablePictureInPicture
+          controlsList="nodownload nofullscreen noremoteplayback"
+          className="w-full h-full object-contain stream-video"
+          style={display && zoomed ? { transform: zoomTransform(zoom, display.width, display.height), transformOrigin: '0 0' } : undefined}
+        />
+      </div>
+
+      {/* Crosshair / grid overlay (stream-model.cpp draw_crosshair) */}
+      {showGrid && display && (
+        <svg className="absolute pointer-events-none" data-testid="grid-overlay"
+          style={{ left: display.offsetX, top: display.offsetY, width: display.width, height: display.height }}
+          viewBox={`0 0 ${display.width} ${display.height}`}>
+          {Array.from({ length: gridPrefs?.grid_vertical_lines ?? 1 }, (_, i) => {
+            const x = display.width * (i + 1) / ((gridPrefs?.grid_vertical_lines ?? 1) + 1)
+            return <line key={`v${i}`} x1={x} y1={0} x2={x} y2={display.height} stroke={gridPrefs?.grid_line_color ?? '#ffffff'} strokeOpacity={0.7} strokeWidth={gridPrefs?.grid_line_width ?? 1} />
+          })}
+          {Array.from({ length: gridPrefs?.grid_horizontal_lines ?? 1 }, (_, i) => {
+            const y = display.height * (i + 1) / ((gridPrefs?.grid_horizontal_lines ?? 1) + 1)
+            return <line key={`h${i}`} x1={0} y1={y} x2={display.width} y2={y} stroke={gridPrefs?.grid_line_color ?? '#ffffff'} strokeOpacity={0.7} strokeWidth={gridPrefs?.grid_line_width ?? 1} />
+          })}
+        </svg>
+      )}
+
+      {/* Zoom preview thumbnail with the visible region (rendering.h show_preview) */}
+      {zoomed && metadata && (
+        <div className="absolute bottom-8 right-2 border border-black bg-black pointer-events-none" data-testid="zoom-preview"
+          style={{ width: 141, height: Math.round(141 * metadata.height / metadata.width) }}>
+          <video ref={previewRef} autoPlay playsInline muted disablePictureInPicture className="w-full h-full object-fill" />
+          <div className="absolute border border-yellow-400"
+            style={{ left: `${zoom.x * 100}%`, top: `${zoom.y * 100}%`, width: `${zoom.w * 100}%`, height: `${zoom.h * 100}%` }} />
+        </div>
+      )}
 
       {/* Device Name Header (shown for multi-camera) */}
       {showDeviceName && (
@@ -574,6 +675,16 @@ function StreamTile({
             ↺
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setShowGrid((g) => !g)}
+          title="Show crosshair/grid overlay"
+          aria-label="Show crosshair/grid overlay"
+          aria-pressed={showGrid}
+          className={`px-2 py-1 rounded text-xs border border-gray-600 z-20 ${showGrid ? 'bg-rs-blue text-white' : 'bg-black/60 hover:bg-black/80 text-white'}`}
+        >
+          #
+        </button>
         <SnapshotButton deviceId={deviceId} streamType={streamType} className="py-1" />
         {pause && <PauseButton pause={pause} className="py-1" />}
         {maximize && <MaximizeButton maximize={maximize} className="py-1" />}

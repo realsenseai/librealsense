@@ -9,5 +9,5 @@ export const mockSettings: ViewerSettings = {
   context: { dds_enabled: false, dds_domain: 0 },
   calibration: { enable_writing: true },
   post_processing: { performance_mode: false },
-  viewer: { metric_system: true },
+  viewer: { metric_system: true, grid_horizontal_lines: 1, grid_vertical_lines: 1, grid_line_width: 1, grid_line_color: '#ffffff' },
 }
