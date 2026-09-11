@@ -183,7 +183,7 @@ Enables everything after it. No user-visible parity except settings and multi-ca
 
 ## Phase 6 — Calibration (~18 d, RSDEV-9262)
 
-- [ ] **WP6.1 Calibration job core.** `services/calibration.py` with workspace
+- [x] **WP6.1 Calibration job core.** `services/calibration.py` with workspace
   save/restore (stop other sensors, force depth profile, laser/thermal off, restore);
   `POST /devices/{d}/calibration/occ {speed, accuracy, scan, host_assist, dry_run}` → job;
   result `{health[], new_table_id}`; `POST /calibration/apply {keep|new}`;
@@ -366,6 +366,14 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   already streams used to stop/close the SDK sensor under the manager lock ("stale state
   recovery") and left the SDK unable to reopen it; start is now a no-op for the same
   configuration and a proper stop_sensor + start for a different one.
+- 2026-09-12: WP6.1 calibration job core (`services/calibration.py`): OCC and tare as
+  jobs inside a workspace that stops the device's streams, streams depth 256x144@90 with
+  the emitter on and thermal loop off, runs the firmware calibration with the legacy JSON,
+  activates the new table, restores streams and options; apply old/new, keep (write,
+  gated by Settings > calibration) and factory reset. Live on the D455: the firmware
+  answered "Not enough depth pixels! - low fill factor" for the desk scene, which the
+  legacy tool would show the same way; the SDK's progress callback reported nothing until
+  the end. Tare backend is in (WP6.3) but has not been run against a target.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).

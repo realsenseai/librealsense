@@ -14,6 +14,7 @@ from app.services.jobs import JobRegistry
 from app.services.settings import SettingsStore
 from app.services.options_poller import OptionsPoller
 from app.services.logs import LogConsole
+from app.services.calibration import CalibrationMixin
 from app.services.manager import (
     console,
     devices,
@@ -35,6 +36,7 @@ class RealSenseManager(
     sensor_streaming.SensorStreamingMixin,
     record_playback.RecordPlaybackMixin,
     console.ConsoleMixin,
+    CalibrationMixin,
 ):
     # Class-level event loop reference for async operations from sync contexts
     _main_loop: Optional[asyncio.AbstractEventLoop] = None

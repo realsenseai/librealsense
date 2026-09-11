@@ -4,7 +4,7 @@
 from typing import List
 
 from fastapi import APIRouter
-from app.api.endpoints import advanced_mode, colorizer, console, devices, filters, firmware, hdr, hwm, jobs, options, playback, point_cloud, presets, record, sensors, settings, streams, system, updates, webrtc
+from app.api.endpoints import advanced_mode, calibration, colorizer, console, devices, filters, firmware, hdr, hwm, jobs, options, playback, point_cloud, presets, record, sensors, settings, streams, system, updates, webrtc
 from app.core.sdk_info import sdk_version
 
 
@@ -87,6 +87,7 @@ api_router.include_router(record.router, prefix="/devices/{device_id}/record", t
 api_router.include_router(playback.router, prefix="/playback", tags=["playback"])
 api_router.include_router(presets.router, prefix="/devices/{device_id}/presets", tags=["presets"])
 api_router.include_router(hdr.router, prefix="/devices/{device_id}/hdr", tags=["hdr"])
+api_router.include_router(calibration.router, prefix="/devices/{device_id}/calibration", tags=["calibration"])
 api_router.include_router(console.logs_router, prefix="/logs", tags=["console"])
 api_router.include_router(console.device_router, prefix="/devices/{device_id}", tags=["console"])
 api_router.include_router(console.terminal_router, prefix="/terminal", tags=["console"])
