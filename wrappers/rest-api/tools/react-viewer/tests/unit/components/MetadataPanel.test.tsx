@@ -17,6 +17,26 @@ const baseMetadata: StreamMetadata = {
   frame_metadata: { actual_fps: 29970, frame_counter: 42 },
 }
 
+describe('MetadataOverlay decoding', () => {
+  it('shows bitmask attributes in hex with the decoded bits as a tooltip', () => {
+    render(<MetadataOverlay streamType="depth" fps={30} metadata={{
+      stream_type: 'depth', timestamp: 1, frame_number: 2, width: 640, height: 480,
+      frame_metadata: { safety_hara_events: 5, actual_exposure: 8500 },
+    }} />)
+    expect(screen.getByText('0x5')).toBeInTheDocument()
+    expect(screen.getByText('Safety Hara Events').closest('[title]')).toHaveAttribute('title', expect.stringContaining('HaRa triggers identified (0)'))
+    expect(screen.getByText('Actual Exposure').closest('[title]')).toHaveAttribute('title', expect.stringContaining("Sensor's exposure width"))
+  })
+
+  it('drops the "manual" qualifier from white balance on depth-mapping cameras', () => {
+    render(<MetadataOverlay streamType="color" fps={30} deviceName="RealSense D585S" metadata={{
+      stream_type: 'color', timestamp: 1, frame_number: 2, width: 640, height: 480,
+      frame_metadata: { manual_white_balance: 4600 },
+    }} />)
+    expect(screen.getByText('White Balance')).toBeInTheDocument()
+  })
+})
+
 describe('MetadataItem', () => {
   it('renders nothing when value is undefined', () => {
     const { container } = render(<MetadataItem label="x" value={undefined} />)

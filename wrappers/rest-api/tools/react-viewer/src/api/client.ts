@@ -16,6 +16,7 @@ import type {
   ViewerSettings,
   ViewerSettingsPatch,
   JobInfo,
+  RegionOfInterest,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -241,6 +242,17 @@ class ApiClient {
       `/devices/${deviceId}/sensors/${sensorId}/start`,
       { configs }  // Send as list
     )
+    return response.data
+  }
+
+  async getRoi(deviceId: string, sensorId: string): Promise<RegionOfInterest> {
+    const response = await this.client.get<RegionOfInterest>(`/devices/${deviceId}/sensors/${sensorId}/roi`)
+    return response.data
+  }
+
+  /** Auto-exposure region of interest in frame pixels; corners may come in any order. */
+  async setRoi(deviceId: string, sensorId: string, roi: { min_x: number; min_y: number; max_x: number; max_y: number }): Promise<RegionOfInterest> {
+    const response = await this.client.put<RegionOfInterest>(`/devices/${deviceId}/sensors/${sensorId}/roi`, roi)
     return response.data
   }
 

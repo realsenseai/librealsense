@@ -5,6 +5,9 @@ import { apiClient } from '../api/client'
 import { DepthLegend } from './DepthLegend'
 import { useMetric } from '../store/settings'
 import { orderKeys, tileKey, useLayoutStore } from '../store/layout'
+import { describeMetadata, formatMetadataValue, isDepthMappingDevice, lessScreamy, metadataLabel } from '../utils/metadataDecoders'
+import { boxFromPixels, pixelFromMouse } from '../utils/tileGeometry'
+import type { RegionOfInterest } from '../api/types'
 import { formatDistance } from '../utils/units'
 import type { DeviceState, StreamConfig, StreamMetadata } from '../api/types'
 
@@ -138,6 +141,7 @@ export function StreamViewer() {
             return tileFrame(stream,
               <StreamTile
                 deviceId={stream.deviceId}
+                sensorId={stream.config.sensor_id}
                 deviceName={stream.deviceName}
                 serialNumber={stream.serialNumber}
                 streamType={stream.config.stream_type}
@@ -220,6 +224,7 @@ const STALE_AFTER_S = 2
 
 interface StreamTileProps {
   deviceId: string
+  sensorId: string
   deviceName: string
   serialNumber: string
   streamType: string
@@ -232,7 +237,7 @@ interface StreamTileProps {
 }
 
 function StreamTile({
-  deviceId, deviceName, serialNumber, streamType, format, showDeviceName, metadata, pause, metadataServerTime, maximize,
+  deviceId, sensorId, deviceName, serialNumber, streamType, format, showDeviceName, metadata, pause, metadataServerTime, maximize,
 }: StreamTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -253,12 +258,72 @@ function StreamTile({
   const [depthRange, setDepthRange] = useState<{ min: number; max: number }>({ min: 0, max: 6 })
   // Max usable range (stream-model.cpp): shown while the depth sensor has the option on.
   const [maxUsableRange, setMaxUsableRange] = useState<number | null>(null)
+  // Auto-exposure ROI (stream-model.cpp update_ae_roi_rect): drawn by dragging on the tile.
+  const [roi, setRoi] = useState<RegionOfInterest | null>(null)
+  const [roiMode, setRoiMode] = useState(false)
+  const [roiDrag, setRoiDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
 
   const isDepthStream = streamType.toLowerCase() === 'depth'
   const metric = useMetric()
   const unrenderable = !!format && UNRENDERABLE_FORMATS.has(format.toLowerCase())
   const stalled = !pause?.paused && metadata?.received_at !== undefined && metadataServerTime !== undefined
     && metadataServerTime - metadata.received_at > STALE_AFTER_S
+
+  useEffect(() => {
+    let cancelled = false
+    apiClient.getRoi(deviceId, sensorId)
+      .then((r) => { if (!cancelled) setRoi(r) })
+      .catch(() => { if (!cancelled) setRoi({ supported: false }) })
+    return () => { cancelled = true }
+  }, [deviceId, sensorId])
+
+  const tileSize = () => {
+    const rect = containerRef.current?.getBoundingClientRect()
+    return rect ? { w: rect.width, h: rect.height, left: rect.left, top: rect.top } : null
+  }
+
+  const commitRoi = (drag: { x0: number; y0: number; x1: number; y1: number }) => {
+    const t = tileSize()
+    if (!t || !metadata) return
+    const a = pixelFromMouse(drag.x0, drag.y0, t.w, t.h, metadata.width, metadata.height)
+    const b = pixelFromMouse(drag.x1, drag.y1, t.w, t.h, metadata.width, metadata.height)
+    if (!a || !b || a.x === b.x || a.y === b.y) return
+    apiClient.setRoi(deviceId, sensorId, { min_x: a.x, min_y: a.y, max_x: b.x, max_y: b.y })
+      .then(setRoi)
+      .catch((error) => console.error('Failed to set ROI:', error))
+  }
+
+  const resetRoi = () => {
+    if (!metadata) return
+    apiClient.setRoi(deviceId, sensorId, { min_x: 0, min_y: 0, max_x: metadata.width - 1, max_y: metadata.height - 1 })
+      .then(setRoi)
+      .catch((error) => console.error('Failed to reset ROI:', error))
+  }
+
+  const roiMouse = {
+    onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => {
+      const t = tileSize()
+      if (!t) return
+      const x = e.clientX - t.left, y = e.clientY - t.top
+      setRoiDrag({ x0: x, y0: y, x1: x, y1: y })
+    },
+    onMouseMove: (e: React.MouseEvent<HTMLDivElement>) => {
+      const t = tileSize()
+      if (!t || !roiDrag) return
+      setRoiDrag({ ...roiDrag, x1: e.clientX - t.left, y1: e.clientY - t.top })
+    },
+    onMouseUp: () => {
+      if (roiDrag) commitRoi(roiDrag)
+      setRoiDrag(null)
+      setRoiMode(false) // like the legacy viewer, one rectangle per activation
+    },
+  }
+
+  const roiBox = (() => {
+    const t = tileSize()
+    if (!roiMode || !t || !metadata || !roi?.supported || roi.min_x === undefined) return null
+    return boxFromPixels({ x: roi.min_x, y: roi.min_y! }, { x: roi.max_x!, y: roi.max_y! }, t.w, t.h, metadata.width, metadata.height)
+  })()
 
   // Fetch dynamic depth range periodically for depth streams
   useEffect(() => {
@@ -334,27 +399,13 @@ function StreamTile({
       const mouseX = e.clientX - rect.left
       const mouseY = e.clientY - rect.top
 
-      // The <video> uses object-contain so it is letterboxed within the tile.
-      // Compute the actual displayed video rect and ignore the bars.
-      const scale = Math.min(rect.width / metadata.width, rect.height / metadata.height)
-      const displayW = metadata.width * scale
-      const displayH = metadata.height * scale
-      const offsetX = (rect.width - displayW) / 2
-      const offsetY = (rect.height - displayH) / 2
-
-      if (mouseX < offsetX || mouseX >= offsetX + displayW ||
-          mouseY < offsetY || mouseY >= offsetY + displayH) {
+      // The <video> is letterboxed (object-contain); the bars map to no pixel.
+      const pixel = pixelFromMouse(mouseX, mouseY, rect.width, rect.height, metadata.width, metadata.height)
+      if (!pixel) {
         setHoverDepth(null)
         return
       }
-
-      const x = Math.floor((mouseX - offsetX) / displayW * metadata.width)
-      const y = Math.floor((mouseY - offsetY) / displayH * metadata.height)
-
-      if (x < 0 || x >= metadata.width || y < 0 || y >= metadata.height) {
-        setHoverDepth(null)
-        return
-      }
+      const { x, y } = pixel
 
       // Store pending query coords
       pendingQuery.current = { x, y, mouseX, mouseY }
@@ -458,8 +509,11 @@ function StreamTile({
     <div 
       ref={containerRef}
       className="relative bg-black rounded-lg overflow-hidden"
-      onMouseMove={isDepthStream ? handleMouseMove : undefined}
+      onMouseMove={roiMode ? roiMouse.onMouseMove : isDepthStream ? handleMouseMove : undefined}
       onMouseLeave={isDepthStream ? handleMouseLeave : undefined}
+      onMouseDown={roiMode ? roiMouse.onMouseDown : undefined}
+      onMouseUp={roiMode ? roiMouse.onMouseUp : undefined}
+      style={roiMode ? { cursor: 'crosshair' } : undefined}
     >
       {/* Video Element */}
       <video
@@ -498,18 +552,47 @@ function StreamTile({
       )}
 
       <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 flex items-center gap-1`}>
+        {roi?.supported && (
+          <button
+            type="button"
+            onClick={() => setRoiMode((m) => !m)}
+            title={roiMode ? 'Drag a rectangle to set the auto-exposure ROI' : 'Set auto-exposure ROI'}
+            aria-label="Set auto-exposure ROI"
+            aria-pressed={roiMode}
+            className={`px-2 py-1 rounded text-xs border border-gray-600 z-20 ${roiMode ? 'bg-yellow-600 text-black' : 'bg-black/60 hover:bg-black/80 text-white'}`}
+          >
+            ROI
+          </button>
+        )}
+        {roiMode && (
+          <button type="button" onClick={resetRoi} title="Reset ROI to the full frame" aria-label="Reset ROI"
+            className="px-2 py-1 bg-black/60 hover:bg-black/80 rounded text-xs text-white border border-gray-600 z-20">
+            ↺
+          </button>
+        )}
         <SnapshotButton deviceId={deviceId} streamType={streamType} className="py-1" />
         {pause && <PauseButton pause={pause} className="py-1" />}
         {maximize && <MaximizeButton maximize={maximize} className="py-1" />}
         <MetadataPanel
           metadata={metadata}
           streamType={streamType}
+          deviceName={deviceName}
           fps={fps}
           show={showMetadata}
           onToggle={setShowMetadata}
           buttonClassName="py-1"
         />
       </div>
+
+      {roiBox && (
+        <div className="absolute border-2 border-yellow-400 pointer-events-none" data-testid="roi-rect"
+          style={{ left: roiBox.left, top: roiBox.top, width: roiBox.width, height: roiBox.height }} />
+      )}
+      {roiDrag && (
+        <div className="absolute border-2 border-dashed border-white pointer-events-none"
+          style={{ left: Math.min(roiDrag.x0, roiDrag.x1), top: Math.min(roiDrag.y0, roiDrag.y1),
+            width: Math.abs(roiDrag.x1 - roiDrag.x0), height: Math.abs(roiDrag.y1 - roiDrag.y0) }} />
+      )}
 
       {/* Stream state overlays, as the legacy viewer draws over a tile */}
       {pause?.paused && (
@@ -632,6 +715,7 @@ function IMUStreamTile({ deviceId, streamType, showDeviceName, deviceName, seria
           <MetadataPanel
             metadata={metadata}
             streamType={streamType}
+            deviceName={deviceName}
             fps={fps}
             show={showMetadata}
             onToggle={setShowMetadata}
@@ -742,10 +826,12 @@ interface MetadataOverlayProps {
   streamType: string
   metadata: StreamMetadata
   fps: number
+  deviceName?: string
 }
 
-export function MetadataOverlay({ streamType, metadata, fps }: MetadataOverlayProps) {
+export function MetadataOverlay({ streamType, metadata, fps, deviceName }: MetadataOverlayProps) {
   const frameMd = metadata.frame_metadata ?? {}
+  const depthMapping = isDepthMappingDevice(deviceName)
   const isMotion = ['gyro', 'accel', 'motion'].includes(streamType.toLowerCase())
   // Mirrors C++ viewer (common/stream-model.cpp): when SDK falls back to system_time,
   // per-frame metadata is unavailable from the kernel UVC driver.
@@ -779,7 +865,7 @@ export function MetadataOverlay({ streamType, metadata, fps }: MetadataOverlayPr
       )}
       <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 p-3 font-mono">
         {Object.entries(frameMd).map(([k, v]) => (
-          <MetadataItem key={k} label={lessScreamy(k)} value={v} />
+          <MetadataItem key={k} label={metadataLabel(k, depthMapping)} value={formatMetadataValue(k, v)} title={describeMetadata(k, v)} />
         ))}
       </div>
     </div>
@@ -793,13 +879,14 @@ function resolutionFrom(w: number | undefined, h: number | undefined): string | 
 interface MetadataPanelProps {
   metadata?: StreamMetadata
   streamType: string
+  deviceName?: string
   fps: number
   show: boolean
   onToggle: (show: boolean) => void
   buttonClassName?: string
 }
 
-export function MetadataPanel({ metadata, streamType, fps, show, onToggle, buttonClassName = '' }: MetadataPanelProps) {
+export function MetadataPanel({ metadata, streamType, deviceName, fps, show, onToggle, buttonClassName = '' }: MetadataPanelProps) {
   const hasMetadata = !!metadata && (
     metadata.frame_number !== undefined ||
     metadata.timestamp !== undefined ||
@@ -816,21 +903,18 @@ export function MetadataPanel({ metadata, streamType, fps, show, onToggle, butto
       >
         {show ? '✕' : 'Metadata'}
       </button>
-      {show && <MetadataOverlay streamType={streamType} metadata={metadata!} fps={fps} />}
+      {show && <MetadataOverlay streamType={streamType} metadata={metadata!} fps={fps} deviceName={deviceName} />}
     </>
   )
 }
 
-// Mirrors the SDK's rsutils::string::make_less_screamy: "ACTUAL_FPS" -> "Actual Fps".
-export function lessScreamy(key: string): string {
-  return key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
-}
+export { lessScreamy }
 
-export function MetadataItem({ label, value }: { label: string; value: ReactNode }) {
+export function MetadataItem({ label, value, title }: { label: string; value: ReactNode; title?: string }) {
   if (value === undefined || value === null) return null
   return (
-    <div className="flex justify-between border-b border-gray-800/50 py-0.5">
-      <span className="text-gray-300 truncate pr-2">{label}</span>
+    <div className="flex justify-between border-b border-gray-800/50 py-0.5" title={title}>
+      <span className={`text-gray-300 truncate pr-2 ${title ? 'underline decoration-dotted' : ''}`}>{label}</span>
       <span className="text-right shrink-0">{value}</span>
     </div>
   )

@@ -35,6 +35,15 @@ export function visibleOptions(options: OptionInfo[]): OptionInfo[] {
   return options.filter((o) => !HIDDEN_OPTIONS.includes(o.option_id.toLowerCase()))
 }
 
+// Wire shape of /devices/{d}/sensors/{s}/roi
+export interface RegionOfInterest {
+  supported: boolean
+  min_x?: number
+  min_y?: number
+  max_x?: number
+  max_y?: number
+}
+
 // Wire shape of /jobs/ and the `job` Socket.IO event (app/models/job.py)
 export type JobState = 'running' | 'done' | 'failed' | 'cancelled'
 export interface JobInfo {

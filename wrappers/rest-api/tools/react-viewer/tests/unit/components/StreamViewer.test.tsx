@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../mocks/server'
@@ -183,6 +183,61 @@ describe('StreamViewer', () => {
 
       await userEvent.click(screen.getByRole('button', { name: 'Restore tile' }))
       expect(screen.getAllByTestId('stream-tile')).toHaveLength(2)
+    })
+  })
+
+  describe('Auto-exposure ROI', () => {
+    const withRoi = () => {
+      server.use(http.get('/api/v1/devices/:deviceId/sensors/:sensorId/roi', () =>
+        HttpResponse.json({ supported: true, min_x: 0, min_y: 0, max_x: 639, max_y: 479 })))
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, {
+        streamConfigs: [createMockStreamConfig({ enable: true })],
+        isStreaming: true,
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth'] },
+        },
+        streamMetadata: { depth: { stream_type: 'depth', timestamp: 0, frame_number: 1, width: 640, height: 480 } },
+      })
+      return ds
+    }
+
+    it('offers no ROI button for a sensor without one', async () => {
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, {
+        streamConfigs: [createMockStreamConfig({ enable: true })], isStreaming: true,
+        sensorStreamingStatus: { 'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth'] } },
+      })
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: ds } } })
+      await waitFor(() => expect(screen.getByRole('link', { name: 'Save snapshot' })).toBeInTheDocument())
+      expect(screen.queryByRole('button', { name: 'Set auto-exposure ROI' })).not.toBeInTheDocument()
+    })
+
+    it('sets the ROI from a dragged rectangle, in frame pixels', async () => {
+      const original = HTMLElement.prototype.getBoundingClientRect
+      HTMLElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 640, height: 480, right: 640, bottom: 480, x: 0, y: 0, toJSON: () => ({}) })
+      let sent: Record<string, number> | null = null
+      server.use(http.put('/api/v1/devices/:deviceId/sensors/:sensorId/roi', async ({ request }) => {
+        sent = (await request.json()) as Record<string, number>
+        return HttpResponse.json({ supported: true, ...sent })
+      }))
+      try {
+        const ds = withRoi()
+        render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+        const button = await screen.findByRole('button', { name: 'Set auto-exposure ROI' })
+        await userEvent.click(button)
+        expect(button).toHaveAttribute('aria-pressed', 'true')
+
+        const tile = screen.getByTestId('roi-rect').parentElement!
+        fireEvent.mouseDown(tile, { clientX: 100, clientY: 50 })
+        fireEvent.mouseMove(tile, { clientX: 300, clientY: 250 })
+        fireEvent.mouseUp(tile)
+
+        await waitFor(() => expect(sent).toEqual({ min_x: 100, min_y: 50, max_x: 300, max_y: 250 }))
+        expect(button).toHaveAttribute('aria-pressed', 'false')
+      } finally {
+        HTMLElement.prototype.getBoundingClientRect = original
+      }
     })
   })
 

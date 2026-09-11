@@ -156,6 +156,12 @@ export const handlers = [
   }),
 
   // Per-sensor streaming: stop sensor
+  http.get(`${API_BASE}/devices/:deviceId/sensors/:sensorId/roi`, () => HttpResponse.json({ supported: false })),
+  http.put(`${API_BASE}/devices/:deviceId/sensors/:sensorId/roi`, async ({ request }) => {
+    const roi = (await request.json()) as Record<string, number>
+    return HttpResponse.json({ supported: true, min_x: Math.min(roi.min_x, roi.max_x), min_y: Math.min(roi.min_y, roi.max_y),
+      max_x: Math.max(roi.min_x, roi.max_x), max_y: Math.max(roi.min_y, roi.max_y) })
+  }),
   http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/pause`, ({ params }) =>
     HttpResponse.json({ sensor_id: params.sensorId, name: '', is_streaming: true, paused: true, stream_types: ['depth'] })),
   http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/resume`, ({ params }) =>
