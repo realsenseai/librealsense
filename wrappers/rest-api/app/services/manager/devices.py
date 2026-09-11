@@ -71,7 +71,7 @@ class DeviceRegistryMixin:
         device_id = dev.get_info(rs.camera_info.serial_number)
         # A recording keeps the recorded camera's serial; give it an id of its own so it can
         # be played back next to that camera.
-        is_playback = bool(getattr(dev, "is_playback", lambda: False)())
+        is_playback = getattr(dev, "is_playback", lambda: False)() is True
         file_name = rs.playback(dev).file_name() if is_playback else None
         if is_playback:
             from app.services.manager.record_playback import playback_device_id

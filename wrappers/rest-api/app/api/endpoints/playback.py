@@ -8,17 +8,16 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from app.api.dependencies import get_realsense_manager, get_settings_store
+from app.api.dependencies import get_realsense_manager
 from app.models.device import DeviceInfo
 from app.models.playback import PlaybackAction, PlaybackLoadRequest, PlaybackStatus
 from app.services.rs_manager import RealSenseManager
-from app.services.settings import SettingsStore
 
 router = APIRouter()
 
 
-def recordings_folder(store: SettingsStore) -> Path:
-    return Path(store.get().record.default_path or str(Path.home() / "Documents"))
+def recordings_folder(rs_manager: RealSenseManager) -> Path:
+    return Path(rs_manager.settings.get().record.default_path or str(Path.home() / "Documents"))
 
 
 @router.post("/load", response_model=DeviceInfo)
@@ -31,13 +30,12 @@ async def load_recording(body: PlaybackLoadRequest, rs_manager: RealSenseManager
 async def upload_recording(
     file: UploadFile = File(...),
     rs_manager: RealSenseManager = Depends(get_realsense_manager),
-    store: SettingsStore = Depends(get_settings_store),
 ):
     """Receive a recording from the browser into the recordings folder and open it."""
     name = Path(file.filename or "recording.bag").name
     if Path(name).suffix.lower() not in (".bag", ".db3"):
         raise HTTPException(status_code=400, detail="Only .bag and .db3 recordings can be played")
-    folder = recordings_folder(store)
+    folder = recordings_folder(rs_manager)
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / name
     with target.open("wb") as out:
@@ -46,9 +44,9 @@ async def upload_recording(
 
 
 @router.get("/files", response_model=list)
-async def list_recordings(store: SettingsStore = Depends(get_settings_store)):
+async def list_recordings(rs_manager: RealSenseManager = Depends(get_realsense_manager)):
     """Recordings in the server's recordings folder, newest first."""
-    folder = recordings_folder(store)
+    folder = recordings_folder(rs_manager)
     if not folder.is_dir():
         return []
     files = [p for p in folder.iterdir() if p.suffix.lower() in (".bag", ".db3")]
