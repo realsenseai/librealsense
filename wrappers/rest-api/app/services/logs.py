@@ -17,13 +17,18 @@ SEVERITIES = {"debug": rs.log_severity.debug, "info": rs.log_severity.info,
 _SEVERITY_NAMES = {v: k for k, v in SEVERITIES.items()}
 
 
+FLUSH_INTERVAL = 0.1  # firmware logs arrive by the hundreds per second; clients get batches
+
+
 class LogConsole:
-    def __init__(self, emit: Callable[[str, Dict[str, Any]], None], max_entries: int = 1000):
+    def __init__(self, emit: Callable[[str, Any], None], max_entries: int = 1000):
         self._emit = emit
         self._entries: Deque[Dict[str, Any]] = deque(maxlen=max_entries)
+        self._pending: List[Dict[str, Any]] = []
         self._lock = threading.Lock()
         self._next_id = 1
         self._sdk_installed = False
+        self._flusher: Optional[threading.Timer] = None
 
     def add(self, severity: str, message: str, source: str = "sdk", file: Optional[str] = None,
             line: Optional[int] = None, **extra: Any) -> Dict[str, Any]:
@@ -32,8 +37,20 @@ class LogConsole:
                      "source": source, "file": file, "line": line, **extra}
             self._next_id += 1
             self._entries.append(entry)
-        self._emit("log", entry)
+            self._pending.append(entry)
+            if self._flusher is None:
+                self._flusher = threading.Timer(FLUSH_INTERVAL, self.flush)
+                self._flusher.daemon = True
+                self._flusher.start()
         return entry
+
+    def flush(self) -> None:
+        """Send what accumulated since the last flush as one ``log_batch`` event."""
+        with self._lock:
+            batch, self._pending = self._pending, []
+            self._flusher = None
+        if batch:
+            self._emit("log_batch", batch)
 
     def since(self, after_id: int = 0, limit: int = 500) -> List[Dict[str, Any]]:
         with self._lock:

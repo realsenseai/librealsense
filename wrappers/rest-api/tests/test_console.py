@@ -24,7 +24,8 @@ def test_entries_are_numbered_emitted_and_bounded():
         console.add("info", f"m{i}")
     assert [e["message"] for e in console.since()] == ["m2", "m3", "m4"]
     assert [e["id"] for e in console.since(after_id=3)] == [4, 5]
-    assert emitted[0] == ("log", console.since()[0]) or emitted[0][0] == "log"
+    console.flush()
+    assert emitted and emitted[-1][0] == "log_batch" and [e["message"] for e in emitted[-1][1]] == [f"m{i}" for i in range(5)]
     console.clear()
     assert console.since() == []
 
