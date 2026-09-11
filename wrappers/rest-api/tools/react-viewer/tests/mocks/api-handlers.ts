@@ -15,6 +15,11 @@ const sensorOptionsMap: Record<string, any[]> = {
 export const handlers = [
   http.get(`${API_BASE}/jobs/`, () => HttpResponse.json([])),
   http.get(`${API_BASE}/logs/`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/updates/:deviceId`, () => HttpResponse.json({
+    source: 'https://db', reachable: true,
+    firmware: { current: '5.16.0.1', essential: null, recommended: { version: '5.17.0.10', link: 'https://x/fw.bin', release_notes: 'https://x/notes' }, verdict: 'recommended' },
+    software: { current: '2.59.0.0', essential: null, recommended: { version: '2.59.0.0', link: 'https://x/sdk' }, verdict: 'up_to_date' },
+  })),
   http.delete(`${API_BASE}/logs/`, () => HttpResponse.json({ cleared: true })),
   http.get(`${API_BASE}/terminal/commands`, () => HttpResponse.json(['GVD', 'GLD'])),
   http.post(`${API_BASE}/devices/:deviceId/terminal`, () => HttpResponse.json({ output: '10 00 00 00' })),

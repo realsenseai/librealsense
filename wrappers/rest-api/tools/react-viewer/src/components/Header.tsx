@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAppStore } from '../store'
 import { apiClient } from '../api'
 import { SettingsDialog } from './settings/SettingsDialog'
+import { reportIssueUrl } from '../store/notifications'
 
 interface WhatsNewModalProps {
   isOpen: boolean
@@ -55,8 +56,13 @@ function AboutModal({ isOpen, onClose }: WhatsNewModalProps) {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-400">License</span>
-            <span className="text-white">Apache 2.0</span>
+            <a href="https://github.com/realsenseai/librealsense/blob/master/LICENSE" target="_blank" rel="noopener noreferrer" className="text-rs-blue hover:underline">Apache 2.0</a>
           </div>
+          <p className="text-xs text-gray-500">
+            Licensed under the Apache License, Version 2.0. You may not use this software except in
+            compliance with the License. Software distributed under the License is distributed on an
+            &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND.
+          </p>
           <div className="pt-2 border-t border-gray-700">
             <p className="text-gray-400 text-sm">
               A modern React-based web UI for RealSense Cameras, 
@@ -95,6 +101,10 @@ export function Header() {
   } = useAppStore()
   const [showAbout, setShowAbout] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+  const [sdkVersion, setSdkVersion] = useState<string | undefined>()
+  const deviceStates = useAppStore((s) => s.deviceStates)
+  useEffect(() => { apiClient.getHealth().then((h) => setSdkVersion(h.sdk_version)).catch(() => undefined) }, [])
 
   const hasActiveDevices = getDeviceStates().length > 0
 
@@ -142,8 +152,31 @@ export function Header() {
             </div>
           )}
 
-          {/* Right side - Settings and About */}
-          <div className="flex items-center gap-1">
+          {/* Right side - Help, Settings and About */}
+          <div className="flex items-center gap-1 relative">
+          <button
+            onClick={() => setShowHelp((v) => !v)}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+            title="Help"
+            aria-label="Help"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+          {showHelp && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowHelp(false)} />
+              <div className="absolute right-0 top-10 w-52 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-20 py-1 text-sm" role="menu">
+                <a href={reportIssueUrl(Object.values(deviceStates).map((ds) => ds.device), sdkVersion)} target="_blank" rel="noopener noreferrer"
+                  className="block px-4 py-2 hover:bg-gray-700" onClick={() => setShowHelp(false)}>Report Issue</a>
+                <a href="https://store.realsenseai.com/" target="_blank" rel="noopener noreferrer"
+                  className="block px-4 py-2 hover:bg-gray-700" onClick={() => setShowHelp(false)}>RealSense Store</a>
+                <a href="https://github.com/realsenseai/librealsense/wiki/Release-Notes" target="_blank" rel="noopener noreferrer"
+                  className="block px-4 py-2 hover:bg-gray-700" onClick={() => setShowHelp(false)}>Release Notes</a>
+              </div>
+            </>
+          )}
           <button
             onClick={() => setShowSettings(true)}
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"

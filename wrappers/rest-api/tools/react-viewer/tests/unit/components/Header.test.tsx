@@ -47,6 +47,13 @@ describe('Header', () => {
     expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument()
   })
 
+  it('has a help menu with Report Issue, the store and release notes', async () => {
+    render(<Header />)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Help' }))
+    expect(screen.getByRole('link', { name: 'Report Issue' })).toHaveAttribute('href', expect.stringContaining('github.com/realsenseai/librealsense/issues/new'))
+    expect(screen.getByRole('link', { name: 'RealSense Store' })).toHaveAttribute('href', 'https://store.realsenseai.com/')
+  })
+
   it('does not show view toggle when no active devices', () => {
     render(<Header />, {
       initialStoreState: {

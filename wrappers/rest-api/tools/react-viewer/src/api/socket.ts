@@ -1,8 +1,9 @@
 import { io, Socket } from 'socket.io-client'
-import type { JobInfo, LogEntry, MetadataUpdate } from './types'
+import type { JobInfo, LogEntry, MetadataUpdate, SdkNotification } from './types'
 import { useAppStore } from '../store'
 import { useJobsStore } from '../store/jobs'
 import { useConsoleStore } from '../store/console'
+import { useNotificationsStore } from '../store/notifications'
 
 class SocketService {
   private socket: Socket | null = null
@@ -66,6 +67,17 @@ class SocketService {
 
     this.socket.on('options_changed', (data: { device_id: string; sensor_id: string; options: { option_id: string; current_value: number }[] }) => {
       useAppStore.getState().applyOptionChanges(data.device_id, data.sensor_id, data.options)
+    })
+
+    this.socket.on('notification', (n: SdkNotification) => {
+      const severity = n.severity === 'error' || n.severity === 'fatal' ? 'error' : n.severity === 'warn' ? 'warn' : 'info'
+      const device = useAppStore.getState().deviceStates[n.device_id]?.device
+      useNotificationsStore.getState().push({
+        severity,
+        title: `${device?.name ?? n.device_id}: ${n.category.replace(/_/g, ' ')}`,
+        message: n.description + (n.serialized_data && n.serialized_data !== n.description ? `\n${n.serialized_data}` : ''),
+        deviceId: n.device_id,
+      })
     })
 
     this.socket.on('log_batch', (entries: LogEntry[]) => {

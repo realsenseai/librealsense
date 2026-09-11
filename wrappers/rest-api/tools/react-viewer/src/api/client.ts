@@ -23,6 +23,7 @@ import type {
   RecordingFile,
   PresetFile,
   LogEntry,
+  UpdatesReport,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -318,6 +319,12 @@ class ApiClient {
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
     await this.client.delete(`/webrtc/sessions/${sessionId}`)
+  }
+
+  // ============ Updates ============
+
+  async checkUpdates(deviceId: string): Promise<UpdatesReport> {
+    return (await this.client.get<UpdatesReport>(`/updates/${deviceId}`)).data
   }
 
   // ============ Console ============

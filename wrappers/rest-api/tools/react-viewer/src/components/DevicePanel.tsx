@@ -11,6 +11,7 @@ import { searchGroup } from '../utils/optionSearch'
 import { unsupportedStreams } from '../utils/streamModes'
 import { Transport } from './playback/Transport'
 import { RecordButton } from './record/RecordButton'
+import { UpdatesDialog } from './updates/UpdatesDialog'
 import { lessScreamy } from '../utils/metadataDecoders'
 import { Collapsible, ToggleSwitch } from './Collapsible'
 
@@ -155,6 +156,7 @@ export function DevicePanel() {
   const [firmwareProgressDevice, setFirmwareProgressDevice] = useState<DeviceInfo | null>(null)
   const [firmwareProgressState, setFirmwareProgressState] = useState<FirmwareState | null>(null)
   const [firmwareFileName, setFirmwareFileName] = useState<string | null>(null)
+  const [updatesFor, setUpdatesFor] = useState<DeviceInfo | null>(null)
 
   useEffect(() => {
     fetchDevices(true)
@@ -345,6 +347,7 @@ export function DevicePanel() {
                 onStartSensorStreaming={(sensorId) => startSensorStreaming(device.device_id, sensorId)}
                 onStopSensorStreaming={(sensorId) => stopSensorStreaming(device.device_id, sensorId)}
                 onCheckFirmwareUpdates={() => handleCheckFirmwareUpdates(device.device_id)}
+                onShowUpdates={() => setUpdatesFor(device)}
                 onUpdateFirmwareFromFile={(file) => handleUpdateFirmwareFromFile(device, file)}
                 onToggleAdvancedMode={(enable) => toggleAdvancedMode(device.device_id, enable)}
                 onUploadPreset={(file) => uploadPreset(device.device_id, file)}
@@ -354,6 +357,15 @@ export function DevicePanel() {
             )
           })}
         </div>
+      )}
+
+      {updatesFor && (
+        <UpdatesDialog
+          deviceId={updatesFor.device_id}
+          deviceName={updatesFor.name}
+          onClose={() => setUpdatesFor(null)}
+          onInstallFirmware={() => { const d = updatesFor; setUpdatesFor(null); handleUpdateFromRecommended(d) }}
+        />
       )}
 
       {firmwareProgressDevice && (
@@ -384,6 +396,7 @@ interface DeviceCardProps {
   onStartSensorStreaming: (sensorId: string) => void
   onStopSensorStreaming: (sensorId: string) => void
   onCheckFirmwareUpdates: () => void
+  onShowUpdates: () => void
   onUpdateFirmwareFromFile: (file: File) => void
   onToggleAdvancedMode: (enable: boolean) => void
   onUploadPreset: (file: File) => void
@@ -400,6 +413,7 @@ function DeviceCard({
   onStartSensorStreaming,
   onStopSensorStreaming,
   onCheckFirmwareUpdates,
+  onShowUpdates,
   onUpdateFirmwareFromFile,
   onToggleAdvancedMode,
   onUploadPreset,
@@ -548,6 +562,13 @@ function DeviceCard({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                       Check for Firmware Updates
+                    </button>
+                    <button
+                      onClick={() => { setShowMenu(false); onShowUpdates() }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                    >
+                      <span className="w-4 text-center">⇪</span>
+                      Software &amp; Firmware Updates…
                     </button>
                     {deviceState?.advancedMode?.supported && (
                       <button

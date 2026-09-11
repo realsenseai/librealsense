@@ -8,6 +8,7 @@ import { ChatButton, ChatPanel } from './components/ChatBot'
 import { ApiDiagnostics } from './components/ApiDiagnostics'
 import { ServerWarnings } from './components/ServerWarnings'
 import { OutputConsole } from './components/console/OutputConsole'
+import { NotificationCenter } from './components/notifications/NotificationCenter'
 import { useAppStore } from './store'
 import { useSettingsStore } from './store/settings'
 import { socketService } from './api/socket'
@@ -110,6 +111,8 @@ function App() {
       {/* AI Chat Assistant */}
       <ChatPanel />
       <ChatButton />
+
+      <NotificationCenter />
     </div>
   )
 }

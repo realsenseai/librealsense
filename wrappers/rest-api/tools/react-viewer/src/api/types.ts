@@ -82,6 +82,37 @@ export interface LogEntry {
   module?: string | null
 }
 
+// Wire shape of GET /updates/{d} (app/services/updates.py)
+export interface UpdateCandidate {
+  version: string
+  link?: string | null
+  release_notes?: string | null
+  description?: string | null
+}
+export interface UpdateSection {
+  current: string | null
+  essential: UpdateCandidate | null
+  recommended: UpdateCandidate | null
+  verdict: 'unknown' | 'up_to_date' | 'recommended' | 'essential'
+}
+export interface UpdatesReport {
+  source: string
+  reachable: boolean
+  firmware: UpdateSection
+  software: UpdateSection
+}
+
+// The `notification` Socket.IO event: an SDK notification from a sensor
+export interface SdkNotification {
+  device_id: string
+  sensor_id: string
+  category: string
+  severity: string
+  description: string
+  serialized_data: string
+  timestamp: number
+}
+
 // A preset file in the server's presets folder (GET /devices/{d}/presets/)
 export interface PresetFile {
   path: string
