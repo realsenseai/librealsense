@@ -413,6 +413,8 @@ export interface StreamMetadata {
   frame_metadata?: Record<string, number>
   clock_domain?: string
   hardware_fps?: number
+  /** Legacy "Frame Drops per Second" dashboard figures, per one-second window */
+  stats?: { frames_per_second: number; drops_per_second: number; expected_fps: number }
   pixel_format?: string
   // frame dims as received from camera
   hardware_width?: number

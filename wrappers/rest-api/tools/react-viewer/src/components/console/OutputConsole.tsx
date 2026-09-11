@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store'
 import { severityCounts, useConsoleStore, visibleEntries } from '../../store/console'
+import { useDashboardsStore } from '../../store/dashboards'
+import { FrameDropsDashboard } from './FrameDropsDashboard'
 import type { LogEntry } from '../../api/types'
 
 const SEVERITY_CLASS: Record<string, string> = {
@@ -25,6 +27,7 @@ export function OutputConsole() {
   const { entries, isOpen, show, search, fwLogs, commandHistory, commandNames,
     setOpen, toggleSeverity, setSearch, clear, toggleFwLogs, recoverFlashLogs, runCommand, backfill, fetchCommandNames } = useConsoleStore()
   const deviceStates = useAppStore((s) => s.deviceStates)
+  const dashboardOpen = useDashboardsStore((s) => s.open)
   const devices = Object.values(deviceStates).map((ds) => ds.device).filter((d) => !d.is_playback)
   const [deviceId, setDeviceId] = useState<string>('')
   const [command, setCommand] = useState('')
@@ -142,10 +145,13 @@ export function OutputConsole() {
           <button onClick={() => copy(visible.map(formatEntry).join('\n'))} className="px-2 py-0.5 rounded bg-gray-700 text-gray-200 hover:bg-gray-600" title="Copy all">Copy</button>
           <button onClick={saveAs} className="px-2 py-0.5 rounded bg-gray-700 text-gray-200 hover:bg-gray-600" title="Save as…">Save</button>
           <button onClick={() => void clear()} className="px-2 py-0.5 rounded bg-gray-700 text-gray-200 hover:bg-gray-600" title="Clear">Clear</button>
+          <button onClick={() => useDashboardsStore.getState().setOpen(!dashboardOpen)} aria-pressed={dashboardOpen}
+            className={`px-2 py-0.5 rounded ${dashboardOpen ? 'bg-rs-blue text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`} title="Frame drops dashboard">Dashboard</button>
           <button onClick={() => setOpen(false)} className="px-2 py-0.5 rounded text-gray-400 hover:text-white" title="Close (Esc)" aria-label="Close output console">✕</button>
         </div>
       </div>
       {flashMessage && <div className="px-3 py-0.5 text-gray-400 bg-gray-800/40">{flashMessage}</div>}
+      <div className="flex-1 flex min-h-0">
       <div ref={listRef} className="flex-1 overflow-y-auto font-mono px-3 py-1 space-y-px" data-testid="console-lines">
         {visible.length === 0 && <div className="text-gray-500">No output</div>}
         {visible.map((e) => (
@@ -156,6 +162,8 @@ export function OutputConsole() {
             <button onClick={() => copy(formatEntry(e))} className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-white" title="Copy line" aria-label="Copy line">⧉</button>
           </div>
         ))}
+      </div>
+      {dashboardOpen && <FrameDropsDashboard />}
       </div>
       <div className="flex items-center gap-2 px-3 py-1 border-t border-gray-700">
         <span className="text-gray-500 font-mono">&gt;</span>

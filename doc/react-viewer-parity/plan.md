@@ -202,7 +202,9 @@ Enables everything after it. No user-visible parity except settings and multi-ca
 - [x] **WP6.6 Calibration tables.** `GET/PUT /calibration/table`, `POST
   /calibration/reset_factory`, write gate from settings; `CalibrationTableEditor.tsx`
   (intrinsics, 3×3, distortion, per-resolution). 2.5 d.
-- [ ] **WP6.7 Recommend-calibration notice** with snooze (WP7.4 dependency). 0.5 d.
+- [x] **WP6.7 Recommend-calibration notice** with snooze (WP7.4 dependency). 0.5 d. Legacy has
+  the notice compiled out (device-model.cpp: "do not pre-emptively suggest auto-calibration");
+  parity is the inert `update.recommend_calibration` setting, which the Settings dialog keeps.
 
 ## Phase 7 — Firmware, updates, notifications (~9 d)
 
@@ -233,7 +235,7 @@ Enables everything after it. No user-visible parity except settings and multi-ca
   path from settings) wrapping `/hwm`; `POST /devices/{d}/terminal {line}`, `GET
   /terminal/commands`; console command line with history (Up/Down), Tab completion,
   `clear`, raw hex. HW: D455. 2 d.
-- [ ] **WP8.4 (stretch) Dashboards.** Frame-drops/s and processing-vs-camera rate charts
+- [x] **WP8.4 (stretch) Dashboards.** Frame-drops/s and processing-vs-camera rate charts
   from metadata stream (`recharts`, already a dependency). 1.5 d.
 - [ ] **WP8.5 (stretch) IR reflectivity readout.** Port `common/reflectivity` estimator
   to `streaming.py`, expose in metadata payload. 1.5 d.
@@ -383,6 +385,13 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   rewrites edited fields with a fresh CRC-32; `GET/PUT /calibration/table` plus the editor
   dialog from the device menu. Finding: the D455 returns 512 bytes (no trailing reserved
   block), version 3.1, baseline -94.69 mm; `set_calibration_table` takes a list of ints.
+- WP2.12 stays deferred on purpose: the legacy 2D view has no align selector, and its sync
+  lock only ties the 3D texture to the point cloud; the React viewer textures the cloud from
+  an independent WebRTC track, so a server-side syncer would not change what the user sees.
+- WP8.4: the server counts frames and drops per stream in one-second windows (a gap over
+  1.5 frame periods is a drop, as output-model.cpp does) and ships them in the metadata
+  `stats`; the output console gets a "Dashboard" panel with the last 30 seconds of drops per
+  second and the delivered frame rate per stream.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).

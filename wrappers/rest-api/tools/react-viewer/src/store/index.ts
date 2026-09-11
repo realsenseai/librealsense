@@ -1,3 +1,4 @@
+import { useDashboardsStore } from './dashboards'
 import { create, type StoreApi } from 'zustand'
 import type {
   DeviceInfo,
@@ -923,6 +924,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   // Metadata
   updateMetadata: (metadata) => {
     const deviceId = metadata.device_id
+    useDashboardsStore.getState().ingest(metadata)
     set((state) => {
       const deviceState = state.deviceStates[deviceId]
       if (!deviceState) return state

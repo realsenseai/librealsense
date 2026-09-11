@@ -249,6 +249,16 @@ class SensorStreamingMixin:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1)
 
         metadata.update(self._build_viewer_info(info_source))
+        # Legacy "Frame Drops per Second" dashboard figures, per stream
+        stats = getattr(self, "_frame_stats", None)
+        if stats is None:
+            from app.services.frame_stats import FrameStats
+            stats = self._frame_stats = FrameStats()
+        try:
+            metadata["stats"] = stats.observe(f"{device_id}:{frame_stream_name}", float(metadata["timestamp"]),
+                                              float(metadata.get("hardware_fps") or info_source.get_profile().fps()))
+        except Exception as exc:
+            logging.debug("frame stats skipped: %s", exc)
         self.last_frames.setdefault(device_id, {})[frame_stream_name] = {
             "frame": info_source,
             "shown": processed_frame if "depth" in frame_stream_name else None,
