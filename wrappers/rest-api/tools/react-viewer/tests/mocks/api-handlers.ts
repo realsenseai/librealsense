@@ -15,6 +15,18 @@ const sensorOptionsMap: Record<string, any[]> = {
 export const handlers = [
   http.get(`${API_BASE}/jobs/`, () => HttpResponse.json([])),
   http.get(`${API_BASE}/logs/`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/devices/:deviceId/hdr/`, () => HttpResponse.json({
+    supported: true, hdr_enabled: false,
+    exposure_range: { min: 1, max: 165000, step: 1, default: 8500 },
+    gain_range: { min: 16, max: 248, step: 1, default: 16 },
+    preset: { id: '0', iterations: 0, control_type_auto: false, items: [
+      { iterations: 1, controls: { depth_gain: 16, depth_exp: 1, delta_gain: 0, delta_exp: 0 } },
+      { iterations: 1, controls: { depth_gain: 16, depth_exp: 8500, delta_gain: 0, delta_exp: 0 } },
+    ] },
+  })),
+  http.put(`${API_BASE}/devices/:deviceId/hdr/`, async ({ request }) => HttpResponse.json({
+    supported: true, hdr_enabled: false, exposure_range: null, gain_range: null, preset: await request.json(),
+  })),
   http.get(`${API_BASE}/updates/:deviceId`, () => HttpResponse.json({
     source: 'https://db', reachable: true,
     firmware: { current: '5.16.0.1', essential: null, recommended: { version: '5.17.0.10', link: 'https://x/fw.bin', release_notes: 'https://x/notes' }, verdict: 'recommended' },

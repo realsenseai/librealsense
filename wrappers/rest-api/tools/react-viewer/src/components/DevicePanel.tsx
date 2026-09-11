@@ -12,6 +12,7 @@ import { unsupportedStreams } from '../utils/streamModes'
 import { Transport } from './playback/Transport'
 import { RecordButton } from './record/RecordButton'
 import { UpdatesDialog } from './updates/UpdatesDialog'
+import { HdrDialog } from './hdr/HdrDialog'
 import { lessScreamy } from '../utils/metadataDecoders'
 import { Collapsible, ToggleSwitch } from './Collapsible'
 
@@ -157,6 +158,7 @@ export function DevicePanel() {
   const [firmwareProgressState, setFirmwareProgressState] = useState<FirmwareState | null>(null)
   const [firmwareFileName, setFirmwareFileName] = useState<string | null>(null)
   const [updatesFor, setUpdatesFor] = useState<DeviceInfo | null>(null)
+  const [hdrFor, setHdrFor] = useState<DeviceInfo | null>(null)
 
   useEffect(() => {
     // The server keeps its registry current from the SDK's devices-changed callback;
@@ -350,6 +352,7 @@ export function DevicePanel() {
                 onStopSensorStreaming={(sensorId) => stopSensorStreaming(device.device_id, sensorId)}
                 onCheckFirmwareUpdates={() => handleCheckFirmwareUpdates(device.device_id)}
                 onShowUpdates={() => setUpdatesFor(device)}
+                onShowHdr={() => setHdrFor(device)}
                 onUpdateFirmwareFromFile={(file) => handleUpdateFirmwareFromFile(device, file)}
                 onToggleAdvancedMode={(enable) => toggleAdvancedMode(device.device_id, enable)}
                 onUploadPreset={(file) => uploadPreset(device.device_id, file)}
@@ -359,6 +362,10 @@ export function DevicePanel() {
             )
           })}
         </div>
+      )}
+
+      {hdrFor && (
+        <HdrDialog deviceId={hdrFor.device_id} deviceName={hdrFor.name} onClose={() => setHdrFor(null)} />
       )}
 
       {updatesFor && (
@@ -399,6 +406,7 @@ interface DeviceCardProps {
   onStopSensorStreaming: (sensorId: string) => void
   onCheckFirmwareUpdates: () => void
   onShowUpdates: () => void
+  onShowHdr: () => void
   onUpdateFirmwareFromFile: (file: File) => void
   onToggleAdvancedMode: (enable: boolean) => void
   onUploadPreset: (file: File) => void
@@ -416,6 +424,7 @@ function DeviceCard({
   onStopSensorStreaming,
   onCheckFirmwareUpdates,
   onShowUpdates,
+  onShowHdr,
   onUpdateFirmwareFromFile,
   onToggleAdvancedMode,
   onUploadPreset,
@@ -551,6 +560,13 @@ function DeviceCard({
                     >
                       <span className="w-4 text-center">★</span>
                       Save to Presets Folder…
+                    </button>
+                    <button
+                      onClick={() => { setShowMenu(false); onShowHdr() }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                    >
+                      <span className="w-4 text-center">◐</span>
+                      HDR Configuration…
                     </button>
                     <div className="border-t border-gray-600 my-1" />
                     <button

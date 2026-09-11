@@ -82,6 +82,37 @@ export interface LogEntry {
   module?: string | null
 }
 
+// HDR sequence editor (app/services/hdr.py, a port of common/hdr-model.*)
+export interface HdrControls {
+  depth_gain: number
+  depth_exp: number
+  delta_gain: number
+  delta_exp: number
+}
+export interface HdrItem {
+  iterations: number
+  controls: HdrControls
+}
+export interface HdrPreset {
+  id: string
+  iterations: number
+  control_type_auto: boolean
+  items: HdrItem[]
+}
+export interface OptionRangeInfo {
+  min: number
+  max: number
+  step: number
+  default: number
+}
+export interface HdrStatus {
+  supported: boolean
+  preset: HdrPreset | null
+  exposure_range: OptionRangeInfo | null
+  gain_range: OptionRangeInfo | null
+  hdr_enabled: boolean | null
+}
+
 // Wire shape of GET /updates/{d} (app/services/updates.py)
 export interface UpdateCandidate {
   version: string

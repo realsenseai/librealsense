@@ -24,6 +24,8 @@ import type {
   PresetFile,
   LogEntry,
   UpdatesReport,
+  HdrPreset,
+  HdrStatus,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -319,6 +321,16 @@ class ApiClient {
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
     await this.client.delete(`/webrtc/sessions/${sessionId}`)
+  }
+
+  // ============ HDR ============
+
+  async getHdr(deviceId: string): Promise<HdrStatus> {
+    return (await this.client.get<HdrStatus>(`/devices/${deviceId}/hdr/`)).data
+  }
+
+  async applyHdr(deviceId: string, preset: HdrPreset): Promise<HdrStatus> {
+    return (await this.client.put<HdrStatus>(`/devices/${deviceId}/hdr/`, preset)).data
   }
 
   // ============ Updates ============
