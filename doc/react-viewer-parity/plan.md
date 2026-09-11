@@ -171,7 +171,7 @@ Enables everything after it. No user-visible parity except settings and multi-ca
 
 ## Phase 5 — Presets and device modes (~5 d)
 
-- [ ] **WP5.1 JSON presets.** `services/presets.py`; `GET /presets` (folder + enum),
+- [x] **WP5.1 JSON presets.** `services/presets.py`; `GET /presets` (folder + enum),
   `GET /presets/current` (download, includes `viewer` section), `POST /presets/load`
   (upload); 409 `advanced_mode_required` → UI toggle prompt; sets preset Custom and
   refetches controls. HW: D455. 2.5 d.
@@ -222,14 +222,14 @@ Enables everything after it. No user-visible parity except settings and multi-ca
 
 ## Phase 8 — Console, logs, terminal (~9 d)
 
-- [ ] **WP8.1 SDK log stream.** `services/logs.py`: `rs.log_to_callback` at startup →
+- [x] **WP8.1 SDK log stream.** `services/logs.py`: `rs.log_to_callback` at startup →
   bounded deque + socket `log`; `GET /logs?since=`; log-to-file/severity from settings.
   `components/console/OutputConsole.tsx`: bottom panel, severity counters as filters,
   search, copy line/all, save as, max entries, Esc closes. 3 d.
-- [ ] **WP8.2 FW logs.** `POST /devices/{d}/fw_logs/start|stop` (thread:
+- [x] **WP8.2 FW logs.** `POST /devices/{d}/fw_logs/start|stop` (thread:
   `start_collecting`, `get_firmware_log`, `parse_log` with XML from settings), `POST
   /fw_logs/flash`; console toggle + "Recover logs from flash" menu item. HW: D455. 2 d.
-- [ ] **WP8.3 Terminal.** `services/terminal.py` (`terminal_parser` with `Commands.xml`
+- [x] **WP8.3 Terminal.** `services/terminal.py` (`terminal_parser` with `Commands.xml`
   path from settings) wrapping `/hwm`; `POST /devices/{d}/terminal {line}`, `GET
   /terminal/commands`; console command line with history (Up/Down), Tab completion,
   `clear`, raw hex. HW: D455. 2 d.
@@ -318,3 +318,8 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   one thread touches options; the server polls options itself (see design §7).
 - Finding: recording in SDK 2.59 writes ROS2 `.db3`; `.bag` files play back but cannot be
   written.
+- 2026-09-11 (later): WP5.1 presets (live-verified; `load_json` once raised a transient WMF
+  `MFCreateDeviceSource` error, fine on retry), WP2.10 HDR backend (mock-tested only, the
+  D455 lacks `hdr-preset`; UI pending), WP8.1-8.3 console/firmware logs/terminal
+  (live-verified: ~670 raw FW lines/s on the D455, hence batched socket emits; 49 flash
+  messages recovered). Playwright real-device suite green after each phase.
