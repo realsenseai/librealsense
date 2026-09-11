@@ -68,7 +68,7 @@ class DeviceRegistryMixin:
         assert self.lock.locked(), "_register_new_device called without self.lock held"
         if not dev.supports(rs.camera_info.serial_number):
             return None
-        device_id = dev.get_info(rs.camera_info.serial_number)
+        serial = device_id = dev.get_info(rs.camera_info.serial_number)
         # A recording keeps the recorded camera's serial; give it an id of its own so it can
         # be played back next to that camera.
         is_playback = getattr(dev, "is_playback", lambda: False)() is True
@@ -111,7 +111,7 @@ class DeviceRegistryMixin:
         info = DeviceInfo(
             device_id=device_id,
             name=_info(rs.camera_info.name, "Unknown Device"),
-            serial_number=device_id,
+            serial_number=serial,
             firmware_version=_info(rs.camera_info.firmware_version),
             physical_port=_info(rs.camera_info.physical_port),
             usb_type=_info(rs.camera_info.usb_type_descriptor),

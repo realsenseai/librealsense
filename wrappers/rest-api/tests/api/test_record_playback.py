@@ -42,7 +42,7 @@ def test_record_start_pause_resume_stop(setup_mock_managers, monkeypatch, tmp_pa
     rs_manager.settings.update({"record": {"default_path": str(tmp_path), "compression": "auto"}})
 
     started = client.post(f"{REC}/start").json()
-    assert started["recording"] is True and started["file"].startswith(str(tmp_path)) and started["file"].endswith(".bag")
+    assert started["recording"] is True and started["file"].startswith(str(tmp_path)) and started["file"].endswith(".db3")
     assert _FakeRecorder.instances[-1].compress is None  # "auto": the SDK decides
     assert client.get(f"{REC}/").json()["recording"] is True
     assert client.post(f"{REC}/start").status_code == 409
@@ -61,7 +61,7 @@ def test_record_compression_setting_is_passed_through(setup_mock_managers, monke
     _streaming(rs_manager)
     monkeypatch.setattr(record_playback.rs, "recorder", _FakeRecorder)
     rs_manager.settings.update({"record": {"compression": "never"}})
-    client.post(f"{REC}/start", json={"path": str(tmp_path / "x.bag")})
+    client.post(f"{REC}/start", json={"path": str(tmp_path / "x.db3")})
     assert _FakeRecorder.instances[-1].compress is False
     client.post(f"{REC}/stop")
 
@@ -96,8 +96,9 @@ class _FakePlayback:
         self.state["status"] = rs.playback_status.stopped
         self.state["pos"] = 0
 
-    def seek(self, ns):
-        self.state["pos"] = ns
+    def seek(self, delta):
+        assert hasattr(delta, "total_seconds"), "seek takes a timedelta"
+        self.state["pos"] = int(delta.total_seconds() * 1e9)
 
     def set_playback_speed(self, speed):
         self.state["speed"] = speed
@@ -125,6 +126,7 @@ def recording(setup_mock_managers, monkeypatch, tmp_path):
 
         def load_device(self, path):
             loaded.append(path)
+            pb_dev.file = path  # a real playback device reports the file it was opened from
             return pb_dev
 
         def unload_device(self, path):
@@ -159,7 +161,8 @@ def test_transport_actions_drive_the_playback(recording):
     assert client.post(url, json={"action": "speed", "value": 0.5}).json()["speed"] == 0.5
     assert client.post(url, json={"action": "repeat", "value": 1}).json()["repeat"] is True
     stepped = client.post(url, json={"action": "step", "value": 1}).json()
-    assert stepped["state"] == "paused" and stepped["position_ns"] == 2_000_000_000 + int(1e9 / 30)
+    assert stepped["state"] == "paused"
+    assert abs(stepped["position_ns"] - (2_000_000_000 + 1e9 / 30)) <= 1000  # seek has microsecond granularity
     assert client.post(url, json={"action": "stop"}).json() == {**client.get(url).json(), "state": "stopped", "position_ns": 0}
 
 

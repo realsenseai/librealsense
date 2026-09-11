@@ -1,13 +1,13 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-"""Recording to ROS-bag and playing recordings back, the legacy viewer's record button and
+"""Recording to a ROS2 db3 file and playing recordings (db3 or legacy bag) back, the legacy viewer's record button and
 playback panel (device-model.cpp start_recording / draw_playback_controls)."""
 
 import logging
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -25,6 +25,11 @@ STATE_NAMES = {
 }
 
 
+def _ns(nanoseconds: float) -> timedelta:
+    """rs.playback.seek() takes a timedelta; positions are reported in nanoseconds."""
+    return timedelta(microseconds=nanoseconds / 1000)
+
+
 def playback_device_id(file_name: str) -> str:
     return f"playback-{Path(file_name).name}"
 
@@ -37,7 +42,7 @@ class RecordPlaybackMixin:
     def _default_recording_path(self, device_id: str) -> Path:
         folder = self.settings.get().record.default_path or str(Path.home() / "Documents")
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return Path(folder) / f"{device_id}_{stamp}.bag"
+        return Path(folder) / f"{device_id}_{stamp}.db3"  # the SDK records ROS2 db3; .bag is playback-only
 
     def start_recording(self, device_id: str, path: Optional[str] = None) -> RecordStatus:
         """Wrap the streaming device in an rs.recorder: frames already flowing get written."""
@@ -85,21 +90,35 @@ class RecordPlaybackMixin:
         if not Path(path).is_file():
             raise RealSenseError(status_code=404, detail=f"Recording not found: {path}")
         device_id = playback_device_id(path)
-        if device_id in self.devices:
+        if device_id in self._playbacks:
             return self.device_infos[device_id]
+        dev = self.devices.get(device_id)
+        if dev is None:
+            try:
+                dev = self.ctx.load_device(path)
+            except RuntimeError as exc:
+                raise RealSenseError(status_code=400, detail=f"Failed to load recording: {exc}")
+            # load_device fires the devices-changed callback, which usually registers the
+            # device before this line runs; registering again is then a no-op.
+            with self.lock:
+                self._register_new_device(dev)
+            if device_id not in self.devices:
+                raise RealSenseError(status_code=500, detail="Recording loaded but could not be registered")
+            dev = self.devices[device_id]
         try:
-            dev = self.ctx.load_device(path)
+            playback = rs.playback(dev)
+            playback.set_real_time(True)
+            playback.set_status_changed_callback(lambda status, d=device_id: self._on_playback_status(d, status))
         except RuntimeError as exc:
-            raise RealSenseError(status_code=400, detail=f"Failed to load recording: {exc}")
-        with self.lock:
-            registered = self._register_new_device(dev)
-        if registered is None:
-            raise RealSenseError(status_code=500, detail="Recording loaded but could not be registered")
-        device_id = registered
-        playback = rs.playback(dev)
-        playback.set_real_time(True)
+            # Leave nothing half-registered behind; the next load starts clean.
+            with self.lock:
+                self._remove_device(device_id)
+            try:
+                self.ctx.unload_device(path)
+            except RuntimeError:
+                pass
+            raise RealSenseError(status_code=400, detail=f"Recording could not be set up for playback: {exc}")
         self._playbacks[device_id] = {"speed": 1.0, "repeat": False, "path": path}
-        playback.set_status_changed_callback(lambda status, d=device_id: self._on_playback_status(d, status))
         self._emit_socket_event("devices_changed", {"added": [device_id], "removed": []})
         return self.device_infos[device_id]
 
@@ -143,7 +162,7 @@ class RecordPlaybackMixin:
         elif action == "stop":
             pb.stop()
         elif action == "seek":
-            pb.seek(int(value or 0))
+            pb.seek(_ns(value or 0))
         elif action == "speed":
             entry["speed"] = float(value or 1.0)
             pb.set_playback_speed(entry["speed"])
@@ -154,7 +173,7 @@ class RecordPlaybackMixin:
             pb.pause()
             fps = max([c.framerate for info in self.sensor_streams.get(device_id, {}).values()
                        for c in info.get("configs", [])] or [30])
-            pb.seek(max(0, int(pb.get_position()) + int((1 if (value or 1) > 0 else -1) * 1e9 / fps)))
+            pb.seek(_ns(max(0, int(pb.get_position()) + int((1 if (value or 1) > 0 else -1) * 1e9 / fps))))
         return self.get_playback_status(device_id)
 
     def _on_playback_status(self, device_id: str, status) -> None:
