@@ -85,7 +85,10 @@ class option(enum.Enum):
     min_distance = 29
     max_distance = 30
     filter_magnitude = 31
-    count = 32
+    hdr_enabled = 32
+    sequence_size = 33
+    sequence_name = 34
+    count = 35
 
     # Override name property for string representation
     @property

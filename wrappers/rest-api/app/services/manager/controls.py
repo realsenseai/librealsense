@@ -8,7 +8,7 @@ import logging
 from typing import Callable, Deque, Dict, List, Optional, Any, Tuple, Set
 import pyrealsense2 as rs
 from app.core.errors import RealSenseError
-from app.services import advanced_mode, options, presets
+from app.services import advanced_mode, hdr, options, presets
 from app.models.sensor import Sensor, SensorInfo, SupportedStreamProfile
 from app.models.option import Option, OptionInfo
 
@@ -294,6 +294,14 @@ class ControlsMixin:
     def load_preset(self, device_id: str, text: str) -> None:
         with self.option_lock(device_id):
             presets.load(self._require_device(device_id), text)
+
+    def get_hdr(self, device_id: str) -> Dict[str, Any]:
+        with self.option_lock(device_id):
+            return hdr.status(self._require_device(device_id))
+
+    def apply_hdr(self, device_id: str, preset: Dict[str, Any]) -> Dict[str, Any]:
+        with self.option_lock(device_id):
+            return hdr.apply(self._require_device(device_id), preset)
 
     def get_sensor_option(
         self, device_id: str, sensor_id: str, option_id: str
