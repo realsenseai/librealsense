@@ -138,6 +138,9 @@ class device:
     def is_metadata_enabled(self):
         return True
 
+    def is_playback(self):
+        return False
+
     def add_sensor(self, sensor):
         self.sensors.append(sensor)
 

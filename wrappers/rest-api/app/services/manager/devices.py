@@ -69,6 +69,13 @@ class DeviceRegistryMixin:
         if not dev.supports(rs.camera_info.serial_number):
             return None
         device_id = dev.get_info(rs.camera_info.serial_number)
+        # A recording keeps the recorded camera's serial; give it an id of its own so it can
+        # be played back next to that camera.
+        is_playback = bool(getattr(dev, "is_playback", lambda: False)())
+        file_name = rs.playback(dev).file_name() if is_playback else None
+        if is_playback:
+            from app.services.manager.record_playback import playback_device_id
+            device_id = playback_device_id(file_name)
 
         if device_id in self.devices:
             return None
@@ -113,6 +120,8 @@ class DeviceRegistryMixin:
             is_streaming=device_id in self.pipelines,
             metadata_enabled=metadata_enabled,
             info=all_info,
+            is_playback=is_playback,
+            file_name=file_name,
         )
         # Publish atomically at the end — if anything above raises, no partial
         # cache entry is left behind. Keep new work above this block.
@@ -154,9 +163,9 @@ class DeviceRegistryMixin:
     def _refresh_devices_locked(self) -> List[DeviceInfo]:
         """Actual device enumeration (no FW-in-progress guard)."""
         with self.lock:
-            # Clear existing devices (that aren't streaming)
+            # Clear existing devices (that aren't streaming); loaded recordings stay.
             for device_id in list(self.devices.keys()):
-                if device_id not in self.pipelines:
+                if device_id not in self.pipelines and device_id not in self._playbacks:
                     del self.devices[device_id]
                     self.device_infos.pop(device_id, None)
                     self._supported_md_by_profile.pop(device_id, None)

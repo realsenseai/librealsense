@@ -15,6 +15,7 @@ from app.services.settings import SettingsStore
 from app.services.options_poller import OptionsPoller
 from app.services.manager import (
     devices,
+    record_playback,
     fw_update,
     controls,
     pipeline,
@@ -30,6 +31,7 @@ class RealSenseManager(
     pipeline.PipelineStreamingMixin,
     frames.FramesMixin,
     sensor_streaming.SensorStreamingMixin,
+    record_playback.RecordPlaybackMixin,
 ):
     # Class-level event loop reference for async operations from sync contexts
     _main_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -136,6 +138,8 @@ class RealSenseManager(
         # One lock per device around option reads and writes: concurrent option access from
         # several threads was measured to wedge the D455 on the Windows backend.
         self._option_locks: Dict[str, threading.Lock] = defaultdict(threading.Lock)
+        self._recorders: Dict[str, Dict[str, Any]] = {}  # device_id -> {recorder, paused, file}
+        self._playbacks: Dict[str, Dict[str, Any]] = {}  # device_id -> {speed, repeat, path}
         self.options_poller = OptionsPoller(lambda: list(self.devices.items()), self.option_lock, self._emit_socket_event)
 
         # Initialize devices

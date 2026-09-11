@@ -31,3 +31,5 @@ class DeviceInfo(BaseModel):
     is_streaming: bool = False
     metadata_enabled: Optional[bool] = None  # None = N/A (non-Windows or unsupported product)
     info: Dict[str, str] = {}  # every RS2_CAMERA_INFO the device reports, by field name
+    is_playback: bool = False  # a loaded recording rather than a camera
+    file_name: Optional[str] = None  # the recording behind a playback device

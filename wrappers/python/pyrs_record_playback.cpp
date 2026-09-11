@@ -26,20 +26,21 @@ void init_record_playback(py::module &m) {
              "mode, playback will wait for each callback to finish handling the data before reading the next frame. In this mode no frames will be dropped, "
              "and the application controls the framerate of playback via callback duration.", "real_time"_a,
              py::call_guard<py::gil_scoped_release>())
-        // set_playback_speed?
+        .def("set_playback_speed", &rs2::playback::set_playback_speed, "Set the playing speed", "speed"_a)
+        .def("stop", &rs2::playback::stop, "Stops playback: all sensors are stopped and the position is reset to the start",
+             py::call_guard<py::gil_scoped_release>())
         .def("set_status_changed_callback", [](rs2::playback& self, std::function<void(rs2_playback_status)> callback) {
             self.set_status_changed_callback(std::move(callback));
         }, "Register to receive callback from playback device upon its status changes. Callbacks are invoked from the reading thread, "
            "and as such any heavy processing in the callback handler will affect the reading thread and may cause frame drops/high latency.", "callback"_a,
            py::call_guard<py::gil_scoped_release>())
         .def("current_status", &rs2::playback::current_status, "Returns the current state of the playback device");
-    // Stop?
 
     py::class_<rs2::recorder, rs2::device, py_holder<rs2::recorder>> recorder(m, "recorder", "Records the given device and saves it to the given file as rosbag format.");
     recorder.def(py::init<const std::string&, rs2::device>())
         .def(py::init<const std::string&, rs2::device, bool>())
         .def("pause", &rs2::recorder::pause, "Pause the recording device without stopping the actual device from streaming.")
-        .def("resume", &rs2::recorder::resume, "Unpauses the recording device, making it resume recording.");
-    // filename?
+        .def("resume", &rs2::recorder::resume, "Unpauses the recording device, making it resume recording.")
+        .def("filename", &rs2::recorder::filename, "The file the recording is written to.");
     /** end rs_record_playback.hpp **/
 }
