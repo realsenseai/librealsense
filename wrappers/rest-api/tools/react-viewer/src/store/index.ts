@@ -64,19 +64,24 @@ function buildStreamConfigs(sensors: SensorInfo[]): StreamConfig[] {
       p => p.resolutions.length > 0 && p.fps.length > 0
     )
     const hasDefaults = profiles.some(p => p.default)
+    // Streams without a default of their own share the sensor's default mode, so pick a
+    // format the SDK lists at that mode (D455 IR: Y8 at 848x480, Y16 only at 1280x800).
+    const sensorDefault = profiles.find(p => p.default)?.default
     for (const profile of profiles) {
       const streamTypeLower = profile.stream_type.toLowerCase()
       const enableByDefault = hasDefaults
         ? profile.default !== undefined
         : streamTypeLower === 'depth' || streamTypeLower === 'color' ||
           streamTypeLower === 'gyro' || streamTypeLower === 'accel'
-      const [width, height] = profile.default?.resolution ?? profile.resolutions[0]
+      const [width, height] = profile.default?.resolution ?? sensorDefault?.resolution ?? profile.resolutions[0]
+      const framerate = profile.default?.fps ?? sensorDefault?.fps ?? profile.fps[0]
+      const atMode = profile.modes?.find(([w, h, fps]) => w === width && h === height && fps === framerate)
       configs.push({
         sensor_id: sensor.sensor_id,
         stream_type: profile.stream_type,
-        format: profile.default?.format ?? profile.formats[0] ?? 'rgb8',
+        format: profile.default?.format ?? atMode?.[3] ?? profile.formats[0] ?? 'rgb8',
         resolution: { width, height },
-        framerate: profile.default?.fps ?? profile.fps[0],
+        framerate,
         enable: enableByDefault,
       })
     }
