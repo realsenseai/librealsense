@@ -242,6 +242,9 @@ class sensor:
     def supports(self, option_type):
         return self._key(option_type) is not None
 
+    def set_notifications_callback(self, callback):
+        self._notifications_callback = callback
+
     def is_depth_sensor(self):
         return False
 

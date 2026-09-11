@@ -123,12 +123,39 @@ class DeviceRegistryMixin:
             is_playback=is_playback,
             file_name=file_name,
         )
+        self._watch_notifications(device_id, dev)
+
         # Publish atomically at the end — if anything above raises, no partial
         # cache entry is left behind. Keep new work above this block.
         self.devices[device_id] = dev
         self.device_infos[device_id] = info
         self.streaming_mode.setdefault(device_id, "idle")
         return device_id
+
+    def _watch_notifications(self, device_id: str, dev) -> None:
+        """Forward SDK notifications (hardware events and errors, frame timeouts) to clients and
+        into the console, as the legacy viewer's notification cards and log do. The SDK pushes
+        these; nothing here polls the device."""
+        for index, sensor in enumerate(dev.sensors):
+            if not hasattr(sensor, "set_notifications_callback"):
+                continue
+            sensor_id = f"{device_id}-sensor-{index}"
+
+            def on_notification(n, sensor_id=sensor_id):
+                payload = {
+                    "device_id": device_id, "sensor_id": sensor_id,
+                    "category": str(n.category).rsplit(".", 1)[-1], "severity": str(n.severity).rsplit(".", 1)[-1],
+                    "description": n.description, "serialized_data": n.serialized_data, "timestamp": n.timestamp,
+                }
+                self._emit_socket_event("notification", payload)
+                console = getattr(self, "console", None)
+                if console is not None:
+                    console.add(payload["severity"], n.description, "notification", device_id=device_id, category=payload["category"])
+
+            try:
+                sensor.set_notifications_callback(on_notification)
+            except RuntimeError as exc:
+                logging.debug("notifications unavailable on %s: %s", sensor_id, exc)
 
     def _emit_socket_event(self, event: str, payload: Dict[str, Any]) -> None:
         """Emit a Socket.IO event from sync contexts using the main FastAPI event loop."""
