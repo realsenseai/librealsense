@@ -106,7 +106,12 @@ async def startup_event():
     loop = asyncio.get_running_loop()
     RealSenseManager.set_event_loop(loop)
     # Started here, not in the manager: tests build managers by the dozen against real hardware.
-    get_realsense_manager().options_poller.start()
+    manager = get_realsense_manager()
+    manager.options_poller.start()
+    console_settings = manager.settings.get().console
+    manager.console.install_sdk_logging(console_settings.log_severity,
+                                        console_settings.log_filename if console_settings.log_to_file else None)
+    manager.console.attach_python_logging()
 
 
 socket_handlers.register(sio, get_realsense_manager)

@@ -13,7 +13,9 @@ from app.services.metadata_socket_server import MetadataSocketServer
 from app.services.jobs import JobRegistry
 from app.services.settings import SettingsStore
 from app.services.options_poller import OptionsPoller
+from app.services.logs import LogConsole
 from app.services.manager import (
+    console,
     devices,
     record_playback,
     fw_update,
@@ -32,6 +34,7 @@ class RealSenseManager(
     frames.FramesMixin,
     sensor_streaming.SensorStreamingMixin,
     record_playback.RecordPlaybackMixin,
+    console.ConsoleMixin,
 ):
     # Class-level event loop reference for async operations from sync contexts
     _main_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -141,6 +144,9 @@ class RealSenseManager(
         self._recorders: Dict[str, Dict[str, Any]] = {}  # device_id -> {recorder, paused, file}
         self._playbacks: Dict[str, Dict[str, Any]] = {}  # device_id -> {speed, repeat, path}
         self.options_poller = OptionsPoller(lambda: list(self.devices.items()), self.option_lock, self._emit_socket_event)
+        # The output console: SDK and server log lines, firmware logs, terminal output.
+        self.console = LogConsole(self._emit_socket_event, self.settings.get().console.max_entries)
+        self._fw_log_collectors: Dict[str, Any] = {}  # device_id -> FwLogCollector
 
         # Initialize devices
         self.refresh_devices()
