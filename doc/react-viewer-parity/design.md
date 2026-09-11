@@ -430,6 +430,12 @@ skybox, in-app `.bag`→`.db3` conversion (stretch via `rs-convert` subprocess).
   fails, fall back to a binary WebSocket for Z16 (RSDEV-11580 B2/B3).
 - **Calibration blocks the device** for tens of seconds and changes stream state; the job
   model plus server-side workspace restore must survive client disconnects.
+- **Concurrent option access wedges the D455 on Windows.** Measured 2026-09-11: the SDK's
+  `on_options_changed` watcher (one polling thread per sensor) and any second thread or
+  process touching options leave the camera answering every write with
+  `0x8007001f` until a hardware reset. The server therefore never registers the SDK
+  watcher; a single poller thread reads options one sensor at a time under a per-device
+  lock that REST reads/writes share (`services/options_poller.py`). Worth an SDK ticket.
 - **Multi-camera** (RSDEV-12011) must be solid before record/playback and calibration,
   which each add device-lifecycle transitions.
 - **`rs_manager` split** is a large refactor under active PRs (#15402, #15559); sequence it

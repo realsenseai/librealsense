@@ -229,9 +229,6 @@ class sensor:
     def supports(self, option_type):
         return self._key(option_type) is not None
 
-    def on_options_changed(self, callback):
-        self._options_changed_callback = callback
-
     def is_depth_sensor(self):
         return False
 

@@ -131,7 +131,9 @@ class ControlsMixin:
 
     def get_sensor_options(self, device_id: str, sensor_id: str) -> List[OptionInfo]:
         """Get all options for a sensor"""
-        return options.all_options(self._find_sensor(device_id, sensor_id))
+        sensor = self._find_sensor(device_id, sensor_id)
+        with self.option_lock(device_id):
+            return options.all_options(sensor)
 
     def _get_or_create_processing_blocks(self, device_id: str, sensor_id: str, sensor) -> List[Dict[str, Any]]:
         """Get or create post-processing filter blocks for a sensor.
@@ -255,10 +257,12 @@ class ControlsMixin:
         return self.get_advanced_mode_status(device_id)
 
     def get_advanced_controls(self, device_id: str) -> Dict[str, List[OptionInfo]]:
-        return advanced_mode.controls(self._require_device(device_id))
+        with self.option_lock(device_id):
+            return advanced_mode.controls(self._require_device(device_id))
 
     def set_advanced_control(self, device_id: str, group: str, field: str, value: float) -> OptionInfo:
-        return advanced_mode.set_control(self._require_device(device_id), group, field, value)
+        with self.option_lock(device_id):
+            return advanced_mode.set_control(self._require_device(device_id), group, field, value)
 
     def get_sensor_option(
         self, device_id: str, sensor_id: str, option_id: str
@@ -279,8 +283,11 @@ class ControlsMixin:
         """
         sensor = self._find_sensor(device_id, sensor_id)
         wanted = {option_id.lower(), option_id.lower().replace(" ", "_")}
-        name = next(o.name for o in sensor.get_supported_options() if o.name.lower() in wanted)
-        return options.set_option(sensor, name, value)
+        with self.option_lock(device_id):
+            name = next(o.name for o in sensor.get_supported_options() if o.name.lower() in wanted)
+            applied = options.set_option(sensor, name, value)
+        self.options_poller.note_written(device_id, sensor_id, name, applied.current_value)
+        return applied
 
     def _apply_depth_filters(self, device_id: str, frame: rs.depth_frame) -> rs.depth_frame:
         """Apply enabled post-processing filters to a depth frame.

@@ -50,6 +50,7 @@ class DeviceRegistryMixin:
         self.metadata_queues.pop(serial, None)
         self.depth_frames.pop(serial, None)
         self.last_frames.pop(serial, None)
+        self.options_poller.forget(serial)
         self.color_frames.pop(serial, None)
         self.point_clouds.pop(serial, None)
         # Drop the point-cloud-enabled flag so a re-plug of the same serial
@@ -103,31 +104,12 @@ class DeviceRegistryMixin:
             is_streaming=device_id in self.pipelines,
             metadata_enabled=metadata_enabled,
         )
-        self._watch_option_changes(device_id, dev)
-
         # Publish atomically at the end — if anything above raises, no partial
         # cache entry is left behind. Keep new work above this block.
         self.devices[device_id] = dev
         self.device_infos[device_id] = info
         self.streaming_mode.setdefault(device_id, "idle")
         return device_id
-
-    def _watch_option_changes(self, device_id: str, dev) -> None:
-        """Forward the SDK's option-change notifications (a preset rewriting exposure, an
-        auto-exposure toggle, ...) so every client shows what the camera actually holds."""
-        for index, sensor in enumerate(dev.sensors):
-            if not hasattr(sensor, "on_options_changed"):
-                continue  # playback and mock sensors
-            sensor_id = f"{device_id}-sensor-{index}"
-
-            def on_changed(changed, sensor_id=sensor_id):
-                payload = [{"option_id": o.id.name, "current_value": o.value} for o in changed]
-                self._emit_socket_event("options_changed", {"device_id": device_id, "sensor_id": sensor_id, "options": payload})
-
-            try:
-                sensor.on_options_changed(on_changed)
-            except RuntimeError as exc:
-                logging.debug("options watcher unavailable on %s: %s", sensor_id, exc)
 
     def _emit_socket_event(self, event: str, payload: Dict[str, Any]) -> None:
         """Emit a Socket.IO event from sync contexts using the main FastAPI event loop."""

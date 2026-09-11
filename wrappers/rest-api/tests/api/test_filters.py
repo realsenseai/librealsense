@@ -55,23 +55,3 @@ def test_d405_threshold_starts_at_short_range(setup_mock_managers):
     assert dev.sensors[0].get_recommended_filters  # sanity: still the mock
     del dev._info[camera_info.product_id]
     assert option.min_distance  # the mock exposes the option enum
-
-
-def test_option_changes_pushed_by_the_sdk_are_forwarded(setup_mock_managers):
-    rs_manager = setup_mock_managers["rs_manager"]
-    emitted = []
-    rs_manager._emit_socket_event = lambda ev, payload: emitted.append((ev, payload))
-    dev = rs_manager.devices["device1"]
-    rs_manager._watch_option_changes("device1", dev)
-
-    class _Changed:
-        def __init__(self, opt, value):
-            self.id, self.value = opt, value
-
-    from ..mocks.pyrealsense_mock import option
-    dev.sensors[0]._options_changed_callback([_Changed(option.laser_power, 150.0)])
-
-    assert emitted == [("options_changed", {
-        "device_id": "device1", "sensor_id": "device1-sensor-0",
-        "options": [{"option_id": "laser_power", "current_value": 150.0}],
-    })]

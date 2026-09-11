@@ -105,6 +105,8 @@ async def startup_event():
     """Store the main event loop for use in synchronous callbacks."""
     loop = asyncio.get_running_loop()
     RealSenseManager.set_event_loop(loop)
+    # Started here, not in the manager: tests build managers by the dozen against real hardware.
+    get_realsense_manager().options_poller.start()
 
 
 socket_handlers.register(sio, get_realsense_manager)

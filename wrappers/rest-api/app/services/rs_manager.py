@@ -12,6 +12,7 @@ import socketio
 from app.services.metadata_socket_server import MetadataSocketServer
 from app.services.jobs import JobRegistry
 from app.services.settings import SettingsStore
+from app.services.options_poller import OptionsPoller
 from app.services.manager import (
     devices,
     fw_update,
@@ -132,9 +133,16 @@ class RealSenseManager(
         self.sensor_rs_queues: Dict[str, Dict[str, Any]] = {}
         # Track sensor stopping state
         self.sensor_stopping: Dict[str, Set[str]] = {}  # device_id -> set of sensor_ids
+        # One lock per device around option reads and writes: concurrent option access from
+        # several threads was measured to wedge the D455 on the Windows backend.
+        self._option_locks: Dict[str, threading.Lock] = defaultdict(threading.Lock)
+        self.options_poller = OptionsPoller(lambda: list(self.devices.items()), self.option_lock, self._emit_socket_event)
 
         # Initialize devices
         self.refresh_devices()
 
         # Refresh devices when one is plugged in or out.
         self.ctx.set_devices_changed_callback(self._on_devices_changed)
+
+    def option_lock(self, device_id: str) -> threading.Lock:
+        return self._option_locks[device_id]
