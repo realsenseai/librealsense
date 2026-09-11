@@ -586,12 +586,13 @@ function StreamTile({
       onMouseUp={roiMode ? roiMouse.onMouseUp : panMouse.onMouseUp}
       style={roiMode ? { cursor: 'crosshair' } : zoomed ? { cursor: 'grab' } : undefined}
     >
-      {/* Video Element: zoomed by transforming it inside a clip box the size of the displayed frame */}
+      {/* Video Element. The wrapper stays in normal flow (it gives the tile its height); when
+          zoomed the video is scaled in place and the wrapper clips to the letterboxed frame area. */}
       <div
-        className="absolute overflow-hidden"
+        className="relative w-full h-full overflow-hidden"
         style={display && zoomed
-          ? { left: display.offsetX, top: display.offsetY, width: display.width, height: display.height }
-          : { inset: 0 }}
+          ? { clipPath: `inset(${display.offsetY}px ${display.offsetX}px ${display.offsetY}px ${display.offsetX}px)` }
+          : undefined}
       >
         <video
           ref={videoRef}
@@ -601,7 +602,9 @@ function StreamTile({
           disablePictureInPicture
           controlsList="nodownload nofullscreen noremoteplayback"
           className="w-full h-full object-contain stream-video"
-          style={display && zoomed ? { transform: zoomTransform(zoom, display.width, display.height), transformOrigin: '0 0' } : undefined}
+          style={display && zoomed
+            ? { transform: zoomTransform(zoom, display.width, display.height, display.offsetX, display.offsetY), transformOrigin: '0 0' }
+            : undefined}
         />
       </div>
 

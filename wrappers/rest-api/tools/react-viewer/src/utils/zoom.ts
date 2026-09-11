@@ -41,9 +41,12 @@ export function pan(z: Zoom, dx: number, dy: number): Zoom {
   return encloseInFrame({ ...z, x: z.x - dx * z.w, y: z.y - dy * z.h })
 }
 
-/** CSS transform that shows only `z` of an element `width` x `height` (origin top-left). */
-export function zoomTransform(z: Zoom, width: number, height: number): string | undefined {
+/** CSS transform (origin top-left) that shows only `z` of the frame, which paints
+ * `width` x `height` at (`offsetX`, `offsetY`) inside the element (its letterbox). */
+export function zoomTransform(z: Zoom, width: number, height: number, offsetX = 0, offsetY = 0): string | undefined {
   if (!isZoomed(z)) return undefined
   const s = 1 / z.w
-  return `translate(${-s * z.x * width}px, ${-s * z.y * height}px) scale(${s})`
+  const tx = offsetX * (1 - s) - s * z.x * width
+  const ty = offsetY * (1 - s) - s * z.y * height
+  return `translate(${tx}px, ${ty}px) scale(${s})`
 }

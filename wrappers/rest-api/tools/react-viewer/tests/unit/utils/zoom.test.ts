@@ -29,6 +29,8 @@ describe('tile zoom', () => {
   it('produces a CSS transform that shows the zoomed region', () => {
     expect(zoomTransform(FULL_FRAME, 400, 300)).toBeUndefined()
     expect(zoomTransform({ x: 0.25, y: 0.25, w: 0.5, h: 0.5 }, 400, 300)).toBe('translate(-200px, -150px) scale(2)')
+    // Letterboxed 100px on each side: the frame's zoomed origin still lands on the bar edge
+    expect(zoomTransform({ x: 0.25, y: 0.25, w: 0.5, h: 0.5 }, 400, 300, 100, 0)).toBe('translate(-300px, -150px) scale(2)')
   })
 
   it('maps mouse and pixels through the zoom', () => {
