@@ -15,6 +15,12 @@ const sensorOptionsMap: Record<string, any[]> = {
 export const handlers = [
   http.get(`${API_BASE}/jobs/`, () => HttpResponse.json([])),
   http.get(`${API_BASE}/logs/`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/devices/:deviceId/calibration/`, () => HttpResponse.json({
+    kind: null, state: 'idle', health: null, verdict: null, has_new_table: false, active: 'old', written: false, error: null, started_at: null,
+  })),
+  http.post(`${API_BASE}/devices/:deviceId/calibration/occ`, () => HttpResponse.json({
+    id: 'calib1', kind: 'calibration_occ', device_id: 'test-device-1', state: 'running', progress: 0.05, message: 'Calibrating', result: null, error: null, created_at: 1, updated_at: 1,
+  })),
   http.get(`${API_BASE}/devices/:deviceId/hdr/`, () => HttpResponse.json({
     supported: true, hdr_enabled: false,
     exposure_range: { min: 1, max: 165000, step: 1, default: 8500 },

@@ -15,7 +15,6 @@ import type {
   SensorStreamStatus,
   ViewerSettings,
   ViewerSettingsPatch,
-  JobInfo,
   RegionOfInterest,
   PlaybackActionName,
   PlaybackStatus,
@@ -27,6 +26,10 @@ import type {
   HdrPreset,
   HdrStatus,
   PointCloudGeometry,
+  CalibrationStatus,
+  OccParams,
+  TareParams,
+  JobInfo,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -322,6 +325,32 @@ class ApiClient {
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
     await this.client.delete(`/webrtc/sessions/${sessionId}`)
+  }
+
+  // ============ Calibration ============
+
+  async getCalibration(deviceId: string): Promise<CalibrationStatus> {
+    return (await this.client.get<CalibrationStatus>(`/devices/${deviceId}/calibration/`)).data
+  }
+
+  async startOnChipCalibration(deviceId: string, params: OccParams): Promise<JobInfo> {
+    return (await this.client.post<JobInfo>(`/devices/${deviceId}/calibration/occ`, params)).data
+  }
+
+  async startTareCalibration(deviceId: string, params: TareParams): Promise<JobInfo> {
+    return (await this.client.post<JobInfo>(`/devices/${deviceId}/calibration/tare`, params)).data
+  }
+
+  async applyCalibration(deviceId: string, useNew: boolean): Promise<CalibrationStatus> {
+    return (await this.client.post<CalibrationStatus>(`/devices/${deviceId}/calibration/apply`, { use_new: useNew })).data
+  }
+
+  async keepCalibration(deviceId: string): Promise<CalibrationStatus> {
+    return (await this.client.post<CalibrationStatus>(`/devices/${deviceId}/calibration/keep`)).data
+  }
+
+  async resetFactoryCalibration(deviceId: string): Promise<CalibrationStatus> {
+    return (await this.client.post<CalibrationStatus>(`/devices/${deviceId}/calibration/reset_factory`)).data
   }
 
   // ============ Point cloud geometry ============

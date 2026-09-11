@@ -188,7 +188,7 @@ Enables everything after it. No user-visible parity except settings and multi-ca
   `POST /devices/{d}/calibration/occ {speed, accuracy, scan, host_assist, dry_run}` → job;
   result `{health[], new_table_id}`; `POST /calibration/apply {keep|new}`;
   `POST /calibration/cancel`. HW: D455. 4 d.
-- [ ] **WP6.2 OCC + dry-run wizard UI.** `components/calibration/OccWizard.tsx`: params,
+- [x] **WP6.2 OCC + dry-run wizard UI.** `components/calibration/OccWizard.tsx`: params,
   progress, health with before/after and colour thresholds, Apply / Keep / Recalibrate;
   disclaimer notice with docs links. 3 d.
 - [ ] **WP6.3 Tare + ground truth.** `POST /calibration/tare {ground_truth_mm, ...}`,
@@ -373,7 +373,11 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   gated by Settings > calibration) and factory reset. Live on the D455: the firmware
   answered "Not enough depth pixels! - low fill factor" for the desk scene, which the
   legacy tool would show the same way; the SDK's progress callback reported nothing until
-  the end. Tare backend is in (WP6.3) but has not been run against a target.
+  the end. Tare backend is in (WP6.3) but has not been run against a target. WP6.2:
+  `components/calibration/CalibrationDialog.tsx` (parameters, job progress, health with the
+  legacy colour bands, Use new / Use old / Keep / Recalibrate) from the device menu, live in
+  `tests/e2e/calibration.spec.ts`. Dry-run (scan only) is exposed as host assistance but
+  the host-assisted frame loop is not implemented.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).

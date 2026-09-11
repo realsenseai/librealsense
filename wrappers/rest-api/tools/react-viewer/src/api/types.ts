@@ -82,6 +82,36 @@ export interface LogEntry {
   module?: string | null
 }
 
+// Calibration session (GET /devices/{d}/calibration/), a port of common/on-chip-calib.cpp
+export interface CalibrationStatus {
+  kind: 'occ' | 'tare' | null
+  state: 'idle' | 'running' | 'done' | 'failed'
+  health: number[] | null
+  verdict: 'good' | 'ok' | 'bad' | 'unknown' | null
+  has_new_table: boolean
+  active: 'old' | 'new'
+  written: boolean
+  error: string | null
+  started_at: number | null
+}
+export interface OccParams {
+  speed: number // 0 very fast .. 3 slow, 4 white wall
+  average_step_count: number
+  step_count: number
+  accuracy: number // 0 very high .. 3 low
+  apply_preset: boolean
+  intrinsic_scan: boolean
+  host_assistance: boolean
+}
+export interface TareParams {
+  ground_truth_mm: number
+  average_step_count: number
+  step_count: number
+  accuracy: number
+  apply_preset: boolean
+  host_assistance: boolean
+}
+
 // Camera geometry for the client-side point cloud (GET /devices/{d}/point_cloud/geometry)
 export interface CameraIntrinsics {
   width: number
