@@ -232,6 +232,9 @@ class sensor:
     def is_depth_sensor(self):
         return False
 
+    def is_roi_sensor(self):
+        return False
+
     def get_recommended_filters(self):
         return []
 

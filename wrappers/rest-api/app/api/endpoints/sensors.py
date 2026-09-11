@@ -11,6 +11,8 @@ control than the pipeline-based /streams/* endpoints, allowing individual sensor
 
 import functools
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from typing import List
 
 from app.models.sensor import SensorInfo
@@ -116,6 +118,28 @@ async def stop_sensor(
     Other sensors on the same device will continue streaming.
     """
     return rs_manager.stop_sensor(device_id, sensor_id)
+
+
+class RegionOfInterest(BaseModel):
+    min_x: int
+    min_y: int
+    max_x: int
+    max_y: int
+
+
+@router.get("/{sensor_id}/roi")
+@rs_exception_handler()
+async def get_roi(device_id: str, sensor_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
+    """Auto-exposure region of interest, in the sensor's pixel coordinates."""
+    return await run_in_threadpool(rs_manager.get_roi, device_id, sensor_id)
+
+
+@router.put("/{sensor_id}/roi")
+@rs_exception_handler()
+async def set_roi(device_id: str, sensor_id: str, roi: RegionOfInterest,
+                  rs_manager: RealSenseManager = Depends(get_realsense_manager)):
+    """Set the auto-exposure region of interest; corners may be given in any order."""
+    return await run_in_threadpool(rs_manager.set_roi, device_id, sensor_id, roi.min_x, roi.min_y, roi.max_x, roi.max_y)
 
 
 @router.post("/{sensor_id}/pause", response_model=SensorStreamStatus)

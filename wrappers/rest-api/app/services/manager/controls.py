@@ -264,6 +264,25 @@ class ControlsMixin:
         with self.option_lock(device_id):
             return advanced_mode.set_control(self._require_device(device_id), group, field, value)
 
+    def get_roi(self, device_id: str, sensor_id: str) -> Dict[str, Any]:
+        """The auto-exposure region of interest of a sensor that has one."""
+        sensor = self._find_sensor(device_id, sensor_id)
+        if not sensor.is_roi_sensor():
+            return {"supported": False}
+        with self.option_lock(device_id):
+            roi = sensor.as_roi_sensor().get_region_of_interest()
+        return {"supported": True, "min_x": roi.min_x, "min_y": roi.min_y, "max_x": roi.max_x, "max_y": roi.max_y}
+
+    def set_roi(self, device_id: str, sensor_id: str, min_x: int, min_y: int, max_x: int, max_y: int) -> Dict[str, Any]:
+        sensor = self._find_sensor(device_id, sensor_id)
+        if not sensor.is_roi_sensor():
+            raise RealSenseError(status_code=400, detail=f"Sensor {sensor_id} has no region of interest")
+        roi = rs.region_of_interest()
+        roi.min_x, roi.min_y, roi.max_x, roi.max_y = min(min_x, max_x), min(min_y, max_y), max(min_x, max_x), max(min_y, max_y)
+        with self.option_lock(device_id):
+            sensor.as_roi_sensor().set_region_of_interest(roi)
+        return self.get_roi(device_id, sensor_id)
+
     def get_sensor_option(
         self, device_id: str, sensor_id: str, option_id: str
     ) -> OptionInfo:

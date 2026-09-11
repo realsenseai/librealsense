@@ -65,3 +65,38 @@ def test_viewer_info_carries_the_server_arrival_time(setup_mock_managers):
     before = time.time()
     info = setup_mock_managers["rs_manager"]._build_viewer_info(_Frame())
     assert before <= info["received_at"] <= time.time()
+
+
+ROI = "/api/v1/devices/device1/sensors/device1-sensor-0/roi"
+
+
+class _Roi:
+    def __init__(self):
+        self.min_x, self.min_y, self.max_x, self.max_y = 0, 0, 639, 479
+
+
+class _RoiSensor:
+    def __init__(self):
+        self.roi = _Roi()
+
+    def get_region_of_interest(self):
+        return self.roi
+
+    def set_region_of_interest(self, roi):
+        self.roi = roi
+
+
+def test_roi_unsupported_on_a_plain_sensor(setup_mock_managers):
+    assert client.get(ROI).json() == {"supported": False}
+    assert client.put(ROI, json={"min_x": 0, "min_y": 0, "max_x": 10, "max_y": 10}).status_code == 400
+
+
+def test_roi_roundtrip_normalizes_corners(setup_mock_managers, monkeypatch):
+    sensor = setup_mock_managers["rs_manager"].devices["device1"].sensors[0]
+    roi_sensor = _RoiSensor()
+    monkeypatch.setattr(sensor, "is_roi_sensor", lambda: True, raising=False)
+    monkeypatch.setattr(sensor, "as_roi_sensor", lambda: roi_sensor, raising=False)
+
+    assert client.get(ROI).json() == {"supported": True, "min_x": 0, "min_y": 0, "max_x": 639, "max_y": 479}
+    body = client.put(ROI, json={"min_x": 300, "min_y": 200, "max_x": 100, "max_y": 50}).json()
+    assert body == {"supported": True, "min_x": 100, "min_y": 50, "max_x": 300, "max_y": 200}
