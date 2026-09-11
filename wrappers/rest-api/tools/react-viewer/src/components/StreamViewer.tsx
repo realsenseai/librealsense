@@ -4,6 +4,7 @@ import { WebRTCHandler } from '../api/webrtc'
 import { apiClient } from '../api/client'
 import { DepthLegend } from './DepthLegend'
 import { useMetric } from '../store/settings'
+import { orderKeys, tileKey, useLayoutStore } from '../store/layout'
 import { formatDistance } from '../utils/units'
 import type { DeviceState, StreamConfig, StreamMetadata } from '../api/types'
 
@@ -20,6 +21,8 @@ interface DeviceStream {
 
 export function StreamViewer() {
   const { deviceStates } = useAppStore()
+  const { tileOrder, maximized, swapTiles, setMaximized } = useLayoutStore()
+  const [dragging, setDragging] = useState<string | null>(null)
   
   // Collect all enabled streams from all active devices; hide tiles until they actually stream.
   const activeStreams = useMemo(() => {
@@ -48,10 +51,39 @@ export function StreamViewer() {
       })
     })
     
-    return streams
-  }, [deviceStates])
+    // Legacy order within a device (depth, color, IR, motion) unless the user rearranged.
+    const byDevice = new Map<string, DeviceStream[]>()
+    for (const s of streams) byDevice.set(s.deviceId, [...(byDevice.get(s.deviceId) ?? []), s])
+    const ordered: DeviceStream[] = []
+    for (const [deviceId, list] of byDevice) {
+      const keyed = new Map(list.map((s) => [tileKey(deviceId, s.config.stream_type), s]))
+      for (const key of orderKeys([...keyed.keys()], tileOrder[deviceId])) ordered.push(keyed.get(key)!)
+    }
+    return ordered
+  }, [deviceStates, tileOrder])
 
   const activeDeviceCount = Object.keys(deviceStates).length
+  const maximizedStream = maximized ? activeStreams.find((s) => tileKey(s.deviceId, s.config.stream_type) === maximized) : undefined
+  const shown = maximizedStream ? [maximizedStream] : activeStreams
+
+  const tileFrame = (stream: DeviceStream, child: ReactNode) => {
+    const key = tileKey(stream.deviceId, stream.config.stream_type)
+    const present = activeStreams.filter((s) => s.deviceId === stream.deviceId).map((s) => tileKey(s.deviceId, s.config.stream_type))
+    return (
+      <div
+        key={key}
+        data-testid="stream-tile"
+        draggable={!maximizedStream}
+        onDragStart={() => setDragging(key)}
+        onDragOver={(e) => { if (dragging && dragging !== key) e.preventDefault() }}
+        onDrop={() => { if (dragging) swapTiles(stream.deviceId, dragging, key, present); setDragging(null) }}
+        onDragEnd={() => setDragging(null)}
+        className={`min-h-0 ${dragging === key ? 'opacity-50' : ''}`}
+      >
+        {child}
+      </div>
+    )
+  }
 
   return (
     <div className="h-full">
@@ -79,17 +111,18 @@ export function StreamViewer() {
         <div
           className="h-full grid gap-2"
           style={{
-            gridTemplateColumns: `repeat(${Math.min(activeStreams.length, 2)}, 1fr)`,
-            gridTemplateRows: `repeat(${Math.ceil(activeStreams.length / 2)}, 1fr)`,
+            gridTemplateColumns: `repeat(${Math.min(shown.length, 2)}, 1fr)`,
+            gridTemplateRows: `repeat(${Math.ceil(shown.length / 2)}, 1fr)`,
           }}
         >
-          {activeStreams.map((stream) => {
+          {shown.map((stream) => {
             const isMotionStream = ['gyro', 'accel'].includes(stream.config.stream_type.toLowerCase())
-            
+            const key = tileKey(stream.deviceId, stream.config.stream_type)
+            const maximize = { maximized: !!maximizedStream, toggle: () => setMaximized(maximizedStream ? null : key) }
+
             if (isMotionStream) {
-              return (
+              return tileFrame(stream,
                 <IMUStreamTile
-                  key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
                   deviceId={stream.deviceId}
                   streamType={stream.config.stream_type}
                   showDeviceName={activeDeviceCount > 1}
@@ -97,13 +130,13 @@ export function StreamViewer() {
                   serialNumber={stream.serialNumber}
                   metadata={stream.metadata}
                   pause={{ deviceId: stream.deviceId, sensorId: stream.config.sensor_id, paused: stream.paused }}
+                  maximize={maximize}
                 />
               )
             }
 
-            return (
+            return tileFrame(stream,
               <StreamTile
-                key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
                 deviceId={stream.deviceId}
                 deviceName={stream.deviceName}
                 serialNumber={stream.serialNumber}
@@ -113,6 +146,7 @@ export function StreamViewer() {
                 showDeviceName={activeDeviceCount > 1}
                 pause={{ deviceId: stream.deviceId, sensorId: stream.config.sensor_id, paused: stream.paused }}
                 metadataServerTime={stream.metadataServerTime}
+                maximize={maximize}
               />
             )
           })}
@@ -126,6 +160,26 @@ interface PauseState {
   deviceId: string
   sensorId: string
   paused: boolean
+}
+
+interface MaximizeState {
+  maximized: boolean
+  toggle: () => void
+}
+
+/** The legacy tile-header maximize/restore button. */
+function MaximizeButton({ maximize, className = '' }: { maximize: MaximizeState; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={maximize.toggle}
+      title={maximize.maximized ? 'Restore tile' : 'Maximize tile'}
+      aria-label={maximize.maximized ? 'Restore tile' : 'Maximize tile'}
+      className={`px-2 py-0.5 bg-black/60 hover:bg-black/80 rounded text-xs text-white border border-gray-600 z-20 ${className}`}
+    >
+      {maximize.maximized ? '⤡' : '⤢'}
+    </button>
+  )
 }
 
 /** The legacy stream-header pause/resume button; pausing holds the whole sensor. */
@@ -174,10 +228,11 @@ interface StreamTileProps {
   metadata?: StreamMetadata
   pause?: PauseState
   metadataServerTime?: number
+  maximize?: MaximizeState
 }
 
 function StreamTile({
-  deviceId, deviceName, serialNumber, streamType, format, showDeviceName, metadata, pause, metadataServerTime,
+  deviceId, deviceName, serialNumber, streamType, format, showDeviceName, metadata, pause, metadataServerTime, maximize,
 }: StreamTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -445,6 +500,7 @@ function StreamTile({
       <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 flex items-center gap-1`}>
         <SnapshotButton deviceId={deviceId} streamType={streamType} className="py-1" />
         {pause && <PauseButton pause={pause} className="py-1" />}
+        {maximize && <MaximizeButton maximize={maximize} className="py-1" />}
         <MetadataPanel
           metadata={metadata}
           streamType={streamType}
@@ -509,9 +565,10 @@ interface IMUStreamTileProps {
   serialNumber: string
   metadata?: StreamMetadata
   pause?: PauseState
+  maximize?: MaximizeState
 }
 
-function IMUStreamTile({ deviceId, streamType, showDeviceName, deviceName, serialNumber, metadata, pause }: IMUStreamTileProps) {
+function IMUStreamTile({ deviceId, streamType, showDeviceName, deviceName, serialNumber, metadata, pause, maximize }: IMUStreamTileProps) {
   const { imuHistory } = useAppStore()
   const [fps, setFps] = useState(0)
   const [showMetadata, setShowMetadata] = useState(false)
@@ -571,6 +628,7 @@ function IMUStreamTile({ deviceId, streamType, showDeviceName, deviceName, seria
           <span className="text-xs text-gray-400">{unit}</span>
           <SnapshotButton deviceId={deviceId} streamType={streamType} />
           {pause && <PauseButton pause={pause} />}
+          {maximize && <MaximizeButton maximize={maximize} />}
           <MetadataPanel
             metadata={metadata}
             streamType={streamType}

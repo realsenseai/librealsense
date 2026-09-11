@@ -23,6 +23,10 @@ function App() {
     void useSettingsStore.getState().fetchSettings()
     const uninstallShortcuts = installShortcuts({
       Space: () => void useAppStore.getState().togglePauseAll(),
+      F8: () => {
+        if (document.fullscreenElement) void document.exitFullscreen?.()
+        else void document.documentElement.requestFullscreen?.()
+      },
     })
     
     // Don't disconnect on cleanup in dev mode (React strict mode double-mounts)

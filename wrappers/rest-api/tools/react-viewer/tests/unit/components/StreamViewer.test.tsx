@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../mocks/server'
 import { render, createMockDevice, createMockDeviceState, createMockStreamConfig } from '../../utils/test-utils'
 import { StreamViewer } from '@/components/StreamViewer'
+import { useLayoutStore } from '@/store/layout'
 
 describe('StreamViewer', () => {
   describe('Empty State', () => {
@@ -135,6 +137,52 @@ describe('StreamViewer', () => {
       })
       
       expect(document.querySelectorAll('video.stream-video')).toHaveLength(2)
+    })
+  })
+
+  describe('Tile layout', () => {
+    const twoStreams = () => {
+      const device = createMockDevice()
+      return createMockDeviceState(device, {
+        streamConfigs: [
+          createMockStreamConfig({ stream_type: 'color', format: 'RGB8', enable: true }),
+          createMockStreamConfig({ stream_type: 'depth', enable: true }),
+        ],
+        isStreaming: true,
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth', 'color'] },
+        },
+      })
+    }
+
+    beforeEach(() => useLayoutStore.setState({ tileOrder: {}, maximized: null }))
+
+    it('draws depth before color whatever order the configs came in', () => {
+      const ds = twoStreams()
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+      const labels = screen.getAllByTestId('stream-tile').map((t) => t.textContent?.includes('DEPTH') ? 'depth' : 'color')
+      expect(labels).toEqual(['depth', 'color'])
+    })
+
+    it('follows the remembered arrangement', () => {
+      const ds = twoStreams()
+      useLayoutStore.setState({ tileOrder: { [ds.device.device_id]: [`${ds.device.device_id}:color`, `${ds.device.device_id}:depth`] } })
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+      const labels = screen.getAllByTestId('stream-tile').map((t) => t.textContent?.includes('DEPTH') ? 'depth' : 'color')
+      expect(labels).toEqual(['color', 'depth'])
+    })
+
+    it('maximizes one tile and restores the grid', async () => {
+      const ds = twoStreams()
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+      expect(screen.getAllByTestId('stream-tile')).toHaveLength(2)
+
+      await userEvent.click(screen.getAllByRole('button', { name: 'Maximize tile' })[0])
+      expect(screen.getAllByTestId('stream-tile')).toHaveLength(1)
+      expect(screen.getByText('DEPTH')).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Restore tile' }))
+      expect(screen.getAllByTestId('stream-tile')).toHaveLength(2)
     })
   })
 
