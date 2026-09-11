@@ -67,6 +67,10 @@ class SocketService {
       useAppStore.getState().applyOptionChanges(data.device_id, data.sensor_id, data.options)
     })
 
+    this.socket.on('playback_status', (data: { device_id: string; state: string }) => {
+      void useAppStore.getState().refreshPlayback(data.device_id)
+    })
+
     this.socket.on('job', (job: JobInfo) => {
       useJobsStore.getState().upsert(job)
     })

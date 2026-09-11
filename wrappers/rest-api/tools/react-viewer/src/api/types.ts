@@ -13,6 +13,36 @@ export interface DeviceInfo {
   metadata_enabled?: boolean | null
   /** Every RS2_CAMERA_INFO field the device reports, by field name. */
   info?: Record<string, string>
+  is_playback?: boolean
+  file_name?: string | null
+}
+
+// Wire shape of /playback/{id} (app/models/playback.py)
+export type PlaybackState = 'unknown' | 'playing' | 'paused' | 'stopped'
+export interface PlaybackStatus {
+  device_id: string
+  file_name: string
+  state: PlaybackState
+  position_ns: number
+  duration_ns: number
+  speed: number
+  repeat: boolean
+}
+export type PlaybackActionName = 'play' | 'pause' | 'stop' | 'seek' | 'speed' | 'step' | 'repeat'
+
+// Wire shape of /devices/{id}/record
+export interface RecordStatus {
+  device_id: string
+  recording: boolean
+  paused: boolean
+  file: string | null
+}
+
+export interface RecordingFile {
+  path: string
+  name: string
+  size: number
+  modified: number
 }
 
 /** Display label for an SDK name: "deepSeaMedianThreshold" -> "Deep Sea Median Threshold". */
@@ -274,6 +304,8 @@ export interface DeviceState {
   isLoading: boolean // loading sensors/options
   streamMetadata: Record<string, StreamMetadata> // keyed by stream_type
   metadataServerTime?: number // timestamp_server of the last metadata_update
+  record?: RecordStatus
+  playback?: PlaybackStatus // loaded recordings only
   // Per-sensor streaming state (sensor API)
   sensorStreamingStatus: Record<string, SensorStreamStatus> // keyed by sensor_id
 }

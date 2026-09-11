@@ -17,6 +17,10 @@ import type {
   ViewerSettingsPatch,
   JobInfo,
   RegionOfInterest,
+  PlaybackActionName,
+  PlaybackStatus,
+  RecordStatus,
+  RecordingFile,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -312,6 +316,52 @@ class ApiClient {
 
   async closeWebRTCSession(sessionId: string): Promise<void> {
     await this.client.delete(`/webrtc/sessions/${sessionId}`)
+  }
+
+  // ============ Record / playback ============
+
+  async getRecordStatus(deviceId: string): Promise<RecordStatus> {
+    return (await this.client.get<RecordStatus>(`/devices/${deviceId}/record/`)).data
+  }
+
+  async startRecording(deviceId: string, path?: string): Promise<RecordStatus> {
+    return (await this.client.post<RecordStatus>(`/devices/${deviceId}/record/start`, path ? { path } : {})).data
+  }
+
+  async setRecordingPaused(deviceId: string, paused: boolean): Promise<RecordStatus> {
+    return (await this.client.post<RecordStatus>(`/devices/${deviceId}/record/${paused ? 'pause' : 'resume'}`)).data
+  }
+
+  async stopRecording(deviceId: string): Promise<RecordStatus> {
+    return (await this.client.post<RecordStatus>(`/devices/${deviceId}/record/stop`)).data
+  }
+
+  /** Open a recording that already sits on the server. */
+  async loadRecording(path: string): Promise<DeviceInfo> {
+    return (await this.client.post<DeviceInfo>('/playback/load', { path })).data
+  }
+
+  /** Send a recording from the browser to the server's recordings folder and open it. */
+  async uploadRecording(file: File): Promise<DeviceInfo> {
+    const form = new FormData()
+    form.append('file', file)
+    return (await this.client.post<DeviceInfo>('/playback/upload', form, { headers: { 'Content-Type': undefined as unknown as string } })).data
+  }
+
+  async listRecordings(): Promise<RecordingFile[]> {
+    return (await this.client.get<RecordingFile[]>('/playback/files')).data
+  }
+
+  async getPlaybackStatus(deviceId: string): Promise<PlaybackStatus> {
+    return (await this.client.get<PlaybackStatus>(`/playback/${deviceId}`)).data
+  }
+
+  async playbackControl(deviceId: string, action: PlaybackActionName, value?: number): Promise<PlaybackStatus> {
+    return (await this.client.post<PlaybackStatus>(`/playback/${deviceId}`, { action, value })).data
+  }
+
+  async unloadRecording(deviceId: string): Promise<void> {
+    await this.client.delete(`/playback/${deviceId}`)
   }
 
   // ============ Jobs ============

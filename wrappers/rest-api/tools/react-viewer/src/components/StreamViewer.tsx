@@ -14,6 +14,7 @@ import type { DeviceState, StreamConfig, StreamMetadata } from '../api/types'
 // A stream with its device context
 interface DeviceStream {
   paused: boolean
+  recording?: boolean
   metadataServerTime?: number
   deviceId: string
   deviceName: string
@@ -50,6 +51,7 @@ export function StreamViewer() {
           metadata: ds.streamMetadata[config.stream_type],
           paused: !!sensorStatus?.paused,
           metadataServerTime: ds.metadataServerTime,
+          recording: !!ds.record?.recording && !ds.record.paused,
         })
       })
     })
@@ -151,6 +153,7 @@ export function StreamViewer() {
                 pause={{ deviceId: stream.deviceId, sensorId: stream.config.sensor_id, paused: stream.paused }}
                 metadataServerTime={stream.metadataServerTime}
                 maximize={maximize}
+                recording={stream.recording}
               />
             )
           })}
@@ -234,10 +237,11 @@ interface StreamTileProps {
   pause?: PauseState
   metadataServerTime?: number
   maximize?: MaximizeState
+  recording?: boolean
 }
 
 function StreamTile({
-  deviceId, sensorId, deviceName, serialNumber, streamType, format, showDeviceName, metadata, pause, metadataServerTime, maximize,
+  deviceId, sensorId, deviceName, serialNumber, streamType, format, showDeviceName, metadata, pause, metadataServerTime, maximize, recording,
 }: StreamTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -592,6 +596,12 @@ function StreamTile({
         <div className="absolute border-2 border-dashed border-white pointer-events-none"
           style={{ left: Math.min(roiDrag.x0, roiDrag.x1), top: Math.min(roiDrag.y0, roiDrag.y1),
             width: Math.abs(roiDrag.x1 - roiDrag.x0), height: Math.abs(roiDrag.y1 - roiDrag.y0) }} />
+      )}
+
+      {recording && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/70 rounded text-red-500 text-xs font-bold animate-pulse pointer-events-none">
+          ● REC
+        </div>
       )}
 
       {/* Stream state overlays, as the legacy viewer draws over a tile */}

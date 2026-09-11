@@ -14,6 +14,7 @@ import type {
   FirmwareState,
   SensorStreamConfig,
   SensorConfig,
+  PlaybackActionName,
 } from '../api/types'
 
 // Map to track pending stop operations by "deviceId:sensorId" key
@@ -201,6 +202,16 @@ interface AppState {
   startSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
   stopSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
   setSensorPaused: (deviceId: string, sensorId: string, paused: boolean) => Promise<void>
+
+  // Record / playback
+  startRecording: (deviceId: string) => Promise<void>
+  setRecordingPaused: (deviceId: string, paused: boolean) => Promise<void>
+  stopRecording: (deviceId: string) => Promise<void>
+  loadRecording: (path: string) => Promise<void>
+  uploadRecording: (file: File) => Promise<void>
+  unloadRecording: (deviceId: string) => Promise<void>
+  refreshPlayback: (deviceId: string) => Promise<void>
+  playbackControl: (deviceId: string, action: PlaybackActionName, value?: number) => Promise<void>
   /** Space in the legacy viewer: pause every streaming sensor, or resume them all. */
   togglePauseAll: () => Promise<void>
 
@@ -670,6 +681,69 @@ export const useAppStore = create<AppState>()((set, get) => ({
         ({ sensorStreamingStatus: { ...ds.sensorStreamingStatus, [sensorId]: status } })))
     } catch (error) {
       set({ error: `Failed to ${paused ? 'pause' : 'resume'} sensor: ${error instanceof Error ? error.message : 'unknown error'}` })
+    }
+  },
+
+  startRecording: async (deviceId) => {
+    try {
+      const record = await apiClient.startRecording(deviceId)
+      set((s) => patchDevice(s, deviceId, () => ({ record })))
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to start recording: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  setRecordingPaused: async (deviceId, paused) => {
+    const record = await apiClient.setRecordingPaused(deviceId, paused)
+    set((s) => patchDevice(s, deviceId, () => ({ record })))
+  },
+
+  stopRecording: async (deviceId) => {
+    const record = await apiClient.stopRecording(deviceId)
+    set((s) => patchDevice(s, deviceId, () => ({ record })))
+  },
+
+  loadRecording: async (path) => {
+    try {
+      await apiClient.loadRecording(path)
+      await get().fetchDevices(true) // the recording shows up as a device
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to load recording: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  uploadRecording: async (file) => {
+    try {
+      await apiClient.uploadRecording(file)
+      await get().fetchDevices(true)
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to load recording: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  unloadRecording: async (deviceId) => {
+    await apiClient.unloadRecording(deviceId)
+    await get().fetchDevices(true)
+  },
+
+  refreshPlayback: async (deviceId) => {
+    try {
+      const playback = await apiClient.getPlaybackStatus(deviceId)
+      set((s) => patchDevice(s, deviceId, () => ({ playback })))
+    } catch {
+      // the recording may just have been closed
+    }
+  },
+
+  playbackControl: async (deviceId, action, value) => {
+    try {
+      const playback = await apiClient.playbackControl(deviceId, action, value)
+      set((s) => patchDevice(s, deviceId, () => ({ playback })))
+    } catch (error) {
+      set({ error: `Playback ${action} failed: ${error instanceof Error ? error.message : 'unknown error'}` })
     }
   },
 

@@ -13,7 +13,7 @@ import { socketService } from './api/socket'
 import { installShortcuts } from './utils/shortcuts'
 
 function App() {
-  const { viewMode, isConnected, getDeviceStates } = useAppStore()
+  const { viewMode, isConnected, getDeviceStates, uploadRecording } = useAppStore()
 
   const hasActiveDevices = getDeviceStates().length > 0
 
@@ -39,7 +39,14 @@ function App() {
   }, [])
 
   return (
-    <div className="h-screen bg-rs-darker flex flex-col overflow-hidden">
+    <div
+      className="h-screen bg-rs-darker flex flex-col overflow-hidden"
+      onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) e.preventDefault() }}
+      onDrop={(e) => {
+        const file = e.dataTransfer.files[0]
+        if (file && /\.(bag|db3)$/i.test(file.name)) { e.preventDefault(); void uploadRecording(file) }
+      }}
+    >
       {/* What's New Modal */}
       <WhatsNew />
       

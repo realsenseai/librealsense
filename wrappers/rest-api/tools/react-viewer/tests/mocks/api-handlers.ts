@@ -14,6 +14,27 @@ const sensorOptionsMap: Record<string, any[]> = {
 
 export const handlers = [
   http.get(`${API_BASE}/jobs/`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/devices/:deviceId/record/`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, recording: false, paused: false, file: null })),
+  http.post(`${API_BASE}/devices/:deviceId/record/start`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, recording: true, paused: false, file: 'C:/recs/clip.db3' })),
+  http.post(`${API_BASE}/devices/:deviceId/record/pause`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, recording: true, paused: true, file: 'C:/recs/clip.db3' })),
+  http.post(`${API_BASE}/devices/:deviceId/record/resume`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, recording: true, paused: false, file: 'C:/recs/clip.db3' })),
+  http.post(`${API_BASE}/devices/:deviceId/record/stop`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, recording: false, paused: false, file: 'C:/recs/clip.db3' })),
+  http.get(`${API_BASE}/playback/files`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/playback/:deviceId`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, file_name: 'C:/recs/clip.db3', state: 'paused', position_ns: 1_500_000_000, duration_ns: 4_000_000_000, speed: 1, repeat: false })),
+  http.post(`${API_BASE}/playback/:deviceId`, async ({ params, request }) => {
+    const body = (await request.json()) as { action: string; value?: number }
+    const state = body.action === 'play' ? 'playing' : body.action === 'stop' ? 'stopped' : 'paused'
+    return HttpResponse.json({ device_id: params.deviceId, file_name: 'C:/recs/clip.db3', state,
+      position_ns: body.action === 'seek' ? body.value : body.action === 'stop' ? 0 : 1_500_000_000, duration_ns: 4_000_000_000,
+      speed: body.action === 'speed' ? body.value : 1, repeat: body.action === 'repeat' ? !!body.value : false })
+  }),
+  http.delete(`${API_BASE}/playback/:deviceId`, ({ params }) => HttpResponse.json({ unloaded: params.deviceId })),
   http.get(`${API_BASE}/settings/`, () => HttpResponse.json(mockSettings)),
   http.put(`${API_BASE}/settings/`, async ({ request }) => {
     const patch = (await request.json()) as Record<string, Record<string, unknown>>

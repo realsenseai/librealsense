@@ -239,6 +239,39 @@ describe('DevicePanel', () => {
     })
   })
 
+  describe('Record and playback', () => {
+    it('offers Record while streaming and switches to pause/stop once recording', async () => {
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, { isStreaming: true })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } } })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Record' }))
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Pause recording' })).toBeInTheDocument())
+      await userEvent.click(screen.getByRole('button', { name: 'Stop recording' }))
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument())
+    })
+
+    it('disables Record while nothing streams', () => {
+      const device = createMockDevice()
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } } })
+      expect(screen.getByRole('button', { name: 'Record' })).toBeDisabled()
+    })
+
+    it('shows the transport, a Playback badge and no Record button for a recording', async () => {
+      const device = createMockDevice({ device_id: 'playback-clip.db3', is_playback: true, file_name: 'C:/recs/clip.db3' })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } } })
+      expect(screen.getByText('Playback')).toBeInTheDocument()
+      expect(await screen.findByTestId('playback-transport')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument()
+    })
+
+    it('has a Load Recorded Sequence button in the header', () => {
+      render(<DevicePanel />)
+      expect(screen.getByRole('button', { name: 'Load recorded sequence' })).toBeInTheDocument()
+    })
+  })
+
   describe('Device details', () => {
     it('lists every camera info field behind a toggle', async () => {
       const device = createMockDevice({ info: { name: 'RealSense D455', serial_number: '123', usb_type_descriptor: '3.2', product_line: 'D400' } })

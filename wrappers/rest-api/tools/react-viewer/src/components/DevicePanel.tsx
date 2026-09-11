@@ -8,6 +8,8 @@ import { FirmwareProgressModal } from './FirmwareProgressModal'
 import { ToastContainer, type ToastType, type ToastAction } from './Toast'
 import { searchGroup } from '../utils/optionSearch'
 import { unsupportedStreams } from '../utils/streamModes'
+import { Transport } from './playback/Transport'
+import { RecordButton } from './record/RecordButton'
 import { lessScreamy } from '../utils/metadataDecoders'
 import { Collapsible, ToggleSwitch } from './Collapsible'
 
@@ -140,7 +142,9 @@ export function DevicePanel() {
     updateFirmwareFromFile,
     updateFirmwareFromRecommended,
     toggleAdvancedMode,
+    uploadRecording,
   } = useAppStore()
+  const recordingPicker = useFilePicker((file) => void uploadRecording(file), '.bag,.db3')
 
   const [toasts, setToasts] = useState<Toast[]>([])
   // Only one FW update can run at a time, so a single-value state is enough.
@@ -256,8 +260,20 @@ export function DevicePanel() {
 
   return (
     <div className="p-4">
+      {recordingPicker.input}
       <div className="flex items-center justify-between mb-4">
         <h2 className="panel-header mb-0">Devices</h2>
+        <div className="flex items-center gap-1">
+        <button
+          onClick={() => recordingPicker.open()}
+          aria-label="Load recorded sequence"
+          title="Load Recorded Sequence (.bag / .db3)"
+          className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+          </svg>
+        </button>
         <button
           onClick={() => fetchDevices(true)}
           disabled={isLoadingDevices}
@@ -268,6 +284,7 @@ export function DevicePanel() {
         >
           <RefreshCcw className={`w-5 h-5 ${isLoadingDevices ? 'animate-spin' : ''}`} />
         </button>
+        </div>
       </div>
 
       {/* Error Display */}
@@ -415,10 +432,14 @@ function DeviceCard({
       <div className="p-3">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-white truncate">{device.name}</h3>
+            <h3 className="font-semibold text-white truncate">
+              {device.is_playback && <span className="mr-1 px-1 rounded bg-purple-700 text-[10px] uppercase align-middle">Playback</span>}
+              {device.name}
+            </h3>
             <p className="text-sm text-gray-400 truncate">S/N: {device.serial_number}</p>
           </div>
           <div className="flex items-center gap-2 ml-2">
+            {!device.is_playback && <RecordButton deviceId={device.device_id} streaming={isStreaming} />}
             {isStreaming && (
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Streaming" />
             )}
@@ -590,6 +611,8 @@ function DeviceCard({
           </div>
         )}
       </div>
+
+      {device.is_playback && <Transport deviceId={device.device_id} />}
 
       {!isLoading && (
         <div className="border-t border-gray-700 p-3 space-y-1.5">
