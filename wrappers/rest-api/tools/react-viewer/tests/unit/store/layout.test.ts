@@ -16,6 +16,19 @@ describe('layout store', () => {
     expect(orderKeys(['d:depth', 'd:color', 'd:gyro'], ['d:color', 'd:depth', 'd:stale'])).toEqual(['d:color', 'd:depth', 'd:gyro'])
   })
 
+  it('slots a stream started later into its legacy place, not ahead of the video tiles', () => {
+    // The camera once ran motion only and the tiles were rearranged then; depth and colour
+    // started afterwards must still come first.
+    expect(orderKeys(['d:depth', 'd:color', 'd:accel', 'd:gyro'], ['d:accel', 'd:gyro']))
+      .toEqual(['d:depth', 'd:color', 'd:accel', 'd:gyro'])
+  })
+
+  it('forgets a rearrangement on reset', () => {
+    useLayoutStore.getState().swapTiles('d', 'd:depth', 'd:color', ['d:depth', 'd:color'])
+    useLayoutStore.getState().resetTileOrder('d')
+    expect(useLayoutStore.getState().tileOrder.d).toBeUndefined()
+  })
+
   it('swaps two tiles and remembers the arrangement per device', () => {
     const present = [tileKey('d', 'Depth'), tileKey('d', 'Color'), tileKey('d', 'Infrared-1')]
     useLayoutStore.getState().swapTiles('d', 'd:depth', 'd:infrared-1', present)

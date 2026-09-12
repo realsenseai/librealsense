@@ -21,6 +21,8 @@ interface LayoutState {
   maximized: string | null
   swapTiles: (deviceId: string, a: string, b: string, present: string[]) => void
   setMaximized: (key: string | null) => void
+  /** Forget a rearrangement and go back to the legacy order (all cameras when no id). */
+  resetTileOrder: (deviceId?: string) => void
 }
 
 /**
@@ -43,6 +45,14 @@ export const useLayoutStore = create<LayoutState>()(
         }),
 
       setMaximized: (key) => set({ maximized: key }),
+
+      resetTileOrder: (deviceId) =>
+        set((s) => {
+          if (!deviceId) return { tileOrder: {} }
+          const tileOrder = { ...s.tileOrder }
+          delete tileOrder[deviceId]
+          return { tileOrder }
+        }),
     }),
     { name: 'rs-viewer-layout', partialize: (s) => ({ tileOrder: s.tileOrder }) },
   ),
@@ -54,5 +64,13 @@ export function orderKeys(present: string[], remembered: string[] = []): string[
   const rest = present
     .filter((k) => !known.includes(k))
     .sort((x, y) => rank(x.split(':')[1]) - rank(y.split(':')[1]) || x.localeCompare(y))
-  return [...known, ...rest]
+  // A stream started after the user last rearranged belongs where the legacy order puts it,
+  // not behind every tile that was open back then: a camera whose motion tiles were once the
+  // only ones running must not keep showing them ahead of depth and colour.
+  const ordered = [...known]
+  for (const key of rest) {
+    const at = ordered.findIndex((k) => rank(k.split(':')[1]) > rank(key.split(':')[1]))
+    ordered.splice(at < 0 ? ordered.length : at, 0, key)
+  }
+  return ordered
 }

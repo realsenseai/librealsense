@@ -174,6 +174,30 @@ describe('StreamViewer', () => {
       expect(labels).toEqual(['color', 'depth'])
     })
 
+    it('rearranges only when the drag starts on the stream label', () => {
+      const ds = twoStreams()
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+      const tile = screen.getAllByTestId('stream-tile')[0]
+      const body = tile.querySelector('video') as HTMLElement
+      const label = tile.querySelector('[data-tile-drag-handle]') as HTMLElement
+
+      // A press on the image is the start of an ROI rectangle or a pan; letting the browser
+      // drag the tile there swallows the mouseup and with it the click.
+      fireEvent.mouseDown(body)
+      expect(fireEvent.dragStart(tile)).toBe(false)
+
+      fireEvent.mouseDown(label)
+      expect(fireEvent.dragStart(tile)).toBe(true)
+    })
+
+    it('gives every row an equal share whatever a tile would rather be', () => {
+      const ds = twoStreams()
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+      const grid = screen.getAllByTestId('stream-tile')[0].parentElement as HTMLElement
+      expect(grid.style.gridTemplateRows).toBe('repeat(1, minmax(0, 1fr))')
+      expect(grid.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))')
+    })
+
     it('maximizes one tile and restores the grid', async () => {
       const ds = twoStreams()
       render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
@@ -240,6 +264,30 @@ describe('StreamViewer', () => {
       } finally {
         HTMLElement.prototype.getBoundingClientRect = original
       }
+    })
+  })
+
+  describe('ROI probe', () => {
+    it('retries after a failed read so a sensor that was still starting still gets the button', async () => {
+      let calls = 0
+      server.use(http.get('/api/v1/devices/:deviceId/sensors/:sensorId/roi', () =>
+        ++calls === 1
+          ? new HttpResponse(null, { status: 500 })
+          : HttpResponse.json({ supported: true, min_x: 0, min_y: 0, max_x: 639, max_y: 479 })))
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, {
+        streamConfigs: [createMockStreamConfig({ enable: true })],
+        isStreaming: true,
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth'] },
+        },
+      })
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: ds } } })
+
+      // The first read fails while the sensor is still coming up; the button must not be
+      // gone for the rest of the session.
+      await expect(screen.findByRole('button', { name: 'Set auto-exposure ROI' }, { timeout: 5000 })).resolves.toBeInTheDocument()
+      expect(calls).toBeGreaterThan(1)
     })
   })
 
@@ -339,6 +387,27 @@ describe('StreamViewer', () => {
         fireEvent.wheel(tile, { deltaY: 100, clientX: 320, clientY: 240 })
         await waitFor(() => expect(video.style.transform).toBe(''))
         expect(screen.queryByTestId('zoom-preview')).not.toBeInTheDocument()
+      } finally {
+        HTMLElement.prototype.getBoundingClientRect = original
+      }
+    })
+
+    it('offers zoom buttons that say what the wheel does', async () => {
+      const original = HTMLElement.prototype.getBoundingClientRect
+      HTMLElement.prototype.getBoundingClientRect = rect640
+      try {
+        const ds = streaming()
+        render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+        const level = await screen.findByTestId('zoom-level')
+        expect(level).toHaveTextContent('100%')
+        expect(screen.getByRole('button', { name: 'Zoom out' })).toBeDisabled()
+
+        await userEvent.click(screen.getByRole('button', { name: 'Zoom in' }))
+        await waitFor(() => expect(level).toHaveTextContent('110%'))
+        expect(screen.getByRole('button', { name: 'Zoom out' })).toBeEnabled()
+
+        await userEvent.click(level) // the readout is the reset
+        await waitFor(() => expect(level).toHaveTextContent('100%'))
       } finally {
         HTMLElement.prototype.getBoundingClientRect = original
       }
@@ -505,6 +574,44 @@ describe('StreamViewer', () => {
 
       expect(screen.getByText('Nothing is streaming!')).toBeInTheDocument()
       expect(document.querySelector('video.stream-video')).toBeNull()
+    })
+  })
+
+  describe('Motion tiles', () => {
+    const motionState = (metadata?: Record<string, unknown>) => {
+      const device = createMockDevice()
+      return createMockDeviceState(device, {
+        streamConfigs: [
+          createMockStreamConfig({ stream_type: 'depth', enable: true }),
+          createMockStreamConfig({ stream_type: 'gyro', format: 'MOTION_XYZ32F', sensor_id: 'test-device-1-sensor-2', enable: true }),
+        ],
+        isStreaming: true,
+        sensorStreamingStatus: {
+          'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth'] },
+          'test-device-1-sensor-2': { sensor_id: 'test-device-1-sensor-2', name: '', is_streaming: true, stream_types: ['gyro'] },
+        },
+        streamMetadata: metadata as never,
+      })
+    }
+
+    it('shows the sample carried by the frame before any history has built up', () => {
+      const ds = motionState({ gyro: { stream_type: 'gyro', frame_number: 3, width: 0, height: 0, motion_data: { x: 0.25, y: -0.5, z: 1.5 } } })
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds }, imuHistory: { accel: [], gyro: [] } } })
+
+      const tile = screen.getAllByTestId('stream-tile').find((t) => t.textContent?.includes('GYRO'))!
+      expect(tile).toHaveTextContent('0.250')
+      expect(tile).toHaveTextContent('-0.500')
+      expect(tile).not.toHaveTextContent('Waiting for data')
+    })
+
+    it('keeps the motion tile behind the video tiles and gives it no more room', () => {
+      const ds = motionState({ depth: { stream_type: 'depth', frame_number: 1, width: 640, height: 480 } })
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+      const tiles = screen.getAllByTestId('stream-tile')
+      expect(tiles[0]).toHaveTextContent('DEPTH')
+      expect(tiles[1]).toHaveTextContent('GYRO')
+      // Every tile is told to fill its cell; a taller readout must not grow the row.
+      expect(tiles.every((t) => t.className.includes('h-full'))).toBe(true)
     })
   })
 

@@ -12,6 +12,9 @@ import type { RegionOfInterest } from '../api/types'
 import { formatDistance } from '../utils/units'
 import type { DeviceState, StreamConfig, StreamMetadata } from '../api/types'
 
+/** Marks the one element a tile may be dragged by (the stream label). */
+const DRAG_HANDLE = 'data-tile-drag-handle'
+
 // A stream with its device context
 interface DeviceStream {
   paused: boolean
@@ -30,6 +33,7 @@ export function StreamViewer() {
   const { deviceStates } = useAppStore()
   const { tileOrder, maximized, swapTiles, setMaximized } = useLayoutStore()
   const [dragging, setDragging] = useState<string | null>(null)
+  const dragArmed = useRef(false)
   
   // Collect all enabled streams from all active devices; hide tiles until they actually stream.
   const activeStreams = useMemo(() => {
@@ -83,11 +87,15 @@ export function StreamViewer() {
         key={key}
         data-testid="stream-tile"
         draggable={!maximizedStream}
-        onDragStart={() => setDragging(key)}
+        // Only the stream label starts a rearrange. Anywhere else the press belongs to the
+        // tile itself (drawing an ROI, panning a zoomed frame, a header button): a native
+        // drag there would steal the mouseup and the click with it.
+        onMouseDown={(e) => { dragArmed.current = !!(e.target as HTMLElement).closest?.(`[${DRAG_HANDLE}]`) }}
+        onDragStart={(e) => { if (!dragArmed.current) { e.preventDefault(); return } setDragging(key) }}
         onDragOver={(e) => { if (dragging && dragging !== key) e.preventDefault() }}
         onDrop={() => { if (dragging) swapTiles(stream.deviceId, dragging, key, present); setDragging(null) }}
-        onDragEnd={() => setDragging(null)}
-        className={`min-h-0 ${dragging === key ? 'opacity-50' : ''}`}
+        onDragEnd={() => { dragArmed.current = false; setDragging(null) }}
+        className={`min-h-0 min-w-0 h-full ${dragging === key ? 'opacity-50' : ''}`}
       >
         {child}
       </div>
@@ -120,8 +128,10 @@ export function StreamViewer() {
         <div
           className="h-full grid gap-2"
           style={{
-            gridTemplateColumns: `repeat(${Math.min(shown.length, 2)}, 1fr)`,
-            gridTemplateRows: `repeat(${Math.ceil(shown.length / 2)}, 1fr)`,
+            // minmax(0, 1fr) and not 1fr: a tile whose content is taller than its share
+            // (the IMU readout) would otherwise stretch its row and squash the video rows.
+            gridTemplateColumns: `repeat(${Math.min(shown.length, 2)}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${Math.ceil(shown.length / 2)}, minmax(0, 1fr))`,
           }}
         >
           {shown.map((stream) => {
@@ -286,12 +296,24 @@ function StreamTile({
   const stalled = !pause?.paused && !playbackIdle && metadata?.received_at !== undefined && metadataServerTime !== undefined
     && metadataServerTime - metadata.received_at > STALE_AFTER_S
 
+  // The sensor is starting as this tile mounts, and the SDK refuses the region until it
+  // runs. One failed read must not hide the ROI button for the rest of the session, so a
+  // failure is retried a few times; a sensor that answers "not supported" is taken at its word.
   useEffect(() => {
     let cancelled = false
-    apiClient.getRoi(deviceId, sensorId)
-      .then((r) => { if (!cancelled) setRoi(r) })
-      .catch(() => { if (!cancelled) setRoi({ supported: false }) })
-    return () => { cancelled = true }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let attempt = 0
+    const probe = () => {
+      apiClient.getRoi(deviceId, sensorId)
+        .then((r) => { if (!cancelled) setRoi(r) })
+        .catch(() => {
+          if (cancelled) return
+          setRoi({ supported: false })
+          if (attempt++ < 5) timer = setTimeout(probe, 1500)
+        })
+    }
+    probe()
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
   }, [deviceId, sensorId])
 
   const tileSize = () => {
@@ -591,7 +613,7 @@ function StreamTile({
   return (
     <div 
       ref={containerRef}
-      className="relative bg-black rounded-lg overflow-hidden"
+      className="relative h-full bg-black rounded-lg overflow-hidden"
       onMouseMove={(e) => {
         if (roiMode) roiMouse.onMouseMove(e)
         else { panMouse.onMouseMove(e); if (isDepthStream) handleMouseMove(e) }
@@ -658,9 +680,11 @@ function StreamTile({
         </div>
       )}
 
-      {/* Stream Label */}
+      {/* Stream label, and the only grip that rearranges tiles */}
       <div
-        className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} left-2 px-2 py-1 rounded text-xs font-semibold text-white ${getStreamColor(
+        {...{ [DRAG_HANDLE]: true }}
+        title="Drag to rearrange the tiles"
+        className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} left-2 px-2 py-1 rounded text-xs font-semibold text-white cursor-move select-none ${getStreamColor(
           streamType
         )}`}
       >
@@ -678,11 +702,25 @@ function StreamTile({
         // Clicks on the header buttons must not reach the tile's ROI / pan drag handlers: a
         // mouseup there ends ROI mode and unmounts the button before its click is delivered.
         onMouseDown={(e) => e.stopPropagation()} onMouseUp={(e) => e.stopPropagation()}>
+        {/* Zoom, which the legacy viewer only offers on the wheel: the readout says the
+            current factor and resets on click, so the feature is visible without guessing. */}
+        <div className="flex items-center rounded border border-gray-600 bg-black/60 overflow-hidden z-20">
+          <button type="button" aria-label="Zoom out" title="Zoom out (or scroll down over the image)"
+            className="px-1.5 py-1 text-xs text-white hover:bg-black/80 disabled:opacity-40"
+            disabled={!zoomed}
+            onClick={() => setZoom((z) => zoomAt(z, 0.5, 0.5, 1 + WHEEL_STEP))}>−</button>
+          <button type="button" aria-label="Reset zoom" title="Reset zoom to the whole frame"
+            data-testid="zoom-level" className="px-1 py-1 text-xs text-white hover:bg-black/80 tabular-nums"
+            onClick={() => setZoom(FULL_FRAME)}>{Math.round(100 / zoom.w)}%</button>
+          <button type="button" aria-label="Zoom in" title="Zoom in (or scroll up over the image)"
+            className="px-1.5 py-1 text-xs text-white hover:bg-black/80"
+            onClick={() => setZoom((z) => zoomAt(z, 0.5, 0.5, 1 / (1 + WHEEL_STEP)))}>+</button>
+        </div>
         {roi?.supported && (
           <button
             type="button"
             onClick={() => setRoiMode((m) => !m)}
-            title={roiMode ? 'Drag a rectangle to set the auto-exposure ROI' : 'Set auto-exposure ROI'}
+            title={roiMode ? 'Now drag a rectangle over the image' : 'Set auto-exposure ROI: click, then drag a rectangle over the image'}
             aria-label="Set auto-exposure ROI"
             aria-pressed={roiMode}
             className={`px-2 py-1 rounded text-xs border border-gray-600 z-20 ${roiMode ? 'bg-yellow-600 text-black' : 'bg-black/60 hover:bg-black/80 text-white'}`}
@@ -816,7 +854,9 @@ function IMUStreamTile({ deviceId, streamType, showDeviceName, deviceName, seria
   const isAccel = streamType.toLowerCase() === 'accel'
   
   const data = isGyro ? imuHistory.gyro : isAccel ? imuHistory.accel : []
-  const latest = data[data.length - 1]
+  // The history is filled from the metadata broadcast; the frame's own sample is the
+  // fallback so a tile shows numbers from the first frame, not "waiting".
+  const latest = data[data.length - 1] ?? metadata?.motion_data
   
   // Calculate magnitude
   const magnitude = latest 
@@ -840,11 +880,12 @@ function IMUStreamTile({ deviceId, streamType, showDeviceName, deviceName, seria
   }
   
   return (
-    <div className={`relative rounded-lg overflow-hidden ${colors.bg} border ${colors.border} flex flex-col`}>
+    <div className={`relative h-full rounded-lg overflow-hidden ${colors.bg} border ${colors.border} flex flex-col`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 bg-black/30">
+      <div className="flex items-center justify-between px-3 py-2 bg-black/30 shrink-0">
         <div className="flex items-center gap-2">
-          <span className={`font-semibold ${colors.text}`}>
+          <span {...{ [DRAG_HANDLE]: true }} title="Drag to rearrange the tiles"
+            className={`font-semibold cursor-move select-none ${colors.text}`}>
             {streamType.toUpperCase()}
           </span>
           <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -872,10 +913,11 @@ function IMUStreamTile({ deviceId, streamType, showDeviceName, deviceName, seria
       )}
       
       {/* Content */}
-      <div className="flex-1 flex flex-col justify-center p-4">
+      <div className="flex-1 min-h-0 overflow-auto flex flex-col justify-center p-4">
         {!latest ? (
           <div className="text-center text-gray-500">
-            <p>Waiting for data...</p>
+            <p>Waiting for data…</p>
+            <p className="text-xs mt-1">The {unit} samples arrive with the frame metadata.</p>
           </div>
         ) : (
           <>
@@ -1034,18 +1076,20 @@ export function MetadataPanel({ metadata, streamType, deviceName, fps, show, onT
     metadata.timestamp !== undefined ||
     Object.keys(metadata.frame_metadata ?? {}).length > 0
   )
-  if (!hasMetadata) return null
+  // The button stays on the tile even before a frame carries metadata - it disappearing is
+  // indistinguishable from the viewer not having the feature at all.
   return (
     <>
       <button
         type="button"
-        onClick={() => onToggle(!show)}
-        title={show ? 'Hide frame metadata' : 'Show frame metadata'}
-        className={`px-2 py-0.5 bg-black/60 hover:bg-black/80 rounded text-xs text-white border border-gray-600 z-20 ${buttonClassName}`}
+        onClick={() => hasMetadata && onToggle(!show)}
+        disabled={!hasMetadata}
+        title={!hasMetadata ? 'No frame metadata yet' : show ? 'Hide frame metadata' : 'Show frame metadata'}
+        className={`px-2 py-0.5 bg-black/60 rounded text-xs text-white border border-gray-600 z-20 ${hasMetadata ? 'hover:bg-black/80' : 'opacity-40 cursor-not-allowed'} ${buttonClassName}`}
       >
-        {show ? '✕' : 'Metadata'}
+        {show && hasMetadata ? '✕' : 'Metadata'}
       </button>
-      {show && <MetadataOverlay streamType={streamType} metadata={metadata!} fps={fps} deviceName={deviceName} />}
+      {show && hasMetadata && <MetadataOverlay streamType={streamType} metadata={metadata!} fps={fps} deviceName={deviceName} />}
     </>
   )
 }

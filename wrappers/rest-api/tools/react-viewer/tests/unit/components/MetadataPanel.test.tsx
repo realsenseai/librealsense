@@ -115,17 +115,24 @@ describe('MetadataOverlay', () => {
 })
 
 describe('MetadataPanel', () => {
-  it('renders nothing when no metadata at all', () => {
-    const { container } = render(
+  it('keeps the button but disables it until a frame carries metadata', () => {
+    const onToggle = vi.fn()
+    render(
       <MetadataPanel
         metadata={undefined}
         streamType="depth"
         fps={30}
         show={false}
-        onToggle={() => {}}
+        onToggle={onToggle}
       />,
     )
-    expect(container).toBeEmptyDOMElement()
+    // A button that disappears reads as "this viewer has no metadata", which is what the
+    // legacy viewer never does: it always offers the panel.
+    const button = screen.getByRole('button', { name: 'Metadata' })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', 'No frame metadata yet')
+    fireEvent.click(button)
+    expect(onToggle).not.toHaveBeenCalled()
   })
 
   it('renders toggle button with viewer info only (no frame_metadata keys)', () => {
