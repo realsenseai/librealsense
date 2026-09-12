@@ -42,6 +42,7 @@ option(ENFORCE_METADATA "Require WinSDK with Metadata support during compilation
 option(BUILD_PYTHON_BINDINGS "Build Python bindings" OFF)
 option(BUILD_LEGACY_PYBACKEND "Build deprecated Python backend bindings" OFF)
 option(BUILD_PYTHON_DOCS "Build Documentation for Python bindings" OFF)
+option(BUILD_REST_API "Build the REST API server's React viewer and Python environment (needs npm and python3)" OFF)
 option(BUILD_CSHARP_BINDINGS "Build C# bindings" OFF)
 option(BUILD_MATLAB_BINDINGS "Build Matlab bindings" OFF)
 option(BUILD_UNITY_BINDINGS "Copy the unity project to the build folder with the required dependencies" OFF)

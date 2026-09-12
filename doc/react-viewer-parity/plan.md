@@ -262,7 +262,7 @@ Enables everything after it. No user-visible parity except settings and multi-ca
 - [ ] **WP10.2 Installer + release flow** (RSDEV-14434, RSDEV-9390): Windows installer
   bundles REST API + viewer; Linux `.deb`/AppImage; Jenkins publish. 3 d.
 - [ ] **WP10.3 Platform matrix** (RSDEV-13547): Python 3.9–3.14, Jetson/aarch64. 2 d.
-- [ ] **WP10.4 CMake hook.** `BUILD_REST_API` option that builds the Python wheel + viewer
+- [x] **WP10.4 CMake hook.** `BUILD_REST_API` option that builds the Python wheel + viewer
   bundle into `build/` and installs alongside `realsense-viewer`. 1 d.
 
 ---
@@ -392,6 +392,11 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   1.5 frame periods is a drop, as output-model.cpp does) and ships them in the metadata
   `stats`; the output console gets a "Dashboard" panel with the last 30 seconds of drops per
   second and the delivered frame rate per stream.
+- WP10.4: `BUILD_REST_API` (CMake/lrs_options.cmake) adds `wrappers/rest-api/CMakeLists.txt`
+  with targets `rest-api-viewer` (npm ci, tsc + vite build, bundle into static/, part of
+  ALL), `rest-api-venv` (venv + requirements) and `rest-api` (both, after pyrealsense2 when
+  BUILD_PYTHON_BINDINGS is on), plus an install rule under share/realsense2/rest-api.
+  Configured and built on Windows with npm 10 and Python 3.14.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).
