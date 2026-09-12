@@ -35,7 +35,7 @@ class ConsoleMixin:
         if not dev.is_firmware_logger():
             raise RealSenseError(status_code=400, detail="Device does not expose firmware logs")
         xml_text = self._read_setting_file(self.settings.get().paths.hwlogger_xml)
-        collector = FwLogCollector(dev, device_id, self.console, self.option_lock(device_id), xml_text)
+        collector = FwLogCollector(dev, device_id, self.console, self.option_lock(device_id), xml_text, on_lost=self.device_lost)
         collector.start()
         self._fw_log_collectors[device_id] = collector
         return self.fw_logs_status(device_id)

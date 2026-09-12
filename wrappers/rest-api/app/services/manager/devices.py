@@ -8,6 +8,7 @@ import platform
 import time
 import contextlib
 import logging
+import threading
 from typing import Callable, Deque, Dict, List, Optional, Any, Tuple, Set
 import pyrealsense2 as rs
 from app.core.errors import RealSenseError
@@ -157,6 +158,68 @@ class DeviceRegistryMixin:
                 sensor.set_notifications_callback(on_notification)
             except RuntimeError as exc:
                 logging.debug("notifications unavailable on %s: %s", sensor_id, exc)
+
+    # The Windows backend reports a camera that went away underneath an open handle (USB
+    # suspend on sleep, a hub hiccup) with this text; the device-changed callback does not
+    # always follow, so the handle stays in the registry and every stream starts but never
+    # delivers a frame.
+    DEVICE_LOST_MARKERS = ("no longer present", "device is not connected", "0xc00d3ea2")
+
+    @staticmethod
+    def is_device_lost_error(exc: BaseException) -> bool:
+        text = str(exc).lower()
+        return any(marker in text for marker in DeviceRegistryMixin.DEVICE_LOST_MARKERS)
+
+    def device_lost(self, device_id: str, reason: str) -> None:
+        """Drop a device whose handle is dead and pick it up again from a fresh enumeration.
+
+        Runs on its own thread; safe to call from frame collectors and log pollers. Everything
+        that referenced the old handle is stopped first (collectors, firmware logs, playback
+        of the same id), the registry forgets the device and clients hear `devices_changed`;
+        once nothing of ours touches the SDK the context is enumerated and the camera, if it
+        is back, is registered as new.
+        """
+        with self.lock:
+            pending = getattr(self, "_lost_in_progress", None)
+            if pending is None:
+                pending = self._lost_in_progress = set()
+            if device_id in pending or device_id not in self.devices:
+                return
+            pending.add(device_id)
+        logging.warning("device %s lost (%s); recovering", device_id, reason)
+        threading.Thread(target=self._recover_lost_device, args=(device_id,), name=f"recover-{device_id}", daemon=True).start()
+
+    def _recover_lost_device(self, device_id: str) -> None:
+        try:
+            try:
+                self.stop_fw_logs(device_id)
+            except Exception as exc:
+                logging.debug("recover %s: fw logs: %s", device_id, exc)
+            for sensor_id in list(self.sensor_streams.get(device_id, {}).keys()):
+                try:
+                    self.stop_sensor(device_id, sensor_id)
+                except Exception as exc:
+                    logging.debug("recover %s: stop %s: %s", device_id, sensor_id, exc)
+            with self.lock:
+                self._remove_device(device_id)
+            self.metadata_socket_server.stop_broadcast(device_id)
+            self._emit_socket_event("devices_changed", {"added": [], "removed": [device_id]})
+            self.console.add("warn", f"Lost contact with {device_id}; looking for it again", "server", device_id=device_id)
+            time.sleep(1.0)  # let the OS finish re-attaching before enumerating
+            for attempt in range(5):
+                try:
+                    self._refresh_devices_locked()
+                except Exception as exc:
+                    logging.warning("recover %s: enumeration failed: %s", device_id, exc)
+                if device_id in self.devices:
+                    self._emit_socket_event("devices_changed", {"added": [device_id], "removed": []})
+                    self.console.add("info", f"{device_id} is back", "server", device_id=device_id)
+                    return
+                time.sleep(2.0)
+            self.console.add("error", f"{device_id} did not come back; replug the camera", "server", device_id=device_id)
+        finally:
+            with self.lock:
+                getattr(self, "_lost_in_progress", set()).discard(device_id)
 
     def _emit_socket_event(self, event: str, payload: Dict[str, Any]) -> None:
         """Emit a Socket.IO event from sync contexts using the main FastAPI event loop."""

@@ -71,6 +71,16 @@ async def get_stream_status(
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+@router.get("/metadata")
+async def get_stream_metadata(device_id: str, stream: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
+    """The newest frame's metadata for one stream, as the socket sends it (without frame data)."""
+    try:
+        metadata = await run_in_threadpool(rs_manager.get_latest_metadata, device_id, stream)
+    except Exception as e:
+        raise HTTPException(status_code=getattr(e, "status_code", 404), detail=str(getattr(e, "detail", e)))
+    return {k: v for k, v in dict(metadata).items() if k != "point_cloud"}
+
+
 @router.get("/snapshot")
 async def snapshot(
     device_id: str,

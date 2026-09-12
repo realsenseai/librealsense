@@ -168,6 +168,7 @@ class SensorStreamingMixin:
             )
 
     DEPTH_FRAME_MIN_INTERVAL_S = 1.0 / 15  # the 3D view does not need more than this
+    DEAD_STREAM_TIMEOUTS = 10  # consecutive 1 s waits with no frame ever -> the handle is dead
 
     def _emit_depth_frame(self, device_id: str, depth_frame) -> None:
         """Binary ``depth_frame`` socket event with the z16 pixels of a (filtered) depth frame."""
@@ -249,6 +250,12 @@ class SensorStreamingMixin:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 255), 1)
 
         metadata.update(self._build_viewer_info(info_source))
+        # "Hardware Size" is the sensor's, even when a filter (decimation) shrank the frame
+        try:
+            raw_profile = frame.get_profile().as_video_stream_profile()
+            metadata["hardware_width"], metadata["hardware_height"] = raw_profile.width(), raw_profile.height()
+        except Exception:
+            pass
         # Legacy "Frame Drops per Second" dashboard figures, per stream
         stats = getattr(self, "_frame_stats", None)
         if stats is None:
@@ -286,6 +293,8 @@ class SensorStreamingMixin:
         logging.info(f"[SENSOR] Frame collection thread started for {device_id}/{sensor_id} streams: {stream_types}")
 
         colorizer = self.colorizers[device_id]
+        timeouts_in_a_row = 0
+        got_any_frame = False
 
         try:
             while True:
@@ -302,6 +311,8 @@ class SensorStreamingMixin:
                 try:
                     # Wait for frame with timeout
                     frame = rs_queue.wait_for_frame(timeout_ms=1000)
+                    timeouts_in_a_row = 0
+                    got_any_frame = True
                     if not frame or sensor_info.get("paused"):
                         continue
                     
@@ -352,6 +363,16 @@ class SensorStreamingMixin:
                     self._publish_frames(device_id, (target_stream_type,))
 
                 except Exception as e:
+                    if self.is_device_lost_error(e):
+                        self.device_lost(device_id, str(e)[:120])
+                        break
+                    if "did not arrive" in str(e).lower() or "timeout" in str(e).lower():
+                        timeouts_in_a_row += 1
+                        # A sensor the SDK says is streaming but that never produced a frame is
+                        # a dead handle (seen after the machine slept); ten seconds is plenty.
+                        if not got_any_frame and timeouts_in_a_row >= self.DEAD_STREAM_TIMEOUTS:
+                            self.device_lost(device_id, f"{sensor_id} started but no frame arrived in {timeouts_in_a_row}s")
+                            break
                     if "timeout" not in str(e).lower():
                         # First occurrence per sensor and message at WARNING, repeats at DEBUG
                         seen = getattr(self, "_frame_errors_seen", None)

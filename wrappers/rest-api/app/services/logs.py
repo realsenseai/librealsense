@@ -189,10 +189,12 @@ class FwLogCollector:
     traffic, so it never races the option poller or a REST write.
     """
 
-    def __init__(self, dev, device_id: str, console: LogConsole, lock: threading.Lock, xml_text: Optional[str]):
+    def __init__(self, dev, device_id: str, console: LogConsole, lock: threading.Lock, xml_text: Optional[str],
+                 on_lost: Optional[Callable[[str, str], None]] = None):
         self.device_id = device_id
         self._console = console
         self._lock = lock
+        self._on_lost = on_lost
         self._logger = rs.firmware_logger(dev)
         self._parses = bool(xml_text) and self._logger.init_parser(xml_text)
         self._stop = threading.Event()
@@ -223,6 +225,12 @@ class FwLogCollector:
             try:
                 got = self.pull_once(flash=False)
             except RuntimeError as exc:
+                if "no longer present" in str(exc).lower() or "0xc00d3ea2" in str(exc).lower():
+                    logging.warning("fw logs on %s: device gone (%s); stopping", self.device_id, exc)
+                    self._stop.set()
+                    if self._on_lost:
+                        self._on_lost(self.device_id, str(exc)[:120])
+                    break
                 logging.debug("fw log pull failed on %s: %s", self.device_id, exc)
                 got = False
             if not got:
