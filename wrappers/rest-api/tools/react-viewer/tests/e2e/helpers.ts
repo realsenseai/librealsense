@@ -24,7 +24,7 @@ export function cameraCard(page: Page, serial: string): Locator {
 }
 
 /** The sensor module section that owns a stream toggle (module header + its Start/Stop). */
-function moduleOf(deviceCard: Locator, streamToggle: string): Locator {
+export function moduleOf(deviceCard: Locator, streamToggle: string): Locator {
   // The innermost div that holds both the toggle and the module's Start/Stop button
   const page = deviceCard.page()
   return deviceCard.locator('div')
