@@ -268,6 +268,23 @@ describe('DevicePanel', () => {
       expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument()
     })
 
+    it('names the recording controls instead of showing a bare red dot', async () => {
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, { isStreaming: true })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } } })
+
+      const pane = screen.getByTestId('recording-pane')
+      expect(pane).toHaveTextContent('Recording')
+      expect(screen.getByTestId('record-start')).toHaveTextContent('Record')
+
+      await userEvent.click(screen.getByTestId('record-start'))
+
+      // While it runs the pane says so, counts, and names the file it writes
+      await waitFor(() => expect(screen.getByTestId('record-indicator')).toHaveTextContent(/Recording 00:0\d/))
+      expect(screen.getByTestId('record-stop')).toHaveTextContent('Stop')
+      await waitFor(() => expect(screen.getByTestId('recording-pane')).toHaveTextContent(/Writing to: /))
+    })
+
     it('has a Load Recorded Sequence button in the header', () => {
       render(<DevicePanel />)
       expect(screen.getByRole('button', { name: 'Load recorded sequence' })).toBeInTheDocument()

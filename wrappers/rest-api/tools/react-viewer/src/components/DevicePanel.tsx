@@ -10,7 +10,7 @@ import { ToastContainer, type ToastType, type ToastAction } from './Toast'
 import { searchGroup } from '../utils/optionSearch'
 import { unsupportedStreams } from '../utils/streamModes'
 import { Transport } from './playback/Transport'
-import { RecordButton } from './record/RecordButton'
+import { RecordingPane } from './record/RecordingPane'
 import { UpdatesDialog } from './updates/UpdatesDialog'
 import { HdrDialog } from './hdr/HdrDialog'
 import { CalibrationDialog } from './calibration/CalibrationDialog'
@@ -280,12 +280,13 @@ export function DevicePanel() {
         <button
           onClick={() => recordingPicker.open()}
           aria-label="Load recorded sequence"
-          title="Load Recorded Sequence (.bag / .db3)"
-          className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+          title="Open a recorded sequence (.bag / .db3) and play it back as a device"
+          className="flex items-center gap-1 px-2 py-1 hover:bg-gray-700 rounded-lg transition-colors text-xs text-gray-200"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
           </svg>
+          Load recording
         </button>
         <button
           onClick={() => fetchDevices(true)}
@@ -495,7 +496,6 @@ function DeviceCard({
             <p className="text-sm text-gray-400 truncate">S/N: {device.serial_number}</p>
           </div>
           <div className="flex items-center gap-2 ml-2">
-            {!device.is_playback && <RecordButton deviceId={device.device_id} streaming={isStreaming} />}
             {isStreaming && (
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Streaming" />
             )}
@@ -741,7 +741,9 @@ function DeviceCard({
         )}
       </div>
 
-      {device.is_playback && <Transport deviceId={device.device_id} />}
+      {device.is_playback
+        ? <Transport deviceId={device.device_id} />
+        : <RecordingPane deviceId={device.device_id} streaming={isStreaming} />}
 
       {!isLoading && (
         <div className="border-t border-gray-700 p-3 space-y-1.5">
