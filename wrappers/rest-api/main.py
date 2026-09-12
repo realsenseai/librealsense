@@ -97,6 +97,23 @@ setup_exception_handlers(app)
 _static_dir = Path(__file__).resolve().parent / "static"
 if _static_dir.is_dir():
     from fastapi.staticfiles import StaticFiles
+    from starlette.routing import Match, Mount
+    from starlette.responses import RedirectResponse
+
+    @app.middleware("http")
+    async def _api_slash_redirect(request, call_next):
+        """With the viewer mounted at "/", Starlette's own trailing-slash redirect never fires
+        (the mount matches everything), so /api/v1/devices would 404 where /api/v1/devices/
+        works. Redirect unmatched API paths to their slash form, as before the mount."""
+        path = request.url.path
+        if path.startswith("/api/") and not path.endswith("/"):
+            for route in app.router.routes:
+                if not isinstance(route, Mount) and route.matches(request.scope)[0] == Match.FULL:
+                    break
+            else:
+                return RedirectResponse(url=str(request.url.replace(path=path + "/")), status_code=307)
+        return await call_next(request)
+
     app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="viewer")
 
 
