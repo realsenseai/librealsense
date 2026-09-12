@@ -355,6 +355,67 @@ describe('AppStore', () => {
     })
   })
 
+  describe('Sensor status pushed by the server', () => {
+    it('a stop done elsewhere turns the module idle and clears the device streaming flag', () => {
+      const device = createMockDevice()
+      const sensorId = `${device.device_id}-sensor-0`
+      useAppStore.setState({ deviceStates: { [device.device_id]: createMockDeviceState(device, {
+        isStreaming: true,
+        sensorStreamingStatus: { [sensorId]: { sensor_id: sensorId, name: 'Stereo Module', is_streaming: true, stream_types: ['depth'] } },
+      }) } })
+
+      useAppStore.getState().applySensorStatus(device.device_id, sensorId, { sensor_id: sensorId, name: 'Stereo Module', is_streaming: false })
+
+      const ds = useAppStore.getState().deviceStates[device.device_id]
+      expect(ds.sensorStreamingStatus[sensorId].is_streaming).toBe(false)
+      expect(ds.isStreaming).toBe(false)
+    })
+
+    it('a start done elsewhere shows the module streaming', () => {
+      const device = createMockDevice()
+      const sensorId = `${device.device_id}-sensor-1`
+      useAppStore.setState({ deviceStates: { [device.device_id]: createMockDeviceState(device) } })
+
+      useAppStore.getState().applySensorStatus(device.device_id, sensorId, { sensor_id: sensorId, name: 'RGB Camera', is_streaming: true, stream_types: ['color'] })
+
+      const ds = useAppStore.getState().deviceStates[device.device_id]
+      expect(ds.sensorStreamingStatus[sensorId].is_streaming).toBe(true)
+      expect(ds.isStreaming).toBe(true)
+    })
+  })
+
+  describe('Start while a start is pending', () => {
+    it('sends one start request for two quick clicks and marks the sensor as starting', async () => {
+      const device = createMockDevice()
+      const sensorId = `${device.device_id}-sensor-0`
+      let starts = 0
+      let release: () => void = () => undefined
+      server.use(http.post(`/api/v1/devices/${device.device_id}/sensors/${sensorId}/start`, async () => {
+        starts++
+        await new Promise<void>((resolve) => { release = resolve })
+        return HttpResponse.json({ sensor_id: sensorId, name: 'Stereo Module', is_streaming: true, stream_types: ['depth'] })
+      }))
+      useAppStore.setState({ deviceStates: { [device.device_id]: createMockDeviceState(device, {
+        streamConfigs: [{ sensor_id: sensorId, stream_type: 'depth', format: 'z16', resolution: { width: 848, height: 480 }, framerate: 30, enable: true }],
+        sensorConfigs: { [sensorId]: { resolution: { width: 848, height: 480 }, framerate: 30 } },
+      }) } })
+
+      const first = useAppStore.getState().startSensorStreaming(device.device_id, sensorId)
+      await new Promise((r) => setTimeout(r, 0))
+      const status = () => useAppStore.getState().deviceStates[device.device_id].sensorStreamingStatus[sensorId]
+      expect(status().pendingOp).toBe('starting')
+      expect(status().is_streaming).toBe(false)
+
+      await useAppStore.getState().startSensorStreaming(device.device_id, sensorId) // the second click
+      release()
+      await first
+
+      expect(starts).toBe(1)
+      expect(status().is_streaming).toBe(true)
+      expect(status().pendingOp).toBeUndefined()
+    })
+  })
+
   describe('Stream Configuration', () => {
     it('starts a sensor with the profiles the SDK marks default', async () => {
       const device = createMockDevice({ device_id: '123456789' })

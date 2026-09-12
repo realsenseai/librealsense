@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client'
-import type { DepthFrameEvent, JobInfo, LogEntry, MetadataUpdate, SdkNotification } from './types'
+import type { DepthFrameEvent, JobInfo, LogEntry, MetadataUpdate, SdkNotification, SensorStreamStatus } from './types'
 import { useAppStore } from '../store'
 import { useJobsStore } from '../store/jobs'
 import { useConsoleStore } from '../store/console'
@@ -79,6 +79,10 @@ class SocketService {
 
     this.socket.on('options_changed', (data: { device_id: string; sensor_id: string; options: { option_id: string; current_value: number }[] }) => {
       useAppStore.getState().applyOptionChanges(data.device_id, data.sensor_id, data.options)
+    })
+
+    this.socket.on('sensor_status', (data: { device_id: string; sensor_id: string; status: SensorStreamStatus }) => {
+      useAppStore.getState().applySensorStatus(data.device_id, data.sensor_id, data.status)
     })
 
     this.socket.on('notification', (n: SdkNotification) => {

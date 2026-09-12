@@ -808,7 +808,7 @@ function SensorPanel({
   }
 
   const isSensorStreaming = status?.is_streaming || false
-  const isSensorPending = status?.pendingOp === 'stopping'
+  const isSensorPending = status?.pendingOp === 'stopping' || status?.pendingOp === 'starting'
   const sensorError = status?.error
   // The legacy viewer refuses to start a mode the SDK does not list ("Selected value is not supported").
   const unsupported = unsupportedStreams(streams, sensor.supported_stream_profiles, sensorConfig)
@@ -861,7 +861,7 @@ function SensorPanel({
           onClick={() => isSensorStreaming ? onStopStreaming() : onStartStreaming()}
           disabled={isSensorPending || (!canStartSensor && !isSensorStreaming)}
           data-testid={isSensorStreaming ? "stop-streaming" : "start-streaming"}
-          title={isSensorPending ? 'Stopping...' : isSensorStreaming ? 'Stop'
+          title={isSensorPending ? (status?.pendingOp === 'starting' ? 'Starting...' : 'Stopping...') : isSensorStreaming ? 'Stop'
             : unsupported.length ? `Selected mode is not supported: ${unsupported.join(', ')}` : 'Start'}
           className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
             isSensorPending

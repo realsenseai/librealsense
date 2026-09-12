@@ -26,6 +26,24 @@ def test_pause_and_resume_flip_the_status_flag(setup_mock_managers):
     assert client.post(f"{SENSOR}/resume").json()["paused"] is False
 
 
+def test_sensor_changes_are_announced_to_every_client(setup_mock_managers):
+    """Pause and stop (and start, through the same helper) emit `sensor_status`, so a UI that
+    did not cause the change (another tab, a calibration job, a lost device) stops showing a
+    stale Stop button."""
+    rs_manager = setup_mock_managers["rs_manager"]
+    _streaming(rs_manager)
+    events = []
+    rs_manager._emit_socket_event = lambda ev, payload: events.append((ev, payload))
+
+    assert client.post(f"{SENSOR}/pause").status_code == 200
+    assert client.post(f"{SENSOR}/stop").status_code == 200
+
+    statuses = [p for ev, p in events if ev == "sensor_status"]
+    assert [(s["device_id"], s["sensor_id"]) for s in statuses] == [("device1", "device1-sensor-0")] * 2
+    assert [(s["status"]["is_streaming"], s["status"]["paused"]) for s in statuses] == [(True, True), (False, False)]
+    assert client.get(f"{SENSOR}/status").json()["is_streaming"] is False
+
+
 def test_pause_refused_while_not_streaming(setup_mock_managers):
     response = client.post(f"{SENSOR}/pause")
     assert response.status_code == 409

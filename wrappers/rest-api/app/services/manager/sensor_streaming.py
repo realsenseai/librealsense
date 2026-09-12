@@ -535,7 +535,7 @@ class SensorStreamingMixin:
             
             # Return status with backward compat fields
             first_config = configs[0]
-            return SensorStreamStatus(
+            return self._announce_sensor_status(device_id, SensorStreamStatus(
                 sensor_id=sensor_id,
                 name=sensor_name,
                 is_streaming=True,
@@ -546,7 +546,7 @@ class SensorStreamingMixin:
                 framerate=first_config.framerate,
                 format=first_config.format,
                 started_at=datetime.now(),
-            )
+            ))
             
         except RealSenseError:
             raise
@@ -669,11 +669,19 @@ class SensorStreamingMixin:
 
         logging.info(f"[SENSOR] Stopped {sensor_id}")
         
-        return SensorStreamStatus(
+        return self._announce_sensor_status(device_id, SensorStreamStatus(
             sensor_id=sensor_id,
             name=sensor_name,
             is_streaming=False,
-        )
+        ))
+
+    def _announce_sensor_status(self, device_id: str, status: SensorStreamStatus) -> SensorStreamStatus:
+        """Tell every client a sensor started, stopped or paused - whoever caused it (another
+        client, a calibration job restoring the stream, a lost device), so no UI keeps showing
+        a Stop button for a sensor the server no longer streams."""
+        self._emit_socket_event("sensor_status", {"device_id": device_id, "sensor_id": status.sensor_id,
+                                                  "status": status.model_dump(mode="json")})
+        return status
 
     def get_sensor_status(
         self,
@@ -730,7 +738,7 @@ class SensorStreamingMixin:
             if not info or not info.get("is_streaming"):
                 raise RealSenseError(status_code=409, detail=f"Sensor {sensor_id} is not streaming")
             info["paused"] = paused
-        return self.get_sensor_status(device_id, sensor_id)
+        return self._announce_sensor_status(device_id, self.get_sensor_status(device_id, sensor_id))
 
     def get_sensor_frame(
         self,

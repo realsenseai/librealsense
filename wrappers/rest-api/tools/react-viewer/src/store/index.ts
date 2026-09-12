@@ -16,6 +16,7 @@ import type {
   SensorStreamConfig,
   SensorConfig,
   PlaybackActionName,
+  SensorStreamStatus,
 } from '../api/types'
 
 // Map to track pending stop operations by "deviceId:sensorId" key
@@ -188,6 +189,8 @@ interface AppState {
   setControlEnabled: (deviceId: string, key: string, enabled: boolean) => Promise<void>
   /** Values the SDK reports changed on a sensor (a preset rewriting exposure, AE toggles). */
   applyOptionChanges: (deviceId: string, sensorId: string, changes: { option_id: string; current_value: number }[]) => void
+  /** A sensor started, stopped or paused on the server - by this client or anyone else. */
+  applySensorStatus: (deviceId: string, sensorId: string, status: SensorStreamStatus) => void
   setPostProcessing: (deviceId: string, sensorId: string, enabled: boolean) => Promise<void>
 
   /** Load a newly connected device's sensors and controls; every device is open. */
@@ -439,6 +442,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((state) => patchGroup(state, deviceId, key, (g) => ({ ...g, enabled })))
   },
 
+  applySensorStatus: (deviceId, sensorId, status) => {
+    set((state) => patchDevice(state, deviceId, (ds) => {
+      const current = ds.sensorStreamingStatus[sensorId]
+      // Our own start is still in flight: its response carries the final word
+      if (current?.pendingOp === 'starting' && !status.is_streaming) return {}
+      const sensorStreamingStatus = { ...ds.sensorStreamingStatus, [sensorId]: status }
+      return { sensorStreamingStatus, isStreaming: Object.values(sensorStreamingStatus).some((s) => s.is_streaming) }
+    }))
+  },
+
   applyOptionChanges: (deviceId, sensorId, changes) => {
     const byId = new Map(changes.map((c) => [c.option_id.toLowerCase(), c.current_value]))
     set((state) => patchGroup(state, deviceId, `sensors/${sensorId}/options`, (group) => ({
@@ -635,6 +648,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
       resolution: sensorConfig.isMotionSensor || sensorConfig.perStreamResolution ? c.resolution : sensorConfig.resolution,
       framerate: sensorConfig.isMotionSensor || sensorConfig.perStreamFps ? c.framerate : sensorConfig.framerate,
     }))
+
+    // A second click while the request is in flight would land on a "Stop" button and undo
+    // the start; mark the sensor pending so the button is disabled until the server answers
+    if (deviceState.sensorStreamingStatus[sensorId]?.pendingOp === 'starting') return
+    set((s) => patchDevice(s, deviceId, (ds) => ({
+      sensorStreamingStatus: {
+        ...ds.sensorStreamingStatus,
+        [sensorId]: { ...(ds.sensorStreamingStatus[sensorId] ?? { sensor_id: sensorId, name: '', is_streaming: false }), pendingOp: 'starting' as const },
+      },
+    })))
 
     try {
       const status = await apiClient.startSensor(deviceId, sensorId, configs)

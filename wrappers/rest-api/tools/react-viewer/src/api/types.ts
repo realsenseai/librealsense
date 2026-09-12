@@ -520,5 +520,5 @@ export interface SensorStreamStatus {
   error?: string | null
   started_at?: string | null
   // UI-only: pending operation state for optimistic updates
-  pendingOp?: 'stopping' | null
+  pendingOp?: 'starting' | 'stopping' | null
 }
