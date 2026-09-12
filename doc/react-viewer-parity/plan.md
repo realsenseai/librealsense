@@ -408,6 +408,26 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   the deliberate deferrals WP1.4 (store split waits for PR #15559), WP2.12, WP3.5 and
   WP4.3. Two E2E flakes remain: the first test after a long idle sometimes finds the camera
   slow to deliver frames, and the machine going to sleep mid-run stretches or aborts runs.
+- 2026-09-12 (after a hands-on session by the user): streams, OCC, ROI and metadata "did not
+  work" and then nothing streamed. Causes found: (1) after the machine slept, the SDK
+  reported the D455 as "no longer present" while the server still held its handle, so every
+  start succeeded without frames and the firmware-log poller flooded the console; the server
+  now detects this (collectors, poller, advanced-controls read) and re-registers the camera
+  from a fresh enumeration (`device_lost`). (2) The ROI drag was swallowed by the tile's
+  drag-to-swap (no mouseup), mapped in decimated-frame pixels instead of sensor pixels, and
+  "reset" asked for a full-frame region the firmware refuses; fixed to the legacy centre-3/4
+  default. (3) The E2E suite only checked that elements existed. It now asserts outcomes:
+  `tests/e2e/helpers.ts` (frames flow per the server, camera idle after, device menu),
+  `tests/e2e/session.spec.ts` (one page: stream, metadata values change, ROI round trip,
+  depth readout, OCC then frames, 3D then 2D, two stop/start cycles, table and updates
+  dialogs load real data), a pixel oracle for the 3D canvas, and `tests/live/test_streams.py`
+  (frames across stop/start cycles, ROI/readout/controls while streaming, streaming healthy
+  after OCC). `GET /stream/metadata` exposes the newest frame metadata for tests and clients.
+  (4) Two UI races the new tests exposed: a second click on a module's Start while the first
+  request was in flight landed on Stop and undid it (the button is now disabled while a start
+  is pending), and a sensor stopped by anyone but this page (another client, a calibration
+  job, a lost device) kept its Stop button because the server never said so; the server now
+  emits `sensor_status` on start/pause/stop and the store applies it.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).

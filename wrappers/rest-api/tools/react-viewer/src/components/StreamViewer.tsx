@@ -355,26 +355,35 @@ function StreamTile({
     onMouseUp: () => { panStart.current = null },
   }
 
+  // The ROI lives in sensor pixels; a decimation filter shrinks the displayed frame, so map
+  // through the sensor's size when the server reports it.
+  const roiFrame = metadata ? { w: metadata.hardware_width ?? metadata.width, h: metadata.hardware_height ?? metadata.height } : null
+
   const commitRoi = (drag: { x0: number; y0: number; x1: number; y1: number }) => {
     const t = tileSize()
-    if (!t || !metadata) return
-    const a = pixelFromMouse(drag.x0, drag.y0, t.w, t.h, metadata.width, metadata.height, zoom)
-    const b = pixelFromMouse(drag.x1, drag.y1, t.w, t.h, metadata.width, metadata.height, zoom)
+    if (!t || !metadata || !roiFrame) return
+    const a = pixelFromMouse(drag.x0, drag.y0, t.w, t.h, roiFrame.w, roiFrame.h, zoom)
+    const b = pixelFromMouse(drag.x1, drag.y1, t.w, t.h, roiFrame.w, roiFrame.h, zoom)
     if (!a || !b || a.x === b.x || a.y === b.y) return
-    apiClient.setRoi(deviceId, sensorId, { min_x: a.x, min_y: a.y, max_x: b.x, max_y: b.y })
+    apiClient.setRoi(deviceId, sensorId, { min_x: Math.min(a.x, b.x), min_y: Math.min(a.y, b.y), max_x: Math.max(a.x, b.x), max_y: Math.max(a.y, b.y) })
       .then(setRoi)
       .catch((error) => console.error('Failed to set ROI:', error))
   }
 
+  // Reset is the legacy default: the centre 3/4 of the frame (stream-model.cpp). The firmware
+  // refuses a full-frame region, so "everything" is not an option.
   const resetRoi = () => {
-    if (!metadata) return
-    apiClient.setRoi(deviceId, sensorId, { min_x: 0, min_y: 0, max_x: metadata.width - 1, max_y: metadata.height - 1 })
+    if (!roiFrame) return
+    const xm = Math.floor(roiFrame.w / 8)
+    const ym = Math.floor(roiFrame.h / 8)
+    apiClient.setRoi(deviceId, sensorId, { min_x: xm, min_y: ym, max_x: roiFrame.w - xm - 1, max_y: roiFrame.h - ym - 1 })
       .then(setRoi)
       .catch((error) => console.error('Failed to reset ROI:', error))
   }
 
   const roiMouse = {
     onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => {
+      e.preventDefault() // the tile wrapper is draggable (tile swap); a native drag would eat the mouseup
       const t = tileSize()
       if (!t) return
       const x = e.clientX - t.left, y = e.clientY - t.top
@@ -395,7 +404,8 @@ function StreamTile({
   const roiBox = (() => {
     const t = tileSize()
     if (!roiMode || !t || !metadata || !roi?.supported || roi.min_x === undefined) return null
-    return boxFromPixels({ x: roi.min_x, y: roi.min_y! }, { x: roi.max_x!, y: roi.max_y! }, t.w, t.h, metadata.width, metadata.height, zoom)
+    const frame = roiFrame ?? { w: metadata.width, h: metadata.height }
+    return boxFromPixels({ x: roi.min_x, y: roi.min_y! }, { x: roi.max_x!, y: roi.max_y! }, t.w, t.h, frame.w, frame.h, zoom)
   })()
 
   // Fetch dynamic depth range periodically for depth streams
@@ -664,7 +674,10 @@ function StreamTile({
         </div>
       )}
 
-      <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 flex items-center gap-1`}>
+      <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 flex items-center gap-1`}
+        // Clicks on the header buttons must not reach the tile's ROI / pan drag handlers: a
+        // mouseup there ends ROI mode and unmounts the button before its click is delivered.
+        onMouseDown={(e) => e.stopPropagation()} onMouseUp={(e) => e.stopPropagation()}>
         {roi?.supported && (
           <button
             type="button"

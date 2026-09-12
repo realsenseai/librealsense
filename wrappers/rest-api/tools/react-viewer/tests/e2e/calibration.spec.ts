@@ -6,6 +6,7 @@
  */
 
 import { test, expect, suppressWhatsNew } from './fixtures'
+import { beginCalibration, restoreOldCalibration } from './helpers'
 
 test.describe('@real-device Calibration', () => {
   test.beforeEach(async ({ testMode, page }) => {
@@ -25,19 +26,23 @@ test.describe('@real-device Calibration', () => {
     await page.getByRole('button', { name: 'On-Chip Calibration…' }).click()
     const dialog = page.getByRole('dialog', { name: 'On-Chip Calibration' })
     await expect(dialog).toBeVisible()
-    await dialog.getByTestId('calibration-start').click()
-    await expect(dialog.getByTestId('calibration-progress')).toBeVisible({ timeout: 10000 })
+    try {
+      await beginCalibration(dialog)
+      await expect(dialog.getByTestId('calibration-progress')).toBeVisible({ timeout: 10000 })
 
-    // The firmware either converges (verdict) or refuses this scene (error); both must land
-    const outcome = dialog.getByTestId('calibration-result').or(dialog.getByTestId('calibration-error'))
-    await expect(outcome.first()).toBeVisible({ timeout: 60000 })
-    await expect(dialog.getByRole('button', { name: 'Close' })).toBeEnabled()
+      // The firmware either converges (verdict) or refuses this scene (error); both must land
+      const outcome = dialog.getByTestId('calibration-result').or(dialog.getByTestId('calibration-error'))
+      await expect(outcome.first()).toBeVisible({ timeout: 60000 })
+      await expect(dialog.getByRole('button', { name: 'Close' })).toBeEnabled()
 
-    // The camera is idle again afterwards
-    await expect.poll(async () => {
-      const status = await (await fetch(`http://localhost:8000/api/v1/devices/${device.device_id}/sensors/${device.device_id}-sensor-0/status`)).json()
-      return status.is_streaming
-    }, { timeout: 15000 }).toBe(false)
-    await dialog.getByRole('button', { name: 'Close' }).click()
+      // The camera is idle again afterwards
+      await expect.poll(async () => {
+        const status = await (await fetch(`http://localhost:8000/api/v1/devices/${device.device_id}/sensors/${device.device_id}-sensor-0/status`)).json()
+        return status.is_streaming
+      }, { timeout: 15000 }).toBe(false)
+      await dialog.getByRole('button', { name: 'Close' }).click()
+    } finally {
+      await restoreOldCalibration(device.device_id)
+    }
   })
 })

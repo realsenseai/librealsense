@@ -157,7 +157,7 @@ export function PointCloudViewer() {
 
       <div className="flex-1 bg-black rounded-b-lg overflow-hidden">
         {frame && geo?.depth ? (
-          <Canvas frameloop={viewMode === '3d' ? 'always' : 'never'} gl={{ antialias: false }}>
+          <Canvas frameloop={viewMode === '3d' ? 'always' : 'never'} gl={{ antialias: false, preserveDrawingBuffer: true }}>
             <PerspectiveCamera makeDefault position={[0, 0, 1]} fov={45} />
             <OrbitControls ref={controls} enablePan enableZoom enableRotate target={[0, 0, -1]} />
             <DepthCloud frame={frame} geometry={geo} video={texture ? video : null} shading={shading}

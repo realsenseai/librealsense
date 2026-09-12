@@ -243,6 +243,65 @@ describe('StreamViewer', () => {
     })
   })
 
+  describe('ROI in sensor pixels', () => {
+    it('maps the drag through the sensor size when a filter shrank the frame', async () => {
+      const original = HTMLElement.prototype.getBoundingClientRect
+      HTMLElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 640, height: 480, right: 640, bottom: 480, x: 0, y: 0, toJSON: () => ({}) })
+      let sent: Record<string, number> | null = null
+      server.use(
+        http.get('/api/v1/devices/:deviceId/sensors/:sensorId/roi', () => HttpResponse.json({ supported: true, min_x: 0, min_y: 0, max_x: 1279, max_y: 719 })),
+        http.put('/api/v1/devices/:deviceId/sensors/:sensorId/roi', async ({ request }) => {
+          sent = (await request.json()) as Record<string, number>
+          return HttpResponse.json({ supported: true, ...sent })
+        }),
+      )
+      try {
+        const device = createMockDevice()
+        const ds = createMockDeviceState(device, {
+          streamConfigs: [createMockStreamConfig({ enable: true })],
+          isStreaming: true,
+          sensorStreamingStatus: { 'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth'] } },
+          // decimated 640x360 display of a 1280x720 sensor
+          streamMetadata: { depth: { stream_type: 'depth', timestamp: 0, frame_number: 1, width: 640, height: 360, hardware_width: 1280, hardware_height: 720 } },
+        })
+        render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: ds } } })
+        await userEvent.click(await screen.findByRole('button', { name: 'Set auto-exposure ROI' }))
+        const tile = screen.getByTestId('roi-rect').parentElement!
+        fireEvent.mouseDown(tile, { clientX: 320, clientY: 120 })
+        fireEvent.mouseMove(tile, { clientX: 480, clientY: 300 })
+        fireEvent.mouseUp(tile)
+        // 640x480 tile letterboxes the 16:9 frame to 640x360 at y offset 60 -> x doubles, y shifts and doubles
+        await waitFor(() => expect(sent).toEqual({ min_x: 640, min_y: 120, max_x: 960, max_y: 480 }))
+      } finally {
+        HTMLElement.prototype.getBoundingClientRect = original
+      }
+    })
+  })
+
+  describe('ROI reset', () => {
+    it('resets to the centre three quarters of the sensor frame, as the legacy viewer does', async () => {
+      let sent: Record<string, number> | null = null
+      server.use(
+        http.get('/api/v1/devices/:deviceId/sensors/:sensorId/roi', () => HttpResponse.json({ supported: true, min_x: 10, min_y: 10, max_x: 20, max_y: 20 })),
+        http.put('/api/v1/devices/:deviceId/sensors/:sensorId/roi', async ({ request }) => {
+          sent = (await request.json()) as Record<string, number>
+          return HttpResponse.json({ supported: true, ...sent })
+        }),
+      )
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, {
+        streamConfigs: [createMockStreamConfig({ enable: true })],
+        isStreaming: true,
+        sensorStreamingStatus: { 'test-device-1-sensor-0': { sensor_id: 'test-device-1-sensor-0', name: '', is_streaming: true, stream_types: ['depth'] } },
+        streamMetadata: { depth: { stream_type: 'depth', timestamp: 0, frame_number: 1, width: 424, height: 240, hardware_width: 848, hardware_height: 480 } },
+      })
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [device.device_id]: ds } } })
+      await userEvent.click(await screen.findByRole('button', { name: 'Set auto-exposure ROI' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Reset ROI' }))
+      await waitFor(() => expect(sent).toEqual({ min_x: 106, min_y: 60, max_x: 741, max_y: 419 }))
+    })
+  })
+
   describe('Zoom and grid', () => {
     const rect640 = () => ({ left: 0, top: 0, width: 640, height: 480, right: 640, bottom: 480, x: 0, y: 0, toJSON: () => ({}) })
     const streaming = () => {

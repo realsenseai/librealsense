@@ -14,6 +14,7 @@
  */
 
 import { test, expect, getTestMode, getApiUrl, dismissWhatsNewModal, suppressWhatsNew } from './fixtures'
+import { expectFramesFlowing, stopAllStreams } from './helpers'
 import type { Locator } from '@playwright/test'
 
 // Per-stream toggles only render inside an expanded sensor module
@@ -87,8 +88,10 @@ test.describe('@real-device Real Device Tests', () => {
       const startButton = page.locator('button:has-text("Start"), [data-testid="start-streaming"]').first()
       await startButton.click()
       
-      // Verify stream is active
+      // Verify stream is active: the server must be delivering frames, not just a <video>
       await expect(page.locator('video, canvas').first()).toBeVisible({ timeout: 15000 })
+      const [device] = await (await fetch(`${getApiUrl()}/api/v1/devices/`)).json()
+      await expectFramesFlowing(device.device_id)
       
       // Stop streaming
       const stopButton = page.locator('button:has-text("Stop"), [data-testid="stop-streaming"]').first()
@@ -132,6 +135,8 @@ test.describe('@real-device Real Device Tests', () => {
       // Cleanup
       const stopButton = page.locator('button:has-text("Stop"), [data-testid="stop-streaming"]').first()
       await stopButton.click()
+      const [dev] = await (await fetch(`${getApiUrl()}/api/v1/devices/`)).json()
+      await stopAllStreams(dev.device_id)
     })
   })
 

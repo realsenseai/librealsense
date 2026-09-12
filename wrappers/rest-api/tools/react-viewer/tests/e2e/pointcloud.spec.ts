@@ -56,6 +56,18 @@ test.describe('@real-device 3D view', () => {
     await expect(toolbar.getByRole('button', { name: 'Export PLY' })).toBeEnabled({ timeout: 20000 })
     await expect(toolbar.getByLabel('Depth source')).toContainText(device.serial_number)
 
+    // Something is drawn: a share of the canvas pixels is not background black
+    await expect.poll(() => page.locator('canvas').first().evaluate((c: HTMLCanvasElement) => {
+      const probe = document.createElement('canvas')
+      probe.width = 64; probe.height = 36
+      const ctx = probe.getContext('2d')!
+      ctx.drawImage(c, 0, 0, 64, 36)
+      const px = ctx.getImageData(0, 0, 64, 36).data
+      let lit = 0
+      for (let i = 0; i < px.length; i += 4) if (px[i] + px[i + 1] + px[i + 2] > 60) lit++
+      return lit / (px.length / 4)
+    }), { timeout: 15000, message: 'the 3D canvas stayed black' }).toBeGreaterThan(0.02)
+
     // Texture defaults to color when it streams; shading can be switched
     const texture = toolbar.getByLabel('Texture source')
     if (hasColor) await expect(texture).toHaveValue('color', { timeout: 15000 })
