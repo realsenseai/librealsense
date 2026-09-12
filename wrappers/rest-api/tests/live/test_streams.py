@@ -95,6 +95,41 @@ class TestLiveStreams:
         options = manager.get_sensor_options(device.device_id, sensor_id)
         assert any(o.option_id == "exposure" for o in options)
 
+    def test_recording_a_streaming_camera_does_not_block_the_server(self, manager):
+        """`rs.recorder` wraps a live device from a request thread while frames are read on
+        another; a binding that keeps the GIL there deadlocks the whole process."""
+        import threading
+
+        device = manager.get_devices()[0]
+        sensor_id, cfg = _depth_config(manager, device.device_id)
+        manager.start_sensor(device.device_id, sensor_id, [cfg])
+        assert _frames_flow(manager, device.device_id)
+
+        done = threading.Event()
+        result = {}
+
+        def record():
+            try:
+                result["status"] = manager.start_recording(device.device_id)
+            except Exception as exc:  # noqa: BLE001 - reported through the assertion below
+                result["error"] = exc
+            finally:
+                done.set()
+
+        threading.Thread(target=record, name="record-start", daemon=True).start()
+        assert done.wait(20), "start_recording never returned: the recorder binding is holding the GIL"
+        assert "error" not in result, result.get("error")
+        assert result["status"].recording is True
+
+        # Frames keep coming while the recorder is attached, and the file is written
+        assert _frames_flow(manager, device.device_id, timeout=10), "frames stopped once recording started"
+        time.sleep(1.0)
+        stopped = manager.stop_recording(device.device_id)
+        assert stopped.recording is False
+        from pathlib import Path
+        assert Path(stopped.file).is_file() and Path(stopped.file).stat().st_size > 0
+        Path(stopped.file).unlink(missing_ok=True)
+
     def test_on_chip_calibration_leaves_streaming_healthy(self, manager):
         device = manager.get_devices()[0]
         sensor_id, cfg = _depth_config(manager, device.device_id)

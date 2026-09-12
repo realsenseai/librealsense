@@ -37,10 +37,15 @@ void init_record_playback(py::module &m) {
         .def("current_status", &rs2::playback::current_status, "Returns the current state of the playback device");
 
     py::class_<rs2::recorder, rs2::device, py_holder<rs2::recorder>> recorder(m, "recorder", "Records the given device and saves it to the given file as rosbag format.");
-    recorder.def(py::init<const std::string&, rs2::device>())
-        .def(py::init<const std::string&, rs2::device, bool>())
-        .def("pause", &rs2::recorder::pause, "Pause the recording device without stopping the actual device from streaming.")
-        .def("resume", &rs2::recorder::resume, "Unpauses the recording device, making it resume recording.")
+    // Wrapping a streaming device, and pausing or resuming it, waits on the SDK's frame
+    // dispatchers; holding the GIL there deadlocks any application whose frames are read on
+    // another Python thread.
+    recorder.def(py::init<const std::string&, rs2::device>(), py::call_guard<py::gil_scoped_release>())
+        .def(py::init<const std::string&, rs2::device, bool>(), py::call_guard<py::gil_scoped_release>())
+        .def("pause", &rs2::recorder::pause, "Pause the recording device without stopping the actual device from streaming.",
+             py::call_guard<py::gil_scoped_release>())
+        .def("resume", &rs2::recorder::resume, "Unpauses the recording device, making it resume recording.",
+             py::call_guard<py::gil_scoped_release>())
         .def("filename", &rs2::recorder::filename, "The file the recording is written to.");
     /** end rs_record_playback.hpp **/
 }

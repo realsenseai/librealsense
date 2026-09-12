@@ -54,10 +54,13 @@ class RecordPlaybackMixin:
         target = Path(path) if path else self._default_recording_path(device_id)
         target.parent.mkdir(parents=True, exist_ok=True)
         compression = self.settings.get().record.compression
+        started = time.monotonic()
+        logging.info("[RECORD] wrapping %s into %s", device_id, target)
         try:
             recorder = rs.recorder(str(target), dev) if compression == "auto" else rs.recorder(str(target), dev, compression == "always")
         except RuntimeError as exc:
             raise RealSenseError(status_code=500, detail=f"Failed to start recording: {exc}")
+        logging.info("[RECORD] recorder ready in %.1fs", time.monotonic() - started)
         self._recorders[device_id] = {"recorder": recorder, "paused": False, "file": str(target)}
         return self.get_record_status(device_id)
 
