@@ -91,6 +91,34 @@ function buildStreamConfigs(sensors: SensorInfo[]): StreamConfig[] {
   return configs
 }
 
+/**
+ * Turn on (and give the running mode to) every stream the camera is already sending, so a
+ * page that arrives mid-stream shows the same tiles as the page that started them.
+ */
+function adoptRunningStreams(configs: StreamConfig[], running: SensorStreamStatus[]): StreamConfig[] {
+  if (running.length === 0) return configs
+  const live = new Map<string, SensorStreamConfig | undefined>()
+  for (const status of running) {
+    const types = status.stream_types ?? (status.stream_type ? [status.stream_type] : [])
+    for (const type of types) {
+      const key = `${status.sensor_id}:${type.toLowerCase()}`
+      live.set(key, status.streams?.find((s) => s.stream_type.toLowerCase() === type.toLowerCase()))
+    }
+  }
+  return configs.map((c) => {
+    const key = `${c.sensor_id}:${c.stream_type.toLowerCase()}`
+    if (!live.has(key)) return c
+    const running = live.get(key)
+    return {
+      ...c,
+      enable: true,
+      format: running?.format ?? c.format,
+      resolution: running?.resolution ?? c.resolution,
+      framerate: running?.framerate ?? c.framerate,
+    }
+  })
+}
+
 function buildSensorConfigs(sensors: SensorInfo[]): Record<string, SensorConfig> {
   const sensorConfigs: Record<string, SensorConfig> = {}
   for (const sensor of sensors) {
@@ -550,8 +578,34 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const configs = buildStreamConfigs(sensors)
       const sensorConfigs = buildSensorConfigs(sensors)
 
-      set((state) => patchDevice(state, deviceId, () =>
-        ({ sensors, streamConfigs: configs, sensorConfigs, isLoading: false })))
+      // The camera may already be streaming - this page was reloaded, or another client
+      // started it. Adopt the server's state instead of showing an idle camera whose tiles
+      // never appear and whose depth frames the 3D view throws away.
+      const statuses = await Promise.all(sensors.map((s) =>
+        apiClient.getSensorStatus(deviceId, s.sensor_id).catch(() => null)))
+      const sensorStreamingStatus: Record<string, SensorStreamStatus> = {}
+      for (const status of statuses) if (status) sensorStreamingStatus[status.sensor_id] = status
+      const running = Object.values(sensorStreamingStatus).filter((s) => s.is_streaming)
+
+      for (const status of running) {
+        const first = status.streams?.[0]
+        const sensorConfig = sensorConfigs[status.sensor_id]
+        if (first && sensorConfig) {
+          sensorConfig.resolution = first.resolution ?? sensorConfig.resolution
+          sensorConfig.framerate = first.framerate ?? sensorConfig.framerate
+        }
+      }
+
+      set((state) => patchDevice(state, deviceId, (ds) => ({
+        sensors,
+        // A stream the camera is already sending must be enabled in the config, or its tile
+        // is filtered out of the 2D view.
+        streamConfigs: adoptRunningStreams(configs, running),
+        sensorConfigs,
+        sensorStreamingStatus: { ...ds.sensorStreamingStatus, ...sensorStreamingStatus },
+        isStreaming: running.length > 0,
+        isLoading: false,
+      })))
     } catch (error) {
       set((state) => ({
         deviceStates: {

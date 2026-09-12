@@ -55,6 +55,18 @@ export function PointCloudViewer() {
   const streamingKey = streaming.join(',')
   const texture = source ? pickTextureSource(textureSource[source], streaming) : null
 
+  // Switching to 3D asks the server to ship depth frames, but a camera that starts (or a
+  // page that arrives) afterwards would never be asked. Keep every streaming device enabled
+  // for as long as the 3D view is on screen.
+  const streamingIds = Object.values(deviceStates).filter((ds) => ds.isStreaming).map((ds) => ds.device.device_id)
+  const streamingKeys = streamingIds.join(',')
+  useEffect(() => {
+    if (viewMode !== '3d' || !streamingKeys) return
+    for (const id of streamingKeys.split(',')) {
+      apiClient.enablePointCloud(id).catch((error) => console.error('Failed to enable the point cloud:', error))
+    }
+  }, [viewMode, streamingKeys])
+
   // Camera geometry follows the source and its texture stream
   useEffect(() => {
     if (!source || viewMode !== '3d') return
@@ -176,7 +188,13 @@ export function PointCloudViewer() {
                   d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
               </svg>
               <p className="text-lg">3D Point Cloud View</p>
-              <p className="text-sm mt-1">Start streaming depth to see points</p>
+              <p className="text-sm mt-1">
+                {sources.length === 0
+                  ? 'Start streaming depth to see points'
+                  : !frame
+                    ? 'Waiting for depth frames from the camera…'
+                    : 'Reading the camera geometry…'}
+              </p>
             </div>
           </div>
         )}

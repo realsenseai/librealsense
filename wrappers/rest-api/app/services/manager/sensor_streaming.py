@@ -717,16 +717,24 @@ class SensorStreamingMixin:
             
             info = self.sensor_streams[device_id][sensor_id]
             resolution = info.get("resolution")
-            
+            # A client that arrives mid-stream (a reload, a second tab) learns from here what
+            # the sensor is sending; without the stream list it cannot show a single tile.
+            configs = info.get("configs") or []
+            stream_types = info.get("stream_types") or []
+            first = configs[0] if configs else None
+
             return SensorStreamStatus(
                 sensor_id=sensor_id,
                 name=info.get("name", sensor_name),
                 is_streaming=info.get("is_streaming", False),
                 paused=info.get("paused", False),
-                stream_type=info.get("stream_type"),
-                resolution=Resolution(width=resolution[0], height=resolution[1]) if resolution else None,
-                framerate=info.get("framerate"),
-                format=info.get("format"),
+                stream_type=info.get("stream_type") or (stream_types[0] if stream_types else None),
+                stream_types=list(stream_types),
+                streams=list(configs),
+                resolution=Resolution(width=resolution[0], height=resolution[1]) if resolution
+                    else (first.resolution if first else None),
+                framerate=info.get("framerate") or (first.framerate if first else None),
+                format=info.get("format") or (first.format if first else None),
                 error=info.get("error"),
                 started_at=info.get("started_at"),
             )

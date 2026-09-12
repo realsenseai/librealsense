@@ -44,6 +44,27 @@ def test_sensor_changes_are_announced_to_every_client(setup_mock_managers):
     assert client.get(f"{SENSOR}/status").json()["is_streaming"] is False
 
 
+def test_status_names_the_streams_a_client_arriving_mid_stream_must_draw(setup_mock_managers):
+    """A page that opens while the camera runs learns what it is running from here; without
+    the stream list it shows an idle camera and draws no tile."""
+    from app.models.sensor_streaming import SensorStreamConfig
+    from app.models.stream import Resolution
+
+    configs = [SensorStreamConfig(stream_type="depth", format="z16", resolution=Resolution(width=848, height=480), framerate=30),
+               SensorStreamConfig(stream_type="infrared-1", format="y8", resolution=Resolution(width=848, height=480), framerate=30)]
+    setup_mock_managers["rs_manager"].sensor_streams["device1"] = {
+        "device1-sensor-0": {"is_streaming": True, "paused": False, "stream_types": ["depth", "infrared-1"],
+                             "configs": configs, "name": "Stereo Module"},
+    }
+
+    status = client.get(f"{SENSOR}/status").json()
+
+    assert status["is_streaming"] is True
+    assert status["stream_types"] == ["depth", "infrared-1"]
+    assert [s["stream_type"] for s in status["streams"]] == ["depth", "infrared-1"]
+    assert status["resolution"] == {"width": 848, "height": 480} and status["framerate"] == 30
+
+
 def test_pause_refused_while_not_streaming(setup_mock_managers):
     response = client.post(f"{SENSOR}/pause")
     assert response.status_code == 409

@@ -248,6 +248,11 @@ class ApiClient {
 
   // ============ Per-Sensor Streaming (Sensor API) ============
 
+  async getSensorStatus(deviceId: string, sensorId: string): Promise<SensorStreamStatus> {
+    const response = await this.client.get<SensorStreamStatus>(`/devices/${deviceId}/sensors/${sensorId}/status`)
+    return response.data
+  }
+
   async startSensor(
     deviceId: string,
     sensorId: string,

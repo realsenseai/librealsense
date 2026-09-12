@@ -416,6 +416,39 @@ describe('AppStore', () => {
     })
   })
 
+  describe('A camera that is already streaming when the page opens', () => {
+    it('adopts the running sensors so the tiles and the 3D view see the frames', async () => {
+      const device = createMockDevice({ device_id: '123456789' })
+      const sensorId = '123456789-sensor-0'
+      server.use(http.get(`/api/v1/devices/${device.device_id}/sensors/:sensorId/status`, ({ params }) =>
+        HttpResponse.json(params.sensorId === sensorId
+          ? { sensor_id: sensorId, name: 'Stereo Module', is_streaming: true, stream_types: ['depth', 'infrared'],
+              streams: [{ stream_type: 'depth', format: 'Z16', resolution: { width: 640, height: 480 }, framerate: 15 },
+                        { stream_type: 'infrared', format: 'Y8', resolution: { width: 640, height: 480 }, framerate: 15 }] }
+          : { sensor_id: params.sensorId, name: 'Other', is_streaming: false })))
+      useAppStore.setState({ devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } })
+
+      await useAppStore.getState().fetchSensors(device.device_id)
+
+      const ds = useAppStore.getState().deviceStates[device.device_id]
+      // Without this the viewer shows an idle camera: no tiles, and every depth frame the
+      // socket delivers is dropped as "not streaming".
+      expect(ds.isStreaming).toBe(true)
+      expect(ds.sensorStreamingStatus[sensorId].is_streaming).toBe(true)
+      expect(ds.streamConfigs.find((c) => c.stream_type === 'Infrared')).toMatchObject({ enable: true, framerate: 15 })
+      expect(ds.sensorConfigs[sensorId]).toMatchObject({ resolution: { width: 640, height: 480 }, framerate: 15 })
+    })
+
+    it('leaves an idle camera idle', async () => {
+      const device = createMockDevice({ device_id: '123456789' })
+      useAppStore.setState({ devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } })
+
+      await useAppStore.getState().fetchSensors(device.device_id)
+
+      expect(useAppStore.getState().deviceStates[device.device_id].isStreaming).toBe(false)
+    })
+  })
+
   describe('Stream Configuration', () => {
     it('starts a sensor with the profiles the SDK marks default', async () => {
       const device = createMockDevice({ device_id: '123456789' })
