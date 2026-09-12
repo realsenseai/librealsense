@@ -72,6 +72,17 @@ Status legend: **Done** on development or parity branch · **Partial** · **Miss
 **Adapt** (Tier B) · **Drop** (Tier C). Legacy anchors are `file:line` under `common/`
 unless noted. Phase column refers to [plan.md](plan.md).
 
+> **Status as of 2026-09-12 (branch `react-viewer-parity`).** The tables below record the
+> gap as it was when this design was written. The checked work packages in
+> [plan.md](plan.md) are authoritative for what has since landed: every Phase 1, 2, 3, 5,
+> 7 and 8 row except multi-camera hardening, the store split, the LibCI harness, sync/align,
+> `.bag` conversion, D500-only items, recovery/unsigned firmware and the reflectivity
+> readout is Done; Phase 4 (3D) and Phase 6 (calibration) are Done except the sync lock,
+> focal-length / UV-mapping calibration, ground-truth measurement and D500 OCC; Phase 10 has
+> the CMake hook only. The plan's progress log lists the findings that changed the design
+> (options polling instead of the SDK watcher, GIL release in the Python bindings, SDK log
+> tailing, no device enumeration while streaming).
+
 ### 3.1 Devices, discovery, playback/record
 
 | Feature | Legacy anchor | React status | Tier | Phase |
