@@ -428,6 +428,24 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   is pending), and a sensor stopped by anyone but this page (another client, a calibration
   job, a lost device) kept its Stop button because the server never said so; the server now
   emits `sensor_status` on start/pause/stop and the store applies it.
+- 2026-09-13 (second hands-on session): motion tiles showed no data and squashed the video
+  tiles, the grid and metadata buttons "did nothing", drawing an ROI moved the tile, zoom was
+  invisible, the record and load-recording buttons were unreadable, and the 3D view drew
+  nothing. Causes: (1) `rs.recorder` held the GIL while wrapping a streaming device, so the
+  recording request never returned and every later request on that server queued behind it -
+  the binding now releases it (pyrs_record_playback.cpp) and `tests/live/test_streams.py`
+  asserts recording returns and frames keep flowing. (2) The whole tile was draggable, so any
+  press started a rearrange and swallowed the click; only the stream label drags now, and an
+  accidental rearrange no longer pins motion tiles ahead of depth (`orderKeys` slots a stream
+  started later into its legacy place; `resetTileOrder` forgets an arrangement). (3) Grid rows
+  are `minmax(0, 1fr)` and every tile fills its cell, so a motion readout cannot stretch a
+  row; a motion tile falls back to the sample its own frame carries. (4) A page that opened
+  mid-stream showed an idle camera: `GET /sensors/{id}/status` now names the running streams
+  and the store adopts them, and the 3D view re-enables depth-frame emission while it is on
+  screen. (5) Zoom has buttons and a percentage readout, the metadata button stays (disabled
+  until a frame carries metadata), a failed ROI probe is retried, and recording lives in a
+  labelled pane with elapsed time and the file name. `tests/e2e/viewer-ui.spec.ts` covers all
+  of it against the camera.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).
