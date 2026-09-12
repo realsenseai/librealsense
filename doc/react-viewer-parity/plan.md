@@ -397,6 +397,17 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   ALL), `rest-api-venv` (venv + requirements) and `rest-api` (both, after pyrealsense2 when
   BUILD_PYTHON_BINDINGS is on), plus an install rule under share/realsense2/rest-api.
   Configured and built on Windows with npm 10 and Python 3.14.
+- 2026-09-12 (end of the autonomous run): 51 commits on `react-viewer-parity` on top of
+  `origin/react-viewer-control-parity`, not pushed. Verification: backend `pytest tests`
+  192 passed (mocked API suite, unit tests, live tests on the D455); frontend Vitest 262
+  passed, tsc clean; Playwright real-device suite 9 passed / 1 skipped (multi-camera needs a
+  second device). Open work packages need hardware or infrastructure that was not
+  available: WP1.6 (second camera), WP1.9 (LibCI), WP5.2/5.3, WP6.5, Phase 9 (D555/D585 or
+  D401-GMSL), WP7.1/7.2 (recovery-mode / unlocked device), WP6.3 ground truth and WP6.4
+  (calibration target), WP10.1-10.3 (Tauri 2 migration, installer, platform matrix), plus
+  the deliberate deferrals WP1.4 (store split waits for PR #15559), WP2.12, WP3.5 and
+  WP4.3. Two E2E flakes remain: the first test after a long idle sometimes finds the camera
+  slow to deliver frames, and the machine going to sleep mid-run stretches or aborts runs.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).
