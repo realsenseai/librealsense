@@ -59,11 +59,10 @@ test.describe('@real-device Real Device Tests', () => {
       // Dismiss What's New modal if it appears
       await dismissWhatsNewModal(page)
       
-      // Check serial number is displayed
-      await expect(page.locator(`text=${device.serial_number}`)).toBeVisible({ timeout: 10000 })
-      
-      // Check firmware version is displayed
-      await expect(page.locator(`text=/${device.firmware_version}/`)).toBeVisible()
+      // The serial also names the camera in the recording panel, so read it off the card
+      const card = page.locator('[data-testid="device-card"]').filter({ hasText: device.serial_number }).first()
+      await expect(card.getByText(`S/N: ${device.serial_number}`)).toBeVisible({ timeout: 10000 })
+      await expect(card.getByText(new RegExp(device.firmware_version))).toBeVisible()
     })
   })
 

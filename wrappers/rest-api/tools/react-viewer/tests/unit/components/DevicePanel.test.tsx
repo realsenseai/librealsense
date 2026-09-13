@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor, fireEvent } from '@testing-library/react'
+import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { render, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 import { DevicePanel } from '@/components/DevicePanel'
@@ -236,7 +236,8 @@ describe('DevicePanel', () => {
         },
       })
       
-      expect(screen.getByText('RealSense D435')).toBeInTheDocument()
+      // The name also appears in the recording panel, so look inside the card
+      expect(within(screen.getByTestId('device-card')).getByText('RealSense D435')).toBeInTheDocument()
       expect(screen.queryByTitle(/Activate device|Deactivate device/)).not.toBeInTheDocument()
     })
   })
@@ -263,30 +264,41 @@ describe('DevicePanel', () => {
     it('shows the transport, a Playback badge and no Record button for a recording', async () => {
       const device = createMockDevice({ device_id: 'playback-clip.db3', is_playback: true, file_name: 'C:/recs/clip.db3' })
       render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } } })
-      expect(screen.getByText('Playback')).toBeInTheDocument()
+      expect(within(screen.getByTestId('device-card')).getByText('Playback')).toBeInTheDocument()
       expect(await screen.findByTestId('playback-transport')).toBeInTheDocument()
+      // A recording is not a camera: nothing offers to record it
       expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument()
+      expect(screen.getByTestId('recording-playback')).toHaveTextContent('clip.db3')
     })
 
-    it('names the recording controls instead of showing a bare red dot', async () => {
+    it('says in words whether a camera is recording, and for how long', async () => {
       const device = createMockDevice()
       const ds = createMockDeviceState(device, { isStreaming: true })
       render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } } })
 
-      const pane = screen.getByTestId('recording-pane')
-      expect(pane).toHaveTextContent('Recording')
+      const panel = screen.getByTestId('recording-panel')
+      expect(panel).toHaveTextContent('Recording')
+      expect(screen.getByTestId('record-indicator')).toHaveTextContent('Not recording')
       expect(screen.getByTestId('record-start')).toHaveTextContent('Record')
 
       await userEvent.click(screen.getByTestId('record-start'))
 
-      // While it runs the pane says so, counts, and names the file it writes
+      // While it runs the panel says so, counts, and names the file it writes
       await waitFor(() => expect(screen.getByTestId('record-indicator')).toHaveTextContent(/Recording 00:0\d/))
       expect(screen.getByTestId('record-stop')).toHaveTextContent('Stop')
-      await waitFor(() => expect(screen.getByTestId('recording-pane')).toHaveTextContent(/Writing to: /))
+      await waitFor(() => expect(panel).toHaveTextContent(/Writing to: /))
     })
 
-    it('has a Load Recorded Sequence button in the header', () => {
+    it('tells the user a camera must stream before it can record', () => {
+      const device = createMockDevice()
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } } })
+      expect(screen.getByTestId('record-indicator')).toHaveTextContent('start streaming to enable')
+      expect(screen.getByTestId('record-start')).toBeDisabled()
+    })
+
+    it('says no recording is open, and offers the button that opens one', () => {
       render(<DevicePanel />)
+      expect(screen.getByTestId('playback-state')).toHaveTextContent('No recording open')
       expect(screen.getByRole('button', { name: 'Load recorded sequence' })).toBeInTheDocument()
     })
   })

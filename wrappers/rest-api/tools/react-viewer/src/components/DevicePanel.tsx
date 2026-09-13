@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { MutableRefObject, ReactElement } from 'react'
+import type { MutableRefObject } from 'react'
 import { useAppStore } from '../store'
 import { apiClient } from '../api/client'
 import type { ControlGroup, DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState, SensorConfig } from '../api/types'
@@ -10,7 +10,8 @@ import { ToastContainer, type ToastType, type ToastAction } from './Toast'
 import { searchGroup } from '../utils/optionSearch'
 import { unsupportedStreams } from '../utils/streamModes'
 import { Transport } from './playback/Transport'
-import { RecordingPane } from './record/RecordingPane'
+import { RecordingPanel } from './record/RecordingPanel'
+import { useFilePicker } from '../hooks/useFilePicker'
 import { UpdatesDialog } from './updates/UpdatesDialog'
 import { HdrDialog } from './hdr/HdrDialog'
 import { CalibrationDialog } from './calibration/CalibrationDialog'
@@ -102,33 +103,6 @@ function showFirmwareUpdatePromptsIfNeeded(
   promptedRef.current = live
 }
 
-// Reusable hidden-file-input hook. Returns the JSX to render once at a stable
-// location in the tree (so the OS file picker callback fires even after the
-// menu that triggered it unmounts) and an `open()` function to trigger it.
-function useFilePicker(onPick: (file: File) => void, accept: string): {
-  open: () => void
-  input: ReactElement
-} {
-  const ref = useRef<HTMLInputElement>(null)
-  const open = () => ref.current?.click()
-  const input = (
-    <input
-      ref={ref}
-      type="file"
-      accept={accept}
-      className="hidden"
-      onClick={(e) => e.stopPropagation()}
-      onChange={(e) => {
-        const f = e.target.files?.[0]
-        if (f) onPick(f)
-        // Reset so selecting the same file again still triggers onChange.
-        e.target.value = ''
-      }}
-    />
-  )
-  return { open, input }
-}
-
 export function DevicePanel() {
   const {
     devices,
@@ -147,11 +121,9 @@ export function DevicePanel() {
     updateFirmwareFromFile,
     updateFirmwareFromRecommended,
     toggleAdvancedMode,
-    uploadRecording,
     uploadPreset,
     savePreset,
   } = useAppStore()
-  const recordingPicker = useFilePicker((file) => void uploadRecording(file), '.bag,.db3')
 
   const [toasts, setToasts] = useState<Toast[]>([])
   // Only one FW update can run at a time, so a single-value state is enough.
@@ -272,22 +244,11 @@ export function DevicePanel() {
   }, [deviceStates, handleUpdateFromRecommended])
 
   return (
+    <>
     <div className="p-4">
-      {recordingPicker.input}
       <div className="flex items-center justify-between mb-4">
         <h2 className="panel-header mb-0">Devices</h2>
         <div className="flex items-center gap-1">
-        <button
-          onClick={() => recordingPicker.open()}
-          aria-label="Load recorded sequence"
-          title="Open a recorded sequence (.bag / .db3) and play it back as a device"
-          className="flex items-center gap-1 px-2 py-1 hover:bg-gray-700 rounded-lg transition-colors text-xs text-gray-200"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
-          </svg>
-          Load recording
-        </button>
         <button
           onClick={() => fetchDevices(true)}
           disabled={isLoadingDevices}
@@ -409,6 +370,9 @@ export function DevicePanel() {
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
+    {/* Recording and playback live together, below the cameras they belong to */}
+    <RecordingPanel />
+    </>
   )
 }
 
@@ -741,9 +705,7 @@ function DeviceCard({
         )}
       </div>
 
-      {device.is_playback
-        ? <Transport deviceId={device.device_id} />
-        : <RecordingPane deviceId={device.device_id} streaming={isStreaming} />}
+      {device.is_playback && <Transport deviceId={device.device_id} />}
 
       {!isLoading && (
         <div className="border-t border-gray-700 p-3 space-y-1.5">

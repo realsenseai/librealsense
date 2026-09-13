@@ -42,9 +42,10 @@ test.describe('@real-device Record and playback', () => {
     await expect(page.locator('video').first()).toBeVisible({ timeout: 15000 })
 
     try {
-    // Record for a few seconds
-    await deviceCard.getByRole('button', { name: 'Record', exact: true }).click()
-    const stopRecording = deviceCard.getByRole('button', { name: 'Stop recording' })
+    // Record for a few seconds, from the recording panel that owns those controls
+    const recordingPanel = page.getByTestId('recording-panel')
+    await recordingPanel.getByTestId('record-start').click()
+    const stopRecording = recordingPanel.getByTestId('record-stop')
     await expect(stopRecording).toBeVisible({ timeout: 10000 })
     const recording = await (await fetch(`${api}/devices/${device.device_id}/record/`)).json()
     expect(recording.recording).toBe(true)
@@ -52,7 +53,7 @@ test.describe('@real-device Record and playback', () => {
     expect(file).toMatch(/\.db3$/)
     await page.waitForTimeout(6000)
     await stopRecording.click()
-    await expect(deviceCard.getByRole('button', { name: 'Record', exact: true })).toBeVisible({ timeout: 10000 })
+    await expect(recordingPanel.getByTestId('record-start')).toBeVisible({ timeout: 10000 })
     await deviceCard.locator('button:has-text("Stop")').first().click()
     await expect(deviceCard.locator('button:has-text("Stop")')).toHaveCount(0, { timeout: 10000 })
 
@@ -68,6 +69,9 @@ test.describe('@real-device Record and playback', () => {
       await expect(playbackCard).toBeVisible({ timeout: 15000 })
       const transport = playbackCard.getByTestId('playback-transport')
       await expect(transport).toBeVisible({ timeout: 10000 })
+      // The recording panel lists the open recording and what it is doing
+      await expect(page.getByTestId('recording-playback')).toContainText('.db3')
+      await expect(page.getByTestId('recording-panel').getByTestId('playback-state')).toContainText(/Playing|Paused|Stopped/)
       await expect(transport).toContainText(file.split(/[\\/]/).pop()!)
 
       // Starting the recorded depth stream starts playback (the SDK plays as soon as a
