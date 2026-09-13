@@ -334,6 +334,11 @@ class ApiClient {
     await this.client.delete(`/webrtc/sessions/${sessionId}`)
   }
 
+  /** For the page-unload path, which must issue its own keepalive request. */
+  webrtcSessionUrl(sessionId: string): string {
+    return `${API_BASE}/webrtc/sessions/${sessionId}`
+  }
+
   // ============ Calibration ============
 
   async getCalibration(deviceId: string): Promise<CalibrationStatus> {

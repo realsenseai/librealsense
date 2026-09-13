@@ -149,6 +149,7 @@ class WebRTCManager:
         self.realsense_manager = realsense_manager
         self.sessions: Dict[str, Dict[str, Any]] = {}
         self.lock = asyncio.Lock()
+        self._reaper: Optional[asyncio.Task] = None
         self.settings = get_settings()
 
         # Set up ICE servers for WebRTC
@@ -192,6 +193,15 @@ class WebRTCManager:
             video_track.on_gone = lambda sid=session_id: asyncio.create_task(self.close_session(sid))
             pc.addTrack(video_track)
 
+        # A browser that navigated away, reloaded or crashed never closes its session, and
+        # every one left behind keeps encoding frames on the event loop. Drop it as soon as
+        # the connection reports it is gone.
+        @pc.on("connectionstatechange")
+        async def _on_connection_state(sid=session_id, peer=pc):
+            logging.info("WebRTC session %s is %s", sid[:8], peer.connectionState)
+            if peer.connectionState in ("failed", "closed", "disconnected"):
+                await self.close_session(sid)
+
         # Create offer
         offer = await pc.createOffer()
         await pc.setLocalDescription(offer)
@@ -206,8 +216,10 @@ class WebRTCManager:
                 "created_at": time.time()
             }
 
-        # Schedule cleanup of unused sessions
+        # Sweep now, and keep sweeping while this process lives
         asyncio.create_task(self._cleanup_sessions())
+        if self._reaper is None or self._reaper.done():
+            self._reaper = asyncio.create_task(self._reap_forever())
 
         # Return session ID and offer
         return session_id, {
@@ -303,35 +315,47 @@ class WebRTCManager:
         )
 
     async def close_session(self, session_id: str) -> bool:
-        """Close a WebRTC session."""
+        """Close a WebRTC session. The peer is closed outside the lock: closing it fires the
+        state-change handler, which calls back in here and would deadlock on a held lock."""
         async with self.lock:
-            if session_id not in self.sessions:
-                return False
+            session = self.sessions.pop(session_id, None)
+        if session is None:
+            return False
+        try:
+            await session["pc"].close()
+        except Exception:
+            pass
+        return True
 
-            # Close peer connection
+    # An offer nobody answers (the page was closed mid-negotiation) is dead this long after
+    UNANSWERED_SESSION_S = 30
+
+    async def _cleanup_sessions(self):
+        """Close sessions whose peer is gone, or that were never answered, and very old ones."""
+        doomed = []
+        async with self.lock:
+            now = time.time()
+            for session_id, session in list(self.sessions.items()):
+                state = getattr(session["pc"], "connectionState", None)
+                age = now - session["created_at"]
+                dead = state in ("failed", "closed")
+                never_answered = not session["connected"] and age > self.UNANSWERED_SESSION_S
+                if dead or never_answered or age > 3600:
+                    logging.info("Dropping WebRTC session %s (state=%s, connected=%s, age=%.0fs)",
+                                 session_id[:8], state, session["connected"], age)
+                    doomed.append(self.sessions.pop(session_id))
+        for session in doomed:
             try:
-                await self.sessions[session_id]["pc"].close()
+                await session["pc"].close()
             except Exception:
                 pass
 
-            # Remove session
-            del self.sessions[session_id]
-            return True
-
-    async def _cleanup_sessions(self):
-        """Clean up old or disconnected sessions."""
-        async with self.lock:
-            now = time.time()
-            session_ids = list(self.sessions.keys())
-
-            for session_id in session_ids:
-                session = self.sessions[session_id]
-
-                # Remove sessions older than 1 hour
-                if now - session["created_at"] > 3600:
-                    try:
-                        await session["pc"].close()
-                    except Exception:
-                        pass
-
-                    del self.sessions[session_id]
+    async def _reap_forever(self, every_s: float = 15.0):
+        """A server that runs for hours never creates a session at the moment an old one dies,
+        so the sweep cannot wait for the next offer."""
+        while True:
+            await asyncio.sleep(every_s)
+            try:
+                await self._cleanup_sessions()
+            except Exception as exc:
+                logging.warning("WebRTC session sweep failed: %s", exc)

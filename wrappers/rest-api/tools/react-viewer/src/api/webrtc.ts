@@ -1,6 +1,23 @@
 import { apiClient } from './client'
 import type { ICECandidate } from './types'
 
+/**
+ * Sessions this page holds. A reload or a closed tab never unmounts the components, so the
+ * server would keep every peer connection encoding frames until it notices the silence -
+ * minutes later, and by then a long-lived server is crawling. Tell it on the way out.
+ */
+const liveSessions = new Set<string>()
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    for (const sessionId of liveSessions) {
+      // keepalive: the request must outlive the document
+      void fetch(apiClient.webrtcSessionUrl(sessionId), { method: 'DELETE', keepalive: true }).catch(() => undefined)
+    }
+    liveSessions.clear()
+  })
+}
+
 export class WebRTCHandler {
   private peerConnection: RTCPeerConnection | null = null
   private sessionId: string | null = null
@@ -78,6 +95,7 @@ export class WebRTCHandler {
       })
 
       this.sessionId = serverOffer.session_id
+      liveSessions.add(this.sessionId)
 
       // disconnect() may have run while the offer was in flight (React
       // StrictMode remounts every effect in dev). Without this the session id
@@ -162,6 +180,7 @@ export class WebRTCHandler {
 
   private releaseSession(): void {
     if (this.sessionId) {
+      liveSessions.delete(this.sessionId)
       apiClient.closeWebRTCSession(this.sessionId).catch(console.error)
       this.sessionId = null
     }
