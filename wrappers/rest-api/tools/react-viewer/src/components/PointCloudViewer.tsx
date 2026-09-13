@@ -167,7 +167,7 @@ export function PointCloudViewer() {
 
       {source && texture && <TextureFeed key={`${source}:${texture}`} deviceId={source} stream={texture} onVideo={onVideo} />}
 
-      <div className="flex-1 bg-black rounded-b-lg overflow-hidden">
+      <div className="flex-1 bg-black rounded-b-lg overflow-hidden" data-testid="pointcloud-view">
         {frame && geo?.depth ? (
           <Canvas frameloop={viewMode === '3d' ? 'always' : 'never'} gl={{ antialias: false, preserveDrawingBuffer: true }}>
             <PerspectiveCamera makeDefault position={[0, 0, 1]} fov={45} />

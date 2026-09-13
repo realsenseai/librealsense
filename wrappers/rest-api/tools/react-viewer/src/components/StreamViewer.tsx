@@ -621,6 +621,9 @@ function StreamTile({
       onMouseLeave={() => { panMouse.onMouseUp(); if (isDepthStream) handleMouseLeave() }}
       onMouseDown={roiMode ? roiMouse.onMouseDown : panMouse.onMouseDown}
       onMouseUp={roiMode ? roiMouse.onMouseUp : panMouse.onMouseUp}
+      // Belt and braces: in ROI mode the press is a rectangle, never a tile drag
+      onDragStart={roiMode ? (e) => e.preventDefault() : undefined}
+      draggable={roiMode ? false : undefined}
       style={roiMode ? { cursor: 'crosshair' } : zoomed ? { cursor: 'grab' } : undefined}
     >
       {/* Video Element. The wrapper stays in normal flow (it gives the tile its height); when
@@ -680,11 +683,12 @@ function StreamTile({
         </div>
       )}
 
-      {/* Stream label, and the only grip that rearranges tiles */}
+      {/* Stream label, and the only grip that rearranges tiles - except while a rectangle
+          is being drawn, when nothing in the tile may start a drag. */}
       <div
-        {...{ [DRAG_HANDLE]: true }}
-        title="Drag to rearrange the tiles"
-        className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} left-2 px-2 py-1 rounded text-xs font-semibold text-white cursor-move select-none ${getStreamColor(
+        {...(roiMode ? {} : { [DRAG_HANDLE]: true })}
+        title={roiMode ? 'Drag a rectangle over the image to set the ROI' : 'Drag to rearrange the tiles'}
+        className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} left-2 px-2 py-1 rounded text-xs font-semibold text-white select-none ${roiMode ? 'cursor-crosshair' : 'cursor-move'} ${getStreamColor(
           streamType
         )}`}
       >

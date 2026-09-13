@@ -52,12 +52,12 @@ test.describe('@real-device 3D view', () => {
     const toolbar = page.getByTestId('3d-toolbar')
     await expect(toolbar).toBeVisible()
     // A frame and its geometry arrived: the canvas is up and export is possible
-    await expect(page.locator('canvas').first()).toBeVisible({ timeout: 20000 })
+    await expect(page.getByTestId('pointcloud-view').locator('canvas')).toBeVisible({ timeout: 20000 })
     await expect(toolbar.getByRole('button', { name: 'Export PLY' })).toBeEnabled({ timeout: 20000 })
     await expect(toolbar.getByLabel('Depth source')).toContainText(device.serial_number)
 
     // Something is drawn: a share of the canvas pixels is not background black
-    await expect.poll(() => page.locator('canvas').first().evaluate((c: HTMLCanvasElement) => {
+    await expect.poll(() => page.getByTestId('pointcloud-view').locator('canvas').evaluate((c: HTMLCanvasElement) => {
       const probe = document.createElement('canvas')
       probe.width = 64; probe.height = 36
       const ctx = probe.getContext('2d')!
@@ -72,14 +72,14 @@ test.describe('@real-device 3D view', () => {
     const texture = toolbar.getByLabel('Texture source')
     if (hasColor) await expect(texture).toHaveValue('color', { timeout: 15000 })
     await toolbar.getByLabel('Shading').selectOption('points')
-    await expect(page.locator('canvas').first()).toBeVisible()
+    await expect(page.getByTestId('pointcloud-view').locator('canvas')).toBeVisible()
     await toolbar.getByLabel('Shading').selectOption('diffuse')
     await texture.selectOption('')
-    await expect(page.locator('canvas').first()).toBeVisible()
+    await expect(page.getByTestId('pointcloud-view').locator('canvas')).toBeVisible()
 
     // Measurement: clicks on the cloud add points; the second one draws a ruler with a
     // distance label. The scene is whatever the camera sees, so probe a grid of spots.
-    const canvas = page.locator('canvas').first()
+    const canvas = page.getByTestId('pointcloud-view').locator('canvas')
     const box = (await canvas.boundingBox())!
     outer: for (const fy of [0.5, 0.4, 0.6, 0.3, 0.7]) {
       for (const fx of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8]) {

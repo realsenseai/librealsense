@@ -17,10 +17,11 @@ async function tileOrder(page: import('@playwright/test').Page): Promise<string[
     tiles.map((t) => t.querySelector('[data-tile-drag-handle]')?.textContent?.trim() ?? '?'))
 }
 
-/** Fraction of the 3D canvas that is not background. */
+/** Fraction of the 3D canvas that is not background. Charts elsewhere on the page have
+ * canvases too, so this reads the one the point cloud draws into. */
 async function canvasLit(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(() => {
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement | null
+    const canvas = document.querySelector('[data-testid="pointcloud-view"] canvas') as HTMLCanvasElement | null
     if (!canvas) return 0
     const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl')
     if (!gl) return 0
@@ -62,7 +63,7 @@ test.describe('@real-device Viewer controls', () => {
       await expect(cameraCard(page, device.serial_number).getByTestId('stop-streaming').first()).toBeVisible()
 
       await page.getByRole('button', { name: '3D View' }).click()
-      await expect(page.locator('canvas').first()).toBeVisible({ timeout: 20000 })
+      await expect(page.getByTestId('pointcloud-view').locator('canvas')).toBeVisible({ timeout: 20000 })
       await expect.poll(() => canvasLit(page), { timeout: 30000, message: 'the 3D view drew nothing' }).toBeGreaterThan(0.01)
       await page.getByRole('button', { name: '2D View' }).click()
     } finally {
@@ -134,7 +135,7 @@ test.describe('@real-device Viewer controls', () => {
     }
   })
 
-  test('the recording pane records a clip and says what it is doing', async ({ page, waitForDevice, getDevices }) => {
+  test('the recording panel records a clip and says what it is doing', async ({ page, waitForDevice, getDevices }) => {
     test.setTimeout(180000)
     const [device] = await getDevices()
     await page.goto('/')
@@ -143,20 +144,24 @@ test.describe('@real-device Viewer controls', () => {
     await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 30000 })
 
     try {
-      await expect(card.getByTestId('record-start')).toBeDisabled() // nothing streams yet
+      const panel = page.getByTestId('recording-panel')
+      await expect(panel.getByTestId('record-start')).toBeDisabled() // nothing streams yet
+      await expect(panel.getByTestId('record-indicator')).toContainText('Not recording')
+      await expect(panel.getByTestId('playback-state')).toContainText('No recording open')
+
       await startDepth(page, card, device.device_id)
-      await expect(card.getByTestId('record-start')).toBeEnabled()
+      await expect(panel.getByTestId('record-start')).toBeEnabled()
 
-      await card.getByTestId('record-start').click()
-      await expect(card.getByTestId('record-indicator')).toContainText('Recording', { timeout: 15000 })
-      await expect(card.getByTestId('recording-pane')).toContainText('Writing to:')
+      await panel.getByTestId('record-start').click()
+      await expect(panel.getByTestId('record-indicator')).toContainText('Recording', { timeout: 15000 })
+      await expect(panel).toContainText('Writing to:')
       await page.waitForTimeout(3000)
-      await card.getByTestId('record-stop').click()
+      await panel.getByTestId('record-stop').click()
 
-      await expect(card.getByTestId('record-start')).toBeVisible({ timeout: 15000 })
-      // The pane keeps naming the file it just wrote, and the server has it on disk
-      await expect(card.getByTestId('recording-pane')).toContainText('Last file:')
-      const written = (await card.getByTestId('recording-pane').innerText()).split('Last file:')[1].trim()
+      await expect(panel.getByTestId('record-start')).toBeVisible({ timeout: 15000 })
+      // The panel keeps naming the file it just wrote, and the server has it on disk
+      await expect(panel).toContainText('Last file:')
+      const [written] = (await panel.innerText()).split('Last file:')[1].trim().split(/\s*[\r\n]+/)
       const files = await (await fetch(`${api()}/playback/files`)).json()
       expect(files.map((f: { name: string }) => f.name)).toContain(written)
     } finally {

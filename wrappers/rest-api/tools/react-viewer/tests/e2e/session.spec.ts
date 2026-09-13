@@ -84,7 +84,7 @@ test.describe('@real-device Feature session', () => {
 
       // 6. 3D view renders the cloud, back to 2D still streams
       await page.getByRole('button', { name: '3D View' }).click()
-      await expect(page.locator('canvas').first()).toBeVisible({ timeout: 20000 })
+      await expect(page.getByTestId('pointcloud-view').locator('canvas')).toBeVisible({ timeout: 20000 })
       await expect(page.getByTestId('3d-toolbar').getByRole('button', { name: 'Export PLY' })).toBeEnabled({ timeout: 20000 })
       await page.getByRole('button', { name: '2D View' }).click()
       await expectFramesFlowing(device.device_id)

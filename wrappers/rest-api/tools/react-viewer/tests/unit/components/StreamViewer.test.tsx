@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor, fireEvent } from '@testing-library/react'
+import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../mocks/server'
@@ -188,6 +188,21 @@ describe('StreamViewer', () => {
 
       fireEvent.mouseDown(label)
       expect(fireEvent.dragStart(tile)).toBe(true)
+    })
+
+    it('refuses to rearrange while a rectangle is being drawn', async () => {
+      server.use(http.get('/api/v1/devices/:deviceId/sensors/:sensorId/roi', () =>
+        HttpResponse.json({ supported: true, min_x: 0, min_y: 0, max_x: 639, max_y: 479 })))
+      const ds = twoStreams()
+      render(<StreamViewer />, { initialStoreState: { deviceStates: { [ds.device.device_id]: ds } } })
+      const tile = screen.getAllByTestId('stream-tile')[0]
+
+      await userEvent.click(await within(tile).findByRole('button', { name: 'Set auto-exposure ROI' }))
+
+      // In ROI mode the press belongs to the rectangle wherever it lands - the label included
+      const label = tile.querySelector('[data-tile-drag-handle]')
+      expect(label).toBeNull()
+      expect(fireEvent.dragStart(tile)).toBe(false)
     })
 
     it('gives every row an equal share whatever a tile would rather be', () => {
