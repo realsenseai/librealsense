@@ -446,6 +446,19 @@ D555/D585 checks (Phase 9, WP5.2, WP6.5) can wait until those phases start.
   until a frame carries metadata), a failed ROI probe is retried, and recording lives in a
   labelled pane with elapsed time and the file name. `tests/e2e/viewer-ui.spec.ts` covers all
   of it against the camera.
+- 2026-09-13 (third hands-on session): most of what still looked broken was a stale bundle -
+  the server serves `wrappers/rest-api/static/` and `npm run build` only wrote `dist/`, so the
+  page at :8000 kept running the previous day's code. `npm run build` now publishes into
+  static/ and the CMake target drops its extra `npm run bundle` step. The real remainders:
+  (1) the stream label still dragged a tile while an ROI rectangle was being drawn - in ROI
+  mode nothing in the tile arms a drag; (2) recording moved out of the camera card into a
+  Recording pane under the device list that names the state ("Not recording" / "Recording
+  00:12" / the file being written) and carries the Playback section (open, play, pause, stop,
+  close, and whether a recording is open at all); (3) a long-lived server crawled because
+  WebRTC sessions were only reaped after an hour and nothing closed them when a browser
+  reloaded - the peer connection now closes on failed/closed/disconnected, a sweep every 15 s
+  drops unanswered offers, and the page releases its sessions on unload. That last one is why
+  earlier full-suite runs degraded from 3 minutes to 10 with unrelated-looking failures.
 - WP3.4: `tests/e2e/playback.spec.ts` (record 6 s, load, transport) and
   `tests/live/test_playback.py`. Finding: a recording that ran to its end only plays again
   once its sensors are reopened; `play` now does that (the legacy play button does too).
