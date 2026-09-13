@@ -34,7 +34,6 @@ add_custom_command(
     OUTPUT ${VIEWER_STAMP}
     COMMAND ${NPM_EXECUTABLE} ci --no-audit --no-fund
     COMMAND ${NPM_EXECUTABLE} run build
-    COMMAND ${NPM_EXECUTABLE} run bundle
     COMMAND ${CMAKE_COMMAND} -E touch ${VIEWER_STAMP}
     WORKING_DIRECTORY ${VIEWER_DIR}
     DEPENDS ${VIEWER_SOURCES} ${VIEWER_DIR}/package.json ${VIEWER_DIR}/package-lock.json ${VIEWER_DIR}/index.html ${VIEWER_DIR}/vite.config.ts
