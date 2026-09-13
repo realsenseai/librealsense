@@ -19,6 +19,7 @@ namespace rs2
             int rows = 0;
             const uint8_t * cells = nullptr;
             size_t cell_count = 0;
+            float cell_size_cm = 0.f;     // 0 = unknown
         };
 
         occupancy_layout resolve_occupancy_layout( const rs2::frame & frame, const void * data )
@@ -39,13 +40,18 @@ namespace rs2
                 std::memcpy( &magic, cells, sizeof( magic ) );
                 if( magic == MAP1_MAGIC && cells[6] == MAP1_DATA_TYPE_OCCG )
                 {
-                    uint16_t w = 0, h = 0;
+                    // OCCG subheader layout per hkr_fw's map1.py (_OCCG_HDR = "<HHHHiiIQI"):
+                    // width, height, res_mm, cell_stride, origin_x_mm, origin_y_mm,
+                    // source_frame_id, timestamp_us, cell_count.
+                    uint16_t w = 0, h = 0, cell_size_mm = 0;
                     std::memcpy( &w, cells + MAP1_HEADER_LEN + 0, sizeof( w ) );
                     std::memcpy( &h, cells + MAP1_HEADER_LEN + 2, sizeof( h ) );
+                    std::memcpy( &cell_size_mm, cells + MAP1_HEADER_LEN + 4, sizeof( cell_size_mm ) );
                     out.cols = w;
                     out.rows = h;
                     out.cells = cells + MAP1_HEADER_LEN + MAP1_OCCG_SUBHEADER_LEN;
                     out.map1 = true;
+                    out.cell_size_cm = cell_size_mm / 10.f;
                 }
             }
 
@@ -60,7 +66,15 @@ namespace rs2
                 out.cols = static_cast< int >( frame.get_frame_metadata( RS2_FRAME_METADATA_OCCUPANCY_GRID_COLUMNS ) );
                 out.rows = static_cast< int >( frame.get_frame_metadata( RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS ) );
                 out.cells = cells;
+                if( frame.supports_frame_metadata( RS2_FRAME_METADATA_OCCUPANCY_CELL_SIZE ) )
+                    out.cell_size_cm
+                        = static_cast< float >( frame.get_frame_metadata( RS2_FRAME_METADATA_OCCUPANCY_CELL_SIZE ) );
             }
+
+            // Sanity bound, both carriers: reject an implausible cell size (real occupancy
+            // cells are a few cm across) rather than scale a 2D overlay by a wild value.
+            if( out.cell_size_cm < 0.5f || out.cell_size_cm > 50.f )
+                out.cell_size_cm = 0.f;
 
             if( out.cols <= 0 || out.rows <= 0 || ! data )
                 return occupancy_layout{};
@@ -95,10 +109,13 @@ namespace rs2
         }
 
         // Decodes cells into luminance bytes, applying the MAP1 axis transpose when needed.
-        void decode_occupancy_cells( const occupancy_layout & layout, std::vector< uint8_t > & vec, int & tex_cols, int & tex_rows )
+        // raw_vec mirrors vec but keeps the original signed value (-1/0/100), for hover-readout.
+        void decode_occupancy_cells( const occupancy_layout & layout, std::vector< uint8_t > & vec,
+                                      std::vector< int8_t > & raw_vec, int & tex_cols, int & tex_rows )
         {
             const auto & level_lut = occupancy_level_lut();
             vec.resize( layout.cell_count );
+            raw_vec.resize( layout.cell_count );
             tex_cols = layout.cols;
             tex_rows = layout.rows;
 
@@ -118,15 +135,20 @@ namespace rs2
                     for( int c = 0; c < tex_cols; ++c )
                     {
                         const int cy = layout.rows - 1 - c;              // +Y on the left
-                        vec[static_cast< size_t >( r ) * tex_cols + c]
-                            = level_lut[layout.cells[static_cast< size_t >( cy ) * layout.cols + cx]];
+                        const uint8_t raw = layout.cells[static_cast< size_t >( cy ) * layout.cols + cx];
+                        const size_t idx = static_cast< size_t >( r ) * tex_cols + c;
+                        vec[idx] = level_lut[raw];
+                        raw_vec[idx] = static_cast< int8_t >( raw );
                     }
                 }
             }
             else
             {
                 for( size_t i = 0; i < layout.cell_count; ++i )
+                {
                     vec[i] = level_lut[layout.cells[i]];
+                    raw_vec[i] = static_cast< int8_t >( layout.cells[i] );
+                }
             }
         }
     }  // namespace
@@ -138,8 +160,13 @@ namespace rs2
             return;
 
         std::vector< uint8_t > vec;
-        int tex_cols, tex_rows;
-        decode_occupancy_cells( layout, vec, tex_cols, tex_rows );
+        int tex_cols = 0, tex_rows = 0;
+        decode_occupancy_cells( layout, vec, last_occupancy_raw, tex_cols, tex_rows );
+
+        last_occupancy_geometry.valid = true;
+        last_occupancy_geometry.tex_cols = tex_cols;
+        last_occupancy_geometry.tex_rows = tex_rows;
+        last_occupancy_geometry.cell_size_cm = layout.cell_size_cm;
 
         // Default alignment is 4 byte on windows, store it and work with 1 as our grid columns are not a multiple of 4
         GLint unpackAlignment;

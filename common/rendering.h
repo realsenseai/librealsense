@@ -399,6 +399,23 @@ namespace rs2
         rect curr_preview_rect{};
         int texture_id = 0;
 
+        // Geometry of the last uploaded occupancy frame, so a 2D overlay can size itself from
+        // the real grid instead of an assumed constant. tex_cols/tex_rows: lateral/depth axes,
+        // matching decode_occupancy_cells' layout. 0 fields mean "unknown".
+        struct occupancy_geometry
+        {
+            bool valid = false;
+            int tex_cols = 0;
+            int tex_rows = 0;
+            float cell_size_cm = 0.f;
+        };
+        occupancy_geometry last_occupancy_geometry;
+
+        // Signed cell values (-1/0/100), same (x,y) layout as the displayed texture - unlike
+        // the raw frame buffer, header/transpose already applied, so a hover-readout can index
+        // it directly with cursor coordinates.
+        std::vector< int8_t > last_occupancy_raw;
+
         // Own the GL texture properly. Each Stop/Start cycle gc_streams destroys
         // and recreates this object, so without a destructor the GL texture (and
         // the driver-side allocation behind it) leaks every cycle.
@@ -1058,6 +1075,19 @@ namespace rs2
         {
             auto image = get_last_frame().as<video_frame>();
             if (!image) return false;
+
+            if (image.get_profile().stream_type() == RS2_STREAM_OCCUPANCY)
+            {
+                // Raw frame buffer has a MAP1 header + axis transpose; last_occupancy_raw
+                // already accounts for both, indexed like the displayed texture.
+                if (!last_occupancy_geometry.valid
+                    || x < 0 || x >= last_occupancy_geometry.tex_cols
+                    || y < 0 || y >= last_occupancy_geometry.tex_rows)
+                    return false;
+                *result = static_cast<float>(
+                    last_occupancy_raw[static_cast<size_t>(y) * last_occupancy_geometry.tex_cols + x]);
+                return true;
+            }
 
             auto format = image.get_profile().format();
             switch (format)

@@ -105,6 +105,8 @@ namespace rs2
         bool show_map_ruler = true;
         bool show_metadata = false;
         bool show_safety_zones_2d = true;
+        bool show_distance_grid_2d = true;
+        int distance_grid_cell_size_cm = 5;
 
         bool show_crosshair     = false;
         int  grid_h_lines  = 1;

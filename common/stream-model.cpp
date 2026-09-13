@@ -17,6 +17,10 @@ struct attribute
     std::string description;
 };
 
+namespace {
+    int clamp_distance_grid_cell_size( int cm ) { return std::min( std::max( cm, 1 ), 200 ); }
+}
+
 namespace rs2
 {
     stream_model::stream_model()
@@ -30,6 +34,10 @@ namespace rs2
             configurations::viewer::show_stream_details, false);
         show_safety_zones_2d = config_file::instance().get_or_default(
             configurations::viewer::show_safety_zones_2d, true);
+        show_distance_grid_2d = config_file::instance().get_or_default(
+            configurations::viewer::show_distance_grid_2d, true);
+        distance_grid_cell_size_cm = clamp_distance_grid_cell_size(config_file::instance().get_or_default(
+            configurations::viewer::distance_grid_cell_size_cm, 5));
         {
             namespace cfg = configurations::viewer::viewport_grid_overlay;
             auto& cf = config_file::instance();
@@ -455,12 +463,23 @@ namespace rs2
         const auto top_bar_height = 32.f;
         auto num_of_buttons = 5;
 
+        // Computed once, reused for both button-count sizing and the draw below.
+        const bool show_distance_grid_button
+            = RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1
+              && dev && device_has_depth_mapping(dev->dev); // hide when zooming in, or for non-depth-mapping devices
+
         if (!viewer.allow_stream_close) --num_of_buttons;
         if (viewer.streams.size() > 1) ++num_of_buttons;
         if (profile.as<rs2::video_stream_profile>()) ++num_of_buttons; // Grid/crosshair button - video streams only
         if (RS2_STREAM_DEPTH == profile.stream_type()) ++num_of_buttons; // Color map ruler button
         if (RS2_FORMAT_MOTION_XYZ32F == profile.format()) ++num_of_buttons; // Motion graph button
         if (RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1) ++num_of_buttons; // Safety zones button
+        if (show_distance_grid_button)
+        {
+            ++num_of_buttons; // Distance grid button
+            if (show_distance_grid_2d)
+                num_of_buttons += 2; // + cell-size input, roughly twice a button's width
+        }
 
         RsImGui_ScopePushFont(font);
         ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
@@ -663,7 +682,7 @@ namespace rs2
 
         if (RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1) // hide polygons button when zooming in
         {
-            label = rsutils::string::from() << textual_icons::draw_polygon << "##Safety zones";
+            label = rsutils::string::from() << textual_icons::draw_polygon << "##Safety zones " << profile.unique_id();
             if (show_safety_zones_2d)
             {
                 ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
@@ -689,6 +708,56 @@ namespace rs2
                 if (ImGui::IsItemHovered())
                 {
                     RsImGui::CustomTooltip("Show safety polygons");
+                }
+            }
+            ImGui::SameLine();
+        }
+
+        if (show_distance_grid_button)
+        {
+            label = rsutils::string::from() << textual_icons::grid << "##Distance grid " << profile.unique_id();
+            if (show_distance_grid_2d)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
+                ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue);
+                if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
+                {
+                    show_distance_grid_2d = false;
+                    config_file::instance().set(configurations::viewer::show_distance_grid_2d, show_distance_grid_2d);
+                }
+                if (ImGui::IsItemHovered())
+                {
+                    RsImGui::CustomTooltip("Hide distance grid");
+                }
+                ImGui::PopStyleColor(2);
+
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(45);
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, header_window_bg);
+                // Edits the member directly - a fresh local copy each frame fought with ImGui's
+                // in-progress edit buffer while typing.
+                std::string cell_size_id = rsutils::string::from() << "##Distance grid cell size " << profile.unique_id();
+                if (ImGui::InputInt(cell_size_id.c_str(), &distance_grid_cell_size_cm, 0, 0))
+                {
+                    distance_grid_cell_size_cm = clamp_distance_grid_cell_size(distance_grid_cell_size_cm);
+                    config_file::instance().set(configurations::viewer::distance_grid_cell_size_cm, distance_grid_cell_size_cm);
+                }
+                ImGui::PopStyleColor();
+                if (ImGui::IsItemHovered())
+                {
+                    RsImGui::CustomTooltip("Distance grid line spacing, in cm");
+                }
+            }
+            else
+            {
+                if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
+                {
+                    show_distance_grid_2d = true;
+                    config_file::instance().set(configurations::viewer::show_distance_grid_2d, show_distance_grid_2d);
+                }
+                if (ImGui::IsItemHovered())
+                {
+                    RsImGui::CustomTooltip("Show distance grid");
                 }
             }
             ImGui::SameLine();
@@ -1510,7 +1579,13 @@ namespace rs2
             std::stringstream ss;
             rect cursor_rect{ mouse.cursor.x, mouse.cursor.y };
             auto ts = cursor_rect.normalize(stream_rect);
-            auto pixels = ts.unnormalize(_normalized_zoom.unnormalize(get_stream_bounds()));
+            // MAP1 frames are transposed for display (decode_occupancy_cells), so the displayed
+            // texture is tex_cols x tex_rows, not this stream's native size.
+            auto occ_geom = texture->last_occupancy_geometry;
+            auto pixel_bounds = (profile.stream_type() == RS2_STREAM_OCCUPANCY && occ_geom.valid)
+                ? rect{ 0, 0, static_cast<float>(occ_geom.tex_cols), static_cast<float>(occ_geom.tex_rows) }
+                : get_stream_bounds();
+            auto pixels = ts.unnormalize(_normalized_zoom.unnormalize(pixel_bounds));
             auto x = (int)pixels.x;
             auto y = (int)pixels.y;
 
@@ -1519,7 +1594,14 @@ namespace rs2
             float val{};
             if (texture->try_pick(x, y, &val))
             {
-                ss << " 0x" << std::hex << static_cast< int >( round( val ) );
+                if (profile.stream_type() == RS2_STREAM_OCCUPANCY)
+                {
+                    ss << " " << static_cast< int >( round( val ) );
+                }
+                else
+                {
+                    ss << " 0x" << std::hex << static_cast< int >( round( val ) );
+                }
             }
 
             bool show_max_range = false;

@@ -150,6 +150,8 @@ namespace rs2
             static const char* lpc_point_size{ "viewer_model.lpc_point_size" };
             static const char* show_safety_zones_3d{ "viewer_model.show_safety_zones_3d" };
             static const char* show_safety_zones_2d{ "viewer_model.show_safety_zones_2d" };
+            static const char* show_distance_grid_2d{ "viewer_model.show_distance_grid_2d" };
+            static const char* distance_grid_cell_size_cm{ "viewer_model.distance_grid_cell_size_cm" };
             namespace viewport_grid_overlay
             {
                 static const char* horizontal_lines{ "viewer_model.grid_overlay.horizontal_lines" };

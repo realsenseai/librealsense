@@ -2046,7 +2046,12 @@ namespace rs2
             auto&& view_rect = kvp.second;
             auto stream = kvp.first;
             auto&& stream_mv = streams[stream];
-            auto&& stream_size = stream_mv.size;
+            auto stream_size = stream_mv.size;
+            // MAP1 frames are transposed for display, so fit the tile to the actual texture size,
+            // not stream_mv.size (which stays native - it also drives "Display Size" UI text).
+            auto occ_geom = stream_mv.texture->last_occupancy_geometry;
+            if (stream_mv.profile.stream_type() == RS2_STREAM_OCCUPANCY && occ_geom.valid)
+                stream_size = { static_cast<float>(occ_geom.tex_cols), static_cast<float>(occ_geom.tex_rows) };
             auto stream_rect = view_rect.adjust_ratio(stream_size).grow(-3);
 
             if (should_render_frame(stream_mv)) {
@@ -2158,6 +2163,17 @@ namespace rs2
                             draw_zone_2d(Zone::Diagnostic, stream_rect, frame);
                             draw_zone_2d(Zone::Warning, stream_rect, frame);
                             draw_zone_2d(Zone::Danger, stream_rect, frame);
+                        }
+                        if (frame && frame.get_data() && streams[stream].show_distance_grid_2d
+                            && streams[stream].dev && device_has_depth_mapping(streams[stream].dev->dev))
+                        {
+                            auto geom = streams[stream].texture->last_occupancy_geometry;
+                            if (geom.valid && geom.cell_size_cm > 0.f)
+                            {
+                                draw_distance_grid_2d(stream_rect, streams[stream].distance_grid_cell_size_cm,
+                                                       streams[stream].dev->normalized_zoom,
+                                                       geom.tex_cols, geom.tex_rows, geom.cell_size_cm);
+                            }
                         }
                         break;
                 }
@@ -4549,5 +4565,100 @@ namespace rs2
         glLineWidth(1.0f);
     }
 
-        
+    // Cartesian grid over the occupancy view, rviz Grid-display style, spaced by line_spacing_cm.
+    // Extent and origin come from the last-uploaded occupancy frame's real geometry, not an
+    // assumed constant. normalized_zoom is remapped the same way texture_buffer::show() remaps
+    // texture coordinates when zoomed, so the grid tracks the zoomed image.
+    void viewer_model::draw_distance_grid_2d(const rect& draw_within, int line_spacing_cm, const rect& normalized_zoom,
+                                              int tex_cols, int tex_rows, float phys_cell_size_cm)
+    {
+        constexpr int label_step_cm = 100; // labels always every 1m, independent of the line spacing
+        if (line_spacing_cm < 1 || tex_cols <= 0 || tex_rows <= 0 || phys_cell_size_cm <= 0.f)
+            return;
+        // tex_cols = lateral axis, tex_rows = depth/forward (decode_occupancy_cells' layout).
+        // Depth starts at 0; lateral is centered on 0 (camera boresight).
+        const float width_cm = tex_cols * phys_cell_size_cm;
+        const float height_cm = tex_rows * phys_cell_size_cm;
+        rect grid_rect = { -width_cm / 2, 0, width_cm, height_cm };
+        const rect unit_rect = { 0, 0, 1, 1 };
+
+        // Depth (v.x) only ever affects the normalized Y; lateral (v.y) only ever affects the
+        // normalized X - transform_vertex keeps them independent, so each can be solved alone.
+        auto depth_frac = [&](float depth_cm_v) { return transform_vertex({ depth_cm_v, 0, 0 }, grid_rect, unit_rect).y; };
+        auto lateral_frac = [&](float lateral_cm_v) { return transform_vertex({ 0, lateral_cm_v, 0 }, grid_rect, unit_rect).x; };
+
+        // Map a normalized full-view fraction into the currently zoomed sub-window's fraction,
+        // the same remapping texture_buffer::draw_texture() applies to texture coordinates.
+        auto zoom_x = [&](float f) { return (f - normalized_zoom.x) / normalized_zoom.w; };
+        auto zoom_y = [&](float f) { return (f - normalized_zoom.y) / normalized_zoom.h; };
+
+        auto to_screen_x = [&](float f) { return draw_within.x + clamp(f, 0.f, 1.f) * draw_within.w; };
+        auto to_screen_y = [&](float f) { return draw_within.y + clamp(f, 0.f, 1.f) * draw_within.h; };
+
+        // Smallest multiple of step strictly greater than min_val.
+        auto first_multiple_after = [](float min_val, int step) {
+            return (int(std::floor(min_val / step)) + 1) * step;
+        };
+        const float lateral_min = -width_cm / 2;
+        const float lateral_max = width_cm / 2;
+
+        // Loop-invariant screen-space edges, hoisted out of the per-line loops below.
+        const float lateral_min_x = to_screen_x(zoom_x(lateral_frac(lateral_min)));
+        const float lateral_max_x = to_screen_x(zoom_x(lateral_frac(lateral_max)));
+        const float depth_min_y = to_screen_y(zoom_y(depth_frac(0.f)));
+        const float depth_max_y = to_screen_y(zoom_y(depth_frac(height_cm)));
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glColor4f(1.f, 1.f, 1.f, 0.6f);
+        glLineWidth(1.0f);
+        glBegin(GL_LINES);
+        for (int depth_cm = line_spacing_cm; depth_cm < height_cm; depth_cm += line_spacing_cm)
+        {
+            float zy = zoom_y(depth_frac(float(depth_cm)));
+            if (zy < 0.f || zy > 1.f)
+                continue; // this depth isn't in the current zoom window at all
+            float y = to_screen_y(zy);
+            glVertex2f(lateral_min_x, y);
+            glVertex2f(lateral_max_x, y);
+        }
+        for (int lateral_cm = first_multiple_after(lateral_min, line_spacing_cm); lateral_cm < lateral_max; lateral_cm += line_spacing_cm)
+        {
+            float zx = zoom_x(lateral_frac(float(lateral_cm)));
+            if (zx < 0.f || zx > 1.f)
+                continue; // this lateral offset isn't in the current zoom window at all
+            float x = to_screen_x(zx);
+            glVertex2f(x, depth_min_y);
+            glVertex2f(x, depth_max_y);
+        }
+        glEnd();
+        glDisable(GL_BLEND);
+        glColor4f(1.f, 1.f, 1.f, 1.f);
+
+        // Depth-axis labels, pinned to the visible view's own left edge (not the physical
+        // lateral edge, which may be scrolled out of view while zoomed).
+        auto draw_list = ImGui::GetWindowDrawList();
+        for (int depth_cm = label_step_cm; depth_cm < height_cm; depth_cm += label_step_cm)
+        {
+            float zy = zoom_y(depth_frac(float(depth_cm)));
+            if (zy < 0.f || zy > 1.f)
+                continue;
+            float y = to_screen_y(zy);
+            std::string label = rsutils::string::from() << (depth_cm / 100) << "m";
+            draw_list->AddText({ draw_within.x + 4, y - 7 }, ImColor(0.f, 0.f, 0.f, 0.95f), label.c_str());
+        }
+
+        // Lateral-axis labels, pinned to the visible view's own bottom edge.
+        for (int lateral_cm = first_multiple_after(lateral_min, label_step_cm); lateral_cm < lateral_max; lateral_cm += label_step_cm)
+        {
+            float zx = zoom_x(lateral_frac(float(lateral_cm)));
+            if (zx < 0.f || zx > 1.f)
+                continue;
+            float x = to_screen_x(zx);
+            std::string label = rsutils::string::from() << (lateral_cm / 100) << "m";
+            draw_list->AddText({ x - 10, draw_within.y + draw_within.h - 16 }, ImColor(0.f, 0.f, 0.f, 0.95f), label.c_str());
+        }
+    }
+
+
 }
