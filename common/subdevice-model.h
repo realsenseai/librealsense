@@ -204,7 +204,6 @@ namespace rs2
         rect normalized_zoom{ 0, 0, 1, 1 };
         rect roi_rect;
         bool auto_exposure_enabled = false;
-        float depth_units = 1.f;
         float stereo_baseline = -1.f;
 
         bool roi_checked = false;

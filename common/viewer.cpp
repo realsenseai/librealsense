@@ -2337,6 +2337,9 @@ namespace rs2
                     auto depth_height = depth_vid_profile.height();
                     auto depth_data = static_cast<const uint16_t*>(frame.get_data());
                     auto textured_depth_data = static_cast<const uint8_t*>(textured_frame.get_data());
+                    // Take the scale off the frame, like the colorizer does: sensors that don't
+                    // expose RS2_OPTION_DEPTH_UNITS (DDS) leave the cached value at its 1.0 default.
+                    const float depth_scale = frame.as<depth_frame>().get_units();
                     static const auto skip_pixels_factor = 30;
                     std::vector<rgb_per_distance> rgb_per_distance_vec;
                     std::vector<float> distances;
@@ -2345,7 +2348,7 @@ namespace rs2
                         for (uint64_t j = 0; j < depth_width; j+= skip_pixels_factor)
                         {
                             auto depth_index = i*depth_width + j;
-                            auto length = depth_data[depth_index] * stream_mv.dev->depth_units;
+                            auto length = depth_data[depth_index] * depth_scale;
                             if (length > 0.f)
                             {
                                 auto textured_depth_index = depth_index * 3;

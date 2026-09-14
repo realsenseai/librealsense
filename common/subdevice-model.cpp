@@ -194,13 +194,6 @@ namespace rs2
 
         try
         {
-            if (s->supports(RS2_OPTION_DEPTH_UNITS))
-                depth_units = s->get_option(RS2_OPTION_DEPTH_UNITS);
-        }
-        catch (...) {}
-
-        try
-        {
             if (s->supports(RS2_OPTION_STEREO_BASELINE))
                 stereo_baseline = s->get_option(RS2_OPTION_STEREO_BASELINE);
         }
@@ -2335,11 +2328,6 @@ namespace rs2
                             auto_exposure_enabled = false;
                         }
                     }
-                }
-
-                if (next == RS2_OPTION_DEPTH_UNITS)
-                {
-                    opt_md.dev->depth_units = opt_md.value_as_float();
                 }
 
                 if (next == RS2_OPTION_STEREO_BASELINE)
