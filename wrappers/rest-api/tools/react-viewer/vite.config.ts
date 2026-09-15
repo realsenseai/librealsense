@@ -30,6 +30,17 @@ export default defineConfig({
       },
     },
   },
+  // `npm run preview` serves the production bundle against the same backend as dev.
+  // Without the proxy here it cannot reach /api or /socket, which leaves dev mode as
+  // the only way to run the viewer locally — and dev-mode React is far slower, which
+  // reads as the viewer being laggy when it is not.
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': { target: 'http://localhost:8000', changeOrigin: true },
+      '/socket': { target: 'http://localhost:8000', ws: true, changeOrigin: true },
+    },
+  },
   build: {
     outDir: 'dist',
     sourcemap: true,

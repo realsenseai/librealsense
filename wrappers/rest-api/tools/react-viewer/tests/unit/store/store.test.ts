@@ -74,8 +74,7 @@ describe('AppStore', () => {
     it('starts with empty IMU history', () => {
       const state = useAppStore.getState()
       
-      expect(state.imuHistory.accel).toEqual([])
-      expect(state.imuHistory.gyro).toEqual([])
+      expect(state.imuHistory).toEqual({})
     })
   })
 
@@ -147,47 +146,157 @@ describe('AppStore', () => {
   })
 
   describe('IMU History', () => {
-    it('adds accelerometer data', () => {
-      const accelData = { timestamp: 1234567890, x: 0.1, y: 0.2, z: 9.8 }
-      
-      useAppStore.getState().addIMUData('accel', accelData)
-      
-      const state = useAppStore.getState()
-      expect(state.imuHistory.accel).toHaveLength(1)
-      expect(state.imuHistory.accel[0]).toEqual(accelData)
-    })
-
-    it('adds gyroscope data', () => {
-      const gyroData = { timestamp: 1234567890, x: 0.01, y: 0.02, z: 0.03 }
-      
-      useAppStore.getState().addIMUData('gyro', gyroData)
-      
-      const state = useAppStore.getState()
-      expect(state.imuHistory.gyro).toHaveLength(1)
-      expect(state.imuHistory.gyro[0]).toEqual(gyroData)
-    })
-
-    it('clears IMU history', () => {
-      useAppStore.getState().addIMUData('accel', { timestamp: 1, x: 0, y: 0, z: 0 })
-      useAppStore.getState().addIMUData('gyro', { timestamp: 1, x: 0, y: 0, z: 0 })
-      
+    // The store keeps one sample per 50 ms in a window that is pre-filled with zeros,
+    // mirroring the C++ viewer's graph_model::clear(), so the buffer is always full
+    // and tests assert on the newest entries rather than on a growing length.
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.setSystemTime(1_700_000_000_000)
       useAppStore.getState().clearIMUHistory()
-      
-      const state = useAppStore.getState()
-      expect(state.imuHistory.accel).toEqual([])
-      expect(state.imuHistory.gyro).toEqual([])
     })
 
-    it('limits IMU history length', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    const push = (deviceId: string, type: 'accel' | 'gyro', sample: { x: number; y: number; z: number }) =>
+      useAppStore.getState().addIMUData(deviceId, type, { timestamp: Date.now(), ...sample })
+
+    const historyOf = (deviceId: string, type: 'accel' | 'gyro' = 'accel') =>
+      useAppStore.getState().imuHistory[deviceId][type]
+
+    const newest = (deviceId: string, type: 'accel' | 'gyro' = 'accel') => {
+      const history = historyOf(deviceId, type)
+      return history[history.length - 1]
+    }
+
+    const realSamples = (deviceId: string, type: 'accel' | 'gyro' = 'accel') =>
+      historyOf(deviceId, type).filter((s) => s.x !== 0 || s.y !== 0 || s.z !== 0)
+
+    it('opens a full window of zeros and appends the sample at the newest end', () => {
       const maxLength = useAppStore.getState().maxIMUHistoryLength
-      
-      // Add more than max entries
-      for (let i = 0; i < maxLength + 10; i++) {
-        useAppStore.getState().addIMUData('accel', { timestamp: i, x: i, y: i, z: i })
+      push('device-1', 'accel', { x: 0.1, y: 0.2, z: 9.8 })
+
+      const accel = historyOf('device-1')
+      expect(accel).toHaveLength(maxLength)
+      expect(accel[accel.length - 1]).toMatchObject({ x: 0.1, y: 0.2, z: 9.8 })
+      // Everything before it is the zero pre-fill, spaced at the sample cadence.
+      expect(realSamples('device-1')).toHaveLength(1)
+      expect(accel[0]).toMatchObject({ x: 0, y: 0, z: 0 })
+      expect(accel[1].timestamp - accel[0].timestamp).toBe(50)
+
+      // The other stream stays untouched until its own first sample.
+      expect(historyOf('device-1', 'gyro')).toEqual([])
+    })
+
+    it('adds gyroscope data under its device', () => {
+      push('device-1', 'gyro', { x: 0.01, y: 0.02, z: 0.03 })
+
+      expect(newest('device-1', 'gyro')).toMatchObject({ x: 0.01, y: 0.02, z: 0.03 })
+    })
+
+    it('keeps devices apart', () => {
+      push('device-1', 'accel', { x: 1, y: 1, z: 1 })
+      push('device-2', 'accel', { x: 2, y: 2, z: 2 })
+
+      expect(newest('device-1')).toMatchObject({ x: 1 })
+      expect(newest('device-2')).toMatchObject({ x: 2 })
+    })
+
+    it('drops samples that arrive inside the cadence interval', () => {
+      push('device-1', 'accel', { x: 1, y: 1, z: 1 })
+      vi.advanceTimersByTime(10)
+      push('device-1', 'accel', { x: 2, y: 2, z: 2 })
+
+      expect(realSamples('device-1')).toHaveLength(1)
+      expect(newest('device-1')).toMatchObject({ x: 1 })
+
+      vi.advanceTimersByTime(50)
+      push('device-1', 'accel', { x: 3, y: 3, z: 3 })
+
+      expect(realSamples('device-1')).toHaveLength(2)
+      expect(newest('device-1')).toMatchObject({ x: 3 })
+    })
+
+    it('starts a fresh window after a streaming gap', () => {
+      push('device-1', 'accel', { x: 1, y: 1, z: 1 })
+      vi.advanceTimersByTime(50)
+      push('device-1', 'accel', { x: 2, y: 2, z: 2 })
+      expect(realSamples('device-1')).toHaveLength(2)
+
+      // Longer than IMU_STALE_GAP_MS: the stream stopped and restarted.
+      vi.advanceTimersByTime(5_000)
+      push('device-1', 'accel', { x: 3, y: 3, z: 3 })
+
+      // The old samples are gone, so the window is zeros plus the new sample.
+      expect(realSamples('device-1')).toHaveLength(1)
+      expect(newest('device-1')).toMatchObject({ x: 3 })
+    })
+
+    it('clears one device without touching the other', () => {
+      push('device-1', 'accel', { x: 1, y: 1, z: 1 })
+      push('device-2', 'accel', { x: 2, y: 2, z: 2 })
+
+      useAppStore.getState().clearIMUHistory('device-1')
+
+      expect(historyOf('device-1')).toEqual([])
+      expect(newest('device-2')).toMatchObject({ x: 2 })
+    })
+
+    // Regression: the restart reset keyed imuLastSampleAt on the bare stream type
+    // while addIMUData keys it "<deviceId>:<type>", so the reset wrote an entry
+    // nothing read and a fast stop/start kept appending to the pre-stop window.
+    it('starts a new window when a sensor restarts inside the stale-gap window', async () => {
+      const device = createMockDevice({ device_id: 'device-1', serial_number: 'device-1' })
+      useAppStore.setState({
+        deviceStates: {
+          'device-1': createMockDeviceState(device, {
+            isActive: true,
+            sensorConfigs: {
+              'motion-sensor': { resolution: { width: 0, height: 0 }, framerate: 200, isMotionSensor: true },
+            },
+            streamConfigs: [
+              {
+                sensor_id: 'motion-sensor',
+                stream_type: 'accel',
+                format: 'motion_xyz32f',
+                resolution: { width: 0, height: 0 },
+                framerate: 200,
+                enable: true,
+              },
+            ],
+          }),
+        },
+      })
+
+      push('device-1', 'accel', { x: 1, y: 1, z: 1 })
+      vi.advanceTimersByTime(50)
+      push('device-1', 'accel', { x: 2, y: 2, z: 2 })
+      expect(realSamples('device-1')).toHaveLength(2)
+
+      // Restart well inside IMU_STALE_GAP_MS, so only the reset can start a new window.
+      vi.advanceTimersByTime(100)
+      await useAppStore.getState().startSensorStreaming('device-1', 'motion-sensor')
+      push('device-1', 'accel', { x: 3, y: 3, z: 3 })
+
+      expect(realSamples('device-1')).toHaveLength(1)
+      expect(newest('device-1')).toMatchObject({ x: 3 })
+    })
+
+    it('holds the window at its length while samples keep arriving', () => {
+      const maxLength = useAppStore.getState().maxIMUHistoryLength
+
+      for (let i = 1; i <= maxLength + 10; i++) {
+        push('device-1', 'accel', { x: i, y: i, z: i })
+        vi.advanceTimersByTime(50)
       }
-      
-      const state = useAppStore.getState()
-      expect(state.imuHistory.accel.length).toBeLessThanOrEqual(maxLength)
+
+      const accel = historyOf('device-1')
+      expect(accel).toHaveLength(maxLength)
+      // The window slid: the oldest samples were dropped, not the newest, and the
+      // zero pre-fill has been pushed out entirely by now.
+      expect(accel[accel.length - 1]).toMatchObject({ x: maxLength + 10 })
+      expect(accel[0]).toMatchObject({ x: 11 })
     })
   })
 
@@ -247,6 +356,32 @@ describe('AppStore', () => {
       })
       
       expect(useAppStore.getState().isAnyDeviceStreaming()).toBe(false)
+    })
+
+    // Regression: derived streaming state used to be a `get isStreaming()`
+    // accessor. Zustand merges with Object.assign, which copies an accessor's
+    // evaluated value, so it froze at false after the first set() and every
+    // consumer silently believed nothing was ever streaming.
+    it('keeps derived streaming state correct across later store updates', () => {
+      const device = createMockDevice()
+
+      useAppStore.setState({
+        devices: [device],
+        deviceStates: {
+          [device.device_id]: createMockDeviceState(device, { isActive: true, isStreaming: true }),
+        },
+      })
+      expect(useAppStore.getState().isAnyDeviceStreaming()).toBe(true)
+
+      // An unrelated write must not stale the derived value.
+      useAppStore.setState({ error: 'unrelated' })
+      expect(useAppStore.getState().isAnyDeviceStreaming()).toBe(true)
+    })
+
+    it('does not expose a snapshot-prone isStreaming value on the store', () => {
+      // A plain boolean here would be frozen at creation time; consumers must
+      // call isAnyDeviceStreaming() instead.
+      expect('isStreaming' in useAppStore.getState()).toBe(false)
     })
   })
 

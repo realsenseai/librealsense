@@ -255,13 +255,13 @@ export function DevicePanel() {
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="panel-header mb-0">Devices</h2>
+        <h2 className="panel-header mb-0 text-3xl tracking-tight">Devices</h2>
         <button
           onClick={() => fetchDevices(true)}
           disabled={isLoadingDevices}
           aria-label={isLoadingDevices ? 'Refreshing devices…' : 'Refresh devices'}
           aria-busy={isLoadingDevices}
-          className="p-2 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 text-rs-muted hover:text-rs-text hover:bg-rs-inset rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title={isLoadingDevices ? 'Refreshing…' : 'Refresh devices'}
         >
           <svg
@@ -282,10 +282,10 @@ export function DevicePanel() {
 
       {/* Error Display */}
       {error && (
-        <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-sm">
+        <div className="mb-4 p-3 bg-rs-err/10 border border-rs-err/40 rounded-lg text-sm text-rs-err">
           <div className="flex justify-between items-start">
             <span>{error}</span>
-            <button onClick={clearError} className="text-red-400 hover:text-red-300">
+            <button onClick={clearError} className="text-rs-err hover:text-rs-text">
               ×
             </button>
           </div>
@@ -294,7 +294,7 @@ export function DevicePanel() {
 
       {/* Device List */}
       {devices.length === 0 ? (
-        <div className="text-gray-500 text-center py-8">
+        <div className="text-rs-dim text-center py-8">
           {isLoadingDevices ? (
             <div className="flex flex-col items-center">
               <div className="w-8 h-8 border-2 border-rs-blue border-t-transparent rounded-full animate-spin mb-2" />
@@ -426,8 +426,8 @@ function DeviceCard({
     <div
       className={`device-card rounded-lg transition-all ${
         isActive
-          ? 'bg-rs-blue/10 border border-rs-blue'
-          : 'bg-gray-800 border border-gray-700 hover:border-gray-600 cursor-pointer'
+          ? 'bg-rs-blue/[0.07] border border-rs-blue/70 shadow-[0_0_0_1px_rgba(0,113,197,0.15)]'
+          : 'bg-rs-inset border border-rs-border hover:border-rs-dim cursor-pointer'
       }`}
       data-testid="device-card"
       onClick={!isActive && !isLoading ? onToggle : undefined}
@@ -440,12 +440,12 @@ function DeviceCard({
       <div className="p-3">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-white truncate">{device.name}</h3>
-            <p className="text-sm text-gray-400 truncate">S/N: {device.serial_number}</p>
+            <h3 className="font-semibold text-rs-text truncate">{device.name}</h3>
+            <p className="text-sm text-rs-muted truncate nums">S/N: {device.serial_number}</p>
           </div>
           <div className="flex items-center gap-2 ml-2">
             {isStreaming && (
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Streaming" />
+              <span className="w-2 h-2 bg-rs-ok rounded-full animate-pulse" title="Streaming" />
             )}
             {isLoading && (
               <div className="w-4 h-4 border-2 border-rs-blue border-t-transparent rounded-full animate-spin" title="Loading..." />
@@ -455,7 +455,7 @@ function DeviceCard({
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-                className="p-1 hover:bg-gray-700 rounded transition-colors"
+                className="p-1 text-rs-muted hover:text-rs-text hover:bg-rs-border/60 rounded transition-colors"
                 title="Device actions"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -469,13 +469,13 @@ function DeviceCard({
                     className="fixed inset-0 z-10" 
                     onClick={() => setShowMenu(false)}
                   />
-                  <div className="absolute right-0 mt-1 w-48 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-20 py-1">
+                  <div className="absolute right-0 mt-1 w-48 bg-rs-inset border border-rs-border rounded-lg shadow-xl z-20 py-1">
                     <button
                       onClick={() => {
                         setShowMenu(false)
                         onShowToast('info', 'Calibration feature coming soon')
                       }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                      className="w-full px-4 py-2 text-left text-sm text-rs-text hover:bg-rs-border/60 flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -487,20 +487,20 @@ function DeviceCard({
                         setShowMenu(false)
                         onShowToast('info', 'Tare calibration feature coming soon')
                       }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                      className="w-full px-4 py-2 text-left text-sm text-rs-text hover:bg-rs-border/60 flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
                       </svg>
                       Tare Calibration
                     </button>
-                    <div className="border-t border-gray-600 my-1" />
+                    <div className="border-t border-rs-border my-1" />
                     <button
                       onClick={() => {
                         setShowMenu(false)
                         handleCheckFirmwareUpdates()
                       }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                      className="w-full px-4 py-2 text-left text-sm text-rs-text hover:bg-rs-border/60 flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -517,8 +517,8 @@ function DeviceCard({
                       disabled={isStreaming}
                       className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
                         isStreaming
-                          ? 'text-gray-500 cursor-not-allowed'
-                          : 'hover:bg-gray-700'
+                          ? 'text-rs-dim cursor-not-allowed'
+                          : 'text-rs-text hover:bg-rs-border/60'
                       }`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -526,7 +526,7 @@ function DeviceCard({
                       </svg>
                       Update FW from File
                     </button>
-                    <div className="border-t border-gray-600 my-1" />
+                    <div className="border-t border-rs-border my-1" />
                     <button
                       onClick={() => {
                         setShowMenu(false)
@@ -534,7 +534,7 @@ function DeviceCard({
                       }}
                       disabled={isStreaming}
                       className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
-                        isStreaming ? 'text-gray-500 cursor-not-allowed' : 'text-red-400 hover:bg-gray-700'
+                        isStreaming ? 'text-rs-dim cursor-not-allowed' : 'text-rs-err hover:bg-rs-err/10'
                       }`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -552,7 +552,7 @@ function DeviceCard({
               onClick={(e) => { e.stopPropagation(); onToggle(); }}
               disabled={isLoading || isStreaming}
               className={`relative w-10 h-5 rounded-full transition-colors ${
-                isActive ? 'bg-rs-blue' : 'bg-gray-600'
+                isActive ? 'bg-rs-blue' : 'bg-rs-border'
               } ${isLoading || isStreaming ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
               title={isActive ? 'Deactivate device' : 'Activate device'}
             >
@@ -566,7 +566,7 @@ function DeviceCard({
         </div>
 
         {/* Device Details */}
-        <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-500">
+        <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-rs-muted nums">
           {device.firmware_version && (
             <span>FW: {device.firmware_version}</span>
           )}
@@ -579,7 +579,7 @@ function DeviceCard({
             {device.sensors.map((sensor) => (
               <span
                 key={sensor}
-                className="px-2 py-0.5 bg-gray-700 rounded text-xs text-gray-300"
+                className="px-2 py-0.5 bg-rs-border/50 border border-rs-border rounded text-xs text-rs-muted"
               >
                 {sensor}
               </span>
@@ -590,10 +590,10 @@ function DeviceCard({
 
       {/* Device Controls - shown when active */}
       {isActive && !isLoading && (
-        <div className="border-t border-gray-700">
+        <div className="border-t border-rs-border">
           {/* Stream Configuration */}
           <div className="p-3">
-            <h4 className="text-sm font-medium text-gray-300 mb-2">Streams</h4>
+            <h4 className="section-label mb-2">Streams</h4>
             
             {/* Stream configs grouped by sensor */}
             <SensorStreamControls
@@ -609,8 +609,8 @@ function DeviceCard({
           </div>
 
           {/* Camera Controls */}
-          <div className="border-t border-gray-700 p-3">
-            <h4 className="text-sm font-medium text-gray-300 mb-2">Controls</h4>
+          <div className="border-t border-rs-border p-3">
+            <h4 className="section-label mb-2 block">Controls</h4>
             <ControlsSearchBox value={searchQuery} onChange={setSearchQuery} />
             {(() => {
               const searching = searchQuery.trim().length > 0
@@ -642,7 +642,7 @@ function DeviceCard({
                     />
                   ))}
                   {searching && !anyMatch && (
-                    <p className="text-gray-500 text-xs py-1">
+                    <p className="text-rs-dim text-xs py-1">
                       No controls match “{searchQuery.trim()}”.
                     </p>
                   )}
@@ -726,7 +726,7 @@ function SensorStreamControls({
         const { resolutions: availableResolutions, fps: availableFps } = computeCommonOptions()
 
         return (
-          <div key={sensor.sensor_id} className="bg-gray-800/50 rounded-lg px-2 py-1">
+          <div key={sensor.sensor_id} className="bg-rs-inset/70 border border-rs-border/60 rounded-lg px-2 py-1">
             {/* Sensor header: collapse toggle (name) on the left, start button always visible on the right */}
             <div className={`flex items-center justify-between ${isExpanded ? 'mb-2' : ''}`}>
               <button
@@ -735,14 +735,14 @@ function SensorStreamControls({
                 aria-expanded={isExpanded}
               >
                 <svg
-                  className={`w-3 h-3 shrink-0 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                  className={`w-3 h-3 shrink-0 text-rs-dim transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                   fill="none" stroke="currentColor" viewBox="0 0 24 24"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                <span className="text-sm font-medium text-gray-300 truncate">{sensor.name}</span>
+                <span className="text-sm font-semibold text-rs-text truncate">{sensor.name}</span>
                 {isSensorStreaming && (
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shrink-0" />
+                  <span className="w-1.5 h-1.5 bg-rs-ok rounded-full animate-pulse shrink-0" />
                 )}
               </button>
               <button
@@ -753,23 +753,45 @@ function SensorStreamControls({
                 disabled={isSensorPending || (!canStartSensor && !isSensorStreaming)}
                 data-testid={isSensorStreaming ? "stop-streaming" : "start-streaming"}
                 title={isSensorPending ? 'Stopping...' : isSensorStreaming ? 'Stop' : 'Start'}
-                className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                  isSensorPending
-                    ? 'bg-yellow-600 text-white cursor-wait'
-                    : isSensorStreaming
-                      ? 'bg-red-600 hover:bg-red-700 text-white'
-                      : canStartSensor
-                        ? 'bg-green-600/80 hover:bg-green-600 text-white'
-                        : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                }`}
+                className="group flex items-center gap-1.5 disabled:cursor-not-allowed"
               >
                 <span className="sr-only">{isSensorStreaming ? 'Stop' : 'Start'}</span>
-                {isSensorPending ? '⏳' : isSensorStreaming ? '■' : '▶'}
+                {/* Switch + word, matching the C++ viewer's per-sensor control. */}
+                <span
+                  className={`relative w-8 h-4 rounded-full transition-colors ${
+                    isSensorPending
+                      ? 'bg-rs-warn/70 cursor-wait'
+                      : isSensorStreaming
+                        ? 'bg-rs-blue'
+                        : canStartSensor
+                          ? 'bg-rs-border group-hover:bg-rs-dim'
+                          : 'bg-rs-border/50'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white/90 transition-transform ${
+                      isSensorStreaming ? 'translate-x-4' : ''
+                    }`}
+                  />
+                </span>
+                <span
+                  className={`w-7 text-left text-xs font-semibold lowercase tracking-wide transition-colors ${
+                    isSensorPending
+                      ? 'text-rs-warn'
+                      : isSensorStreaming
+                        ? 'text-rs-accent'
+                        : canStartSensor
+                          ? 'text-rs-dim group-hover:text-rs-muted'
+                          : 'text-rs-dim/60'
+                  }`}
+                >
+                  {isSensorPending ? 'wait' : isSensorStreaming ? 'on' : 'off'}
+                </span>
               </button>
             </div>
 
             {sensorError && (
-              <div className="mb-2 text-xs text-red-400 bg-red-900/30 rounded px-2 py-1">
+              <div className="mb-2 text-xs text-rs-err bg-rs-err/10 border border-rs-err/30 rounded px-2 py-1">
                 {sensorError}
               </div>
             )}
@@ -778,7 +800,7 @@ function SensorStreamControls({
             {sensorConfig && !sensorConfig.isMotionSensor && (
               <div className="mb-2 flex items-center gap-2 text-xs">
                 <div className="flex items-center gap-1">
-                  <label className="text-gray-500">Res:</label>
+                  <label className="text-rs-muted font-semibold uppercase tracking-wide text-xs">Res</label>
                   <select
                     value={`${sensorConfig.resolution.width}x${sensorConfig.resolution.height}`}
                     onChange={(e) => {
@@ -786,7 +808,7 @@ function SensorStreamControls({
                       onUpdateSensorConfig(sensor.sensor_id, { resolution: { width, height } })
                     }}
                     disabled={isSensorStreaming}
-                    className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+                    className="select-rs text-xs py-0.5"
                   >
                     {availableResolutions.map(([w, h]) => (
                       <option key={`${w}x${h}`} value={`${w}x${h}`}>
@@ -796,12 +818,12 @@ function SensorStreamControls({
                   </select>
                 </div>
                 <div className="flex items-center gap-1">
-                  <label className="text-gray-500">FPS:</label>
+                  <label className="text-rs-muted font-semibold uppercase tracking-wide text-xs">FPS</label>
                   <select
                     value={sensorConfig.framerate}
                     onChange={(e) => onUpdateSensorConfig(sensor.sensor_id, { framerate: Number(e.target.value) })}
                     disabled={isSensorStreaming}
-                    className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+                    className="select-rs text-xs py-0.5"
                   >
                     {availableFps.map((fps) => (
                       <option key={fps} value={fps}>
@@ -850,18 +872,6 @@ function StreamConfigItem({ config, sensors, onUpdate, disabled, isMotionSensor 
   // Don't render if no matching profile found (sensor doesn't support this stream)
   if (!profile) return null
 
-  const getStreamColor = (type: string) => {
-    const colors: Record<string, string> = {
-      depth: 'text-blue-400',
-      color: 'text-green-400',
-      infrared: 'text-purple-400',
-      fisheye: 'text-yellow-400',
-      gyro: 'text-red-400',
-      accel: 'text-orange-400',
-    }
-    return colors[type.toLowerCase()] || 'text-gray-400'
-  }
-
   // Available FPS options for this stream profile
   const availableFps = [...profile.fps].sort((a, b) => a - b)
 
@@ -876,7 +886,8 @@ function StreamConfigItem({ config, sensors, onUpdate, disabled, isMotionSensor 
           className="control-checkbox w-3 h-3 flex-shrink-0"
           data-testid={`toggle-stream-${config.stream_type.toLowerCase()}`}
         />
-        <span className={`text-xs font-semibold min-w-[50px] ${getStreamColor(config.stream_type)}`}>
+        {/* Same color whether or not the stream is selected; the checkbox carries that state. */}
+        <span className="text-xs font-bold uppercase tracking-[0.06em] min-w-[56px] text-rs-muted">
           {config.stream_type.toUpperCase()}
         </span>
       </label>
@@ -886,7 +897,7 @@ function StreamConfigItem({ config, sensors, onUpdate, disabled, isMotionSensor 
           value={config.format}
           onChange={(e) => onUpdate({ ...config, format: e.target.value })}
           disabled={disabled}
-          className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs max-w-[100px]"
+          className="select-rs text-xs py-0.5 max-w-[100px]"
         >
           {profile.formats.map((format) => (
             <option key={format} value={format}>
@@ -901,7 +912,7 @@ function StreamConfigItem({ config, sensors, onUpdate, disabled, isMotionSensor 
           value={config.framerate}
           onChange={(e) => onUpdate({ ...config, framerate: Number(e.target.value) })}
           disabled={disabled}
-          className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs w-[70px]"
+          className="select-rs text-xs py-0.5 w-[70px]"
         >
           {availableFps.map((fps) => (
             <option key={fps} value={fps}>
@@ -922,18 +933,18 @@ interface ControlsSearchBoxProps {
 function ControlsSearchBox({ value, onChange }: ControlsSearchBoxProps) {
   return (
     <div className="relative mb-2">
-      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
+      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-rs-dim pointer-events-none" />
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search controls…"
-        className="w-full pl-7 pr-7 py-1.5 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-rs-blue text-xs"
+        className="w-full pl-7 pr-7 py-1.5 bg-rs-darker/70 border border-rs-border rounded-lg text-rs-text placeholder-rs-dim shadow-inner focus:outline-none focus:border-rs-accent focus:ring-1 focus:ring-rs-accent/40 transition-colors text-xs"
       />
       {value && (
         <button
           onClick={() => onChange('')}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-rs-dim hover:text-rs-text transition-colors"
           title="Clear search"
         >
           <X className="w-3.5 h-3.5" />
@@ -1017,11 +1028,11 @@ function SensorOptionsPanel({ sensor, options, searchQuery, isExpanded, onToggle
     <div className="mb-1">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-1.5 bg-gray-800/50 rounded hover:bg-gray-700 transition-colors text-xs"
+        className="w-full flex items-center justify-between p-1.5 bg-rs-inset/70 border border-rs-border/60 rounded hover:bg-rs-inset hover:border-rs-dim/60 transition-colors text-xs"
       >
-        <span className="flex items-center gap-1.5 font-medium min-w-0">
+        <span className="flex items-center gap-1.5 font-semibold text-rs-text min-w-0">
           <svg
-            className={`w-3.5 h-3.5 shrink-0 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            className={`w-3.5 h-3.5 shrink-0 text-rs-dim transition-transform ${isExpanded ? 'rotate-90' : ''}`}
             fill="none" stroke="currentColor" viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1029,7 +1040,7 @@ function SensorOptionsPanel({ sensor, options, searchQuery, isExpanded, onToggle
           <span className="truncate">{sensor.name}</span>
         </span>
         {modifiedCount > 0 && (
-          <span className="px-1.5 py-0.5 bg-rs-blue/20 text-rs-blue rounded text-[10px]">
+          <span className="px-1.5 py-0.5 bg-rs-blue/15 border border-rs-blue/30 text-rs-accent rounded text-[11px]">
             {modifiedCount} modified
           </span>
         )}
@@ -1038,14 +1049,14 @@ function SensorOptionsPanel({ sensor, options, searchQuery, isExpanded, onToggle
       {isExpanded && (
         <div className="mt-1 space-y-1 pl-2">
           {options.length === 0 ? (
-            <p className="text-gray-500 text-xs py-1">No options available</p>
+            <p className="text-rs-dim text-xs py-1">No options available</p>
           ) : (
             <>
               {/* Global restore defaults for all sensor options */}
               {modifiedCount > 0 && (
                 <button
                   onClick={handleRestoreAllDefaults}
-                  className="w-full flex items-center justify-center gap-1 p-1 bg-gray-700/50 hover:bg-gray-600 rounded text-xs text-gray-300 transition-colors mb-1"
+                  className="w-full flex items-center justify-center gap-1 p-1 bg-rs-border/40 border border-rs-border hover:border-rs-dim hover:text-rs-text rounded text-xs text-rs-muted transition-colors mb-1"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1112,24 +1123,24 @@ function CategorySection({ category, options, searchQuery, isExpanded, onToggle,
   }
 
   return (
-    <div className="border border-gray-700 rounded overflow-hidden">
-      <div className="flex items-center bg-gray-750 hover:bg-gray-700 transition-colors">
+    <div className="border border-rs-border rounded overflow-hidden">
+      <div className="flex items-center bg-rs-inset hover:bg-rs-border/50 transition-colors">
         <button
           onClick={onToggle}
           className="flex-1 flex items-center gap-1.5 p-1.5"
         >
           <svg
-            className={`w-3 h-3 shrink-0 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            className={`w-3 h-3 shrink-0 text-rs-dim transition-transform ${isExpanded ? 'rotate-90' : ''}`}
             fill="none" stroke="currentColor" viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-xs font-medium text-gray-300">{category}</span>
+          <span className="text-xs font-semibold text-rs-text">{category}</span>
         </button>
         {hasModifiedOptions && (
           <button
             onClick={(e) => { e.stopPropagation(); onRestoreDefaults(); }}
-            className="px-1.5 py-0.5 mr-1 text-[10px] text-rs-blue hover:text-blue-400"
+            className="px-1.5 py-0.5 mr-1 text-[10px] text-rs-muted hover:text-rs-accent transition-colors"
             title={`Restore ${category} to defaults`}
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1140,7 +1151,7 @@ function CategorySection({ category, options, searchQuery, isExpanded, onToggle,
       </div>
 
       {isExpanded && (
-        <div className="p-1.5 space-y-1 bg-gray-800/30">
+        <div className="p-1.5 space-y-1 bg-rs-darker/40">
           {visibleOptions.map((option) => (
             <OptionControl
               key={option.option_id}
@@ -1201,24 +1212,24 @@ function PostProcessingSection({ options, searchQuery, isExpanded, onToggle, onR
   }
 
   return (
-    <div className="border border-gray-700 rounded overflow-hidden">
-      <div className="flex items-center bg-gray-750 hover:bg-gray-700 transition-colors">
+    <div className="border border-rs-border rounded overflow-hidden">
+      <div className="flex items-center bg-rs-inset hover:bg-rs-border/50 transition-colors">
         <button
           onClick={onToggle}
           className="flex-1 flex items-center gap-1.5 p-1.5"
         >
           <svg
-            className={`w-3 h-3 shrink-0 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            className={`w-3 h-3 shrink-0 text-rs-dim transition-transform ${isExpanded ? 'rotate-90' : ''}`}
             fill="none" stroke="currentColor" viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-xs font-medium text-gray-300">Post-Processing</span>
+          <span className="text-xs font-semibold text-rs-text">Post-Processing</span>
         </button>
         {hasModifiedOptions && (
           <button
             onClick={(e) => { e.stopPropagation(); onRestoreDefaults(); }}
-            className="px-1.5 py-0.5 mr-1 text-[10px] text-rs-blue hover:text-blue-400"
+            className="px-1.5 py-0.5 mr-1 text-[10px] text-rs-muted hover:text-rs-accent transition-colors"
             title="Restore Post-Processing to defaults"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1229,7 +1240,7 @@ function PostProcessingSection({ options, searchQuery, isExpanded, onToggle, onR
       </div>
 
       {isExpanded && (
-        <div className="p-1.5 space-y-1 bg-gray-800/30">
+        <div className="p-1.5 space-y-1 bg-rs-darker/40">
           {Object.entries(filterGroups).map(([filterName, group]) => (
             <FilterDropdown
               key={filterName}
@@ -1269,21 +1280,21 @@ function FilterDropdown({ filterName, enableOption, paramOptions, isExpanded, on
   }
 
   return (
-    <div className="border border-gray-600 rounded overflow-hidden">
-      <div 
-        className="flex items-center justify-between p-1.5 bg-gray-700/50 hover:bg-gray-700 transition-colors cursor-pointer"
+    <div className="border border-rs-border rounded overflow-hidden">
+      <div
+        className="flex items-center justify-between p-1.5 bg-rs-inset/80 hover:bg-rs-border/50 transition-colors cursor-pointer"
         onClick={onToggle}
       >
         <div className="flex items-center gap-1.5">
           <svg
-            className={`w-2.5 h-2.5 transition-transform text-gray-400 ${isExpanded ? 'rotate-90' : ''}`}
+            className={`w-2.5 h-2.5 transition-transform text-rs-dim ${isExpanded ? 'rotate-90' : ''}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-xs font-medium text-gray-200">{filterName}</span>
+          <span className="text-xs font-medium text-rs-text">{filterName}</span>
         </div>
         
         {/* Toggle Switch */}
@@ -1291,7 +1302,7 @@ function FilterDropdown({ filterName, enableOption, paramOptions, isExpanded, on
           <button
             onClick={handleToggleEnable}
             className={`relative w-8 h-4 rounded-full transition-colors ${
-              isEnabled ? 'bg-rs-blue' : 'bg-gray-600'
+              isEnabled ? 'bg-rs-blue' : 'bg-rs-border'
             }`}
           >
             <span
@@ -1304,7 +1315,7 @@ function FilterDropdown({ filterName, enableOption, paramOptions, isExpanded, on
       </div>
 
       {isExpanded && paramOptions.length > 0 && (
-        <div className="p-1.5 space-y-1 bg-gray-800/50">
+        <div className="p-1.5 space-y-1 bg-rs-darker/50">
           {paramOptions.map((option) => (
             <OptionControl
               key={option.option_id}
@@ -1361,17 +1372,17 @@ function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
   }
 
   return (
-    <div className="bg-gray-800/30 rounded p-1.5 text-xs">
+    <div className="bg-rs-inset/50 border border-rs-border/50 rounded p-1.5 text-xs">
       <div className="flex items-center justify-between mb-0.5">
-        <label className="font-medium truncate text-gray-300 flex-1" title={option.description}>
+        <label className="font-medium truncate text-rs-text flex-1" title={option.description}>
           {option.name}
         </label>
         <div className="flex items-center gap-1">
-          {option.units && <span className="text-gray-500">{option.units}</span>}
+          {option.units && <span className="text-rs-muted">{option.units}</span>}
           {!option.read_only && isModified && (
             <button
               onClick={handleRestoreDefault}
-              className="text-gray-500 hover:text-rs-blue transition-colors"
+              className="text-rs-dim hover:text-rs-accent transition-colors"
               title={`Restore default (${getDefaultDisplay()})`}
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1383,22 +1394,22 @@ function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
       </div>
 
       {option.read_only ? (
-        <div className="text-gray-400">{String(localValue)}</div>
+        <div className="text-rs-text nums">{String(localValue)}</div>
       ) : isBoolean ? (
         <label className="flex items-center gap-1 cursor-pointer">
           <input
             type="checkbox"
             checked={Boolean(localValue)}
             onChange={(e) => handleChange(e.target.checked)}
-            className="w-3 h-3"
+            className="control-checkbox w-3 h-3"
           />
-          <span className="text-gray-400">{localValue ? 'On' : 'Off'}</span>
+          <span className="text-rs-text">{localValue ? 'On' : 'Off'}</span>
         </label>
       ) : isEnum ? (
         <select
           value={String(Math.round(Number(localValue)))}
           onChange={(e) => handleChange(Number(e.target.value))}
-          className="w-full bg-gray-700 text-white rounded px-1 py-0.5 border border-gray-600 focus:border-rs-blue focus:outline-none"
+          className="select-rs w-full py-0.5"
         >
           {Object.entries(option.value_descriptions!).map(([val, desc]) => (
             <option key={val} value={val}>
@@ -1417,9 +1428,9 @@ function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
             onChange={(e) => setLocalValue(Number(e.target.value))}
             onMouseUp={() => handleChange(Number(localValue))}
             onTouchEnd={() => handleChange(Number(localValue))}
-            className="flex-1 h-1"
+            className="flex-1 h-1 cursor-pointer"
           />
-          <span className="text-gray-400 w-10 text-right">
+          <span className="text-rs-text w-10 text-right nums">
             {typeof localValue === 'number' ? localValue.toFixed(option.step && option.step < 1 ? 1 : 0) : localValue}
           </span>
         </div>
@@ -1429,7 +1440,7 @@ function OptionControl({ option, sensorId, onSetOption }: OptionControlProps) {
           value={String(localValue)}
           onChange={(e) => setLocalValue(e.target.value)}
           onBlur={() => handleChange(localValue)}
-          className="w-full bg-gray-700 text-white rounded px-1 py-0.5"
+          className="w-full bg-rs-darker/70 text-rs-text border border-rs-border rounded px-1 py-0.5 shadow-inner focus:border-rs-accent focus:outline-none"
         />
       )}
     </div>

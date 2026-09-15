@@ -19,7 +19,7 @@ export function resetStore() {
     isChatLoading: false,
     chatMessages: [],
     pendingSettings: null,
-    imuHistory: { accel: [], gyro: [] },
+    imuHistory: {},
   })
 }
 
