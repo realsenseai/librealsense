@@ -185,8 +185,11 @@ namespace librealsense
             // The occupancy canvas is transposed between the two layouts.
             const int width  = _is_safety_layout ? 256 : 320;
             const int height = _is_safety_layout ? 320 : 256;
+            // Superset only, not DEFAULT: a no-config pipeline already asks for depth + color,
+            // and the device cannot serve occupancy alongside both - the two video streams then
+            // deliver no frames at all. Callers that want occupancy enable it explicitly.
             tags.push_back( { RS2_STREAM_OCCUPANCY, -1, width, height, RS2_FORMAT_Y8, 30,
-                              profile_tag::PROFILE_TAG_SUPERSET | profile_tag::PROFILE_TAG_DEFAULT } );
+                              profile_tag::PROFILE_TAG_SUPERSET } );
         }
     }
 
