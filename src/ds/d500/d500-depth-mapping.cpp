@@ -53,6 +53,7 @@ namespace librealsense
 
         const auto pid = dev_info->get_group().uvc_devices.front().pid;
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
+        _is_d585s = ( pid == D585S_PID );
 
         const uint32_t mapping_stream_mi = _is_safety_layout ? 13 : 11;
         auto mapping_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, mapping_stream_mi);
@@ -185,11 +186,13 @@ namespace librealsense
             // The occupancy canvas is transposed between the two layouts.
             const int width  = _is_safety_layout ? 256 : 320;
             const int height = _is_safety_layout ? 320 : 256;
-            // Superset only, not DEFAULT: a no-config pipeline already asks for depth + color,
-            // and the device cannot serve occupancy alongside both - the two video streams then
-            // deliver no frames at all. Callers that want occupancy enable it explicitly.
-            tags.push_back( { RS2_STREAM_OCCUPANCY, -1, width, height, RS2_FORMAT_Y8, 30,
-                              profile_tag::PROFILE_TAG_SUPERSET } );
+            // Only D585S streams occupancy alongside depth and color, so only it keeps the
+            // DEFAULT tag. Elsewhere a no-config pipeline asks for all three and the device
+            // delivers no depth or color frames at all; occupancy is enabled explicitly there.
+            int tag = profile_tag::PROFILE_TAG_SUPERSET;
+            if( _is_d585s )
+                tag |= profile_tag::PROFILE_TAG_DEFAULT;
+            tags.push_back( { RS2_STREAM_OCCUPANCY, -1, width, height, RS2_FORMAT_Y8, 30, tag } );
         }
     }
 
