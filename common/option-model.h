@@ -31,7 +31,7 @@ namespace rs2
     class option_model
     {
     public:
-        bool draw( std::string& error_message, notifications_model& model, bool new_line = true, bool use_option_name = true );
+        bool draw( std::string& error_message, notifications_model& model, bool new_line = true );
         void update_supported( std::string& error_message );
         void update_read_only_status( std::string& error_message );
         void update_all_fields( std::string& error_message, notifications_model& model );
@@ -89,7 +89,7 @@ namespace rs2
         // Route a user-initiated write to the synchronous or async path per write_synchronously.
         void write_value( float new_value, std::string & error_message );
         bool draw_checkbox( notifications_model& model, std::string& error_message, const char* description );
-        bool draw_combobox( notifications_model& model, std::string& error_message, const char* description, bool new_line, bool use_option_name );
+        bool draw_combobox( notifications_model& model, std::string& error_message, const char* description, bool new_line );
         bool draw_slider( notifications_model& model, std::string& error_message, const char* description, bool use_cm_units );
         bool slider_selected( rs2_option opt,
             float value,

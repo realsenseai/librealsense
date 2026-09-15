@@ -998,15 +998,7 @@ class RealSenseManager:
                     option_range = filter_obj.get_option_range(opt)
                     opt_description = filter_obj.get_option_description(opt)
                     
-                    # For holes_fill option, use description as display name (matches legacy viewer)
-                    # This is because holes_fill has different meanings per filter:
-                    # - Spatial: "Holes filling mode"
-                    # - Temporal: "Persistency mode"  
-                    # - Hole Filling: "Hole Filling mode"
-                    if opt_name == 'holes_fill':
-                        display_name = opt_description
-                    else:
-                        display_name = opt_name.replace('_', ' ').title()
+                    display_name = opt_name.replace('_', ' ').title()
                     
                     # Check for enum-type options (step of 1, integer range)
                     # and collect value descriptions if available

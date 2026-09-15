@@ -10,7 +10,7 @@ namespace librealsense
         _selected_stream_id(1.f)
     {
         auto selected_stream_id = std::make_shared<ptr_option<float>>(0.f, 2.f, 1.f, 1.f,
-            &_selected_stream_id, "Selected stream id for display",
+            &_selected_stream_id, "Which HDR exposure passes through. One exposure = lower frame rate",
             std::map<float, std::string>{ {0.f, "all"}, { 1.f, "1" }, { 2.f, "2" }});
         register_option(RS2_OPTION_SEQUENCE_ID, selected_stream_id);
     }

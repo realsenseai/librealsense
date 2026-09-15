@@ -36,7 +36,7 @@ namespace librealsense {
                                                                        rotation_step,
                                                                        rotation_default_val,
                                                                        &_control_val,
-                                                                       "Rotation angle" );
+                                                                       "Frame rotation, in 90 degree steps" );
 
         auto weak_rotation_control = std::weak_ptr< ptr_option< int > >( rotation_control );
         rotation_control->on_set(

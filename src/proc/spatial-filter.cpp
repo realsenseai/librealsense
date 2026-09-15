@@ -74,14 +74,14 @@ namespace librealsense
             alpha_max_val,
             alpha_step,
             alpha_default_val,
-            &_spatial_alpha_param, "Alpha factor of Exp.moving average, 1 = no filter, 0 = infinite filter");
+            &_spatial_alpha_param, "Smoothing amount. Lower = smoother depth, softer edges. 1 = filter off");
 
         auto spatial_filter_delta = std::make_shared<ptr_option<uint8_t>>(
             delta_min_val,
             delta_max_val,
             delta_step,
             delta_default_val,
-            &_spatial_delta_param, "Edge-preserving Threshold");
+            &_spatial_delta_param, "Edge preservation. Lower = keeps sharp edges, higher = smooths across them");
 
         auto weak_spatial_filter_delta = std::weak_ptr<ptr_option<uint8_t>>();
         spatial_filter_delta->on_set([this, weak_spatial_filter_delta](float val)
@@ -103,14 +103,14 @@ namespace librealsense
             filter_iter_max,
             filter_iter_step,
             filter_iter_def,
-            &_spatial_iterations, "Filtering iterations");
+            &_spatial_iterations, "How far smoothing spreads. Higher = flatter surfaces, more CPU");
 
         auto holes_filling_mode = std::make_shared<ptr_option<uint8_t>>(
             holes_fill_min,
             holes_fill_max,
             holes_fill_step,
             holes_fill_def,
-            &_holes_filling_mode, "Holes filling mode");
+            &_holes_filling_mode, "Hole filling reach. Higher = fills wider gaps with guessed depth");
 
         holes_filling_mode->set_description(sp_hf_disabled, "Disabled");
         holes_filling_mode->set_description(sp_hf_2_pixel_radius, "2-pixel radius");

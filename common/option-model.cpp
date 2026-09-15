@@ -53,24 +53,12 @@ std::string option_model::adjust_description(const std::string& str_in, const st
 
 bool option_model::draw( std::string & error_message,
                          notifications_model & model,
-                         bool new_line,
-                         bool use_option_name )
+                         bool new_line )
 {
     auto res = false;
     if( endpoint->supports( opt ) )
     {
         std::string desc_str( endpoint->get_option_description( opt ) );
-
-        // The option's rendering model supports an alternative option title derived from its
-        // description rather than name. This is applied to the Holes Filling as its display must
-        // conform with the names used by a 3rd-party tools for consistency.
-        if (opt == RS2_OPTION_HOLES_FILL)
-        {
-            use_option_name = false;
-            // Below change is instead of the long description provided with DDS
-            // which is useful when user does not know what are the options' possible values
-            desc_str = "Persistency mode"; 
-        }
 
         // Device D405 is for short range, therefore, its units are in cm - for better UX
         bool use_cm_units = false;
@@ -92,7 +80,7 @@ bool option_model::draw( std::string & error_message,
 
         if( is_enum() )
         {
-            res = draw_combobox( model, error_message, desc, new_line, use_option_name );
+            res = draw_combobox( model, error_message, desc, new_line );
         }
         else
         {
@@ -290,12 +278,10 @@ std::vector< const char * > option_model::get_combo_labels( int * p_selected ) c
 bool option_model::draw_combobox( notifications_model & model,
                                   std::string & error_message,
                                   const char * description,
-                                  bool new_line,
-                                  bool use_option_name )
+                                  bool new_line )
 {
     bool item_clicked = false;
-    std::string txt = rsutils::string::from()
-                   << ( use_option_name ? endpoint->get_option_name( opt ) : description ) << ":";
+    std::string txt = rsutils::string::from() << endpoint->get_option_name( opt ) << ":";
 
     float text_length = ImGui::CalcTextSize( txt.c_str() ).x;
     float combo_position_x = ImGui::GetCursorPosX() + text_length + 5;

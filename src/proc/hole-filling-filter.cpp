@@ -36,7 +36,7 @@ namespace librealsense
             hole_fill_max,
             hole_fill_step,
             hole_fill_def,
-            &_hole_filling_mode, "Hole Filling mode");
+            &_hole_filling_mode, "Which neighbor fills a hole. Filled pixels are guesses, not measurements");
 
         hole_filling_mode->set_description(hf_fill_from_left, "Fill from Left");
         hole_filling_mode->set_description(hf_farest_from_around, "Farest from around");

@@ -222,7 +222,7 @@ namespace librealsense
             decimation_max_val,
             decimation_step,
             decimation_default_val,
-            &_control_val, "Decimation scale");
+            &_control_val, "Resolution reduction. Higher = less noise and CPU, coarser detail");
 
         auto weak_decimation_control = std::weak_ptr<ptr_option<uint8_t>>(decimation_control);
         decimation_control->on_set([this, weak_decimation_control](float val)
