@@ -185,9 +185,7 @@ namespace librealsense
             // The occupancy canvas is transposed between the two layouts.
             const int width  = _is_safety_layout ? 256 : 320;
             const int height = _is_safety_layout ? 320 : 256;
-            // Only the safety layout streams occupancy alongside depth and color, so only it
-            // keeps the DEFAULT tag. Elsewhere a no-config pipeline asks for all three and the
-            // device delivers no depth or color frames at all; occupancy is enabled explicitly.
+            // Only the safety layout can stream occupancy together with depth and color.
             int tag = profile_tag::PROFILE_TAG_SUPERSET;
             if( _is_safety_layout )
                 tag |= profile_tag::PROFILE_TAG_DEFAULT;
