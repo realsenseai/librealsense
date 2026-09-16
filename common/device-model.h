@@ -14,6 +14,7 @@
 #include "dds-model.h"
 #include "hdr-model.h"
 #include "textual-icons.h"
+#include "control-model.h"   // control_draw_context, passed to the control groups
 
 ImVec4 from_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a, bool consistent_color = false);
 ImVec4 operator+(const ImVec4& c, float v);
@@ -428,14 +429,8 @@ namespace rs2
         bool draw_device_panel_auto_calib_d400(viewer_model& viewer, bool& something_to_show, std::string& error_message);
         bool draw_device_panel_auto_calib_d500(viewer_model& viewer, bool& something_to_show, std::string& error_message);
 
-        void draw_processing_blocks(std::shared_ptr<subdevice_model> sub, float windows_width,
-            ux_window& window, viewer_model& viewer,
-            std::string& error_message, std::string& label,
-            std::vector<std::function<void()>>& draw_later, const bool& update_read_only_options);
-
-        void draw_embedded_filters(std::shared_ptr<subdevice_model> sub, float windows_width,
-            ux_window& window, viewer_model& viewer, std::string& error_message, std::string& label,
-            std::vector<std::function<void()>>& draw_later, const bool& update_read_only_options);
+        void draw_processing_blocks(std::shared_ptr<subdevice_model> sub, control_draw_context& ctx);
+        void draw_embedded_filters(std::shared_ptr<subdevice_model> sub, control_draw_context& ctx);
 
         std::thread check_for_device_updates_thread;
         std::mutex dev_mutex;

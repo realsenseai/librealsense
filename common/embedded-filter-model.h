@@ -15,6 +15,7 @@
 
 namespace rs2
 {
+    class control_section;
     class subdevice_model;
     class option_model;
     class viewer_model;
@@ -37,10 +38,8 @@ namespace rs2
             bool* options_invalidated,
             std::string& error_message );
 
-        void draw_options( viewer_model & viewer,
-                           bool update_read_only_options,
-                           bool is_streaming,
-                           std::string & error_message );
+        void add_options_to( control_section & section );
+        void draw_composite_options( std::string & error_message );
 
         // Hardcoded editor for RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP specifically. There is
         // no generic per-field composite-option editor (would need per-struct schema knowledge

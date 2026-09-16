@@ -30,6 +30,8 @@ namespace rs2
         option.opt = opt->id;
         option.endpoint = options;
         option.label = rsutils::string::from() << option_name << "##" << option.id;
+        auto const title = alternative_option_title( opt->id );
+        option.name = title ? title : option_name;   // the search matches what the control is titled
         option.invalidate_flag = options_invalidated;
         option.dev = model;
         option.value = opt;
@@ -64,12 +66,12 @@ bool option_model::draw( std::string & error_message,
         // The option's rendering model supports an alternative option title derived from its
         // description rather than name. This is applied to the Holes Filling as its display must
         // conform with the names used by a 3rd-party tools for consistency.
-        if (opt == RS2_OPTION_HOLES_FILL)
+        if (auto title = alternative_option_title(opt))
         {
             use_option_name = false;
             // Below change is instead of the long description provided with DDS
             // which is useful when user does not know what are the options' possible values
-            desc_str = "Persistency mode"; 
+            desc_str = title;
         }
 
         // Device D405 is for short range, therefore, its units are in cm - for better UX

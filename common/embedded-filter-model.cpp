@@ -9,6 +9,7 @@
 #include <string>
 #include "subdevice-model.h"
 #include "embedded-filter-model.h"
+#include "control-section.h"
 #include "textual-icons.h"
 #include "viewer.h"
 
@@ -135,19 +136,20 @@ namespace rs2
         }
     }
 
-    void embedded_filter_model::draw_options( viewer_model & viewer,
-                                               bool update_read_only_options,
-                                               bool is_streaming,
-                                               std::string & error_message )
+    void embedded_filter_model::add_options_to( control_section & section )
     {
         for (auto& id_and_model : _options_id_to_model)
         {
             if( id_and_model.first == RS2_OPTION_EMBEDDED_FILTER_ENABLED )
                 continue;
 
-            id_and_model.second.draw_option( update_read_only_options, is_streaming, error_message, *viewer.not_model );
+            section.add( std::make_unique< option_control >( id_and_model.second ) );
         }
+    }
 
+
+    void embedded_filter_model::draw_composite_options( std::string & error_message )
+    {
         // Composite options have no generic per-field editing UI - Decimation, Temporal Filter DPP
         // and HDRD each get a hardcoded editor below; everything else shows read-only metadata.
         for( auto id : _composite_option_ids )

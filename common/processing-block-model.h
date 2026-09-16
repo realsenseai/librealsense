@@ -10,6 +10,7 @@
 
 namespace rs2
 {
+    class control_section;
     class subdevice_model;
     class option_model;
     class viewer_model;
@@ -36,16 +37,15 @@ namespace rs2
             bool* options_invalidated,
             std::string& error_message );
 
-        void draw_options( viewer_model & viewer,
-                           bool update_read_only_options,
-                           bool is_streaming,
-                           std::string & error_message );
-
         std::shared_ptr<rs2::filter> get_block() { return _block; }
 
         // Access the UI model for one of this block's options (nullptr if not present).
         // Used by the viewer UI tests to drive/read post-processing filter controls.
         option_model * get_option_model( rs2_option opt );
+
+        // Adds this block's options to the section, in map order - the ones the viewer hides
+        // are left out
+        void add_options_to( control_section & section, viewer_model & viewer );
 
         void enable( bool e = true )
         {

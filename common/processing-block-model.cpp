@@ -5,6 +5,7 @@
 #include <string>
 #include "subdevice-model.h"
 #include "processing-block-model.h"
+#include "control-section.h"
 #include "viewer.h"
 
 
@@ -45,26 +46,18 @@ namespace rs2
         save_processing_block_to_config_file(_full_name.c_str(), _block, _enabled);
     }
 
-    void processing_block_model::draw_options( viewer_model & viewer,
-                                               bool update_read_only_options,
-                                               bool is_streaming,
-                                               std::string & error_message )
+    void processing_block_model::add_options_to( control_section & section, viewer_model & viewer )
     {
         for( auto & id_model : _options_id_to_model )
         {
             if( viewer.is_option_skipped( id_model.first ) )
                 continue;
-            
-            switch( id_model.first )
-            {
-            case RS2_OPTION_MIN_DISTANCE:
-            case RS2_OPTION_MAX_DISTANCE:
-            case RS2_OPTION_HISTOGRAM_EQUALIZATION_ENABLED:
-                id_model.second.update_all_fields( error_message, *viewer.not_model );
-                break;
-            }
 
-            id_model.second.draw_option( update_read_only_options, is_streaming, error_message, *viewer.not_model );
+            // written behind the panel's back - by the block itself and by the depth-visualization
+            // controls - so these are re-read on every frame they draw
+            section.add( std::make_unique< option_control >( id_model.second,
+                val_in_range( id_model.first, { RS2_OPTION_MIN_DISTANCE, RS2_OPTION_MAX_DISTANCE,
+                                                RS2_OPTION_HISTOGRAM_EQUALIZATION_ENABLED } ) ) );
         }
     }
 
