@@ -328,7 +328,8 @@ namespace rs2
         void refresh_notifications(viewer_model& viewer);
 
         int draw_playback_panel(ux_window& window, ImFont* font, viewer_model& view);
-        bool draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message, bool is_streaming = false);
+        bool draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message,
+            bool is_streaming, std::vector<std::function<void()>>& draw_later);
         void draw_controls(float panel_width, float panel_height,
             ux_window& window,
             std::string& error_message,
@@ -393,6 +394,16 @@ namespace rs2
         int draw_seek_bar();
         int draw_playback_controls(ux_window& window, ImFont* font, viewer_model& view);
         advanced_mode_control amc;
+        // The advanced-mode tree names the same fields of the same amc every frame, and nothing
+        // in it comes from the sensor's option list, so it is built once and drawn from then on.
+        // Its controls capture amc, _advanced and _advanced_was_set BY REFERENCE and outlive the
+        // call that built them, so all three have to be members: moving any of them back to a
+        // local in draw_advanced_controls() leaves the tree holding a dangling reference, and
+        // nothing warns. They are also declared before _advanced_sections so it dies first.
+        void build_advanced_sections();
+        std::unique_ptr< rs400::advanced_mode > _advanced;
+        std::unique_ptr< control_section > _advanced_sections;
+        bool _advanced_was_set = false;
         std::string pretty_time(std::chrono::nanoseconds duration);
         float draw_device_panel(float panel_width,
                                 ux_window& window,

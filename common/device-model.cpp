@@ -850,61 +850,86 @@ namespace rs2
     }
 
 
-    bool device_model::draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message, bool is_streaming)
+    void device_model::build_advanced_sections()
+    {
+        std::string const dev_name = dev.supports(RS2_CAMERA_INFO_NAME) ? dev.get_info(RS2_CAMERA_INFO_NAME) : "";
+        bool const ae_setpoint_unsupported = (dev_name.find("D457") != std::string::npos) || _is_d500_device;
+
+        _advanced_sections.reset(new control_section("Advanced Controls", "Advanced Controls"));
+        _advanced_sections->gap_above = false;
+        // Read on the way in, not while building: a collapsed section must not pay for
+        // a bulk read of controls nobody is looking at
+        _advanced_sections->on_open = [this]()
+        { refresh_advanced_mode_controls( *_advanced, amc, get_curr_advanced_controls ); };
+        build_advanced_mode_sections(*_advanced_sections, *_advanced, amc, _advanced_was_set,
+                                     ae_setpoint_unsupported);
+    }
+
+    bool device_model::draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message,
+        bool is_streaming, std::vector<std::function<void()>>& draw_later)
     {
         bool was_set = false;
 
         ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, { 0.9f, 0.9f, 0.9f, 1 });
 
         auto is_advanced_mode = dev.is<advanced_mode>();
-        if (is_advanced_mode && ImGui::TreeNode("Advanced Controls"))
+        if (is_advanced_mode)
         {
             try
             {
-                auto advanced = dev.as<advanced_mode>();
-                if (advanced.is_enabled())
+                if (!_advanced)
+                    _advanced.reset(new advanced_mode(dev.as<advanced_mode>()));
+                control_draw_context ctx{ view, *view.not_model, error_message, window, draw_later,
+                                          0.f, false, is_streaming };
+                if (_advanced->is_enabled())
                 {
-                    std::string dev_name = dev.supports(RS2_CAMERA_INFO_NAME) ? dev.get_info(RS2_CAMERA_INFO_NAME) : "";
-                    bool ae_setpoint_unsupported = (dev_name.find("D457") != std::string::npos) || _is_d500_device;
-
-                    draw_advanced_mode_controls(advanced, amc, get_curr_advanced_controls, was_set, error_message, ae_setpoint_unsupported);
+                    if (!_advanced_sections)
+                        build_advanced_sections();
+                    _advanced_was_set = false;
+                    _advanced_sections->draw(ctx);
+                    was_set = _advanced_was_set;
                 }
                 else
                 {
-                    if( _is_d500_device )  // D500 cannot toggle Advanced Mode
+                    _advanced_sections.reset();   // built afresh if advanced mode comes back on
+                    control_section root("Advanced Controls", "Advanced Controls");
+                    root.gap_above = false;
+                    root.content = [this, &view, &window, &error_message, is_streaming](control_draw_context &)
                     {
-                        ImGui::TextColored( redish, "Device FW does not support advanced mode" );
-                    }
-                    else if (is_streaming)
-                    {
-                        ImGui::TextColored( redish, "Advanced mode cannot be enabled\nwhen streaming" );
-                    }
-                    else
-                    {
-                        ImGui::TextColored( redish, "Device is not in advanced mode" );
-                        std::string button_text = rsutils::string::from() << "Turn on Advanced Mode" << "##" << id;
-                        static bool show_yes_no_modal = false;
-                        if (ImGui::Button(button_text.c_str(), ImVec2{ 226, 0 }))
+                        if( _is_d500_device )  // D500 cannot toggle Advanced Mode
                         {
-                            show_yes_no_modal = true;
+                            ImGui::TextColored( redish, "Device FW does not support advanced mode" );
                         }
-                        if (ImGui::IsItemHovered())
+                        else if (is_streaming)
                         {
-                            RsImGui::CustomTooltip("Advanced mode is a persistent camera state unlocking calibration formats and depth generation controls\nYou can always reset the camera to factory defaults by disabling advanced mode");
+                            ImGui::TextColored( redish, "Advanced mode cannot be enabled\nwhen streaming" );
                         }
-                        if (show_yes_no_modal)
+                        else
                         {
-                            show_yes_no_modal = prompt_toggle_advanced_mode(true, "\t\tAre you sure you want to turn on Advanced Mode?\t\t", restarting_device_info, view, window, error_message);
+                            ImGui::TextColored( redish, "Device is not in advanced mode" );
+                            std::string button_text = rsutils::string::from() << "Turn on Advanced Mode" << "##" << id;
+                            static bool show_yes_no_modal = false;
+                            if (ImGui::Button(button_text.c_str(), ImVec2{ 226, 0 }))
+                            {
+                                show_yes_no_modal = true;
+                            }
+                            if (ImGui::IsItemHovered())
+                            {
+                                RsImGui::CustomTooltip("Advanced mode is a persistent camera state unlocking calibration formats and depth generation controls\nYou can always reset the camera to factory defaults by disabling advanced mode");
+                            }
+                            if (show_yes_no_modal)
+                            {
+                                show_yes_no_modal = prompt_toggle_advanced_mode(true, "\t\tAre you sure you want to turn on Advanced Mode?\t\t", restarting_device_info, view, window, error_message);
+                            }
                         }
-                    }
+                    };
+                    root.draw(ctx);
                 }
             }
             catch (const std::exception& ex)
             {
                 error_message = ex.what();
             }
-
-            ImGui::TreePop();
         }
 
         ImGui::PopStyleColor();
@@ -2864,7 +2889,7 @@ namespace rs2
                 }
                 if (dev.is<advanced_mode>() && sub->s->is<depth_sensor>())
                 {
-                    if (draw_advanced_controls(viewer, window, error_message, is_streaming))
+                    if (draw_advanced_controls(viewer, window, error_message, is_streaming, draw_later))
                     {
                         sub->_options_invalidated = true;
                         selected_file_preset.clear();
