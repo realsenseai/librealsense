@@ -11,6 +11,38 @@ export interface DeviceInfo {
   sensors: string[]
   is_streaming: boolean
   metadata_enabled?: boolean | null
+  /** Every RS2_CAMERA_INFO field the device reports, by field name. */
+  info?: Record<string, string>
+  is_playback?: boolean
+  file_name?: string | null
+}
+
+// Wire shape of /playback/{id} (app/models/playback.py)
+export type PlaybackState = 'unknown' | 'playing' | 'paused' | 'stopped'
+export interface PlaybackStatus {
+  device_id: string
+  file_name: string
+  state: PlaybackState
+  position_ns: number
+  duration_ns: number
+  speed: number
+  repeat: boolean
+}
+export type PlaybackActionName = 'play' | 'pause' | 'stop' | 'seek' | 'speed' | 'step' | 'repeat'
+
+// Wire shape of /devices/{id}/record
+export interface RecordStatus {
+  device_id: string
+  recording: boolean
+  paused: boolean
+  file: string | null
+}
+
+export interface RecordingFile {
+  path: string
+  name: string
+  size: number
+  modified: number
 }
 
 /** Display label for an SDK name: "deepSeaMedianThreshold" -> "Deep Sea Median Threshold". */
@@ -34,6 +66,224 @@ const HIDDEN_OPTIONS = [
 export function visibleOptions(options: OptionInfo[]): OptionInfo[] {
   return options.filter((o) => !HIDDEN_OPTIONS.includes(o.option_id.toLowerCase()))
 }
+
+// One output-console line (GET /logs/, `log_batch` Socket.IO event)
+export interface LogEntry {
+  id: number
+  ts: number  // server clock, seconds
+  severity: string  // debug | info | warn | error | fatal (firmware: its own words, lower-cased)
+  message: string
+  source: string  // sdk | server | fw | fw-flash | terminal
+  file?: string | null
+  line?: number | null
+  device_id?: string
+  command?: string
+  thread?: string
+  module?: string | null
+}
+
+// Calibration session (GET /devices/{d}/calibration/), a port of common/on-chip-calib.cpp
+export interface CalibrationStatus {
+  kind: 'occ' | 'tare' | null
+  state: 'idle' | 'running' | 'done' | 'failed'
+  health: number[] | null
+  verdict: 'good' | 'ok' | 'bad' | 'unknown' | null
+  has_new_table: boolean
+  active: 'old' | 'new'
+  written: boolean
+  error: string | null
+  started_at: number | null
+}
+// The D400 coefficients table (GET/PUT /devices/{d}/calibration/table)
+export interface RectParams {
+  resolution: string
+  fx: number
+  fy: number
+  ppx: number
+  ppy: number
+}
+export interface CalibrationTable {
+  version: string
+  table_type: number
+  table_size: number
+  crc_valid: boolean
+  intrinsic_left: number[][]
+  intrinsic_right: number[][]
+  world2left_rot: number[][]
+  world2right_rot: number[][]
+  baseline: number
+  brown_model: number
+  rect_params: RectParams[]
+}
+export interface CalibrationTablePatch {
+  baseline?: number
+  intrinsic_left?: number[][]
+  intrinsic_right?: number[][]
+  world2left_rot?: number[][]
+  world2right_rot?: number[][]
+  rect_params?: { index: number; fx?: number; fy?: number; ppx?: number; ppy?: number }[]
+  write: boolean
+}
+export interface OccParams {
+  speed: number // 0 very fast .. 3 slow, 4 white wall
+  average_step_count: number
+  step_count: number
+  accuracy: number // 0 very high .. 3 low
+  apply_preset: boolean
+  intrinsic_scan: boolean
+  host_assistance: boolean
+}
+export interface TareParams {
+  ground_truth_mm: number
+  average_step_count: number
+  step_count: number
+  accuracy: number
+  apply_preset: boolean
+  host_assistance: boolean
+}
+
+// Camera geometry for the client-side point cloud (GET /devices/{d}/point_cloud/geometry)
+export interface CameraIntrinsics {
+  width: number
+  height: number
+  fx: number
+  fy: number
+  ppx: number
+  ppy: number
+  model: string // 'brown_conrady' | 'inverse_brown_conrady' | 'modified_brown_conrady' | ...
+  coeffs: number[]
+}
+export interface Extrinsics {
+  rotation: number[] // 3x3, column-major (rs2_extrinsics)
+  translation: number[]
+}
+export interface PointCloudGeometry {
+  depth: (CameraIntrinsics & { stream: string; units: number }) | null
+  texture: (CameraIntrinsics & { stream: string; extrinsics: Extrinsics }) | null
+}
+// The binary `depth_frame` Socket.IO event
+export interface DepthFrameEvent {
+  device_id: string
+  width: number
+  height: number
+  frame_number: number
+  units: number
+  format: string
+  data: ArrayBuffer | Uint8Array
+}
+
+// HDR sequence editor (app/services/hdr.py, a port of common/hdr-model.*)
+export interface HdrControls {
+  depth_gain: number
+  depth_exp: number
+  delta_gain: number
+  delta_exp: number
+}
+export interface HdrItem {
+  iterations: number
+  controls: HdrControls
+}
+export interface HdrPreset {
+  id: string
+  iterations: number
+  control_type_auto: boolean
+  items: HdrItem[]
+}
+export interface OptionRangeInfo {
+  min: number
+  max: number
+  step: number
+  default: number
+}
+export interface HdrStatus {
+  supported: boolean
+  preset: HdrPreset | null
+  exposure_range: OptionRangeInfo | null
+  gain_range: OptionRangeInfo | null
+  hdr_enabled: boolean | null
+}
+
+// Wire shape of GET /updates/{d} (app/services/updates.py)
+export interface UpdateCandidate {
+  version: string
+  link?: string | null
+  release_notes?: string | null
+  description?: string | null
+}
+export interface UpdateSection {
+  current: string | null
+  essential: UpdateCandidate | null
+  recommended: UpdateCandidate | null
+  verdict: 'unknown' | 'up_to_date' | 'recommended' | 'essential'
+}
+export interface UpdatesReport {
+  source: string
+  reachable: boolean
+  firmware: UpdateSection
+  software: UpdateSection
+}
+
+// The `notification` Socket.IO event: an SDK notification from a sensor
+export interface SdkNotification {
+  device_id: string
+  sensor_id: string
+  category: string
+  severity: string
+  description: string
+  serialized_data: string
+  timestamp: number
+}
+
+// A preset file in the server's presets folder (GET /devices/{d}/presets/)
+export interface PresetFile {
+  path: string
+  name: string
+}
+
+// Wire shape of /devices/{d}/sensors/{s}/roi
+export interface RegionOfInterest {
+  supported: boolean
+  min_x?: number
+  min_y?: number
+  max_x?: number
+  max_y?: number
+}
+
+// Wire shape of /jobs/ and the `job` Socket.IO event (app/models/job.py)
+export type JobState = 'running' | 'done' | 'failed' | 'cancelled'
+export interface JobInfo {
+  id: string
+  kind: string
+  device_id: string | null
+  state: JobState
+  progress: number  // 0..1
+  message: string | null
+  result: unknown
+  error: string | null
+  created_at: number
+  updated_at: number
+}
+
+// Wire shape of GET/PUT /settings/ (app/models/settings.py)
+export interface ViewerSettings {
+  record: { file_save_mode: 'auto' | 'ask'; default_path: string; compression: 'auto' | 'always' | 'never' }
+  update: { sw_update_official_server: boolean; sw_update_url: string; recommend_calibration: boolean }
+  console: { max_entries: number; log_to_file: boolean; log_filename: string; log_severity: 'debug' | 'info' | 'warn' | 'error' }
+  paths: { hwlogger_xml: string; commands_xml: string; presets_folder: string }
+  context: { dds_enabled: boolean; dds_domain: number }
+  calibration: { enable_writing: boolean }
+  post_processing: { performance_mode: boolean }
+  viewer: {
+    metric_system: boolean
+    grid_horizontal_lines: number
+    grid_vertical_lines: number
+    grid_line_width: number
+    grid_line_color: string
+  }
+}
+
+/** Any subset of the settings groups, each with any subset of its keys. */
+export type ViewerSettingsPatch = { [G in keyof ViewerSettings]?: Partial<ViewerSettings[G]> }
 
 export type FirmwareStatus = 'up_to_date' | 'outdated' | 'unknown'
 
@@ -76,6 +326,10 @@ export interface SupportedStreamProfile {
   resolutions: [number, number][]
   fps: number[]
   formats: string[]
+  /** The profile the SDK marks default for this stream, when it has one. */
+  default?: { resolution: [number, number]; fps: number; format: string }
+  /** Every exact (width, height, fps, format) the SDK lists. */
+  modes?: [number, number, number, string][]
 }
 
 export interface OptionInfo {
@@ -148,6 +402,7 @@ export interface ICECandidate {
 // Metadata from Socket.IO
 export interface StreamMetadata {
   stream_type: string
+  received_at?: number  // server clock, seconds; compare with MetadataUpdate.timestamp_server
   timestamp: number
   frame_number: number
   // frame dims after post processing
@@ -158,6 +413,8 @@ export interface StreamMetadata {
   frame_metadata?: Record<string, number>
   clock_domain?: string
   hardware_fps?: number
+  /** Legacy "Frame Drops per Second" dashboard figures, per one-second window */
+  stats?: { frames_per_second: number; drops_per_second: number; expected_fps: number }
   pixel_format?: string
   // frame dims as received from camera
   hardware_width?: number
@@ -202,6 +459,10 @@ export interface SensorConfig {
   resolution: { width: number; height: number }
   framerate: number
   isMotionSensor?: boolean // Motion sensors use per-stream FPS instead of shared
+  // Set when the sensor's streams share no resolution / no frame rate (legacy: depth and IR
+  // at different sizes, or no common FPS), so each stream picks its own.
+  perStreamResolution?: boolean
+  perStreamFps?: boolean
 }
 
 // Per-device state for multi-camera support
@@ -221,9 +482,12 @@ export interface DeviceState {
   streamConfigs: StreamConfig[]
   sensorConfigs: Record<string, SensorConfig> // Per-sensor resolution/FPS, keyed by sensor_id
   isStreaming: boolean
-  isActive: boolean // whether this device is shown in viewer
   isLoading: boolean // loading sensors/options
   streamMetadata: Record<string, StreamMetadata> // keyed by stream_type
+  metadataServerTime?: number // timestamp_server of the last metadata_update
+  record?: RecordStatus
+  playback?: PlaybackStatus // loaded recordings only
+  presetFiles?: PresetFile[] // JSON presets in the server's folder for this model
   // Per-sensor streaming state (sensor API)
   sensorStreamingStatus: Record<string, SensorStreamStatus> // keyed by sensor_id
 }
@@ -244,6 +508,7 @@ export interface SensorStreamStatus {
   sensor_id: string
   name: string
   is_streaming: boolean
+  paused?: boolean
   // Single stream_type for backward compatibility (first stream)
   stream_type?: string | null
   resolution?: { width: number; height: number } | null
@@ -255,5 +520,5 @@ export interface SensorStreamStatus {
   error?: string | null
   started_at?: string | null
   // UI-only: pending operation state for optimistic updates
-  pendingOp?: 'stopping' | null
+  pendingOp?: 'starting' | 'stopping' | null
 }

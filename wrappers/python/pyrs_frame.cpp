@@ -137,7 +137,7 @@ void init_frame(py::module &m) {
     perception_stream_profile.def(py::init<const rs2::stream_profile&>(), "sp"_a);
 
     py::class_<rs2::filter_interface> filter_interface(m, "filter_interface", "Interface for frame filtering functionality");
-    filter_interface.def("process", &rs2::filter_interface::process, "frame"_a); // No docstring in C++
+    filter_interface.def("process", &rs2::filter_interface::process, "frame"_a, py::call_guard<py::gil_scoped_release>()); // Blocks on the block's output queue
 
     py::class_<rs2::frame> frame(m, "frame", "Base class for multiple frame extensions");
     frame.def(py::init<>())

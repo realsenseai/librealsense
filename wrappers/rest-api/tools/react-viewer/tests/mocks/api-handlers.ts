@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { mockDeviceList, mockDevice } from './fixtures/devices'
 import { mockSensors, mockDepthOptions, mockColorOptions, mockMotionOptions, mockFilters } from './fixtures/sensors'
+import { mockSettings } from './fixtures/settings'
 
 const API_BASE = '/api/v1'
 
@@ -11,7 +12,89 @@ const sensorOptionsMap: Record<string, any[]> = {
   'sensor-2': mockMotionOptions,
 }
 
+
+export function mockCalibrationTable() {
+  const eye = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+  const res = ['1920x1080', '1280x720', '640x480', '848x480', '640x360', '424x240', '320x240', '480x270', '1280x800', '960x540', 'reserved', 'reserved', '640x400', '576x576', '720x720', '1152x1152']
+  return {
+    version: '2.1', table_type: 25, table_size: 576, crc_valid: true,
+    intrinsic_left: [[0.5, 0, 0.5], [0, 0.9, 0.5], [0, 0, 1]], intrinsic_right: [[0.5, 0, 0.5], [0, 0.9, 0.5], [0, 0, 1]],
+    world2left_rot: eye, world2right_rot: eye, baseline: 95, brown_model: 1,
+    rect_params: res.map((resolution, i) => ({ resolution, fx: 400 + i, fy: 400 + i, ppx: 320, ppy: 240 })),
+  }
+}
+
 export const handlers = [
+  http.get(`${API_BASE}/jobs/`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/logs/`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/devices/:deviceId/calibration/`, () => HttpResponse.json({
+    kind: null, state: 'idle', health: null, verdict: null, has_new_table: false, active: 'old', written: false, error: null, started_at: null,
+  })),
+  http.get(`${API_BASE}/devices/:deviceId/calibration/table`, () => HttpResponse.json(mockCalibrationTable())),
+  http.put(`${API_BASE}/devices/:deviceId/calibration/table`, async ({ request }) => {
+    const patch = (await request.json()) as { baseline?: number }
+    return HttpResponse.json({ ...mockCalibrationTable(), baseline: patch.baseline ?? 95 })
+  }),
+  http.post(`${API_BASE}/devices/:deviceId/calibration/occ`, () => HttpResponse.json({
+    id: 'calib1', kind: 'calibration_occ', device_id: 'test-device-1', state: 'running', progress: 0.05, message: 'Calibrating', result: null, error: null, created_at: 1, updated_at: 1,
+  })),
+  http.get(`${API_BASE}/devices/:deviceId/hdr/`, () => HttpResponse.json({
+    supported: true, hdr_enabled: false,
+    exposure_range: { min: 1, max: 165000, step: 1, default: 8500 },
+    gain_range: { min: 16, max: 248, step: 1, default: 16 },
+    preset: { id: '0', iterations: 0, control_type_auto: false, items: [
+      { iterations: 1, controls: { depth_gain: 16, depth_exp: 1, delta_gain: 0, delta_exp: 0 } },
+      { iterations: 1, controls: { depth_gain: 16, depth_exp: 8500, delta_gain: 0, delta_exp: 0 } },
+    ] },
+  })),
+  http.put(`${API_BASE}/devices/:deviceId/hdr/`, async ({ request }) => HttpResponse.json({
+    supported: true, hdr_enabled: false, exposure_range: null, gain_range: null, preset: await request.json(),
+  })),
+  http.get(`${API_BASE}/updates/:deviceId`, () => HttpResponse.json({
+    source: 'https://db', reachable: true,
+    firmware: { current: '5.16.0.1', essential: null, recommended: { version: '5.17.0.10', link: 'https://x/fw.bin', release_notes: 'https://x/notes' }, verdict: 'recommended' },
+    software: { current: '2.59.0.0', essential: null, recommended: { version: '2.59.0.0', link: 'https://x/sdk' }, verdict: 'up_to_date' },
+  })),
+  http.delete(`${API_BASE}/logs/`, () => HttpResponse.json({ cleared: true })),
+  http.get(`${API_BASE}/terminal/commands`, () => HttpResponse.json(['GVD', 'GLD'])),
+  http.post(`${API_BASE}/devices/:deviceId/terminal`, () => HttpResponse.json({ output: '10 00 00 00' })),
+  http.post(`${API_BASE}/devices/:deviceId/fw_logs/start`, () => HttpResponse.json({ running: true, parsed: false })),
+  http.post(`${API_BASE}/devices/:deviceId/fw_logs/stop`, () => HttpResponse.json({ running: false, parsed: false })),
+  http.post(`${API_BASE}/devices/:deviceId/fw_logs/flash`, () => HttpResponse.json({ messages: 3 })),
+  http.get(`${API_BASE}/devices/:deviceId/presets/`, () => HttpResponse.json([])),
+  http.post(`${API_BASE}/devices/:deviceId/presets/load`, () => HttpResponse.json({ loaded: 'x' })),
+  http.post(`${API_BASE}/devices/:deviceId/presets/save`, async ({ request }) => {
+    const { name } = (await request.json()) as { name: string }
+    return HttpResponse.json([{ path: `C:/presets/D455 ${name}.preset`, name }])
+  }),
+  http.get(`${API_BASE}/devices/:deviceId/record/`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, recording: false, paused: false, file: null })),
+  http.post(`${API_BASE}/devices/:deviceId/record/start`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, recording: true, paused: false, file: 'C:/recs/clip.db3' })),
+  http.post(`${API_BASE}/devices/:deviceId/record/pause`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, recording: true, paused: true, file: 'C:/recs/clip.db3' })),
+  http.post(`${API_BASE}/devices/:deviceId/record/resume`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, recording: true, paused: false, file: 'C:/recs/clip.db3' })),
+  http.post(`${API_BASE}/devices/:deviceId/record/stop`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, recording: false, paused: false, file: 'C:/recs/clip.db3' })),
+  http.get(`${API_BASE}/playback/files`, () => HttpResponse.json([])),
+  http.get(`${API_BASE}/playback/:deviceId`, ({ params }) =>
+    HttpResponse.json({ device_id: params.deviceId, file_name: 'C:/recs/clip.db3', state: 'paused', position_ns: 1_500_000_000, duration_ns: 4_000_000_000, speed: 1, repeat: false })),
+  http.post(`${API_BASE}/playback/:deviceId`, async ({ params, request }) => {
+    const body = (await request.json()) as { action: string; value?: number }
+    const state = body.action === 'play' ? 'playing' : body.action === 'stop' ? 'stopped' : 'paused'
+    return HttpResponse.json({ device_id: params.deviceId, file_name: 'C:/recs/clip.db3', state,
+      position_ns: body.action === 'seek' ? body.value : body.action === 'stop' ? 0 : 1_500_000_000, duration_ns: 4_000_000_000,
+      speed: body.action === 'speed' ? body.value : 1, repeat: body.action === 'repeat' ? !!body.value : false })
+  }),
+  http.delete(`${API_BASE}/playback/:deviceId`, ({ params }) => HttpResponse.json({ unloaded: params.deviceId })),
+  http.get(`${API_BASE}/settings/`, () => HttpResponse.json(mockSettings)),
+  http.put(`${API_BASE}/settings/`, async ({ request }) => {
+    const patch = (await request.json()) as Record<string, Record<string, unknown>>
+    const merged = structuredClone(mockSettings) as unknown as Record<string, Record<string, unknown>>
+    for (const [group, values] of Object.entries(patch)) merged[group] = { ...merged[group], ...values }
+    return HttpResponse.json(merged)
+  }),
   // Health check
   http.get(`${API_BASE}/health`, () => {
     return HttpResponse.json({ status: 'ok', service: 'realsense-api' })
@@ -92,6 +175,8 @@ export const handlers = [
   ),
 
   // Get depth range
+  http.get(`${API_BASE}/devices/:deviceId/stream/max-usable-range`, () =>
+    HttpResponse.json({ supported: false, enabled: false, range_m: null })),
   http.get(`${API_BASE}/devices/:deviceId/stream/depth-range`, () => {
     return HttpResponse.json({
       min_depth: 0.3,
@@ -145,6 +230,16 @@ export const handlers = [
   }),
 
   // Per-sensor streaming: stop sensor
+  http.get(`${API_BASE}/devices/:deviceId/sensors/:sensorId/roi`, () => HttpResponse.json({ supported: false })),
+  http.put(`${API_BASE}/devices/:deviceId/sensors/:sensorId/roi`, async ({ request }) => {
+    const roi = (await request.json()) as Record<string, number>
+    return HttpResponse.json({ supported: true, min_x: Math.min(roi.min_x, roi.max_x), min_y: Math.min(roi.min_y, roi.max_y),
+      max_x: Math.max(roi.min_x, roi.max_x), max_y: Math.max(roi.min_y, roi.max_y) })
+  }),
+  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/pause`, ({ params }) =>
+    HttpResponse.json({ sensor_id: params.sensorId, name: '', is_streaming: true, paused: true, stream_types: ['depth'] })),
+  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/resume`, ({ params }) =>
+    HttpResponse.json({ sensor_id: params.sensorId, name: '', is_streaming: true, paused: false, stream_types: ['depth'] })),
   http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/stop`, async ({ params }) => {
     const sensorId = params.sensorId as string
     return HttpResponse.json({

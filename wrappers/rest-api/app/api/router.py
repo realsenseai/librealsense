@@ -4,23 +4,8 @@
 from typing import List
 
 from fastapi import APIRouter
-from app.api.endpoints import advanced_mode, colorizer, devices, filters, firmware, hwm, options, point_cloud, sensors, streams, system, webrtc
-
-
-def _get_sdk_version() -> str:
-    """Return the version of the actually-loaded pyrealsense2 binary, or 'unknown'.
-
-    Read it from the loaded module (RS2_API_*, bound as __full_version__) rather than
-    pip metadata: main.py may load a locally-built extension whose version differs from
-    any installed wheel. The source-built wrapper re-exports __full_version__ on the
-    package, while the PyPI wheel exposes it only on the extension submodule, so check
-    the inner module first, then the package.
-    """
-    try:
-        import pyrealsense2 as rs
-        return getattr(getattr(rs, "pyrealsense2", rs), "__full_version__", "unknown")
-    except Exception:
-        return "unknown"
+from app.api.endpoints import advanced_mode, calibration, colorizer, console, devices, filters, firmware, hdr, hwm, jobs, options, playback, point_cloud, presets, record, sensors, settings, streams, system, updates, webrtc
+from app.core.sdk_info import sdk_version
 
 
 def _check_debug_sdk_build() -> str:
@@ -64,7 +49,7 @@ def _get_sdk_warnings() -> List[str]:
     return warnings
 
 
-_SDK_VERSION = _get_sdk_version()
+_SDK_VERSION = sdk_version()
 _SDK_WARNINGS = _get_sdk_warnings()
 
 api_router = APIRouter()
@@ -96,4 +81,15 @@ api_router.include_router(sensors.router, prefix="/devices/{device_id}/sensors",
 api_router.include_router(options.router, prefix="/devices/{device_id}/sensors/{sensor_id}/options", tags=["options"])
 api_router.include_router(streams.router, prefix="/devices/{device_id}/stream", tags=["streams"])
 api_router.include_router(system.router, prefix="/system", tags=["system"])
+api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
+api_router.include_router(record.router, prefix="/devices/{device_id}/record", tags=["record"])
+api_router.include_router(playback.router, prefix="/playback", tags=["playback"])
+api_router.include_router(presets.router, prefix="/devices/{device_id}/presets", tags=["presets"])
+api_router.include_router(hdr.router, prefix="/devices/{device_id}/hdr", tags=["hdr"])
+api_router.include_router(calibration.router, prefix="/devices/{device_id}/calibration", tags=["calibration"])
+api_router.include_router(console.logs_router, prefix="/logs", tags=["console"])
+api_router.include_router(console.device_router, prefix="/devices/{device_id}", tags=["console"])
+api_router.include_router(console.terminal_router, prefix="/terminal", tags=["console"])
+api_router.include_router(updates.router, prefix="/updates", tags=["updates"])
 api_router.include_router(webrtc.router, prefix="/webrtc", tags=["webrtc"])

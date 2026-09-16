@@ -99,15 +99,9 @@ export const mockDeviceState: DeviceState = {
   streamConfigs: mockStreamConfigs,
   sensorConfigs: mockSensorConfigs,
   isStreaming: false,
-  isActive: true,
   isLoading: false,
   streamMetadata: {},
   sensorStreamingStatus: {},
-}
-
-export const mockDeviceStateInactive: DeviceState = {
-  ...mockDeviceState,
-  isActive: false,
 }
 
 export const mockDeviceStateStreaming: DeviceState = {

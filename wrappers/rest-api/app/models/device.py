@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 class DeviceBase(BaseModel):
     name: str
@@ -30,3 +30,6 @@ class DeviceInfo(BaseModel):
     sensors: List[str] = []
     is_streaming: bool = False
     metadata_enabled: Optional[bool] = None  # None = N/A (non-Windows or unsupported product)
+    info: Dict[str, str] = {}  # every RS2_CAMERA_INFO the device reports, by field name
+    is_playback: bool = False  # a loaded recording rather than a camera
+    file_name: Optional[str] = None  # the recording behind a playback device

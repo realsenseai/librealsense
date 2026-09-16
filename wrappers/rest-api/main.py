@@ -66,6 +66,8 @@ from config import settings
 import socketio
 from app.services.socketio import sio
 from app.services.rs_manager import RealSenseManager
+from app.services import socket_handlers
+from app.api.dependencies import get_realsense_manager
 
 
 # --- Create FastAPI App ---
@@ -90,12 +92,57 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 # Set up exception handlers
 setup_exception_handlers(app)
 
+# Serve the bundled React viewer (tools/react-viewer: `npm run build && npm run bundle`) from
+# the same port. Mounted after the API routes so /api/v1 and /docs keep precedence.
+_static_dir = Path(__file__).resolve().parent / "static"
+if _static_dir.is_dir():
+    from fastapi.staticfiles import StaticFiles
+    from starlette.routing import Match, Mount
+    from starlette.responses import RedirectResponse
+
+    @app.middleware("http")
+    async def _api_slash_redirect(request, call_next):
+        """With the viewer mounted at "/", Starlette's own trailing-slash redirect never fires
+        (the mount matches everything), so /api/v1/devices would 404 where /api/v1/devices/
+        works. Redirect unmatched API paths to their slash form, as before the mount."""
+        path = request.url.path
+        if path.startswith("/api/") and not path.endswith("/"):
+            for route in app.router.routes:
+                if not isinstance(route, Mount) and route.matches(request.scope)[0] == Match.FULL:
+                    break
+            else:
+                return RedirectResponse(url=str(request.url.replace(path=path + "/")), status_code=307)
+        return await call_next(request)
+
+    app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="viewer")
+
 
 @app.on_event("startup")
 async def startup_event():
     """Store the main event loop for use in synchronous callbacks."""
     loop = asyncio.get_running_loop()
     RealSenseManager.set_event_loop(loop)
+    # Started here, not in the manager: tests build managers by the dozen against real hardware.
+    manager = get_realsense_manager()
+    manager.options_poller.start()
+    # RS_REST_LOG_FILE=<path>: mirror the server's Python log at INFO into a file, for the
+    # cases where the process itself is what needs debugging.
+    import logging
+    import os
+    log_file = os.environ.get("RS_REST_LOG_FILE")
+    if log_file:
+        handler = logging.FileHandler(log_file, encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(threadName)s %(name)s: %(message)s"))
+        logging.getLogger().addHandler(handler)
+        level = getattr(logging, os.environ.get("RS_REST_LOG_LEVEL", "INFO").upper(), logging.INFO)
+        logging.getLogger().setLevel(min(logging.getLogger().level or level, level))
+    console_settings = manager.settings.get().console
+    manager.console.install_sdk_logging(console_settings.log_severity,
+                                        console_settings.log_filename if console_settings.log_to_file else None)
+    manager.console.attach_python_logging()
+
+
+socket_handlers.register(sio, get_realsense_manager)
 
 
 # --- Combine FastAPI and Socket.IO into a single ASGI App ---

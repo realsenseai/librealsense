@@ -19,12 +19,17 @@ void init_context(py::module &m) {
     py::class_< rs2::context >( m, "context", "Librealsense context class. Includes realsense API version." )
         .def( py::init< char const * >(), py::arg( "json-settings" ) = nullptr )
         .def( py::init<>( []( rsutils::json const & j ) { return rs2::context( j.dump() ); } ), py::arg( "json-settings" ) )
+        // Enumeration and file (un)loading block on the same locks the device-watcher thread
+        // takes before it raises the devices-changed callback into Python, so they must not
+        // hold the GIL: otherwise the watcher waits for the GIL, the caller waits for the lock,
+        // and every Python thread in the process stalls.
         .def("query_devices", (rs2::device_list(rs2::context::*)() const) &rs2::context::query_devices, "Create a static"
-             " snapshot of all connected devices at the time of the call.")
+             " snapshot of all connected devices at the time of the call.", py::call_guard<py::gil_scoped_release>())
         .def( "query_devices", ( rs2::device_list( rs2::context::* )(int) const ) & rs2::context::query_devices, "Create a static"
-              " snapshot of all connected devices of specific product line at the time of the call." )
+              " snapshot of all connected devices of specific product line at the time of the call." , py::call_guard<py::gil_scoped_release>() )
         .def_property_readonly("devices", (rs2::device_list(rs2::context::*)() const) &rs2::context::query_devices,
-                               "A static snapshot of all connected devices at time of access. Identical to calling query_devices.")
+                               "A static snapshot of all connected devices at time of access. Identical to calling query_devices.",
+                               py::call_guard<py::gil_scoped_release>())
         .def("query_all_sensors", &rs2::context::query_all_sensors, "Generate a flat list of "
              "all available sensors from all RealSense devices.")
         .def_property_readonly("sensors", &rs2::context::query_all_sensors, "A flat list of "
@@ -35,8 +40,8 @@ void init_context(py::module &m) {
         }, "Register devices changed callback.", "callback"_a, py::call_guard<py::gil_scoped_release>())
         .def("load_device", &rs2::context::load_device, "Creates a devices from a RealSense file.\n"
              "On successful load, the device will be appended to the context and a devices_changed event triggered.",
-             "filename"_a)
-        .def("unload_device", &rs2::context::unload_device, "filename"_a) // No docstring in C++
+             "filename"_a, py::call_guard<py::gil_scoped_release>())
+        .def("unload_device", &rs2::context::unload_device, "filename"_a, py::call_guard<py::gil_scoped_release>()) // No docstring in C++
         .def("unload_tracking_module", &rs2::context::unload_tracking_module) // No docstring in C++
         .def("convert_bag_to_db3",
              (void (rs2::context::*)(const std::string&, const std::string&)) &rs2::context::convert_bag_to_db3,

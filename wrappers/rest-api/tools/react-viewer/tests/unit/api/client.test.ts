@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw'
 import { server } from '../../mocks/server'
 import { mockDeviceList, mockDevice } from '../../mocks/fixtures/devices'
 import { mockSensors, mockDepthOptions } from '../../mocks/fixtures/sensors'
+import { mockSettings } from '../../mocks/fixtures/settings'
 
 // Helper: capture the query string the apiClient sends on /devices/
 function captureDevicesQuery(): { current: string | null } {
@@ -27,6 +28,18 @@ describe('API Client', () => {
     // Dynamically import to get fresh instance with MSW active
     const module = await import('@/api/client')
     apiClient = module.apiClient
+  })
+
+  describe('settings', () => {
+    it('fetches the server settings', async () => {
+      expect(await apiClient.getSettings()).toEqual(mockSettings)
+    })
+
+    it('sends a partial update and returns the merged settings', async () => {
+      const merged = await apiClient.updateSettings({ viewer: { metric_system: false } })
+      expect(merged.viewer.metric_system).toBe(false)
+      expect(merged.record).toEqual(mockSettings.record)
+    })
   })
 
   describe('getDevices', () => {

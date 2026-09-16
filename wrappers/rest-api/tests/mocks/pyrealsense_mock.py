@@ -81,7 +81,14 @@ class option(enum.Enum):
     error_polling_enabled = 25
     projector_temperature = 26
     output_trigger_enabled = 27
-    count = 28
+    sequence_id = 28
+    min_distance = 29
+    max_distance = 30
+    filter_magnitude = 31
+    hdr_enabled = 32
+    sequence_size = 33
+    sequence_name = 34
+    count = 35
 
     # Override name property for string representation
     @property
@@ -120,9 +127,22 @@ class device:
         }
 
     def get_info(self, info_type):
-        if info_type in self._info:
-            return self._info[info_type]
+        # str(), not .name: rs.camera_info has a member called "name" that shadows the property.
+        wanted = str(info_type).rsplit(".", 1)[-1]
+        for key, value in self._info.items():
+            if str(key).rsplit(".", 1)[-1] == wanted:
+                return value
         raise RuntimeError(f"Info {info_type} not available")
+
+    def supports(self, info_type):
+        wanted = str(info_type).rsplit(".", 1)[-1]
+        return any(str(key).rsplit(".", 1)[-1] == wanted for key in self._info)
+
+    def is_metadata_enabled(self):
+        return True
+
+    def is_playback(self):
+        return False
 
     def add_sensor(self, sensor):
         self.sensors.append(sensor)
@@ -164,35 +184,44 @@ class sensor:
         self._profiles = []
 
     def get_info(self, info_type):
-        value = next(iter(self._info.values()))
-        for key in self._info:
-            if key.name == info_type.name:
-                value = self._info[key]
-                break
-        return value
+        wanted = str(info_type).rsplit(".", 1)[-1]
+        for key, value in self._info.items():
+            if str(key).rsplit(".", 1)[-1] == wanted:
+                return value
+        raise RuntimeError(f"Info {info_type} not available")
 
     def get_supported_options(self):
         return list(self._options.keys())
 
+    def _key(self, option_type):
+        """Services pass real rs.option members; match them to the mock's by name."""
+        for key in self._options:
+            if key is option_type or key.name == getattr(option_type, "name", None):
+                return key
+        return None
+
     def get_option(self, option_type):
-        if option_type in self._options:
-            return self._options[option_type]
+        key = self._key(option_type)
+        if key is not None:
+            return self._options[key]
         raise RuntimeError(f"Option {option_type} not supported")
 
     def set_option(self, option_type, value):
-        if option_type in self._option_read_only:
+        key = self._key(option_type)
+        if key in self._option_read_only:
             raise RuntimeError(f"Option {option_type} is read-only")
-        if option_type in self._options:
-            opt_range = self._option_ranges[option_type]
+        if key is not None:
+            opt_range = self._option_ranges[key]
             if value < opt_range.min or value > opt_range.max:
                 raise RuntimeError(f"Value {value} out of range [{opt_range.min}, {opt_range.max}]")
-            self._options[option_type] = value
+            self._options[key] = value
         else:
             raise RuntimeError(f"Option {option_type} not supported")
 
     def get_option_range(self, option_type):
-        if option_type in self._option_ranges:
-            return self._option_ranges[option_type]
+        key = self._key(option_type)
+        if key is not None:
+            return self._option_ranges[key]
         raise RuntimeError(f"Option range {option_type} not available")
 
     def get_option_description(self, option_type):
@@ -210,7 +239,16 @@ class sensor:
     def add_profile(self, profile):
         self._profiles.append(profile)
 
+    def supports(self, option_type):
+        return self._key(option_type) is not None
+
+    def set_notifications_callback(self, callback):
+        self._notifications_callback = callback
+
     def is_depth_sensor(self):
+        return False
+
+    def is_roi_sensor(self):
         return False
 
     def get_recommended_filters(self):
@@ -237,6 +275,28 @@ class depth_sensor(sensor):
 
     def is_depth_sensor(self):
         return True
+
+    def get_depth_scale(self):
+        return 0.001
+
+    def get_recommended_filters(self):
+        return [processing_block(name) for name in
+                ("Decimation Filter", "HDR Merge", "Threshold Filter", "Spatial Filter", "Temporal Filter", "Hole Filling Filter")]
+
+
+class processing_block(sensor):
+    """A post-processing filter: same options surface as a sensor, plus process()."""
+    def __init__(self, name):
+        super().__init__(name)
+        self._options = {option.filter_magnitude: 2}
+        self._option_ranges = {option.filter_magnitude: option_range(1, 8, 2, 1)}
+        if name == "Threshold Filter":
+            self._options = {option.min_distance: 0.1, option.max_distance: 4.0}
+            self._option_ranges = {option.min_distance: option_range(0.0, 16.0, 0.1, 0.0),
+                                   option.max_distance: option_range(0.0, 16.0, 4.0, 0.1)}
+
+    def process(self, frame):
+        return frame
 
 # Mock for color sensor
 class color_sensor(sensor):
@@ -272,10 +332,14 @@ class fisheye_sensor(sensor):
 
 # Mock for stream profile
 class stream_profile:
-    def __init__(self, stream_type=stream.depth, format=format.z16, index=0):
+    def __init__(self, stream_type=stream.depth, format=format.z16, index=0, is_default=False):
         self._stream_type = stream_type
         self._format = format
         self._index = index
+        self._is_default = is_default
+
+    def is_default(self):
+        return self._is_default
 
     def stream_type(self):
         return self._stream_type
@@ -285,6 +349,12 @@ class stream_profile:
 
     def index(self):
         return self._index
+
+    def stream_index(self):
+        return self._index
+
+    def get_extrinsics_to(self, _other):
+        return extrinsics()
 
     def is_video_stream_profile(self):
         return isinstance(self, video_stream_profile)
@@ -296,8 +366,8 @@ class stream_profile:
 
 # Mock for video stream profile
 class video_stream_profile(stream_profile):
-    def __init__(self, stream_type=stream.depth, format=format.z16, width=640, height=480, fps=30, index=0):
-        super().__init__(stream_type, format, index)
+    def __init__(self, stream_type=stream.depth, format=format.z16, width=640, height=480, fps=30, index=0, is_default=False):
+        super().__init__(stream_type, format, index, is_default)
         self._width = width
         self._height = height
         self._fps = fps
@@ -311,10 +381,29 @@ class video_stream_profile(stream_profile):
     def fps(self):
         return self._fps
 
+    def get_intrinsics(self):
+        return intrinsics(self._width, self._height)
+
+
+class intrinsics:
+    """rs.intrinsics: a pinhole at the image centre, no distortion."""
+    def __init__(self, width, height):
+        self.width, self.height = width, height
+        self.fx = self.fy = float(width)  # ~90 degree FOV
+        self.ppx, self.ppy = width / 2.0, height / 2.0
+        self.model = "distortion.brown_conrady"
+        self.coeffs = [0.0, 0.0, 0.0, 0.0, 0.0]
+
+
+class extrinsics:
+    """rs.extrinsics: identity rotation, a 15 mm baseline along x."""
+    rotation = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    translation = [0.015, 0.0, 0.0]
+
 # Mock for motion stream profile
 class motion_stream_profile(stream_profile):
-    def __init__(self, stream_type=stream.gyro, format=format.motion_xyz32f, fps=200, index=0):
-        super().__init__(stream_type, format, index)
+    def __init__(self, stream_type=stream.gyro, format=format.motion_xyz32f, fps=200, index=0, is_default=False):
+        super().__init__(stream_type, format, index, is_default)
         self._fps = fps
 
     def fps(self):
@@ -692,7 +781,7 @@ def create_mock_device(serial_number, name, with_depth=True, with_color=True, wi
         for res in [(640, 480), (1280, 720)]:
             for fps in [30, 60]:
                 depth_sensor_obj.add_profile(video_stream_profile(
-                    stream.depth, format.z16, res[0], res[1], fps
+                    stream.depth, format.z16, res[0], res[1], fps, is_default=(res, fps) == ((640, 480), 30)
                 ))
         mock_device.add_sensor(depth_sensor_obj)
 
@@ -703,7 +792,8 @@ def create_mock_device(serial_number, name, with_depth=True, with_color=True, wi
             for fps in [30, 60]:
                 for fmt in [format.rgb8, format.bgr8]:
                     color_sensor_obj.add_profile(video_stream_profile(
-                        stream.color, fmt, res[0], res[1], fps
+                        stream.color, fmt, res[0], res[1], fps,
+                        is_default=(res, fps, fmt) == ((1280, 720), 30, format.rgb8),
                     ))
         mock_device.add_sensor(color_sensor_obj)
 
@@ -711,8 +801,8 @@ def create_mock_device(serial_number, name, with_depth=True, with_color=True, wi
         motion_sensor_obj = motion_sensor("Motion Module")
         # Add motion stream profiles
         for fps in [200, 400]:
-            motion_sensor_obj.add_profile(motion_stream_profile(stream.gyro, format.motion_xyz32f, fps))
-            motion_sensor_obj.add_profile(motion_stream_profile(stream.accel, format.motion_xyz32f, fps))
+            motion_sensor_obj.add_profile(motion_stream_profile(stream.gyro, format.motion_xyz32f, fps, is_default=fps == 200))
+            motion_sensor_obj.add_profile(motion_stream_profile(stream.accel, format.motion_xyz32f, fps, is_default=fps == 200))
         mock_device.add_sensor(motion_sensor_obj)
 
     if with_fisheye:

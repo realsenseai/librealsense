@@ -6,6 +6,7 @@
 import pyrealsense2 as rs
 from typing import Dict, List
 
+from app.core.errors import RealSenseError
 from app.models.option import OptionInfo
 
 
@@ -40,9 +41,18 @@ def toggle(dev, enable: bool) -> None:
     rs.rs400_advanced_mode(dev).toggle_advanced_mode(enable)
 
 
+def _enabled(dev):
+    """The device's advanced-mode wrapper, or 409 when the mode is off: firmware answers
+    every control read/write with a bare error code then."""
+    am = rs.rs400_advanced_mode(dev)
+    if not am.is_enabled():
+        raise RealSenseError(status_code=409, detail="Advanced mode is disabled on this device")
+    return am
+
+
 def controls(dev) -> Dict[str, List[OptionInfo]]:
     """Every advanced-mode control the device has, keyed by the group the writes go to."""
-    groups = rs.rs400_advanced_mode(dev).get_all_controls()
+    groups = _enabled(dev).get_all_controls()
     by_group: Dict[str, List[OptionInfo]] = {}
     for group in groups.keys():
         values, mins, maxes = groups[group]
@@ -52,7 +62,7 @@ def controls(dev) -> Dict[str, List[OptionInfo]]:
 
 def set_control(dev, group: str, field: str, value: float) -> OptionInfo:
     """Set one control: firmware only accepts whole groups, so it is a read-modify-write."""
-    am = rs.rs400_advanced_mode(dev)
+    am = _enabled(dev)
     values = am[group]
     values[field] = value  # the SDK rounds to the field's own type
     am[group] = values

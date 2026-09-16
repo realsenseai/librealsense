@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { MutableRefObject, ReactElement } from 'react'
+import type { MutableRefObject } from 'react'
 import { useAppStore } from '../store'
+import { apiClient } from '../api/client'
 import type { ControlGroup, DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState, SensorConfig } from '../api/types'
 import { SECTIONS, firmwareStatus, optionLabel } from '../api/types'
 import { RefreshCcw, Search, X } from 'lucide-react'
 import { FirmwareProgressModal } from './FirmwareProgressModal'
 import { ToastContainer, type ToastType, type ToastAction } from './Toast'
 import { searchGroup } from '../utils/optionSearch'
+import { unsupportedStreams } from '../utils/streamModes'
+import { Transport } from './playback/Transport'
+import { RecordingPanel } from './record/RecordingPanel'
+import { useFilePicker } from '../hooks/useFilePicker'
+import { UpdatesDialog } from './updates/UpdatesDialog'
+import { HdrDialog } from './hdr/HdrDialog'
+import { CalibrationDialog } from './calibration/CalibrationDialog'
+import { CalibrationTableEditor } from './calibration/CalibrationTableEditor'
+import { lessScreamy } from '../utils/metadataDecoders'
 import { Collapsible, ToggleSwitch } from './Collapsible'
 
 interface Toast {
@@ -93,33 +103,6 @@ function showFirmwareUpdatePromptsIfNeeded(
   promptedRef.current = live
 }
 
-// Reusable hidden-file-input hook. Returns the JSX to render once at a stable
-// location in the tree (so the OS file picker callback fires even after the
-// menu that triggered it unmounts) and an `open()` function to trigger it.
-function useFilePicker(onPick: (file: File) => void, accept: string): {
-  open: () => void
-  input: ReactElement
-} {
-  const ref = useRef<HTMLInputElement>(null)
-  const open = () => ref.current?.click()
-  const input = (
-    <input
-      ref={ref}
-      type="file"
-      accept={accept}
-      className="hidden"
-      onClick={(e) => e.stopPropagation()}
-      onChange={(e) => {
-        const f = e.target.files?.[0]
-        if (f) onPick(f)
-        // Reset so selecting the same file again still triggers onChange.
-        e.target.value = ''
-      }}
-    />
-  )
-  return { open, input }
-}
-
 export function DevicePanel() {
   const {
     devices,
@@ -127,7 +110,6 @@ export function DevicePanel() {
     isLoadingDevices,
     fetchDevices,
     enableMetadata,
-    toggleDeviceActive,
     resetDevice,
     error,
     clearError,
@@ -139,6 +121,8 @@ export function DevicePanel() {
     updateFirmwareFromFile,
     updateFirmwareFromRecommended,
     toggleAdvancedMode,
+    uploadPreset,
+    savePreset,
   } = useAppStore()
 
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -147,9 +131,15 @@ export function DevicePanel() {
   const [firmwareProgressDevice, setFirmwareProgressDevice] = useState<DeviceInfo | null>(null)
   const [firmwareProgressState, setFirmwareProgressState] = useState<FirmwareState | null>(null)
   const [firmwareFileName, setFirmwareFileName] = useState<string | null>(null)
+  const [updatesFor, setUpdatesFor] = useState<DeviceInfo | null>(null)
+  const [hdrFor, setHdrFor] = useState<DeviceInfo | null>(null)
+  const [calibrationFor, setCalibrationFor] = useState<{ device: DeviceInfo; mode: 'occ' | 'tare' } | null>(null)
+  const [tableFor, setTableFor] = useState<DeviceInfo | null>(null)
 
   useEffect(() => {
-    fetchDevices(true)
+    // The server keeps its registry current from the SDK's devices-changed callback;
+    // forcing an enumeration here would run ctx enumeration on every page load.
+    fetchDevices()
   }, [fetchDevices])
 
   // Counter, not just Date.now(): several cameras can raise a firmware proposal in the
@@ -254,9 +244,11 @@ export function DevicePanel() {
   }, [deviceStates, handleUpdateFromRecommended])
 
   return (
+    <>
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
         <h2 className="panel-header mb-0">Devices</h2>
+        <div className="flex items-center gap-1">
         <button
           onClick={() => fetchDevices(true)}
           disabled={isLoadingDevices}
@@ -267,6 +259,7 @@ export function DevicePanel() {
         >
           <RefreshCcw className={`w-5 h-5 ${isLoadingDevices ? 'animate-spin' : ''}`} />
         </button>
+        </div>
       </div>
 
       {/* Error Display */}
@@ -318,20 +311,47 @@ export function DevicePanel() {
                 key={device.device_id}
                 device={device}
                 deviceState={deviceState}
-                onToggle={() => toggleDeviceActive(device)}
                 onReset={() => resetDevice(device.device_id)}
                 onUpdateStreamConfig={(config) => updateStreamConfig(device.device_id, config)}
                 onUpdateSensorConfig={(sensorId, config) => updateSensorConfig(device.device_id, sensorId, config)}
                 onStartSensorStreaming={(sensorId) => startSensorStreaming(device.device_id, sensorId)}
                 onStopSensorStreaming={(sensorId) => stopSensorStreaming(device.device_id, sensorId)}
                 onCheckFirmwareUpdates={() => handleCheckFirmwareUpdates(device.device_id)}
+                onShowUpdates={() => setUpdatesFor(device)}
+                onShowHdr={() => setHdrFor(device)}
+                onShowCalibration={(mode) => setCalibrationFor({ device, mode })}
+                onShowCalibrationTable={() => setTableFor(device)}
                 onUpdateFirmwareFromFile={(file) => handleUpdateFirmwareFromFile(device, file)}
                 onToggleAdvancedMode={(enable) => toggleAdvancedMode(device.device_id, enable)}
+                onUploadPreset={(file) => uploadPreset(device.device_id, file)}
+                onSavePreset={(name) => savePreset(device.device_id, name)}
                 onShowToast={addToast}
               />
             )
           })}
         </div>
+      )}
+
+      {hdrFor && (
+        <HdrDialog deviceId={hdrFor.device_id} deviceName={hdrFor.name} onClose={() => setHdrFor(null)} />
+      )}
+
+      {tableFor && (
+        <CalibrationTableEditor deviceId={tableFor.device_id} deviceName={tableFor.name} onClose={() => setTableFor(null)} />
+      )}
+
+      {calibrationFor && (
+        <CalibrationDialog deviceId={calibrationFor.device.device_id} deviceName={calibrationFor.device.name}
+          mode={calibrationFor.mode} onClose={() => setCalibrationFor(null)} />
+      )}
+
+      {updatesFor && (
+        <UpdatesDialog
+          deviceId={updatesFor.device_id}
+          deviceName={updatesFor.name}
+          onClose={() => setUpdatesFor(null)}
+          onInstallFirmware={() => { const d = updatesFor; setUpdatesFor(null); handleUpdateFromRecommended(d) }}
+        />
       )}
 
       {firmwareProgressDevice && (
@@ -350,42 +370,57 @@ export function DevicePanel() {
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
+    {/* Recording and playback live together, below the cameras they belong to */}
+    <RecordingPanel />
+    </>
   )
 }
 
 interface DeviceCardProps {
   device: DeviceInfo
   deviceState?: DeviceState
-  onToggle: () => void
   onReset: () => void
   onUpdateStreamConfig: (config: StreamConfig) => void
   onUpdateSensorConfig: (sensorId: string, config: Partial<SensorConfig>) => void
   onStartSensorStreaming: (sensorId: string) => void
   onStopSensorStreaming: (sensorId: string) => void
   onCheckFirmwareUpdates: () => void
+  onShowUpdates: () => void
+  onShowHdr: () => void
+  onShowCalibration: (mode: 'occ' | 'tare') => void
+  onShowCalibrationTable: () => void
   onUpdateFirmwareFromFile: (file: File) => void
   onToggleAdvancedMode: (enable: boolean) => void
+  onUploadPreset: (file: File) => void
+  onSavePreset: (name: string) => void
   onShowToast: (type: ToastType, message: string) => void
 }
 
 function DeviceCard({
   device,
   deviceState,
-  onToggle,
   onReset,
   onUpdateStreamConfig,
   onUpdateSensorConfig,
   onStartSensorStreaming,
   onStopSensorStreaming,
   onCheckFirmwareUpdates,
+  onShowUpdates,
+  onShowHdr,
+  onShowCalibration,
+  onShowCalibrationTable,
   onUpdateFirmwareFromFile,
   onToggleAdvancedMode,
+  onUploadPreset,
+  onSavePreset,
   onShowToast,
 }: DeviceCardProps) {
   const [showMenu, setShowMenu] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
   const fwPicker = useFilePicker(onUpdateFirmwareFromFile, '.bin')
+  const presetPicker = useFilePicker(onUploadPreset, '.json,.preset')
+  const advancedOn = deviceState?.advancedMode?.enabled === true
 
-  const isActive = deviceState?.isActive || false
   const isLoading = deviceState?.isLoading || false
   const isStreaming = deviceState?.isStreaming || false
   const sensors = deviceState?.sensors || []
@@ -408,24 +443,20 @@ function DeviceCard({
   }
 
   return (
-    <div
-      className={`device-card rounded-lg transition-all ${
-        isActive
-          ? 'bg-rs-blue/10 border border-rs-blue'
-          : 'bg-gray-800 border border-gray-700 hover:border-gray-600 cursor-pointer'
-      }`}
-      data-testid="device-card"
-      onClick={!isActive && !isLoading ? onToggle : undefined}
-    >
+    <div className="device-card rounded-lg bg-rs-blue/10 border border-rs-blue" data-testid="device-card">
       {/* Hidden file input — rendered at card root so it persists when the
           hamburger menu closes; otherwise the OS file picker resolves into
           an unmounted input and onChange never fires. */}
       {fwPicker.input}
+      {presetPicker.input}
       {/* Device Header */}
       <div className="p-3">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-white truncate">{device.name}</h3>
+            <h3 className="font-semibold text-white truncate">
+              {device.is_playback && <span className="mr-1 px-1 rounded bg-purple-700 text-[10px] uppercase align-middle">Playback</span>}
+              {device.name}
+            </h3>
             <p className="text-sm text-gray-400 truncate">S/N: {device.serial_number}</p>
           </div>
           <div className="flex items-center gap-2 ml-2">
@@ -481,6 +512,72 @@ function DeviceCard({
                     </button>
                     <div className="border-t border-gray-600 my-1" />
                     <button
+                      onClick={() => { setShowMenu(false); setTimeout(() => presetPicker.open(), 0) }}
+                      disabled={!advancedOn}
+                      title={advancedOn ? 'Apply a JSON preset from a file' : 'Requires Advanced Mode'}
+                      className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${advancedOn ? 'hover:bg-gray-700' : 'text-gray-500 cursor-not-allowed'}`}
+                    >
+                      <span className="w-4 text-center">⤒</span>
+                      Load Preset (JSON)…
+                    </button>
+                    <a
+                      href={advancedOn ? apiClient.presetDownloadUrl(device.device_id) : undefined}
+                      download
+                      onClick={() => setShowMenu(false)}
+                      aria-disabled={!advancedOn}
+                      title={advancedOn ? 'Download the current settings as a JSON preset' : 'Requires Advanced Mode'}
+                      className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${advancedOn ? 'hover:bg-gray-700' : 'text-gray-500 cursor-not-allowed pointer-events-none'}`}
+                    >
+                      <span className="w-4 text-center">⤓</span>
+                      Save Preset (JSON)…
+                    </a>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false)
+                        const name = window.prompt('Preset name (stored in the presets folder as "<model> <name>.preset")')
+                        if (name?.trim()) onSavePreset(name.trim())
+                      }}
+                      disabled={!advancedOn}
+                      title={advancedOn ? 'Store the current settings in the presets folder' : 'Requires Advanced Mode'}
+                      className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${advancedOn ? 'hover:bg-gray-700' : 'text-gray-500 cursor-not-allowed'}`}
+                    >
+                      <span className="w-4 text-center">★</span>
+                      Save to Presets Folder…
+                    </button>
+                    {!device.is_playback && (
+                      <>
+                        <button
+                          onClick={() => { setShowMenu(false); onShowCalibration('occ') }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                        >
+                          <span className="w-4 text-center">◎</span>
+                          On-Chip Calibration…
+                        </button>
+                        <button
+                          onClick={() => { setShowMenu(false); onShowCalibration('tare') }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                        >
+                          <span className="w-4 text-center">⊚</span>
+                          Tare Calibration…
+                        </button>
+                        <button
+                          onClick={() => { setShowMenu(false); onShowCalibrationTable() }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                        >
+                          <span className="w-4 text-center">▦</span>
+                          Calibration Table…
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => { setShowMenu(false); onShowHdr() }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                    >
+                      <span className="w-4 text-center">◐</span>
+                      HDR Configuration…
+                    </button>
+                    <div className="border-t border-gray-600 my-1" />
+                    <button
                       onClick={() => {
                         setShowMenu(false)
                         handleCheckFirmwareUpdates()
@@ -491,6 +588,13 @@ function DeviceCard({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                       Check for Firmware Updates
+                    </button>
+                    <button
+                      onClick={() => { setShowMenu(false); onShowUpdates() }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                    >
+                      <span className="w-4 text-center">⇪</span>
+                      Software &amp; Firmware Updates…
                     </button>
                     {deviceState?.advancedMode?.supported && (
                       <button
@@ -552,22 +656,6 @@ function DeviceCard({
                 </>
               )}
             </div>
-            
-            {/* Toggle switch */}
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggle(); }}
-              disabled={isLoading || isStreaming}
-              className={`relative w-10 h-5 rounded-full transition-colors ${
-                isActive ? 'bg-rs-blue' : 'bg-gray-600'
-              } ${isLoading || isStreaming ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
-              title={isActive ? 'Deactivate device' : 'Activate device'}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                  isActive ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
           </div>
         </div>
 
@@ -578,9 +666,32 @@ function DeviceCard({
           )}
           {device.usb_type && <span>USB: {device.usb_type}</span>}
         </div>
+        {device.info && Object.keys(device.info).length > 0 && (
+          <div className="mt-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              className="text-gray-400 hover:text-white"
+            >
+              {showDetails ? 'Hide Device Details' : 'Show Device Details'}
+            </button>
+            {showDetails && (
+              <table className="mt-1 w-full text-[11px] text-gray-300" data-testid="device-details">
+                <tbody>
+                  {Object.entries(device.info).map(([key, value]) => (
+                    <tr key={key} className="border-t border-gray-700/60">
+                      <td className="py-0.5 pr-2 text-gray-500 whitespace-nowrap">{lessScreamy(key)}</td>
+                      <td className="py-0.5 break-all">{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
 
-        {/* Sensors Tags */}
-        {device.sensors.length > 0 && !isActive && (
+        {/* Sensor names, until the sensors themselves are loaded */}
+        {device.sensors.length > 0 && isLoading && (
           <div className="mt-2 flex flex-wrap gap-1">
             {device.sensors.map((sensor) => (
               <span
@@ -594,8 +705,9 @@ function DeviceCard({
         )}
       </div>
 
-      {/* Device Controls - shown when active */}
-      {isActive && !isLoading && (
+      {device.is_playback && <Transport deviceId={device.device_id} />}
+
+      {!isLoading && (
         <div className="border-t border-gray-700 p-3 space-y-1.5">
           {sensors.map((sensor) => (
             <SensorPanel
@@ -660,9 +772,11 @@ function SensorPanel({
   }
 
   const isSensorStreaming = status?.is_streaming || false
-  const isSensorPending = status?.pendingOp === 'stopping'
+  const isSensorPending = status?.pendingOp === 'stopping' || status?.pendingOp === 'starting'
   const sensorError = status?.error
-  const canStartSensor = streams.some(c => c.enable)
+  // The legacy viewer refuses to start a mode the SDK does not list ("Selected value is not supported").
+  const unsupported = unsupportedStreams(streams, sensor.supported_stream_profiles, sensorConfig)
+  const canStartSensor = streams.some(c => c.enable) && unsupported.length === 0
 
   const modifiedCount = groups.flatMap(([, g]) => g.options).filter(isModified).length
 
@@ -711,7 +825,8 @@ function SensorPanel({
           onClick={() => isSensorStreaming ? onStopStreaming() : onStartStreaming()}
           disabled={isSensorPending || (!canStartSensor && !isSensorStreaming)}
           data-testid={isSensorStreaming ? "stop-streaming" : "start-streaming"}
-          title={isSensorPending ? 'Stopping...' : isSensorStreaming ? 'Stop' : 'Start'}
+          title={isSensorPending ? (status?.pendingOp === 'starting' ? 'Starting...' : 'Stopping...') : isSensorStreaming ? 'Stop'
+            : unsupported.length ? `Selected mode is not supported: ${unsupported.join(', ')}` : 'Start'}
           className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
             isSensorPending
               ? 'bg-yellow-600 text-white cursor-wait'
@@ -726,15 +841,16 @@ function SensorPanel({
           {isSensorPending ? '⏳' : isSensorStreaming ? '■' : '▶'}
         </button>
       }
-      belowHeader={sensorError && (
+      belowHeader={(sensorError || (unsupported.length > 0 && !isSensorStreaming)) && (
         <div className="mb-2 text-xs text-red-400 bg-red-900/30 rounded px-2 py-1">
-          {sensorError}
+          {sensorError ?? `Selected mode is not supported: ${unsupported.join(', ')}`}
         </div>
       )}
     >
       <div className="mt-2 space-y-1">
-            {sensorConfig && !sensorConfig.isMotionSensor && (
+            {sensorConfig && !sensorConfig.isMotionSensor && !(sensorConfig.perStreamResolution && sensorConfig.perStreamFps) && (
               <div className="mb-2 flex items-center gap-2 text-xs">
+                {!sensorConfig.perStreamResolution && (
                 <div className="flex items-center gap-1">
                   <label className="text-gray-500">Res:</label>
                   <select
@@ -753,6 +869,8 @@ function SensorPanel({
                     ))}
                   </select>
                 </div>
+                )}
+                {!sensorConfig.perStreamFps && (
                 <div className="flex items-center gap-1">
                   <label className="text-gray-500">FPS:</label>
                   <select
@@ -768,6 +886,7 @@ function SensorPanel({
                     ))}
                   </select>
                 </div>
+                )}
               </div>
             )}
 
@@ -780,6 +899,8 @@ function SensorPanel({
                   onUpdate={onUpdateStreamConfig}
                   disabled={isSensorStreaming}
                   isMotionSensor={sensorConfig?.isMotionSensor ?? false}
+                  perStreamResolution={sensorConfig?.perStreamResolution ?? false}
+                  perStreamFps={sensorConfig?.perStreamFps ?? false}
                 />
               ))}
             </div>
@@ -802,6 +923,7 @@ function SensorPanel({
           return (
             <ControlSection
               key={title}
+              deviceId={deviceId}
               title={title}
               groups={mine}
               // Post-processing is the one section the viewer can bypass wholesale.
@@ -833,9 +955,11 @@ interface StreamConfigItemProps {
   onUpdate: (config: StreamConfig) => void
   disabled: boolean
   isMotionSensor: boolean
+  perStreamResolution?: boolean
+  perStreamFps?: boolean
 }
 
-function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor }: StreamConfigItemProps) {
+function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor, perStreamResolution, perStreamFps }: StreamConfigItemProps) {
   const profile = sensor.supported_stream_profiles.find((p) =>
     p.stream_type.toLowerCase() === config.stream_type.toLowerCase()
   )
@@ -888,8 +1012,24 @@ function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor }
           ))}
         </select>
       )}
-      {/* Per-stream FPS selector for motion sensors */}
-      {config.enable && isMotionSensor && (
+      {config.enable && perStreamResolution && !isMotionSensor && (
+        <select
+          value={`${config.resolution.width}x${config.resolution.height}`}
+          onChange={(e) => {
+            const [width, height] = e.target.value.split('x').map(Number)
+            onUpdate({ ...config, resolution: { width, height } })
+          }}
+          disabled={disabled}
+          className="bg-gray-700 text-white rounded px-1 py-0.5 text-xs"
+          aria-label={`${config.stream_type} resolution`}
+        >
+          {profile.resolutions.map(([w, h]) => (
+            <option key={`${w}x${h}`} value={`${w}x${h}`}>{w}×{h}</option>
+          ))}
+        </select>
+      )}
+      {/* Per-stream FPS: motion sensors always, video sensors when no frame rate is shared */}
+      {config.enable && (isMotionSensor || perStreamFps) && (
         <select
           value={config.framerate}
           onChange={(e) => onUpdate({ ...config, framerate: Number(e.target.value) })}
@@ -937,6 +1077,7 @@ function ControlsSearchBox({ value, onChange }: ControlsSearchBoxProps) {
 }
 
 interface ControlSectionProps {
+  deviceId: string
   title: string
   /** The section's groups, each with the key its writes go to. */
   groups: [string, ControlGroup][]
@@ -954,6 +1095,7 @@ interface ControlSectionProps {
  * and whether a group can be switched off, so they are all this component.
  */
 function ControlSection({
+  deviceId,
   title, groups, sectionSwitch, searchQuery, onSet, onToggleGroup, onRestoreDefaults,
 }: ControlSectionProps) {
   const searching = searchQuery.trim().length > 0
@@ -998,11 +1140,13 @@ function ControlSection({
       <div className="p-1.5 space-y-1 bg-gray-800/30">
         {matching.map(({ key, group, options }) => {
           const controls = options.map(option => (
-            <OptionControl
-              key={option.option_id}
-              option={option}
-              onSet={(optionId, value) => onSet(key, optionId, value)}
-            />
+            <div key={option.option_id}>
+              <OptionControl
+                option={option}
+                onSet={(optionId, value) => onSet(key, optionId, value)}
+              />
+              {option.option_id.toLowerCase() === 'visual_preset' && <VisualPresetFiles deviceId={deviceId} />}
+            </div>
           ))
           return !group.name ? controls : (
             <Collapsible
@@ -1036,13 +1180,43 @@ interface OptionControlProps {
   onSet: (optionId: string, value: number | boolean | string) => Promise<void>
 }
 
+// Firmware writes take time; while a slider is dragged, send at most one value per interval
+// and always the newest one, as the legacy viewer's option dispatcher does (option-model.h).
+const SLIDER_WRITE_INTERVAL_MS = 200
+
+/** The Visual Preset dropdown with the folder presets the legacy viewer appends to it. */
+function VisualPresetFiles({ deviceId }: { deviceId: string }) {
+  const files = useAppStore((s) => s.deviceStates[deviceId]?.presetFiles ?? [])
+  const { fetchPresets, loadPresetFile } = useAppStore()
+  useEffect(() => { void fetchPresets(deviceId) }, [deviceId, fetchPresets])
+  if (files.length === 0) return null
+  return (
+    <select
+      className="mt-1 w-full bg-gray-700 text-white rounded px-1 py-0.5 border border-gray-600 text-xs"
+      value=""
+      onChange={(e) => { if (e.target.value) void loadPresetFile(deviceId, e.target.value) }}
+      aria-label="Presets from folder"
+    >
+      <option value="">Load from presets folder…</option>
+      {files.map((f) => <option key={f.path} value={f.path}>{f.name}</option>)}
+    </select>
+  )
+}
+
 function OptionControl({ option, onSet }: OptionControlProps) {
   const [localValue, setLocalValue] = useState(option.current_value)
+  // Text-edit mode: the legacy pencil button that turns a slider into a typed value.
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+  const lastSentAt = useRef(0)
+  const pendingWrite = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Sync with external changes (e.g., from chatbot)
   useEffect(() => {
     setLocalValue(option.current_value)
   }, [option.current_value])
+
+  useEffect(() => () => { if (pendingWrite.current) clearTimeout(pendingWrite.current) }, [])
 
   const handleChange = async (value: number | boolean | string) => {
     setLocalValue(value)
@@ -1051,6 +1225,25 @@ function OptionControl({ option, onSet }: OptionControlProps) {
     } catch (error) {
       setLocalValue(option.current_value)
     }
+  }
+
+  const handleDrag = (value: number) => {
+    setLocalValue(value)
+    if (pendingWrite.current) clearTimeout(pendingWrite.current)
+    const wait = Math.max(0, SLIDER_WRITE_INTERVAL_MS - (Date.now() - lastSentAt.current))
+    pendingWrite.current = setTimeout(() => {
+      pendingWrite.current = null
+      lastSentAt.current = Date.now()
+      void handleChange(value)
+    }, wait)
+  }
+
+  const commitEdit = () => {
+    setEditing(false)
+    const parsed = Number(editText)
+    if (editText.trim() === '' || Number.isNaN(parsed)) return
+    const clamped = Math.min(option.max_value, Math.max(option.min_value, parsed))
+    void handleChange(clamped)
   }
 
   const handleRestoreDefault = async () => {
@@ -1124,22 +1317,49 @@ function OptionControl({ option, onSet }: OptionControlProps) {
         </label>
       ) : isSlider ? (
         <div className="flex items-center gap-1">
-          <input
-            type="range"
-            min={option.min_value}
-            max={option.max_value}
-            step={option.step ?? 'any'}
-            value={Number(localValue)}
-            onChange={(e) => setLocalValue(Number(e.target.value))}
-            onMouseUp={() => handleChange(Number(localValue))}
-            onTouchEnd={() => handleChange(Number(localValue))}
-            className="flex-1 h-1"
-          />
-          <span className="text-gray-400 w-10 text-right">
-            {typeof localValue === 'number'
-              ? localValue.toFixed((option.step ?? 0) >= 1 ? 0 : 2)
-              : localValue}
-          </span>
+          {editing ? (
+            <input
+              type="number"
+              autoFocus
+              aria-label={`${optionLabel(option.option_id)} value`}
+              min={option.min_value}
+              max={option.max_value}
+              step={option.step ?? 'any'}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitEdit()
+                if (e.key === 'Escape') setEditing(false)
+              }}
+              className="flex-1 bg-gray-700 text-white rounded px-1 py-0.5 border border-rs-blue focus:outline-none"
+            />
+          ) : (
+            <>
+              <input
+                type="range"
+                min={option.min_value}
+                max={option.max_value}
+                step={option.step ?? 'any'}
+                value={Number(localValue)}
+                onChange={(e) => handleDrag(Number(e.target.value))}
+                className="flex-1 h-1"
+              />
+              <span className="text-gray-400 w-10 text-right">
+                {typeof localValue === 'number'
+                  ? localValue.toFixed((option.step ?? 0) >= 1 ? 0 : 2)
+                  : localValue}
+              </span>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => { setEditText(String(localValue)); setEditing((e) => !e) }}
+            title={editing ? 'Exit text-edit mode' : 'Enter text-edit mode'}
+            className={`px-1 ${editing ? 'text-rs-blue' : 'text-gray-500 hover:text-gray-300'}`}
+          >
+            ✎
+          </button>
         </div>
       ) : (
         <input

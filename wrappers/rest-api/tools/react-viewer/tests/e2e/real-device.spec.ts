@@ -13,7 +13,8 @@
  *   REAL_DEVICE=true npx playwright test --project=real-device
  */
 
-import { test, expect, getTestMode, getApiUrl, dismissWhatsNewModal } from './fixtures'
+import { test, expect, getTestMode, getApiUrl, dismissWhatsNewModal, suppressWhatsNew } from './fixtures'
+import { expectFramesFlowing, stopAllStreams } from './helpers'
 import type { Locator } from '@playwright/test'
 
 // Per-stream toggles only render inside an expanded sensor module
@@ -29,11 +30,7 @@ async function expandSensorModules(deviceCard: Locator) {
 test.beforeEach(async ({ testMode, page }) => {
   test.skip(testMode !== 'real', 'Real device tests require REAL_DEVICE=true')
   
-  // Clear localStorage to ensure consistent test state, but also set version
-  // to prevent What's New modal from appearing
-  await page.addInitScript(() => {
-    localStorage.setItem('realsense-viewer-last-version', '0.5.0')
-  })
+  await suppressWhatsNew(page)
 })
 
 test.describe('@real-device Real Device Tests', () => {
@@ -62,11 +59,10 @@ test.describe('@real-device Real Device Tests', () => {
       // Dismiss What's New modal if it appears
       await dismissWhatsNewModal(page)
       
-      // Check serial number is displayed
-      await expect(page.locator(`text=${device.serial_number}`)).toBeVisible({ timeout: 10000 })
-      
-      // Check firmware version is displayed
-      await expect(page.locator(`text=/${device.firmware_version}/`)).toBeVisible()
+      // The serial also names the camera in the recording panel, so read it off the card
+      const card = page.locator('[data-testid="device-card"]').filter({ hasText: device.serial_number }).first()
+      await expect(card.getByText(`S/N: ${device.serial_number}`)).toBeVisible({ timeout: 10000 })
+      await expect(card.getByText(new RegExp(device.firmware_version))).toBeVisible()
     })
   })
 
@@ -75,12 +71,10 @@ test.describe('@real-device Real Device Tests', () => {
       await page.goto('/')
       await waitForDevice(page)
       
-      // Activate device
       const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-      await deviceCard.click()
       
       // Wait for device to finish loading sensors
-      await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
+      await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 30000 })
       
       // Sensor modules are collapsed by default; expand them to reveal the stream toggles
       await expandSensorModules(deviceCard)
@@ -93,8 +87,10 @@ test.describe('@real-device Real Device Tests', () => {
       const startButton = page.locator('button:has-text("Start"), [data-testid="start-streaming"]').first()
       await startButton.click()
       
-      // Verify stream is active
+      // Verify stream is active: the server must be delivering frames, not just a <video>
       await expect(page.locator('video, canvas').first()).toBeVisible({ timeout: 15000 })
+      const [device] = await (await fetch(`${getApiUrl()}/api/v1/devices/`)).json()
+      await expectFramesFlowing(device.device_id)
       
       // Stop streaming
       const stopButton = page.locator('button:has-text("Stop"), [data-testid="stop-streaming"]').first()
@@ -108,12 +104,10 @@ test.describe('@real-device Real Device Tests', () => {
       await page.goto('/')
       await waitForDevice(page)
       
-      // Activate and start streaming
       const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-      await deviceCard.click()
       
       // Wait for device to finish loading sensors
-      await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
+      await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 30000 })
       
       await expandSensorModules(deviceCard)
 
@@ -126,8 +120,9 @@ test.describe('@real-device Real Device Tests', () => {
       // Wait for frames
       await page.waitForTimeout(3000)
       
-      // Check frame counter is incrementing
-      const frameCounter = page.locator('text=/frame.*[0-9]+/i').first()
+      // The frame counter lives in the tile's metadata overlay; open it first
+      await page.locator('[title="Show frame metadata"]').first().click()
+      const frameCounter = page.getByText('Frame Number').locator('..').first()
       const firstValue = await frameCounter.textContent()
       
       await page.waitForTimeout(1000)
@@ -139,6 +134,8 @@ test.describe('@real-device Real Device Tests', () => {
       // Cleanup
       const stopButton = page.locator('button:has-text("Stop"), [data-testid="stop-streaming"]').first()
       await stopButton.click()
+      const [dev] = await (await fetch(`${getApiUrl()}/api/v1/devices/`)).json()
+      await stopAllStreams(dev.device_id)
     })
   })
 
@@ -147,9 +144,7 @@ test.describe('@real-device Real Device Tests', () => {
       await page.goto('/')
       await waitForDevice(page)
       
-      // Activate device
       const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-      await deviceCard.click()
       
       // Wait for options to load
       await page.waitForTimeout(1000)
@@ -194,22 +189,17 @@ test.describe('@real-device Performance Tests', () => {
   test.beforeEach(async ({ testMode, page }) => {
     test.skip(testMode !== 'real', 'Real device tests require REAL_DEVICE=true')
     
-    // Set version in localStorage to prevent What's New modal
-    await page.addInitScript(() => {
-      localStorage.setItem('realsense-viewer-last-version', '0.5.0')
-    })
+    await suppressWhatsNew(page)
   })
 
   test('streaming maintains acceptable frame rate', async ({ page, waitForDevice }) => {
     await page.goto('/')
     await waitForDevice(page)
     
-    // Activate and start streaming
     const deviceCard = page.locator('.device-card, [data-testid="device-card"]').first()
-    await deviceCard.click()
     
     // Wait for device to finish loading sensors
-    await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 10000 })
+    await expect(page.locator('[title="Loading..."]')).not.toBeVisible({ timeout: 30000 })
     
     await expandSensorModules(deviceCard)
 

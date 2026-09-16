@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { render } from '../../utils/test-utils'
 import { Header } from '@/components/Header'
 
@@ -15,7 +16,6 @@ describe('Header', () => {
       initialStoreState: {
         deviceStates: {
           '123': {
-            isActive: true,
             device: { device_id: '123', name: 'Test Device' },
           } as any,
         },
@@ -31,7 +31,6 @@ describe('Header', () => {
       initialStoreState: {
         deviceStates: {
           '123': {
-            isActive: true,
             device: { device_id: '123', name: 'Test Device' },
           } as any,
         },
@@ -40,6 +39,19 @@ describe('Header', () => {
 
     const button = screen.getByText(/3D View/i).closest('button')
     expect(button).not.toBeDisabled()
+  })
+
+  it('opens the settings dialog from the gear button', async () => {
+    render(<Header />)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument()
+  })
+
+  it('has a help menu with Report Issue, the store and release notes', async () => {
+    render(<Header />)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Help' }))
+    expect(screen.getByRole('link', { name: 'Report Issue' })).toHaveAttribute('href', expect.stringContaining('github.com/realsenseai/librealsense/issues/new'))
+    expect(screen.getByRole('link', { name: 'RealSense Store' })).toHaveAttribute('href', 'https://store.realsenseai.com/')
   })
 
   it('does not show view toggle when no active devices', () => {

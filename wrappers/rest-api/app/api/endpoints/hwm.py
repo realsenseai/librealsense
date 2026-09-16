@@ -3,6 +3,7 @@
 
 import logging
 
+from starlette.concurrency import run_in_threadpool
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.dependencies import get_realsense_manager
@@ -25,7 +26,8 @@ async def send_hwm_command(
     Returns 400 if the device does not support hardware monitor commands.
     """
     try:
-        response_bytes = rs_manager.send_hwm_command(
+        response_bytes = await run_in_threadpool(
+            rs_manager.send_hwm_command,
             device_id,
             request.opcode,
             request.param1,

@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { render, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 import { DevicePanel } from '@/components/DevicePanel'
 import { useAppStore } from '@/store'
+import { http, HttpResponse } from 'msw'
+import { server } from '../../mocks/server'
 
 describe('DevicePanel', () => {
   beforeEach(() => {
@@ -16,7 +18,6 @@ describe('DevicePanel', () => {
       error: null,
       fetchDevices: vi.fn().mockResolvedValue(undefined),
       clearError: vi.fn(),
-      toggleDeviceActive: vi.fn().mockResolvedValue(undefined),
       resetDevice: vi.fn().mockResolvedValue(undefined),
       isAnyDeviceStreaming: () => false,
       updateStreamConfig: vi.fn(),
@@ -224,9 +225,9 @@ describe('DevicePanel', () => {
       expect(screen.getByText('RealSense D435')).toBeInTheDocument()
     })
 
-    it('shows device as active when deviceState.isActive is true', () => {
+    it('shows a device with state without any activate control', () => {
       const mockDevice = createMockDevice()
-      const mockDeviceState = createMockDeviceState(mockDevice, { isActive: true })
+      const mockDeviceState = createMockDeviceState(mockDevice)
       
       render(<DevicePanel />, {
         initialStoreState: {
@@ -235,9 +236,136 @@ describe('DevicePanel', () => {
         },
       })
       
-      // When active, the device card should have active styling
-      // The exact check depends on component implementation
-      expect(screen.getByText('RealSense D435')).toBeInTheDocument()
+      // The name also appears in the recording panel, so look inside the card
+      expect(within(screen.getByTestId('device-card')).getByText('RealSense D435')).toBeInTheDocument()
+      expect(screen.queryByTitle(/Activate device|Deactivate device/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Record and playback', () => {
+    it('offers Record while streaming and switches to pause/stop once recording', async () => {
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, { isStreaming: true })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } } })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Record' }))
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Pause recording' })).toBeInTheDocument())
+      await userEvent.click(screen.getByRole('button', { name: 'Stop recording' }))
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument())
+    })
+
+    it('disables Record while nothing streams', () => {
+      const device = createMockDevice()
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } } })
+      expect(screen.getByRole('button', { name: 'Record' })).toBeDisabled()
+    })
+
+    it('shows the transport, a Playback badge and no Record button for a recording', async () => {
+      const device = createMockDevice({ device_id: 'playback-clip.db3', is_playback: true, file_name: 'C:/recs/clip.db3' })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } } })
+      expect(within(screen.getByTestId('device-card')).getByText('Playback')).toBeInTheDocument()
+      expect(await screen.findByTestId('playback-transport')).toBeInTheDocument()
+      // A recording is not a camera: nothing offers to record it
+      expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument()
+      expect(screen.getByTestId('recording-playback')).toHaveTextContent('clip.db3')
+    })
+
+    it('says in words whether a camera is recording, and for how long', async () => {
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, { isStreaming: true })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } } })
+
+      const panel = screen.getByTestId('recording-panel')
+      expect(panel).toHaveTextContent('Recording')
+      expect(screen.getByTestId('record-indicator')).toHaveTextContent('Not recording')
+      expect(screen.getByTestId('record-start')).toHaveTextContent('Record')
+
+      await userEvent.click(screen.getByTestId('record-start'))
+
+      // While it runs the panel says so, counts, and names the file it writes
+      await waitFor(() => expect(screen.getByTestId('record-indicator')).toHaveTextContent(/Recording 00:0\d/))
+      expect(screen.getByTestId('record-stop')).toHaveTextContent('Stop')
+      await waitFor(() => expect(panel).toHaveTextContent(/Writing to: /))
+    })
+
+    it('tells the user a camera must stream before it can record', () => {
+      const device = createMockDevice()
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } } })
+      expect(screen.getByTestId('record-indicator')).toHaveTextContent('start streaming to enable')
+      expect(screen.getByTestId('record-start')).toBeDisabled()
+    })
+
+    it('says no recording is open, and offers the button that opens one', () => {
+      render(<DevicePanel />)
+      expect(screen.getByTestId('playback-state')).toHaveTextContent('No recording open')
+      expect(screen.getByRole('button', { name: 'Load recorded sequence' })).toBeInTheDocument()
+    })
+  })
+
+  describe('JSON presets', () => {
+    const withAdvanced = (enabled: boolean) => {
+      const device = createMockDevice()
+      const ds = createMockDeviceState(device, { advancedMode: { supported: true, enabled } })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } } })
+      return device
+    }
+
+    it('offers Load / Save Preset only with advanced mode on', async () => {
+      withAdvanced(false)
+      await userEvent.click(await screen.findByTitle('Device actions'))
+      expect(screen.getByText('Load Preset (JSON)…').closest('button')).toBeDisabled()
+      expect(screen.getByText('Save Preset (JSON)…').closest('a')).toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('links the preset download to the device and saves to the folder by name', async () => {
+      const device = withAdvanced(true)
+      await userEvent.click(await screen.findByTitle('Device actions'))
+      expect(screen.getByText('Save Preset (JSON)…').closest('a')).toHaveAttribute('href', `/api/v1/devices/${device.device_id}/presets/current`)
+
+      vi.spyOn(window, 'prompt').mockReturnValue('Max Range')
+      await userEvent.click(screen.getByText('Save to Presets Folder…'))
+      await waitFor(() => expect(useAppStore.getState().deviceStates[device.device_id].presetFiles).toEqual([
+        { path: 'C:/presets/D455 Max Range.preset', name: 'Max Range' },
+      ]))
+    })
+
+    it('lists folder presets under the Visual Preset control and loads one', async () => {
+      let loaded: unknown = null
+      server.use(
+        http.get('/api/v1/devices/:deviceId/presets/', () => HttpResponse.json([{ path: 'C:/p/D455 Fast.preset', name: 'Fast' }])),
+        http.post('/api/v1/devices/:deviceId/presets/load', async ({ request }) => { loaded = await request.json(); return HttpResponse.json({}) }),
+      )
+      const device = createMockDevice()
+      const sensor = createMockSensor({ sensor_id: 'sensor-a', name: 'Stereo Module' })
+      const ds = createMockDeviceState(device, {
+        sensors: [sensor],
+        controls: { 'sensors/sensor-a/options': { section: 'Controls', sensorId: 'sensor-a', name: '', options: [
+          createMockOption({ option_id: 'visual_preset', current_value: 0, default_value: 0, min_value: 0, max_value: 6, step: 1,
+            value_descriptions: { '0': 'Custom', '1': 'Default', '2': 'Hand', '3': 'High Accuracy', '4': 'High Density', '5': 'Medium Density', '6': 'Remove IR' } }),
+        ] } },
+      })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: ds } } })
+      await userEvent.click(screen.getByText('Stereo Module'))
+      await userEvent.type(screen.getByPlaceholderText('Search controls…'), 'visual')
+
+      const folder = await screen.findByLabelText('Presets from folder')
+      await userEvent.selectOptions(folder, 'C:/p/D455 Fast.preset')
+      await waitFor(() => expect(loaded).toEqual({ path: 'C:/p/D455 Fast.preset' }))
+    })
+  })
+
+  describe('Device details', () => {
+    it('lists every camera info field behind a toggle', async () => {
+      const device = createMockDevice({ info: { name: 'RealSense D455', serial_number: '123', usb_type_descriptor: '3.2', product_line: 'D400' } })
+      render(<DevicePanel />, { initialStoreState: { devices: [device], deviceStates: { [device.device_id]: createMockDeviceState(device) } } })
+
+      expect(screen.queryByTestId('device-details')).not.toBeInTheDocument()
+      await userEvent.click(screen.getByText('Show Device Details'))
+      const table = screen.getByTestId('device-details')
+      expect(table).toHaveTextContent('Usb Type Descriptor')
+      expect(table).toHaveTextContent('3.2')
+      expect(table).toHaveTextContent('Product Line')
     })
   })
 
@@ -328,7 +456,6 @@ describe('DevicePanel', () => {
     const withAdvancedMode = (overrides: Partial<ReturnType<typeof createMockDeviceState>> = {}) => {
       const device = createMockDevice()
       const ds = createMockDeviceState(device, {
-        isActive: true,
         advancedMode: { supported: true, enabled: false },
         ...overrides,
       })
@@ -410,7 +537,6 @@ describe('DevicePanel', () => {
         createMockOption({ option_id: 'Laser_Power', name: 'Laser Power' }),
       ]
       const deviceState = createMockDeviceState(device, {
-        isActive: true,
         sensors: [sensor],
         controls: {
           'sensors/sensor-a/options': {
@@ -496,6 +622,40 @@ describe('DevicePanel', () => {
       // The search force-opened the Controls section; clearing it returns the section to
       // the state the user left it in, which is closed.
       expect(screen.queryByText('Exposure')).not.toBeInTheDocument()
+    })
+
+    it('types an exact value in text-edit mode and clamps it to the range', async () => {
+      const setControl = vi.fn().mockResolvedValue(undefined)
+      await renderWithControls({
+        setControl,
+        options: [createMockOption({ option_id: 'Exposure', current_value: 100, default_value: 50, min_value: 1, max_value: 10000, step: 1 })],
+      })
+      await userEvent.type(screen.getByPlaceholderText('Search controls…'), 'expo')
+      await waitFor(() => expect(screen.getByText('Exposure')).toBeInTheDocument())
+
+      await userEvent.click(screen.getByTitle('Enter text-edit mode'))
+      const input = screen.getByLabelText('Exposure value')
+      await userEvent.clear(input)
+      await userEvent.type(input, '20000{Enter}')
+
+      await waitFor(() => expect(setControl).toHaveBeenCalledWith('test-device-1', 'sensors/sensor-a/options', 'Exposure', 10000))
+      expect(screen.queryByLabelText('Exposure value')).not.toBeInTheDocument()
+    })
+
+    it('writes a dragged slider value once the interval has passed', async () => {
+      const setControl = vi.fn().mockResolvedValue(undefined)
+      await renderWithControls({
+        setControl,
+        options: [createMockOption({ option_id: 'Gain', current_value: 16, default_value: 16, min_value: 0, max_value: 128, step: 1 })],
+      })
+      await userEvent.type(screen.getByPlaceholderText('Search controls…'), 'gain')
+      const slider = await screen.findByRole('slider')
+
+      fireEvent.change(slider, { target: { value: '40' } })
+      fireEvent.change(slider, { target: { value: '64' } })
+
+      await waitFor(() => expect(setControl).toHaveBeenCalledTimes(1))
+      expect(setControl).toHaveBeenCalledWith('test-device-1', 'sensors/sensor-a/options', 'Gain', 64)
     })
 
     // Firmware reports no range for some advanced-mode groups, so a flag in one arrives

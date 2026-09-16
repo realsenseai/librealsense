@@ -11,6 +11,8 @@ control than the pipeline-based /streams/* endpoints, allowing individual sensor
 
 import functools
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from typing import List
 
 from app.models.sensor import SensorInfo
@@ -58,7 +60,7 @@ async def get_sensors(
     """
     Get a list of all sensors for a specific RealSense device.
     """
-    return rs_manager.get_sensors(device_id)
+    return await run_in_threadpool(rs_manager.get_sensors, device_id)
 
 
 @router.get("/{sensor_id}", response_model=SensorInfo)
@@ -71,7 +73,7 @@ async def get_sensor(
     """
     Get details of a specific sensor for a RealSense device.
     """
-    return rs_manager.get_sensor(device_id, sensor_id)
+    return await run_in_threadpool(rs_manager.get_sensor, device_id, sensor_id)
 
 
 @router.post("/{sensor_id}/start", response_model=SensorStreamStatus)
@@ -99,7 +101,7 @@ async def start_sensor(
     else:
         raise HTTPException(status_code=400, detail="config or configs required")
 
-    return rs_manager.start_sensor(device_id, sensor_id, configs)
+    return await run_in_threadpool(rs_manager.start_sensor, device_id, sensor_id, configs)
 
 
 @router.post("/{sensor_id}/stop", response_model=SensorStreamStatus)
@@ -115,7 +117,50 @@ async def stop_sensor(
     The sensor will be stopped and closed, freeing its resources.
     Other sensors on the same device will continue streaming.
     """
-    return rs_manager.stop_sensor(device_id, sensor_id)
+    return await run_in_threadpool(rs_manager.stop_sensor, device_id, sensor_id)
+
+
+class RegionOfInterest(BaseModel):
+    min_x: int
+    min_y: int
+    max_x: int
+    max_y: int
+
+
+@router.get("/{sensor_id}/roi")
+@rs_exception_handler()
+async def get_roi(device_id: str, sensor_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
+    """Auto-exposure region of interest, in the sensor's pixel coordinates."""
+    return await run_in_threadpool(rs_manager.get_roi, device_id, sensor_id)
+
+
+@router.put("/{sensor_id}/roi")
+@rs_exception_handler()
+async def set_roi(device_id: str, sensor_id: str, roi: RegionOfInterest,
+                  rs_manager: RealSenseManager = Depends(get_realsense_manager)):
+    """Set the auto-exposure region of interest; corners may be given in any order."""
+    return await run_in_threadpool(rs_manager.set_roi, device_id, sensor_id, roi.min_x, roi.min_y, roi.max_x, roi.max_y)
+
+
+@router.post("/{sensor_id}/pause", response_model=SensorStreamStatus)
+@rs_exception_handler()
+async def pause_sensor(
+    device_id: str,
+    sensor_id: str,
+    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+):
+    """Freeze a streaming sensor's output: the last frame stays on screen until resume."""
+    return await run_in_threadpool(rs_manager.set_sensor_paused, device_id, sensor_id, True)
+
+
+@router.post("/{sensor_id}/resume", response_model=SensorStreamStatus)
+@rs_exception_handler()
+async def resume_sensor(
+    device_id: str,
+    sensor_id: str,
+    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+):
+    return await run_in_threadpool(rs_manager.set_sensor_paused, device_id, sensor_id, False)
 
 
 @router.get("/{sensor_id}/status", response_model=SensorStreamStatus)
@@ -131,4 +176,4 @@ async def get_sensor_status(
     Returns information about whether the sensor is streaming,
     and if so, what configuration it is using.
     """
-    return rs_manager.get_sensor_status(device_id, sensor_id)
+    return await run_in_threadpool(rs_manager.get_sensor_status, device_id, sensor_id)

@@ -1,6 +1,10 @@
 import { io, Socket } from 'socket.io-client'
-import type { MetadataUpdate } from './types'
+import type { DepthFrameEvent, JobInfo, LogEntry, MetadataUpdate, SdkNotification, SensorStreamStatus } from './types'
 import { useAppStore } from '../store'
+import { useJobsStore } from '../store/jobs'
+import { useConsoleStore } from '../store/console'
+import { useNotificationsStore } from '../store/notifications'
+import { usePointCloudStore } from '../store/pointcloud'
 
 class SocketService {
   private socket: Socket | null = null
@@ -55,11 +59,54 @@ class SocketService {
       useAppStore.getState().updateMetadata(data)
     })
 
+    this.socket.on('depth_frame', (f: DepthFrameEvent) => {
+      // Frames still in flight after a stop must not repopulate the cleared cloud
+      if (!useAppStore.getState().deviceStates[f.device_id]?.isStreaming) return
+      const bytes = f.data instanceof ArrayBuffer ? new Uint8Array(f.data) : new Uint8Array(f.data.buffer, f.data.byteOffset, f.data.byteLength)
+      const aligned = bytes.byteOffset % 2 === 0 ? bytes : bytes.slice()
+      usePointCloudStore.getState().pushFrame(f.device_id, {
+        width: f.width, height: f.height, units: f.units, frameNumber: f.frame_number,
+        data: new Uint16Array(aligned.buffer, aligned.byteOffset, aligned.byteLength >> 1),
+      })
+    })
+
     this.socket.on('devices_changed', (data: { added?: string[]; removed?: string[] }) => {
       if (import.meta.env.DEV) console.log('Socket.IO devices_changed:', data)
-      // Force a re-enumeration: a device returning after a FW flash must not be
-      // served from the cached list. fetchDevices handles first-load auto-activate.
-      useAppStore.getState().fetchDevices(true)
+      // The server's registry already reflects the change (this event comes from it);
+      // fetchDevices handles first-load auto-activate.
+      useAppStore.getState().fetchDevices()
+    })
+
+    this.socket.on('options_changed', (data: { device_id: string; sensor_id: string; options: { option_id: string; current_value: number }[] }) => {
+      useAppStore.getState().applyOptionChanges(data.device_id, data.sensor_id, data.options)
+    })
+
+    this.socket.on('sensor_status', (data: { device_id: string; sensor_id: string; status: SensorStreamStatus }) => {
+      useAppStore.getState().applySensorStatus(data.device_id, data.sensor_id, data.status)
+    })
+
+    this.socket.on('notification', (n: SdkNotification) => {
+      const severity = n.severity === 'error' || n.severity === 'fatal' ? 'error' : n.severity === 'warn' ? 'warn' : 'info'
+      const device = useAppStore.getState().deviceStates[n.device_id]?.device
+      useNotificationsStore.getState().push({
+        severity,
+        title: `${device?.name ?? n.device_id}: ${n.category.replace(/_/g, ' ')}`,
+        message: n.description + (n.serialized_data && n.serialized_data !== n.description ? `\n${n.serialized_data}` : ''),
+        deviceId: n.device_id,
+      })
+    })
+
+    this.socket.on('log_batch', (entries: LogEntry[]) => {
+      const append = useConsoleStore.getState().append
+      entries.forEach(append)
+    })
+
+    this.socket.on('playback_status', (data: { device_id: string; state: string }) => {
+      void useAppStore.getState().refreshPlayback(data.device_id)
+    })
+
+    this.socket.on('job', (job: JobInfo) => {
+      useJobsStore.getState().upsert(job)
     })
 
     this.socket.on('welcome', (data) => {
@@ -74,6 +121,21 @@ class SocketService {
       this.socket = null
       this.isConnecting = false
     }
+  }
+
+  /**
+   * Ask the server a question and await its acknowledgement. Rejects when the socket is
+   * down so callers can fall back to REST.
+   */
+  request<T>(event: string, data: unknown, timeoutMs = 1000): Promise<T> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket?.connected) return reject(new Error('socket not connected'))
+      const timer = setTimeout(() => reject(new Error(`${event}: no reply`)), timeoutMs)
+      this.socket.emit(event, data, (reply: T) => {
+        clearTimeout(timer)
+        resolve(reply)
+      })
+    })
   }
 
   emit(event: string, data: unknown): void {

@@ -31,7 +31,7 @@ void init_processing(py::module &m) {
                                              "developers who are not using async APIs.");
     frame_queue.def(py::init<>())
         .def(py::init<unsigned int, bool>(), "capacity"_a, "keep_frames"_a = false)
-        .def("enqueue", &rs2::frame_queue::enqueue, "Enqueue a new frame into the queue.", "f"_a)
+        .def("enqueue", &rs2::frame_queue::enqueue, "Enqueue a new frame into the queue.", "f"_a, py::call_guard<py::gil_scoped_release>())
         .def("wait_for_frame", &rs2::frame_queue::wait_for_frame, "Wait until a new frame "
              "becomes available in the queue and dequeue it.", "timeout_ms"_a = 5000, py::call_guard<py::gil_scoped_release>())
         .def("poll_for_frame", [](const rs2::frame_queue &self) {
@@ -57,7 +57,7 @@ void init_processing(py::module &m) {
         .def("start", [](rs2::processing_block& self, std::function<void(rs2::frame)> f) {
             self.start(f);
         }, "Start the processing block with callback function to inform the application the frame is processed.", "callback"_a)
-        .def("invoke", &rs2::processing_block::invoke, "Ask processing block to process the frame", "f"_a)
+        .def("invoke", &rs2::processing_block::invoke, "Ask processing block to process the frame", "f"_a, py::call_guard<py::gil_scoped_release>())
         .def("supports", (bool (rs2::processing_block::*)(rs2_camera_info) const) &rs2::processing_block::supports, "Check if a specific camera info field is supported.")
         .def("get_info", &rs2::processing_block::get_info, "Retrieve camera specific information, like versions of various internal components.");
         /*.def("__call__", &rs2::processing_block::operator(), "f"_a)*/

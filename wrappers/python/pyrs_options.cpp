@@ -211,7 +211,7 @@ void init_options(py::module &m) {
                   }
                   self.set_option_value( rs2_value );
               } )
-        .def("get_option_range", &rs2::options::get_option_range, "Retrieve the available range of values "
+        .def("get_option_range", &rs2::options::get_option_range, py::call_guard<py::gil_scoped_release>(), "Retrieve the available range of values "
              "of a supported option", "option"_a, py::call_guard<py::gil_scoped_release>())
         .def("set_option", &rs2::options::set_option, "Write new value to device option", "option"_a, "value"_a, py::call_guard<py::gil_scoped_release>())
         .def("supports", (bool (rs2::options::*)(rs2_option option) const) &rs2::options::supports, "Check if particular "
@@ -219,7 +219,7 @@ void init_options(py::module &m) {
         .def("get_option_description", &rs2::options::get_option_description, "Get option description.", "option"_a)
         .def("get_option_value_description", &rs2::options::get_option_value_description, "Get option value description "
              "(In case a specific option value holds special meaning)", "option"_a, "value"_a)
-        .def("get_supported_options", &rs2::options::get_supported_options, "Retrieve list of supported options") // No docstring in C++
+        .def("get_supported_options", &rs2::options::get_supported_options, "Retrieve list of supported options", py::call_guard<py::gil_scoped_release>()) // No docstring in C++
         .def( "get_supported_option_values", &rs2::options::get_supported_option_values,
               "Retrieve the supported options, each with its value and range", py::call_guard< py::gil_scoped_release >() )
         .def( "on_options_changed", &rs2::options::on_options_changed,

@@ -45,7 +45,7 @@ export function ChatPanel() {
     sendChatMessage(message)
   }
 
-  const activeDeviceCount = Object.values(deviceStates).filter(ds => ds.isActive).length
+  const activeDeviceCount = Object.keys(deviceStates).length
 
   if (!isChatOpen) return null
 

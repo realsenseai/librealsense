@@ -59,6 +59,12 @@ async def get_advanced_controls(
         return await run_in_threadpool(rs_manager.get_advanced_controls, device_id)
     except RealSenseError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
+    except RuntimeError as e:
+        # The SDK could not talk to the device (a stale handle after sleep, a busy USB link)
+        logging.warning("advanced controls unavailable for %s: %s", device_id, e)
+        if rs_manager.is_device_lost_error(e):
+            rs_manager.device_lost(device_id, str(e)[:120])
+        raise HTTPException(status_code=503, detail=f"The device did not answer: {e}")
     except Exception:
         logging.exception("Unexpected error reading advanced controls for %s", device_id)
         raise HTTPException(status_code=500, detail="Unexpected error while reading advanced controls")

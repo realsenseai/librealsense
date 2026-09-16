@@ -1,4 +1,6 @@
 import { useState, useRef } from 'react'
+import { useMetric } from '../store/settings'
+import { formatDistance, toDisplayUnits } from '../utils/units'
 
 interface DepthLegendProps {
   minDepth: number // in meters
@@ -16,6 +18,7 @@ export function DepthLegend({
   const [hoverY, setHoverY] = useState<number | null>(null)
   const [hoverDepth, setHoverDepth] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const metric = useMetric()
 
   if (!show) return null
 
@@ -116,7 +119,7 @@ export function DepthLegend({
               className="absolute right-0 transform -translate-y-1/2"
               style={{ top: `${y}%` }}
             >
-              {depth.toFixed(1)}
+              {toDisplayUnits(depth, metric).toFixed(1)}
             </div>
           )
         })}
@@ -128,7 +131,7 @@ export function DepthLegend({
           className="absolute left-16 bg-black/90 text-white text-xs px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap z-10"
           style={{ top: `${hoverY}px`, transform: 'translateY(-50%)' }}
         >
-          {hoverDepth.toFixed(3)} m
+          {formatDistance(hoverDepth, metric)}
         </div>
       )}
     </div>

@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from app.models.option import OptionInfo
 
@@ -21,11 +21,19 @@ class Sensor(SensorBase):
     class Config:
         from_attributes = True
 
+class DefaultProfile(BaseModel):
+    """The profile the SDK marks default for a stream - what the viewer starts with."""
+    resolution: tuple[int, int]
+    fps: int
+    format: str
+
 class SupportedStreamProfile(BaseModel):
     stream_type: str
     resolutions: List[tuple[int, int]] # List of tuples (width, height)
     fps: List[int] # List of frames per second
     formats: List[str] # List of supported formats
+    default: Optional[DefaultProfile] = None
+    modes: List[Tuple[int, int, int, str]] = []  # every (width, height, fps, format) the SDK lists
 
 class SensorInfo(BaseModel):
     sensor_id: str

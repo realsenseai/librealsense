@@ -141,10 +141,10 @@ react-viewer/
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start development server with hot reload |
-| `npm run build` | Build for production |
+| `npm run build` | Build for production **and publish into `wrappers/rest-api/static/`, which the server serves** |
 | `npm run preview` | Preview production build locally |
 | `npm run lint` | Run ESLint |
-| `npm run bundle` | Copy build to FastAPI static folder |
+| `npm run bundle` | Copy an existing build to the FastAPI static folder (`npm run build` already does this) |
 
 ## Testing
 
@@ -252,7 +252,6 @@ manual build steps, dev mode and troubleshooting, see
 1. Build the React app:
    ```bash
    npm run build
-   npm run bundle
    ```
 
 2. This copies the build to `../rest-api/static/`

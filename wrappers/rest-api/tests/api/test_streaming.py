@@ -30,3 +30,10 @@ def test_get_stream_status(setup_mock_managers):
     status = response.json()
     assert status["device_id"] == "device1"
     assert "is_streaming" in status
+
+
+def test_latest_metadata_is_readable_over_rest(setup_mock_managers, monkeypatch):
+    rs_manager = setup_mock_managers["rs_manager"]
+    monkeypatch.setattr(rs_manager, "get_latest_metadata", lambda d, s: {"frame_number": 7, "stream": s, "point_cloud": {"vertices": b"x"}})
+    body = client.get("/api/v1/devices/device1/stream/metadata?stream=depth").json()
+    assert body["frame_number"] == 7 and body["stream"] == "depth" and "point_cloud" not in body

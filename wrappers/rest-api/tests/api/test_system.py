@@ -43,3 +43,9 @@ def test_enable_metadata_windows(returncode, status, body_status, detail):
         assert response.json()["status"] == body_status
     if detail:
         assert detail in response.json()["detail"]
+
+
+def test_api_paths_without_a_trailing_slash_still_resolve(setup_mock_managers):
+    # The viewer bundle is mounted at "/" when present; API paths must not fall into it.
+    assert client.get("/api/v1/devices").status_code == 200
+    assert client.get("/api/v1/devices", follow_redirects=False).status_code in (200, 307)

@@ -37,6 +37,10 @@ if (BUILD_PCL_EXAMPLES)
   add_subdirectory(pcl)
 endif()
 
+if(BUILD_REST_API)
+  add_subdirectory(rest-api)
+endif()
+
 if(BUILD_UNITY_BINDINGS)
 	if(NOT WIN32)
 		message( FATAL_ERROR "BUILD_UNITY_BINDINGS is supported only for Windows OS" )

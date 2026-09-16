@@ -8,3 +8,6 @@ venv/
 # Ignore Python bytecode files
 *.pyc
 __pycache__/
+
+# The React viewer bundle built by `npm run bundle` / the BUILD_REST_API CMake target
+static/

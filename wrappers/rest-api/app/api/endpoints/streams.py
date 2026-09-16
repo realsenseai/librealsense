@@ -1,13 +1,15 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Response, Depends, HTTPException
 from typing import List, Optional
 
 
 from app.models.stream import StreamStatus, StreamStart, StreamStartTiming
 from app.services.rs_manager import RealSenseManager
 from app.api.dependencies import get_realsense_manager
+
+from starlette.concurrency import run_in_threadpool
 
 router = APIRouter()
 
@@ -26,7 +28,8 @@ async def start_stream(
     import traceback
     t0 = time.perf_counter()
     try:
-        result = rs_manager.start_stream(
+        result = await run_in_threadpool(
+            rs_manager.start_stream,
             device_id,
             stream_config.configs,
             stream_config.align_to,
@@ -51,7 +54,7 @@ async def stop_stream(
     Stop streaming from a RealSense device.
     """
     try:
-        return rs_manager.stop_stream(device_id)
+        return await run_in_threadpool(rs_manager.stop_stream, device_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -64,9 +67,38 @@ async def get_stream_status(
     Get the streaming status for a RealSense device.
     """
     try:
-        return rs_manager.get_stream_status(device_id)
+        return await run_in_threadpool(rs_manager.get_stream_status, device_id)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/metadata")
+async def get_stream_metadata(device_id: str, stream: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
+    """The newest frame's metadata for one stream, as the socket sends it (without frame data)."""
+    try:
+        metadata = await run_in_threadpool(rs_manager.get_latest_metadata, device_id, stream)
+    except Exception as e:
+        raise HTTPException(status_code=getattr(e, "status_code", 404), detail=str(getattr(e, "detail", e)))
+    return {k: v for k, v in dict(metadata).items() if k != "point_cloud"}
+
+
+@router.get("/snapshot")
+async def snapshot(
+    device_id: str,
+    stream: str,
+    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+):
+    """Download the newest frame of a stream as a zip: PNG, raw pixels and attributes CSV
+    (motion streams: the sample as CSV) - the legacy viewer's snapshot button."""
+    filename, data = await run_in_threadpool(rs_manager.snapshot, device_id, stream)
+    return Response(content=data, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@router.get("/max-usable-range")
+async def get_max_usable_range(device_id: str, rs_manager: RealSenseManager = Depends(get_realsense_manager)):
+    """Whether the depth sensor estimates its max usable range, and the estimate when it does."""
+    return await run_in_threadpool(rs_manager.get_max_usable_range, device_id)
+
 
 @router.get("/depth-at-pixel")
 async def get_depth_at_pixel(
@@ -80,7 +112,7 @@ async def get_depth_at_pixel(
     Returns null if no depth frame is available or coordinates are out of bounds.
     """
     try:
-        depth = rs_manager.get_depth_at_pixel(device_id, x, y)
+        depth = await run_in_threadpool(rs_manager.get_depth_at_pixel, device_id, x, y)
         return {"depth": depth, "x": x, "y": y, "units": "meters"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -95,7 +127,7 @@ async def get_depth_range(
     Uses the same algorithm as the legacy viewer (mean + 1.5*stddev, rounded to nearest 4m).
     """
     try:
-        result = rs_manager.get_depth_range(device_id)
+        result = await run_in_threadpool(rs_manager.get_depth_range, device_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

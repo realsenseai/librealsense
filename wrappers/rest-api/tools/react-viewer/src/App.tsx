@@ -3,45 +3,54 @@ import { DevicePanel } from './components/DevicePanel'
 import { StreamViewer } from './components/StreamViewer'
 import { PointCloudViewer } from './components/PointCloudViewer'
 import { Header } from './components/Header'
-import { LoadingSplash } from './components/LoadingSplash'
 import { WhatsNew } from './components/WhatsNew'
 import { ChatButton, ChatPanel } from './components/ChatBot'
 import { ApiDiagnostics } from './components/ApiDiagnostics'
 import { ServerWarnings } from './components/ServerWarnings'
+import { OutputConsole } from './components/console/OutputConsole'
+import { NotificationCenter } from './components/notifications/NotificationCenter'
 import { useAppStore } from './store'
+import { useSettingsStore } from './store/settings'
 import { socketService } from './api/socket'
+import { installShortcuts } from './utils/shortcuts'
 
 function App() {
-  const { viewMode, isConnected, getActiveDevices } = useAppStore()
+  const { viewMode, isConnected, getDeviceStates, uploadRecording } = useAppStore()
 
-  const activeDevices = getActiveDevices()
-  const hasActiveDevices = activeDevices.length > 0
-  
-  // Check if any device is loading
-  const isAnyDeviceLoading = activeDevices.some(ds => ds.isLoading)
-  const loadingDeviceName = activeDevices.find(ds => ds.isLoading)?.device.name
+  const hasActiveDevices = getDeviceStates().length > 0
 
   useEffect(() => {
     // Connect to Socket.IO on mount
     socketService.connect()
+    void useSettingsStore.getState().fetchSettings()
+    const uninstallShortcuts = installShortcuts({
+      Space: () => void useAppStore.getState().togglePauseAll(),
+      F8: () => {
+        if (document.fullscreenElement) void document.exitFullscreen?.()
+        else void document.documentElement.requestFullscreen?.()
+      },
+    })
     
     // Don't disconnect on cleanup in dev mode (React strict mode double-mounts)
     // The socket service handles reconnection gracefully
     return () => {
-      // Only disconnect if we're actually unmounting the app
-      // In development with strict mode, this fires twice
+      // The socket stays up: React strict mode double-mounts in development and the
+      // service reconnects on its own. Shortcuts are cheap to re-install.
+      uninstallShortcuts()
     }
   }, [])
 
   return (
-    <div className="h-screen bg-rs-darker flex flex-col overflow-hidden">
+    <div
+      className="h-screen bg-rs-darker flex flex-col overflow-hidden"
+      onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) e.preventDefault() }}
+      onDrop={(e) => {
+        const file = e.dataTransfer.files[0]
+        if (file && /\.(bag|db3)$/i.test(file.name)) { e.preventDefault(); void uploadRecording(file) }
+      }}
+    >
       {/* What's New Modal */}
       <WhatsNew />
-      
-      {/* Loading Splash Screen */}
-      {isAnyDeviceLoading && (
-        <LoadingSplash message={`Initializing ${loadingDeviceName || 'device'} sensors...`} />
-      )}
       
       <Header />
 
@@ -56,6 +65,7 @@ function App() {
 
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0">
           {hasActiveDevices ? (
             <>
               {/* Stream/PointCloud View — keep both mounted so WebRTC stays alive
@@ -78,11 +88,13 @@ function App() {
                   <circle cx="65" cy="40" r="8" fill="currentColor" opacity="0.5"/>
                   <circle cx="50" cy="60" r="6" fill="currentColor" opacity="0.3"/>
                 </svg>
-                <p className="text-xl">No Device Activated</p>
-                <p className="text-sm mt-2">Connect a RealSense device and toggle it on from the sidebar</p>
+                <p className="text-xl">No Device Connected</p>
+                <p className="text-sm mt-2">Connect a RealSense device to start streaming</p>
               </div>
             </div>
           )}
+          </div>
+          <OutputConsole />
         </main>
       </div>
 
@@ -99,6 +111,8 @@ function App() {
       {/* AI Chat Assistant */}
       <ChatPanel />
       <ChatButton />
+
+      <NotificationCenter />
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { useDashboardsStore } from './dashboards'
 import { create, type StoreApi } from 'zustand'
 import type {
   DeviceInfo,
@@ -14,6 +15,8 @@ import type {
   FirmwareState,
   SensorStreamConfig,
   SensorConfig,
+  PlaybackActionName,
+  SensorStreamStatus,
 } from '../api/types'
 
 // Map to track pending stop operations by "deviceId:sensorId" key
@@ -51,31 +54,69 @@ function decodeFloat32Payload(raw: ArrayBuffer | string): Float32Array {
   return new Float32Array(u8.buffer, u8.byteOffset, u8.byteLength >> 2)
 }
 
+/**
+ * Initial stream selection. Like the legacy viewer, a sensor starts with the profiles the
+ * SDK marks default; a sensor that reports none falls back to depth/color/IMU at the
+ * first listed mode.
+ */
 function buildStreamConfigs(sensors: SensorInfo[]): StreamConfig[] {
   const configs: StreamConfig[] = []
   for (const sensor of sensors) {
     const profiles = sensor.supported_stream_profiles.filter(
       p => p.resolutions.length > 0 && p.fps.length > 0
     )
+    const hasDefaults = profiles.some(p => p.default)
+    // Streams without a default of their own share the sensor's default mode, so pick a
+    // format the SDK lists at that mode (D455 IR: Y8 at 848x480, Y16 only at 1280x800).
+    const sensorDefault = profiles.find(p => p.default)?.default
     for (const profile of profiles) {
       const streamTypeLower = profile.stream_type.toLowerCase()
-      const enableByDefault =
-        streamTypeLower === 'depth' || streamTypeLower === 'color' ||
-        streamTypeLower === 'gyro' || streamTypeLower === 'accel'
+      const enableByDefault = hasDefaults
+        ? profile.default !== undefined
+        : streamTypeLower === 'depth' || streamTypeLower === 'color' ||
+          streamTypeLower === 'gyro' || streamTypeLower === 'accel'
+      const [width, height] = profile.default?.resolution ?? sensorDefault?.resolution ?? profile.resolutions[0]
+      const framerate = profile.default?.fps ?? sensorDefault?.fps ?? profile.fps[0]
+      const atMode = profile.modes?.find(([w, h, fps]) => w === width && h === height && fps === framerate)
       configs.push({
         sensor_id: sensor.sensor_id,
         stream_type: profile.stream_type,
-        format: profile.formats[0] || 'rgb8',
-        resolution: {
-          width: profile.resolutions[0][0],
-          height: profile.resolutions[0][1],
-        },
-        framerate: profile.fps[0],
+        format: profile.default?.format ?? atMode?.[3] ?? profile.formats[0] ?? 'rgb8',
+        resolution: { width, height },
+        framerate,
         enable: enableByDefault,
       })
     }
   }
   return configs
+}
+
+/**
+ * Turn on (and give the running mode to) every stream the camera is already sending, so a
+ * page that arrives mid-stream shows the same tiles as the page that started them.
+ */
+function adoptRunningStreams(configs: StreamConfig[], running: SensorStreamStatus[]): StreamConfig[] {
+  if (running.length === 0) return configs
+  const live = new Map<string, SensorStreamConfig | undefined>()
+  for (const status of running) {
+    const types = status.stream_types ?? (status.stream_type ? [status.stream_type] : [])
+    for (const type of types) {
+      const key = `${status.sensor_id}:${type.toLowerCase()}`
+      live.set(key, status.streams?.find((s) => s.stream_type.toLowerCase() === type.toLowerCase()))
+    }
+  }
+  return configs.map((c) => {
+    const key = `${c.sensor_id}:${c.stream_type.toLowerCase()}`
+    if (!live.has(key)) return c
+    const running = live.get(key)
+    return {
+      ...c,
+      enable: true,
+      format: running?.format ?? c.format,
+      resolution: running?.resolution ?? c.resolution,
+      framerate: running?.framerate ?? c.framerate,
+    }
+  })
 }
 
 function buildSensorConfigs(sensors: SensorInfo[]): Record<string, SensorConfig> {
@@ -103,7 +144,25 @@ function buildSensorConfigs(sensors: SensorInfo[]): Record<string, SensorConfig>
       }
     }
 
-    if (commonResolutions.size > 0 && commonFps.size > 0) {
+    // Nothing shared: like the legacy viewer (subdevice-model.h), each stream picks its own.
+    const perStreamResolution = commonResolutions.size === 0 && profiles.length > 0
+    const perStreamFps = commonFps.size === 0 && profiles.length > 0
+    if ((perStreamResolution || perStreamFps) && !isMotionSensor) {
+      const first = profiles[0].default ?? { resolution: profiles[0].resolutions[0], fps: profiles[0].fps[0] }
+      sensorConfigs[sensor.sensor_id] = {
+        resolution: { width: first.resolution[0], height: first.resolution[1] }, framerate: first.fps,
+        isMotionSensor, perStreamResolution, perStreamFps,
+      }
+      continue
+    }
+
+    // The SDK default of a video stream on this sensor wins over the first common mode.
+    const preferred = isMotionSensor ? undefined : profiles.find(p => p.default)?.default
+    const preferredRes = preferred && `${preferred.resolution[0]}x${preferred.resolution[1]}`
+    if (preferred && preferredRes && commonResolutions.has(preferredRes) && commonFps.has(preferred.fps)) {
+      const [width, height] = preferred.resolution
+      sensorConfigs[sensor.sensor_id] = { resolution: { width, height }, framerate: preferred.fps, isMotionSensor }
+    } else if (commonResolutions.size > 0 && commonFps.size > 0) {
       const firstCommonRes = [...commonResolutions][0]
       const [width, height] = firstCommonRes.split('x').map(Number)
       const sortedFps = [...commonFps].sort((a, b) => b - a)
@@ -131,6 +190,7 @@ import {
   type ChatResponse,
 } from '../api/chat'
 import type { ProposedSettings } from '../utils/chatPrompt'
+import { orderOptions } from '../utils/optionOrder'
 
 interface IMUHistory {
   accel: { timestamp: number; x: number; y: number; z: number }[]
@@ -155,11 +215,15 @@ interface AppState {
   fetchDeviceControls: (deviceId: string) => Promise<void>
   setControl: (deviceId: string, key: string, optionId: string, value: number | boolean | string) => Promise<void>
   setControlEnabled: (deviceId: string, key: string, enabled: boolean) => Promise<void>
+  /** Values the SDK reports changed on a sensor (a preset rewriting exposure, AE toggles). */
+  applyOptionChanges: (deviceId: string, sensorId: string, changes: { option_id: string; current_value: number }[]) => void
+  /** A sensor started, stopped or paused on the server - by this client or anyone else. */
+  applySensorStatus: (deviceId: string, sensorId: string, status: SensorStreamStatus) => void
   setPostProcessing: (deviceId: string, sensorId: string, enabled: boolean) => Promise<void>
 
-  // Device activation (multi-select support)
-  toggleDeviceActive: (device: DeviceInfo) => Promise<void>
-  getActiveDevices: () => DeviceState[]
+  /** Load a newly connected device's sensors and controls; every device is open. */
+  openDevice: (device: DeviceInfo) => Promise<void>
+  getDeviceStates: () => DeviceState[]
   isAnyDeviceStreaming: () => boolean
   
   resetDevice: (deviceId: string) => Promise<void>
@@ -174,6 +238,25 @@ interface AppState {
   // Per-sensor streaming (sensor API)
   startSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
   stopSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
+  setSensorPaused: (deviceId: string, sensorId: string, paused: boolean) => Promise<void>
+
+  // JSON presets (need advanced mode; the server answers 409 otherwise)
+  fetchPresets: (deviceId: string) => Promise<void>
+  loadPresetFile: (deviceId: string, path: string) => Promise<void>
+  uploadPreset: (deviceId: string, file: File) => Promise<void>
+  savePreset: (deviceId: string, name: string) => Promise<void>
+
+  // Record / playback
+  startRecording: (deviceId: string) => Promise<void>
+  setRecordingPaused: (deviceId: string, paused: boolean) => Promise<void>
+  stopRecording: (deviceId: string) => Promise<void>
+  loadRecording: (path: string) => Promise<void>
+  uploadRecording: (file: File) => Promise<void>
+  unloadRecording: (deviceId: string) => Promise<void>
+  refreshPlayback: (deviceId: string) => Promise<void>
+  playbackControl: (deviceId: string, action: PlaybackActionName, value?: number) => Promise<void>
+  /** Space in the legacy viewer: pause every streaming sensor, or resume them all. */
+  togglePauseAll: () => Promise<void>
 
   // Metadata from Socket.IO
   updateMetadata: (metadata: MetadataUpdate) => void
@@ -266,7 +349,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const devices = await apiClient.getDevices(forceRefresh)
       // A newer enumeration already landed: this response is older than what we show.
       if (seq !== _fetchSeq) return
-      const known = new Set(get().devices.map((d) => d.device_id))
       // Carry over the UI state of devices that are still here; the rest drop out.
       set((state) => ({
         devices,
@@ -278,12 +360,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
         isLoadingDevices: false,
       }))
 
-      // A camera just showed up and it is the only one: open it. Covers first load and a
-      // return from DFU alike, and leaves a camera the user closed closed.
-      const appeared = devices.filter((d) => !known.has(d.device_id))
-      if (devices.length === 1 && appeared.length === 1 && get().getActiveDevices().length === 0) {
-        await get().toggleDeviceActive(devices[0])
-      }
+      // Like the legacy viewer, a camera is ready to use the moment it shows up: open
+      // every one we have not seen (first load and a return from DFU alike).
+      const appeared = devices.filter((d) => !get().deviceStates[d.device_id])
+      await Promise.all(appeared.map((d) => get().openDevice(d)))
     } catch (error) {
       set({
         error: `Failed to fetch devices: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -351,7 +431,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }
     sensors.forEach((s, i) => {
       groups[`sensors/${s.sensor_id}/options`] =
-        { section: 'Controls', sensorId: s.sensor_id, name: '', options: s.options }
+        { section: 'Controls', sensorId: s.sensor_id, name: '', options: orderOptions(s.options) }
       for (const [name, filter] of Object.entries(perSensor[i])) {
         groups[`sensors/${s.sensor_id}/filters/${name}`] =
           { section: 'Post-Processing', sensorId: s.sensor_id, name, ...filter }
@@ -390,6 +470,27 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((state) => patchGroup(state, deviceId, key, (g) => ({ ...g, enabled })))
   },
 
+  applySensorStatus: (deviceId, sensorId, status) => {
+    set((state) => patchDevice(state, deviceId, (ds) => {
+      const current = ds.sensorStreamingStatus[sensorId]
+      // Our own start is still in flight: its response carries the final word
+      if (current?.pendingOp === 'starting' && !status.is_streaming) return {}
+      const sensorStreamingStatus = { ...ds.sensorStreamingStatus, [sensorId]: status }
+      return { sensorStreamingStatus, isStreaming: Object.values(sensorStreamingStatus).some((s) => s.is_streaming) }
+    }))
+  },
+
+  applyOptionChanges: (deviceId, sensorId, changes) => {
+    const byId = new Map(changes.map((c) => [c.option_id.toLowerCase(), c.current_value]))
+    set((state) => patchGroup(state, deviceId, `sensors/${sensorId}/options`, (group) => ({
+      ...group,
+      options: group.options.map((o) => {
+        const value = byId.get(o.option_id.toLowerCase())
+        return value === undefined ? o : { ...o, current_value: value }
+      }),
+    })))
+  },
+
   setPostProcessing: async (deviceId, sensorId, enabled) => {
     // Choices stay in `controls` untouched, as in the legacy viewer: its master switch and
     // its per-filter flags are separate (processing-block-model.h).
@@ -419,51 +520,30 @@ export const useAppStore = create<AppState>()((set, get) => ({
     return recommended
   },
 
-  toggleDeviceActive: async (device: DeviceInfo) => {
-    const state = get()
-    const existing = state.deviceStates[device.device_id]
-    
-    if (existing?.isActive) {
-      // Deactivate: stop streaming if active, then remove
-      for (const [sensorId, status] of Object.entries(existing.sensorStreamingStatus)) {
-        if (status.is_streaming) await get().stopSensorStreaming(device.device_id, sensorId)
-      }
-      set((s) => {
-        const newStates = { ...s.deviceStates }
-        delete newStates[device.device_id]
-        return { deviceStates: newStates }
-      })
-    } else {
-      // Activate: create device state and fetch sensors
-      const deviceState: DeviceState = {
-        device,
-        firmware: { is_updating: false, progress: undefined, last_error: null },
-        sensors: [],
-        controls: {},
-        streamConfigs: [],
-        sensorConfigs: {},
-        isStreaming: false,
-        isActive: true,
-        isLoading: true,
-        streamMetadata: {},
-        sensorStreamingStatus: {},
-      }
-      set((s) => ({
-        deviceStates: { ...s.deviceStates, [device.device_id]: deviceState },
-      }))
-      
-      // Fetch sensors for this device
-      await get().fetchSensors(device.device_id)
-      // Best-effort: a versions-DB outage shouldn't make opening a camera look like it failed.
-      get().checkFirmwareUpdates(device.device_id).catch(() => {})
-      get().fetchDeviceControls(device.device_id)
+  openDevice: async (device: DeviceInfo) => {
+    const deviceState: DeviceState = {
+      device,
+      firmware: { is_updating: false, progress: undefined, last_error: null },
+      sensors: [],
+      controls: {},
+      streamConfigs: [],
+      sensorConfigs: {},
+      isStreaming: false,
+      isLoading: true,
+      streamMetadata: {},
+      sensorStreamingStatus: {},
     }
+    set((s) => ({
+      deviceStates: { ...s.deviceStates, [device.device_id]: deviceState },
+    }))
+
+    await get().fetchSensors(device.device_id)
+    // Best-effort: a versions-DB outage shouldn't make opening a camera look like it failed.
+    get().checkFirmwareUpdates(device.device_id).catch(() => {})
+    get().fetchDeviceControls(device.device_id)
   },
 
-  getActiveDevices: () => {
-    const state = get()
-    return Object.values(state.deviceStates).filter(ds => ds.isActive)
-  },
+  getDeviceStates: () => Object.values(get().deviceStates),
 
   isAnyDeviceStreaming: () => {
     const state = get()
@@ -498,8 +578,34 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const configs = buildStreamConfigs(sensors)
       const sensorConfigs = buildSensorConfigs(sensors)
 
-      set((state) => patchDevice(state, deviceId, () =>
-        ({ sensors, streamConfigs: configs, sensorConfigs, isLoading: false })))
+      // The camera may already be streaming - this page was reloaded, or another client
+      // started it. Adopt the server's state instead of showing an idle camera whose tiles
+      // never appear and whose depth frames the 3D view throws away.
+      const statuses = await Promise.all(sensors.map((s) =>
+        apiClient.getSensorStatus(deviceId, s.sensor_id).catch(() => null)))
+      const sensorStreamingStatus: Record<string, SensorStreamStatus> = {}
+      for (const status of statuses) if (status) sensorStreamingStatus[status.sensor_id] = status
+      const running = Object.values(sensorStreamingStatus).filter((s) => s.is_streaming)
+
+      for (const status of running) {
+        const first = status.streams?.[0]
+        const sensorConfig = sensorConfigs[status.sensor_id]
+        if (first && sensorConfig) {
+          sensorConfig.resolution = first.resolution ?? sensorConfig.resolution
+          sensorConfig.framerate = first.framerate ?? sensorConfig.framerate
+        }
+      }
+
+      set((state) => patchDevice(state, deviceId, (ds) => ({
+        sensors,
+        // A stream the camera is already sending must be enabled in the config, or its tile
+        // is filtered out of the 2D view.
+        streamConfigs: adoptRunningStreams(configs, running),
+        sensorConfigs,
+        sensorStreamingStatus: { ...ds.sensorStreamingStatus, ...sensorStreamingStatus },
+        isStreaming: running.length > 0,
+        isLoading: false,
+      })))
     } catch (error) {
       set((state) => ({
         deviceStates: {
@@ -593,9 +699,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const configs: SensorStreamConfig[] = enabledStreamConfigs.map(c => ({
       stream_type: c.stream_type,
       format: c.format,
-      resolution: sensorConfig.isMotionSensor ? c.resolution : sensorConfig.resolution,
-      framerate: sensorConfig.isMotionSensor ? c.framerate : sensorConfig.framerate,
+      resolution: sensorConfig.isMotionSensor || sensorConfig.perStreamResolution ? c.resolution : sensorConfig.resolution,
+      framerate: sensorConfig.isMotionSensor || sensorConfig.perStreamFps ? c.framerate : sensorConfig.framerate,
     }))
+
+    // A second click while the request is in flight would land on a "Stop" button and undo
+    // the start; mark the sensor pending so the button is disabled until the server answers
+    if (deviceState.sensorStreamingStatus[sensorId]?.pendingOp === 'starting') return
+    set((s) => patchDevice(s, deviceId, (ds) => ({
+      sensorStreamingStatus: {
+        ...ds.sensorStreamingStatus,
+        [sensorId]: { ...(ds.sensorStreamingStatus[sensorId] ?? { sensor_id: sensorId, name: '', is_streaming: false }), pendingOp: 'starting' as const },
+      },
+    })))
 
     try {
       const status = await apiClient.startSensor(deviceId, sensorId, configs)
@@ -645,6 +761,131 @@ export const useAppStore = create<AppState>()((set, get) => ({
         },
       }))
     }
+  },
+
+  setSensorPaused: async (deviceId, sensorId, paused) => {
+    try {
+      const status = await apiClient.setSensorPaused(deviceId, sensorId, paused)
+      set((s) => patchDevice(s, deviceId, (ds) =>
+        ({ sensorStreamingStatus: { ...ds.sensorStreamingStatus, [sensorId]: status } })))
+    } catch (error) {
+      set({ error: `Failed to ${paused ? 'pause' : 'resume'} sensor: ${error instanceof Error ? error.message : 'unknown error'}` })
+    }
+  },
+
+  fetchPresets: async (deviceId) => {
+    try {
+      const presetFiles = await apiClient.listPresets(deviceId)
+      set((s) => patchDevice(s, deviceId, () => ({ presetFiles })))
+    } catch {
+      // no folder yet: nothing to list
+    }
+  },
+
+  loadPresetFile: async (deviceId, path) => {
+    try {
+      await apiClient.loadPresetFile(deviceId, path)
+      await get().fetchDeviceControls(deviceId) // a preset rewrites many controls
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to load preset: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  uploadPreset: async (deviceId, file) => {
+    try {
+      await apiClient.uploadPreset(deviceId, file)
+      await get().fetchDeviceControls(deviceId)
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to load preset: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  savePreset: async (deviceId, name) => {
+    try {
+      const presetFiles = await apiClient.savePreset(deviceId, name)
+      set((s) => patchDevice(s, deviceId, () => ({ presetFiles })))
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to save preset: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  startRecording: async (deviceId) => {
+    try {
+      const record = await apiClient.startRecording(deviceId)
+      set((s) => patchDevice(s, deviceId, () => ({ record })))
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to start recording: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  setRecordingPaused: async (deviceId, paused) => {
+    const record = await apiClient.setRecordingPaused(deviceId, paused)
+    set((s) => patchDevice(s, deviceId, () => ({ record })))
+  },
+
+  stopRecording: async (deviceId) => {
+    const record = await apiClient.stopRecording(deviceId)
+    set((s) => patchDevice(s, deviceId, () => ({ record })))
+  },
+
+  loadRecording: async (path) => {
+    try {
+      await apiClient.loadRecording(path)
+      await get().fetchDevices() // the server registered the recording as a device already
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to load recording: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  uploadRecording: async (file) => {
+    try {
+      await apiClient.uploadRecording(file)
+      await get().fetchDevices()
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      set({ error: `Failed to load recording: ${detail ?? (error instanceof Error ? error.message : 'unknown error')}` })
+    }
+  },
+
+  unloadRecording: async (deviceId) => {
+    await apiClient.unloadRecording(deviceId)
+    await get().fetchDevices()
+  },
+
+  refreshPlayback: async (deviceId) => {
+    try {
+      const playback = await apiClient.getPlaybackStatus(deviceId)
+      set((s) => patchDevice(s, deviceId, () => ({ playback })))
+    } catch {
+      // the recording may just have been closed
+    }
+  },
+
+  playbackControl: async (deviceId, action, value) => {
+    try {
+      const playback = await apiClient.playbackControl(deviceId, action, value)
+      set((s) => patchDevice(s, deviceId, () => ({ playback })))
+    } catch (error) {
+      set({ error: `Playback ${action} failed: ${error instanceof Error ? error.message : 'unknown error'}` })
+    }
+  },
+
+  togglePauseAll: async () => {
+    const streaming: [string, string, boolean][] = []
+    for (const ds of Object.values(get().deviceStates)) {
+      for (const [sensorId, status] of Object.entries(ds.sensorStreamingStatus)) {
+        if (status.is_streaming) streaming.push([ds.device.device_id, sensorId, !!status.paused])
+      }
+    }
+    if (streaming.length === 0) return
+    // Any sensor still running means "pause everything"; only when all are paused, resume.
+    const pause = streaming.some(([, , paused]) => !paused)
+    await Promise.all(streaming.map(([d, s]) => get().setSensorPaused(d, s, pause)))
   },
 
   stopSensorStreaming: async (deviceId, sensorId) => {
@@ -760,6 +1001,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   // Metadata
   updateMetadata: (metadata) => {
     const deviceId = metadata.device_id
+    useDashboardsStore.getState().ingest(metadata)
     set((state) => {
       const deviceState = state.deviceStates[deviceId]
       if (!deviceState) return state
@@ -770,6 +1012,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           [deviceId]: {
             ...deviceState,
             streamMetadata: metadata.metadata_streams,
+            metadataServerTime: metadata.timestamp_server,
           },
         },
       }
@@ -836,7 +1079,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     if (prev === mode) return
     set({ viewMode: mode })
 
-    const activeDevices = Object.values(get().deviceStates).filter(ds => ds.isActive)
+    const activeDevices = Object.values(get().deviceStates)
     try {
       if (mode === '3d') {
         await Promise.all(
