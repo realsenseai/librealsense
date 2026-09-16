@@ -180,9 +180,6 @@ namespace librealsense
 
     void d500_depth_mapping::add_profile_tag_if_active( std::vector< tagged_profile > & tags ) const
     {
-        // Only the safety layout can stream occupancy together with depth and color, so it is
-        // the only one where occupancy joins enable_all and the default pipeline. Elsewhere it
-        // is left untagged and has to be enabled explicitly.
         if( is_depth_mapping_active() && _is_safety_layout )
         {
             // The occupancy canvas is transposed on this layout.
