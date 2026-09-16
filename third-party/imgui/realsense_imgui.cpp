@@ -369,6 +369,34 @@ void RsImGui::RsImButton(const std::function<void()>& f, bool disable_button)
         ImGui::EndDisabled();
 }
 
+bool RsImGui::TreeNode(const char* label, bool should_be_open)
+{
+    // A node shown open on demand keeps the open state the user left it in: that state is put back
+    // behind ImGui's back every frame, so once the caller stops asking, the tree is as it was. A
+    // click while it is held open is the user overruling the caller, and is honored until then.
+    ImGuiID const id = ImGui::GetID(label);
+    // Seeded by the node, so it cannot land on another node's id the way a bare XOR could
+    ImGuiID const collapsed_id = ImHashStr( "##closed_by_hand", 0, id );
+    ImGuiStorage* storage = ImGui::GetStateStorage();
+
+    if (!should_be_open)
+    {
+        storage->SetInt(collapsed_id, 0);
+        return ImGui::TreeNode(label);
+    }
+
+    bool const collapsed_by_user = storage->GetInt(collapsed_id, 0) != 0;
+    int const was_open = storage->GetInt(id, 0);
+    if (!collapsed_by_user)
+        ImGui::SetNextItemOpen(true);
+    bool const open = ImGui::TreeNode(label);
+    if (ImGui::IsItemToggledOpen())
+        storage->SetInt(collapsed_id, open ? 0 : 1);
+    else if (!collapsed_by_user)
+        storage->SetInt(id, was_open);
+    return open;
+}
+
 void RsImGui::CustomTooltip( const char * fmt, const char * label )
 {
     ImGui::PushStyleColor( ImGuiCol_Text, ImVec4( 0.90f, 0.90f, 0.90f, 1.00f ) );

@@ -21,8 +21,8 @@
 #include <rsutils/os/special-folder.h>
 #include "os.h"
 #include <rsutils/os/os.h>
-#include "viewer.h"
 #include "control-section.h"
+#include "viewer.h"
 #include "on-chip-calib.h"
 #include "d500-on-chip-calib.h"
 #include "subdevice-model.h"
@@ -850,23 +850,8 @@ namespace rs2
     }
 
 
-    void device_model::build_advanced_sections()
-    {
-        std::string const dev_name = dev.supports(RS2_CAMERA_INFO_NAME) ? dev.get_info(RS2_CAMERA_INFO_NAME) : "";
-        bool const ae_setpoint_unsupported = (dev_name.find("D457") != std::string::npos) || _is_d500_device;
-
-        _advanced_sections.reset(new control_section("Advanced Controls", "Advanced Controls"));
-        _advanced_sections->gap_above = false;
-        // Read on the way in, not while building: a collapsed section must not pay for
-        // a bulk read of controls nobody is looking at
-        _advanced_sections->on_open = [this]()
-        { refresh_advanced_mode_controls( *_advanced, amc, get_curr_advanced_controls ); };
-        build_advanced_mode_sections(*_advanced_sections, *_advanced, amc, _advanced_was_set,
-                                     ae_setpoint_unsupported);
-    }
-
     bool device_model::draw_advanced_controls(viewer_model& view, ux_window& window, std::string& error_message,
-        bool is_streaming, std::vector<std::function<void()>>& draw_later)
+        bool is_streaming, std::string const & filter, std::vector<std::function<void()>>& draw_later)
     {
         bool was_set = false;
 
@@ -875,25 +860,22 @@ namespace rs2
         auto is_advanced_mode = dev.is<advanced_mode>();
         if (is_advanced_mode)
         {
+            control_section root("Advanced Controls", "Advanced Controls",
+                                 false);   // a container heading, not something to search for
+            root.gap_above = false;
             try
             {
-                if (!_advanced)
-                    _advanced.reset(new advanced_mode(dev.as<advanced_mode>()));
-                control_draw_context ctx{ view, *view.not_model, error_message, window, draw_later,
-                                          0.f, false, is_streaming };
-                if (_advanced->is_enabled())
+                auto advanced = dev.as<advanced_mode>();
+                if (advanced.is_enabled())
                 {
-                    if (!_advanced_sections)
-                        build_advanced_sections();
-                    _advanced_was_set = false;
-                    _advanced_sections->draw(ctx);
-                    was_set = _advanced_was_set;
+                    std::string dev_name = dev.supports(RS2_CAMERA_INFO_NAME) ? dev.get_info(RS2_CAMERA_INFO_NAME) : "";
+                    bool ae_setpoint_unsupported = (dev_name.find("D457") != std::string::npos) || _is_d500_device;
+
+                    build_advanced_mode_sections(root, advanced, amc, get_curr_advanced_controls, was_set, ae_setpoint_unsupported);
                 }
                 else
                 {
-                    _advanced_sections.reset();   // built afresh if advanced mode comes back on
-                    control_section root("Advanced Controls", "Advanced Controls");
-                    root.gap_above = false;
+                    // What this section has to say when advanced mode is off
                     root.content = [this, &view, &window, &error_message, is_streaming](control_draw_context &)
                     {
                         if( _is_d500_device )  // D500 cannot toggle Advanced Mode
@@ -923,8 +905,11 @@ namespace rs2
                             }
                         }
                     };
-                    root.draw(ctx);
                 }
+
+                control_draw_context ctx{ view, *view.not_model, error_message, window, draw_later,
+                                          0.f, false, is_streaming, filter };
+                root.draw(ctx);
             }
             catch (const std::exception& ex)
             {
@@ -2816,80 +2801,112 @@ namespace rs2
                     }
                 }
 
-                if (sub->num_supported_non_default_options())
                 {
-                    label = rsutils::string::from() << "Controls ##" << sub->s->get_info(RS2_CAMERA_INFO_NAME) << "," << id;
-                    if (ImGui::TreeNode(label.c_str()))
+                    auto & supported_options = sub->options_metadata;
+
+                    // moving the color dedicated options to the end of the vector
+                    std::vector<rs2_option> color_options = {
+                        RS2_OPTION_BACKLIGHT_COMPENSATION,
+                        RS2_OPTION_BRIGHTNESS,
+                        RS2_OPTION_CONTRAST,
+                        RS2_OPTION_GAMMA,
+                        RS2_OPTION_HUE,
+                        RS2_OPTION_SATURATION,
+                        RS2_OPTION_SHARPNESS,
+                        RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE,
+                        RS2_OPTION_WHITE_BALANCE
+                    };
+
+                    std::vector<rs2_option> so_ordered;
+
+                    for( auto const id_model : sub->supported_options )
+                    {
+                        auto it = find( color_options.begin(), color_options.end(), id_model );
+                        if (it == color_options.end())
+                            so_ordered.push_back( id_model );
+                    }
+
+                    std::for_each( color_options.begin(),
+                                   color_options.end(),
+                                   [&]( rs2_option opt )
+                                   {
+                                       auto it = supported_options.find( opt );
+                                       if( it != supported_options.end() )
+                                           so_ordered.push_back( opt );
+                                   } );
+
+                    control_section controls("Controls",
+                                             rsutils::string::from() << "Controls ##"
+                                                 << sub->s->get_info(RS2_CAMERA_INFO_NAME) << "," << id,
+                                             false);   // the heading itself is not searchable
+                    controls.gap_above = false;
+                    for (auto opt : so_ordered)
+                    {
+                        if( viewer.is_option_skipped( opt ) )
+                            continue;
+                        auto it = supported_options.find( opt );
+                        if( it == supported_options.end() )
+                            continue;
+                        if (std::find(drawing_order.begin(), drawing_order.end(), opt) == drawing_order.end())
+                        {
+                            if (serialize && opt == RS2_OPTION_VISUAL_PRESET)
+                                continue;
+
+                            controls.add( std::make_unique< option_control >( it->second ) );
+                        }
+                    }
+
+                    bool const anything_to_search = ! controls.empty() || ! sub->post_processing.empty()
+                                                 || ! sub->embedded_filters.empty()
+                                                 || ( dev.is< advanced_mode >() && sub->s->is< depth_sensor >() );
+
+                    if (anything_to_search)
                     {
                         char filter_buf[TEXT_BUFF_SIZE];
                         std::snprintf(filter_buf, sizeof(filter_buf), "%s", sub->options_filter.c_str());
-                        ImGui::PushItemWidth(295 - ImGui::GetCursorPosX()); // align with the sliders' right edge
+                        // align with the sliders' right edge, leaving room for the button that clears
+                        // it - 18px of button and the item spacing before it - only while that
+                        // button is actually there, or the empty box stops short of the sliders
+                        float clear_button_room = 0.f;
+                        if( ! sub->options_filter.empty() )
+                            clear_button_room = 18.f + ImGui::GetStyle().ItemSpacing.x;
+                        ImGui::PushItemWidth(295 - ImGui::GetCursorPosX() - clear_button_room);
                         if (ImGui::InputTextWithHint("##options_filter", "Search controls...", filter_buf, sizeof(filter_buf)))
                             sub->options_filter = filter_buf;
                         ImGui::PopItemWidth();
 
-                        auto const & supported_options = sub->options_metadata;
-
-                        // moving the color dedicated options to the end of the vector
-                        std::vector<rs2_option> color_options = {
-                            RS2_OPTION_BACKLIGHT_COMPENSATION,
-                            RS2_OPTION_BRIGHTNESS,
-                            RS2_OPTION_CONTRAST,
-                            RS2_OPTION_GAMMA,
-                            RS2_OPTION_HUE,
-                            RS2_OPTION_SATURATION,
-                            RS2_OPTION_SHARPNESS,
-                            RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE,
-                            RS2_OPTION_WHITE_BALANCE
-                        };
-
-                        std::vector<rs2_option> so_ordered;
-
-                        for( auto const id_model : sub->supported_options )
+                        if (!sub->options_filter.empty())
                         {
-                            auto it = find( color_options.begin(), color_options.end(), id_model );
-                            if (it == color_options.end())
-                                so_ordered.push_back( id_model );
+                            ImGui::SameLine();
+                            label = rsutils::string::from() << textual_icons::times_circle << "##clear_options_filter,"
+                                                           << sub->s->get_info(RS2_CAMERA_INFO_NAME) << "," << id;
+                            ImGui::PushStyleColor(ImGuiCol_Button, { 0.f, 0.f, 0.f, 0.f });
+                            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.f, 0.f, 0.f, 0.f });
+                            ImGui::PushStyleColor(ImGuiCol_Text, grey);
+                            if (ImGui::Button(label.c_str(), { 18.f, 0.f }))
+                                sub->options_filter.clear();
+                            if (ImGui::IsItemHovered())
+                                RsImGui::CustomTooltip("Clear the search");
+                            ImGui::PopStyleColor(3);
                         }
+                    }
 
-                        std::for_each( color_options.begin(),
-                                       color_options.end(),
-                                       [&]( rs2_option opt )
-                                       {
-                                           auto it = supported_options.find( opt );
-                                           if( it != supported_options.end() )
-                                               so_ordered.push_back( opt );
-                                       } );
-
-                        const std::string filter_lc = rsutils::string::to_lower( sub->options_filter );
-                        for (auto opt : so_ordered)
-                        {
-                            if( viewer.is_option_skipped( opt ) )
-                                continue;
-                            auto it = supported_options.find( opt );
-                            if( ! filter_lc.empty() && it != supported_options.end()
-                                && rsutils::string::to_lower( it->second.label.substr( 0, it->second.label.find( "##" ) ) )
-                                       .find( filter_lc ) == std::string::npos )
-                                continue;
-                            if (std::find(drawing_order.begin(), drawing_order.end(), opt) == drawing_order.end())
-                            {
-                                if (serialize && opt == RS2_OPTION_VISUAL_PRESET)
-                                    continue;
-
-                                if (sub->draw_option(opt, dev.is<playback>() || update_read_only_options, error_message, *viewer.not_model))
-                                {
-                                    get_curr_advanced_controls = true;
-                                    selected_file_preset.clear();
-                                }
-                            }
-                        }
-
-                        ImGui::TreePop();
+                    control_draw_context ctx{ viewer, *viewer.not_model, error_message, window,
+                                              draw_later, windows_width,
+                                              dev.is< playback >() || update_read_only_options,
+                                              sub->streaming,
+                                              rsutils::string::to_lower(sub->options_filter) };
+                    controls.draw( ctx );
+                    if( ctx.changed )
+                    {
+                        get_curr_advanced_controls = true;
+                        selected_file_preset.clear();
                     }
                 }
                 if (dev.is<advanced_mode>() && sub->s->is<depth_sensor>())
                 {
-                    if (draw_advanced_controls(viewer, window, error_message, is_streaming, draw_later))
+                    if (draw_advanced_controls(viewer, window, error_message, is_streaming,
+                                               rsutils::string::to_lower(sub->options_filter), draw_later))
                     {
                         sub->_options_invalidated = true;
                         selected_file_preset.clear();
@@ -2900,12 +2917,14 @@ namespace rs2
                 // them - the Controls list above is the only group that does
                 control_draw_context filters_ctx{ viewer, *viewer.not_model, error_message, window,
                                                   draw_later, windows_width,
-                                                  dev.is< playback >() || update_read_only_options, false };
+                                                  dev.is< playback >() || update_read_only_options, false,
+                                                  rsutils::string::to_lower(sub->options_filter) };
 
                 if (sub->s->is<depth_sensor>()) {
                     for (auto&& pb : sub->const_effects)
                     {
-                        control_section effect(pb->get_name(), pb->get_name() + "##" + id);
+                        control_section effect(pb->get_name(),
+                                               rsutils::string::from() << pb->get_name() << "##" << id);
                         pb->add_options_to(effect, viewer);
 
                         effect.draw(filters_ctx);
@@ -2989,6 +3008,7 @@ namespace rs2
                 draw_embedded_filters(sub, filters_ctx);
                 draw_processing_blocks(sub, filters_ctx);
 
+
                 ImGui::TreePop();
             }
 
@@ -3027,271 +3047,50 @@ namespace rs2
     void device_model::draw_processing_blocks(std::shared_ptr<subdevice_model> sub,
         control_draw_context& ctx)
     {
-        if (sub->post_processing.empty())
-            return;
-
-        auto & viewer = ctx.viewer;
-        auto & window = ctx.window;
-        float const windows_width = ctx.windows_width;
-
-        control_section section("Post-Processing",
-                                "Post-Processing##" + id);
-
-        section.toggle = [this, sub, &window, windows_width](ImVec2 pos)
+        if (sub->post_processing.size() > 0)
         {
-            ImGui::SetCursorPos({ windows_width - 41, pos.y - 3 });
-            try
+            auto & viewer = ctx.viewer;
+            auto & window = ctx.window;
+            float const windows_width = ctx.windows_width;
+
+            control_section section("Post-Processing", rsutils::string::from() << "Post-Processing##" << id,
+                                    false);   // the heading itself is not searchable
+
+            section.toggle = [this, sub, &window, windows_width](ImVec2 pos)
             {
-                ImGui::PushFont(window.get_font());
-                ImGui::PushStyleColor(ImGuiCol_Button, sensor_bg);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sensor_bg);
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, sensor_bg);
-
-                if (!sub->post_processing_enabled)
-                {
-                    std::string label = rsutils::string::from()
-                        << " " << textual_icons::toggle_off << "##" << id << ","
-                        << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ",post";
-
-                    ImGui::PushStyleColor(ImGuiCol_Text, redish);
-                    ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, redish + 0.1f);
-
-                    if (ImGui::Button(label.c_str(), { 30,24 }))
-                    {
-                        sub->post_processing_enabled = true;
-                        config_file::instance().set(get_post_processing_device_sensor_name(sub.get()).c_str(),
-                            sub->post_processing_enabled);
-                        for (auto&& pb : sub->post_processing)
-                        {
-                            if (pb->is_enabled())
-                                pb->processing_block_enable_disable(true);
-                        }
-                    }
-                    if (ImGui::IsItemHovered())
-                    {
-                        RsImGui::CustomTooltip("Enable post-processing filters");
-                        window.link_hovered();
-                    }
-                }
-                else
-                {
-                    std::string label = rsutils::string::from()
-                        << " " << textual_icons::toggle_on << "##" << id << ","
-                        << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ",post";
-                    ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
-                    ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue + 0.1f);
-
-                    if (ImGui::Button(label.c_str(), { 30,24 }))
-                    {
-                        sub->post_processing_enabled = false;
-                        config_file::instance().set(get_post_processing_device_sensor_name(sub.get()).c_str(),
-                            sub->post_processing_enabled);
-                        for (auto&& pb : sub->post_processing)
-                        {
-                            if (pb->is_enabled())
-                                pb->processing_block_enable_disable(false);
-                        }
-                    }
-                    if (ImGui::IsItemHovered())
-                    {
-                        RsImGui::CustomTooltip("Disable post-processing filters");
-                        window.link_hovered();
-                    }
-                }
-                ImGui::PopStyleColor(5);
-                ImGui::PopFont();
-            }
-            catch (...)
-            {
-                ImGui::PopStyleColor(5);
-                ImGui::PopFont();
-                throw;
-            }
-        };
-
-        for (auto&& pb : sub->post_processing)
-        {
-            auto & filter = section.add_section(pb->get_name(), pb->get_name() + "##" + id);
-
-            filter.toggle = [this, sub, pb, &window, windows_width](ImVec2 pos)
-            {
-                ImGui::SetCursorPos({ windows_width - 42, pos.y - 3 });
-
-                const bool pb_available = pb->is_available();
-                disable_guard dg( !pb_available );
+                ImGui::SetCursorPos({ windows_width - 41, pos.y - 3 });
                 try
                 {
+
                     ImGui::PushFont(window.get_font());
+
                     ImGui::PushStyleColor(ImGuiCol_Button, sensor_bg);
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sensor_bg);
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, sensor_bg);
-                    int font_size = window.get_font_size();
-                    const ImVec2 button_size = { font_size * 2.f, font_size * 1.5f };
 
                     if (!sub->post_processing_enabled)
                     {
-                        if (!pb->is_enabled())
-                        {
-                            std::string label = rsutils::string::from()
-                                << " " << textual_icons::toggle_off << "##" << id << ","
-                                << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
-                                << pb->get_name();
-
-                            ImGui::PushStyleColor(ImGuiCol_Text, redish);
-                            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, redish + 0.1f);
-                            RsImGui::RsImButton([&]() {ImGui::ButtonEx(label.c_str(), button_size); }, true);
-                        }
-                        else
-                        {
-                            std::string label = rsutils::string::from()
-                                << " " << textual_icons::toggle_on << "##" << id << ","
-                                << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
-                                << pb->get_name();
-                            ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
-                            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue + 0.1f);
-                            RsImGui::RsImButton([&]() {ImGui::ButtonEx(label.c_str(), button_size); }, true);
-                        }
-                    }
-                    else
-                    {
-                        if (!pb->is_enabled())
-                        {
-                            std::string label = rsutils::string::from()
-                                << " " << textual_icons::toggle_off << "##" << id << ","
-                                << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
-                                << pb->get_name();
-
-                            ImGui::PushStyleColor(ImGuiCol_Text, redish);
-                            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, redish + 0.1f);
-
-                            if (ImGui::Button(label.c_str(), button_size))
-                            {
-                                pb->enable(true);
-                                pb->save_to_config_file();
-                            }
-                            if (ImGui::IsItemHovered())
-                            {
-                                label = rsutils::string::from() << "Enable " << pb->get_name() << " post-processing filter";
-                                RsImGui::CustomTooltip("%s", label.c_str());
-                                window.link_hovered();
-                            }
-                        }
-                        else
-                        {
-                            std::string label = rsutils::string::from()
-                                << " " << textual_icons::toggle_on << "##" << id << ","
-                                << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
-                                << pb->get_name();
-                            ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
-                            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue + 0.1f);
-
-                            if (ImGui::Button(label.c_str(), button_size))
-                            {
-                                pb->enable(false);
-                                pb->save_to_config_file();
-                            }
-                            if (ImGui::IsItemHovered())
-                            {
-                                label = rsutils::string::from()
-                                    << "Disable " << pb->get_name() << " post-processing filter";
-                                RsImGui::CustomTooltip("%s", label.c_str());
-                                window.link_hovered();
-                            }
-                        }
-                    }
-
-                    dg.end();
-                    if( !pb_available && !pb->unavailable_tooltip.empty()
-                        && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
-                        RsImGui::CustomTooltip( "%s", pb->unavailable_tooltip.c_str() );
-
-                    ImGui::PopStyleColor(5);
-                    ImGui::PopFont();
-                }
-                catch (...)
-                {
-                    ImGui::PopStyleColor(5);
-                    ImGui::PopFont();
-                    throw;
-                }
-            };
-
-            filter.on_open = []() { ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5); };
-            pb->add_options_to(filter, viewer);
-        }
-
-        section.draw(ctx);
-    }
-
-    void device_model::draw_embedded_filters(std::shared_ptr<subdevice_model> sub,
-        control_draw_context& ctx)
-    {
-        if (sub->embedded_filters.empty())
-            return;
-
-        auto & window = ctx.window;
-        float const windows_width = ctx.windows_width;
-        std::string * const err = &ctx.error_message;
-
-        control_section section("Embedded-Filters",
-                                "Embedded-Filters##" + id);
-
-        for (auto&& pb : sub->embedded_filters)
-        {
-            auto & filter = section.add_section(pb->get_name(), pb->get_name() + "##" + id);
-
-            filter.toggle = [this, sub, pb, &window, windows_width, err](ImVec2 pos)
-            {
-                ImGui::SetCursorPos({ windows_width - 42, pos.y - 3 });
-
-                const bool pb_available = pb->is_available();
-                // Block turning a decimation/temporal filter on while perception streams
-                // (mutually exclusive).
-                auto ef_type = pb->get_filter()->get_type();
-                const bool block_enable_while_perception = !pb->is_enabled()
-                    && ( ef_type == RS2_EMBEDDED_FILTER_TYPE_DECIMATION
-                      || ef_type == RS2_EMBEDDED_FILTER_TYPE_TEMPORAL )
-                    && is_perception_streaming();
-                // Decimation is FW-side read-only while depth streams - lock both directions.
-                const bool block_decimation_while_depth_streams = sub->streaming
-                    && ef_type == RS2_EMBEDDED_FILTER_TYPE_DECIMATION;
-                disable_guard dg( !pb_available || block_enable_while_perception || block_decimation_while_depth_streams );
-                try
-                {
-                    ImGui::PushFont(window.get_font());
-                    ImGui::PushStyleColor(ImGuiCol_Button, sensor_bg);
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sensor_bg);
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, sensor_bg);
-                    int font_size = window.get_font_size();
-                    const ImVec2 button_size = { font_size * 2.f, font_size * 1.5f };
-
-                    // While this filter's composite editor has a debounced commit pending,
-                    // tint the toggle with the same gold->blue ramp the editor's own
-                    // framed box fades through, so the row header echoes "about to send".
-                    float dirty_progress = 0.0f;
-                    const bool composite_dirty = pb->has_pending_composite_commit(dirty_progress);
-                    ImVec4 dirty_tint = composite_control_dirty_blend(dirty_progress);
-                    dirty_tint.w = 1.0f;   // full opacity for text - the fill's own alpha ramp doesn't apply here
-
-                    if (!pb->is_enabled())
-                    {
                         std::string label = rsutils::string::from()
                             << " " << textual_icons::toggle_off << "##" << id << ","
-                            << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
-                            << pb->get_name();
+                            << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ",post";
 
-                        const ImVec4 text_color = composite_dirty ? dirty_tint : redish;
-                        ImGui::PushStyleColor(ImGuiCol_Text, text_color);
-                        ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_color + 0.1f);
+                        ImGui::PushStyleColor(ImGuiCol_Text, redish);
+                        ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, redish + 0.1f);
 
-                        if (ImGui::Button(label.c_str(), button_size))
+                        if (ImGui::Button(label.c_str(), { 30,24 }))
                         {
-                            pb->enable(true, err);
+                            sub->post_processing_enabled = true;
+                            config_file::instance().set(get_post_processing_device_sensor_name(sub.get()).c_str(),
+                                sub->post_processing_enabled);
+                            for (auto&& pb : sub->post_processing)
+                            {
+                                if (pb->is_enabled())
+                                    pb->processing_block_enable_disable(true);
+                            }
                         }
                         if (ImGui::IsItemHovered())
                         {
-                            label = rsutils::string::from() << "Enable " << pb->get_name() << " embedded filter";
-                            RsImGui::CustomTooltip("%s", label.c_str());
+                            RsImGui::CustomTooltip("Enable post-processing filters");
                             window.link_hovered();
                         }
                     }
@@ -3299,34 +3098,27 @@ namespace rs2
                     {
                         std::string label = rsutils::string::from()
                             << " " << textual_icons::toggle_on << "##" << id << ","
-                            << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
-                            << pb->get_name();
-                        const ImVec4 text_color = composite_dirty ? dirty_tint : light_blue;
-                        ImGui::PushStyleColor(ImGuiCol_Text, text_color);
-                        ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_color + 0.1f);
+                            << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ",post";
+                        ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
+                        ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue + 0.1f);
 
-                        if (ImGui::Button(label.c_str(), button_size))
+                        if (ImGui::Button(label.c_str(), { 30,24 }))
                         {
-                            pb->enable(false, err);
+                            sub->post_processing_enabled = false;
+                            config_file::instance().set(get_post_processing_device_sensor_name(sub.get()).c_str(),
+                                sub->post_processing_enabled);
+                            for (auto&& pb : sub->post_processing)
+                            {
+                                if (pb->is_enabled())
+                                    pb->processing_block_enable_disable(false);
+                            }
                         }
                         if (ImGui::IsItemHovered())
                         {
-                            label = rsutils::string::from()
-                                << "Disable " << pb->get_name() << " embedded filter";
-                            RsImGui::CustomTooltip("%s", label.c_str());
+                            RsImGui::CustomTooltip("Disable post-processing filters");
                             window.link_hovered();
                         }
                     }
-
-                    dg.end();
-                    if( !pb_available && !pb->unavailable_tooltip.empty()
-                        && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
-                        RsImGui::CustomTooltip( "%s", pb->unavailable_tooltip.c_str() );
-                    else if( block_enable_while_perception && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
-                        RsImGui::CustomTooltip( "Stop the perception stream before enabling this filter (cannot run together)" );
-                    else if( block_decimation_while_depth_streams && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
-                        RsImGui::CustomTooltip( "Stop streaming before toggling this filter (read-only while active)" );
-
                     ImGui::PopStyleColor(5);
                     ImGui::PopFont();
                 }
@@ -3338,14 +3130,247 @@ namespace rs2
                 }
             };
 
-            filter.on_open = []() { ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5); };
-            pb->add_options_to(filter);
-            // Composite options are their own identity space with no option_model, so they draw
-            // as the section's content rather than as controls of its own
-            filter.content = [pb](control_draw_context & c) { pb->draw_composite_options(c.error_message); };
-        }
+            for (auto&& pb : sub->post_processing)
+            {
+                auto & filter = section.add_section(pb->get_name(),
+                                                    rsutils::string::from() << pb->get_name() << "##" << id);
 
-        section.draw(ctx);
+                filter.toggle = [this, sub, pb, &window, windows_width](ImVec2 pos)
+                {
+                    ImGui::SetCursorPos({ windows_width - 42, pos.y - 3 });
+
+                    const bool pb_available = pb->is_available();
+                    disable_guard dg( !pb_available );
+                    try
+                    {
+                        ImGui::PushFont(window.get_font());
+
+                        ImGui::PushStyleColor(ImGuiCol_Button, sensor_bg);
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sensor_bg);
+                        ImGui::PushStyleColor(ImGuiCol_ButtonActive, sensor_bg);
+                        int font_size = window.get_font_size();
+                        const ImVec2 button_size = { font_size * 2.f, font_size * 1.5f };
+
+                        if (!sub->post_processing_enabled)
+                        {
+                            if (!pb->is_enabled())
+                            {
+                                std::string label = rsutils::string::from()
+                                    << " " << textual_icons::toggle_off << "##" << id << ","
+                                    << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
+                                    << pb->get_name();
+
+                                ImGui::PushStyleColor(ImGuiCol_Text, redish);
+                                ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, redish + 0.1f);
+                                RsImGui::RsImButton([&]() {ImGui::ButtonEx(label.c_str(), button_size); }, true);
+                            }
+                            else
+                            {
+                                std::string label = rsutils::string::from()
+                                    << " " << textual_icons::toggle_on << "##" << id << ","
+                                    << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
+                                    << pb->get_name();
+                                ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
+                                ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue + 0.1f);
+                                RsImGui::RsImButton([&]() {ImGui::ButtonEx(label.c_str(), button_size); }, true);
+                            }
+                        }
+                        else
+                        {
+                            if (!pb->is_enabled())
+                            {
+                                std::string label = rsutils::string::from()
+                                    << " " << textual_icons::toggle_off << "##" << id << ","
+                                    << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
+                                    << pb->get_name();
+
+                                ImGui::PushStyleColor(ImGuiCol_Text, redish);
+                                ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, redish + 0.1f);
+
+                                if (ImGui::Button(label.c_str(), button_size))
+                                {
+                                    pb->enable(true);
+                                    pb->save_to_config_file();
+                                }
+                                if (ImGui::IsItemHovered())
+                                {
+                                    label = rsutils::string::from() << "Enable " << pb->get_name() << " post-processing filter";
+                                    RsImGui::CustomTooltip("%s", label.c_str());
+                                    window.link_hovered();
+                                }
+                            }
+                            else
+                            {
+                                std::string label = rsutils::string::from()
+                                    << " " << textual_icons::toggle_on << "##" << id << ","
+                                    << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
+                                    << pb->get_name();
+                                ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
+                                ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue + 0.1f);
+
+                                if (ImGui::Button(label.c_str(), button_size))
+                                {
+                                    pb->enable(false);
+                                    pb->save_to_config_file();
+                                }
+                                if (ImGui::IsItemHovered())
+                                {
+                                    label = rsutils::string::from()
+                                        << "Disable " << pb->get_name() << " post-processing filter";
+                                    RsImGui::CustomTooltip("%s", label.c_str());
+                                    window.link_hovered();
+                                }
+                            }
+                        }
+
+                        dg.end();
+                        if( !pb_available && !pb->unavailable_tooltip.empty()
+                            && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
+                            RsImGui::CustomTooltip( "%s", pb->unavailable_tooltip.c_str() );
+
+                        ImGui::PopStyleColor(5);
+                        ImGui::PopFont();
+                    }
+                    catch (...)
+                    {
+                        ImGui::PopStyleColor(5);
+                        ImGui::PopFont();
+                        throw;
+                    }
+                };
+
+                filter.on_open = []() { ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5); };
+                pb->add_options_to(filter, viewer);
+            }
+
+            section.draw(ctx);
+        }
+    }
+
+    void device_model::draw_embedded_filters(std::shared_ptr<subdevice_model> sub,
+        control_draw_context& ctx)
+    {
+        if (sub->embedded_filters.size() > 0)
+        {
+            auto & window = ctx.window;
+            float const windows_width = ctx.windows_width;
+            auto & error_message = ctx.error_message;
+
+            control_section section("Embedded-Filters", rsutils::string::from() << "Embedded-Filters##" << id,
+                                    false);
+
+            for (auto&& pb : sub->embedded_filters)
+            {
+                auto & filter = section.add_section(pb->get_name(),
+                                                    rsutils::string::from() << pb->get_name() << "##" << id);
+
+                filter.toggle = [this, sub, pb, &window, windows_width, &error_message](ImVec2 pos)
+                {
+                    ImGui::SetCursorPos({ windows_width - 42, pos.y - 3 });
+
+                    const bool pb_available = pb->is_available();
+                    // Block turning a decimation/temporal filter on while perception streams (mutually exclusive).
+                    auto ef_type = pb->get_filter()->get_type();
+                    const bool block_enable_while_perception = !pb->is_enabled()
+                        && ( ef_type == RS2_EMBEDDED_FILTER_TYPE_DECIMATION
+                          || ef_type == RS2_EMBEDDED_FILTER_TYPE_TEMPORAL )
+                        && is_perception_streaming();
+                    // Decimation is FW-side read-only while depth streams - lock both directions.
+                    const bool block_decimation_while_depth_streams = sub->streaming
+                        && ef_type == RS2_EMBEDDED_FILTER_TYPE_DECIMATION;
+                    disable_guard dg( !pb_available || block_enable_while_perception || block_decimation_while_depth_streams );
+                    try
+                    {
+                        ImGui::PushFont(window.get_font());
+
+                        ImGui::PushStyleColor(ImGuiCol_Button, sensor_bg);
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sensor_bg);
+                        ImGui::PushStyleColor(ImGuiCol_ButtonActive, sensor_bg);
+                        int font_size = window.get_font_size();
+                        const ImVec2 button_size = { font_size * 2.f, font_size * 1.5f };
+
+                        // While this filter's composite editor has a debounced commit pending,
+                        // tint the toggle with the same gold->blue ramp the editor's own
+                        // framed box fades through, so the row header echoes "about to send".
+                        float dirty_progress = 0.0f;
+                        const bool composite_dirty = pb->has_pending_composite_commit(dirty_progress);
+                        ImVec4 dirty_tint = composite_control_dirty_blend(dirty_progress);
+                        dirty_tint.w = 1.0f;   // full opacity for text - the fill's own alpha ramp doesn't apply here
+
+                        if (!pb->is_enabled())
+                        {
+                            std::string label = rsutils::string::from()
+                                << " " << textual_icons::toggle_off << "##" << id << ","
+                                << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
+                                << pb->get_name();
+
+                            const ImVec4 text_color = composite_dirty ? dirty_tint : redish;
+                            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
+                            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_color + 0.1f);
+
+                            if (ImGui::Button(label.c_str(), button_size))
+                            {
+                                pb->enable(true, &error_message);
+                            }
+                            if (ImGui::IsItemHovered())
+                            {
+                                label = rsutils::string::from() << "Enable " << pb->get_name() << " embedded filter";
+                                RsImGui::CustomTooltip("%s", label.c_str());
+                                window.link_hovered();
+                            }
+                        }
+                        else
+                        {
+                            std::string label = rsutils::string::from()
+                                << " " << textual_icons::toggle_on << "##" << id << ","
+                                << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
+                                << pb->get_name();
+                            const ImVec4 text_color = composite_dirty ? dirty_tint : light_blue;
+                            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
+                            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_color + 0.1f);
+
+                            if (ImGui::Button(label.c_str(), button_size))
+                            {
+                                pb->enable(false, &error_message);
+                            }
+                            if (ImGui::IsItemHovered())
+                            {
+                                label = rsutils::string::from()
+                                    << "Disable " << pb->get_name() << " embedded filter";
+                                RsImGui::CustomTooltip("%s", label.c_str());
+                                window.link_hovered();
+                            }
+                        }
+
+                        dg.end();
+                        if( !pb_available && !pb->unavailable_tooltip.empty()
+                            && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
+                            RsImGui::CustomTooltip( "%s", pb->unavailable_tooltip.c_str() );
+                        else if( block_enable_while_perception && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
+                            RsImGui::CustomTooltip( "Stop the perception stream before enabling this filter (cannot run together)" );
+                        else if( block_decimation_while_depth_streams && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
+                            RsImGui::CustomTooltip( "Stop streaming before toggling this filter (read-only while active)" );
+
+                        ImGui::PopStyleColor(5);
+                        ImGui::PopFont();
+                    }
+                    catch (...)
+                    {
+                        ImGui::PopStyleColor(5);
+                        ImGui::PopFont();
+                        throw;
+                    }
+                };
+
+                filter.on_open = []() { ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5); };
+                pb->add_options_to(filter);
+                // Composite options are their own identity space with no option_model, so they draw
+                // as the section's content rather than as controls of its own
+                filter.content = [pb](control_draw_context & c) { pb->draw_composite_options(c.error_message); };
+            }
+
+            section.draw(ctx);
+        }
     }
 
     void device_model::handle_hardware_events(const std::string& serialized_data)
