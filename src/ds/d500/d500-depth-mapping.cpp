@@ -6,6 +6,7 @@
 #include "d500-safety.h"
 #include "d500-info.h"
 #include "d585s-md.h"
+#include "mapping-timing.h"
 #include "d500-types/safety-interface-config.h"
 
 #include <vector>
@@ -27,6 +28,26 @@ using rs_fourcc = rsutils::type::fourcc;
 
 namespace librealsense
 {
+    // Use the same validated UVC capture identity as the Mapping timestamp reader.
+    class mapping_capture_parser : public md_attribute_parser_base
+    {
+        rs2_frame_metadata_value const _attribute;
+    public:
+        explicit mapping_capture_parser( rs2_frame_metadata_value attribute ) : _attribute( attribute ) {}
+        bool find( const frame & f, rs2_metadata_type * value ) const override
+        {
+            uint32_t counter = 0;
+            uint64_t timestamp = 0;
+            if( ! get_mapping_capture_timing( f, counter, timestamp ) )
+                return false;
+            if( _attribute == RS2_FRAME_METADATA_ACTUAL_FPS )
+                return ds_md_attribute_actual_fps().find( f, value );
+            if( value )
+                *value = _attribute == RS2_FRAME_METADATA_SENSOR_TIMESTAMP ? timestamp : counter;
+            return true;
+        }
+    };
+
     const std::map<uint32_t, rs2_format> mapping_fourcc_to_rs2_format = {
         {rs_fourcc('G','R','E','Y'), RS2_FORMAT_Y8},
         // point cloud - w/a done in backend in order to distinguish between occupancy
@@ -200,6 +221,13 @@ namespace librealsense
 
         register_occupancy_metadata(raw_mapping_ep);
         register_point_cloud_metadata(raw_mapping_ep);
+
+        raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_FRAME_COUNTER,
+            std::make_shared< mapping_capture_parser >( RS2_FRAME_METADATA_FRAME_COUNTER ) );
+        raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_SENSOR_TIMESTAMP,
+            std::make_shared< mapping_capture_parser >( RS2_FRAME_METADATA_SENSOR_TIMESTAMP ) );
+        raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_ACTUAL_FPS,
+            std::make_shared< mapping_capture_parser >( RS2_FRAME_METADATA_ACTUAL_FPS ) );
     }
 
 

@@ -15,6 +15,7 @@
 #include "image.h"
 #include "metadata.h"
 #include "d500/d585s-md.h"
+#include "d500/mapping-timing.h"
 
 namespace librealsense
 {
@@ -135,12 +136,12 @@ namespace librealsense
             return 0;
         }
 
-        _has_metadata[0] = has_metadata(frame);
-
-        auto md = (librealsense::md_occupancy*)(f->additional_data.metadata_blob.data() + platform::uvc_header_size);
-        if (_has_metadata[0] && md)
+        uint32_t counter = 0;
+        uint64_t timestamp = 0;
+        _has_metadata[0] = get_mapping_capture_timing( *f, counter, timestamp );
+        if( _has_metadata[0] )
         {
-            return (double)(md->frame_timestamp) * MICROSEC_TO_MILLISEC;
+            return double( timestamp ) * MICROSEC_TO_MILLISEC;
         }
         else
         {
@@ -163,11 +164,10 @@ namespace librealsense
             return 0;
         }
 
-        if (_has_metadata[0] && f->additional_data.metadata_size > platform::uvc_header_size)
-        {
-            auto md = (librealsense::md_occupancy*)(f->additional_data.metadata_blob.data() + platform::uvc_header_size);
-            return md->frame_counter;
-        }
+        uint32_t counter = 0;
+        uint64_t timestamp = 0;
+        if( get_mapping_capture_timing( *f, counter, timestamp ) )
+            return counter;
 
         return _backup_timestamp_reader->get_frame_counter(frame);
     }
