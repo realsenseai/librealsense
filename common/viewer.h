@@ -240,7 +240,7 @@ namespace rs2
         bool _support_ir_reflectivity;
 
     private:
-        void get_frame_objects_container( rs2::frame & frame, std::shared_ptr< atomic_objects_in_frame > & objects );
+        std::shared_ptr< subdevice_model > get_frame_subdevice( rs2::frame const & frame ) const;
         rs2::rect project_color_bbox_to_depth( const rs2::rect &    color_bbox,
                                                const uint16_t *     depth_data,
                                                float                depth_scale,
@@ -250,6 +250,11 @@ namespace rs2
                                                const rs2_extrinsics & depth_to_color,
                                                const rs2::rect &    depth_frame_rect );
         void process_object_detection_frames( std::map< int, rs2::frame > & last_frames );
+        void update_device_detections( rs2::object_detection_frame const & odf,
+                                       rs2::video_frame const & cf,
+                                       rs2::depth_frame const & df,
+                                       std::shared_ptr< atomic_objects_in_frame > const & objects );
+        int od_color_stream_index( device_model const * dev_model ) const;
 
         void check_permissions();
         void hide_common_options();

@@ -32,6 +32,7 @@
 #include <regex>
 #include <algorithm>
 #include <fstream>
+#include <limits>
 
 namespace rs2
 {
@@ -2179,8 +2180,9 @@ namespace rs2
                 }
             }
 
-            // Detection overlays only make sense on the color stream; bbox coords are in color-frame space.
-            if( stream_mv.profile.stream_type() == RS2_STREAM_COLOR )
+            // Detection overlays only make sense on the color stream object detection runs on; bbox coords are in that stream's frame space.
+            if( stream_mv.profile.stream_type() == RS2_STREAM_COLOR && stream_mv.dev
+                && stream_mv.profile.stream_index() == od_color_stream_index( stream_mv.dev->dev_model ) )
             {
                 static std::vector< std::pair< ImColor, bool > > colors =
                 {
@@ -3948,8 +3950,7 @@ namespace rs2
         else return nullptr;
     }
 
-    void viewer_model::get_frame_objects_container( rs2::frame & frame,
-                                                          std::shared_ptr< atomic_objects_in_frame > & objects )
+    std::shared_ptr< subdevice_model > viewer_model::get_frame_subdevice( rs2::frame const & frame ) const
     {
         auto uid = frame.get_profile().unique_id();
         auto it = streams.find( uid );
@@ -3959,8 +3960,19 @@ namespace rs2
             if( orig != streams_origin.end() )
                 it = streams.find( orig->second );
         }
-        if( it != streams.end() && it->second.dev )
-            objects = it->second.dev->detected_objects;
+        return it != streams.end() ? it->second.dev : nullptr;
+    }
+
+    // Object detection runs on a single color imager of its own camera: dual-RGB firmware reports boxes for
+    // the lower-indexed color stream, and a device with one color sensor only has index 0.
+    int viewer_model::od_color_stream_index( device_model const * dev_model ) const
+    {
+        int index = std::numeric_limits< int >::max();
+        for( auto const & s : streams )
+            if( s.second.dev && s.second.dev->dev_model == dev_model
+                && s.second.profile.stream_type() == RS2_STREAM_COLOR )
+                index = std::min( index, s.second.profile.stream_index() );
+        return index;
     }
 
     rs2::rect viewer_model::project_color_bbox_to_depth( const rs2::rect &     color_bbox,
@@ -3983,14 +3995,31 @@ namespace rs2
         return rs2::rect{ dst_tl[0], dst_tl[1], dst_br[0] - dst_tl[0], dst_br[1] - dst_tl[1] }.intersection( depth_frame_rect );
     }
 
+    // Group the tick's frames per camera and hand each camera's set to update_device_detections. The OD stream
+    // and the color stream it describes sit on different sensors of the same device, so with several cameras
+    // connected an OD frame must never be paired against another camera's color or depth.
     void viewer_model::process_object_detection_frames( std::map< int, rs2::frame > & last_frames )
     {
-        // Scan last_frames for an object detection frame, a color frame, and a depth frame.
-        // These types have no default constructor; initialise from an empty rs2::frame.
-        rs2::object_detection_frame odf{ rs2::frame{} };
-        rs2::video_frame cf{ rs2::frame{} };
-        rs2::depth_frame df{ rs2::frame{} };
-        std::shared_ptr< atomic_objects_in_frame > objects;
+        // These frame types have no default constructor; initialise from an empty rs2::frame.
+        struct device_frames
+        {
+            rs2::object_detection_frame odf{ rs2::frame{} };
+            rs2::video_frame cf{ rs2::frame{} };
+            rs2::depth_frame df{ rs2::frame{} };
+            std::shared_ptr< subdevice_model > color_sub;
+        };
+        std::map< device_model *, device_frames > per_device;
+
+        // Seed an entry per camera that shows a color stream, so a camera that stopped delivering frames
+        // (sensor stopped, cable pulled) still ages its overlay out instead of leaving it frozen on screen.
+        for( auto const & s : streams )
+        {
+            auto const & sm = s.second;
+            if( sm.profile.stream_type() != RS2_STREAM_COLOR || ! sm.dev || ! sm.dev->dev_model )
+                continue;
+            if( sm.profile.stream_index() == od_color_stream_index( sm.dev->dev_model ) )
+                per_device[sm.dev->dev_model].color_sub = sm.dev;
+        }
 
         for( auto & kv : last_frames )
         {
@@ -3999,30 +4028,51 @@ namespace rs2
                 continue;
 
             auto stype = frame.get_profile().stream_type();
+            if( stype != RS2_STREAM_OBJECT_DETECTION && stype != RS2_STREAM_COLOR && stype != RS2_STREAM_DEPTH )
+                continue;
 
-            if( stype == RS2_STREAM_OBJECT_DETECTION && ! odf )
+            auto sub = get_frame_subdevice( frame );
+            if( ! sub || ! sub->dev_model )
+                continue;
+            auto & frames = per_device[sub->dev_model];
+
+            if( stype == RS2_STREAM_OBJECT_DETECTION )
             {
-                odf = frame.as< rs2::object_detection_frame >();
+                if( ! frames.odf )
+                    frames.odf = frame.as< rs2::object_detection_frame >();
             }
-            else if( stype == RS2_STREAM_COLOR && ! cf )
+            else if( stype == RS2_STREAM_COLOR )
             {
-                cf = frame.as< rs2::video_frame >();
-                get_frame_objects_container( frame, objects );
+                // Same rule the draw gate uses, so the two always agree on which stream carries the overlay
+                if( frame.get_profile().stream_index() == od_color_stream_index( sub->dev_model ) )
+                    frames.cf = frame.as< rs2::video_frame >();
             }
-            else if( stype == RS2_STREAM_DEPTH && ! df )
+            else if( ! frames.df )
             {
-                df = frame.as< rs2::depth_frame >();
+                frames.df = frame.as< rs2::depth_frame >();
             }
         }
 
-        // Without a color sensor we have nowhere to draw
-        if( ! objects )
-            return;
+        for( auto & kv : per_device )
+        {
+            auto & frames = kv.second;
+            // Without a color stream on this camera we have nowhere to draw
+            if( frames.color_sub && frames.color_sub->detected_objects )
+                update_device_detections( frames.odf, frames.cf, frames.df, frames.color_sub->detected_objects );
+        }
+    }
 
-        // No OD frame this tick. When OD fps < render fps this is normal (e.g. OD@15fps, RGB@30fps).
-        // Keep last known detections to avoid flicker, but clear if absent for too long (OD sensor stopped).
+    // Turn one camera's object detection frame into the overlay entries drawn on its color stream.
+    void viewer_model::update_device_detections( rs2::object_detection_frame const & odf,
+                                                 rs2::video_frame const & cf,
+                                                 rs2::depth_frame const & df,
+                                                 std::shared_ptr< atomic_objects_in_frame > const & objects )
+    {
+        // Nothing to place detections against this tick. When OD fps < render fps this is normal
+        // (e.g. OD@15fps, RGB@30fps), so keep the last ones to avoid flicker - but age them out, or a
+        // camera that stopped delivering would leave its overlay frozen on screen.
         static constexpr int MAX_STALE_OD_TICKS = 3;
-        if( ! odf )
+        if( ! odf || ! cf )
         {
             if( ++objects->ticks_without_od_frame > MAX_STALE_OD_TICKS )
             {

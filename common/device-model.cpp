@@ -279,8 +279,9 @@ namespace rs2
         {
             auto s = std::make_shared<sensor>(sub);
             auto objects = std::make_shared< atomic_objects_in_frame >();
-            // checking if the sensor is color_sensor or is D405 (with integrated RGB in depth sensor)
-            if (s->is<color_sensor>() || (dev.supports(RS2_CAMERA_INFO_PRODUCT_ID) && !strcmp(dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID), "0B5B")))
+            // The subdevice carrying the color streams owns the detection overlay - a dedicated RGB
+            // sensor, or a stereo module that carries them too (D500 dual-RGB, D405).
+            if (sensor_has_color_stream(s->get_stream_profiles()))
                 objects = _detected_objects;
             auto model = std::make_shared<subdevice_model>(dev, std::make_shared<sensor>(sub), objects, error_message, viewer, this, new_device_connected);
             subdevices.push_back(model);
