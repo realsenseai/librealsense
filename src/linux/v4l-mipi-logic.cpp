@@ -57,6 +57,13 @@ namespace librealsense
             static constexpr uint32_t RS_CAMERA_CID_DEVICE_MODE             = ( RS_CAMERA_CID_BASE + 0x24 ); // Dual RGB (2C) vs dedicated color sensor (3C)
             static constexpr uint32_t RS_CAMERA_CID_2C_AE_POLICY            = ( RS_CAMERA_CID_BASE + 0x25 );
             static constexpr uint32_t RS_CAMERA_CID_GYRO_SENSITIVITY        = ( RS_CAMERA_CID_BASE + 0x26 );
+            // D500 DPP composite XU controls - array-of-U32 CIDs the MIPI driver publishes (see
+            // realsense_mipi_platform_driver#658). Payload on the wire is param_count * u32, no
+            // dpp_header - backend-v4l2's set/get translate between LibRS's 38-byte struct and
+            // this compact form.
+            static constexpr uint32_t RS_CAMERA_CID_MINZ                    = ( RS_CAMERA_CID_BASE + 44 );
+            static constexpr uint32_t RS_CAMERA_CID_DECIMATION_FILTER_DPP   = ( RS_CAMERA_CID_BASE + 49 );
+            static constexpr uint32_t RS_CAMERA_CID_TEMPORAL_FILTER_DPP     = ( RS_CAMERA_CID_BASE + 51 );
 
             static constexpr uint8_t GVD_VALID_OPCODE = 0x10;
 
@@ -319,13 +326,14 @@ namespace librealsense
                         {
                         case RS_DUAL_RGB_MODE: return RS_CAMERA_CID_DEVICE_MODE;
                         case RS_COLORED_IR_AE_POLICY: return RS_CAMERA_CID_2C_AE_POLICY;
-                        // Selectors the D400 table below maps to something else entirely, and which have
-                        // no MIPI equivalent yet: ALIGN_DEPTH, and the decimation / temporal / close-range
-                        // DPP composites the driver splits into its own scalar CIDs.
+                        // D500 composite DPP controls - LibRS-side ctrl ids from ds-private.h that
+                        // route to the driver's D500_CAMERA_CID_MINZ / _DECIMATION_FILTER_DPP /
+                        // _TEMPORAL_FILTER_DPP composite CIDs. MINZ is what LibRS calls HDRD.
+                        case RS_DECIMATION_FILTER_DPP: return RS_CAMERA_CID_DECIMATION_FILTER_DPP;
+                        case RS_TEMPORAL_FILTER_DPP:   return RS_CAMERA_CID_TEMPORAL_FILTER_DPP;
+                        case RS_HDRD_CONTROL:          return RS_CAMERA_CID_MINZ;
+                        // No MIPI equivalent yet.
                         case RS_ALIGN_DEPTH:
-                        case RS_DECIMATION_FILTER_DPP:
-                        case RS_TEMPORAL_FILTER_DPP:
-                        case RS_HDRD_CONTROL:
                             throw linux_backend_exception( rsutils::string::from() << "no v4l2 mipi cid for D500 XU depth control " << std::dec << int( control ) );
                         default: break;  // the rest are common to both families
                         }
@@ -359,6 +367,38 @@ namespace librealsense
                 }
                 else
                     throw linux_backend_exception( rsutils::string::from() << "MIPI Controls mapping is for Depth XU only, requested for subdevice " << xu.subdevice );
+            }
+
+            // Per-slot ranges mirror the kernel driver's d500_{minz,decimation,temporal}_{min,max,
+            // step,def} arrays - V4L2's VIDIOC_QUERY_EXT_CTRL only reports aggregate scalar bounds
+            // for a compound U32 array with heterogeneous slots, so we hardcode the same values here.
+            // MINZ steps and defaults track LibRS's public rs2_hdrd_control field defaults (see
+            // rs_hdrd_control.h); the driver validates against min/max only.
+            static constexpr int32_t s_minz_min[]  = { 0, 0, 1, 0,   0, 0, 0 };
+            static constexpr int32_t s_minz_max[]  = { 1, 1, 2, 2, 256, 2, 65535 };
+            static constexpr int32_t s_minz_step[] = { 1, 1, 1, 1,   1, 1, 1 };
+            static constexpr int32_t s_minz_def[]  = { 0, 0, 1, 0, 126, 0, 0 };
+            static constexpr int32_t s_dec_min[]   = { 0, 2 };
+            static constexpr int32_t s_dec_max[]   = { 1, 2 };
+            static constexpr int32_t s_dec_step[]  = { 1, 1 };
+            static constexpr int32_t s_dec_def[]   = { 0, 2 };
+            static constexpr int32_t s_tmp_min[]   = { 0,    0,   1, 0 };
+            static constexpr int32_t s_tmp_max[]   = { 1, 1000, 100, 8 };
+            static constexpr int32_t s_tmp_step[]  = { 1,   10,   1, 1 };
+            static constexpr int32_t s_tmp_def[]   = { 0,  400,  20, 3 };
+
+            const d500_dpp_info * d500_dpp_info_for_cid( uint32_t cid )
+            {
+                static const d500_dpp_info minz  = { 0x0008, 7, 0x00, s_minz_min, s_minz_max, s_minz_step, s_minz_def };
+                static const d500_dpp_info decim = { 0x0001, 2, 0x00, s_dec_min,  s_dec_max,  s_dec_step,  s_dec_def };
+                static const d500_dpp_info temp  = { 0x0002, 4, 0x02, s_tmp_min,  s_tmp_max,  s_tmp_step,  s_tmp_def };
+                switch( cid )
+                {
+                case RS_CAMERA_CID_MINZ:                  return &minz;
+                case RS_CAMERA_CID_DECIMATION_FILTER_DPP: return &decim;
+                case RS_CAMERA_CID_TEMPORAL_FILTER_DPP:   return &temp;
+                default:                                  return nullptr;
+                }
             }
         }  // namespace v4l_mipi_logic
     }  // namespace platform

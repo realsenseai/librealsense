@@ -22,6 +22,32 @@ namespace librealsense
             // The families reuse selector numbers for different controls, so `is_d5xx` picks the right table.
             uint32_t xu_to_cid( const extension_unit & xu, uint8_t control, bool is_d5xx );
 
+            // D500 DPP composite XU descriptor for the MIPI backend's payload translation and range
+            // synthesis. The driver's compound U32 array carries only the active param slots (no
+            // dpp_header, no reserved-slot padding); this struct captures the header fields the
+            // backend synthesizes on read and the per-slot ranges V4L2 can't publish for compound
+            // controls with heterogeneous slots. Values mirror the driver's per-slot arrays.
+
+            // LibRS wire layout is dpp_header + 8 int32 slots = 38 bytes (see rs_dpp_header.h /
+            // rs_hdrd_control.h). Defined here so backend-v4l2 does not need to include the public
+            // rs_dpp_header.h just for the byte offset.
+            static constexpr size_t dpp_header_bytes = 6;
+            static constexpr size_t dpp_wire_size = 38;
+
+            struct d500_dpp_info
+            {
+                uint16_t ctl_id;         // dpp_header.ctl_id on read
+                uint8_t  param_count;    // active int32 slots this control uses (7/2/4)
+                uint8_t  param_type;     // dpp_header.param_type on read
+                const int32_t * min;     // param_count entries each; nullptr on unknown
+                const int32_t * max;
+                const int32_t * step;
+                const int32_t * def;
+            };
+
+            // Non-null only for RS_CAMERA_CID_MINZ / _DECIMATION_FILTER_DPP / _TEMPORAL_FILTER_DPP.
+            const d500_dpp_info * d500_dpp_info_for_cid( uint32_t cid );
+
             // Translate an rs2_option (processing-unit control) to its V4L2 control id. Throws on an unmapped option.
             uint32_t option_to_cid( rs2_option option );
 

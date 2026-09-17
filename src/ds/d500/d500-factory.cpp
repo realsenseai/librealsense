@@ -140,24 +140,21 @@ namespace librealsense
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
 
-            // Decimation Filter DPP composite option - USB-only, skipped on MIPI, alongside the DDS-connected
-            // path's own independent scalar-option decimation filter.
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< decimation_filter_feature >(
-                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
+            // Embedded filters (decimation, temporal, close range) - USB and GMSL. MIPI needs a later
+            // FW that publishes the composite CIDs matched by v4l_mipi_logic::xu_to_cid(). Older
+            // firmware still speaks the old scalar-only "Improved Close Range Depth" semantics at
+            // the close-range XU control id (0x14).
+            const auto min_fw_embedded_filters = _is_mipi_device
+                ? firmware_version( "7.58.46315.15221" )
+                : firmware_version( "7.58.45911.14188" );
 
-            // Temporal Filter DPP composite option - reuses the same FW/MIPI gate as Decimation
-            // above (same protocol family, introduced together on this SKU).
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< temporal_filter_feature >(
-                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
-
-            // Improved Close Range Control composite option - USB toggle, formerly the scalar "Improved
-            // Close Range Depth". Skipped on MIPI (the driver publishes it as minz_configuration, without
-            // the dpp_header written here); FW-gated for the older scalar-only semantics at this same id.
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< hdrd_filter_feature >(
-                        dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
+            if( d500_device::_fw_version >= min_fw_embedded_filters )
+            {
+                auto & depth_sensor = dynamic_cast< d500_depth_sensor & >( get_depth_sensor() );
+                register_feature( std::make_shared< decimation_filter_feature >( depth_sensor ) );
+                register_feature( std::make_shared< temporal_filter_feature >( depth_sensor ) );
+                register_feature( std::make_shared< hdrd_filter_feature >( depth_sensor ) );
+            }
 
             // Dual-RGB rectification toggle, supported by the D585 2C USB firmware only. Depth and both
             // color streams share the depth sensor here, so its streaming state gates the option.
@@ -236,21 +233,21 @@ namespace librealsense
         {
             ds_advanced_mode_base::initialize_advanced_mode( this );
 
-            // Decimation Filter DPP composite option - USB-only, skipped on MIPI (no V4L2 CID
-            // for the depth-XU selector 0x11).
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< decimation_filter_feature >( dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
+            // Embedded filters (decimation, temporal, close range) - USB and GMSL. MIPI needs a later
+            // FW that publishes the composite CIDs matched by v4l_mipi_logic::xu_to_cid(). Older
+            // firmware still speaks the old scalar-only "Improved Close Range Depth" semantics at
+            // the close-range XU control id (0x14).
+            const auto min_fw_embedded_filters = _is_mipi_device
+                ? firmware_version( "7.58.46315.15221" )
+                : firmware_version( "7.58.45911.14188" );
 
-            // Temporal Filter DPP composite option - reuses the same FW/MIPI gate as Decimation
-            // above (same protocol family, introduced together on this SKU).
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< temporal_filter_feature >( dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
-
-            // Improved Close Range Control composite option - USB toggle, formerly the
-            // scalar "Improved Close Range Depth". Skipped on MIPI (no V4L2 CID for the depth-XU
-            // selector 0x14); gated on FW for older scalar-only semantics at this same id.
-            if( ! _is_mipi_device && d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
-                register_feature( std::make_shared< hdrd_filter_feature >( dynamic_cast< d500_depth_sensor & >( get_depth_sensor() ) ) );
+            if( d500_device::_fw_version >= min_fw_embedded_filters )
+            {
+                auto & depth_sensor = dynamic_cast< d500_depth_sensor & >( get_depth_sensor() );
+                register_feature( std::make_shared< decimation_filter_feature >( depth_sensor ) );
+                register_feature( std::make_shared< temporal_filter_feature >( depth_sensor ) );
+                register_feature( std::make_shared< hdrd_filter_feature >( depth_sensor ) );
+            }
         }
 
         std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override

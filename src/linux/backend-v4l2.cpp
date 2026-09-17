@@ -2924,8 +2924,17 @@ namespace librealsense
 
         bool v4l_mipi_device::set_xu(const extension_unit& xu, uint8_t control, const uint8_t* data, int size)
         {
-            v4l2_ext_control xctrl{v4l_mipi_logic::xu_to_cid(xu,control,is_d5xx_product_line(_info.pid)), uint32_t(size), 0, 0};
-            switch (size)
+            const uint32_t cid = v4l_mipi_logic::xu_to_cid(xu,control,is_d5xx_product_line(_info.pid));
+            v4l2_ext_control xctrl{cid, uint32_t(size), 0, 0};
+
+            // D500 DPP composites: LibRS ships a 38-byte struct (6-byte dpp_header + 8 int32 slots);
+            // the driver's compound U32 array takes only the active param_count slots.
+            if( auto info = v4l_mipi_logic::d500_dpp_info_for_cid( cid ) )
+            {
+                xctrl.size = uint32_t( info->param_count * sizeof( int32_t ) );
+                xctrl.p_u8 = const_cast< uint8_t * >( data + v4l_mipi_logic::dpp_header_bytes );
+            }
+            else switch (size)
             {
                 case 1: xctrl.value   = *(reinterpret_cast<const uint8_t*>(data)); break;
                 case 2: xctrl.value   = *reinterpret_cast<const uint16_t*>(data); break; // TODO check signed/unsigned
@@ -2956,8 +2965,20 @@ namespace librealsense
 
         bool v4l_mipi_device::get_xu(const extension_unit& xu, uint8_t control, uint8_t* data, int size) const
         {
-            v4l2_ext_control xctrl{v4l_mipi_logic::xu_to_cid(xu,control,is_d5xx_product_line(_info.pid)), uint32_t(size), 0, 0};
+            const uint32_t cid = v4l_mipi_logic::xu_to_cid(xu,control,is_d5xx_product_line(_info.pid));
+            v4l2_ext_control xctrl{cid, uint32_t(size), 0, 0};
             xctrl.p_u8 = data;
+
+            // D500 DPP composites: driver returns just param_count * u32; reconstruct LibRS's
+            // 38-byte struct (dpp_header + active params + reserved zero-fill) into `data`.
+            std::vector< uint8_t > dpp_params;
+            const auto info = v4l_mipi_logic::d500_dpp_info_for_cid( cid );
+            if( info )
+            {
+                dpp_params.resize( info->param_count * sizeof( int32_t ) );
+                xctrl.size = uint32_t( dpp_params.size() );
+                xctrl.p_u8 = dpp_params.data();
+            }
 
             v4l2_ext_controls ext {xctrl.id & 0xffff0000, 1, 0, 0, 0, &xctrl};
 
@@ -2971,6 +2992,18 @@ namespace librealsense
                 {
                     // exception is thrown if the ioctl fails twice
                     continue;
+                }
+
+                if( info )
+                {
+                    std::memset( data, 0, size );
+                    data[0] = 1;                        // dpp_header.version
+                    data[1] = 0;                        // dpp_header.flags
+                    std::memcpy( data + 2, &info->ctl_id, sizeof( uint16_t ) );
+                    data[4] = info->param_count;
+                    data[5] = info->param_type;
+                    std::memcpy( data + v4l_mipi_logic::dpp_header_bytes, dpp_params.data(), dpp_params.size() );
+                    return true;
                 }
 
                 if (v4l_mipi_logic::is_auto_exposure_control(control))
@@ -2992,8 +3025,31 @@ namespace librealsense
 
         control_range v4l_mipi_device::get_xu_range(const extension_unit& xu, uint8_t control, int len) const
         {
+            const uint32_t cid = v4l_mipi_logic::xu_to_cid(xu,control,is_d5xx_product_line(_info.pid));
+
+            // D500 DPP composites: V4L2 can't publish heterogeneous per-slot bounds for a compound
+            // U32 array via VIDIOC_QUERY_EXT_CTRL, and the driver already validates SETs against
+            // the same arrays we hardcode in d500_dpp_info_for_cid(). Synthesize each of the four
+            // 38-byte bounds (min|max|step|def) as a full LibRS struct: header + active params
+            // (from the hardcoded arrays) + reserved-slot zero-fill.
+            if( auto info = v4l_mipi_logic::d500_dpp_info_for_cid( cid ) )
+            {
+                auto build = [info]( const int32_t * slots )
+                {
+                    std::vector< uint8_t > v( v4l_mipi_logic::dpp_wire_size, 0 );
+                    v[0] = 1;                        // dpp_header.version
+                    v[1] = 0;                        // dpp_header.flags
+                    std::memcpy( v.data() + 2, &info->ctl_id, sizeof( uint16_t ) );
+                    v[4] = info->param_count;
+                    v[5] = info->param_type;
+                    std::memcpy( v.data() + v4l_mipi_logic::dpp_header_bytes, slots, info->param_count * sizeof( int32_t ) );
+                    return v;
+                };
+                return { build( info->min ), build( info->max ), build( info->step ), build( info->def ) };
+            }
+
             v4l2_query_ext_ctrl xctrl_query{};
-            xctrl_query.id = v4l_mipi_logic::xu_to_cid(xu,control,is_d5xx_product_line(_info.pid));
+            xctrl_query.id = cid;
 
             if(0 > ioctl(_fd,VIDIOC_QUERY_EXT_CTRL,&xctrl_query)){
                 throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_QUERY_EXT_CTRL) failed, errno=" << errno);
