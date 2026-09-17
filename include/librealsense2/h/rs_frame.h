@@ -160,6 +160,8 @@ typedef enum rs2_frame_metadata_value
     RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_X_CORD       , /**< Diagnostic Zone point #3, X coord in mm*/
     RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_Y_CORD       , /**< Diagnostic Zone point #3, Y coord in mm*/
     RS2_FRAME_METADATA_EMBEDDED_FILTERS                     , /**< Bitmask, enumerated */
+    RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_X              , /**< Occupancy-grid origin on the forward axis, in millimeters */
+    RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_Y              , /**< Occupancy-grid origin on the lateral axis, in millimeters */
     RS2_FRAME_METADATA_COUNT
 } rs2_frame_metadata_value;
 const char* rs2_frame_metadata_to_string(rs2_frame_metadata_value metadata);

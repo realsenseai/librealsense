@@ -63,6 +63,8 @@ namespace librealsense
         danger_zone = (1u << 14),
         warning_zone = (1u << 15),
         diagnostic_zone = (1u << 16),
+        grid_origin_x_attribute = (1u << 17),
+        grid_origin_y_attribute = (1u << 18),
         payload_crc32_attribute = (1u << 31)
     };
 
@@ -432,9 +434,12 @@ namespace librealsense
         uint16_t    grid_rows;                       // Number of rows in the grid. Max value is 250 (corresponding to 5M width with 2cm tile)
         uint16_t    grid_columns;                    // Number of columns in the grid. Max value is 320 (corresponding to ~6.5M depth with 2cm tile)
         uint8_t     cell_size;                       // Edge size of each tile, measured in cm
-        uint8_t     reserved2[15];                   // Zero-ed
+        int32_t     grid_origin_x_mm;                // Grid origin on the forward axis, in millimeters
+        int32_t     grid_origin_y_mm;                // Grid origin on the lateral axis, in millimeters
+        uint8_t     reserved2[7];                    // Zero-ed
         uint32_t    payload_crc32;                   // Crc32 for the occupancy grid payload data only, not including the metadata header.
     };// Safety Preset at the time of Occupancy grid generation 
+    static_assert( sizeof( md_occupancy ) == 136, "Occupancy metadata ABI" );
     REGISTER_MD_TYPE(md_occupancy, md_type::META_DATA_INTEL_OCCUPANCY_ID)
 
 

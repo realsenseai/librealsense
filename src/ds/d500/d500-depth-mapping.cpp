@@ -373,6 +373,14 @@ namespace librealsense
             make_attribute_parser(&md_occupancy::cell_size,
                 md_occupancy_attributes::cell_size_attribute, md_prop_offset));
 
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_X,
+            make_attribute_parser(&md_occupancy::grid_origin_x_mm,
+                md_occupancy_attributes::grid_origin_x_attribute, md_prop_offset));
+
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_Y,
+            make_attribute_parser(&md_occupancy::grid_origin_y_mm,
+                md_occupancy_attributes::grid_origin_y_attribute, md_prop_offset));
+
         raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_CRC,
             make_attribute_parser(&md_occupancy::payload_crc32,
                 md_occupancy_attributes::payload_crc32_attribute, md_prop_offset));
