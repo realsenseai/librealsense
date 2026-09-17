@@ -28,7 +28,8 @@ namespace librealsense
          {rs_fourcc('M','J','P','G'), RS2_FORMAT_MJPEG},
          {rs_fourcc('R','W','1','6'), RS2_FORMAT_RAW16},
          {rs_fourcc('B','Y','R','2'), RS2_FORMAT_RAW16},
-         {rs_fourcc('B','A','8','1'), RS2_FORMAT_RAW8}    // D401 GMSL dual-RGB: SBGGR8 (driver PR #459), RAW10 in disguise
+         {rs_fourcc('B','A','8','1'), RS2_FORMAT_RAW8},   // D401 GMSL dual-RGB: SBGGR8 (older MIPI driver)
+         {rs_fourcc('p','B','A','A'), RS2_FORMAT_RAW10}   // D401 GMSL dual-RGB: SBGGR10P (MIPI driver 1.0.6.10+)
     };
     std::map<rs_fourcc::value_type, rs2_stream> d400_color_fourcc_to_rs2_stream = {
         {rs_fourcc('Y','U','Y','2'), RS2_STREAM_COLOR},
@@ -37,7 +38,8 @@ namespace librealsense
         {rs_fourcc('R','W','1','6'), RS2_STREAM_COLOR},
         {rs_fourcc('B','Y','R','2'), RS2_STREAM_COLOR},
         {rs_fourcc('M','J','P','G'), RS2_STREAM_COLOR},
-        {rs_fourcc('B','A','8','1'), RS2_STREAM_COLOR}   // D401 GMSL dual-RGB: SBGGR8 (driver PR #459)
+        {rs_fourcc('B','A','8','1'), RS2_STREAM_COLOR},  // D401 GMSL dual-RGB: SBGGR8 (older MIPI driver)
+        {rs_fourcc('p','B','A','A'), RS2_STREAM_COLOR}   // D401 GMSL dual-RGB: SBGGR10P (MIPI driver 1.0.6.10+)
     };
 
     d400_color::d400_color( std::shared_ptr< const d400_info > const & dev_info )
@@ -381,18 +383,14 @@ namespace librealsense
             }
         }
 
-        // D401 GMSL raw dual-RGB: register the RAW8->RGB8 debayer AFTER the ISP blocks above so ISP wins
-        // ties. formats_converter::find_pbf_matching_most_profiles picks the block satisfying the most
-        // REQUESTED targets; find_satisfied_requests counts only requested profiles, so the raw block's
-        // extra Color 1 output is NOT counted when Color 1 is not requested. A lone Color 0 RGB8 is thus a
-        // tie (both blocks satisfy 1, equal source size) and the first-registered block - ISP - wins, so it
-        // stays ISP and coexists with IR. Requesting Color 1 too makes only the raw block satisfy both
-        // (count 2), so raw wins for both imagers (which excludes IR). Verified on HW: Color 0 RGB8 + IR
-        // stream together. Per-pin routing is set in d400_device::init().
+        // D401 GMSL raw dual-RGB: register the raw->RGB8 debayer AFTER the ISP blocks so ISP wins the tie
+        // for a lone Color 0 RGB8 (registration order breaks ties in find_pbf_matching_most_profiles); raw
+        // wins only when Color 1 is also requested. Per-pin routing is set in d400_device::init().
         if( _is_mipi_device && _pid == ds::RS401_GMSL_PID && _fw_version >= firmware_version( "5.17.4.13" ) )
         {
-            // Native color is 1288x808 (after cropping 1612 transport padding); other resolutions are
-            // center-crop + bilinear scale. resolution_transform is a captureless fn ptr, one per output.
+            // Native color 1288x808; raw payload is packed MIPI RAW10 (SBGGR10P/pBAA on 1.0.6.10+, or the
+            // older BA81 padded to 1612). The converter recovers the true stride from the frame size, so
+            // both are handled. Other resolutions are center-crop + scale (one captureless xf per output).
             static const int NATIVE_W = 1288;
             struct color_res { int w, h; void ( *xf )( uint32_t &, uint32_t & ); };
             static const color_res color_resolutions[] = {
@@ -403,20 +401,27 @@ namespace librealsense
                 {  480, 270, []( uint32_t & w, uint32_t & h ) { w =  480; h = 270; } },
                 {  424, 240, []( uint32_t & w, uint32_t & h ) { w =  424; h = 240; } },
             };
+            // One SINGLE-source block per (resolution, format): a multi-format source list trips the
+            // formats-converter many-to-one guard and drops the RGB8 targets. BA81->RAW8, pBAA->RAW10;
+            // only the format the driver advertises has matching raw pins.
+            static const rs2_format raw_src_formats[] = { RS2_FORMAT_RAW8, RS2_FORMAT_RAW10 };
             for( auto & r : color_resolutions )
             {
                 const int rw = r.w, rh = r.h;
-                color_ep.register_processing_block(
-                    { { RS2_FORMAT_RAW8, RS2_STREAM_COLOR } },
-                    { { RS2_FORMAT_RGB8, RS2_STREAM_COLOR, 0, 0, 0, 0, r.xf },
-                      { RS2_FORMAT_RGB8, RS2_STREAM_COLOR, 1, 0, 0, 0, r.xf } },
-                    [rw, rh]() {
-                        rggb::isp_params isp;
-                        isp.swap_rb = true;   // OV9782 is BGGR (driver declares SBGGR8); base demosaic is
-                                              // RGGB-pattern, so swap R<->B to correct it
-                        return std::make_shared< rggb_converter >( RS2_FORMAT_RGB8, NATIVE_W, rw, rh, isp );
-                    }
-                );
+                for( auto src_fmt : raw_src_formats )
+                {
+                    color_ep.register_processing_block(
+                        { { src_fmt, RS2_STREAM_COLOR } },
+                        { { RS2_FORMAT_RGB8, RS2_STREAM_COLOR, 0, 0, 0, 0, r.xf },
+                          { RS2_FORMAT_RGB8, RS2_STREAM_COLOR, 1, 0, 0, 0, r.xf } },
+                        [rw, rh]() {
+                            rggb::isp_params isp;
+                            isp.swap_rb = true;   // OV9782 is BGGR (driver declares SBGGR8 / SBGGR10P); base
+                                                  // demosaic is RGGB-pattern, so swap R<->B to correct it
+                            return std::make_shared< rggb_converter >( RS2_FORMAT_RGB8, NATIVE_W, rw, rh, isp );
+                        }
+                    );
+                }
             }
         }
     }
