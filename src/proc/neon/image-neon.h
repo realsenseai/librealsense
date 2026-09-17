@@ -16,6 +16,7 @@ namespace librealsense
     void unpack_yuy2_neon_rgba8(uint8_t * const d[], const uint8_t * s, int n);
     void unpack_yuy2_neon_bgr8(uint8_t * const d[], const uint8_t * s, int n);
     void unpack_yuy2_neon_bgra8(uint8_t * const d[], const uint8_t * s, int n);
+    void unpack_nv12_neon(rs2_format format, uint8_t * const d[], const uint8_t * s, int width, int height);
     #endif
 #endif
 }

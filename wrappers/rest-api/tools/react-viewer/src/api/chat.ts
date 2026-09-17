@@ -115,7 +115,8 @@ export function getActiveProviderName(): string | null {
  */
 export async function sendChatMessage(
   messages: ChatMessage[],
-  deviceStates: Record<string, DeviceState>
+  deviceStates: Record<string, DeviceState>,
+  signal?: AbortSignal
 ): Promise<ChatResponse> {
   const active = getActiveProvider()
   if (!active) {
@@ -142,6 +143,7 @@ export async function sendChatMessage(
       temperature: 0.7,
       max_tokens: 2048,
     }),
+    signal,
   })
 
   if (!response.ok) {

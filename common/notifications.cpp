@@ -1093,17 +1093,10 @@ namespace rs2
         std::string button_name = rsutils::string::from() << "Learn More..." << "##" << index;
         if (ImGui::Button(button_name.c_str(), { float(bar_width), 20.f }))
         {
-            bool should_dismiss = true;
-            try
-            {
-                open_url(_recommended_version_link.c_str());
-            }
-            catch (const exception& e)
-            {
-                error_message = e.what();
-                should_dismiss = false;
-            }
-            if (should_dismiss) dismiss(false);
+            if (open_url(_recommended_version_link.c_str()))
+                dismiss(false);
+            else
+                error_message = "Failed opening URL " + _recommended_version_link;
         }
         ImGui::PopStyleColor();
         if (ImGui::IsItemHovered())

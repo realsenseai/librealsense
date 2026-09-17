@@ -153,7 +153,7 @@ independently configure multiple cameras.
 
 RealSense cameras can be configured with a simple `json` configuration
 file. See [RealSense
-documentation](https://intelrealsense.github.io/librealsense/doxygen/rs__option_8h.html)
+documentation](https://realsenseai.github.io/librealsense/doxygen/rs__option_8h.html)
 for the set of configuration values. Supported configuration options
 will be depend on the device and other chosen options. Here are the
 options supported by Open3D:

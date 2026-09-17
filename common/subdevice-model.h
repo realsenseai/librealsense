@@ -302,6 +302,9 @@ namespace rs2
         // True when `unique_id`'s checkbox should be greyed out given the current mode (IR while raw
         // dual-RGB is active; the raw-only Color 1 while IR is active).
         bool is_stream_mode_locked(int unique_id) const;
+        // The device publishes a separate aligned-depth stream (DDS) only while the mode is on, so its
+        // checkbox stays disabled until then. False for devices that carry aligned depth on one stream.
+        bool is_aligned_depth_stream_off(int unique_id) const;
         void set_extrinsics_from_depth_if_needed();
         bool is_post_processing_enabled_in_config_file() const;
         void avoid_streaming_on_embedded_filters_not_matching_configuration() const;

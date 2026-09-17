@@ -27,6 +27,20 @@ using rs_fourcc = rsutils::type::fourcc;
 
 namespace librealsense
 {
+    // Image and calibration encodings published by the color pins.
+    // The 16-bit raw can have several spellings: RW16 over USB (V4L2 passes it through, WMF normalizes it to BYR2)
+    // and BA10 or GR16 over GMSL, depending on the d4xx driver version.
+    static const std::map< uint32_t, rs2_format > color_pin_formats = {
+        { rs_fourcc( 'M', '4', '2', '0' ), RS2_FORMAT_M420 },
+        { rs_fourcc( 'N', 'V', '1', '2' ), RS2_FORMAT_NV12 },
+        { rs_fourcc( 'Y', 'U', 'Y', '2' ), RS2_FORMAT_YUYV },
+        { rs_fourcc( 'Y', 'U', 'Y', 'V' ), RS2_FORMAT_YUYV },
+        { rs_fourcc( 'B', 'A', '1', '0' ), RS2_FORMAT_RAW16 },
+        { rs_fourcc( 'R', 'W', '1', '6' ), RS2_FORMAT_RAW16 },
+        { rs_fourcc( 'B', 'Y', 'R', '2' ), RS2_FORMAT_RAW16 },
+        { rs_fourcc( 'G', 'R', '1', '6' ), RS2_FORMAT_RAW16 }
+    };
+
     d500_dual_color::d500_dual_color( std::shared_ptr< const d500_info > const & dev_info )
         : d500_device( dev_info )
         , device( dev_info )
@@ -37,18 +51,14 @@ namespace librealsense
         auto raw_depth_sensor = get_raw_depth_sensor();
 
         // Map the color pins' image and calibration encodings so their raw profiles survive enumeration.
+        // They default to infrared; resolve_color_stream below retypes the ones that arrive on a color pin.
         auto & raw_fourcc_to_rs2_format_map = raw_depth_sensor->get_fourcc_to_rs2_format_map();
-        raw_fourcc_to_rs2_format_map->insert( { rs_fourcc( 'M', '4', '2', '0' ), RS2_FORMAT_M420 } );
-        raw_fourcc_to_rs2_format_map->insert( { rs_fourcc( 'N', 'V', '1', '2' ), RS2_FORMAT_NV12 } );
-        raw_fourcc_to_rs2_format_map->insert( { rs_fourcc( 'Y', 'U', 'Y', '2' ), RS2_FORMAT_YUYV } );
-        raw_fourcc_to_rs2_format_map->insert( { rs_fourcc( 'Y', 'U', 'Y', 'V' ), RS2_FORMAT_YUYV } );
-        raw_fourcc_to_rs2_format_map->insert( { rs_fourcc( 'B', 'A', '1', '0' ), RS2_FORMAT_RAW16 } );
         auto & raw_fourcc_to_rs2_stream_map = raw_depth_sensor->get_fourcc_to_rs2_stream_map();
-        raw_fourcc_to_rs2_stream_map->insert( { rs_fourcc( 'M', '4', '2', '0' ), RS2_STREAM_INFRARED } );
-        raw_fourcc_to_rs2_stream_map->insert( { rs_fourcc( 'N', 'V', '1', '2' ), RS2_STREAM_INFRARED } );
-        raw_fourcc_to_rs2_stream_map->insert( { rs_fourcc( 'Y', 'U', 'Y', '2' ), RS2_STREAM_INFRARED } );
-        raw_fourcc_to_rs2_stream_map->insert( { rs_fourcc( 'Y', 'U', 'Y', 'V' ), RS2_STREAM_INFRARED } );
-        raw_fourcc_to_rs2_stream_map->insert( { rs_fourcc( 'B', 'A', '1', '0' ), RS2_STREAM_INFRARED } );
+        for( auto const & entry : color_pin_formats )
+        {
+            raw_fourcc_to_rs2_format_map->insert( entry );
+            raw_fourcc_to_rs2_stream_map->insert( { entry.first, RS2_STREAM_INFRARED } );
+        }
 
         raw_depth_sensor->set_stream_id_resolver( resolve_color_stream );
 
@@ -335,9 +345,7 @@ namespace librealsense
     void d500_dual_color::resolve_color_stream( const std::vector< platform::stream_profile > & all,
                                               const platform::stream_profile & p, rs2_stream & type, int & index )
     {
-        if( p.format != rs_fourcc( 'M', '4', '2', '0' ) && p.format != rs_fourcc( 'N', 'V', '1', '2' )
-            && p.format != rs_fourcc( 'Y', 'U', 'Y', '2' ) && p.format != rs_fourcc( 'Y', 'U', 'Y', 'V' )
-            && p.format != rs_fourcc( 'B', 'A', '1', '0' ) )
+        if( ! color_pin_formats.count( p.format ) )
             return;
 
         if( ! is_color_pin( all, p.pin_index ) )

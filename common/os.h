@@ -19,7 +19,7 @@ namespace rs2
 
     std::string truncate_string(const std::string& str, size_t width);
 
-    void open_url(const char* url);
+    bool open_url(const char* url);
 
     bool directory_exists(const char* dir);
 

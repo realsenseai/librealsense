@@ -128,6 +128,7 @@ void dds_sensor_proxy::register_converters()
     std::set< int > y8_indexes;
     std::set< int > y16_indexes;
     std::set< int > jpeg_indexes;
+    std::set< int > z16_indexes;
     for( auto & stream : streams() )
     {
         for( auto & profile : stream.second->profiles() )
@@ -139,6 +140,8 @@ void dds_sensor_proxy::register_converters()
                     y16_indexes.insert( stream.first.index );
                 else if( vsp->encoding().to_rs2() == RS2_FORMAT_MJPEG )
                     jpeg_indexes.insert( stream.first.index );
+                else if( vsp->encoding().to_rs2() == RS2_FORMAT_Z16 )
+                    z16_indexes.insert( stream.first.index );
         }
     }
 
@@ -169,9 +172,16 @@ void dds_sensor_proxy::register_converters()
                                                []() { return std::make_shared< mjpeg_converter >( RS2_FORMAT_RGB8 ); } );
     }
 
-    // Depth
-    _formats_converter.register_converter(
-        processing_block_factory::create_id_pbf( RS2_FORMAT_Z16, RS2_STREAM_DEPTH ) );
+    // Depth. A device can expose more than one, e.g. raw depth next to device-aligned depth, so the
+    // target profiles carry an index each and the source needs a type for the converter to respect it.
+    if( z16_indexes.size() > 0 )
+    {
+        std::vector< stream_profile > target_profiles;
+        for( int index : z16_indexes )
+            target_profiles.push_back( { RS2_FORMAT_Z16, RS2_STREAM_DEPTH, index } );
+        _formats_converter.register_converter( { { { RS2_FORMAT_Z16, RS2_STREAM_DEPTH } }, target_profiles,
+                                               []() { return std::make_shared< identity_processing_block >(); } } );
+    }
 
     // Infrared (converter source needs type to be handled properly by formats_converter)
     if( y8_indexes.size() > 0 )
@@ -862,10 +872,28 @@ public:
 };
 
 
+namespace {
+
+// WORKAROUND: Remove once the firmware ships the new name.
+// Options are matched to rs2_option by name, and the firmware still publishes this one under its former name.
+// Only the match is translated - the option keeps the device's name, which is what set/query-option carry.
+std::string const & sdk_option_name( std::string const & device_name )
+{
+    static std::map< std::string, std::string > const renamed = {
+        { "Align Depth", "Enable Aligned Depth" },
+    };
+
+    auto it = renamed.find( device_name );
+    return it != renamed.end() ? it->second : device_name;
+}
+
+}  // namespace
+
+
 void dds_sensor_proxy::add_option( std::shared_ptr< realdds::dds_option > option )
 {
     bool const ok_if_there = true;
-    auto option_id = options_registry::register_option_by_name( option->get_name(), ok_if_there );
+    auto option_id = options_registry::register_option_by_name( sdk_option_name( option->get_name() ), ok_if_there );
 
     if( ! is_valid( option_id ) )
     {
@@ -899,6 +927,11 @@ void dds_sensor_proxy::add_option( std::shared_ptr< realdds::dds_option > option
             //    return _dev->query_option_value( option );
             // Then we may have get a null even when is_enabled() returned true!
         } );
+
+    // Aligned depth adds and removes a topic, which the device will not do mid-stream
+    if( RS2_OPTION_ENABLE_ALIGNED_DEPTH == option_id )
+        opt->set_locked_predicate( [this]() { return is_streaming(); } );
+
     register_option( option_id, opt );
     _options_watcher.register_option( option_id, opt );
 

@@ -2040,10 +2040,8 @@ namespace rs2
                         ///////////////////////////////////////////
                         //TODO: make this a member function
                         int selected;
-                        std::vector< const char * > labels = opt_model.get_combo_labels( &selected );
                         std::vector< float > counters;
-                        for (auto i = opt_model.range.min; i <= opt_model.range.max; i += opt_model.range.step)
-                            counters.push_back(i);
+                        std::vector< const char * > labels = opt_model.get_combo_labels( &selected, &counters );
                         ///////////////////////////////////////////
 
                         RsImGui_ScopePushStyleColor(ImGuiCol_TextSelectedBg, white);
@@ -2789,8 +2787,8 @@ namespace rs2
                     sub->draw_stream_selection(error_message);
 
                 const std::vector<rs2_option> drawing_order = serialize ?
-                    std::vector<rs2_option>{                           RS2_OPTION_EMITTER_ENABLED, RS2_OPTION_ENABLE_AUTO_EXPOSURE, RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE }
-                : std::vector<rs2_option>{ RS2_OPTION_VISUAL_PRESET, RS2_OPTION_EMITTER_ENABLED, RS2_OPTION_ENABLE_AUTO_EXPOSURE, RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE };
+                    std::vector<rs2_option>{                           RS2_OPTION_ENABLE_ALIGNED_DEPTH, RS2_OPTION_EMITTER_ENABLED, RS2_OPTION_ENABLE_AUTO_EXPOSURE, RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE }
+                : std::vector<rs2_option>{ RS2_OPTION_VISUAL_PRESET, RS2_OPTION_ENABLE_ALIGNED_DEPTH, RS2_OPTION_EMITTER_ENABLED, RS2_OPTION_ENABLE_AUTO_EXPOSURE, RS2_OPTION_DEPTH_AUTO_EXPOSURE_MODE };
 
                 for (auto& opt : drawing_order)
                 {

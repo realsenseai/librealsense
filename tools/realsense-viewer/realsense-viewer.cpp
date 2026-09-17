@@ -401,8 +401,6 @@ int run_viewer( int argc, const char ** argv,
         refresh_devices(m, ctx, devices_connection_changes, connected_devs,
             device_names, *device_models, viewer_model, error_message);
 
-        rum_boot.upload_data(window);
-
         auto output_height = viewer_model.get_output_height();
 
         rect viewer_rect = { viewer_model.panel_width,
@@ -664,6 +662,9 @@ int run_viewer( int argc, const char ** argv,
 
         // Fetch and process frames from queue
         viewer_model.handle_ready_frames(viewer_rect, window, static_cast<int>(device_models->size()), error_message);
+
+        if( ! keep_alive )
+            rum_boot.upload_data(window);
 
         // Check if we need to close the window
         if( keep_alive && !keep_alive() )

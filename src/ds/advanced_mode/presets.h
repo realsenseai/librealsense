@@ -220,4 +220,5 @@ namespace librealsense
     void hand_gesture( preset & p );
     void d415_remove_ir( preset & p );
     void d460_remove_ir( preset & p );
+    void edge_enhancement( preset & p );
 }  // namespace librealsense

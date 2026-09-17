@@ -176,7 +176,7 @@ std::vector< char const * > get_option_enum_values( rs2::sensor const & sensor,
     {
         auto label = sensor.get_option_value_description( opt, i );
         if( ! label )
-            return {};  // Missing value - not an enum
+            continue;  // Value hidden for this device, not evidence the option isn't an enum
 
         if( std::fabs( i - current_value ) < 0.001f )
             current_index = labels.size();

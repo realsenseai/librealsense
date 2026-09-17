@@ -1,4 +1,4 @@
-# Intel® RealSense™ Viewer
+# RealSense Viewer
 
 <p align="center"><img src="https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/realsense-viewer-backup.gif" /></p>
 

@@ -66,29 +66,32 @@ namespace rs2
         return std::regex_match( url, url_regex );
     }
 
-    void open_url(const char* url)
+    bool open_url(const char* url)
     {
-        if( url && !is_valid_url( url ) )
+        if( !url || !is_valid_url( url ) )
         {
-            throw std::invalid_argument( "The URL provided is not valid: " + std::string( url ) );
+            LOG_ERROR( "Invalid URL: " << ( url ? url : "(null)" ) );
+            return false;
         }
+        // No browser or no handler is the user's environment, not a program error
 #if (defined(_WIN32) || defined(_WIN64))
-        if (reinterpret_cast<INT_PTR>(ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOW)) < 32)
-            throw std::runtime_error("Failed opening URL");
+        bool ok = reinterpret_cast<INT_PTR>(ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOW)) >= 32;
 #elif defined __linux__ || defined(__linux__)
         std::string command_name = "xdg-open ";
         std::string command = command_name + url;
-        if (system(command.c_str()))
-            throw std::runtime_error("Failed opening URL");
+        bool ok = system(command.c_str()) == 0;
 #elif __APPLE__
         std::string command_name = "open ";
         std::string command = command_name + url;
-        if (system(command.c_str()))
-            throw std::runtime_error("Failed opening URL");
+        bool ok = system(command.c_str()) == 0;
 #else
 #pragma message ( "\nLibrealsense couldn't establish OS/Build environment. \
 Some auxillary functionalities might be affected. Please report this message if encountered")
+        bool ok = false;
 #endif
+        if (!ok)
+            LOG_ERROR("Failed opening URL " << url);
+        return ok;
     }
 
     std::vector<std::string> split_string(std::string& input, char delim)

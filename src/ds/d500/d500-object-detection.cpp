@@ -116,23 +116,6 @@ namespace librealsense
         od_ep->register_processing_block( od_pbf );
     }
 
-    static void set_align_depth_xu( std::shared_ptr< uvc_sensor > raw_depth, bool enable )
-    {
-        if( !raw_depth )
-            return;
-        try
-        {
-            raw_depth->invoke_powered( [enable]( platform::uvc_device & dev )
-            {
-                uint8_t val = enable ? 1 : 0;
-                if( !dev.set_xu( ds::depth_xu, ds::d500_xu_id::ALIGN_DEPTH, &val, sizeof( val ) ) )
-                    LOG_WARNING( "Failed to " << ( enable ? "enable" : "disable" ) << " Align_Depth XU" );
-            } );
-        }
-        catch( std::exception const & e ) { LOG_WARNING( "Align_Depth XU exception: " << e.what() ); }
-        catch( ... )                       { LOG_WARNING( "Align_Depth XU: unknown exception" ); }
-    }
-
     void d500_object_detection_sensor::open( const stream_profiles & requests )
     {
         // Perception and some embedded filters cannot run together. Reject here before the device is touched.
@@ -142,16 +125,12 @@ namespace librealsense
 
     void d500_object_detection_sensor::start( rs2_frame_callback_sptr callback )
     {
-        // TODO: FW does not yet support the Align_Depth XU — re-enable once FW is ready.
-        // set_align_depth_xu( _owner->get_raw_depth_sensor(), true );
         synthetic_sensor::start( callback );
     }
 
     void d500_object_detection_sensor::stop()
     {
         synthetic_sensor::stop();
-        // TODO: FW does not yet support the Align_Depth XU — re-enable once FW is ready.
-        // set_align_depth_xu( _owner->get_raw_depth_sensor(), false );
     }
 
     stream_profiles d500_object_detection_sensor::init_stream_profiles()

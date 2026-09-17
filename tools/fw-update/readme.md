@@ -5,7 +5,7 @@
 
 ## Prerequisites
 In order to update a depth camera firmware, a signed image file is required.
-The latest firmware for D400 cameras is available [here.](https://downloadcenter.intel.com/download/28870/Latest-Firmware-for-Intel-RealSense-D400-Product-Family?product=128255)
+The latest firmware for D400 cameras is available [here.](https://dev.realsenseai.com/docs/firmware-releases-d400)
 The firmware is packed into zip file and contains a file with "bin" extension with the following naming convension: "Signed_Image_UVC_<firmware_version>.bin"
 
 ## Usage

@@ -1,9 +1,8 @@
 ## Useful Links
 * White papers and further documents are available at: [realsense-downloads](https://dev.realsenseai.com/docs/docs-get-started)
-* [RealSense Community](https://communities.intel.com/community/tech/realsense) - Official support, Q&A and other useful content
+* [GitHub Discussions](https://github.com/realsenseai/librealsense/discussions) - Community Q&A and other useful content
 * [Support Site](https://realsenseai.com/support) - Contains content and web ticket capability for 1:1 interaction
 * [RealSense Stereoscopic Depth Cameras](https://arxiv.org/abs/1705.05548) - A technical paper describing the D400 series and others in detail. Includes theoretical background, performance expectations, post-processing suggestions, etc.  
-* [Build an Autonomous Mobile Robot with the RealSense D400 Series Camera, ROS*, and SAWR](https://software.intel.com/en-us/articles/build-an-autonomous-mobile-robot-with-the-intel-realsense-camera-ros-and-sawr)
 
 ## librealsense Wiki
 * [API How-To](https://github.com/realsenseai/librealsense/wiki/API-How-To) - List ot questions and answers related to the camera API
@@ -16,7 +15,7 @@
 * [Depth from Stereo](depth-from-stereo.md) - Tutorial introducing users to depth from stereo technology 
 * [API Architecture](api_arch.md) - Overview of the high-level concepts
 * [C API](../include/librealsense2) - With doxygen-style API comments
-  * [Latest Doxygen Output](http://intelrealsense.github.io/librealsense/doxygen/annotated.html)
+  * [Latest Doxygen Output](https://realsenseai.github.io/librealsense/doxygen/annotated.html)
   * To build documentation locally from sources, on Ubuntu run the following commands:
     * `sudo apt-get install doxygen`
     * `cd doc/doxygen`
@@ -28,7 +27,7 @@
 * [Getting Started](stepbystep/getting_started_with_openCV.md) - Getting started with OpenCV
 * [Error Handling](error_handling.md) - Documents librealsense error handling policy
 * Device specific topics:
-  * [D400 at realsense.intel.com/](https://realsenseai.com/stereo-depth-cameras/) - Camera specifications
+  * [D400 series cameras](https://realsenseai.com/stereo-depth-cameras/) - Camera specifications
   * [D400 Advanced Mode](rs400/rs400_advanced_mode.md) - Overview of the Advanced Mode APIs
   * [D401 GMSL Dual-RGB and ISP color](rs400/d401_dual_rgb_gmsl.md) - Using the D401 GMSL raw dual-RGB and legacy ISP color modes (SDK and Viewer)
   * [D400 cameras with Raspberry Pi](./RaspberryPi3.md) - Example of low-end system without USB3 interface

@@ -143,6 +143,7 @@ void dds_device::impl::reset()
     _server_guid = {};
     _n_streams_expected = 0;
     _streams.clear();
+    _stream_order.clear();
     _stream_header_received.clear();
     _stream_options_received.clear();
     _device_header_received = false;
@@ -905,6 +906,9 @@ void dds_device::impl::on_stream_header( json const & j, dds_sample const & samp
         DDS_THROW( runtime_error,
                    "failed to instantiate stream type '" << stream_type << "' (instead, got '" << stream->type_string()
                                                          << "')" );
+    // Streams are indexed in the order the device declares them, so remember it. _streams is sorted by name, and would return
+    // index 0 to whichever of two same-type streams happens to sort first. Save now that the header is fully handled.
+    _stream_order.push_back( stream );
     _stream_header_received[stream_name] = true;
     std::string expected_streams = _n_streams_expected == 0 ? "unknown" : std::to_string( _n_streams_expected );
     LOG_DEBUG( "[" << debug_name() << "] ... stream " << _streams.size() << "/" << expected_streams << " '" << stream_name

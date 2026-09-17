@@ -207,6 +207,90 @@
         {
             unpack_yuy2_neon<RS2_FORMAT_BGRA8>(d, s, n);
         }
+
+        static inline uint8x8_t nv12_channel(int16x8_t c, int16x8_t d, int16x8_t e,
+                                            int16_t u_coefficient, int16_t v_coefficient)
+        {
+            auto low = vmull_n_s16(vget_low_s16(c), 298);
+            auto high = vmull_n_s16(vget_high_s16(c), 298);
+            low = vmlal_n_s16(low, vget_low_s16(d), u_coefficient);
+            high = vmlal_n_s16(high, vget_high_s16(d), u_coefficient);
+            low = vmlal_n_s16(low, vget_low_s16(e), v_coefficient);
+            high = vmlal_n_s16(high, vget_high_s16(e), v_coefficient);
+            low = vaddq_s32(low, vdupq_n_s32(128));
+            high = vaddq_s32(high, vdupq_n_s32(128));
+
+            return vqmovun_s16(vcombine_s16(vshrn_n_s32(low, 8), vshrn_n_s32(high, 8)));
+        }
+
+        template<rs2_format FORMAT>
+        static inline void unpack_nv12_neon_pixels(uint8_t * output, uint8x8_t y,
+                                                    uint8x8_t u, uint8x8_t v)
+        {
+            const auto c = vsubq_s16(vreinterpretq_s16_u16(vmovl_u8(y)), vdupq_n_s16(16));
+            const auto d = vsubq_s16(vreinterpretq_s16_u16(vmovl_u8(u)), vdupq_n_s16(128));
+            const auto e = vsubq_s16(vreinterpretq_s16_u16(vmovl_u8(v)), vdupq_n_s16(128));
+            const auto r = nv12_channel(c, d, e, 0, 409);
+            const auto g = nv12_channel(c, d, e, -100, -208);
+            const auto b = nv12_channel(c, d, e, 516, 0);
+
+            if (FORMAT == RS2_FORMAT_RGB8 || FORMAT == RS2_FORMAT_BGR8)
+            {
+                uint8x8x3_t rgb;
+                rgb.val[0] = FORMAT == RS2_FORMAT_RGB8 ? r : b;
+                rgb.val[1] = g;
+                rgb.val[2] = FORMAT == RS2_FORMAT_RGB8 ? b : r;
+                vst3_u8(output, rgb);
+            }
+            else
+            {
+                uint8x8x4_t rgba;
+                rgba.val[0] = FORMAT == RS2_FORMAT_RGBA8 ? r : b;
+                rgba.val[1] = g;
+                rgba.val[2] = FORMAT == RS2_FORMAT_RGBA8 ? b : r;
+                rgba.val[3] = vdup_n_u8(255);
+                vst4_u8(output, rgba);
+            }
+        }
+
+        template<rs2_format FORMAT>
+        static void unpack_nv12_neon_format(uint8_t * const d[], const uint8_t * s, int width, int height)
+        {
+            const int bpp = FORMAT == RS2_FORMAT_RGB8 || FORMAT == RS2_FORMAT_BGR8 ? 3 : 4;
+            const auto y_plane = s;
+            const auto uv_plane = s + width * height;
+            for (int row = 0; row < height; ++row)
+            {
+                const auto y = y_plane + row * width;
+                const auto uv = uv_plane + (row / 2) * width;
+                auto output = d[0] + row * width * bpp;
+                for (int column = 0; column < width; column += 16)
+                {
+                    const auto y_values = vld1q_u8(y + column);
+                    const auto uv_values = vld2_u8(uv + column);
+                    const auto u = vzip_u8(uv_values.val[0], uv_values.val[0]);
+                    const auto v = vzip_u8(uv_values.val[1], uv_values.val[1]);
+
+                    unpack_nv12_neon_pixels<FORMAT>(output + column * bpp,
+                                                    vget_low_u8(y_values), u.val[0], v.val[0]);
+                    unpack_nv12_neon_pixels<FORMAT>(output + (column + 8) * bpp,
+                                                    vget_high_u8(y_values), u.val[1], v.val[1]);
+                }
+            }
+        }
+
+        void unpack_nv12_neon(rs2_format format, uint8_t * const d[], const uint8_t * s,
+                              int width, int height)
+        {
+            switch (format)
+            {
+            case RS2_FORMAT_RGB8: unpack_nv12_neon_format<RS2_FORMAT_RGB8>(d, s, width, height); break;
+            case RS2_FORMAT_RGBA8: unpack_nv12_neon_format<RS2_FORMAT_RGBA8>(d, s, width, height); break;
+            case RS2_FORMAT_BGR8: unpack_nv12_neon_format<RS2_FORMAT_BGR8>(d, s, width, height); break;
+            case RS2_FORMAT_BGRA8: unpack_nv12_neon_format<RS2_FORMAT_BGRA8>(d, s, width, height); break;
+            default: assert(false); break;
+            }
+        }
     }
     #endif
 #endif

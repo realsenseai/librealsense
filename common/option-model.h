@@ -57,7 +57,8 @@ namespace rs2
         bool draw_option( bool update_read_only_options, bool is_streaming,
             std::string& error_message, notifications_model& model );
 
-        std::vector< const char * > get_combo_labels( int * p_selected = nullptr ) const;
+        // p_values, if given, receives the raw value behind each label (entries with no description are skipped)
+        std::vector< const char * > get_combo_labels( int * p_selected = nullptr, std::vector< float > * p_values = nullptr ) const;
         std::string value_as_string() const;
         float value_as_float() const;
 

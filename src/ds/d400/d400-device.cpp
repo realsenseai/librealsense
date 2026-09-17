@@ -405,19 +405,9 @@ namespace librealsense
 
     float d400_depth_sensor::get_preset_max_value() const
     {
-        float preset_max_value = RS2_RS400_VISUAL_PRESET_COUNT - 1;
-        switch (_owner->_pid)
-        {
-        case ds::RS400_PID:
-        case ds::RS410_PID:
-        case ds::RS415_PID:
-        case ds::RS460_PID:
-            preset_max_value = static_cast<float>(RS2_RS400_VISUAL_PRESET_REMOVE_IR_PATTERN);
-            break;
-        default:
-            preset_max_value = static_cast<float>(RS2_RS400_VISUAL_PRESET_MEDIUM_DENSITY);
-        }
-        return preset_max_value;
+        // Edge Enhancement is the highest preset supported across all D400 devices; per-pid gating
+        // below REMOVE_IR_PATTERN (only D400/D410/D415/D460) is enforced by the feature check in apply_preset()
+        return static_cast<float>(RS2_RS400_VISUAL_PRESET_EDGE_ENHANCEMENT);
     }
 
     class ds5u_depth_sensor : public d400_depth_sensor

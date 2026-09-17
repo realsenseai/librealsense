@@ -914,6 +914,15 @@ namespace librealsense
         }
         // fall through to scalar path for non-16-aligned widths
 #endif // __SSSE3__
+#if defined(__ARM_NEON) && defined(BUILD_WITH_NEON) && !defined(ANDROID)
+        if ((FORMAT == RS2_FORMAT_RGB8 || FORMAT == RS2_FORMAT_RGBA8
+             || FORMAT == RS2_FORMAT_BGR8 || FORMAT == RS2_FORMAT_BGRA8)
+            && width % 16 == 0)
+        {
+            unpack_nv12_neon(FORMAT, d, s, width, height);
+            return;
+        }
+#endif
         auto src = reinterpret_cast<const uint8_t*>(s);
         auto dst = reinterpret_cast<uint8_t*>(d[0]);
 

@@ -56,6 +56,7 @@ void rum_uploader::join_pending_stops( std::shared_ptr< std::vector< std::unique
 static char const * RUM_ENDPOINT = "https://telemetry.realsenseai.com/v1/rum";
 static char const * PRIVACY_POLICY_URL = "https://realsenseai.github.io/librealsense/privacy-policy.html";
 static char const * CONSENT_POPUP_ID = "Help improve RealSense";
+static char const * CONSENT_TITLE = "RealSense collects usage data to improve SDK performance and functionality.";
 static const int  DEFAULT_UPLOAD_INTERVAL_HOURS = 24;   // 0 disables the throttle
 static const int  SECONDS_PER_HOUR = 3600;
 
@@ -211,23 +212,25 @@ rum_uploader::~rum_uploader()
 void rum_uploader::draw_consent_popup( ux_window & window )
 {
     auto const & style = ImGui::GetStyle();
-    ImGui::SetNextWindowSize( { 460.f, 0.f } );
+    // Wide enough that the title line never wraps - measured in the font it is drawn with.
+    ImGui::PushFont( window.get_large_font() );
+    float const title_width = ImGui::CalcTextSize( CONSENT_TITLE ).x;
+    ImGui::PopFont();
+    ImGui::SetNextWindowSize( { title_width + style.WindowPadding.x * 2, 0.f } );
     if( ! ImGui::BeginPopupModal( CONSENT_POPUP_ID, nullptr,
         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove ) )
         return;
 
     ImGui::PushFont( window.get_large_font() );
-    ImGui::Text( "%s", CONSENT_POPUP_ID );
+    ImGui::TextUnformatted( CONSENT_TITLE );
     ImGui::PopFont();
-    ImGui::Separator();
-    ImGui::Spacing();
-    ImGui::TextWrapped( "RealSense collects usage data to improve SDK performance and functionality. "
-                        "This is entirely voluntary and does not include images, video, or personally "
-                        "identifying details." );
+    ImGui::TextWrapped( "This is entirely voluntary and does not include images, video, or personally identifying details." );
     ImGui::Spacing();
     // The default frame color equals the popup background, which would leave the box invisible.
     ImGui::PushStyleColor( ImGuiCol_FrameBg, button_color );
+    ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, ImVec2( style.FramePadding.x, 1.f ) );  // box the height of the text
     ImGui::Checkbox( "##rum_consent", &_consented );
+    ImGui::PopStyleVar();
     ImGui::PopStyleColor();
     ImGui::SameLine( 0.f, style.ItemInnerSpacing.x );
     ImGui::TextWrapped( "I consent to the collection and processing of information as described in the Privacy Policy." );
@@ -238,12 +241,20 @@ void rum_uploader::draw_consent_popup( ux_window & window )
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    if( ImGui::Button( "OK", ImVec2( 110, 26 ) ) )
+    RsImGui::RsImButton( [&]()
     {
-        // save now: the upload thread reads consent from disk
-        config_file::instance().set_and_save( configurations::stats::rum_cloud_enabled, _consented );
-        if( _consented )
+        if( ImGui::Button( "Accept", ImVec2( 110, 26 ) ) )
+        {
+            // save now: the upload thread reads consent from disk
+            config_file::instance().set_and_save( configurations::stats::rum_cloud_enabled, true );
             start();
+            ImGui::CloseCurrentPopup();
+        }
+    }, ! _consented );
+    ImGui::SameLine();
+    if( ImGui::Button( "Decline", ImVec2( 110, 26 ) ) )
+    {
+        config_file::instance().set_and_save( configurations::stats::rum_cloud_enabled, false );
         ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();

@@ -31,8 +31,20 @@ static void register_viewer_tests( ImGuiTestEngine *       engine,
         t->TestFunc = [fn, &device_models, &viewer_model]( ImGuiTestContext * ctx )
         {
             viewer_test vtc{ ctx, device_models, viewer_model };
+            // Uncaught exceptions would std::terminate the whole run; catch and mark
+            // the test errored so the queue continues. C++ exceptions only (MSVC /EHsc
+            // in this project — no SEH). IM_ERRORF is guarded too, in case a future
+            // test-engine version can throw from it.
             try { fn( vtc ); }
             catch( const test_exit & ) {}
+            catch( const std::exception & e )
+            {
+                try { IM_ERRORF( "test threw: %s", e.what() ); } catch( ... ) {}
+            }
+            catch( ... )
+            {
+                try { IM_ERRORF( "test threw non-std exception" ); } catch( ... ) {}
+            }
         };
     }
 }

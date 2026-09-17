@@ -170,7 +170,8 @@ void rs_dds_option::set_value( json value )
 
 bool rs_dds_option::is_read_only() const
 {
-    return _dds_opt->is_read_only();
+    // Reporting locked through is_read_only() lets a UI disable the control instead of erroring on click.
+    return _dds_opt->is_read_only() || ( _locked && _locked() );
 }
 
 

@@ -90,11 +90,21 @@ namespace librealsense
         return ret.first;
     }
 
+    // Extensions like GPU accelerated frames get one archive each, registered under a single key - see
+    // add_extension - so the stream and index play no part in it. Both allocation paths key alike.
+    static void normalize_extension_archive_id( frame_source::archive_id & id )
+    {
+        if( std::get< rs2_extension >( id ) >= RS2_EXTENSION_COUNT )
+        {
+            std::get< rs2_stream >( id ) = RS2_STREAM_COUNT;
+            std::get< int >( id ) = 0;
+        }
+    }
+
+
     callback_invocation_holder frame_source::begin_callback( archive_id id )
     {
-        // We use a special index for extensions, like GPU accelerated frames. See add_extension.
-        if( std::get< rs2_extension >( id ) >= RS2_EXTENSION_COUNT )
-            std::get< rs2_stream >( id ) = RS2_STREAM_COUNT;  // For added extensions like GPU accelerated frames
+        normalize_extension_archive_id( id );
 
         std::lock_guard< std::recursive_mutex > lock( _mutex );
 
@@ -119,9 +129,7 @@ namespace librealsense
                                                  frame_additional_data && additional_data,
                                                  bool requires_memory )
     {
-        // We use a special index for extensions, like GPU accelerated frames. See add_extension.
-        if( std::get< rs2_extension>( id ) >= RS2_EXTENSION_COUNT )
-            std::get< rs2_stream >( id ) = RS2_STREAM_COUNT;  // For added extensions like GPU accelerated frames
+        normalize_extension_archive_id( id );
 
         std::lock_guard< std::recursive_mutex > lock( _mutex );
 

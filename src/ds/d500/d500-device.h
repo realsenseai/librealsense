@@ -72,6 +72,7 @@ namespace librealsense
     class ds_devices_common;
     class d500_info;
     class d500_mipi_device;
+    class d500_enable_aligned_depth_option;
 
     namespace platform {
         struct backend_device_group;
@@ -177,6 +178,8 @@ namespace librealsense
         std::shared_ptr<stream_interface> _right_ir_stream;
 
         uint8_t _depth_device_idx;
+
+        std::shared_ptr< d500_enable_aligned_depth_option > _aligned_depth_option;
 
         rsutils::lazy< std::vector< uint8_t > > _coefficients_table_raw;
         rsutils::lazy< std::vector< uint8_t > > _new_calib_table_raw;

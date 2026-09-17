@@ -6,6 +6,7 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 import logging
+import platform
 
 import sw_device as sw
 
@@ -87,3 +88,28 @@ def test_sdk_vs_cv2(in_fmt, out_fmt):
     mean = np.abs(diff).mean()
     log.info(f"{in_fmt} -> {out_fmt}  mean |d|={mean:.2f}")
     assert mean <= TOL_MEAN, f"{in_fmt} -> {out_fmt} mean |d|={mean:.2f} > {TOL_MEAN}"
+
+
+@pytest.mark.skipif(platform.machine().lower() not in ("aarch64", "arm64"),
+                    reason="exercises the ARM NV12 fast path")
+@pytest.mark.parametrize("out_fmt", OUTPUTS, ids=[f.name for f in OUTPUTS])
+def test_nv12_matches_scalar_reference(out_fmt):
+    raw = np.random.default_rng(14604).integers(0, 256, size=W * H * 3 // 2, dtype=np.uint8)
+    sdk_out = sdk_convert(raw, rs.format.nv12, out_fmt)
+
+    y = raw[:W * H].reshape(H, W).astype(np.int32) - 16
+    uv = raw[W * H:].reshape(H // 2, W)
+    u = np.repeat(np.repeat(uv[:, 0::2], 2, axis=0), 2, axis=1).astype(np.int32) - 128
+    v = np.repeat(np.repeat(uv[:, 1::2], 2, axis=0), 2, axis=1).astype(np.int32) - 128
+    reference = np.stack((
+        np.clip((298 * y + 409 * v + 128) >> 8, 0, 255),
+        np.clip((298 * y - 100 * u - 208 * v + 128) >> 8, 0, 255),
+        np.clip((298 * y + 516 * u + 128) >> 8, 0, 255),
+    ), axis=-1).astype(np.uint8)
+    if out_fmt in (rs.format.bgr8, rs.format.bgra8):
+        reference = reference[..., ::-1]
+    if out_fmt in _WITH_ALPHA:
+        alpha = np.full(reference.shape[:2] + (1,), 255, dtype=np.uint8)
+        reference = np.concatenate([reference, alpha], axis=-1)
+
+    np.testing.assert_array_equal(sdk_out, reference)

@@ -25,15 +25,19 @@ namespace librealsense {
     public:
         typedef std::function< void(rsutils::json value) > set_option_callback;
         typedef std::function< rsutils::json() > query_option_callback;
+        typedef std::function< bool() > locked_predicate; // e.g options that cannot change while streaming
 
     private:
         set_option_callback _set_opt_cb;
         query_option_callback _query_opt_cb;
+        locked_predicate _locked;
 
     public:
         rs_dds_option(const std::shared_ptr< realdds::dds_option >& dds_opt,
             set_option_callback set_opt_cb,
             query_option_callback query_opt_cb);
+
+        void set_locked_predicate( locked_predicate is_locked ) { _locked = std::move( is_locked ); }
 
         rsutils::json get_value() const noexcept override;
         rs2_option_type get_value_type() const noexcept override { return _rs_type; }

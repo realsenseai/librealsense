@@ -364,8 +364,10 @@ dds_device_proxy::dds_device_proxy( std::shared_ptr< const device_info > const &
             {
                 auto & source_profiles = sensor_proxy->_formats_converter.get_source_profiles_from_target( profile );
                 if( source_profiles.size() != 1 )
-                    LOG_ERROR( "More than one source profile available for [" << profile << "]: " << source_profiles );
-                auto source_profile = source_profiles[0];
+                    LOG_ERROR( source_profiles.size() << " source profiles available for [" << profile
+                                                      << "]: " << source_profiles );
+                if( ! source_profiles.empty() )
+                    source_profile = source_profiles[0];
             }
 
             sid_index type_and_index( source_profile->get_stream_type(), source_profile->get_stream_index() );
@@ -675,8 +677,9 @@ void dds_device_proxy::tag_default_profile_of_stream(
         // Superset = picked up in pipeline with enable_all_stream() config
         // We want color and depth to be default, and add infrared as superset
         int tag = PROFILE_TAG_SUPERSET;
-        if( ( strcmp( stream->type_string(), "color" ) == 0 && profile->get_stream_index() == 0 ) || // Now we have cameras with more then one color stream, take the first
-              strcmp( stream->type_string(), "depth" ) == 0 )
+        // Cameras may expose more than one color stream, and more than one depth stream, so take the first of each
+        if( ( strcmp( stream->type_string(), "color" ) == 0 || strcmp( stream->type_string(), "depth" ) == 0 )
+            && profile->get_stream_index() == 0 )
             tag |= PROFILE_TAG_DEFAULT;
         else if( strcmp( stream->type_string(), "ir" ) != 0 || profile->get_stream_index() >= 2 )
             return;  // leave untagged

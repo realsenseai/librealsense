@@ -35,6 +35,7 @@ namespace librealsense
         CASE(MEDIUM_DENSITY)
         CASE(DEFAULT)
         CASE(REMOVE_IR_PATTERN)
+        CASE(EDGE_ENHANCEMENT)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
         #undef CASE
