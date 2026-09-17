@@ -377,10 +377,15 @@ bool RsImGui::TreeNode(const char* label, bool should_be_open)
     ImGuiID const id = ImGui::GetID(label);
     // Seeded by the node, so it cannot land on another node's id the way a bare XOR could
     ImGuiID const collapsed_id = ImHashStr( "##closed_by_hand", 0, id );
+    // Where the state goes while the user overrules: that click leaves ImGui's own slot holding
+    // the collapse, so the pre-request state has nowhere else left to live
+    ImGuiID const saved_id = ImHashStr( "##open_before_ask", 0, id );
     ImGuiStorage* storage = ImGui::GetStateStorage();
 
     if (!should_be_open)
     {
+        if (storage->GetInt(collapsed_id, 0))
+            storage->SetInt(id, storage->GetInt(saved_id, 0));
         storage->SetInt(collapsed_id, 0);
         return ImGui::TreeNode(label);
     }
@@ -391,7 +396,11 @@ bool RsImGui::TreeNode(const char* label, bool should_be_open)
         ImGui::SetNextItemOpen(true);
     bool const open = ImGui::TreeNode(label);
     if (ImGui::IsItemToggledOpen())
+    {
         storage->SetInt(collapsed_id, open ? 0 : 1);
+        if (!open)
+            storage->SetInt(saved_id, was_open);
+    }
     else if (!collapsed_by_user)
         storage->SetInt(id, was_open);
     return open;
