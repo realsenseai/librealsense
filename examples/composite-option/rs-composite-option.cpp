@@ -280,11 +280,11 @@ namespace
 
         rs2_temporal_filter_dpp_config cfg_to_send = current;
         cfg_to_send.enabled = 1;
-        cfg_to_send.smooth_alpha = 550;  // normalized [0,1] scaled into [0,1000] - i.e. 0.55
+        cfg_to_send.smooth_alpha = 0.55F;
         cfg_to_send.smooth_delta = 35;
         cfg_to_send.persistency_index = 5;
         opts.set_composite_option_from( id, cfg_to_send );
-        std::cout << "      Set (read-modify-write): enabled=1 smooth_alpha=550 smooth_delta=35 persistency_index=5\n";
+        std::cout << "      Set (read-modify-write): enabled=1 smooth_alpha=0.55 smooth_delta=35 persistency_index=5\n";
 
         print_bytes( "Get (after)", opts.get_composite_option( id ) );
         auto cfg = opts.get_composite_option_as< rs2_temporal_filter_dpp_config >( id );

@@ -226,7 +226,7 @@ bool test_temporal_filter_dpp()
 {
     rs2_temporal_filter_dpp_config initial{};
     initial.enabled = 1;
-    initial.smooth_alpha = 400;  // normalized [0,1] scaled into [0,1000] - see rs_temporal_filter_dpp.h
+    initial.smooth_alpha = 0.4F;  // normalized float in [0,1] - see rs_temporal_filter_dpp.h
     initial.smooth_delta = 20;
     initial.persistency_index = 3;
     rs2_temporal_filter_dpp_config modified = initial;

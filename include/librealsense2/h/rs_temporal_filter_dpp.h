@@ -4,7 +4,7 @@
 /** \file rs_temporal_filter_dpp.h
 * \brief
 * Cast-target struct for RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP (see rs_composite_option.h).
-* Same shared HKR DPP wire layout (see rs_hdrd_control.h): dpp_header + 8 int32 param slots,
+* Same shared HKR DPP wire layout (see rs_hdrd_control.h): dpp_header + 8 32-bit param slots,
 * 4 used (38 bytes, little-endian, pack(1)); ctl_id = 0x0002.
 */
 
@@ -26,8 +26,7 @@ typedef struct rs2_temporal_filter_dpp_config
     dpp_header header;
 
     int32_t enabled;             /**< 0 = Off, 1 = On. Default 0 */
-    int32_t smooth_alpha;        /**< Normalized [0,1] scaled into [0,1000] (every param slot is
-                                  * an int32, not a float). Default 400 (0.4) */
+    float smooth_alpha;          /**< IEEE-754 float32, normalized [0,1]. Default 0.4 */
     int32_t smooth_delta;        /**< Range [1,100], step 1. Default 20 */
     int32_t persistency_index;   /**< Range [0,8], step 1. Default 3 */
 

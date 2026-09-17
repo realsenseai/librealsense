@@ -4,7 +4,7 @@
 /** \file rs_dpp_header.h
 * \brief
 * Wire header shared by every control in the HKR Depth Post-Processing (DPP) composite-option
-* family: this header + a fixed 8-slot int32 param block; param_count says how many are active,
+* family: this header + a fixed 8-slot 32-bit param block; param_count says how many are active,
 * the rest MUST be zero on SET. See rs_hdrd_control.h for a control that uses it.
 */
 
@@ -30,7 +30,7 @@ typedef struct dpp_header
     uint8_t  flags;         /**< Bitwise control-status mask (active/read-only) */
     uint16_t ctl_id;        /**< dpp_ctrl_list entry identifying this control */
     uint8_t  param_count;   /**< Active param slots out of the fixed 8 that follow */
-    uint8_t  param_type;    /**< Per-param int/float bitmap. 0x00 = all-integer */
+    uint8_t  param_type;    /**< Per-param int/float bitmap. 0x00 = all-integer; a float slot is IEEE-754 float32 */
 } dpp_header;
 
 #pragma pack(pop)

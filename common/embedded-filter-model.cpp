@@ -546,11 +546,19 @@ namespace rs2
     // field is meaningful all the time.
     bool embedded_filter_model::draw_temporal_filter_dpp_fields()
     {
-        bool any_field_active = draw_temporal_filter_dpp_manual_editable_field( "Smooth Alpha:", "temporal_filter_dpp_smooth_alpha",
-            _temporal_filter_dpp_editor.value.smooth_alpha, 0, 1000,
-            _temporal_filter_dpp_smooth_alpha_edit_mode, _temporal_filter_dpp_smooth_alpha_edit_buf );
-        if( ImGui::IsItemHovered() )
-            ImGui::SetTooltip( "Normalized [0,1] scaled into [0,1000] - e.g. 400 = 0.4." );
+        ImGui::Text("Smooth Alpha:");
+        ImGui::SameLine();
+        const bool alpha_changed = ImGui::SliderFloat("##temporal_filter_dpp_smooth_alpha",
+            &_temporal_filter_dpp_editor.value.smooth_alpha, 0.0F, 1.0F, "%.2f");
+        if (alpha_changed || ImGui::IsItemActive())
+            _temporal_filter_dpp_editor.touch();
+        if (ImGui::IsItemDeactivatedAfterEdit())
+            _temporal_filter_dpp_editor.finalize(
+                _temporal_filter_dpp_editor.numeric_commit_delay);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Normalized alpha in the range [0.0, 1.0].");
+
+        bool any_field_active = ImGui::IsItemActive();
 
         any_field_active |= draw_temporal_filter_dpp_manual_editable_field( "Smooth Delta:", "temporal_filter_dpp_smooth_delta",
             _temporal_filter_dpp_editor.value.smooth_delta, 1, 100,
