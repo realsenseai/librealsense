@@ -5,6 +5,8 @@
 #include "core/notification.h"
 #include "librealsense-exception.h"
 #include <librealsense2/hpp/rs_processing.hpp>
+#include <cmath>
+#include <limits>
 #include <ostream>
 
 
