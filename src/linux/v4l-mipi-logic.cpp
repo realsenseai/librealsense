@@ -2,12 +2,18 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 #include "v4l-mipi-logic.h"
-#include "backend-v4l2.h"  // xioctl(), linux_backend_exception
+#include "v4l-ioctl.h"  // xioctl()
+
+#include <src/librealsense-exception.h>  // linux_backend_exception
 
 #include <src/platform/uvc-device.h>  // extension_unit
 #include <rsutils/string/from.h>
 
 #include <linux/media.h>  // media_device_info, MEDIA_IOC_DEVICE_INFO
+
+#include <fcntl.h>      // open(), O_RDWR
+#include <sys/ioctl.h>  // ioctl()
+#include <unistd.h>     // close()
 
 #include <cstring>
 #include <regex>
