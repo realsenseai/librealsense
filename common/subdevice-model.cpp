@@ -2333,14 +2333,6 @@ namespace rs2
         }
     }
 
-    uint64_t subdevice_model::num_supported_non_default_options() const
-    {
-        return (uint64_t)std::count_if(
-            std::begin(options_metadata),
-            std::end(options_metadata),
-            [&](const std::pair<int, option_model>& p) {return p.second.supported && !viewer.is_option_skipped(p.second.opt); });
-    }
-
     bool subdevice_model::supports_on_chip_calib()
     {
         bool is_d400 = s->supports(RS2_CAMERA_INFO_PRODUCT_LINE) ?

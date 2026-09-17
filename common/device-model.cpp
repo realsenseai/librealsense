@@ -2801,6 +2801,8 @@ namespace rs2
                     }
                 }
 
+                bool const has_advanced_controls = dev.is< advanced_mode >() && sub->s->is< depth_sensor >();
+
                 {
                     auto & supported_options = sub->options_metadata;
 
@@ -2858,7 +2860,7 @@ namespace rs2
 
                     bool const anything_to_search = ! controls.empty() || ! sub->post_processing.empty()
                                                  || ! sub->embedded_filters.empty()
-                                                 || ( dev.is< advanced_mode >() && sub->s->is< depth_sensor >() );
+                                                 || has_advanced_controls;
 
                     if (anything_to_search)
                     {
@@ -2903,7 +2905,7 @@ namespace rs2
                         selected_file_preset.clear();
                     }
                 }
-                if (dev.is<advanced_mode>() && sub->s->is<depth_sensor>())
+                if (has_advanced_controls)
                 {
                     if (draw_advanced_controls(viewer, window, error_message, is_streaming,
                                                rsutils::string::to_lower(sub->options_filter), draw_later))
