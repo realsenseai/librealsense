@@ -73,6 +73,8 @@ namespace librealsense
         const uint8_t DS5_HKR_TEMPORAL_FILTER_DPP           = 0x13;
         // Backs RS2_COMPOSITE_OPTION_HDRD_CONTROL - see src/ds/d500/hdrd-embedded-filter.h.
         const uint8_t DS5_HKR_HDRD_CONTROL = 0x14;
+        // GMSL-only motion negotiation; one byte, not a USB HID control.
+        const uint8_t DS5_HKR_IMU_BATCH = 0x1B;
                 
 
         // DS5 fisheye XU identifiers

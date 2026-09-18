@@ -2,9 +2,13 @@
 // Copyright(c) 2022-4 RealSense, Inc. All Rights Reserved.
 
 #include "ds-motion-common.h"
+#include <cstdlib>
+#include <chrono>
+#include <thread>
 
 #include "algo.h"
 #include "hid-sensor.h"
+#include "uvc-sensor.h"
 #include "environment.h"
 #include "metadata.h"
 #include "backend.h"
@@ -144,6 +148,120 @@ namespace librealsense
         : synthetic_sensor( name, sensor, owner, motion_fourcc_to_rs2_format, motion_fourcc_to_rs2_stream )
         , _owner( owner )
     {
+    }
+
+    namespace {
+        constexpr uint8_t imu_batch_supported = 0x80;
+        constexpr uint8_t imu_batch_pixel = 0x40;
+        constexpr uint8_t imu_batch_active = 0x20;
+
+        uint8_t query_imu_batch(const std::shared_ptr<uvc_sensor>& sensor)
+        {
+            return sensor->invoke_powered([](platform::uvc_device& dev) {
+                uint8_t status = 0;
+                if (!dev.get_xu(ds::depth_xu, ds::DS5_HKR_IMU_BATCH, &status, sizeof(status)))
+                    throw std::runtime_error("Cannot read IMU batch XU");
+                return status;
+            });
+        }
+
+        bool valid_imu_batch_status(uint8_t status)
+        {
+            return (status & imu_batch_supported) && !(status & 0x1c);
+        }
+
+        void configure_imu_batch(const std::shared_ptr<uvc_sensor>& sensor, uint8_t mask)
+        {
+            sensor->invoke_powered([mask](platform::uvc_device& dev) {
+                uint8_t status = 0;
+                if (!dev.set_xu(ds::depth_xu, ds::DS5_HKR_IMU_BATCH, &mask, sizeof(mask)) ||
+                    !dev.get_xu(ds::depth_xu, ds::DS5_HKR_IMU_BATCH, &status, sizeof(status)) ||
+                    !valid_imu_batch_status(status) || (status & imu_batch_active) ||
+                    (status & 3U) != mask || (mask && !(status & imu_batch_pixel)))
+                    throw std::runtime_error("HKR rejected IMU batch XU configuration");
+            });
+        }
+
+        void disable_imu_batch(const std::shared_ptr<uvc_sensor>& sensor)
+        {
+            try {
+                // STREAMOFF may return before HKR releases the IMU source.
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+                while (query_imu_batch(sensor) & imu_batch_active) {
+                    if (std::chrono::steady_clock::now() >= deadline)
+                        throw std::runtime_error("Timed out waiting for IMU source release");
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                configure_imu_batch(sensor, 0);
+            } catch (const std::exception& e) {
+                LOG_WARNING("IMUB XU cleanup failed: " << e.what());
+            } catch (...) {
+                LOG_WARNING("IMUB XU cleanup failed with an unknown error");
+            }
+        }
+    }
+
+    void ds_motion_sensor::open(const stream_profiles& requests)
+    {
+        if (is_opened()) {
+            synthetic_sensor::open(requests); // preserve the existing session on error
+            return;
+        }
+        // USB HID is excluded. Old GMSL drivers/FW without this XU remain legacy.
+        auto raw = std::dynamic_pointer_cast<uvc_sensor>(get_raw_sensor());
+        bool supported = false;
+        if (raw && dynamic_cast<const d500_motion*>(_owner)) {
+            try {
+                const auto status = query_imu_batch(raw);
+                supported = valid_imu_batch_status(status) && (status & imu_batch_pixel);
+            } catch (const std::exception& e) {
+                LOG_DEBUG("IMU pair XU unavailable: " << e.what());
+            }
+        }
+        uint8_t mask = 0;
+        if (supported) {
+            int fps = 0;
+            for (const auto& request : requests) {
+                const auto type = request->get_stream_type();
+                if (type != RS2_STREAM_ACCEL && type != RS2_STREAM_GYRO)
+                    throw invalid_value_exception("IMUB accepts only accel/gyro requests");
+                if (fps != 0 && fps != request->get_framerate())
+                    throw invalid_value_exception("IMUB requires equal accel and gyro rates");
+                fps = request->get_framerate();
+                mask |= type == RS2_STREAM_ACCEL ? 1U : 2U;
+            }
+            if (mask == 0) throw invalid_value_exception("IMUB requires a motion stream");
+            if (const char* setting = std::getenv("RS2_GMSL_IMU_BATCH")) {
+                const std::string value(setting);
+                if (value != "0" && value != "1")
+                    LOG_WARNING("Ignoring RS2_GMSL_IMU_BATCH: expected 0 or 1, using automatic negotiation");
+                if (value == "0") mask = 0;
+            }
+        }
+        try {
+            if (supported) {
+                // Remember the endpoint before SET so even a failed readback rolls back.
+                // UVC open issues STREAMON; start/stop only gate SDK callbacks.
+                _gmsl_batch_sensor = raw;
+                configure_imu_batch(raw, mask);
+            }
+            synthetic_sensor::open(requests);
+        } catch (...) {
+            if (_gmsl_batch_sensor)
+                disable_imu_batch(_gmsl_batch_sensor);
+            _gmsl_batch_sensor.reset();
+            throw;
+        }
+    }
+
+    void ds_motion_sensor::close()
+    {
+        synthetic_sensor::close();
+        if (_gmsl_batch_sensor) {
+            auto raw = _gmsl_batch_sensor;
+            _gmsl_batch_sensor.reset();
+            disable_imu_batch(raw);
+        }
     }
 
     rs2_motion_device_intrinsic ds_motion_sensor::get_motion_intrinsics(rs2_stream stream) const

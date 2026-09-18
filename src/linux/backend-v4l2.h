@@ -448,6 +448,8 @@ namespace librealsense
             uvc_device_info _info;
 
             std::vector<std::shared_ptr<buffer>> _buffers;
+            uint64_t _invalid_imu_batch_packets = 0;
+            std::chrono::steady_clock::time_point _last_imu_batch_warning{};
             stream_profile _profile;
             bool _variable_frame_size = false; // some frames may arrive in shorter size than the buffer - skip the partial frame check
             frame_callback _callback;
