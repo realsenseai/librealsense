@@ -6,6 +6,7 @@
 #include <librealsense2-gl/rs_processing_gl.hpp>
 #include <string>
 #include <map>
+#include <mutex>
 #include <thread>
 #include "opengl3.h"
 #include <GLFW/glfw3.h>
@@ -73,9 +74,18 @@ namespace rs2
                     while (resulting_queue.poll_for_frame(&f));
                 }
 
+                rs2::frame_queue get_frame_queue(int id)
+                {
+                    // Return a shared queue handle so callers wait without holding the map lock.
+                    std::lock_guard<std::mutex> lock(frames_queue_mutex);
+                    return frames_queue.at(id);
+                }
+
                 std::atomic<bool> depth_stream_active;
 
                 const size_t resulting_queue_max_size;
+                // Capture callbacks must not wait for texture uploads under streams_mutex.
+                std::mutex frames_queue_mutex;
                 std::map<int, rs2::frame_queue> frames_queue;
                 rs2::frame_queue resulting_queue;
 

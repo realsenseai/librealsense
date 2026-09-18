@@ -2223,7 +2223,7 @@ namespace rs2
                     {
                         auto id = f.get_profile().unique_id();
                         {
-                            std::lock_guard< std::mutex > lock( viewer.streams_mutex );
+                            std::lock_guard< std::mutex > lock( viewer.ppf.frames_queue_mutex );
                             auto queue = viewer.ppf.frames_queue.find( id );
                             if( queue == viewer.ppf.frames_queue.end() )
                                 return;

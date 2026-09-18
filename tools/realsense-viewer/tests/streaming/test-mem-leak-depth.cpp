@@ -190,6 +190,9 @@ VIEWER_TEST( "streaming", "mem_leak_depth_start_stop" )
             std::lock_guard< std::mutex > lock( test.viewer_model.streams_mutex );
             streams_size          = test.viewer_model.streams.size();
             streams_origin_size   = test.viewer_model.streams_origin.size();
+        }
+        {
+            std::lock_guard< std::mutex > lock( test.viewer_model.ppf.frames_queue_mutex );
             ppf_frames_queue_size = test.viewer_model.ppf.frames_queue.size();
         }
 

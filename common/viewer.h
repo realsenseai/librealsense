@@ -150,6 +150,7 @@ namespace rs2
 
         void disable_measurements();
 
+        // Held across texture uploads; capture callbacks must use the queue mutex instead.
         std::mutex streams_mutex;
         std::map<int, stream_model> streams;
         std::map<int, int> streams_origin;
