@@ -3,6 +3,7 @@
 
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 #include "example-imgui.hpp"    // Include short list of convenience functions for rendering
+#include "../example-utils.hpp"
 #include <iostream>
 
 #include "imgui_impl_glfw.h"
@@ -14,7 +15,7 @@ int main() try
 {
 
     rs2::context ctx;
-    rs2::device_list devices_list = ctx.query_devices();
+    rs2::device_list devices_list = wait_for_devices( ctx );
     size_t device_count = devices_list.size();
     if (!device_count)
     {

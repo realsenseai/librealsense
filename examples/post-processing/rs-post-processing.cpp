@@ -71,7 +71,9 @@ int main(int argc, char * argv[]) try
     rs2::pointcloud filtered_pc;
 
     // Declare RealSense pipeline, encapsulating the actual device and sensors
-    rs2::pipeline pipe;
+    rs2::context ctx;
+    wait_for_devices( ctx );
+    rs2::pipeline pipe( ctx );
     rs2::config cfg;
     // Use a configuration object to request only depth from the pipeline
     cfg.enable_stream(RS2_STREAM_DEPTH, 640, 0, RS2_FORMAT_Z16, 30);
