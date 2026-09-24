@@ -73,10 +73,8 @@ if(WIN32)
 endif()
 
 if(${BACKEND} STREQUAL RS2_USE_V4L2_BACKEND)
-    list(APPEND RAW_RS
-        ../../src/linux/backend-v4l2.cpp
-        ../../src/linux/backend-hid.cpp
-    )
+    # LRS_V4L2_SOURCES is set by src/linux/CMakeLists.txt, which the root CMakeLists includes first.
+    list(APPEND RAW_RS ${LRS_V4L2_SOURCES})
 endif()
 
 if(${BACKEND} STREQUAL RS2_USE_WMF_BACKEND)
@@ -134,6 +132,10 @@ if( BUILD_LEGACY_PYBACKEND )
         add_dependencies(pybackend2 libusb)
     endif()
     target_link_libraries(pybackend2 PRIVATE rsutils usb ${CMAKE_THREAD_LIBS_INIT})
+    if(${BACKEND} STREQUAL RS2_USE_V4L2_BACKEND)
+        target_link_libraries(pybackend2 PRIVATE ${LRS_V4L2_LINK_LIBS})
+        target_include_directories(pybackend2 PRIVATE ${LRS_V4L2_INCLUDE_DIRS})
+    endif()
     set_target_properties(pybackend2 PROPERTIES
                             VERSION     ${REALSENSE_VERSION_STRING}
                             SOVERSION   ${REALSENSE_VERSION_MAJOR})
