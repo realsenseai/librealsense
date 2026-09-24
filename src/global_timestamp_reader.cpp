@@ -161,10 +161,7 @@ namespace librealsense
                 a = _dest_a;
                 b = _dest_b;
             }
-            if( _last_request_time - _prev_time < _time_span_ms )
-            {
-                dt = (_last_request_time - _prev_time) / _time_span_ms;
-            }
+            dt = std::min( 1., std::max( 0., ( _last_request_time - _prev_time ) / _time_span_ms ) );
         }
         _prev_a = _dest_a * dt + _prev_a * (1 - dt);
         _prev_b = _dest_b * dt + _prev_b * (1 - dt);
@@ -194,14 +191,11 @@ namespace librealsense
 
     void CLinearCoefficients::get_a_b(double x, double& a, double& b) const
     {
-        a = _dest_a;
-        b = _dest_b;
-        if (x - _prev_time < _time_span_ms)
-        {
-            double dt((x - _prev_time) / _time_span_ms);
-            a = _dest_a * dt + _prev_a * (1 - dt);
-            b = _dest_b * dt + _prev_b * (1 - dt);
-        }
+        // Blend from the previous to the current coefficients over the second following the last
+        // recompute; clamp so a query before that time can't extrapolate.
+        double dt = std::min( 1., std::max( 0., ( x - _prev_time ) / _time_span_ms ) );
+        a = _dest_a * dt + _prev_a * (1 - dt);
+        b = _dest_b * dt + _prev_b * (1 - dt);
     }
 
     double CLinearCoefficients::calc_value(double x) const
@@ -238,6 +232,7 @@ namespace librealsense
             sample._x -= base_x;
         }
         _prev_time -= base_x;
+        _last_request_time -= base_x;
         _base_sample._x -= base_x;
         return true;
     }

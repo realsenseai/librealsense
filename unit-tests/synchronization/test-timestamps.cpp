@@ -10,6 +10,8 @@
 #include "../catch.h"
 #include <src/global_timestamp_reader.h>
 #include <vector>
+#include <cmath>
+#include <algorithm>
 
 using namespace librealsense;
 
@@ -165,4 +167,46 @@ TEST_CASE( "refit_from_samples_across_wrap", "[global-timestamp]" )
         add_sample( coefs, t, true );
         CHECK( query( coefs, t ) == Catch::Approx( to_sys_ms( t ) ).margin( 0.001 ) );
     }
+}
+
+// The real clock model is never the identity: the device clock drifts against the host and every
+// clock-sync sample carries a little latency jitter, so consecutive fits differ slightly and
+// calc_value blends the previous and current coefficients over the second after each sample. Frames
+// keep being converted between samples (they set the fit's last request time), so the first sample
+// after the wrap must carry that time across the epoch too - otherwise the blend extrapolates from a
+// request time one full wrap period away and the converted frames step by seconds.
+TEST_CASE( "wrap_with_drifting_fit_and_frames_between_samples", "[global-timestamp]" )
+{
+    const double drift = 1.00005;               // device clock 50 ppm fast vs. host
+    const double offset_ms = 1.7e12;            // host epoch
+    auto sys_ms = [&]( uint64_t ts_usec, int jitter_ms ) {
+        return ts_usec * USEC_TO_MSEC * drift + offset_ms + jitter_ms;
+    };
+
+    CLinearCoefficients coefs( 15 );
+    const uint64_t poll_usec = 1000000;         // steady-state clock-sync interval
+    const uint64_t frame_usec = 66667;          // 15 fps
+    uint64_t ts = WRAP_USEC - 20 * poll_usec;
+    bool is_ready = false;
+    double max_err = 0;
+    for( int poll = 0; poll < 40; ++poll, ts += poll_usec )
+    {
+        // Irregular sample latency (-3..3 ms) so consecutive fits differ, as they do in practice
+        int jitter = ( poll * 37 ) % 7 - 3;
+        if( is_ready )
+            coefs.update_samples_base( to_hw_ms( ts ) );
+        coefs.add_value( CSample( to_hw_ms( ts ), sys_ms( ts, jitter ) ) );
+        is_ready = true;
+        if( poll < 3 )
+            continue;
+        // Frames arriving until the next poll
+        for( uint64_t f = ts + frame_usec; f < ts + poll_usec; f += frame_usec )
+        {
+            double err = std::fabs( query( coefs, f ) - sys_ms( f, 0 ) );
+            max_err = std::max( max_err, err );
+            // Latency jitter is a few ms; anything beyond that is the fit misbehaving
+            CHECK( err < 10. );
+        }
+    }
+    CHECK( max_err < 10. );
 }
