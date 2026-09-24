@@ -122,8 +122,11 @@ namespace librealsense
             int color_height = 480;
             int fps = 30;
 
+            // Default only Color 0 (index 0). In raw dual-RGB mode Color 1 (index 1) also
+            // advertises RGB8; an index -1 wildcard would default-enable both, and Color 1
+            // shares a HW endpoint with IR2 so the default pipeline could not resolve.
             tags.push_back( { RS2_STREAM_COLOR,
-                              -1,  // index
+                              0,  // index
                               color_width,
                               color_height,
                               get_color_format(),
