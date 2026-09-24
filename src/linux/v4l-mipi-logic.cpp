@@ -58,6 +58,10 @@ namespace librealsense
             static constexpr uint32_t RS_CAMERA_CID_2C_AE_POLICY            = ( RS_CAMERA_CID_BASE + 0x25 );
             static constexpr uint32_t RS_CAMERA_CID_GYRO_SENSITIVITY        = ( RS_CAMERA_CID_BASE + 0x26 );
 
+            // RSDEV-13850: one-byte IMU batch XU (0x1b) on the motion node.
+            static constexpr uint32_t RS_CAMERA_CID_IMU_BATCH = RS_CAMERA_CID_BASE + 0x27;
+            static constexpr uint8_t RS_IMU_BATCH = 0x1B;
+
             static constexpr uint8_t GVD_VALID_OPCODE = 0x10;
 
             // MIPI depth-XU selector identifiers (subdevice 0).
@@ -334,6 +338,7 @@ namespace librealsense
                     switch( control )
                     {
                     case RS_HWMONITOR: return RS_CAMERA_CID_HWMC;
+                    case RS_IMU_BATCH: return RS_CAMERA_CID_IMU_BATCH;
                     case RS_DEPTH_EMITTER_ENABLED: return RS_CAMERA_CID_LASER_POWER;
                     case RS_EXPOSURE: return V4L2_CID_EXPOSURE_ABSOLUTE;
                     case RS_LASER_POWER: return RS_CAMERA_CID_MANUAL_LASER_POWER;
