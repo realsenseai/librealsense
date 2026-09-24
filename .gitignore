@@ -100,6 +100,10 @@ librealsense-log.txt
 # Per-device FW fallback map consumed by rspy.fw_compat (override the *.json rule)
 !unit-tests/py/rspy/fw_fallback.json
 
+# DDT occupancy regression corpus: recorded frames, configuration and goldens the
+# test replays. Data, not build output, so it has to survive the *.bin rule above.
+!unit-tests/live/d500/ddt/corpus/**/*.bin
+
 .vscode/*
 /unit-tests/.idea
 
