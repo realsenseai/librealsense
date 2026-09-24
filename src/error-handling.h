@@ -55,9 +55,11 @@ namespace librealsense
     class polling_errors_disable : public option
     {
     public:
-        polling_errors_disable( std::shared_ptr< polling_error_handler > handler )
+        // 'enabled' is the initial option value only; the loop itself starts on the first set() > 0.
+        // A disabled initial value means nothing auto-starts polling - the user must enable it explicitly.
+        polling_errors_disable( std::shared_ptr< polling_error_handler > handler, bool enabled = true )
             : _polling_error_handler( handler )
-            , _value( 1 )
+            , _value( enabled ? 1.f : 0.f )
         {
         }
 

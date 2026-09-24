@@ -105,8 +105,12 @@ void log_callback_end( uint32_t fps,
     {
         if (supports_option(RS2_OPTION_ERROR_POLLING_ENABLED))
         {
+            // Error polling is a SW-only option (polling_errors_disable): query() returns its cached value, no device round trip.
+            // Registering a callback starts the polling loop only when that value is enabled - devices that default to disabled,
+            // and users who disabled it, must opt in explicitly via set_option.
             auto&& opt = get_option(RS2_OPTION_ERROR_POLLING_ENABLED);
-            opt.set(1.0f);
+            if (opt.query() > 0.f)
+                opt.set(1.0f);
         }
         _notifications_processor->set_callback(std::move(callback));
     }

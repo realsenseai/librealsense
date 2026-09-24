@@ -637,8 +637,9 @@ namespace librealsense
                 raw_depth_sensor->get_notifications_processor(),
                 std::make_shared< ds_notification_decoder >( d500_fw_error_report ) );
 
+            // D500 starts with error polling off
             depth_sensor.register_option( RS2_OPTION_ERROR_POLLING_ENABLED,
-                                          std::make_shared< polling_errors_disable >( _polling_error_handler ) );
+                                          std::make_shared< polling_errors_disable >( _polling_error_handler, false ) );
 
         }); //group_multiple_fw_calls
 
