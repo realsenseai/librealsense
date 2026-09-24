@@ -20,7 +20,7 @@
 #endif
 #include "neon/image-neon.h"
 
-#if defined (ANDROID) || (defined (__linux__) && !defined (__x86_64__)) || (defined (__APPLE__) && !defined (__x86_64__))
+#if defined (ANDROID) || !(defined (__x86_64__) || defined (_M_X64) || defined (__i386__) || defined (_M_IX86))
 
 bool has_avx() { return false; }
 
