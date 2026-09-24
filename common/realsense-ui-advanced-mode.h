@@ -15,12 +15,15 @@
 template<class T>
 bool* draw_edit_button(const char* id, T val, std::string*& val_str)
 {
-    static std::map<const char*, bool> edit_mode;
-    static std::map<const char*, std::string> edit_value;
+    // Keyed by ImGui id, not by the address of the id string: callers may hand in a c_str() that
+    // is rebuilt every frame, and the ImGui id also tells apart same-named controls in different sections
+    static std::map<ImGuiID, bool> edit_mode;
+    static std::map<ImGuiID, std::string> edit_value;
+    ImGuiID const key = ImGui::GetID(id);
 
     ImGui::SameLine();
     ImGui::SetCursorPosX(268);
-    if (!edit_mode[id])
+    if (!edit_mode[key])
     {
         std::string edit_id = rsutils::string::from() 
             << rs2::textual_icons::edit << "##" << id;
@@ -30,8 +33,8 @@ bool* draw_edit_button(const char* id, T val, std::string*& val_str)
         ImGui::PushStyleColor(ImGuiCol_Button, { 1.f,1.f,1.f,0.f });
         if (ImGui::Button(edit_id.c_str(), { 20, 20 }))
         {
-            edit_value[id] = rsutils::string::from( val );
-            edit_mode[id] = true;
+            edit_value[key] = rsutils::string::from( val );
+            edit_mode[key] = true;
         }
         if (ImGui::IsItemHovered())
         {
@@ -49,7 +52,7 @@ bool* draw_edit_button(const char* id, T val, std::string*& val_str)
         ImGui::PushStyleColor(ImGuiCol_Button, { 1.f,1.f,1.f,0.f });
         if (ImGui::Button(edit_id.c_str(), { 20, 20 }))
         {
-            edit_mode[id] = false;
+            edit_mode[key] = false;
         }
         if (ImGui::IsItemHovered())
         {
@@ -58,8 +61,8 @@ bool* draw_edit_button(const char* id, T val, std::string*& val_str)
         ImGui::PopStyleColor(4);
     }
 
-    val_str = &edit_value[id];
-    return &edit_mode[id];
+    val_str = &edit_value[key];
+    return &edit_mode[key];
 }
 
 template<class T, class S>

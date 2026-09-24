@@ -138,6 +138,10 @@ public:
                                    std::shared_ptr< rs2::subdevice_model > sub,
                                    rs2_option option );
 
+    // Enter a value the way a user does: click the pencil beside a slider, click the text box it
+    // turns into, type, Enter. False when no text box took the click - the pencil did nothing.
+    bool type_value( ImGuiID widget, ImGuiID edit_button, std::string const & value );
+
     // Replace the text in the Controls section's search/filter box ("" clears it)
     void set_controls_filter( rs2::device_model & model,
                               std::shared_ptr< rs2::subdevice_model > sub,

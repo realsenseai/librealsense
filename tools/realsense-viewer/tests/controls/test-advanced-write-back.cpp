@@ -6,8 +6,10 @@
 #include <librealsense2/rs_advanced_mode.hpp>
 
 
-// An advanced-mode section writes its whole group to the camera once, after the controls inside it
-// have drawn: what the user dragged has to reach the camera, and only that section has to write.
+// An advanced-mode control is edited the way a user does it: the pencil swaps the slider for a text
+// box, the typed value is entered, and the section writes its whole group to the camera once the
+// controls inside it have drawn. The pencil's state has to survive from one frame to the next, and
+// only that section has to write.
 VIEWER_TEST( "controls", "advanced_write_back" )
 {
     auto & model = test.find_first_device_or_exit();
@@ -41,21 +43,26 @@ VIEWER_TEST( "controls", "advanced_write_back" )
 
     test.imgui->ItemOpen( test.node_id( model, sub, { "Advanced Controls" } ) );
     test.imgui->ItemOpen( test.node_id( model, sub, { "Advanced Controls", "Depth Control" } ) );
-    // the slider labels its widget "##<name>", under the section it was registered in
-    ImGuiID const slider = test.node_id( model, sub,
+    // the slider and the text box that replaces it share the "##<name>" label under the section
+    // they were registered in; the pencil beside them is "<edit icon>##<name>"
+    ImGuiID const widget = test.node_id( model, sub,
         { "Advanced Controls", "Depth Control", "##DS Median Threshold" } );
-    IM_CHECK( test.wait_until( 10, 0.3f, [&] { return test.imgui->ItemExists( slider ); } ) );
+    std::string const edit_label = rsutils::string::from()
+        << rs2::textual_icons::edit << "##DS Median Threshold";
+    ImGuiID const edit_button = test.node_id( model, sub,
+        { "Advanced Controls", "Depth Control", edit_label } );
+    IM_CHECK( test.wait_until( 10, 0.3f, [&] { return test.imgui->ItemExists( widget ); } ) );
 
     auto const original = advanced.get_depth_control( 0 ).deepSeaMedianThreshold;
     auto const minimum = advanced.get_depth_control( 1 ).deepSeaMedianThreshold;
     auto const target = ( original == minimum ) ? original + 100 : minimum;
 
-    test.imgui->ItemInputValue( slider, (int)target );
+    IM_CHECK( test.type_value( widget, edit_button, std::to_string( target ) ) );
     IM_CHECK( test.wait_until( 20, 0.25f, [&] {
         return advanced.get_depth_control( 0 ).deepSeaMedianThreshold == target; } ) );
 
     // and back, so the next test starts where this one found the camera
-    test.imgui->ItemInputValue( slider, (int)original );
+    IM_CHECK( test.type_value( widget, edit_button, std::to_string( original ) ) );
     IM_CHECK( test.wait_until( 20, 0.25f, [&] {
         return advanced.get_depth_control( 0 ).deepSeaMedianThreshold == original; } ) );
 }

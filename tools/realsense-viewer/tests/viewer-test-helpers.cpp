@@ -164,10 +164,19 @@ void viewer_test::set_value_by_seed( rs2::option_model & opt, ImGuiID seed, cons
     {
         std::string edit_btn = rsutils::string::from()
             << rs2::textual_icons::edit << "##" << opt.id;
-        imgui->ItemClick( ImHashStr( edit_btn.c_str(), 0, seed ) );
-        imgui->ItemInput( ImHashStr( opt.id.c_str(), 0, seed ) );
-        imgui->KeyCharsReplaceEnter( value.c_str() );
+        type_value( ImHashStr( opt.id.c_str(), 0, seed ), ImHashStr( edit_btn.c_str(), 0, seed ), value );
     }
+}
+
+bool viewer_test::type_value( ImGuiID widget, ImGuiID edit_button, std::string const & value )
+{
+    imgui->ItemClick( edit_button );
+    imgui->ItemClick( widget );
+    // ItemInput() would ctrl-click a slider into ImGui's own temp input and pass regardless; the
+    // text box the pencil swaps in must be the one holding the focus
+    IM_CHECK_RETV( imgui->UiContext->InputTextState.ID == widget, false );
+    imgui->KeyCharsReplaceEnter( value.c_str() );
+    return true;
 }
 
 std::string viewer_test::get_value_by_seed( rs2::option_model & opt, ImGuiID seed )
