@@ -2974,10 +2974,7 @@ namespace rs2
                                 rs2_temporal_filter_dpp_config cfg{};
                                 memcpy(&cfg, bytes.data(), sizeof(cfg));
                                 sub->temporal_filter_dpp_enabled = cfg.enabled;
-                                // Wire value is normalized [0,1] scaled into [0,1000] (every DPP
-                                // param slot is an int32 - see rs_temporal_filter_dpp.h) -
-                                // converted back to a plain [0,1] float for the slider below.
-                                sub->temporal_filter_dpp_smooth_alpha = cfg.smooth_alpha / 1000.0f;
+                                sub->temporal_filter_dpp_smooth_alpha = cfg.smooth_alpha;
                                 sub->temporal_filter_dpp_smooth_delta = cfg.smooth_delta;
                                 sub->temporal_filter_dpp_persistency_index = cfg.persistency_index;
                                 sub->temporal_filter_dpp_populated = true;
@@ -3002,9 +2999,7 @@ namespace rs2
                             {
                                 rs2_temporal_filter_dpp_config cfg{};
                                 cfg.enabled = sub->temporal_filter_dpp_enabled;
-                                // [0,1] float slider back to the wire's [0,1000] scaled int32 -
-                                // see the matching conversion on read, above.
-                                cfg.smooth_alpha = static_cast<int32_t>( std::lround( sub->temporal_filter_dpp_smooth_alpha * 1000.0f ) );
+                                cfg.smooth_alpha = sub->temporal_filter_dpp_smooth_alpha;
                                 cfg.smooth_delta = sub->temporal_filter_dpp_smooth_delta;
                                 cfg.persistency_index = sub->temporal_filter_dpp_persistency_index;
                                 sub->s->set_composite_option(RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP, &cfg, sizeof(cfg));

@@ -83,7 +83,7 @@ static void print_decimation_filter_dpp_range( const rs2_decimation_filter_dpp_r
 }
 
 /* C99 equivalent of print_struct(temporal_filter_dpp_fields(), ...) - see
-   print_decimation_filter_dpp_struct() above. smooth_alpha is [0,1] scaled into [0,1000] (every
+   print_decimation_filter_dpp_struct() above. smooth_alpha is a normalized float in [0,1] (every
    DPP param slot is an int32), so it prints as a plain %d like every other field, not a float. */
 static void print_temporal_filter_dpp_struct( const rs2_temporal_filter_dpp_config * v )
 {
@@ -93,7 +93,7 @@ static void print_temporal_filter_dpp_struct( const rs2_temporal_filter_dpp_conf
     printf( "        %-16s = %d\n", "param_count", (int)v->header.param_count );
     printf( "        %-16s = %d\n", "param_type", (int)v->header.param_type );
     printf( "        %-16s = %d\n", "enabled", v->enabled );
-    printf( "        %-16s = %d\n", "smooth_alpha", v->smooth_alpha );
+    printf( "        %-16s = %.3f\n", "smooth_alpha", v->smooth_alpha );
     printf( "        %-16s = %d\n", "smooth_delta", v->smooth_delta );
     printf( "        %-16s = %d\n", "persistency_index", v->persistency_index );
 }
@@ -376,12 +376,12 @@ static int exercise_temporal_filter_dpp( const rs2_options * opts, rs2_composite
        every step below, same discipline as exercise_hdrd_control() below. */
     cfg = current;
     cfg.enabled = 1;
-    cfg.smooth_alpha = 550;  /* normalized [0,1] scaled into [0,1000] - i.e. 0.55 */
+    cfg.smooth_alpha = 0.55F;
     cfg.smooth_delta = 35;
     cfg.persistency_index = 5;
     if( ! temporal_filter_dpp_set_and_readback( opts, id, &cfg, &after ) )
         return 0;  /* helper already printed and freed its own error */
-    printf( "      Set (enabled=1 smooth_alpha=550 smooth_delta=35 persistency_index=5): %s\n",
+    printf( "      Set (enabled=1 smooth_alpha=0.55 smooth_delta=35 persistency_index=5): %s\n",
             ( after.enabled == cfg.enabled && after.smooth_alpha == cfg.smooth_alpha
               && after.smooth_delta == cfg.smooth_delta && after.persistency_index == cfg.persistency_index )
                 ? "matches what was sent" : "differs - FW may quantize/clamp on write" );

@@ -557,7 +557,7 @@ public:
             std::cout << "  persistency_index : [" << range.min.persistency_index << ", " << range.max.persistency_index << "]" << std::endl;
 
             std::cout << "\nWhich field would you like to change?\n" << std::endl;
-            std::cout << "  0 : enabled\n  1 : smooth_alpha (normalized [0,1] scaled into [0,1000])\n"
+            std::cout << "  0 : enabled\n  1 : smooth_alpha (normalized float in [0,1])\n"
                           "  2 : smooth_delta\n  3 : persistency_index" << std::endl;
             uint32_t field_index = get_user_selection("Select a field by index: ");
 
