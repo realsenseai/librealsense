@@ -270,7 +270,7 @@ void post_processing_filters::render_loop()
             {
                 std::map<int, rs2::frame_queue> frames_queue_local;
                 {
-                    std::lock_guard<std::mutex> lock(viewer.streams_mutex);
+                    std::lock_guard<std::mutex> lock(frames_queue_mutex);
                     frames_queue_local = frames_queue;
                 }
                 for (auto&& q : frames_queue_local)

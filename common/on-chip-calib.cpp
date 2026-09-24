@@ -918,11 +918,14 @@ namespace rs2
 
             float step = 50.f / frames_required; // The first stage represents 50% of the calibration process
 
+            auto left_input = _viewer.ppf.get_frame_queue(_uid);
+            auto right_input = _viewer.ppf.get_frame_queue(_uid2);
+
             // Stage 1 : Gather frames from Left/Right IR sensors
             while (counter < frames_required) // TODO timeout
             {
-                auto fl = _viewer.ppf.frames_queue[_uid].wait_for_frame();    // left intensity
-                auto fr = _viewer.ppf.frames_queue[_uid2].wait_for_frame();   // right intensity
+                auto fl = left_input.wait_for_frame();    // left intensity
+                auto fr = right_input.wait_for_frame();   // right intensity
                 if (fl && fr)
                 {
                     left.enqueue(fl);
@@ -970,12 +973,16 @@ namespace rs2
             int counter = 0;
             float step = 50.f / frames_required; // The first stage represents 50% of the calibration process
 
+            auto left_input = _viewer.ppf.get_frame_queue(_uid);
+            auto depth_input = _viewer.ppf.get_frame_queue(_uid2);
+            auto color_input = _viewer.ppf.get_frame_queue(_uid_color);
+
             // Stage 1 : Gather frames from Depth/Left IR and RGB streams
             while (counter < frames_required)
             {
-                auto fl = _viewer.ppf.frames_queue[_uid].wait_for_frame(); // left
-                auto fd = _viewer.ppf.frames_queue[_uid2].wait_for_frame(); // depth
-                auto fc = _viewer.ppf.frames_queue[_uid_color].wait_for_frame(); // rgb
+                auto fl = left_input.wait_for_frame(); // left
+                auto fd = depth_input.wait_for_frame(); // depth
+                auto fc = color_input.wait_for_frame(); // rgb
 
                 if (fl && fd && fc)
                 {
@@ -1024,10 +1031,12 @@ namespace rs2
             rs2::frame_queue queue3(limit * 2, true);
             rs2::frame f;
 
+            auto input_queue = _viewer.ppf.get_frame_queue(_uid);
+
             // Collect sufficient amount of frames (up to 50) to extract target pattern and calculate distance to it
             while ((counter < limit) && (++frm_idx < limit*2))
             {
-                f = _viewer.ppf.frames_queue[_uid].wait_for_frame();
+                f = input_queue.wait_for_frame();
                 if (f)
                 {
                     queue.enqueue(f);

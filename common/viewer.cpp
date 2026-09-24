@@ -1085,11 +1085,11 @@ namespace rs2
                 selected_tex_source_uid = -1;
             }
             streams.erase(i);
-
-            if(ppf.frames_queue.find(i) != ppf.frames_queue.end())
-            {
-                ppf.frames_queue.erase(i);
-            }
+        }
+        {
+            std::lock_guard< std::mutex > lock( ppf.frames_queue_mutex );
+            for( auto i : streams_to_remove )
+                ppf.frames_queue.erase( i );
         }
 
         // The depth source can stop and other streams stream (e.g. color or IR only), in which case its stream model
@@ -4048,7 +4048,10 @@ namespace rs2
             std::lock_guard< std::mutex > lock( streams_mutex );
             auto & active = streams[p.unique_id()];
             active.begin_stream(d, p, *this);
-            ppf.frames_queue.emplace(p.unique_id(), rs2::frame_queue(5));
+            {
+                std::lock_guard< std::mutex > queue_lock( ppf.frames_queue_mutex );
+                ppf.frames_queue.emplace(p.unique_id(), rs2::frame_queue(5));
+            }
 
             if( splits_passive_depth( d, p ) )
             {
