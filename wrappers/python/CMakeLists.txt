@@ -35,6 +35,16 @@ set_target_properties( pyrealsense2
         FOLDER Library/Python
     )
 
+if(APPLE AND BUILD_WITH_DDS)
+    # Build tree: librealsense2 and FastDDS are not co-located with the Python
+    # extension. Install tree: climb from
+    # lib/pythonX.Y/site-packages/pyrealsense2 to the prefix lib directory.
+    set_target_properties(pyrealsense2 PROPERTIES
+        BUILD_RPATH "@loader_path;${CMAKE_BINARY_DIR};${CMAKE_BINARY_DIR}/fastdds/fastdds_install/lib"
+        INSTALL_RPATH "@loader_path;@loader_path/../../.."
+        MACOSX_RPATH ON)
+endif()
+
 set(RAW_RS
     pybackend.cpp
     pybackend_extras.h

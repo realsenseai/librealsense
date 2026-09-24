@@ -72,7 +72,19 @@ function(get_pybind11)
       set( PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/pyrealsense2" CACHE PATH "Installation directory for Python bindings")
     else()
       find_package(Python REQUIRED COMPONENTS Interpreter Development)
-      set( PYTHON_INSTALL_DIR "${Python_SITEARCH}/pyrealsense2" CACHE PATH "Installation directory for Python bindings")
+      # Keep Apple DDS installs prefix-local so the extension and all shared
+      # libraries can be relocated together without DYLD_LIBRARY_PATH.
+      if(APPLE AND BUILD_WITH_DDS)
+        if(NOT DEFINED CMAKE_INSTALL_LIBDIR)
+          include(GNUInstallDirs)
+        endif()
+        set( _pyrealsense2_default_install_dir
+             "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pyrealsense2" )
+      else()
+        set( _pyrealsense2_default_install_dir "${Python_SITEARCH}/pyrealsense2" )
+      endif()
+      set( PYTHON_INSTALL_DIR "${_pyrealsense2_default_install_dir}"
+           CACHE PATH "Installation directory for Python bindings")
     endif()
 
     message( STATUS #CHECK_PASS

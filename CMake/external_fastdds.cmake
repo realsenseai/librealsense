@@ -13,6 +13,20 @@ function(get_fastdds)
     message(CHECK_START  "Fetching fastdds...")
     list(APPEND CMAKE_MESSAGE_INDENT "  ")  # Indent outputs
 
+    if(APPLE)
+        get_filename_component(_FASTDDS_MACOS_REUSEPORT_PATCH
+            "${CMAKE_SOURCE_DIR}/CMake/patches/fastdds-v2.10.4-macos-reuseport.patch"
+            ABSOLUTE)
+        get_filename_component(_FASTDDS_MACOS_PATCH_SCRIPT
+            "${CMAKE_SOURCE_DIR}/CMake/patches/apply-fastdds-macos-patch.cmake"
+            ABSOLUTE)
+        set(_FASTDDS_PATCH_COMMAND
+            PATCH_COMMAND ${CMAKE_COMMAND}
+                -DFASTDDS_SOURCE_DIR=<SOURCE_DIR>
+                -DFASTDDS_PATCH=${_FASTDDS_MACOS_REUSEPORT_PATCH}
+                -P ${_FASTDDS_MACOS_PATCH_SCRIPT})
+    endif()
+
     FetchContent_Declare(
       fastdds
       GIT_REPOSITORY https://github.com/eProsima/Fast-DDS.git
@@ -24,6 +38,7 @@ function(get_fastdds)
       GIT_SUBMODULES ""     # Submodules will be cloned as part of the FastDDS cmake configure stage
       GIT_SHALLOW ON        # No history needed
       SOURCE_DIR ${CMAKE_BINARY_DIR}/third-party/fastdds
+      ${_FASTDDS_PATCH_COMMAND}
     )
 
     # Set FastDDS internal variables
@@ -40,12 +55,19 @@ function(get_fastdds)
     # Enforce NO_TLS to disable SSL: if OpenSSL is found, it will be linked to, and we don't want it!
     set(NO_TLS ON CACHE INTERNAL "" FORCE)
 
-    # Set special values for FastDDS sub directory
-    set(BUILD_SHARED_LIBS OFF)
+    # Set special values for FastDDS sub directory. This function scope keeps
+    # BUILD_SHARED_LIBS from leaking back into librealsense. On Apple, FastDDS
+    # must be shared: linking its static archives into librealsense2.dylib
+    # crashes in DomainParticipantFactory::create_participant at runtime.
+    if(APPLE)
+        set(BUILD_SHARED_LIBS ON)
+        message(STATUS "FastDDS: shared libraries (required for macOS librealsense2.dylib + DDS)")
+    else()
+        set(BUILD_SHARED_LIBS OFF)
+    endif()
     set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/fastdds/fastdds_install)
     set(CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/fastdds/fastdds_install)
 
-    # Get fastdds
     FetchContent_MakeAvailable(fastdds)
 
     # GCC 14 / libstdc++-15 (Ubuntu 26.04 "resolute") removed transitive <cstdint>
@@ -83,11 +105,29 @@ function(get_fastdds)
 
     add_definitions(-DBUILD_WITH_DDS)
 
-    install(TARGETS dds fastrtps eProsima_atomic EXPORT realsense2Targets)
+    if(APPLE)
+        # foonathan_memory remains a static vendor archive in the observed
+        # FastDDS build; only fastrtps and fastcdr need dylib RPATH metadata.
+        foreach(_dds_tgt fastrtps fastcdr)
+            if(TARGET ${_dds_tgt})
+                set_target_properties(${_dds_tgt} PROPERTIES
+                    BUILD_RPATH "@loader_path"
+                    INSTALL_RPATH "@loader_path"
+                    MACOSX_RPATH ON
+                    INSTALL_NAME_DIR "@rpath")
+            endif()
+        endforeach()
+    endif()
+
+    install(TARGETS dds fastrtps eProsima_atomic EXPORT realsense2Targets
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
     
     # fastcdr is installed separately because it cannot be exported to realsense2Targets - it is already exported in fastdds
-    # install in order to set ARCHIVE DESTINATION - to put libfastcdr.a into the x86_64 folder
-    install(TARGETS fastcdr 
+    install(TARGETS fastcdr
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
     message(CHECK_PASS "Done")
 endfunction()
