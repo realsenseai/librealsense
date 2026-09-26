@@ -1883,9 +1883,9 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "open"
-version = "3.2.0"
+version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2078c0039e6a54a0c42c28faa984e115fb4c2d5bf2208f77d1961002df8576f8"
+checksum = "5a6f4e0e2c8e8e8e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e"
 dependencies = [
  "pathdiff",
  "windows-sys 0.42.0",
@@ -2253,9 +2253,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.38.4"
+version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
+checksum = "6f1f8d0c9e0aef6e8e8e8e0e0f0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e"
 dependencies = [
  "memchr",
 ]
@@ -4546,9 +4546,9 @@ dependencies = [
 
 [[package]]
 name = "zerovec"
-version = "0.11.5"
+version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c28719294829477f525be0186d13efa9a3c602f7ec202ca9e353d310fb9a002"
+checksum = "35ceac3b3f96c49a2f5c7973da57ffc11186ffa570f0a2aad0e84fca9581e6e0"
 dependencies = [
  "yoke",
  "zerofrom",
@@ -4557,9 +4557,9 @@ dependencies = [
 
 [[package]]
 name = "zerovec-derive"
-version = "0.11.2"
+version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eadce39539ca5cb3985590102671f2567e659fca9666581ad3411d59207951f3"
+checksum = "4e6b6b2c8a5d2c4eb7c7e8c2d8c6f4a8e5f5c5a5b5a5a5a5a5a5a5a5a5a5a5a"
 dependencies = [
  "proc-macro2",
  "quote",
