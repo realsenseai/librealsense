@@ -20,6 +20,7 @@ struct uvc_device_info
     uint16_t mi = 0;
     std::string unique_id;
     std::string device_path;
+    std::string subdev_name; // subdev node for MIPI/GMSL on IPU6/IPU7 upstream
     std::string dfu_device_path; // for mipi multiple cameras
     std::string serial;
     usb_spec usb_conn_spec = usb_undefined;
