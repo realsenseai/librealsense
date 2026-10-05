@@ -2,11 +2,12 @@
 // Copyright(c) 2015-2024 RealSense, Inc. All Rights Reserved.
 
 #include "backend-v4l2.h"
-#include "v4l-mipi-mux.h"
+
 #include "backend-hid.h"
 #include "v4l-enumerator.h"        // foreach_uvc_device()
 #include "v4l-enumerator-mipi.h"   // foreach_mipi_device()
 #include "v4l-mipi-device.h"
+#include "v4l-mipi-mux.h"
 #include "v4l-uvc-device.h"
 #include "v4l-uvc-meta-device.h"
 #if defined(USING_UDEV)

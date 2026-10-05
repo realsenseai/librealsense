@@ -619,13 +619,7 @@ namespace librealsense
                 && _fw_version >= firmware_version( "7.58.40897.13078" ) )
             {
                 depth_sensor.register_option( RS2_OPTION_SENSORS_CONFIG_MODE,
-                    std::make_shared< uvc_xu_option< uint8_t > >(
-                        raw_depth_sensor,
-                        depth_xu,
-                        d500_xu_id::DUAL_RGB_MODE,
-                        "Dedicated color sensor (0) vs dual RGB (1). Requires a hardware reset to take effect.",
-                        std::map< float, std::string >{ { 0.f, "Dedicated Color Sensor" }, { 1.f, "Dual RGB" } },
-                        false /* not settable while streaming */ ) );
+                                              std::make_shared< sensors_config_mode_option >( raw_depth_sensor ) );
             }
 
             auto error_control = std::make_shared< uvc_xu_option< uint8_t > >( raw_depth_sensor,

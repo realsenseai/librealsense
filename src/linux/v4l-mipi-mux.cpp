@@ -196,10 +196,16 @@ namespace librealsense
                         {
                             clear_stale_requests();
                             set_enable( m, true );
+                            // The camera starts the capture here, and refuses it unless the streams' inputs are running
+                            try
                             {
-                                // The driver sends CAPTURE_START here, over the HWMC mailbox the depth node lock guards
-                                std::lock_guard< uvc_device > hwmc( *_control );
                                 _carrier->stream_on( error_handler );
+                            }
+                            catch( const std::exception & e )
+                            {
+                                throw backend_exception( rsutils::string::from()
+                                                         << "The camera refused to start Perception streams; Depth and Color must "
+                                                            "already be streaming at a supported resolution (" << e.what() << ")" );
                             }
                             _streaming = true;
                         }
@@ -242,7 +248,6 @@ namespace librealsense
                             // Stop the capture before the last stream, so the camera never outputs with none enabled
                             _streaming = false;
                             _carrier->stop_callbacks();
-                            std::lock_guard< uvc_device > hwmc( *_control );  // STREAMOFF sends CAPTURE_STOP
                             _carrier->close( _carrier_profile );
                         }
                         if( _slots[m].enabled )

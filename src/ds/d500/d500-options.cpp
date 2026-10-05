@@ -5,6 +5,9 @@
 #include "d500-options.h"
 #include "d500-private.h"
 
+#include <chrono>
+#include <thread>
+
 namespace librealsense
 {
     d500_mipi_gyro_sensitivity_option::d500_mipi_gyro_sensitivity_option(
@@ -313,6 +316,37 @@ namespace librealsense
     bool colored_ir_ae_policy_option::is_read_only() const
     {
         return sensor_is_streaming( _ep );
+    }
+
+    sensors_config_mode_option::sensors_config_mode_option( const std::weak_ptr< uvc_sensor > & raw_ep )
+        : uvc_xu_option< uint8_t >( raw_ep,
+                                    ds::depth_xu,
+                                    ds::d500_xu_id::DUAL_RGB_MODE,
+                                    "Dedicated color sensor (0) vs dual RGB (1). Requires a hardware reset to take effect.",
+                                    std::map< float, std::string >{ { 0.f, "Dedicated Color Sensor" }, { 1.f, "Dual RGB" } },
+                                    false ) // Not settable while streaming
+    {
+    }
+
+    void sensors_config_mode_option::set( float value )
+    {
+        uvc_xu_option< uint8_t >::set( value );
+
+        // Reads fail while the camera is still busy with the write; it answers within ~0.1 s
+        auto const deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 250 );
+        while( std::chrono::steady_clock::now() < deadline )
+        {
+            try
+            {
+                if( query() == value )
+                    return;
+            }
+            catch( const std::exception & )
+            {
+            }
+            std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
+        }
+        LOG_WARNING( "Sensors config mode " << value << " did not read back within 250 ms" );
     }
 
     passive_depth_mode_option::passive_depth_mode_option( const std::weak_ptr< uvc_sensor > & raw_ep,
