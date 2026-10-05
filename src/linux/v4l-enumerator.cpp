@@ -8,6 +8,7 @@
 
 #include "v4l-ioctl.h"
 #include "v4l-mipi-logic.h"
+#include "v4l-mipi-mux.h"
 #include "v4l-usb-logic.h"
 #include "types.h"
 #include <src/librealsense-exception.h>
@@ -321,6 +322,8 @@ namespace librealsense
             std::vector<node_info> uvc_devices = match_video_with_metadata_nodes(uvc_nodes);
 
             sort_nodes_by_streaming_interface(uvc_devices);
+
+            v4l_mipi_mux::add_mux_devices(uvc_devices);
 
             try
             {

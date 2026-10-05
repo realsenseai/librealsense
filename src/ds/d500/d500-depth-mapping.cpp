@@ -67,12 +67,12 @@ namespace librealsense
     {
         using namespace ds;
 
-        // Depth mapping is currently only supported over USB; skip on MIPI/GMSL transport
-        // rather than failing device creation for units that don't expose it (yet).
-        if( _is_mipi_device )
+        const auto pid = dev_info->get_group().uvc_devices.front().pid;
+
+        // Over GMSL only 3C devices produce occupancy
+        if( _is_mipi_device && ( pid == D535_2C_PID || pid == D585_2C_PID || pid == D585_2C_PROTO_PID ) )
             return;
 
-        const auto pid = dev_info->get_group().uvc_devices.front().pid;
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
 
         const uint32_t mapping_stream_mi = _is_safety_layout ? 13 : 11;

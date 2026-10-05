@@ -63,6 +63,7 @@ namespace librealsense
             static constexpr uint32_t RS_CAMERA_CID_DEVICE_MODE             = ( RS_CAMERA_CID_BASE + 0x24 ); // Dual RGB (2C) vs dedicated color sensor (3C)
             static constexpr uint32_t RS_CAMERA_CID_2C_AE_POLICY            = ( RS_CAMERA_CID_BASE + 0x25 );
             static constexpr uint32_t RS_CAMERA_CID_GYRO_SENSITIVITY        = ( RS_CAMERA_CID_BASE + 0x26 );
+            static constexpr uint32_t RS_CAMERA_CID_OD_DISTANCE             = ( RS_CAMERA_CID_BASE + 0x27 );
             // D500 DPP composite XU CIDs, matching the MIPI driver's D500_CAMERA_CID_*
             // allocations (see realsense_mipi_platform_driver#658). The payload translation
             // for these lives in composite_mipi_xu_option, not this file.
@@ -100,6 +101,10 @@ namespace librealsense
             static constexpr uint8_t RS_DUAL_RGB_MODE         = 0x12; // vs RS_EXTERNAL_SYNC
             static constexpr uint8_t RS_TEMPORAL_FILTER_DPP   = 0x13; // vs RS_READOUT_SHAPING
             static constexpr uint8_t RS_HDRD_CONTROL          = 0x14; // D500 only, no D400 counterpart
+
+            // D500 inference XU, on subdevice 0 like the depth XU but with its own unit and selectors.
+            static constexpr uint8_t RS_INFERENCE_XU_UNIT     = 0x10;
+            static constexpr uint8_t RS_DETECTION_DISTANCE    = 0x01;
 
             bool is_auto_exposure_control( uint8_t control )
             {
@@ -327,6 +332,13 @@ namespace librealsense
                 {
                     if( is_d5xx )
                     {
+                        if( xu.unit == RS_INFERENCE_XU_UNIT )
+                        {
+                            if( control == RS_DETECTION_DISTANCE )
+                                return RS_CAMERA_CID_OD_DISTANCE;
+                            throw linux_backend_exception( rsutils::string::from() << "no v4l2 mipi cid for D500 inference XU control " << std::dec << int( control ) );
+                        }
+
                         switch( control )
                         {
                         case RS_DUAL_RGB_MODE: return RS_CAMERA_CID_DEVICE_MODE;

@@ -184,6 +184,11 @@ namespace librealsense
             _thread->join();
             _thread.reset();
 
+            // Consume the stop signal, or a capture restarted without a power cycle would see it at once
+            char buff[1];
+            if (read(_stop_pipe_fd[0], buff, 1) < 0)
+                LOG_WARNING("Could not consume the video capture stop signal");
+
             // Notify kernel
             streamoff();
         }

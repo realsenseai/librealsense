@@ -22,6 +22,7 @@ set(LRS_V4L2_SOURCES
     "${CMAKE_CURRENT_LIST_DIR}/v4l-named-mutex.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/camera-identifier-v4l.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/v4l-mipi-logic.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/v4l-mipi-mux.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/v4l-usb-logic.cpp"
 )
 set(LRS_V4L2_HEADERS
@@ -42,6 +43,7 @@ set(LRS_V4L2_HEADERS
     "${CMAKE_CURRENT_LIST_DIR}/v4l-named-mutex.h"
     "${CMAKE_CURRENT_LIST_DIR}/camera-identifier-v4l.h"
     "${CMAKE_CURRENT_LIST_DIR}/v4l-mipi-logic.h"
+    "${CMAKE_CURRENT_LIST_DIR}/v4l-mipi-mux.h"
     "${CMAKE_CURRENT_LIST_DIR}/v4l-usb-logic.h"
 )
 set(LRS_V4L2_LINK_LIBS usb)

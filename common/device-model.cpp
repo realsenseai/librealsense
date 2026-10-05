@@ -28,6 +28,7 @@
 #include "d500-on-chip-calib.h"
 #include "subdevice-model.h"
 #include "device-model.h"
+#include "fw-update-common.h"
 
 using namespace rs400;
 using rsutils::json;
@@ -375,32 +376,29 @@ namespace rs2
         }
     }
 
-    bool device_model::subdevice_has_perception_stream_enabled( const subdevice_model & sub ) const
+    bool device_model::subdevice_has_stream_enabled( const subdevice_model & sub, rs2_stream type ) const
     {
         for( auto const & kv : sub.stream_enabled )
         {
             if( ! kv.second ) continue;
             for( auto const & p : sub.profiles )
-                if( p.unique_id() == kv.first && p.stream_type() == RS2_STREAM_OBJECT_DETECTION )
+                if( p.unique_id() == kv.first && p.stream_type() == type )
                     return true;
         }
         return false;
     }
 
+    bool device_model::is_stream_active( rs2_stream type ) const
+    {
+        for( auto const & sub : subdevices )
+            if( sub->streaming && subdevice_has_stream_enabled( *sub, type ) )
+                return true;
+        return false;
+    }
+
     bool device_model::are_color_and_depth_streaming() const
     {
-        bool has_color = false, has_depth = false;
-        for( auto const & sub : subdevices )
-        {
-            if( ! sub->streaming ) continue;
-            for( auto const & p : sub->profiles )
-            {
-                if( p.stream_type() == RS2_STREAM_COLOR ) has_color = true;
-                if( p.stream_type() == RS2_STREAM_DEPTH ) has_depth = true;
-            }
-            if( has_color && has_depth ) return true;
-        }
-        return false;
+        return is_stream_active( RS2_STREAM_COLOR ) && is_stream_active( RS2_STREAM_DEPTH );
     }
 
     void device_model::stop_perception_if_video_stopped( viewer_model & viewer )
@@ -410,17 +408,14 @@ namespace rs2
             return;
         for( auto & sub : subdevices )
         {
-            if( sub->streaming && subdevice_has_perception_stream_enabled( *sub ) )
+            if( sub->streaming && subdevice_has_stream_enabled( *sub, RS2_STREAM_OBJECT_DETECTION ) )
                 sub->stop( viewer.not_model );
         }
     }
 
     bool device_model::is_perception_streaming() const
     {
-        for( auto const & sub : subdevices )
-            if( sub->streaming && subdevice_has_perception_stream_enabled( *sub ) )
-                return true;
-        return false;
+        return is_stream_active( RS2_STREAM_OBJECT_DETECTION );
     }
 
     bool device_model::is_perception_blocking_filter_enabled() const
@@ -2682,9 +2677,13 @@ namespace rs2
                         {
                             // Disable the start button for perception streams unless color and depth are already
                             // streaming, and while a decimation/temporal embedded filter is enabled (mutually exclusive).
-                            bool sub_has_perception = subdevice_has_perception_stream_enabled( *sub );
+                            // Over GMSL perception and infrared share the IR channel, so they exclude each other too.
+                            bool sub_has_perception = subdevice_has_stream_enabled( *sub, RS2_STREAM_OBJECT_DETECTION );
                             bool blocking_filter_enabled = sub_has_perception && is_perception_blocking_filter_enabled();
-                            bool disable_perception = ( sub_has_perception && ! are_color_and_depth_streaming() ) || blocking_filter_enabled;
+                            bool blocking_ir_active = sub_has_perception && fw_update::is_mipi_device( dev )
+                                                   && is_stream_active( RS2_STREAM_INFRARED );
+                            bool disable_perception = ( sub_has_perception && ! are_color_and_depth_streaming() )
+                                                   || blocking_filter_enabled || blocking_ir_active;
                             if( disable_perception )
                                 ImGui::BeginDisabled();
 
@@ -2727,6 +2726,8 @@ namespace rs2
                                 if( ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
                                     RsImGui::CustomTooltip( blocking_filter_enabled
                                         ? "Disable the decimation/temporal embedded filter before starting perception (cannot run together)"
+                                        : blocking_ir_active
+                                        ? "Stop the Infrared streams before starting perception (they share the GMSL IR channel)"
                                         : "Color and Depth streams must be streaming before starting perception" );
                             }
                             else if (ImGui::IsItemHovered())
