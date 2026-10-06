@@ -135,6 +135,8 @@ namespace librealsense
                         for( auto const & dev : strong->query_devices( RS2_PRODUCT_LINE_ANY ) )
                             if( dev->get_address() == devs.front()->get_address() )
                                 added = { dev };
+                        if( added == devs )
+                            LOG_WARNING( "Device " << devs.front()->get_address() << " not found after reset; reconnecting its old identity" );
                         strong->invoke_devices_changed_callbacks( {}, added );
                     }
                     else

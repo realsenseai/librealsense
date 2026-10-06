@@ -338,7 +338,9 @@ namespace librealsense
                                 && state.requested )
                             {
                                 LOG_INFO( "Clearing a stale request of Perception stream " << MUX_MEMBERS[i].stream_id );
-                                command( MUX_SET_ENABLE, MUX_MEMBERS[i].stream_id, 0, state, error );
+                                if( ! command( MUX_SET_ENABLE, MUX_MEMBERS[i].stream_id, 0, state, error ) )
+                                    LOG_WARNING( "Perception stream " << MUX_MEMBERS[i].stream_id
+                                                 << " stale request not cleared, error " << error << "; its frames are dropped" );
                             }
                         }
                     }
@@ -407,6 +409,7 @@ namespace librealsense
                     // Capture thread
                     void dispatch( frame_object f, std::function< void() > release )
                     {
+                        // Valid for the callback only, which copies the metadata into the frame before returning
                         std::array< uint8_t, 255 > md;
                         int m = demux( f, md );
                         std::lock_guard< std::recursive_mutex > route( _route_mtx );

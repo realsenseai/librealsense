@@ -334,6 +334,7 @@ namespace librealsense
 
         // Reads fail while the camera is still busy with the write; it answers within ~0.1 s
         auto const deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 250 );
+        std::string last_error;
         while( std::chrono::steady_clock::now() < deadline )
         {
             try
@@ -341,12 +342,14 @@ namespace librealsense
                 if( query() == value )
                     return;
             }
-            catch( const std::exception & )
+            catch( const std::exception & e )
             {
+                last_error = e.what();
             }
             std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
         }
-        LOG_WARNING( "Sensors config mode " << value << " did not read back within 250 ms" );
+        LOG_WARNING( "Sensors config mode " << value << " did not read back within 250 ms"
+                     << ( last_error.empty() ? "" : ": " + last_error ) );
     }
 
     passive_depth_mode_option::passive_depth_mode_option( const std::weak_ptr< uvc_sensor > & raw_ep,
