@@ -370,9 +370,14 @@ try
     {
         ~release_devices()
         {
-            std::lock_guard< std::mutex > lk( mutex );
-            new_device = rs2::device();
-            new_fw_update_device = rs2::update_device();
+            // Destroy outside the lock: the last release joins the watcher thread, which may be waiting on it
+            rs2::device dev;
+            rs2::update_device fwu_dev;
+            {
+                std::lock_guard< std::mutex > lk( mutex );
+                std::swap( dev, new_device );
+                std::swap( fwu_dev, new_fw_update_device );
+            }
         }
     } release_on_exit;
 
