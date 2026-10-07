@@ -70,7 +70,7 @@ namespace librealsense
         const auto pid = dev_info->get_group().uvc_devices.front().pid;
 
         // Over GMSL only 3C devices produce occupancy
-        if( _is_mipi_device && ( pid == D535_2C_PID || pid == D585_2C_PID || pid == D585_2C_PROTO_PID ) )
+        if( _is_mipi_device && is_dual_rgb_pid( pid ) )
             return;
 
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );

@@ -44,7 +44,7 @@ namespace librealsense
         // Skip if the device does not expose the stream; the rest of the device enumerates normally.
         if( od_devs_info.empty() )
         {
-            LOG_DEBUG( "Object detection interface not present - sensor not created" );
+            LOG_WARNING( "Object detection interface not present - sensor not created" );
             return;
         }
         if( od_devs_info.size() != 1 )

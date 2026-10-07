@@ -493,6 +493,9 @@ namespace librealsense
 
         try
         {
+            if( ds::is_dual_rgb_pid( pid ) )
+                return std::make_shared< rs5x5_device >( dev_info );
+
             switch( pid )
             {
             case ds::D555_PID:
@@ -501,10 +504,6 @@ namespace librealsense
                 return std::make_shared< rs585_legacy_device >( dev_info );
             case ds::D585S_PID:
                 return std::make_shared< rs585s_device >( dev_info );
-            case ds::D535_2C_PID:
-            case ds::D585_2C_PID:
-            case ds::D585_2C_PROTO_PID:
-                return std::make_shared< rs5x5_device >( dev_info );
             case ds::D535_3C_PID:
             case ds::D535F_PID:
             case ds::D585_3C_PID:

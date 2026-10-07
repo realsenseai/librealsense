@@ -132,9 +132,16 @@ namespace librealsense
                     {
                         // The reset can change what the device enumerates as (e.g. its PID after a mode switch)
                         auto added = devs;
-                        for( auto const & dev : strong->query_devices( RS2_PRODUCT_LINE_ANY ) )
-                            if( dev->get_address() == devs.front()->get_address() )
-                                added = { dev };
+                        try
+                        {
+                            for( auto const & dev : strong->query_devices( RS2_PRODUCT_LINE_ANY ) )
+                                if( dev->get_address() == devs.front()->get_address() )
+                                    added = { dev };
+                        }
+                        catch( const std::exception & e )
+                        {
+                            LOG_WARNING( "Re-enumeration after reset failed: " << e.what() );
+                        }
                         if( added == devs )
                             LOG_WARNING( "Device " << devs.front()->get_address() << " not found after reset; reconnecting its old identity" );
                         strong->invoke_devices_changed_callbacks( {}, added );

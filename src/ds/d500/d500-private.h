@@ -100,6 +100,12 @@ namespace librealsense
             return d5x5_family_pids.count( pid ) || pid == D585S_PID;
         }
 
+        // Dual RGB (2C) variants of the D5x5 family: two RGB streams on the depth sensor, no dedicated color sensor
+        inline bool is_dual_rgb_pid( uint16_t pid )
+        {
+            return pid == D535_2C_PID || pid == D585_2C_PID || pid == D585_2C_PROTO_PID;
+        }
+
         static const std::map< std::uint16_t, std::string > rs500_sku_names = {
             { D555_PID,               "RealSense D555" },
             { D555_RECOVERY_PID,      "RealSense D555 Recovery" },

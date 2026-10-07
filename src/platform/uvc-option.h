@@ -269,19 +269,27 @@ public:
     {
         uvc_xu_option< T >::set( value );
 
-        // Check that set operation succeeded
+        // Check that set operation succeeded; reads may fail while the camera is still busy with the write
+        std::string last_error;
         _timer.start();
         do
         {
             std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 
-            float current_value = uvc_xu_option< T >::query();
-            if( current_value == value )
-                return;
+            try
+            {
+                if( uvc_xu_option< T >::query() == value )
+                    return;
+            }
+            catch( const std::exception & e )
+            {
+                last_error = e.what();
+            }
         }
         while( ! _timer.has_expired() );
 
-        throw std::runtime_error( rsutils::string::from() << "Failed to set the option to value " << value );
+        throw std::runtime_error( rsutils::string::from() << "Failed to set the option to value " << value
+                                                          << ( last_error.empty() ? "" : ": " + last_error ) );
     }
 
 protected:

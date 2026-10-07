@@ -618,8 +618,16 @@ namespace librealsense
             if( d5x5_family_pids.count( _pid )
                 && _fw_version >= firmware_version( "7.58.40897.13078" ) )
             {
+                // The camera rejects a reset sent right after the write, so wait for the new mode to read back
                 depth_sensor.register_option( RS2_OPTION_SENSORS_CONFIG_MODE,
-                                              std::make_shared< sensors_config_mode_option >( raw_depth_sensor ) );
+                    std::make_shared< ensure_set_xu_option< uint8_t > >(
+                        raw_depth_sensor,
+                        depth_xu,
+                        d500_xu_id::DUAL_RGB_MODE,
+                        "Dedicated color sensor (0) vs dual RGB (1). Requires a hardware reset to take effect.",
+                        std::map< float, std::string >{ { 0.f, "Dedicated Color Sensor" }, { 1.f, "Dual RGB" } },
+                        std::chrono::milliseconds( 250 ),
+                        false /* not settable while streaming */ ) );
             }
 
             auto error_control = std::make_shared< uvc_xu_option< uint8_t > >( raw_depth_sensor,

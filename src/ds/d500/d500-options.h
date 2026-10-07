@@ -248,16 +248,6 @@ namespace librealsense
         std::weak_ptr< passive_depth_mode_option > _passive_depth_mode;
     };
 
-    // Dual RGB (2C) vs dedicated color sensor (3C), applied by the hardware reset that follows. The camera rejects
-    // a reset sent right after the write, so set() returns only once the new mode reads back.
-    class sensors_config_mode_option : public uvc_xu_option< uint8_t >
-    {
-    public:
-        explicit sensors_config_mode_option( const std::weak_ptr< uvc_sensor > & raw_ep );
-
-        void set( float value ) override;
-    };
-
     class power_line_freq_option : public uvc_pu_option
     {
     public:

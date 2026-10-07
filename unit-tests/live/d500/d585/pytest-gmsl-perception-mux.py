@@ -30,9 +30,11 @@ MUX_CONTROL, MUX_SET_ENABLE, MUX_GET_STATE = 0xC0, 1, 2
 @pytest.fixture
 def device(test_device):
     dev, _ = test_device
+    if sensor( dev, 'Perception' ) is None:
+        pytest.skip( "No Perception sensor: driver/FW without the RSVL MUX" )
     yield dev
-    for sensor in dev.query_sensors():   # never hand the next test an open sensor
-        for close in ( sensor.stop, sensor.close ):
+    for s in dev.query_sensors():        # never hand the next test an open sensor
+        for close in ( s.stop, s.close ):
             try:
                 close()
             except RuntimeError:
@@ -260,10 +262,7 @@ def test_ir_and_perception_exclude_each_other(device):
     """IR and Perception share the GMSL IR channel."""
     stereo = device.first_depth_sensor()
     ir = profile( stereo, rs.stream.infrared, rs.format.y8, index=1 )   # same resolution as depth
-    try:
-        inputs = start_inputs( device, [ir] )
-    except RuntimeError as e:
-        pytest.skip( f"IR does not start on this device now: {e}" )
+    inputs = start_inputs( device, [ir] )
     with pytest.raises( RuntimeError, match="IR channel" ):
         sensor( device, 'Perception' ).open( pd_profile( device ) )
     assert mux_state( device, PD_ID ) == ( 0, 0, 0 )
