@@ -364,6 +364,18 @@ int update_signed_fw(rs2::device& d, const std::vector<uint8_t>& fw_image)
 int main(int argc, char** argv)
 try
 {
+    // The global devices keep the context and its device-watcher thread alive; release them before static
+    // destruction tears down the logger that thread still uses.
+    struct release_devices
+    {
+        ~release_devices()
+        {
+            std::lock_guard< std::mutex > lk( mutex );
+            new_device = rs2::device();
+            new_fw_update_device = rs2::update_device();
+        }
+    } release_on_exit;
+
     using rs2::cli;
     cli cmd("librealsense rs-fw-update tool");
 
