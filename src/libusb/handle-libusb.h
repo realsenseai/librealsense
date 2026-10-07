@@ -7,6 +7,9 @@
 #include "context-libusb.h"
 
 #include <chrono>
+#include <thread>
+
+#include <unistd.h>
 
 #include "libusb.h"
 
@@ -45,7 +48,14 @@ namespace librealsense
                     _first_interface(interface), _context(context), _handle(nullptr),
                     _event_handler_started(false)
             {
-                auto sts = libusb_open(device, &_handle);
+                auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds( 5 );
+                int sts;
+                // /run/udev/queue exists while udev still has events pending, so a just-enumerated device whose
+                // permissions udev has not applied yet is not really ours to give up on.
+                while( ( sts = libusb_open( device, &_handle ) ) == LIBUSB_ERROR_ACCESS
+                       &&  ! access( "/run/udev/queue", F_OK )
+                       &&  std::chrono::steady_clock::now() < deadline )
+                    std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
                 if(sts != LIBUSB_SUCCESS)
                 {
                     auto rs_sts =  libusb_status_to_rs(sts);

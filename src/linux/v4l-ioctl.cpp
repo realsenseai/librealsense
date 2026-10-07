@@ -50,7 +50,7 @@ namespace librealsense
         {
             // RAII to handle exceptions
             std::unique_ptr<int, std::function<void(int*)> > fd(
-                        new int (open(dev_name.c_str(), O_RDWR | O_NONBLOCK, 0)),
+                        new int (open_v4l_node(dev_name)),
                         [](int* d){ if (d && (*d)) {::close(*d); } delete d; });
 
             if(*fd < 0)
