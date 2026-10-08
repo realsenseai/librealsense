@@ -207,6 +207,17 @@ namespace librealsense
             buf_mgr.set_md_attributes(bytesused, md_start);
         }
 
+        void v4l_mipi_device::streamoff() const
+        {
+            if (is_platform_jetson())
+                return v4l_uvc_meta_device::streamoff();
+
+            // IPU6: stop metadata first, then video
+            if (_md_fd != -1)
+                stream_off(_md_fd, _md_type);
+            v4l_uvc_device::streamoff();
+        }
+
         bool v4l_mipi_device::is_platform_jetson() const
         {
             v4l2_capability cap = get_dev_capabilities(_name);
