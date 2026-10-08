@@ -403,9 +403,10 @@ namespace rs2
 
     bool device_model::subdevice_needs_color_and_depth( const subdevice_model & sub ) const
     {
-        // Over GMSL the camera also builds occupancy from the running color and depth streams
-        return subdevice_has_stream_enabled( sub, RS2_STREAM_OBJECT_DETECTION )
-            || ( fw_update::is_mipi_device( dev ) && subdevice_has_stream_enabled( sub, RS2_STREAM_OCCUPANCY ) );
+        // GMSL PD can build cache-only inputs; preserve the existing USB viewer policy.
+        return fw_update::is_mipi_device( dev )
+            ? subdevice_has_stream_enabled( sub, RS2_STREAM_OCCUPANCY )
+            : subdevice_has_stream_enabled( sub, RS2_STREAM_OBJECT_DETECTION );
     }
 
     bool device_model::is_depth_resolution_valid_for_occupancy() const
@@ -2694,16 +2695,16 @@ namespace rs2
                         }
                         if (can_stream)
                         {
-                            // Disable the start button for perception streams unless color and depth are already
-                            // streaming, and while a decimation/temporal embedded filter is enabled (mutually exclusive).
-                            // Over GMSL perception and infrared share the IR channel, so they exclude each other too.
-                            bool sub_has_perception = subdevice_needs_color_and_depth( *sub );
+                            // Input dependencies and shared IR-channel ownership are separate checks.
+                            bool needs_inputs = subdevice_needs_color_and_depth( *sub );
+                            bool sub_has_perception = subdevice_has_stream_enabled( *sub, RS2_STREAM_OBJECT_DETECTION )
+                                                   || subdevice_has_stream_enabled( *sub, RS2_STREAM_OCCUPANCY );
                             bool blocking_filter_enabled = subdevice_has_stream_enabled( *sub, RS2_STREAM_OBJECT_DETECTION )
                                                         && is_perception_blocking_filter_enabled();
                             bool blocking_ir_active = sub_has_perception && fw_update::is_mipi_device( dev )
                                                    && is_stream_active( RS2_STREAM_INFRARED );
-                            bool missing_color_or_depth = sub_has_perception && ! are_color_and_depth_streaming();
-                            bool invalid_depth_resolution = ! missing_color_or_depth && sub_has_perception
+                            bool missing_color_or_depth = needs_inputs && ! are_color_and_depth_streaming();
+                            bool invalid_depth_resolution = ! missing_color_or_depth && needs_inputs
                                                          && subdevice_has_stream_enabled( *sub, RS2_STREAM_OCCUPANCY )
                                                          && ! is_depth_resolution_valid_for_occupancy();
                             bool disable_perception = missing_color_or_depth || invalid_depth_resolution

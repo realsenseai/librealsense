@@ -3,7 +3,7 @@
 
 # GMSL Perception MUX: Object Detection (PD) and Occupancy (OCC) time-share the GMSL IR channel and are told apart
 # by their metadata. Each stream is still its own sensor and opens and closes independently; the camera starts the
-# shared capture with the first and stops it with the last, and needs Depth and Color streaming as their inputs.
+# shared capture with the first and stops it with the last. PD can run alone; OCC needs running Depth and Color inputs.
 #
 # Tests follow the camera's current mode: Occupancy exists on 3C only, so its tests skip on 2C.
 
@@ -120,6 +120,14 @@ class Collector:
         self.frames.setdefault( f.get_profile().stream_type(), [] ).append( info )
     def count(self, stream_type, since=0.):
         return sum( 1 for i in self.frames.get( stream_type, [] ) if i['time'] >= since )
+    def check_active(self, stream_type, since, end, minimum):
+        got = [i for i in self.frames.get( stream_type, [] ) if since <= i['time'] <= end]
+        assert len( got ) >= minimum, f"Too few {stream_type} frames: {len(got)}"
+        assert got[0]['time'] - since < 1, f"{stream_type} did not start promptly"
+        assert end - got[-1]['time'] < 1, f"{stream_type} stopped delivering before the step ended"
+        assert all( b['time'] - a['time'] < 1 for a, b in zip( got, got[1:] ) ), f"{stream_type} stalled"
+        log.info( "%s: %d frames, first wait %.3fs, tail silence %.3fs", stream_type, len( got ),
+                  got[0]['time'] - since, end - got[-1]['time'] )
 
 
 def test_perception_sensors_enumerate(device):
@@ -198,9 +206,16 @@ def test_pd_and_occ_independent(device):
         action()
         since = time.monotonic() + 0.6   # frames already in flight around a switch
         time.sleep( DURATION_S )
-        assert ( frames.count( rs.stream.object_detection, since ) >= MIN_PD_FRAMES ) == pd_on
-        assert ( frames.count( rs.stream.occupancy, since ) >= MIN_OCC_FRAMES ) == occ_on
-        assert mux_state( device, PD_ID )[0] == pd_on and mux_state( device, OCC_ID )[0] == occ_on
+        end = time.monotonic()
+        for stream_type, enabled, minimum in ( ( rs.stream.object_detection, pd_on, MIN_PD_FRAMES ),
+                                               ( rs.stream.occupancy, occ_on, MIN_OCC_FRAMES ) ):
+            if enabled:
+                frames.check_active( stream_type, since, end, minimum )
+            else:
+                assert frames.count( stream_type, since ) == 0, f"Disabled {stream_type} still delivers frames"
+        active = int( pd_on or occ_on )
+        assert mux_state( device, PD_ID ) == ( int(pd_on), int(pd_on), active )
+        assert mux_state( device, OCC_ID ) == ( int(occ_on), int(occ_on), active )
 
     def start(s, p):
         s.open( p )
@@ -234,10 +249,11 @@ def test_occ_start_order(device):
     pd.start( frames )
     since = time.monotonic()
     time.sleep( DURATION_S )
+    end = time.monotonic()
     stop( [pd, mapping] )
     stop( inputs )
-    assert frames.count( rs.stream.object_detection, since ) >= MIN_PD_FRAMES
-    assert frames.count( rs.stream.occupancy, since ) >= MIN_OCC_FRAMES
+    frames.check_active( rs.stream.object_detection, since, end, MIN_PD_FRAMES )
+    frames.check_active( rs.stream.occupancy, since, end, MIN_OCC_FRAMES )
 
 
 def test_stale_request_cleared(device):
@@ -279,20 +295,23 @@ def test_ir_and_perception_exclude_each_other(device):
     pd.close()
 
 
-def test_refused_start_recovers(device):
-    """Without its inputs the camera refuses Perception; the SDK must report it and leave nothing behind."""
-    if is_3c( device ):
-        pytest.skip( "A refused start can leave 3C streaming broken until a power cycle (FW)" )
+def test_pd_only_without_inputs(device):
+    """PD builds cache-only inputs on either SKU, without opening normal captures."""
     pd = sensor( device, 'Perception' )
-    with pytest.raises( RuntimeError, match="refused" ):
+    for _ in range( 2 ):
+        frames = Collector()
         pd.open( pd_profile( device ) )
-    assert mux_state( device, PD_ID ) == ( 0, 0, 0 )
-    inputs = start_inputs( device )
-    frames = Collector()
-    pd.open( pd_profile( device ) )
-    pd.start( frames )
-    time.sleep( DURATION_S )
-    pd.stop()
-    pd.close()
-    stop( inputs )
-    assert frames.count( rs.stream.object_detection ) >= MIN_PD_FRAMES
+        since = time.monotonic()
+        pd.start( frames )
+        time.sleep( DURATION_S )
+        end = time.monotonic()
+        assert mux_state( device, PD_ID ) == ( 1, 1, 1 )
+        pd.stop()
+        pd.close()
+        got = frames.frames.get( rs.stream.object_detection, [] )
+        assert len( got ) >= MIN_PD_FRAMES
+        assert all( i['size'] == 2347 and i['magic'] == b'ODET' for i in got )
+        assert got[0]['time'] - since < 2, "PD never started promptly"
+        assert end - got[-1]['time'] < 1, "PD stopped delivering before the session ended"
+        assert max( b['time'] - a['time'] for a, b in zip( got, got[1:] ) ) < 1, "PD stalled"
+        assert mux_state( device, PD_ID ) == ( 0, 0, 0 )

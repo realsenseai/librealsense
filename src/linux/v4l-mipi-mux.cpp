@@ -196,7 +196,7 @@ namespace librealsense
                         {
                             clear_stale_requests();
                             set_enable( m, true );
-                            // The camera starts the capture here, and refuses it unless the streams' inputs are running
+                            // PD can build cache-only inputs; OCC needs a compatible running Depth/Color graph.
                             try
                             {
                                 _carrier->stream_on( error_handler );
@@ -204,8 +204,7 @@ namespace librealsense
                             catch( const std::exception & e )
                             {
                                 throw backend_exception( rsutils::string::from()
-                                                         << "The camera refused to start Perception streams; Depth and Color must "
-                                                            "already be streaming at a supported resolution (" << e.what() << ")" );
+                                                         << "The camera refused to start Perception streams (" << e.what() << ")" );
                             }
                             _streaming = true;
                         }
@@ -319,7 +318,9 @@ namespace librealsense
                         if( ! command( MUX_SET_ENABLE, MUX_MEMBERS[m].stream_id, on, state, error ) )
                             throw backend_exception( rsutils::string::from() << "Perception stream " << MUX_MEMBERS[m].stream_id
                                                                              << " enable(" << on << ") rejected, error " << error );
-                        if( state.requested != uint32_t( on ) || ( state.capture_active && state.applied != uint32_t( on ) ) )
+                        // SET_ENABLE acknowledges admission; the camera worker applies the lifecycle asynchronously.
+                        // Before STREAMON, an enabled member is only armed and cannot be applied yet.
+                        if( state.requested != uint32_t( on ) )
                             throw backend_exception( rsutils::string::from()
                                                      << "Perception stream " << MUX_MEMBERS[m].stream_id << " enable(" << on
                                                      << ") returned requested " << state.requested << ", applied " << state.applied );

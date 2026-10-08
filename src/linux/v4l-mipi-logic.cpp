@@ -63,7 +63,7 @@ namespace librealsense
             static constexpr uint32_t RS_CAMERA_CID_DEVICE_MODE             = ( RS_CAMERA_CID_BASE + 0x24 ); // Dual RGB (2C) vs dedicated color sensor (3C)
             static constexpr uint32_t RS_CAMERA_CID_2C_AE_POLICY            = ( RS_CAMERA_CID_BASE + 0x25 );
             static constexpr uint32_t RS_CAMERA_CID_GYRO_SENSITIVITY        = ( RS_CAMERA_CID_BASE + 0x26 );
-            static constexpr uint32_t RS_CAMERA_CID_OD_DISTANCE             = ( RS_CAMERA_CID_BASE + 0x27 );
+            static constexpr uint32_t RS_CAMERA_CID_OD_DISTANCE             = ( RS_CAMERA_CID_BASE + 0x28 );
             // D500 DPP composite XU CIDs, matching the MIPI driver's D500_CAMERA_CID_*
             // allocations (see realsense_mipi_platform_driver#658). The payload translation
             // for these lives in composite_mipi_xu_option, not this file.
