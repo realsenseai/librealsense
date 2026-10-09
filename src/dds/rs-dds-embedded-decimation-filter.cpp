@@ -15,6 +15,11 @@ using rsutils::json;
 
 namespace librealsense {
 
+    // C++14 static constexpr data members are not implicitly inline.
+    constexpr const char * rs_dds_embedded_decimation_filter::TOGGLE_OPTION_NAME;
+    constexpr const char * rs_dds_embedded_decimation_filter::MAGNITUDE_OPTION_NAME;
+    constexpr int32_t rs_dds_embedded_decimation_filter::DECIMATION_MAGNITUDE;
+
     rs_dds_embedded_decimation_filter::rs_dds_embedded_decimation_filter(const std::shared_ptr< realdds::dds_embedded_filter >& dds_embedded_filter,
         set_embedded_filter_callback set_embedded_filter_cb,
         query_embedded_filter_callback query_embedded_filter_cb)

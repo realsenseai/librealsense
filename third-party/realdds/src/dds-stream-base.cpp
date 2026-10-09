@@ -39,7 +39,16 @@ void dds_stream_base::init_profiles( dds_stream_profiles const & profiles, size_
                    "invalid default profile index (" + std::to_string( _default_profile_index ) + " for "
                        + std::to_string( profiles.size() ) + " stream profiles" );
 
-    auto self = weak_from_this();
+    // weak_from_this() requires C++17; preserve its empty-result behavior when
+    // the stream is not yet owned by a shared_ptr.
+    std::weak_ptr< dds_stream_base > self;
+    try
+    {
+        self = shared_from_this();
+    }
+    catch( std::bad_weak_ptr const & )
+    {
+    }
     for( auto const & profile : profiles )
     {
         check_profile( profile );

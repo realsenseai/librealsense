@@ -12,6 +12,12 @@ using rsutils::json;
 
 namespace librealsense {
 
+    // C++14 static constexpr data members are not implicitly inline.
+    constexpr const char * rs_dds_embedded_close_range_filter::ENABLE_OPTION_NAME;
+    constexpr const char * rs_dds_embedded_close_range_filter::DOWNSCALE_RATIO_OPTION_NAME;
+    constexpr const char * rs_dds_embedded_close_range_filter::DISPARITY_SHIFT_OPTION_NAME;
+    constexpr const char * rs_dds_embedded_close_range_filter::THRESHOLD_OPTION_NAME;
+
     rs_dds_embedded_close_range_filter::rs_dds_embedded_close_range_filter(const std::shared_ptr< realdds::dds_embedded_filter >& dds_embedded_filter,
         set_embedded_filter_callback set_embedded_filter_cb,
         query_embedded_filter_callback query_embedded_filter_cb)
