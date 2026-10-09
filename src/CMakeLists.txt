@@ -195,6 +195,8 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/embedded-filter-interface.h"
 )
 
+hide_sources_symbols( ${CMAKE_CURRENT_LIST_DIR}/log.cpp )
+
 if(BUILD_WITH_DDS)
     file( GLOB_RECURSE RS_DDS_SOURCE_FILES
         LIST_DIRECTORIES false

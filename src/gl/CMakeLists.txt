@@ -19,6 +19,7 @@ set(REALSENSE_GL_CPP
     pointcloud-gl.h
     pointcloud-gl.cpp
     rs-gl.cpp
+    log-gl.cpp
     realsense-gl.def
     ../../include/librealsense2-gl/rs_processing_gl.h
     ../../include/librealsense2-gl/rs_processing_gl.hpp
@@ -96,6 +97,9 @@ target_link_libraries( ${PROJECT_NAME}
         ${DEPENDENCIES}
         rs_lz4
     )
+
+# Keep the EasyLogging++ storage private to this library, as done for the core library
+hide_sources_symbols( log-gl.cpp ../../third-party/easyloggingpp/src/easylogging++.cc )
 
 # CMake prior to 3.13 cannot install targets located in sub-directories.
 #https://gitlab.kitware.com/cmake/cmake/merge_requests/2152
