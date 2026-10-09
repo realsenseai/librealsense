@@ -8,6 +8,7 @@ brainstem==2.12.4; platform_machine != "aarch64"
 paramiko==3.5.1; platform_machine != "aarch64"
 
 # Common testing requirements
+pyyaml==6.0.2 # device-map inventory parsing (rspy/device_map.py)
 opencv-python==4.11.0.86
 numpy==2.0.2 # max version currently working on Jetson
 
