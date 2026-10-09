@@ -148,10 +148,6 @@ export function DevicePanel() {
   const [firmwareProgressState, setFirmwareProgressState] = useState<FirmwareState | null>(null)
   const [firmwareFileName, setFirmwareFileName] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchDevices(true)
-  }, [fetchDevices])
-
   // Counter, not just Date.now(): several cameras can raise a firmware proposal in the
   // same tick, and duplicate keys would make React drop all but one toast.
   const toastSeqRef = useRef(0)

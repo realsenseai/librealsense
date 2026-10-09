@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { isDesktopApp } from '../api/backend'
+import { useAppStore } from '../store'
 
 interface BackendStatus {
   is_running: boolean
@@ -8,99 +10,47 @@ interface BackendStatus {
   last_logs: string[]
 }
 
-// Detect if running in Tauri desktop app
-const isDesktopApp = typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined;
-
 export function ApiDiagnostics() {
-  const [status, setStatus] = useState<'checking' | 'connected' | 'error'>('checking')
-  const [message, setMessage] = useState('')
   const [showDetails, setShowDetails] = useState(false)
   const [backendStatus, setBackendStatus] = useState<BackendStatus | null>(null)
-  const [backendLogs, setBackendLogs] = useState<string[]>([])
-  const [retrying, setRetrying] = useState(false)
+  const isConnected = useAppStore((s) => s.connection === 'connected')
 
   const testConnection = async () => {
-    if (!isDesktopApp) {
-      setStatus('error');
-      setMessage('Backend diagnostics are only available in the desktop app.');
-      return;
-    }
     try {
-      const result = await invoke<string>('test_api_connection')
-      setStatus('connected')
-      setMessage(result)
-    } catch (error: any) {
-      setStatus('error')
-      setMessage(error || 'Unknown error')
-      
-      // Fetch backend status and logs for debugging
-      try {
-        const bStatus = await invoke<BackendStatus>('get_backend_status')
-        setBackendStatus(bStatus)
-        
-        const logs = await invoke<string[]>('get_backend_logs')
-        setBackendLogs(logs)
-      } catch (e) {
-        console.error('Failed to fetch backend diagnostics:', e)
-      }
+      setBackendStatus(await invoke<BackendStatus>('get_backend_status'))
+    } catch (e) {
+      console.error('Failed to fetch backend diagnostics:', e)
     }
-  }
-
-  const handleRetry = async () => {
-    setRetrying(true)
-    await testConnection()
-    setRetrying(false)
   }
 
   useEffect(() => {
-    testConnection()
-    // Re-test every 10 seconds if error
-    const interval = setInterval(() => {
-      if (status === 'error') {
-        testConnection()
-      }
-    }, 10000)
+    if (!isDesktopApp || isConnected) return
+    const interval = setInterval(testConnection, 2000) // no immediate check: backend may not be spawned yet
 
     return () => clearInterval(interval)
-  }, [status])
+  }, [isConnected])
 
-  if (!isDesktopApp) {
-    return null;
-  }
-
-  if (status === 'connected') {
-    return null // Hide when connected
+  // A live backend process is still starting; only a dead one is an error.
+  if (isConnected || !backendStatus || backendStatus.is_running) {
+    return null
   }
 
   return (
     <div className="fixed bottom-4 right-4 max-w-md z-50">
-      <div
-        className={`rounded-lg shadow-lg p-4 ${
-          status === 'checking'
-            ? 'bg-yellow-50 border border-yellow-200'
-            : 'bg-red-50 border border-red-200'
-        }`}
-      >
+      <div className="rounded-lg shadow-lg p-4 bg-red-50 border border-red-200">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <p className={`font-semibold ${status === 'checking' ? 'text-yellow-900' : 'text-red-900'}`}>
-              {status === 'checking' ? '⏳ Connecting to Backend...' : '⚠️ Backend Connection Error'}
-            </p>
-            {message && (
-              <p className={`text-xs mt-2 font-mono ${status === 'checking' ? 'text-yellow-800' : 'text-red-800'}`}>
-                {message}
-              </p>
-            )}
+            <p className="font-semibold text-red-900">⚠️ Backend Connection Error</p>
           </div>
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className={`text-sm font-medium ml-2 ${status === 'checking' ? 'text-yellow-600' : 'text-red-600'}`}
+            className="text-sm font-medium ml-2 text-red-600"
           >
             {showDetails ? '▼' : '▶'}
           </button>
         </div>
 
-        {showDetails && status === 'error' && (
+        {showDetails && (
           <>
             <div className="mt-3 text-sm text-red-800 space-y-1">
               <p>
@@ -114,33 +64,22 @@ export function ApiDiagnostics() {
               </ul>
             </div>
 
-            {backendStatus && (
-              <div className="mt-3 p-2 bg-red-100 rounded text-xs text-red-900">
-                <p><strong>Backend Status:</strong></p>
-                <p>• Process running: {backendStatus.is_running ? '✅ Yes' : '❌ No'}</p>
-                <p>• Port: {backendStatus.port}</p>
-                <p>• Log entries: {backendStatus.log_count}</p>
-              </div>
-            )}
+            <div className="mt-3 p-2 bg-red-100 rounded text-xs text-red-900">
+              <p><strong>Backend Status:</strong></p>
+              <p>• Port: {backendStatus.port}</p>
+              <p>• Log entries: {backendStatus.log_count}</p>
+            </div>
 
-            {backendLogs.length > 0 && (
+            {backendStatus.last_logs.length > 0 && (
               <div className="mt-3">
                 <p className="text-sm font-semibold text-red-900 mb-1">Backend Logs (last 10):</p>
                 <div className="bg-red-100 rounded p-2 max-h-48 overflow-y-auto">
                   <pre className="text-xs text-red-900 font-mono whitespace-pre-wrap">
-                    {backendLogs.slice(-10).join('\n')}
+                    {backendStatus.last_logs.join('\n')}
                   </pre>
                 </div>
               </div>
             )}
-
-            <button
-              onClick={handleRetry}
-              disabled={retrying}
-              className="mt-3 w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
-            >
-              {retrying ? '🔄 Retrying...' : '🔄 Retry Connection'}
-            </button>
           </>
         )}
       </div>

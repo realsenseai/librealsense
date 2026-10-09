@@ -138,7 +138,8 @@ import { createAssistantSlice } from './assistantSlice'
 
 interface AppState {
   // Connection state
-  isConnected: boolean
+  // The socket retries forever, so a lost connection is always being re-established.
+  connection: 'starting' | 'connected' | 'reconnecting'
   setConnected: (connected: boolean) => void
 
   // Devices - multi-camera support
@@ -265,8 +266,8 @@ export type { AppState }
 
 export const useAppStore = create<AppState>()((set, get, api) => ({
   // Connection state
-  isConnected: false,
-  setConnected: (connected) => set({ isConnected: connected }),
+  connection: 'starting',
+  setConnected: (connected) => set({ connection: connected ? 'connected' : 'reconnecting' }),
 
   // Devices
   devices: [],

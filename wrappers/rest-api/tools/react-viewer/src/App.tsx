@@ -10,9 +10,10 @@ import { ApiDiagnostics } from './components/ApiDiagnostics'
 import { ServerWarnings } from './components/ServerWarnings'
 import { useAppStore } from './store'
 import { socketService } from './api/socket'
+import { isDesktopApp } from './api/backend'
 
 function App() {
-  const { viewMode, isConnected, getActiveDevices } = useAppStore()
+  const { viewMode, connection, getActiveDevices } = useAppStore()
 
   const activeDevices = getActiveDevices()
   const hasActiveDevices = activeDevices.length > 0
@@ -39,6 +40,7 @@ function App() {
       <WhatsNew />
       
       {/* Loading Splash Screen */}
+      {isDesktopApp && connection === 'starting' && <LoadingSplash message="Connecting to the RealSense backend..." />}
       {isAnyDeviceLoading && (
         <LoadingSplash message={`Initializing ${loadingDeviceName || 'device'} sensors...`} />
       )}
@@ -86,14 +88,16 @@ function App() {
         </main>
       </div>
 
-      {/* Connection Status */}
-      <div className={`fixed bottom-4 left-4 px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-sm ${
-        isConnected
-          ? 'border-rs-ok/30 bg-rs-ok/10 text-rs-ok'
-          : 'border-rs-err/30 bg-rs-err/10 text-rs-err'
-      }`}>
-        {isConnected ? '● Connected' : '○ Disconnected'}
-      </div>
+      {/* Connection Status (hidden until the first connect) */}
+      {connection !== 'starting' && (
+        <div className={`fixed bottom-4 left-4 px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-sm ${
+          connection === 'connected'
+            ? 'border-rs-ok/30 bg-rs-ok/10 text-rs-ok'
+            : 'border-rs-warn/30 bg-rs-warn/10 text-rs-warn'
+        }`}>
+          {connection === 'connected' ? '● Connected' : '◌ Reconnecting…'}
+        </div>
+      )}
 
       {/* API Diagnostics (shows when there's a connection error) */}
       <ApiDiagnostics />

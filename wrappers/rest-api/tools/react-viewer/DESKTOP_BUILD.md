@@ -181,9 +181,7 @@ Use `@tauri-apps/api` to invoke Rust commands:
 ```typescript
 import { invoke } from '@tauri-apps/api/tauri'
 
-const status = await invoke('api_status')
-const port   = await invoke('get_api_port')
-const logs   = await invoke('get_backend_logs') as string[]
+const status = await invoke('get_backend_status') // { is_running, port, log_count, last_logs }
 ```
 
 The API client in `src/api/client.ts` already detects Tauri and routes requests

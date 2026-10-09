@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiClient } from '../api'
+import { useAppStore } from '../store'
 
 /**
  * Dismissible banner for server-side environment warnings reported by
@@ -9,29 +10,21 @@ import { apiClient } from '../api'
 export function ServerWarnings() {
   const [warnings, setWarnings] = useState<string[]>([])
   const [dismissed, setDismissed] = useState(false)
+  const isConnected = useAppStore((s) => s.connection === 'connected')
 
   useEffect(() => {
+    if (!isConnected) return
     let cancelled = false
-    let attempts = 0
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const fetchWarnings = () => {
-      apiClient
-        .getHealth()
-        .then((h) => {
-          if (!cancelled && h.warnings?.length) setWarnings(h.warnings)
-        })
-        .catch(() => {
-          // Backend may still be starting (e.g. desktop build spawns it);
-          // retry a few times, then give up — ApiDiagnostics covers hard-down.
-          if (!cancelled && ++attempts < 5) timer = setTimeout(fetchWarnings, 3000)
-        })
-    }
-    fetchWarnings()
+    apiClient
+      .getHealth()
+      .then((h) => {
+        if (!cancelled && h.warnings?.length) setWarnings(h.warnings)
+      })
+      .catch(() => {})
     return () => {
       cancelled = true
-      clearTimeout(timer)
     }
-  }, [])
+  }, [isConnected])
 
   if (dismissed || warnings.length === 0) return null
 

@@ -8,7 +8,7 @@ import type { DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState } fr
  */
 export function resetStore() {
   useAppStore.setState({
-    isConnected: false,
+    connection: 'starting',
     devices: [],
     deviceStates: {},
     isLoadingDevices: false,

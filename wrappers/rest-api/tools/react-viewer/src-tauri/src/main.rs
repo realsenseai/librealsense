@@ -63,10 +63,6 @@ fn main() {
             _ => {}
         })
         .invoke_handler(tauri::generate_handler![
-            api_status,
-            get_api_port,
-            test_api_connection,
-            get_backend_logs,
             get_backend_status,
         ])
         .run(tauri::generate_context!())
@@ -300,44 +296,6 @@ async fn wait_for_api_ready(port: u16, backend_logs: Arc<Mutex<Vec<String>>>) {
     }
 }
 
-/// Check if the API server is running
-#[tauri::command]
-fn api_status() -> String {
-    "ok".to_string()
-}
-
-/// Get the port the API server is running on
-#[tauri::command]
-fn get_api_port(state: State<AppState>) -> u16 {
-    *state.api_port.lock().unwrap()
-}
-
-/// Diagnostic command: Test if API server is accessible
-#[tauri::command]
-async fn test_api_connection() -> Result<String, String> {
-    match reqwest::Client::new()
-        .get("http://127.0.0.1:8000/api/v1/health")
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await
-    {
-        Ok(resp) => {
-            if resp.status().is_success() {
-                Ok("✅ API server is accessible and responding".to_string())
-            } else {
-                Err(format!("❌ API server responded with status: {}", resp.status()))
-            }
-        }
-        Err(e) => Err(format!("❌ Cannot reach API server: {}", e)),
-    }
-}
-
-/// Get backend logs for diagnostics
-#[tauri::command]
-fn get_backend_logs(state: State<AppState>) -> Vec<String> {
-    state.backend_logs.lock().unwrap().clone()
-}
-
 /// Get detailed backend status for diagnostics
 #[tauri::command]
 fn get_backend_status(state: State<AppState>) -> serde_json::Value {
@@ -352,6 +310,8 @@ fn get_backend_status(state: State<AppState>) -> serde_json::Value {
                 // Process has exited
                 let exit_msg = format!("[Tauri] Backend process exited with status: {}", status);
                 eprintln!("{}", exit_msg);
+                // Drop the reaped child so later polls don't log the exit again.
+                *process = None;
                 drop(process); // Release lock before modifying logs
                 state.backend_logs.lock().unwrap().push(exit_msg);
                 false
@@ -373,6 +333,6 @@ fn get_backend_status(state: State<AppState>) -> serde_json::Value {
         "is_running": is_running,
         "port": port,
         "log_count": logs.len(),
-        "last_logs": logs.iter().rev().take(10).cloned().collect::<Vec<_>>(),
+        "last_logs": logs[logs.len().saturating_sub(10)..].to_vec(),
     })
 }

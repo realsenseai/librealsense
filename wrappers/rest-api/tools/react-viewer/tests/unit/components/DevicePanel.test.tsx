@@ -46,24 +46,12 @@ describe('DevicePanel', () => {
       expect(screen.getByText('Connect a RealSense device')).toBeInTheDocument()
     })
 
-    it('shows loading message when loading with no devices', async () => {
-      const fetchDevices = vi.fn().mockImplementation(() => {
-        // Simulate loading - set isLoadingDevices to true and devices to empty
-        useAppStore.setState({ isLoadingDevices: true, devices: [] })
-        return new Promise(() => {}) // Never resolves to keep loading
+    it('shows loading message when loading with no devices', () => {
+      render(<DevicePanel />, {
+        initialStoreState: { isLoadingDevices: true, devices: [] },
       })
-      
-      useAppStore.setState({ 
-        isLoadingDevices: true, 
-        devices: [],
-        fetchDevices,
-      })
-      render(<DevicePanel />)
-      
-      // When loading with no devices, should show "Searching for devices..."
-      await waitFor(() => {
-        expect(screen.getByText('Searching for devices...')).toBeInTheDocument()
-      })
+
+      expect(screen.getByText('Searching for devices...')).toBeInTheDocument()
     })
   })
 
@@ -96,26 +84,14 @@ describe('DevicePanel', () => {
       expect(screen.getByText('D455')).toBeInTheDocument()
     })
 
-    it('displays device serial number', async () => {
+    it('displays device serial number', () => {
       const mockDevice = createMockDevice({ serial_number: 'TEST-SERIAL-123' })
-      
-      // Make sure fetchDevices keeps the devices we set
-      const fetchDevices = vi.fn().mockImplementation(() => {
-        useAppStore.setState({ devices: [mockDevice], isLoadingDevices: false })
-        return Promise.resolve()
+
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [mockDevice], deviceStates: {} },
       })
-      
-      useAppStore.setState({
-        devices: [mockDevice],
-        deviceStates: {},
-        fetchDevices,
-        isLoadingDevices: false,
-      })
-      render(<DevicePanel />)
-      
-      await waitFor(() => {
-        expect(screen.getByText(/TEST-SERIAL-123/)).toBeInTheDocument()
-      })
+
+      expect(screen.getByText(/TEST-SERIAL-123/)).toBeInTheDocument()
     })
 
     it('displays firmware version', () => {
@@ -191,8 +167,6 @@ describe('DevicePanel', () => {
       const refreshButton = screen.getByLabelText('Refresh devices')
       await userEvent.click(refreshButton)
 
-      // The polling effect also calls fetchDevices() with no args on mount.
-      // The manual-click call must explicitly pass true.
       expect(fetchDevices).toHaveBeenCalledWith(true)
     })
 

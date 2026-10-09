@@ -50,7 +50,7 @@ describe('AppStore', () => {
     it('starts with default values', () => {
       const state = useAppStore.getState()
       
-      expect(state.isConnected).toBe(false)
+      expect(state.connection).toBe('starting')
       expect(state.devices).toEqual([])
       expect(state.deviceStates).toEqual({})
       expect(state.isLoadingDevices).toBe(false)
@@ -76,11 +76,11 @@ describe('AppStore', () => {
     it('sets connection state', () => {
       useAppStore.getState().setConnected(true)
       
-      expect(useAppStore.getState().isConnected).toBe(true)
+      expect(useAppStore.getState().connection).toBe('connected')
       
       useAppStore.getState().setConnected(false)
       
-      expect(useAppStore.getState().isConnected).toBe(false)
+      expect(useAppStore.getState().connection).toBe('reconnecting')
     })
   })
 
