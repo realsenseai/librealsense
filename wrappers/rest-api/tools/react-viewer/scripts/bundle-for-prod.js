@@ -34,13 +34,11 @@ async function copyDir(src, dest) {
 }
 
 async function main() {
-  console.log('📦 Bundling React build for production...\n');
-
   // Check if dist exists
   try {
     await fs.access(SOURCE_DIR);
   } catch {
-    console.error('❌ Error: dist/ directory not found.');
+    console.error('   Error: dist/ directory not found.');
     console.error('   Run "npm run build" first.\n');
     process.exit(1);
   }
@@ -52,14 +50,9 @@ async function main() {
     // Ignore if doesn't exist
   }
 
-  // Copy files
-  console.log(`📁 Copying from: ${SOURCE_DIR}`);
-  console.log(`📁 Copying to:   ${TARGET_DIR}\n`);
-
   await copyDir(SOURCE_DIR, TARGET_DIR);
 
-  console.log('✅ Build bundled successfully!');
-  console.log('\n📝 Run the server - it serves this build automatically.');
+  console.log('Build files copied. The rest-api server will serve the viewer automatically.');
 }
 
 main().catch(console.error);

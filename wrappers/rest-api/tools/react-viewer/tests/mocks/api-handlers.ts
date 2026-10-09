@@ -166,5 +166,8 @@ export const handlers = [
 
   // Recommended firmware (none, unless a test says otherwise)
   http.get(`${API_BASE}/devices/:deviceId/firmware/`, () => HttpResponse.json({ recommended: null })),
+
+  http.post(`${API_BASE}/webrtc/offer/`, () =>
+    HttpResponse.json({ session_id: 'test-session', sdp: '', type: 'answer' })),
 ]
 
