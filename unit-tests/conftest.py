@@ -136,6 +136,12 @@ def pytest_addoption(parser):
              "Can be used multiple times or with a comma-separated value (--exclude-device 'D585 Proto,D585S')."
     )
     group.addoption(
+        "--device-map",
+        action="store",
+        default=None,
+        help="Device inventory YAML for pytest-map-check.py (default: device-map.yaml in the LibCI home)."
+    )
+    group.addoption(
         "--context",
         action="store",
         default="",
@@ -337,6 +343,10 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers", "dds: test requires a DDS-enabled build (selected by --tag dds / -m dds)"
+    )
+    config.addinivalue_line(
+        "markers", "infra: harness-level test with no device requirement that still runs under --live "
+                   "(and is skipped under --not-live)"
     )
 
     # Configure standard logging with format matching legacy rspy.log output

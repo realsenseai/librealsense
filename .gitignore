@@ -107,3 +107,7 @@ librealsense-log.txt
 .github/agents/
 
 unit-tests/logs/pytest-results.xml
+unit-tests/logs/health.json
+unit-tests/logs/health.txt
+unit-tests/logs/health-exclude.txt
+unit-tests/logs/health.html

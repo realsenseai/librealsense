@@ -410,6 +410,7 @@ The `unit-tests/infra-tests/` directory contains regression tests for the pytest
 | `test_e2e_skip_fail.py` | `@device` fails vs `@device_each` skips when no match |
 | `test_e2e_cli_options.py` | All CLI flags accepted (`--device`, `--context`, `--live`, `--debug`, etc.) |
 | `test_e2e_port_management.py` | `enable_only()` called with correct serials and recycle flag |
+| `test_map_check.py` | `pytest-map-check.py` verdict/report files, the `infra` marker under `--live`/`--not-live`, excluded-but-absent `device()` patterns skip, `--device-map` |
 
 ### How E2E tests work
 

@@ -138,6 +138,31 @@ def _passes_connection_type(sn, required_types, excluded_types):
     return True
 
 
+def _pattern_excluded(pattern, cli_excludes):
+    """True when a device() pattern is covered by an --exclude-device spec textually
+    (no enumerated device to compare against): same name, or a wildcard spec whose
+    prefix the pattern starts with or product line it names (D43* and D400* both cover D435)."""
+    pattern = pattern.strip().upper()
+    for spec in split_cli_patterns(cli_excludes):
+        spec = spec.upper()
+        if spec.endswith('*'):
+            prefix = spec[:-1]
+            if pattern.startswith(prefix) or _product_line_of(pattern) == prefix:
+                return True
+        elif spec == pattern:
+            return True
+    return False
+
+
+def _product_line_of(product):
+    """D455 -> D400; D555/D585S -> D500 (same rule as rspy.device_map)"""
+    if product.startswith('D4'):
+        return 'D400'
+    if product.startswith('D5'):
+        return 'D500'
+    return None
+
+
 def resolve_device_each_serials(metafunc):
     """Expand @device_each and @device markers into parametrized test instances.
 
@@ -229,7 +254,9 @@ def resolve_device_each_serials(metafunc):
         if found_sn is not None:
             if found_sn not in all_serials:
                 all_serials.append(found_sn)
-        elif had_raw_match:
+        elif had_raw_match or _pattern_excluded(pattern, cli_excludes):
+            # Excluded on the CLI (e.g. the map-check reported it missing): a skip,
+            # not an unattributed failure, even though nothing of that pattern enumerated
             sentinel = f"{_SKIP_SENTINEL_PREFIX}{pattern}"
             if sentinel not in all_serials:
                 all_serials.append(sentinel)

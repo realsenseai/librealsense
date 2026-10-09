@@ -47,7 +47,7 @@ python3 -m pytest -v -k "hdr and not preset"   # filter by test name
 ```
 
 Flags are registered in `conftest.py`: `--live`, `--not-live`, `--device`, `--exclude-device`,
-`--context`, `--tag`, `--repeat`, `--reruns`, `--debug`, `--rslog`, `--test-dir`. Note that `-s`
+`--context`, `--tag`, `--repeat`, `--reruns`, `--debug`, `--rslog`, `--test-dir`, `--device-map`. Note that `-s`
 disables the per-test log files. See `.github/skills/pytest-infra.md` for fixtures and markers.
 
 ## Running the C++ Tests (legacy runner)
