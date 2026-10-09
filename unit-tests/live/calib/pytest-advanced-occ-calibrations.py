@@ -173,15 +173,23 @@ def run_advanced_occ_calibration_test(host_assistance, config, pipeline, calib_d
             log.error("Fill rate after OCC unavailable")
             pytest.fail()
 
-        # Fill rate assertions: post-OCC must be better than both base and modified
+        # Fill rate assertions.
+        # The "post > modified" invariant only holds when the perturbation actually degraded the
+        # scene. When the factory ppy is off-optimum, the shift can accidentally land closer to
+        # the true value and *raise* fill rate; OCC then correctly converges near that better
+        # optimum and post ≈ modified. Only enforce the improvement check when the perturbation
+        # degraded fill rate; always require post to stay within tolerance of base.
         if base_fill_rate is not None and modified_fill_rate is not None and post_fill_rate is not None:
             log.info(f"Fill rates: base={base_fill_rate*100:.1f}% modified={modified_fill_rate*100:.1f}% post={post_fill_rate*100:.1f}%")
-            if post_fill_rate <= modified_fill_rate:
+            perturbation_degraded = modified_fill_rate < base_fill_rate - FILL_RATE_TOLERANCE
+            if perturbation_degraded and post_fill_rate <= modified_fill_rate:
                 log.error("Post-OCC fill rate did not improve over perturbed fill rate")
                 pytest.fail()
             elif post_fill_rate < base_fill_rate - FILL_RATE_TOLERANCE:
                 log.error(f"Post-OCC fill rate ({post_fill_rate*100:.1f}%) is below base ({base_fill_rate*100:.1f}%) by more than tolerance ({FILL_RATE_TOLERANCE*100:.0f}%)")
                 pytest.fail()
+            elif not perturbation_degraded:
+                log.info(f"Perturbation did not degrade fill rate (modified={modified_fill_rate*100:.1f}% vs base={base_fill_rate*100:.1f}%); skipping post>modified check, post={post_fill_rate*100:.1f}% is within tolerance of base")
             else:
                 log.info(f"Fill rate improved after OCC vs modified (+{(post_fill_rate - modified_fill_rate)*100:.1f}%) and vs base (+{(post_fill_rate - base_fill_rate)*100:.1f}%)")
 
