@@ -4,6 +4,7 @@
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 
 #include <common/cli.h>
+#include "../example-utils.hpp"
 
 #include <iostream>
 #include <map>
@@ -40,8 +41,11 @@ int main(int argc, char * argv[]) try
         }
     };
 
+    rs2::context ctx( settings.dump() );
+    wait_for_devices( ctx );
+
     // Declare RealSense pipeline, encapsulating the actual device and sensors.
-    rs2::pipeline pipe( settings.dump() );
+    rs2::pipeline pipe( ctx );
 
     // Start streaming through the callback with default recommended configuration
     // The default video configuration contains Depth and Color streams
