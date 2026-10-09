@@ -46,6 +46,7 @@ namespace librealsense
     protected:
         std::shared_ptr<stream_interface> _occupancy_stream;
         std::shared_ptr<stream_interface> _point_cloud_stream;
+        std::shared_ptr<stream_interface> _pcl_stream;  // device point cloud (RS2_STREAM_POINT_CLOUD)
         bool _depth_mapping_active = false;
         // True for D585S (mapping on MI 13, 2880-wide payloads), false for every other
         // D5xx (mapping on MI 11, OCCG 320x256 and LPCL 640x360).
@@ -68,6 +69,8 @@ namespace librealsense
 
         rs2_intrinsics get_intrinsics(const stream_profile& profile) const override;
         stream_profiles init_stream_profiles() override;
+        // EP12 carries one Mapping stream at a time (PCL, LPCL, or OG)
+        void open(const stream_profiles& requests) override;
 
     protected:
         const d500_depth_mapping* _owner;

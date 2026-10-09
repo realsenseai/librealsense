@@ -77,12 +77,13 @@ namespace rs2
         }
 
         void export_to_ply(points p, video_frame color) {
-            const bool use_texcoords  = color && !get_option(OPTION_IGNORE_COLOR);
+            // A device point cloud (RS2_STREAM_POINT_CLOUD) has no texture coordinates: vertices only
+            const auto texcoords = p.get_texture_coordinates();
+            const bool use_texcoords  = color && !get_option(OPTION_IGNORE_COLOR) && texcoords;
             bool mesh = get_option(OPTION_PLY_MESH) != 0;
             bool binary = get_option(OPTION_PLY_BINARY) != 0;
             bool use_normals = get_option(OPTION_PLY_NORMALS) != 0;
             const auto verts = p.get_vertices();
-            const auto texcoords = p.get_texture_coordinates();
             const uint8_t* texture_data = nullptr;
             if (use_texcoords) // texture might be on the gpu, get pointer to data before for-loop to avoid repeated access
                 texture_data = reinterpret_cast<const uint8_t*>(color.get_data());

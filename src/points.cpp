@@ -9,6 +9,7 @@
 #include <rsutils/string/from.h>
 #include <fstream>
 #include <cmath>
+#include <algorithm>
 
 #define MIN_DISTANCE 1e-6
 
@@ -37,7 +38,7 @@ get_texcolor( const frame_holder & texture, float u, float v )
 }
 
 
-void points::export_to_ply( const std::string & fname, const frame_holder & texture )
+void points::export_to_ply( const std::string & fname, const frame_holder & texture_in )
 {
     auto stream_profile = get_stream().get();
     auto video_stream_profile = dynamic_cast< video_stream_profile_interface * >( stream_profile );
@@ -45,20 +46,23 @@ void points::export_to_ply( const std::string & fname, const frame_holder & text
         throw librealsense::invalid_value_exception( "stream must be video stream" );
     const auto vertices = get_vertices();
     const auto texcoords = get_texture_coordinates();
+    const frame_holder no_texture;
+    const frame_holder & texture = texcoords ? texture_in : no_texture;  // device cloud: vertices only
     std::vector< float3 > new_vertices;
     std::vector< std::tuple< uint8_t, uint8_t, uint8_t > > new_tex;
     std::map< int, int > index2reducedIndex;
 
-    new_vertices.reserve( get_vertex_count() );
-    new_tex.reserve( get_vertex_count() );
-    assert( get_vertex_count() );
-    for( int i = 0; i < get_vertex_count(); ++i )
+    const size_t vertex_count = get_vertex_count();
+    new_vertices.reserve( vertex_count );
+    new_tex.reserve( vertex_count );
+    assert( vertex_count );
+    for( size_t i = 0; i < vertex_count; ++i )
         if( fabs( vertices[i].x ) >= MIN_DISTANCE || fabs( vertices[i].y ) >= MIN_DISTANCE
             || fabs( vertices[i].z ) >= MIN_DISTANCE )
         {
             index2reducedIndex[i] = (int)new_vertices.size();
             new_vertices.push_back( { vertices[i].x, -1 * vertices[i].y, -1 * vertices[i].z } );
-            if( texture )
+            if( texture && texcoords )
             {
                 auto color = get_texcolor( texture, texcoords[i].x, texcoords[i].y );
                 new_tex.push_back( color );
@@ -144,13 +148,31 @@ void points::export_to_ply( const std::string & fname, const frame_holder & text
     }
 }
 
+// Device point cloud (RS2_STREAM_POINT_CLOUD, D5xx EP12 Mapping): the bare W x H vertex array, 12 B per
+// point, with no texture coordinates after it.
+bool points::is_device_cloud() const
+{
+    auto profile = get_stream();
+    return profile && profile->get_stream_type() == RS2_STREAM_POINT_CLOUD;
+}
+
 size_t points::get_vertex_count() const
 {
+    if( is_device_cloud() )
+    {
+        size_t count = data.size() / sizeof( float3 );
+        auto vsp = dynamic_cast< video_stream_profile_interface * >( get_stream().get() );
+        if( vsp )
+            count = std::min( count, size_t( vsp->get_width() ) * vsp->get_height() );
+        return count;
+    }
     return data.size() / ( sizeof( float3 ) + sizeof( int2 ) );
 }
 
 float2 * points::get_texture_coordinates()
 {
+    if( is_device_cloud() )
+        return nullptr;
     get_frame_data();  // call GetData to ensure data is in main memory
     auto xyz = (float3 *)data.data();
     auto ijs = (float2 *)( xyz + get_vertex_count() );

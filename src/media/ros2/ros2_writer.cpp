@@ -119,14 +119,15 @@ namespace librealsense
             stride = vid_frame->get_stride();
             format = vid_frame->get_stream()->get_format();
         }
-        else if (auto lp = As<labeled_points>(frame))
+        else if (As<labeled_points>(frame)
+                 || (As<points>(frame) && frame->get_stream()->get_stream_type() == RS2_STREAM_POINT_CLOUD))
         {
-            // labeled points have no 2D geometry — encode as a single row of bytes
-            auto data_size = static_cast<uint32_t>(lp->get_frame_data_size());
-            pixels = lp->get_frame_data();
+            // labeled / device point clouds have no 2D geometry — encode as a single row of bytes
+            auto data_size = static_cast<uint32_t>(frame->get_frame_data_size());
+            pixels = frame->get_frame_data();
             width = stride = data_size;
             height = 1;
-            format = lp->get_stream()->get_format();
+            format = frame->get_stream()->get_format();
         }
         else
         {
@@ -217,6 +218,7 @@ namespace librealsense
         if (!frame || !frame.frame)
             return;
 
+
         // Build ROS2 timestamp from nanoseconds
         auto ns_count = timestamp.count();
         int32_t stamp_sec = static_cast<int32_t>(ns_count / 1000000000LL);
@@ -297,9 +299,10 @@ namespace librealsense
 
             write_message(ros2_topic::frame_data_topic(stream_id), "sensor_msgs/msg/Imu", timestamp, imu);
         }
-        else if (Is<labeled_points>(frame.frame))
+        else if (Is<labeled_points>(frame.frame)
+                 || (Is<points>(frame.frame) && stream_id.stream_type == RS2_STREAM_POINT_CLOUD))
         {
-            auto lp = As<labeled_points>(frame.frame);
+            // Labeled point cloud and device point cloud: the raw frame buffer, no 2D geometry
             if (_compress)
             {
                 write_compressed_video_frame(stream_id, timestamp, frame.frame);
@@ -314,7 +317,7 @@ namespace librealsense
             auto data_size = static_cast<uint32_t>(frame.frame->get_frame_data_size());
             auto raw = frame.frame->get_frame_data();
             img.data(std::vector<uint8_t>(raw, raw + data_size));
-            img.encoding(rs2_format_to_string(lp->get_stream()->get_format()));
+            img.encoding(rs2_format_to_string(frame.frame->get_stream()->get_format()));
             img.width(data_size);
             img.height(1);
             img.step(data_size);

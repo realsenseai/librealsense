@@ -87,6 +87,17 @@ namespace librealsense
         danger_zone = (1u << 12),
         warning_zone = (1u << 13),
         diagnostic_zone = (1u << 14),
+        // D5xx EP12 Mapping (metadata layout 0x0002, revision 2+); see the D585 PointCloud design
+        profile_id_attribute = (1u << 15),
+        stream_generation_attribute = (1u << 16),
+        point_stride_attribute = (1u << 17),
+        point_format_attribute = (1u << 18),
+        color_frame_counter_attribute = (1u << 19),
+        color_sync_delta_attribute = (1u << 20),
+        segmentation_mode_attribute = (1u << 21),
+        segmentation_classes_attribute = (1u << 22),
+        occlusion_removal_attribute = (1u << 23),
+        segmentation_status_attribute = (1u << 24),
         payload_crc32_attribute = (1u << 31)
     };
 
@@ -496,10 +507,20 @@ namespace librealsense
         int16_t     diagnostic_zone_point_3_y_cord;  // Diagnostic zone point #3, Y coord in mm
 
         uint8_t     reserved[10];                    // Zero-ed
-        uint32_t    number_of_3d_vertices;           // The max number of points is 320X240
-        uint8_t     reserved2[16];                   // Zero-ed
-        uint32_t    payload_crc32;                   // Crc32 for the occupancy grid payload data only, not including the metadata header.
+        uint32_t    number_of_3d_vertices;           // W x H of the organized payload
+        uint16_t    profile_id;                      // Active EP12 profile
+        uint16_t    stream_generation;               // Changes on every successful STREAMON
+        uint32_t    color_frame_counter;             // XYZRGB: matched RGB frame; LPCL: RGB frame used by segmentation
+        int16_t     color_sync_delta_us;             // Signed Depth - RGB capture timestamp delta, us
+        uint8_t     point_stride;                    // Bytes per point: 12 XYZ, 16 XYZRGB, 13 XYZ + label
+        uint8_t     point_format;                    // Bits 0-3: 0 XYZ, 1 XYZRGB, 2 XYZ + label; bits 4-7: encoding, 0 = raw
+        uint8_t     segmentation_mode;               // 0 = not applied; 1 / 2 = mode applied
+        uint8_t     segmentation_classes;            // Segmentation class bitmask applied
+        uint8_t     occlusion_removal;               // XYZRGB: 0 = off, 1 = on
+        uint8_t     segmentation_status;             // Depth post-processing status bitmask
+        uint32_t    payload_crc32;                   // Crc32 for the payload data only, not including the metadata header.
     };
+    static_assert( sizeof( md_point_cloud ) == 136, "Point-cloud metadata ABI" );
     REGISTER_MD_TYPE(md_point_cloud, md_type::META_DATA_INTEL_POINT_CLOUD_ID)
 
 

@@ -7,6 +7,9 @@
 #include "d500-info.h"
 #include "d585s-md.h"
 #include "mapping-timing.h"
+#include "mapping-pcl-check.h"
+#include "librealsense-exception.h"
+#include <rsutils/string/from.h>
 #include "d500-types/safety-interface-config.h"
 
 #include <vector>
@@ -22,6 +25,7 @@ using rs_fourcc = rsutils::type::fourcc;
 
 #include "platform/platform-utils.h"
 #include "pose.h"   // identity_matrix
+#include "proc/synthetic-stream.h"
 
 #include <src/metadata-parser.h>
 #include <thread>
@@ -38,6 +42,14 @@ namespace librealsense
         {
             uint32_t counter = 0;
             uint64_t timestamp = 0;
+            if( _attribute == RS2_FRAME_METADATA_FRAME_COUNTER )
+            {
+                if( ! get_mapping_frame_counter( f, counter ) )
+                    return false;
+                if( value )
+                    *value = counter;
+                return true;
+            }
             if( ! get_mapping_capture_timing( f, counter, timestamp ) )
                 return false;
             if( _attribute == RS2_FRAME_METADATA_ACTUAL_FPS )
@@ -55,6 +67,139 @@ namespace librealsense
         // because both are received as GREY 
         {rs_fourcc('P','A','L','8'), RS2_FORMAT_Y8}
     };
+    // EP12 point-cloud (PCL XYZ) profiles: GREY transport selectors whose payload is the bare
+    // W x H float32 x,y,z array (12 B per point, no in-band header). Phase 1 selects the
+    // stream by the full (width, height, fps) tuple, as the FW MAPPING_EP12_PROFILES table.
+    namespace {
+
+    struct pcl_tuple { uint32_t width, height, fps; uint16_t profile_id; };
+    const pcl_tuple pcl_xyz_tuples[] = { { 640, 480, 30, 0x0001 }, { 1280, 720, 15, 0x0002 } };
+
+    const pcl_tuple * find_pcl_xyz_tuple( uint32_t width, uint32_t height, uint32_t fps )
+    {
+        for( auto const & t : pcl_xyz_tuples )
+            if( t.width == width && t.height == height && t.fps == fps )
+                return &t;
+        return nullptr;
+    }
+
+    bool is_pcl_xyz_tuple( uint32_t width, uint32_t height, uint32_t fps )
+    {
+        return find_pcl_xyz_tuple( width, height, fps ) != nullptr;
+    }
+
+    // The transport profile is GREY (Y8); the payload is XYZ32F. Validate the frame against the
+    // committed profile (design section 4.4), then relabel it to the requested XYZ32F profile
+    // without copying, so the metadata and the buffer are kept. Invalid frames are dropped.
+    class pcl_xyz_relabel_block : public stream_filter_processing_block
+    {
+        std::shared_ptr< stream_profile_interface > _source;
+        std::shared_ptr< stream_profile_interface > _target;
+        pcl_expected _expected;
+        pcl_session _session;
+        unsigned long long _dropped = 0;
+        unsigned _restarts_logged = 0;
+        bool _warned_no_metadata = false;
+        bool _warned_unknown_layout = false;
+
+    public:
+        pcl_xyz_relabel_block()
+            : stream_filter_processing_block( "PCL XYZ passthrough" )
+        {
+        }
+
+    protected:
+        rs2::frame process_frame( const rs2::frame_source &, const rs2::frame & f ) override
+        {
+            auto fi = (frame_interface *)f.get();
+            auto source = fi->get_stream();
+            if( source != _source )
+            {
+                _source = source;
+                _target = source->clone();
+                _target->set_format( RS2_FORMAT_XYZ32F );
+                _target->set_stream_type( RS2_STREAM_POINT_CLOUD );
+                _target->set_stream_index( source->get_stream_index() );
+
+                _expected = pcl_expected();
+                if( auto vsp = dynamic_cast< video_stream_profile_interface * >( source.get() ) )
+                {
+                    _expected.width = vsp->get_width();
+                    _expected.height = vsp->get_height();
+                    if( auto t = find_pcl_xyz_tuple( _expected.width, _expected.height, source->get_framerate() ) )
+                        _expected.profile_id = t->profile_id;
+                }
+            }
+
+            auto lf = dynamic_cast< frame * >( fi );
+            if( ! lf )
+                return {};
+
+            const uint8_t * md = nullptr;
+            size_t md_size = 0;
+            auto const & ad = lf->additional_data;
+            if( ad.metadata_size > platform::uvc_header_size && ad.metadata_size <= ad.metadata_blob.size() )
+            {
+                md = ad.metadata_blob.data() + platform::uvc_header_size;
+                md_size = ad.metadata_size - platform::uvc_header_size;
+            }
+            else if( ! _warned_no_metadata
+                     && ! resolve_pcl_layout( reinterpret_cast< const uint8_t * >( lf->get_frame_data() ),
+                                              lf->get_frame_data_size() ).map1 )  // MAP1 has no UVC metadata
+            {
+                _warned_no_metadata = true;
+                LOG_WARNING( "Point cloud frames carry no UVC metadata: only the payload size is validated" );
+            }
+
+            auto result = check_pcl_frame( reinterpret_cast< const uint8_t * >( lf->get_frame_data() ),
+                                           lf->get_frame_data_size(),
+                                           md,
+                                           md_size,
+                                           _expected,
+                                           _session );
+            if( _session.restarts != _restarts_logged )
+            {
+                _restarts_logged = _session.restarts;
+                LOG_WARNING( "Point cloud stream restarted by the device (stream generation " << _session.generation
+                                                                                             << ") at frame "
+                                                                                             << lf->get_frame_number() );
+            }
+            if( result != pcl_frame_check::ok )
+            {
+                if( _dropped++ % 100 == 0 )
+                    LOG_WARNING( "Point cloud frame " << lf->get_frame_number() << " dropped: " << to_string( result )
+                                                      << " (payload " << lf->get_frame_data_size() << " B, expected "
+                                                      << size_t( _expected.width ) * _expected.height * _expected.point_stride
+                                                      << " B; " << _dropped << " dropped so far)" );
+                return {};
+            }
+
+            if( _session.unknown_metadata_layout && ! _warned_unknown_layout )
+            {
+                _warned_unknown_layout = true;
+                LOG_WARNING( "Point cloud metadata has an unknown layout: only the payload size is validated" );
+            }
+
+            // MAP1 (FW before the pure-payload contract): take the frame number from the sub-header, then drop
+            // the headers so the frame is the bare W x H XYZ32F array that its profile describes
+            const auto layout = resolve_pcl_layout( reinterpret_cast< const uint8_t * >( lf->get_frame_data() ),
+                                                    lf->get_frame_data_size() );
+            if( layout.map1 && lf->data.size() >= layout.vertex_offset )
+            {
+                uint32_t source_frame_id = 0;
+                if( map1_pcl_source_frame_id( lf->data.data(), lf->data.size(), source_frame_id ) )
+                    lf->additional_data.frame_number = source_frame_id;
+                lf->data.erase( lf->data.begin(), lf->data.begin() + layout.vertex_offset );
+                lf->set_data_size( lf->data.size() );
+            }
+
+            fi->set_stream( _target );
+            return f;
+        }
+    };
+
+    }  // namespace
+
     const std::map<uint32_t, rs2_stream> mapping_fourcc_to_rs2_stream = {
         {rs_fourcc('G','R','E','Y'), RS2_STREAM_OCCUPANCY},
         {rs_fourcc('P','A','L','8'), RS2_STREAM_LABELED_POINT_CLOUD}
@@ -63,7 +208,8 @@ namespace librealsense
     d500_depth_mapping::d500_depth_mapping( std::shared_ptr< const d500_info > const & dev_info)
         : device( dev_info ), d500_device( dev_info ),
         _occupancy_stream(new stream(RS2_STREAM_OCCUPANCY)),
-        _point_cloud_stream(new stream(RS2_STREAM_LABELED_POINT_CLOUD))
+        _point_cloud_stream(new stream(RS2_STREAM_LABELED_POINT_CLOUD)),
+        _pcl_stream(new stream(RS2_STREAM_POINT_CLOUD))
     {
         using namespace ds;
 
@@ -108,6 +254,20 @@ namespace librealsense
             std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(ds_timestamp_reader_metadata), _tf_keeper, enable_global_time_option)),
             this);
 
+        // The mapping function reports every EP12 output as GREY; the PCL XYZ tuples are the
+        // device point cloud, not occupancy (D5xx layout only).
+        if( ! _is_safety_layout )
+        {
+            raw_mapping_ep->set_stream_id_resolver( []( const std::vector< platform::stream_profile > &,
+                                                        const platform::stream_profile & p,
+                                                        rs2_stream & type,
+                                                        int & )
+                {
+                    if( p.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) && is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
+                        type = RS2_STREAM_POINT_CLOUD;
+                } );
+        }
+
         auto mapping_ep = std::make_shared<d500_depth_mapping_sensor>(this,
             raw_mapping_ep,
             mapping_fourcc_to_rs2_format,
@@ -140,47 +300,70 @@ namespace librealsense
         // is fully up (though it may not be the case in the device contructor's order, in ds500-factory)
         _depth_to_depth_mapping_extrinsics = std::make_shared< rsutils::lazy< rs2_extrinsics > > ( [this]()
             {
-                // Non-safety D5xx emit mapping payloads in ROS map axes (+X forward, +Y left,
-                // +Z up); consumers expect depth/optical axes (+X right, +Y down, +Z forward).
-                // Report the fixed conversion rather than identity:
-                //   x_ros = z_opt   y_ros = -x_opt   z_ros = -y_opt
-                // stored column-major, depth -> mapping.
-                if( ! _is_safety_layout )
+                // The mapping streams are in the robot frame FW builds from the safety interface's
+                // camera_position (DppCpuNode): ROS map axes (+X forward, +Y left, +Z up) placed by the
+                // camera mount pose. Report that pose as depth -> mapping, so consumers line them up
+                // with depth.
+                //
+                // FW's own default when the safety interface has no camera position: the axis
+                // conversion x_ros = z_opt, y_ros = -x_opt, z_ros = -y_opt, and the camera 180 mm above
+                // the ground (GRID_INSTALL_POS_VERTICAL), stored column-major.
+                auto fw_default_pose = []()
                 {
-                    rs2_extrinsics axes = {};
+                    rs2_extrinsics pose = {};
                     const float depth_to_mapping[9] = { 0.f, -1.f,  0.f,     // column 1
                                                         0.f,  0.f, -1.f,     // column 2
                                                         1.f,  0.f,  0.f };   // column 3
-                    std::memcpy( axes.rotation, depth_to_mapping, sizeof( depth_to_mapping ) );
-                    // Translation would be the mount height, which lives in the same safety
-                    // config we cannot read here, so the ground plane passes through the
-                    // camera origin rather than below it.
-                    return axes;
-                }
+                    std::memcpy( pose.rotation, depth_to_mapping, sizeof( depth_to_mapping ) );
+                    pose.translation[2] = 0.18f;
+                    return pose;
+                };
 
-                // Pull extrinsic from safety interface config (HKR 0.9 QS) via the shared
-                // HW-monitor read - depth mapping doesn't require a d500_safety sibling.
-                rs2_extrinsics res;
-                json sic_json;
+                // Read via the shared HW-monitor path - depth mapping doesn't require a d500_safety sibling.
+                rs2_extrinsics res = {};
                 try
                 {
-                    sic_json = json::parse(read_safety_interface_config(_hw_monitor));
-                }
-                catch (const std::exception& e)
-                {
-                    throw std::runtime_error(rsutils::string::from() << "Could not read safety interface config: " << e.what());
-                }
-                camera_position extrinsics_from_preset(sic_json["safety_interface_config"]["camera_position"]);
-                auto rot = extrinsics_from_preset.get_rotation();
-                auto trans = extrinsics_from_preset.get_translation();
+                    // The working copy is in RAM; a unit configured but not yet loaded has it in flash only
+                    std::string sic;
+                    try
+                    {
+                        sic = read_safety_interface_config( _hw_monitor, RS2_CALIB_LOCATION_RAM );
+                    }
+                    catch( const std::exception & ram_error )
+                    {
+                        LOG_DEBUG( "Depth mapping: safety interface config not in RAM (" << ram_error.what() << "), reading flash" );
+                        sic = read_safety_interface_config( _hw_monitor, RS2_CALIB_LOCATION_FLASH );
+                    }
+                    json sic_json = json::parse( sic );
+                    camera_position extrinsics_from_preset( sic_json["safety_interface_config"]["camera_position"] );
+                    auto rot = extrinsics_from_preset.get_rotation();
+                    auto trans = extrinsics_from_preset.get_translation();
 
-                // converting row-major matrix to column-major
-                float rotation_matrix[9] = { rot[0][0], rot[1][0], rot[2][0],
-                                             rot[0][1], rot[1][1], rot[2][1],
-                                             rot[0][2], rot[1][2], rot[2][2] };
-                std::memcpy(res.rotation, &rotation_matrix, sizeof rotation_matrix);
-                std::memcpy(res.translation, trans.data(), trans.size() * sizeof(float));
-                return res;
+                    // converting row-major matrix to column-major
+                    float rotation_matrix[9] = { rot[0][0], rot[1][0], rot[2][0],
+                                                 rot[0][1], rot[1][1], rot[2][1],
+                                                 rot[0][2], rot[1][2], rot[2][2] };
+                    std::memcpy( res.rotation, &rotation_matrix, sizeof rotation_matrix );
+                    std::memcpy( res.translation, trans.data(), trans.size() * sizeof( float ) );
+
+                    // An unset record reads as zeros: not a rotation (FW applies its default then)
+                    const float det = rot[0][0] * ( rot[1][1] * rot[2][2] - rot[1][2] * rot[2][1] )
+                                    - rot[0][1] * ( rot[1][0] * rot[2][2] - rot[1][2] * rot[2][0] )
+                                    + rot[0][2] * ( rot[1][0] * rot[2][1] - rot[1][1] * rot[2][0] );
+                    if( ! _is_safety_layout && std::abs( det - 1.f ) > 0.05f )
+                        throw std::runtime_error( rsutils::string::from() << "camera_position rotation is not a rotation (det " << det << ")" );
+                    LOG_INFO( "Depth mapping: camera position from the safety interface config, translation "
+                              << res.translation[0] << ", " << res.translation[1] << ", " << res.translation[2] << " m" );
+                    return res;
+                }
+                catch( const std::exception & e )
+                {
+                    if( _is_safety_layout )
+                        throw std::runtime_error( rsutils::string::from() << "Could not read safety interface config: " << e.what() );
+                    LOG_WARNING( "Depth mapping: camera position unavailable (" << e.what()
+                                 << "); mapping streams use the FW default pose (axis conversion, 180 mm mount height)" );
+                    return fw_default_pose();
+                }
             });
 
         register_stream_to_extrinsic_group(*_occupancy_stream, 0);
@@ -188,6 +371,10 @@ namespace librealsense
 
         register_stream_to_extrinsic_group(*_point_cloud_stream, 0);
         environment::get_instance().get_extrinsics_graph().register_extrinsics(*_depth_stream, *_point_cloud_stream, _depth_to_depth_mapping_extrinsics);
+
+        // The device point cloud is in the depth optical frame.
+        register_stream_to_extrinsic_group(*_pcl_stream, 0);
+        environment::get_instance().get_extrinsics_graph().register_same_extrinsics(*_depth_stream, *_pcl_stream);
     }
 
     void d500_depth_mapping::add_streams_if_active( std::vector< std::shared_ptr< stream_interface > > & streams ) const
@@ -196,6 +383,8 @@ namespace librealsense
         {
             streams.push_back( _occupancy_stream );
             streams.push_back( _point_cloud_stream );
+            if( ! _is_safety_layout )
+                streams.push_back( _pcl_stream );
         }
     }
 
@@ -582,6 +771,13 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                     return std::make_shared< identity_processing_block >();
                 } };
         mapping_ep->register_processing_block( lpc_pbf );
+        processing_block_factory pcl_pbf
+            = { { { RS2_FORMAT_Y8, RS2_STREAM_POINT_CLOUD } },
+                { { RS2_FORMAT_XYZ32F, RS2_STREAM_POINT_CLOUD } },
+                []() {
+                    return std::make_shared< pcl_xyz_relabel_block >();
+                } };
+        mapping_ep->register_processing_block( pcl_pbf );
     }
 
     stream_profiles d500_depth_mapping_sensor::init_stream_profiles()
@@ -594,9 +790,9 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             if (p->get_stream_type() == RS2_STREAM_OCCUPANCY)
             {
                 const auto&& profile = to_profile(p.get());
-                // The mapping interface also advertises the plain point-cloud selectors
-                // (640x480, 1280x720), which have no rs2 stream of their own and would
-                // otherwise surface as bogus occupancy profiles. Keep only the canvas.
+                // Keep only the canvas. The PCL XYZ tuples (640x480@30, 1280x720@15) are
+                // remapped to RS2_STREAM_POINT_CLOUD by the raw sensor's stream-id resolver;
+                // any other GREY size on this interface is not occupancy.
                 if (_owner->_is_safety_layout ? (profile.width == 2880)
                                               : (profile.width != 320 || profile.height != 256))
                     continue;
@@ -610,6 +806,13 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                     continue;
                 relevant_results.push_back(std::move(p));
             }
+            else if (p->get_stream_type() == RS2_STREAM_POINT_CLOUD)
+            {
+                const auto&& profile = to_profile(p.get());
+                if (_owner->_is_safety_layout || ! is_pcl_xyz_tuple(profile.width, profile.height, profile.fps))
+                    continue;
+                relevant_results.push_back(std::move(p));
+            }
         }
 
         for (auto p : relevant_results)
@@ -619,6 +822,8 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                 assign_stream(_owner->_occupancy_stream, p);
             else if (p->get_stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
                 assign_stream(_owner->_point_cloud_stream, p);
+            else if (p->get_stream_type() == RS2_STREAM_POINT_CLOUD)
+                assign_stream(_owner->_pcl_stream, p);
 
             auto&& video = dynamic_cast<video_stream_profile_interface*>(p.get());
             const auto&& profile = to_profile(p.get());
@@ -636,6 +841,15 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
         }
 
         return relevant_results;
+    }
+
+    void d500_depth_mapping_sensor::open(const stream_profiles& requests)
+    {
+        if (requests.size() > 1)
+            throw invalid_value_exception(rsutils::string::from()
+                << "The Depth Mapping Camera streams one of Point Cloud, Labeled Point Cloud, or Occupancy at a time; "
+                << requests.size() << " profiles were requested");
+        synthetic_sensor::open(requests);
     }
 
     rs2_intrinsics d500_depth_mapping_sensor::get_intrinsics(const stream_profile& profile) const

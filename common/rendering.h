@@ -792,6 +792,10 @@ namespace rs2
             {
                 // Points can be uploaded as two different
                 // formats: XYZ for verteces and UV for texture coordinates
+                // A device point cloud has no texture coordinates; its 2D tile gets the colorized image the
+                // Viewer uploads right after, so skip uploading the raw vertices there
+                if (prefered_format != RS2_FORMAT_XYZ32F && ! pc.get_texture_coordinates())
+                    return;
                 if (prefered_format == RS2_FORMAT_XYZ32F)
                 {
                     // Upload vertices

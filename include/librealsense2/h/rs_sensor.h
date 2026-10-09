@@ -61,6 +61,7 @@ typedef enum rs2_stream
     RS2_STREAM_OCCUPANCY                        , /**< occupancy info */
     RS2_STREAM_LABELED_POINT_CLOUD              , /**< labeled point cloud stream */
     RS2_STREAM_OBJECT_DETECTION                 , /**< object detection stream */
+    RS2_STREAM_POINT_CLOUD                      , /**< device-generated point cloud stream (D5xx EP12 Mapping) */
     RS2_STREAM_COUNT
 } rs2_stream;
 const char* rs2_stream_to_string(rs2_stream stream);

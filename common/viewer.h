@@ -19,6 +19,7 @@
 #include "rum-uploader/rum-uploader.h"
 #endif
 #include <librealsense2/hpp/rs_export.hpp>
+#include <librealsense2/hpp/rs_internal.hpp>
 
 namespace rs2
 {
@@ -313,6 +314,20 @@ namespace rs2
         void init_depth_uid(int& selected_depth_source, std::vector<std::string>& depth_sources_str, std::vector<int>& depth_sources);
         void init_labeled_points_uid();
         void draw_3d_labeled_points(const rect& viewer_rect, rs2::labeled_points labeled_points);
+        // HKR clouds (device point cloud, labeled point cloud) are drawn by the host point-cloud renderer:
+        // converted to host-style points (vertices + texture coordinates) over a color texture.
+        rs2::points make_host_points(rs2::frame source);
+        void prepare_device_cloud();
+        void prepare_labeled_cloud();
+        bool render_hkr_cloud(rs2::gl::pointcloud_renderer& renderer, rs2::points pts, texture_buffer& tex, float point_size,
+                              const rect& viewer_rect, ux_window& win, matrix4 camera, matrix4 projection, bool pick);
+        void on_point_picked(ux_window& win, const float3& p, const float3& normal);
+        void switch_to_3d_view(ux_window& win, const rect& viewer_rect);
+        void switch_to_2d_view();
+        bool is_streaming(rs2_stream type) const;
+        bool is_stream_streaming(int key) const;
+        bool _lpcl_active = false;  // labeled point cloud streaming: went to 3D when it started
+        bool _occupancy_active = false;  // occupancy grid streaming: went to 2D when it started
         bool should_texture_frame_be_updated(const rs2::frame& f) const;
         bool is_passive_frame(const rs2::frame& f) const;
         bool is_split_passive_frame( const rs2::frame & f );
@@ -348,12 +363,40 @@ namespace rs2
         
         rs2::labeled_points last_labeled_points;
 
+        // Device point cloud (RS2_STREAM_POINT_CLOUD): ready-made XYZ, drawn without texture.
+        rs2::points last_device_points;
+        rs2::points _device_pc_host_points;  // host-style copy for the point-cloud renderer
+        std::shared_ptr< texture_buffer > _device_pc_texture;
+        unsigned long long _device_pc_frame_number = 0;
+        double _device_pc_timestamp = 0.;
+        rs2::points _lpcl_host_points;
+        std::shared_ptr< texture_buffer > _lpcl_texture;
+        std::vector< uint8_t > _lpcl_rgb;
+        unsigned long long _lpcl_frame_number = 0;
+        double _lpcl_timestamp = 0.;
+        std::shared_ptr< rs2::filter > _host_points_maker;
+        std::map< int, rs2::stream_profile > _host_points_profiles;
+        std::vector< rs2::vertex > _host_points_xyz;  // input of _host_points_maker
+        // Colors come from the depth colorizer, as for the host cloud: the cloud's Z goes through a
+        // software depth sensor (to give the frame its depth units) and a CPU copy of the colorizer.
+        std::vector< uint16_t > _device_pc_z16;
+        std::shared_ptr< rs2::software_device > _device_pc_sw_device;
+        std::shared_ptr< rs2::software_sensor > _device_pc_sw_sensor;
+        rs2::stream_profile _device_pc_sw_profile;
+        std::shared_ptr< rs2::frame_queue > _device_pc_sw_queue;
+        std::shared_ptr< rs2::colorizer > _device_pc_colorizer;
+        rs2::frame _device_pc_colors;  // colorized W x H image of the latest device cloud (3D colors and 2D tile)
+        rs2::frame colorize_device_points( int width, int height );
+        void update_device_points( rs2::points pc );
+
         // Infinite pan / rotate feature:
         bool manipulating = false;
         float2 overflow = { 0.f, 0.f };
 
         rs2::gl::camera_renderer _cam_renderer;
         rs2::gl::pointcloud_renderer _pc_renderer;
+        rs2::gl::pointcloud_renderer _device_pc_renderer;
+        rs2::gl::pointcloud_renderer _lpcl_renderer;
 
 
         bool _pc_selected = false;

@@ -276,7 +276,8 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // payload with its own headers, so width*height*bpp is not its length.
                     const bool is_depth_mapping
                         = ( extension == RS2_EXTENSION_LABELED_POINTS )
-                       || ( req_profile_base->get_stream_type() == RS2_STREAM_OCCUPANCY );
+                       || ( req_profile_base->get_stream_type() == RS2_STREAM_OCCUPANCY )
+                       || ( req_profile_base->get_stream_type() == RS2_STREAM_POINT_CLOUD );
 
                     if( ! msp )
                         expected_size = compute_frame_expected_size( width, height, bpp );
@@ -301,7 +302,10 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // Zero-copy capture is taken only on the clean branch where the frame is a
                     // verbatim view of the backend buffer (sizes match exactly, not motion, not
                     // realigned) and we have not already pinned too many ring buffers.
+                    // Mapping streams stay on the copy path: their frame classes and the point-cloud block
+                    // read and reshape the payload in `data`, which a zero-copy frame leaves empty.
                     const bool do_zc = capture_zerocopy_enabled()
+                                       && ! is_depth_mapping
                                        && ! msp
                                        && ! align64
                                        && expected_size == sizeof( uint8_t ) * f.frame_size
