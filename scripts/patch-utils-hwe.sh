@@ -88,9 +88,12 @@ function choose_kernel_branch {
 		"6.14")
 			echo hwe-6.14
 			;;
+		"7.0")
+			echo hwe-7.0
+			;;
 		*)
 			#error message shall be redirected to stderr to be printed properly
-			echo -e "\e[31mUnsupported kernel version $1 . The Noble patches are maintained for Ubuntu LTS with kernel 6.8, 6.11, 6.14 only\e[0m" >&2
+			echo -e "\e[31mUnsupported kernel version $1 . The Noble patches are maintained for Ubuntu LTS with kernel 6.8, 6.11, 6.14, 7.0 only\e[0m" >&2
 			exit 1
 			;;
 		esac
