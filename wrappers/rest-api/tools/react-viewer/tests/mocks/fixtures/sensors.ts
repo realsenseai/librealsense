@@ -1,43 +1,36 @@
 import type { SensorInfo, OptionInfo, SupportedStreamProfile } from '@/api/types'
 
-export const mockDepthSensorProfiles: SupportedStreamProfile[] = [
-  {
-    stream_type: 'Depth',
-    resolutions: [[640, 480], [1280, 720], [848, 480]],
-    fps: [30, 15, 6],
-    formats: ['Z16'],
-  },
-  {
-    stream_type: 'Infrared',
-    resolutions: [[640, 480], [1280, 720]],
-    fps: [30, 15],
-    formats: ['Y8', 'Y16'],
-  },
-]
+type Spec = [stream_type: string, stream_index: number, formats: string[], resolutions: [number, number][], fps: number[]]
 
-export const mockColorSensorProfiles: SupportedStreamProfile[] = [
-  {
-    stream_type: 'Color',
-    resolutions: [[640, 480], [1280, 720], [1920, 1080]],
-    fps: [30, 15, 6],
-    formats: ['RGB8', 'YUYV', 'BGR8'],
-  },
-]
+/** Rows for every combination of each spec, as the SDK lists them; `isDefault` marks the SDK defaults. */
+function profiles(specs: Spec[], isDefault: (p: SupportedStreamProfile) => boolean): SupportedStreamProfile[] {
+  const rows: SupportedStreamProfile[] = []
+  for (const [stream_type, stream_index, formats, resolutions, fpsList] of specs)
+    for (const format of formats)
+      for (const [width, height] of resolutions)
+        for (const fps of fpsList) {
+          const row = { stream_type, stream_index, format, width, height, fps, default: false }
+          rows.push({ ...row, default: isDefault(row) })
+        }
+  return rows
+}
 
-export const mockMotionSensorProfiles: SupportedStreamProfile[] = [
-  {
-    stream_type: 'Accel',
-    resolutions: [[1, 1]],
-    fps: [100, 200, 400],
-    formats: ['MOTION_XYZ32F'],
-  },
-  {
-    stream_type: 'Gyro',
-    resolutions: [[1, 1]],
-    fps: [200, 400],
-    formats: ['MOTION_XYZ32F'],
-  },
-]
+// Infrared has no SDK default, and only y8 exists at 848x480
+export const mockDepthSensorProfiles: SupportedStreamProfile[] = profiles([
+  ['depth', 0, ['z16'], [[640, 480], [1280, 720], [848, 480]], [30, 15, 6]],
+  ['infrared', 1, ['y8'], [[640, 480], [1280, 720], [848, 480]], [30, 15]],
+  ['infrared', 1, ['y16'], [[640, 480], [1280, 720]], [30, 15]],
+], (p) => p.stream_type === 'depth' && p.width === 848 && p.fps === 30)
+
+export const mockColorSensorProfiles: SupportedStreamProfile[] = profiles([
+  ['color', 0, ['rgb8', 'yuyv', 'bgr8'], [[640, 480], [1280, 720], [1920, 1080]], [30, 15, 6]],
+], (p) => p.format === 'rgb8' && p.width === 1280 && p.fps === 30)
+
+// Motion profiles have no resolution; the SDK reports 0x0
+export const mockMotionSensorProfiles: SupportedStreamProfile[] = profiles([
+  ['accel', 0, ['motion_xyz32f'], [[0, 0]], [100, 200]],
+  ['gyro', 0, ['motion_xyz32f'], [[0, 0]], [200, 400]],
+], (p) => (p.stream_type === 'accel' && p.fps === 100) || (p.stream_type === 'gyro' && p.fps === 200))
 
 export const mockDepthSensor: SensorInfo = {
   sensor_id: '123456789-sensor-0',

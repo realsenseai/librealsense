@@ -72,17 +72,14 @@ export const mockSensorConfigs: Record<string, SensorConfig> = {
   '123456789-sensor-0': {
     resolution: { width: 640, height: 480 },
     framerate: 30,
-    isMotionSensor: false,
   },
   '123456789-sensor-1': {
     resolution: { width: 640, height: 480 },
     framerate: 30,
-    isMotionSensor: false,
   },
   '123456789-sensor-2': {
     resolution: { width: 1, height: 1 },
     framerate: 200,
-    isMotionSensor: true,
   },
 }
 

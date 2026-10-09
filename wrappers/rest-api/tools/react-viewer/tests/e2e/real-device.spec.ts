@@ -43,13 +43,7 @@ async function startDepthStream(page: Page, device: DeviceInfo): Promise<void> {
   await openDeviceCard(page, device)
   await page.locator('[data-testid="toggle-stream-depth"]').first().check()
 
-  // The sensors API reports resolutions and framerates as two independent lists, so the
-  // viewer's default pick can be a pair the SDK does not actually offer.
-  const sensorModule = depthSensorModule(page)
-  await sensorModule.locator('[data-testid="sensor-resolution"]').selectOption('1280x720')
-  await sensorModule.locator('[data-testid="sensor-fps"]').selectOption('30')
-
-  const startButton = sensorModule.locator('[data-testid="start-streaming"]')
+  const startButton = depthSensorModule(page).locator('[data-testid="start-streaming"]')
   await expect(startButton).toBeEnabled()
   await startButton.click()
   await expect(page.locator('video.stream-video').first()).toBeVisible({ timeout: 20000 })

@@ -395,6 +395,44 @@ describe('DevicePanel', () => {
     })
   })
 
+  describe('Resolution and FPS', () => {
+    const row = (width: number, height: number, fps: number) =>
+      ({ stream_type: 'depth', stream_index: 0, format: 'z16', width, height, fps, default: false })
+
+    async function renderSensor(framerate: number, updateSensorConfig = vi.fn()) {
+      const device = createMockDevice()
+      const sensor = createMockSensor({
+        sensor_id: 'sensor-a',
+        supported_stream_profiles: [row(848, 480, 90), row(848, 480, 30), row(1280, 720, 15), row(1280, 720, 30)],
+      })
+      const deviceState = createMockDeviceState(device, {
+        isActive: true,
+        sensors: [sensor],
+        sensorConfigs: { 'sensor-a': { resolution: { width: 848, height: 480 }, framerate } },
+        streamConfigs: [{ sensor_id: 'sensor-a', stream_type: 'depth', format: 'z16',
+          resolution: { width: 848, height: 480 }, framerate, enable: true }],
+      })
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: deviceState }, updateSensorConfig },
+      })
+      await userEvent.click(screen.getByText('Stereo Module'))
+      return updateSensorConfig
+    }
+
+    it('offers every fps the sensor has, like the C++ viewer', async () => {
+      await renderSensor(30)
+      const fps = screen.getByTestId('sensor-fps') as HTMLSelectElement
+      expect([...fps.options].map(o => o.value)).toEqual(['15', '30', '90'])
+    })
+
+    it('keeps the picked resolution and moves fps onto one it has', async () => {
+      const updateSensorConfig = await renderSensor(90)
+      await userEvent.selectOptions(screen.getByTestId('sensor-resolution'), '1280x720')
+      expect(updateSensorConfig).toHaveBeenLastCalledWith(expect.anything(), 'sensor-a',
+        { resolution: { width: 1280, height: 720 }, framerate: 15 })
+    })
+  })
+
   describe('Control Search', () => {
     // The search covers one sensor's controls and lives inside its panel, so the sensor
     // has to be expanded before there is a box to type in.

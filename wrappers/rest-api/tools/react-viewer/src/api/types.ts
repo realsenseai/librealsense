@@ -71,11 +71,27 @@ export interface SensorInfo {
   options: OptionInfo[]
 }
 
+// One SDK stream profile, as listed; /sensors/{id}/start takes these back unchanged
 export interface SupportedStreamProfile {
   stream_type: string
-  resolutions: [number, number][]
-  fps: number[]
-  formats: string[]
+  stream_index: number
+  format: string
+  width: number // 0 for motion, as the SDK reports it
+  height: number
+  fps: number
+  default: boolean
+}
+
+/** The backend's name for a profile's stream ("depth", "infrared-1"), as frame, WebRTC and status lookups use it. */
+export const streamKey = (p: SupportedStreamProfile) =>
+  p.stream_type === 'infrared' ? `infrared-${p.stream_index}` : p.stream_type
+
+/** A sensor's profiles of one stream at a resolution/fps. */
+export function profilesAt(
+  sensor: SensorInfo, stream: string, resolution: { width: number; height: number }, fps: number
+): SupportedStreamProfile[] {
+  return sensor.supported_stream_profiles.filter(p => streamKey(p) === stream && p.fps === fps &&
+    p.width === resolution.width && p.height === resolution.height)
 }
 
 export interface OptionInfo {
@@ -201,7 +217,6 @@ export interface StreamLayout {
 export interface SensorConfig {
   resolution: { width: number; height: number }
   framerate: number
-  isMotionSensor?: boolean // Motion sensors use per-stream FPS instead of shared
 }
 
 // Per-device state for multi-camera support
@@ -228,32 +243,12 @@ export interface DeviceState {
   sensorStreamingStatus: Record<string, SensorStreamStatus> // keyed by sensor_id
 }
 
-// Per-sensor streaming types (for sensor API)
-export interface SensorStreamConfig {
-  stream_type: string
-  format: string
-  resolution: { width: number; height: number }
-  framerate: number
-}
-
-export interface SensorStartRequest {
-  config: SensorStreamConfig
-}
-
+// Per-sensor streaming state, kept by the viewer (the sensor API's start/stop return nothing)
 export interface SensorStreamStatus {
   sensor_id: string
-  name: string
   is_streaming: boolean
-  // Single stream_type for backward compatibility (first stream)
-  stream_type?: string | null
-  resolution?: { width: number; height: number } | null
-  framerate?: number | null
-  format?: string | null
-  // New: multiple streams support
-  stream_types?: string[]  // All active stream types
-  streams?: SensorStreamConfig[]  // All active stream configs
+  stream_types?: string[]  // The streams it was started with, by streamKey
   error?: string | null
-  started_at?: string | null
   // UI-only: pending operation state for optimistic updates
   pendingOp?: 'stopping' | null
 }

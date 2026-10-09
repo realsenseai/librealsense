@@ -67,12 +67,7 @@ export function createMockSensor(overrides: Partial<SensorInfo> = {}): SensorInf
     sensor_id: 'test-device-1-sensor-0',
     name: 'Stereo Module',
     supported_stream_profiles: [
-      {
-        stream_type: 'depth',
-        resolutions: [[640, 480]],
-        fps: [30],
-        formats: ['Z16'],
-      },
+      { stream_type: 'depth', stream_index: 0, format: 'z16', width: 640, height: 480, fps: 30, default: true },
     ],
     is_streaming: false,
     ...overrides,

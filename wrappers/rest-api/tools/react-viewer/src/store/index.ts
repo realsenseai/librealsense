@@ -11,8 +11,8 @@ import type {
   ControlGroup,
   SensorFilters,
   FirmwareState,
-  SensorStreamConfig,
   SensorConfig,
+  SupportedStreamProfile,
 } from '../api/types'
 
 // Tracks the in-flight legacy-chatbot request so `stopChatMessage` can abort it.
@@ -53,78 +53,52 @@ function decodeFloat32Payload(raw: ArrayBuffer | string): Float32Array {
   return new Float32Array(u8.buffer, u8.byteOffset, u8.byteLength >> 2)
 }
 
+const resolutionOf = (p: SupportedStreamProfile) => ({ width: p.width, height: p.height })
+
+/**
+ * The profile each stream starts with: its SDK default, else (infrared has none) the one at
+ * the resolution/fps of the sensor's default, else its first.
+ */
+function startupProfiles(sensor: SensorInfo): SupportedStreamProfile[] {
+  const profiles = sensor.supported_stream_profiles
+  const anchor = profiles.find(p => p.default) ?? profiles[0]
+  return [...new Set(profiles.map(streamKey))].map(key => {
+    const ofType = profiles.filter(p => streamKey(p) === key)
+    return ofType.find(p => p.default)
+      ?? ofType.find(p => p.width === anchor.width && p.height === anchor.height && p.fps === anchor.fps)
+      ?? ofType[0]
+  })
+}
+
 function buildStreamConfigs(sensors: SensorInfo[]): StreamConfig[] {
-  const configs: StreamConfig[] = []
-  for (const sensor of sensors) {
-    const profiles = sensor.supported_stream_profiles.filter(
-      p => p.resolutions.length > 0 && p.fps.length > 0
-    )
-    for (const profile of profiles) {
-      const streamTypeLower = profile.stream_type.toLowerCase()
-      const enableByDefault =
-        streamTypeLower === 'depth' || streamTypeLower === 'color' ||
-        streamTypeLower === 'gyro' || streamTypeLower === 'accel'
-      configs.push({
-        sensor_id: sensor.sensor_id,
-        stream_type: profile.stream_type,
-        format: profile.formats[0] || 'rgb8',
-        resolution: {
-          width: profile.resolutions[0][0],
-          height: profile.resolutions[0][1],
-        },
-        framerate: profile.fps[0],
-        enable: enableByDefault,
-      })
+  return sensors.flatMap(sensor => startupProfiles(sensor).map(profile => {
+    const streamTypeLower = profile.stream_type.toLowerCase()
+    const enableByDefault =
+      streamTypeLower === 'depth' || streamTypeLower === 'color' ||
+      streamTypeLower === 'gyro' || streamTypeLower === 'accel'
+    return {
+      sensor_id: sensor.sensor_id,
+      stream_type: streamKey(profile),
+      format: profile.format,
+      resolution: resolutionOf(profile),
+      framerate: profile.fps,
+      enable: enableByDefault,
     }
-  }
-  return configs
+  }))
 }
 
 function buildSensorConfigs(sensors: SensorInfo[]): Record<string, SensorConfig> {
   const sensorConfigs: Record<string, SensorConfig> = {}
   for (const sensor of sensors) {
-    const isMotionSensor = sensor.name.toLowerCase().includes('motion')
-    const profiles = sensor.supported_stream_profiles.filter(
-      p => p.resolutions.length > 0 && p.fps.length > 0
-    )
-
-    let commonResolutions = new Set<string>()
-    let commonFps = new Set<number>()
-    let isFirst = true
-
-    for (const profile of profiles) {
-      const profileRes = new Set<string>(profile.resolutions.map(([w, h]) => `${w}x${h}`))
-      const profileFps = new Set<number>(profile.fps)
-      if (isFirst) {
-        commonResolutions = profileRes
-        commonFps = profileFps
-        isFirst = false
-      } else {
-        commonResolutions = new Set<string>([...commonResolutions].filter(r => profileRes.has(r)))
-        commonFps = new Set<number>([...commonFps].filter(f => profileFps.has(f)))
-      }
-    }
-
-    if (commonResolutions.size > 0 && commonFps.size > 0) {
-      const firstCommonRes = [...commonResolutions][0]
-      const [width, height] = firstCommonRes.split('x').map(Number)
-      const sortedFps = [...commonFps].sort((a, b) => b - a)
-      let selectedFps = sortedFps[0]
-      if (commonFps.has(30)) selectedFps = 30
-      else if (commonFps.has(15)) selectedFps = 15
-      sensorConfigs[sensor.sensor_id] = { resolution: { width, height }, framerate: selectedFps, isMotionSensor }
-    } else if (sensor.supported_stream_profiles.length > 0) {
-      const firstProfile = sensor.supported_stream_profiles[0]
-      const width = firstProfile.resolutions[0]?.[0] || 320
-      const height = firstProfile.resolutions[0]?.[1] || 120
-      const selectedFps = firstProfile.fps[0] || 200
-      sensorConfigs[sensor.sensor_id] = { resolution: { width, height }, framerate: selectedFps, isMotionSensor }
-    }
+    const anchor = sensor.supported_stream_profiles.find(p => p.default) ?? sensor.supported_stream_profiles[0]
+    if (!anchor) continue
+    sensorConfigs[sensor.sensor_id] = { resolution: resolutionOf(anchor), framerate: anchor.fps }
   }
   return sensorConfigs
 }
 import { apiClient } from '../api/client'
-import { optionLabel } from '../api/types'
+import { optionLabel, profilesAt, streamKey } from '../api/types'
+import { sharedFps } from '../utils/streamSelection'
 import {
   checkChatAvailability,
   sendChatMessage as sendChatMessageApi,
@@ -508,7 +482,11 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     }))
 
     try {
-      const sensors = await apiClient.getSensors(deviceId)
+      // The viewer hides infrared index 0
+      const sensors = (await apiClient.getSensors(deviceId)).map(s => ({
+        ...s,
+        supported_stream_profiles: s.supported_stream_profiles.filter(p => streamKey(p) !== 'infrared-0'),
+      }))
 
       const configs = buildStreamConfigs(sensors)
       const sensorConfigs = buildSensorConfigs(sensors)
@@ -603,18 +581,23 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
       return
     }
 
-    // Build configs array for all enabled streams
-    // Motion sensors use per-stream FPS, others use sensor-level FPS
-    const configs: SensorStreamConfig[] = enabledStreamConfigs.map(c => ({
-      stream_type: c.stream_type,
-      format: c.format,
-      resolution: sensorConfig.isMotionSensor ? c.resolution : sensorConfig.resolution,
-      framerate: sensorConfig.isMotionSensor ? c.framerate : sensorConfig.framerate,
-    }))
+    const sensor = deviceState.sensors.find(s => s.sensor_id === sensorId)!
+    const shared = sharedFps(sensor.supported_stream_profiles)
+    const profiles: SupportedStreamProfile[] = []
+    for (const c of enabledStreamConfigs) {
+      const { resolution, framerate } = shared ? sensorConfig : c
+      const profile = profilesAt(sensor, c.stream_type, resolution, framerate).find(p => p.format === c.format)
+      if (!profile) {
+        set({ error: `${c.stream_type} has no ${c.format} profile at ${resolution.width}x${resolution.height} ${framerate}fps` })
+        return
+      }
+      profiles.push(profile)
+    }
 
     try {
-      const status = await apiClient.startSensor(deviceId, sensorId, configs)
-      
+      await apiClient.startSensor(deviceId, sensorId, profiles)
+      const status = { sensor_id: sensorId, is_streaming: true, stream_types: profiles.map(streamKey) }
+
       set((s) => ({
         deviceStates: {
           ...s.deviceStates,
@@ -651,7 +634,6 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
               ...s.deviceStates[deviceId].sensorStreamingStatus,
               [sensorId]: {
                 sensor_id: sensorId,
-                name: '',
                 is_streaming: false,
                 error: errorMessage,
               },
@@ -672,7 +654,6 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
 
       const currentSensorStatus = deviceState.sensorStreamingStatus[sensorId] || {
         sensor_id: sensorId,
-        name: '',
         is_streaming: false,
       }
 
@@ -709,19 +690,20 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     // Create and store the stop promise so startSensorStreaming can await it
     const stopPromise = (async () => {
       try {
-        const status = await apiClient.stopSensor(deviceId, sensorId)
-        
+        await apiClient.stopSensor(deviceId, sensorId)
+
         set((s) => {
           const deviceState = s.deviceStates[deviceId]
           if (!deviceState) return s
 
           const newSensorStatus = { ...deviceState.sensorStreamingStatus }
           newSensorStatus[sensorId] = {
-            ...status,
+            sensor_id: sensorId,
+            is_streaming: false,
             pendingOp: null,  // Clear pending state
           }
 
-          // Recheck streaming state with actual server response
+          // Recheck streaming state now that the stop is confirmed
           const anyStreaming = Object.values(newSensorStatus).some(ss => ss.is_streaming)
 
           return {

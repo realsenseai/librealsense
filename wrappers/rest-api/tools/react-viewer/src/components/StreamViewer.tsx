@@ -31,8 +31,7 @@ export function StreamViewer() {
       ds.streamConfigs.filter(c => c.enable).forEach(config => {
         // Is this specific stream running on its sensor?
         const sensorStatus = ds.sensorStreamingStatus?.[config.sensor_id]
-        // stream_types is the current shape; stream_type is the older single-stream one
-        const activeTypes = sensorStatus?.stream_types || (sensorStatus?.stream_type ? [sensorStatus.stream_type] : [])
+        const activeTypes = sensorStatus?.stream_types ?? []
         const streamIsActive = sensorStatus?.is_streaming === true &&
                         activeTypes.some(st => st.toLowerCase() === config.stream_type.toLowerCase())
 

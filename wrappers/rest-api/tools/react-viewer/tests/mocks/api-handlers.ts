@@ -128,41 +128,9 @@ export const handlers = [
     })
   }),
 
-  // Per-sensor streaming: start sensor
-  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/start`, async ({ params }) => {
-    const sensorId = params.sensorId as string
-    return HttpResponse.json({
-      sensor_id: sensorId,
-      name: 'Stereo Module',
-      is_streaming: true,
-      stream_type: 'depth',
-      stream_types: ['depth'],
-      resolution: { width: 640, height: 480 },
-      framerate: 30,
-      format: 'Z16',
-      started_at: new Date().toISOString(),
-    })
-  }),
-
-  // Per-sensor streaming: stop sensor
-  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/stop`, async ({ params }) => {
-    const sensorId = params.sensorId as string
-    return HttpResponse.json({
-      sensor_id: sensorId,
-      name: 'Stereo Module',
-      is_streaming: false,
-    })
-  }),
-
-  // Per-sensor streaming: get sensor status
-  http.get(`${API_BASE}/devices/:deviceId/sensors/:sensorId/status`, async ({ params }) => {
-    const sensorId = params.sensorId as string
-    return HttpResponse.json({
-      sensor_id: sensorId,
-      name: 'Stereo Module',
-      is_streaming: false,
-    })
-  }),
+  // Per-sensor streaming: start / stop return no body
+  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/start`, () => HttpResponse.json(null)),
+  http.post(`${API_BASE}/devices/:deviceId/sensors/:sensorId/stop`, () => HttpResponse.json(null)),
 
   // Recommended firmware (none, unless a test says otherwise)
   http.get(`${API_BASE}/devices/:deviceId/firmware/`, () => HttpResponse.json({ recommended: null })),

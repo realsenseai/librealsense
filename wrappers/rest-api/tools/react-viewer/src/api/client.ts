@@ -11,8 +11,7 @@ import type {
   WebRTCOffer,
   WebRTCSession,
   ICECandidate,
-  SensorStreamConfig,
-  SensorStreamStatus,
+  SupportedStreamProfile,
 } from './types'
 
 // Detect if running in Tauri desktop app
@@ -216,20 +215,13 @@ class ApiClient {
   async startSensor(
     deviceId: string,
     sensorId: string,
-    configs: SensorStreamConfig[]  // Array of configs for multi-profile support
-  ): Promise<SensorStreamStatus> {
-    const response = await this.client.post<SensorStreamStatus>(
-      `/devices/${deviceId}/sensors/${sensorId}/start`,
-      { configs }  // Send as list
-    )
-    return response.data
+    profiles: SupportedStreamProfile[]
+  ): Promise<void> {
+    await this.client.post(`/devices/${deviceId}/sensors/${sensorId}/start`, { profiles })
   }
 
-  async stopSensor(deviceId: string, sensorId: string): Promise<SensorStreamStatus> {
-    const response = await this.client.post<SensorStreamStatus>(
-      `/devices/${deviceId}/sensors/${sensorId}/stop`
-    )
-    return response.data
+  async stopSensor(deviceId: string, sensorId: string): Promise<void> {
+    await this.client.post(`/devices/${deviceId}/sensors/${sensorId}/stop`)
   }
 
   // ============ Point Cloud ============

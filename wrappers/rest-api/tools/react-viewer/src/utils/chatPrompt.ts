@@ -1,6 +1,6 @@
 // System prompt builder and response parser for AI camera configuration chat
 
-import { optionLabel } from '../api/types'
+import { optionLabel, streamKey } from '../api/types'
 import type { ControlGroup, DeviceState, SensorInfo, StreamConfig } from '../api/types'
 
 /**
@@ -130,15 +130,14 @@ function formatSensors(sensors: SensorInfo[]): string {
   
   return sensors.map(s => {
     const profiles = s.supported_stream_profiles || []
-    const streamTypes = [...new Set(profiles.map(p => p.stream_type))]
-    
+    const streamTypes = [...new Set(profiles.map(streamKey))]
+
     // Build available resolutions and FPS for each stream type
     const streamDetails = streamTypes.map(type => {
-      const typeProfiles = profiles.filter(p => p.stream_type === type)
-      const resolutions = [...new Set(typeProfiles.flatMap(p => 
-        p.resolutions.map(r => `${r[0]}x${r[1]}`)
-      ))].slice(0, 5).join(', ') // Limit to 5 resolutions
-      const fps = [...new Set(typeProfiles.flatMap(p => p.fps))].sort((a, b) => a - b).join(', ')
+      const typeProfiles = profiles.filter(p => streamKey(p) === type)
+      const resolutions = [...new Set(typeProfiles.flatMap(p => p.width === 0 ? [] : [`${p.width}x${p.height}`]))]
+        .slice(0, 5).join(', ') // Limit to 5 resolutions
+      const fps = [...new Set(typeProfiles.map(p => p.fps))].sort((a, b) => a - b).join(', ')
       return `${type} (${resolutions} @ ${fps} fps)`
     })
     

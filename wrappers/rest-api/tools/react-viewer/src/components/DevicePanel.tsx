@@ -3,6 +3,10 @@ import type { MutableRefObject, ReactElement } from 'react'
 import { useAppStore } from '../store'
 import type { ControlGroup, DeviceInfo, SensorInfo, OptionInfo, StreamConfig, DeviceState, FirmwareState, SensorConfig } from '../api/types'
 import { SECTIONS, firmwareStatus, optionLabel } from '../api/types'
+import {
+  applyFormat, applyFps, applyResolution, applyToggle, withStream,
+  formatOptions, fpsOptions, resolutionOptions, sharedFps, type Selection,
+} from '../utils/streamSelection'
 import { RefreshCcw, Search, X } from 'lucide-react'
 import { FirmwareProgressModal } from './FirmwareProgressModal'
 import { ToastContainer, type ToastType, type ToastAction } from './Toast'
@@ -666,29 +670,14 @@ function SensorPanel({
 
   const modifiedCount = groups.flatMap(([, g]) => g.options).filter(isModified).length
 
-  const computeCommonOptions = () => {
-          const profiles = sensor.supported_stream_profiles
-          if (profiles.length === 0) return { resolutions: [], fps: [] }
-
-          let commonResolutions = new Set(profiles[0].resolutions.map(([w, h]) => `${w}x${h}`))
-          let commonFps = new Set(profiles[0].fps)
-
-          for (let i = 1; i < profiles.length; i++) {
-            const profileRes = new Set(profiles[i].resolutions.map(([w, h]) => `${w}x${h}`))
-            const profileFps = new Set(profiles[i].fps)
-            commonResolutions = new Set([...commonResolutions].filter(r => profileRes.has(r)))
-            commonFps = new Set([...commonFps].filter(f => profileFps.has(f)))
-          }
-
-          const resolutions: [number, number][] = [...commonResolutions].map(r => {
-            const [w, h] = r.split('x').map(Number)
-            return [w, h] as [number, number]
-          })
-          const fps = [...commonFps].sort((a, b) => a - b)
-          return { resolutions, fps }
-        }
-
-  const { resolutions: availableResolutions, fps: availableFps } = computeCommonOptions()
+  // Every change goes through streamSelection, which keeps the pick and moves the rest onto real SDK profiles
+  const profiles = sensor.supported_stream_profiles
+  const sel: Selection | undefined = sensorConfig && { ...sensorConfig, streams }
+  const shared = sharedFps(profiles)
+  const commit = (next: Selection) => {
+    next.streams.forEach(onUpdateStreamConfig)
+    onUpdateSensorConfig(sensor.sensor_id, { resolution: next.resolution, framerate: next.framerate })
+  }
 
   return (
     <Collapsible
@@ -723,21 +712,21 @@ function SensorPanel({
       )}
     >
       <div className="mt-2 space-y-1">
-            {sensorConfig && !sensorConfig.isMotionSensor && (
+            {sel && shared && (
               <div className="mb-2 flex items-center gap-2 text-xs">
                 <div className="flex items-center gap-1">
                   <label className="text-rs-muted font-semibold uppercase tracking-wide text-xs">Res</label>
                   <select
-                    value={`${sensorConfig.resolution.width}x${sensorConfig.resolution.height}`}
+                    value={`${sel.resolution.width}x${sel.resolution.height}`}
                     onChange={(e) => {
                       const [width, height] = e.target.value.split('x').map(Number)
-                      onUpdateSensorConfig(sensor.sensor_id, { resolution: { width, height } })
+                      commit(applyResolution(profiles, sel, { width, height }))
                     }}
                     disabled={isSensorStreaming}
                     data-testid="sensor-resolution"
                     className="select-rs text-xs py-0.5"
                   >
-                    {availableResolutions.map(([w, h]) => (
+                    {resolutionOptions(profiles).map(({ width: w, height: h }) => (
                       <option key={`${w}x${h}`} value={`${w}x${h}`}>
                         {w}×{h}
                       </option>
@@ -747,13 +736,13 @@ function SensorPanel({
                 <div className="flex items-center gap-1">
                   <label className="text-rs-muted font-semibold uppercase tracking-wide text-xs">FPS</label>
                   <select
-                    value={sensorConfig.framerate}
-                    onChange={(e) => onUpdateSensorConfig(sensor.sensor_id, { framerate: Number(e.target.value) })}
+                    value={sel.framerate}
+                    onChange={(e) => commit(applyFps(profiles, sel, Number(e.target.value)))}
                     disabled={isSensorStreaming}
                     data-testid="sensor-fps"
                     className="select-rs text-xs py-0.5"
                   >
-                    {availableFps.map((fps) => (
+                    {fpsOptions(profiles).map((fps) => (
                       <option key={fps} value={fps}>
                         {fps}
                       </option>
@@ -764,14 +753,17 @@ function SensorPanel({
             )}
 
             <div className="space-y-1">
-              {streams.map((config) => (
+              {sel && streams.map((config) => (
                 <StreamConfigItem
                   key={`${config.sensor_id}-${config.stream_type}`}
                   config={config}
-                  sensor={sensor}
-                  onUpdate={onUpdateStreamConfig}
+                  formats={formatOptions(profiles, config.stream_type)}
+                  fpsChoices={fpsOptions(profiles, config.stream_type)}
+                  onToggle={(enable) => commit(applyToggle(profiles, sel, config.stream_type, enable))}
+                  onFormat={(format) => commit(applyFormat(profiles, sel, config.stream_type, format))}
+                  onFps={(framerate) => commit(withStream(sel, config.stream_type, { framerate }))}
                   disabled={isSensorStreaming}
-                  isMotionSensor={sensorConfig?.isMotionSensor ?? false}
+                  perStreamFps={!shared}
                 />
               ))}
             </div>
@@ -821,30 +813,23 @@ function SensorPanel({
 
 interface StreamConfigItemProps {
   config: StreamConfig
-  sensor: SensorInfo
-  onUpdate: (config: StreamConfig) => void
+  formats: string[] // every format the stream has; picking one moves the rest to fit
+  fpsChoices: number[] // motion streams set their own fps
+  onToggle: (enable: boolean) => void
+  onFormat: (format: string) => void
+  onFps: (fps: number) => void
   disabled: boolean
-  isMotionSensor: boolean
+  perStreamFps: boolean
 }
 
-function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor }: StreamConfigItemProps) {
-  const profile = sensor.supported_stream_profiles.find((p) =>
-    p.stream_type.toLowerCase() === config.stream_type.toLowerCase()
-  )
-
-  // Don't render if no matching profile found (sensor doesn't support this stream)
-  if (!profile) return null
-
-  // Available FPS options for this stream profile
-  const availableFps = [...profile.fps].sort((a, b) => a - b)
-
+function StreamConfigItem({ config, formats, fpsChoices, onToggle, onFormat, onFps, disabled, perStreamFps }: StreamConfigItemProps) {
   return (
     <div className="flex items-center gap-2 py-0.5 flex-wrap">
       <label className="flex items-center gap-2 cursor-pointer">
         <input
           type="checkbox"
           checked={config.enable}
-          onChange={(e) => onUpdate({ ...config, enable: e.target.checked })}
+          onChange={(e) => onToggle(e.target.checked)}
           disabled={disabled}
           className="control-checkbox w-3 h-3 flex-shrink-0"
           data-testid={`toggle-stream-${config.stream_type.toLowerCase()}`}
@@ -858,11 +843,11 @@ function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor }
       {config.enable && (
         <select
           value={config.format}
-          onChange={(e) => onUpdate({ ...config, format: e.target.value })}
+          onChange={(e) => onFormat(e.target.value)}
           disabled={disabled}
           className="select-rs text-xs py-0.5 max-w-[100px]"
         >
-          {profile.formats.map((format) => (
+          {formats.map((format) => (
             <option key={format} value={format}>
               {format}
             </option>
@@ -870,14 +855,14 @@ function StreamConfigItem({ config, sensor, onUpdate, disabled, isMotionSensor }
         </select>
       )}
       {/* Per-stream FPS selector for motion sensors */}
-      {config.enable && isMotionSensor && (
+      {config.enable && perStreamFps && (
         <select
           value={config.framerate}
-          onChange={(e) => onUpdate({ ...config, framerate: Number(e.target.value) })}
+          onChange={(e) => onFps(Number(e.target.value))}
           disabled={disabled}
           className="select-rs text-xs py-0.5 w-[70px]"
         >
-          {availableFps.map((fps) => (
+          {fpsChoices.map((fps) => (
             <option key={fps} value={fps}>
               {fps}Hz
             </option>

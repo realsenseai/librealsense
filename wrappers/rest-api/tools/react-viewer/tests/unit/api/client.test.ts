@@ -140,20 +140,21 @@ describe('API Client', () => {
   })
 
   describe('Sensor Streaming', () => {
-    it('starts sensor streaming', async () => {
-      const result = await apiClient.startSensor(
-        mockDevice.device_id,
-        'sensor-0',
-        [{ stream_type: 'depth', width: 640, height: 480, format: 'Z16', fps: 30 }]
-      )
-      
-      expect(result.is_streaming).toBe(true)
+    it('starts sensor streaming with the listed profiles', async () => {
+      let body: unknown
+      server.use(http.post('/api/v1/devices/:deviceId/sensors/:sensorId/start', async ({ request }) => {
+        body = await request.json()
+        return HttpResponse.json(null)
+      }))
+      const profile = mockSensors[0].supported_stream_profiles[0]
+
+      await apiClient.startSensor(mockDevice.device_id, 'sensor-0', [profile])
+
+      expect(body).toEqual({ profiles: [profile] })
     })
 
     it('stops sensor streaming', async () => {
-      const result = await apiClient.stopSensor(mockDevice.device_id, 'sensor-0')
-      
-      expect(result.is_streaming).toBe(false)
+      await expect(apiClient.stopSensor(mockDevice.device_id, 'sensor-0')).resolves.toBeUndefined()
     })
   })
 
