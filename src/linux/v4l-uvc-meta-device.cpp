@@ -19,7 +19,7 @@ namespace librealsense
     {
         v4l_uvc_meta_device::v4l_uvc_meta_device(const uvc_device_info& info, bool use_memory_map):
             v4l_uvc_device(info,use_memory_map),
-            _md_fd(0),
+            _md_fd(-1),
             _md_name(info.metadata_node_id),
             _md_capabilities_assigned(false)
         {
@@ -108,7 +108,7 @@ namespace librealsense
         {
             v4l_uvc_device::map_device_descriptor();
 
-            if (_md_fd>0)
+            if (_md_fd >= 0)
                 throw linux_backend_exception(rsutils::string::from() << _md_name << " descriptor is already opened");
 
             _md_fd = open_v4l_node(_md_name);
@@ -159,7 +159,7 @@ namespace librealsense
                 return;  // Does not throw, MIPI device metadata not received through UVC, no metadata here may be valid
             }
 
-            _md_fd = 0;
+            _md_fd = -1;
         }
 
         void v4l_uvc_meta_device::set_format(stream_profile profile)
@@ -239,7 +239,7 @@ namespace librealsense
         void v4l_uvc_meta_device::acquire_metadata(buffers_mgr & buf_mgr,fd_set &fds, bool)
         {
             //Use non-blocking metadata node polling
-            if(_md_fd > 0 && FD_ISSET(_md_fd, &fds))
+            if(_md_fd >= 0 && FD_ISSET(_md_fd, &fds))
             {
                 // In scenario if [md+vid] ->[md] ->[md,vid] the third md should not be retrieved but wait for next select
                 if (buf_mgr.metadata_size())

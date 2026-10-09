@@ -168,11 +168,11 @@ namespace librealsense
                 fl.l_len = 0;
                 fl.l_type = F_UNLCK;
                 auto ret = fcntl( _fildes, F_OFD_SETLKW, &fl );
+
+                // Closing the fd releases the OFD lock even if the explicit unlock failed, so close before throwing
+                close_fd();
                 if( 0 != ret )
                     throw linux_backend_exception( rsutils::string::from() << __FUNCTION__ << ": unlocking failed" );
-
-                // Close file descriptor when last lock is released
-                close_fd();
             }
         }
 

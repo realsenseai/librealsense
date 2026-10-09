@@ -651,6 +651,11 @@ namespace librealsense
         void v4l_uvc_device::set_metadata_attributes(buffers_mgr& buf_mgr, __u32 bytesused, uint8_t* md_start)
         {
             size_t uvc_md_start_offset = sizeof(uvc_meta_buffer::ns) + sizeof(uvc_meta_buffer::sof);
+            if (bytesused < uvc_md_start_offset)
+            {
+                buf_mgr.set_md_attributes(0, nullptr);
+                return;
+            }
             buf_mgr.set_md_attributes(bytesused - uvc_md_start_offset,
                                         md_start + uvc_md_start_offset);
         }

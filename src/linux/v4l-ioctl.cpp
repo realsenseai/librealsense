@@ -98,10 +98,9 @@ namespace librealsense
             {
                 if(errno == EINVAL)
                     LOG_ERROR(dev_name + " does not support memory mapping");
-                else
-                    return;
-                    //D457 - fails on close (when num = 0)
-                    //throw linux_backend_exception("xioctl(VIDIOC_REQBUFS) failed");
+                else if (count)
+                    LOG_WARNING(dev_name + " VIDIOC_REQBUFS failed, errno " << errno);
+                //D457 - fails on close (when num = 0), so no throw
             }
         }
     }  // namespace platform

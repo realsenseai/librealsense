@@ -32,7 +32,7 @@ namespace librealsense
             virtual void acquire_metadata(buffers_mgr & buf_mgr,fd_set &fds, bool compressed_format=false) override;
             void assign_md_device_capabilities();
             // checking if metadata is streamed
-            virtual inline bool is_metadata_streamed() const override { return _md_fd > 0;}
+            virtual inline bool is_metadata_streamed() const override { return _md_fd >= 0;}
             virtual inline std::shared_ptr<buffer> get_md_buffer(__u32 index) const override {return _md_buffers[index];}
             int _md_fd = -1;
             std::string _md_name = "";
