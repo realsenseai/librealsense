@@ -196,7 +196,7 @@ namespace librealsense
                         {
                             clear_stale_requests();
                             set_enable( m, true );
-                            // The camera starts the capture here, and refuses it when a stream's inputs are not running
+                            // Firmware owns the backing graph, including standalone Perception inputs.
                             try
                             {
                                 _carrier->stream_on( error_handler );
@@ -204,8 +204,7 @@ namespace librealsense
                             catch( const std::exception & e )
                             {
                                 throw backend_exception( rsutils::string::from()
-                                                         << "The camera refused to start Perception streams; Occupancy needs Depth "
-                                                            "streaming at 1280x720 or 640x360 (" << e.what() << ")" );
+                                                         << "The camera refused to start Perception streams (" << e.what() << ")" );
                             }
                             _streaming = true;
                         }

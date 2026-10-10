@@ -69,10 +69,6 @@ namespace librealsense
 
         const auto pid = dev_info->get_group().uvc_devices.front().pid;
 
-        // Over GMSL only 3C devices produce occupancy
-        if( _is_mipi_device && is_dual_rgb_pid( pid ) )
-            return;
-
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
 
         const uint32_t mapping_stream_mi = _is_safety_layout ? 13 : 11;
@@ -222,8 +218,19 @@ namespace librealsense
         register_occupancy_metadata(raw_mapping_ep);
         register_point_cloud_metadata(raw_mapping_ep);
 
-        raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_FRAME_COUNTER,
-            std::make_shared< mapping_capture_parser >( RS2_FRAME_METADATA_FRAME_COUNTER ) );
+        std::shared_ptr< md_attribute_parser_base > counter_parser
+            = std::make_shared< mapping_capture_parser >( RS2_FRAME_METADATA_FRAME_COUNTER );
+        if( _is_mipi_device )
+        {
+            // GMSL counter validity is independent of unavailable source timing on 2C.
+            auto const offset = metadata_raw_mode_offset + offsetof( md_mapping_mode, intel_occupancy );
+            counter_parser = std::make_shared< md_layout_selecting_parser >(
+                make_attribute_parser( &md_occupancy::frame_counter,
+                                       md_occupancy_attributes::frame_counter_attribute, offset ),
+                make_attribute_parser( &md_point_cloud::frame_counter,
+                                       md_point_cloud_attributes::frame_counter_attribute, offset ) );
+        }
+        raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_FRAME_COUNTER, counter_parser );
         raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_SENSOR_TIMESTAMP,
             std::make_shared< mapping_capture_parser >( RS2_FRAME_METADATA_SENSOR_TIMESTAMP ) );
         raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_ACTUAL_FPS,
