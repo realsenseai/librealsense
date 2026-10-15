@@ -416,12 +416,23 @@ formats_converter::find_pbf_matching_most_profiles( const stream_profiles & from
     return { best_match_processing_block_factory, best_match_profiles };
 }
 
+rs2_frame_callback_sptr formats_converter::get_frames_callback() const
+{
+    std::lock_guard< std::mutex > lock( _callback_mutex );
+    return _converted_frames_callback;
+}
+
 void formats_converter::set_frames_callback( rs2_frame_callback_sptr callback )
 {
-    _converted_frames_callback = callback;
+    {
+        std::lock_guard< std::mutex > lock( _callback_mutex );
+        _converted_frames_callback = callback;
+    }
 
     // After processing callback
     auto output_cb = make_frame_callback( [&]( frame_holder f ) {
+        // Our own reference keeps the user callback alive for this call even if it is swapped meanwhile
+        auto converted_frames_callback = get_frames_callback();
         std::vector< frame_interface * > frames_to_be_processed;
         frames_to_be_processed.push_back( f.frame );
 
@@ -459,8 +470,8 @@ void formats_converter::set_frames_callback( rs2_frame_callback_sptr callback )
                     continue;
 
                 fr->acquire();
-                if( _converted_frames_callback )
-                    _converted_frames_callback->on_frame( (rs2_frame *)fr );
+                if( converted_frames_callback )
+                    converted_frames_callback->on_frame( (rs2_frame *)fr );
             }
         }
     } );

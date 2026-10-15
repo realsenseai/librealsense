@@ -170,11 +170,15 @@ namespace librealsense
         {
             try
             {
-                if (_callback)
+                // Hold our own reference for the duration of the call: set_callback() may replace
+                // _callback from another thread (e.g. a record sensor re-hooking during stop()) while a
+                // frame is still being delivered, and the old callback must not be destroyed under us.
+                auto callback = get_callback();
+                if (callback)
                 {
                     frame_interface* ref = nullptr;
                     std::swap(frame.frame, ref);
-                    _callback->on_frame((rs2_frame*)ref);
+                    callback->on_frame((rs2_frame*)ref);
                 }
             }
             catch( const std::exception & e )
