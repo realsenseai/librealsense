@@ -19,6 +19,10 @@ You can get RealSense Viewer in form of a binary package on Windows and Linux, o
 
 Please refer to [D400 Series Visual Presets](https://github.com/realsenseai/librealsense/wiki/D400-Series-Visual-Presets) for information about the Presets
 
+To have your own presets listed in the Viewer's Preset combo-box, export them from the Viewer (as JSON) and place them in
+`Documents/librealsense2/presets` (`~/Documents/...` on Linux and macOS), named `<model> <name>.preset`,
+e.g. `D435I Max Range.preset`. Only files whose `<model>` matches the connected camera are shown.
+
 ## Advanced Mode
 Please note that some of the Viewer features are only available in Advanced Mode.
 It's easy to enable Advanced Mode, and once done it is saved in flash, so there's no need to perfrom this again, even after the camera reset:

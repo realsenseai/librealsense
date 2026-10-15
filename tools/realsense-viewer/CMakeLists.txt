@@ -265,11 +265,6 @@ install(
     TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-#https://cmake.org/cmake/help/latest/command/install.html
-install(DIRECTORY presets/
-    DESTINATION $ENV{HOME}/Documents/librealsense2/presets
-    FILES_MATCHING PATTERN "*.preset"
-)
 
 if(BUILD_VIEWER_TESTS)
     include(tests/viewer_tests.cmake)
