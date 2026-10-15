@@ -277,6 +277,9 @@ void formats_converter::prepare_to_convert( stream_profiles from_profiles )
         // Retrieve source profile from cached map and generate the relevant processing block.
         std::unordered_set< std::shared_ptr< stream_profile_interface > > current_resolved_reqs;
         auto best_pb = factory_of_best_match->generate();
+        // Streams told apart by a frame stream resolver get a converter instance each: a converter allocates its
+        // output from its own frame pool, so sharing one would make the streams compete for the same frames.
+        std::map< int, std::shared_ptr< processing_block > > pb_per_index;
         for( const auto & from_profile : from_profiles_of_best_match )
         {
             auto & mapped_raw_profiles = _target_profiles_to_raw_profiles[to_profile( from_profile.get() )];
@@ -287,8 +290,19 @@ void formats_converter::prepare_to_convert( stream_profiles from_profiles )
                 {
                     current_resolved_reqs.insert( raw_profile );
 
+                    auto pb = best_pb;
+                    if( _frame_stream_resolvers.count( from_profile->get_stream_type() ) )
+                    {
+                        auto index = from_profile->get_stream_index();
+                        auto it = pb_per_index.find( index );
+                        if( it == pb_per_index.end() )
+                            it = pb_per_index.emplace( index, pb_per_index.empty() ? best_pb : factory_of_best_match->generate() ).first;
+                        pb = it->second;
+                        _raw_profile_to_indexed_converters[raw_profile][index].insert( pb );
+                    }
+
                     // Caching converters to invoke appropriate converters for received frames
-                    _raw_profile_to_converters[raw_profile].insert( best_pb );
+                    _raw_profile_to_converters[raw_profile].insert( pb );
                 }
             }
         }
@@ -355,6 +369,7 @@ void formats_converter::cache_from_profiles( const stream_profiles & from_profil
 void formats_converter::clear_active_cache()
 {
     _raw_profile_to_converters.clear();
+    _raw_profile_to_indexed_converters.clear();
     _format_mapping_to_from_profiles.clear();
 }
 
@@ -482,7 +497,28 @@ void formats_converter::convert_frame( frame_holder & f )
     if( ! f )
         return;
 
-    auto & converters = _raw_profile_to_converters[f->get_stream()];
+    auto const & raw_profile = f->get_stream();
+    auto indexed = _raw_profile_to_indexed_converters.find( raw_profile );
+    if( indexed != _raw_profile_to_indexed_converters.end() )
+    {
+        // Hand the frame to the converters of the stream it belongs to; frames of a stream that was not requested
+        // (or that cannot be attributed) are dropped before spending a conversion on them
+        int index = raw_profile->get_stream_index();
+        auto resolver = _frame_stream_resolvers.find( raw_profile->get_stream_type() );
+        if( resolver != _frame_stream_resolvers.end() && ! resolver->second( f.frame, index ) )
+            return;
+        auto it = indexed->second.find( index );
+        if( it == indexed->second.end() )
+            return;
+        for( auto & converter : it->second )
+        {
+            f->acquire();
+            converter->invoke( f.frame );
+        }
+        return;
+    }
+
+    auto & converters = _raw_profile_to_converters[raw_profile];
     for( auto & converter : converters )
     {
         f->acquire();

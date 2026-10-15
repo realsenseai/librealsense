@@ -9,6 +9,7 @@
 
 import pytest
 import pyrealsense2 as rs
+import threading
 import time
 import logging
 log = logging.getLogger(__name__)
@@ -99,6 +100,37 @@ def test_one_color_streams_alone(depth_sensor, index):
     frames = stream( depth_sensor, [color( depth_sensor, index )] )
     assert set( frames ) == {name}, f"unexpected streams delivered: {sorted( frames )}"
     check_stream( frames, name )
+
+
+def test_colors_held_by_slow_consumer(depth_sensor):
+    """Each color stream has its own frame pool: holding frames of one does not starve the other (RSDEV-15260)."""
+    HOLD = 12   # frames kept per stream, as a slow viewer does; both colors together exceed one pool (16)
+    held = {}
+    frames = {}
+    lock = threading.Lock()
+    done = False
+    def on_frame(f):
+        name = f.get_profile().stream_name()
+        with lock:
+            frames.setdefault( name, [] ).append( f.get_frame_number() )
+            if done:
+                return
+            q = held.setdefault( name, [] )
+            q.append( f )
+            del q[:-HOLD]
+    depth_sensor.open( [profile( depth_sensor, rs.stream.depth, 0, rs.format.z16 ),
+                        color( depth_sensor, 1 ), color( depth_sensor, 2 )] )
+    depth_sensor.start( on_frame )
+    time.sleep( DURATION_S )
+    depth_sensor.stop()
+    # stop() does not wait for a callback already running (the capture thread joins in close()), so stop holding
+    # frames under the lock before releasing them
+    with lock:
+        done = True
+        held.clear()
+    depth_sensor.close()
+    for name in ("Depth", "Color 1", "Color 2"):
+        check_stream( frames, name )
 
 
 def test_colors_with_depth_and_infrared(depth_sensor):
