@@ -5,6 +5,9 @@
 
 #include "v4l-product-ids.h"
 #include <src/platform/hid-data.h>
+#include <src/platform/gmsl-imu-batch.h>
+#include <rsutils/type/fourcc.h>
+#include <array>
 #include <src/core/time-service.h>
 #include <src/core/notification.h>
 #include <src/librealsense-exception.h>
@@ -528,13 +531,66 @@ namespace librealsense
                                                     populate_imu_data(meta_data, buffer->get_frame_start(), md_size, &md_start);
                                                 }
 
-                                                frame_object fo{ frame_sz, md_size,
-                                                            buffer->get_frame_start(), md_start, timestamp };
-
-                                                //Invoke user callback and enqueue next frame
-                                                _callback(_profile, fo, [buf_mgr]() mutable {
+                                                const uint8_t* wire = buffer->get_frame_start();
+                                                if (_info.mi == 4 && _profile.width == 256 && _profile.height == 1
+                                                    && _profile.format == rsutils::type::fourcc('G', 'R', 'E', 'Y')
+                                                    && gmsl_imu_batch::has_magic(wire, frame_sz))
+                                                {
+                                                    // Copy the small batch before returning the VI buffer. Each
+                                                    // callback owns its sample and metadata independently.
+                                                    struct owned_imu_sample {
+                                                        std::array<uint8_t, gmsl_imu_batch::sample_bytes> bytes{};
+                                                        metadata_hid_raw metadata{};
+                                                    };
+                                                    std::array<std::shared_ptr<owned_imu_sample>, gmsl_imu_batch::max_records> samples{};
+                                                    const unsigned count = gmsl_imu_batch::valid(wire, frame_sz) ? wire[5] : 0;
+                                                    const uint32_t packet_sequence = count ? gmsl_imu_batch::read_u32(wire + 8) : 0;
+                                                    for (unsigned i = 0; i < count; ++i) {
+                                                        samples[i] = std::make_shared<owned_imu_sample>();
+                                                        auto& bytes = samples[i]->bytes;
+                                                        gmsl_imu_batch::decode_record(wire, frame_sz, i, bytes.data(), bytes.size());
+                                                    }
                                                     buf_mgr.request_next_frame();
-                                                });
+                                                    if (!count) {
+                                                        ++_invalid_imu_batch_packets;
+                                                        const auto now = std::chrono::steady_clock::now();
+                                                        if (_invalid_imu_batch_packets == 1 ||
+                                                            now - _last_imu_batch_warning >= std::chrono::seconds(1)) {
+                                                            _last_imu_batch_warning = now;
+                                                            LOG_WARNING("Discarding invalid IMUB packet on " << _name
+                                                                << ": bytes=" << frame_sz
+                                                                << ", total=" << _invalid_imu_batch_packets);
+                                                        }
+                                                    }
+                                                    // Optional receive evidence, after re-queueing the VI buffer.
+                                                    // Keep the transport sequence distinct from sensor sequences.
+                                                    static const bool trace_packets = std::getenv("RS2_GMSL_IMU_PACKET_TRACE") != nullptr;
+                                                    if (trace_packets && count) {
+                                                        LOG_INFO("IMUB_RX packet=" << packet_sequence
+                                                            << " records=" << count
+                                                            << " first_sensor=" << unsigned(samples[0]->bytes[0])
+                                                            << " first_seq=" << gmsl_imu_batch::read_u64(samples[0]->bytes.data()+gmsl_imu_batch::sample_sequence_offset)
+                                                            << " second_seq=" << (count == 2 ? gmsl_imu_batch::read_u64(samples[1]->bytes.data()+gmsl_imu_batch::sample_sequence_offset) : 0));
+                                                    }
+                                                    for (unsigned i = 0; i < count; ++i) {
+                                                        auto owned = samples[i];
+                                                        uint8_t sample_md_size = 0;
+                                                        void* sample_md = nullptr;
+                                                        populate_imu_data(owned->metadata, owned->bytes.data(), sample_md_size, &sample_md);
+                                                        frame_object sample{owned->bytes.size(), sample_md_size,
+                                                            owned->bytes.data(), sample_md, timestamp};
+                                                        _callback(_profile, sample, [owned]() {});
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    frame_object fo{ frame_sz, md_size,
+                                                                buffer->get_frame_start(), md_start, timestamp };
+                                                    //Invoke user callback and enqueue next frame
+                                                    _callback(_profile, fo, [buf_mgr]() mutable {
+                                                        buf_mgr.request_next_frame();
+                                                    });
+                                                }
                                             }
                                             else
                                             {

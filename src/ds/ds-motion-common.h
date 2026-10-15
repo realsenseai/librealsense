@@ -93,6 +93,8 @@ namespace librealsense
                                    const std::map< uint32_t, rs2_stream > & motion_fourcc_to_rs2_stream );
 
         rs2_motion_device_intrinsic get_motion_intrinsics(rs2_stream stream) const;
+        void open(const stream_profiles& requests) override;
+        void close() override;
 
         stream_profiles init_stream_profiles() override;
 
@@ -100,6 +102,7 @@ namespace librealsense
         std::shared_ptr<stream_interface> get_accel_stream() const;
         std::shared_ptr<stream_interface> get_gyro_stream() const;
 
+        std::shared_ptr<uvc_sensor> _gmsl_batch_sensor;
         const device* _owner;
     };
 

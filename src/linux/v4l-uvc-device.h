@@ -16,6 +16,7 @@
 #include "types.h"
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <thread>
@@ -131,6 +132,8 @@ namespace librealsense
 
             std::vector<std::shared_ptr<buffer>> _buffers;
             stream_profile _profile;
+            uint64_t _invalid_imu_batch_packets = 0;
+            std::chrono::steady_clock::time_point _last_imu_batch_warning{};
             bool _variable_frame_size = false; // some frames may arrive in shorter size than the buffer - skip the partial frame check
             frame_callback _callback;
             std::atomic<bool> _is_capturing;

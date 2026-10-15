@@ -1,6 +1,7 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2023-4 RealSense, Inc. All Rights Reserved.
 
+#include "platform/gmsl-imu-batch.h"
 #include "uvc-sensor.h"
 #include "device.h"
 #include "stream.h"
@@ -228,7 +229,11 @@ void uvc_sensor::open( const stream_profiles & requests )
                         //Motion stream on uvc is used only for mipi. Stream frame number counts gyro and accel together.
                         //We override it using 2 seperate counters.
                         auto stream_type = ((uint8_t *)f.pixels)[0];
-                        if( stream_type == 1 ) // 1 == Accel
+                        const auto* sample_bytes = static_cast<const uint8_t*>(f.pixels);
+                        const bool batched_sample = gmsl_imu_batch::is_decoded_sample(sample_bytes, f.frame_size);
+                        if (batched_sample)
+                            fr->additional_data.frame_number = gmsl_imu_batch::read_u64(sample_bytes + gmsl_imu_batch::sample_sequence_offset);
+                        else if( stream_type == 1 ) // 1 == Accel
                             fr->additional_data.frame_number = ++_accel_counter;
                         else if( stream_type == 2 ) // 2 == Gyro
                             fr->additional_data.frame_number = ++_gyro_counter;

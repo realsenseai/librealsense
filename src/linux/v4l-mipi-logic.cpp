@@ -74,6 +74,10 @@ namespace librealsense
 
             static constexpr uint32_t RS_CAMERA_CID_ALIGNED_DEPTH           = ( RS_CAMERA_CID_BASE + 55 );
 
+            // One-byte IMU batch XU (0x1c) on the motion node.
+            static constexpr uint32_t RS_CAMERA_CID_IMU_BATCH = RS_CAMERA_CID_BASE + 56;
+            static constexpr uint8_t RS_IMU_BATCH = 0x1C;
+
             static constexpr uint8_t GVD_VALID_OPCODE = 0x10;
 
             // MIPI depth-XU selector identifiers (subdevice 0).
@@ -345,6 +349,7 @@ namespace librealsense
                     case RS_TEMPORAL_FILTER_DPP:   return RS_CAMERA_CID_TEMPORAL_FILTER_DPP;
                     case RS_HDRD_CONTROL:          return RS_CAMERA_CID_MINZ;
                     case RS_ALIGN_DEPTH:           return RS_CAMERA_CID_ALIGNED_DEPTH;
+                    case RS_IMU_BATCH: return RS_CAMERA_CID_IMU_BATCH;
                     default: break;  // the rest are common to both families
                     }
                 }
