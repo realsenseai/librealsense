@@ -27,6 +27,7 @@
 #include <src/image.h>
 
 #include <src/proc/color-formats-converter.h>
+#include <src/proc/h264-decoder.h>
 #include <src/proc/y16-10msb-to-y16.h>
 #include <src/proc/rotation-filter.h>
 
@@ -137,6 +138,7 @@ void dds_sensor_proxy::register_converters()
     std::set< int > y16_indexes;
     std::set< int > jpeg_indexes;
     std::set< int > z16_indexes;
+    std::set< int > h264_indexes;
     for( auto & stream : streams() )
     {
         for( auto & profile : stream.second->profiles() )
@@ -150,6 +152,8 @@ void dds_sensor_proxy::register_converters()
                     jpeg_indexes.insert( stream.first.index );
                 else if( vsp->encoding().to_rs2() == RS2_FORMAT_Z16 )
                     z16_indexes.insert( stream.first.index );
+                else if( vsp->encoding().to_rs2() == RS2_FORMAT_H264 )
+                    h264_indexes.insert( stream.first.index );
         }
     }
 
@@ -183,6 +187,25 @@ void dds_sensor_proxy::register_converters()
                                                []() { return std::make_shared< mjpeg_converter >( RS2_FORMAT_RGB8 ); } );
         _formats_converter.register_converter( { { RS2_FORMAT_MJPEG, RS2_STREAM_COLOR } }, passthrough_profiles,
                                                []() { return std::make_shared< identity_processing_block >(); } );
+    }
+
+    if( h264_indexes.size() > 0 )
+    {
+        // Passthrough, so an application can take the access units and decode them itself. Offered
+        // on every platform - it needs no decoder.
+        for( int index : h264_indexes )
+            _formats_converter.register_converter(
+                processing_block_factory::create_id_pbf( RS2_FORMAT_H264, RS2_STREAM_COLOR, index ) );
+
+        // Decoding to RGB8 is only offered where the platform has a decoder
+        if( h264_decoder::is_supported() )
+        {
+            std::vector< stream_profile > target_profiles;
+            for( int index : h264_indexes )
+                target_profiles.push_back( { RS2_FORMAT_RGB8, RS2_STREAM_COLOR, index } );
+            _formats_converter.register_converter( { { RS2_FORMAT_H264, RS2_STREAM_COLOR } }, target_profiles,
+                                                   []() { return std::make_shared< h264_decoder >( RS2_FORMAT_RGB8 ); } );
+        }
     }
 
     // Depth. A device can expose more than one, e.g. raw depth next to device-aligned depth, so the

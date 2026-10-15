@@ -95,6 +95,10 @@ void init_processing(py::module &m) {
     py::class_<rs2::mjpeg_decoder, rs2::filter> mjpeg_decoder(m, "mjpeg_decoder", "Decodes compressed MJPEG frames to RGB8.");
     mjpeg_decoder.def(py::init<>());
 
+    py::class_<rs2::h264_decoder, rs2::filter> h264_decoder(m, "h264_decoder", "Decodes H.264 access units to RGB8. "
+                                                            "Stateful: feed one decoder a single stream in order.");
+    h264_decoder.def(py::init<>());
+
     // Parameterized converters: same internal classes the SDK uses for live cameras,
     // exposed here as factories so tests can pick the output format.
 #define BIND_CONVERTER(name) \

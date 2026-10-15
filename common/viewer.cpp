@@ -2319,7 +2319,9 @@ namespace rs2
             stream_mv.show_stream_footer(font1, stream_rect, active_mouse, streams, *this);
 
 
-            if (stream_mv.profile.format() == RS2_FORMAT_RAW10)
+            // H264 is passthrough for applications that decode it themselves. Decoding it here cannot work: the render
+            // loop only ever sees the newest frame, while an H.264 decoder needs every access unit, in order.
+            if (val_in_range(stream_mv.profile.format(), { RS2_FORMAT_RAW10, RS2_FORMAT_H264 }))
             {
                 show_rendering_not_supported(font2, static_cast<int>(stream_rect.x), static_cast<int>(stream_rect.y), static_cast<int>(stream_rect.w),
                     static_cast<int>(stream_rect.h), stream_mv.profile.format());

@@ -142,6 +142,34 @@ if not the SDK will use a timer polling approach which is less sensitive for dev
     Try closing memory consuming applications, and if you are running inside a VM, increase available RAM to at least 2 GB. \
     **Note:** You can find more information about the available configuration options on [this wiki page](https://github.com/realsenseai/librealsense/wiki/Build-Configuration).
 
+
+### H264 GPU decoding
+
+Decoding an H.264 stream to `RGB8` on Linux uses [oneVPL](https://github.com/intel/libvpl) on an Intel GPU, and is off by
+default. Without it the stream is still delivered as passthrough, for the application to decode itself.
+
+  * Install the build-time packages, then configure with the flag:
+    ```sh
+    sudo apt install libvpl-dev libva-dev
+    cmake ../ -DBUILD_WITH_VPL=ON
+    ```
+    **Note:** These must already be present. Unlike Fast-DDS or libusb nothing is downloaded during the build, so configuring
+    with `-DBUILD_WITH_VPL=ON` fails immediately if `pkg-config` cannot find them.
+  * Install the runtime driver. Gen9 and older Intel GPUs also need the legacy runtime:
+    ```sh
+    sudo apt install intel-media-va-driver libmfx1
+    ```
+  * Give the user access to the GPU, then log out and back in for it to take effect:
+    ```sh
+    sudo usermod -aG render $USER
+    ```
+    **Note:** Without the `render` group the process cannot open `/dev/dri/renderD128`, and decoding is unavailable with no
+    error on the camera side -- the `RGB8` option simply never appears.
+  * Confirm the GPU advertises the profile, `VAProfileH264High` with `VAEntrypointVLD`:
+    ```sh
+    vainfo --display drm --device /dev/dri/renderD128 | grep VAProfileH264
+    ```
+
   
 ## Troubleshooting Installation and Patch-related Issues
 

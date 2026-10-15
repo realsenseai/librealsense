@@ -7,6 +7,10 @@
 option(ENABLE_CCACHE "Build with ccache." ON)
 option(BUILD_WITH_CUDA "Enable CUDA" OFF)
 
+# oneVPL (MIT) decodes H.264 on an Intel GPU, giving Linux what Media Foundation gives Windows. Without it H264 streams are
+# still received, just not decoded. Needs libvpl-dev and libva-dev, and the user must be in the 'render' group at runtime.
+option(BUILD_WITH_VPL "Enable H.264 GPU decoding through oneVPL (Linux, Intel GPU)" OFF)
+
 # Zero-copy GPU memory path (Jetson / integrated-GPU only). Requires BUILD_WITH_CUDA.
 # Eliminates the per-frame CPU->frame copy (capture) and the GPU host<->device round-trips.
 # Activates at runtime only on integrated GPUs; discrete GPUs keep the copy path. Default OFF

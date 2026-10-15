@@ -7,6 +7,10 @@
 
 namespace librealsense
 {
+    // Unpacks tightly packed NV12 into Y8/Y16/RGB8/RGBA8/BGR8/BGRA8
+    void unpack_nv12( rs2_format dst_format, rs2_stream dst_stream, uint8_t * const d[], const uint8_t * s,
+                      int w, int h, int actual_size );
+
     class LRS_EXTENSION_API color_converter : public functional_processing_block
     {
     protected:
