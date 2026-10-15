@@ -196,7 +196,7 @@ namespace librealsense
         std::vector<node_info> match_video_with_metadata_nodes(const std::vector<node_info>& uvc_nodes)
         {
             // Assume uvc_nodes is already sorted according to videoXX (video0, then video1...)
-            // Assume for each metadata node with index N there is a origin streaming node with index (N-1)
+            // USB hotplug can interleave nodes from different devices and interfaces.
             std::vector<node_info> uvc_devices;
             for (auto&& cur_node : uvc_nodes)
             {
@@ -212,8 +212,21 @@ namespace librealsense
                             continue;
                         }
 
-                        // Update the preceding uvc item with metadata node info
-                        auto uvc_node = uvc_devices.back();
+                        auto video = uvc_devices.rbegin();
+                        if (!cur_node.first.is_mipi)
+                        {
+                            video = std::find_if(uvc_devices.rbegin(), uvc_devices.rend(),
+                                [&](const node_info& node) {
+                                    return node.first.unique_id == cur_node.first.unique_id
+                                        && node.first.mi == cur_node.first.mi;
+                                });
+                        }
+                        if (video == uvc_devices.rend())
+                        {
+                            LOG_ERROR("UVC meta-node with no matching video node: " << std::string(cur_node.first));
+                            continue;
+                        }
+                        auto& uvc_node = *video;
 
                         if (uvc_node.first.uvc_capabilities & V4L2_CAP_META_CAPTURE)
                         {
@@ -227,10 +240,9 @@ namespace librealsense
                             continue;
                         }
 
-                        // modify the last element with metadata node info
+                        // Update the matching video node; keep the legacy MIPI pairing unchanged.
                         uvc_node.first.has_metadata_node = true;
                         uvc_node.first.metadata_node_id = cur_node.first.id;
-                        uvc_devices.back() = uvc_node;
                     }
                 }
                 catch(const std::exception & e)
