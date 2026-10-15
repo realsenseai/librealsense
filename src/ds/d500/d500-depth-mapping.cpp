@@ -9,6 +9,7 @@
 #include "mapping-timing.h"
 #include "d500-types/safety-interface-config.h"
 
+#include <algorithm>
 #include <vector>
 #include <map>
 #include <cstddef>
@@ -69,11 +70,12 @@ namespace librealsense
 
         const auto pid = dev_info->get_group().uvc_devices.front().pid;
 
-        // Over GMSL only 3C devices produce occupancy
-        if( _is_mipi_device && is_dual_rgb_pid( pid ) )
-            return;
-
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
+
+        // Older FW needs running Depth for occupancy over GMSL, and produces none on GMSL 2C
+        _standalone_occupancy = _fw_version >= firmware_version( "7.59.46596.16636" );
+        if( _is_mipi_device && is_dual_rgb_pid( pid ) && ! _standalone_occupancy )
+            return;
 
         const uint32_t mapping_stream_mi = _is_safety_layout ? 13 : 11;
         auto mapping_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, mapping_stream_mi);
@@ -89,8 +91,76 @@ namespace librealsense
         }
 
         auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_devs_info );
-        add_sensor(mapping_ep);
+        _depth_mapping_idx = add_sensor(mapping_ep);
         _depth_mapping_active = true;
+        if( ! _is_safety_layout )
+            add_stream_combination_validator( [this]( const stream_profiles & requests )
+                                              { depth_sensor_allowed_or_throw( requests ); } );
+    }
+
+    // The camera builds occupancy from depth at these sizes only, at the occupancy rate
+    static bool is_occupancy_depth_source( const stream_profile_interface & p, uint32_t fps, bool fixed_source_only )
+    {
+        auto vp = dynamic_cast< const video_stream_profile_interface * >( &p );
+        if( p.get_stream_type() != RS2_STREAM_DEPTH || ! vp || p.get_framerate() != fps )
+            return false;
+        bool const native = vp->get_width() == 640 && vp->get_height() == 360;
+        return native || ( ! fixed_source_only && vp->get_width() == 1280 && vp->get_height() == 720 );
+    }
+
+    static bool has_stream( const stream_profiles & profiles, rs2_stream type )
+    {
+        return std::any_of( profiles.begin(), profiles.end(),
+                            [type]( const std::shared_ptr< stream_profile_interface > & p ) { return p && p->get_stream_type() == type; } );
+    }
+
+    static std::shared_ptr< stream_profile_interface > find_stream( const stream_profiles & profiles, rs2_stream type )
+    {
+        auto it = std::find_if( profiles.begin(), profiles.end(),
+                                [type]( const std::shared_ptr< stream_profile_interface > & p ) { return p && p->get_stream_type() == type; } );
+        return it == profiles.end() ? nullptr : *it;
+    }
+
+    void d500_depth_mapping::occupancy_allowed_or_throw( const stream_profiles & requests ) const
+    {
+        auto const occupancy = find_stream( requests, RS2_STREAM_OCCUPANCY );
+        auto const running = get_sensor( _depth_device_idx ).get_active_streams();
+        if( _is_safety_layout || ! occupancy )
+            return;
+        uint32_t const fps = occupancy->get_framerate();
+        if( running.empty() )
+        {
+            if( _is_mipi_device && ! _standalone_occupancy )
+                throw wrong_api_call_sequence_exception( rsutils::string::from()
+                    << "Occupancy needs Depth at 640x360 or 1280x720, " << fps
+                    << " fps, streaming first; standalone occupancy needs FW 7.59.46596.16636 or newer" );
+            return;
+        }
+        if( std::none_of( running.begin(), running.end(),
+                          [fps]( const std::shared_ptr< stream_profile_interface > & p ) { return p && is_occupancy_depth_source( *p, fps, false ); } ) )
+            throw wrong_api_call_sequence_exception( rsutils::string::from()
+                << "Occupancy needs Depth at 640x360 or 1280x720, " << fps << " fps, while the depth sensor streams" );
+        // Over USB the camera keeps the colors open but stops delivering them
+        if( ! _is_mipi_device && has_stream( running, RS2_STREAM_COLOR ) )
+            throw wrong_api_call_sequence_exception( "Occupancy cannot start while the depth sensor streams color" );
+    }
+
+    void d500_depth_mapping::depth_sensor_allowed_or_throw( const stream_profiles & requests ) const
+    {
+        auto const occupancy = _depth_mapping_idx < 0 ? nullptr
+            : find_stream( get_sensor( _depth_mapping_idx ).get_active_streams(), RS2_STREAM_OCCUPANCY );
+        if( ! occupancy )
+            return;
+        // Occupancy started first fixes its depth source at 640x360; colors and other streams cannot join it
+        uint32_t const fps = occupancy->get_framerate();
+        if( has_stream( requests, RS2_STREAM_DEPTH ) )
+        {
+            if( requests.size() != 1 || ! is_occupancy_depth_source( *requests.front(), fps, true ) )
+                throw wrong_api_call_sequence_exception( rsutils::string::from()
+                    << "While Occupancy streams, Depth can start only alone at 640x360, " << fps << " fps" );
+        }
+        else if( has_stream( requests, RS2_STREAM_COLOR ) )
+            throw wrong_api_call_sequence_exception( "Color cannot start while Occupancy streams" );
     }
 
     std::shared_ptr<synthetic_sensor> d500_depth_mapping::create_depth_mapping_device(std::shared_ptr<context> ctx,
@@ -222,8 +292,19 @@ namespace librealsense
         register_occupancy_metadata(raw_mapping_ep);
         register_point_cloud_metadata(raw_mapping_ep);
 
-        raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_FRAME_COUNTER,
-            std::make_shared< mapping_capture_parser >( RS2_FRAME_METADATA_FRAME_COUNTER ) );
+        std::shared_ptr< md_attribute_parser_base > counter_parser
+            = std::make_shared< mapping_capture_parser >( RS2_FRAME_METADATA_FRAME_COUNTER );
+        if( _is_mipi_device )
+        {
+            // GMSL counter validity is independent of unavailable source timing on 2C.
+            auto const offset = metadata_raw_mode_offset + offsetof( md_mapping_mode, intel_occupancy );
+            counter_parser = std::make_shared< md_layout_selecting_parser >(
+                make_attribute_parser( &md_occupancy::frame_counter,
+                                       md_occupancy_attributes::frame_counter_attribute, offset ),
+                make_attribute_parser( &md_point_cloud::frame_counter,
+                                       md_point_cloud_attributes::frame_counter_attribute, offset ) );
+        }
+        raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_FRAME_COUNTER, counter_parser );
         raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_SENSOR_TIMESTAMP,
             std::make_shared< mapping_capture_parser >( RS2_FRAME_METADATA_SENSOR_TIMESTAMP ) );
         raw_mapping_ep->register_metadata( RS2_FRAME_METADATA_ACTUAL_FPS,
@@ -582,6 +663,13 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
                     return std::make_shared< identity_processing_block >();
                 } };
         mapping_ep->register_processing_block( lpc_pbf );
+    }
+
+    void d500_depth_mapping_sensor::open( const stream_profiles & requests )
+    {
+        // Reject combinations the camera refuses or starves before the device is touched
+        _owner->occupancy_allowed_or_throw( requests );
+        synthetic_sensor::open( requests );
     }
 
     stream_profiles d500_depth_mapping_sensor::init_stream_profiles()

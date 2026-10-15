@@ -30,6 +30,9 @@ namespace librealsense
         void add_streams_if_active( std::vector< std::shared_ptr< stream_interface > > & streams ) const;
         void add_profile_tag_if_active( std::vector< tagged_profile > & tags ) const;
 
+        // Throws if the camera would refuse occupancy with the running depth sensor streams, or starve them
+        void occupancy_allowed_or_throw( const stream_profiles & requests ) const;
+
     private:
 
         friend class d500_depth_mapping_sensor;
@@ -42,6 +45,12 @@ namespace librealsense
         
         void register_occupancy_metadata(std::shared_ptr<uvc_sensor> raw_mapping_ep);
         void register_point_cloud_metadata(std::shared_ptr<uvc_sensor> raw_mapping_ep);
+
+        // Depth sensor counterpart of occupancy_allowed_or_throw, for streams added while occupancy runs
+        void depth_sensor_allowed_or_throw( const stream_profiles & requests ) const;
+
+        int _depth_mapping_idx = -1;
+        bool _standalone_occupancy = false;   // FW runs occupancy without host Depth, on 2C too
 
     protected:
         std::shared_ptr<stream_interface> _occupancy_stream;
@@ -68,6 +77,7 @@ namespace librealsense
 
         rs2_intrinsics get_intrinsics(const stream_profile& profile) const override;
         stream_profiles init_stream_profiles() override;
+        void open( const stream_profiles & requests ) override;
 
     protected:
         const d500_depth_mapping* _owner;

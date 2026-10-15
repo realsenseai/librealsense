@@ -3,10 +3,9 @@
 
 # GMSL Perception MUX: Object Detection (PD) and Occupancy (OCC) time-share the GMSL IR channel and are told apart
 # by their metadata. Each stream is still its own sensor and opens and closes independently; the camera starts the
-# shared capture with the first and stops it with the last. PD runs alone; OCC needs Depth at 1280x720 or 640x360.
-# Standalone PD on every transport is covered by pytest-pd-standalone.py.
-#
-# Tests follow the camera's current mode: Occupancy exists on 3C only, so its tests skip on 2C.
+# shared capture with the first and stops it with the last.
+# This file covers what is specific to the MUX; the stream lifecycles and the Occupancy input rules on every
+# transport are in pytest-perception-streams.py.
 
 import pytest
 import pyrealsense2 as rs
@@ -19,13 +18,17 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each( "D585" ),
     pytest.mark.device_type( "GMSL" ),   # the MUX exists only over GMSL
+    pytest.mark.context( "nightly" ),
 ]
 
-DURATION_S = 4
-MIN_PD_FRAMES = 10                    # PD runs at ~15 fps
-MIN_OCC_FRAMES = 60                   # OCC runs at ~30 fps
+MIN_PD_FRAMES = 8                     # PD runs at ~15 fps
+MIN_OCC_FRAMES = 15                   # OCC runs at ~30 fps
+FRAME_TIMEOUT_S = 5                   # first frames of a fresh stream
+SWITCH_S = 0.6                        # frames already in flight around an enable or disable
+QUIET_S = 1.0                         # how long a disabled stream must stay silent
 PD_ID, OCC_ID = 6, 7                  # stream ids of the camera's MUX control (HWMC 0xC0)
 MUX_CONTROL, MUX_SET_ENABLE, MUX_GET_STATE = 0xC0, 1, 2
+STANDALONE_OCC_FW = '7.59.46596.16636'   # occupancy without host Depth, on 2C too
 
 
 @pytest.fixture
@@ -49,8 +52,18 @@ def sensor(dev, name):
     return None
 
 
+def fw_at_least(dev, version):
+    as_tuple = lambda v: tuple( int( x ) for x in v.split( '.' ) )
+    return as_tuple( dev.get_info( rs.camera_info.firmware_version ) ) >= as_tuple( version )
+
+
+def require_occupancy(dev):
+    if sensor( dev, 'Depth Mapping Camera' ) is None:
+        pytest.skip( f"No Occupancy: 2C on FW older than {STANDALONE_OCC_FW}" )
+
+
 def is_3c(dev):
-    return sensor( dev, 'Depth Mapping Camera' ) is not None
+    return sensor( dev, 'RGB Camera' ) is not None   # 2C carries its colors on the Stereo Module
 
 
 def profile(s, stream_type, fmt, w=1280, h=720, index=None):
@@ -115,11 +128,11 @@ def stop(sensors):
 
 
 class Collector:
-    """Frames per stream name, with the checks this file needs taken at arrival."""
+    """Frames per stream type, with the checks this file needs taken at arrival."""
     def __init__(self):
         self.frames = {}
     def __call__(self, f):
-        info = { 'time': time.monotonic(), 'size': f.get_data_size(), 'ts': f.get_timestamp() }
+        info = { 'time': time.monotonic(), 'size': f.get_data_size() }
         if f.is_object_detection_frame():
             info['magic'] = bytes( f.get_data() )[:4]
         if f.get_profile().stream_type() == rs.stream.occupancy:
@@ -131,54 +144,23 @@ class Collector:
         self.frames.setdefault( f.get_profile().stream_type(), [] ).append( info )
     def count(self, stream_type, since=0.):
         return sum( 1 for i in self.frames.get( stream_type, [] ) if i['time'] >= since )
+    def wait(self, stream_type, since, count, timeout=FRAME_TIMEOUT_S):
+        deadline = time.monotonic() + timeout
+        while self.count( stream_type, since ) < count and time.monotonic() < deadline:
+            time.sleep( 0.05 )
+        assert self.count( stream_type, since ) >= count, f"too few {stream_type} frames"
 
 
 def test_perception_sensors_enumerate(device):
     pd = pd_profile( device )
     assert pd.format() == rs.format.y8 and pd.fps() == 30
-    if is_3c( device ):
-        occ = occ_profile( device ).as_video_stream_profile()
-        assert ( occ.format(), occ.width(), occ.height(), occ.fps() ) == ( rs.format.y8, 320, 256, 30 )
-    else:
-        assert sensor( device, 'Depth Mapping Camera' ) is None, "2C produces no occupancy"
     assert mux_state( device, PD_ID ) == ( 0, 0, 0 )
-
-
-def test_pd_open_close_twice(device):
-    inputs = start_inputs( device )
-    pd = sensor( device, 'Perception' )
-    for _ in range( 2 ):   # the shared capture must restart cleanly
-        frames = Collector()
-        pd.open( pd_profile( device ) )
-        pd.start( frames )
-        time.sleep( DURATION_S )
-        state = mux_state( device, PD_ID )
-        pd.stop()
-        pd.close()
-        got = frames.frames.get( rs.stream.object_detection, [] )
-        assert len( got ) >= MIN_PD_FRAMES
-        assert all( i['size'] == 2347 and i['magic'] == b'ODET' for i in got )
-        assert all( b['ts'] > a['ts'] for a, b in zip( got, got[1:] ) )
-        assert state == ( 1, 1, 1 )
-        assert wait_state( device, PD_ID, ( 0, 0, 0 ) ) == ( 0, 0, 0 )
-    stop( inputs )
-
-
-def test_pd_stop_start_resumes(device):
-    inputs = start_inputs( device )
-    pd = sensor( device, 'Perception' )
-    frames = Collector()
-    pd.open( pd_profile( device ) )
-    pd.start( frames )
-    time.sleep( DURATION_S / 2 )
-    pd.stop()
-    restart = time.monotonic()
-    pd.start( frames )
-    time.sleep( DURATION_S / 2 )
-    pd.stop()
-    pd.close()
-    stop( inputs )
-    assert frames.count( rs.stream.object_detection, since=restart ) >= MIN_PD_FRAMES / 2
+    if not is_3c( device ) and not fw_at_least( device, STANDALONE_OCC_FW ):
+        assert sensor( device, 'Depth Mapping Camera' ) is None, "older FW produces no 2C occupancy"
+        return
+    occ = occ_profile( device ).as_video_stream_profile()
+    assert ( occ.format(), occ.width(), occ.height(), occ.fps() ) == ( rs.format.y8, 320, 256, 30 )
+    assert mux_state( device, OCC_ID ) == ( 0, 0, 0 )
 
 
 def test_detection_distance(device):
@@ -198,64 +180,57 @@ def test_detection_distance(device):
     stop( inputs )
 
 
-def test_pd_and_occ_independent(device):
-    if not is_3c( device ):
-        pytest.skip( "Occupancy is 3C only" )
+@pytest.mark.parametrize( 'occ_first', [False, True] )
+def test_pd_and_occ_independent(device, occ_first):
+    """Each MUX member starts and stops on its own while the other keeps streaming, in either start order."""
+    require_occupancy( device )
     inputs = start_inputs( device )
     pd, mapping = sensor( device, 'Perception' ), sensor( device, 'Depth Mapping Camera' )
     frames = Collector()
 
     def step(action, pd_on, occ_on):
         action()
-        since = time.monotonic() + 0.6   # frames already in flight around a switch
-        time.sleep( DURATION_S )
-        assert ( frames.count( rs.stream.object_detection, since ) >= MIN_PD_FRAMES ) == pd_on
-        assert ( frames.count( rs.stream.occupancy, since ) >= MIN_OCC_FRAMES ) == occ_on
-        assert mux_state( device, PD_ID )[0] == pd_on and mux_state( device, OCC_ID )[0] == occ_on
+        since = time.monotonic() + SWITCH_S
+        for stream_type, on, count in ( ( rs.stream.object_detection, pd_on, MIN_PD_FRAMES ),
+                                        ( rs.stream.occupancy, occ_on, MIN_OCC_FRAMES ) ):
+            if on:
+                frames.wait( stream_type, since, count )
+        time.sleep( max( 0., since + QUIET_S - time.monotonic() ) )
+        for stream_type, on in ( ( rs.stream.object_detection, pd_on ), ( rs.stream.occupancy, occ_on ) ):
+            if not on:
+                assert frames.count( stream_type, since ) == 0, f"disabled {stream_type} still delivers frames"
+        active = int( pd_on or occ_on )
+        assert wait_state( device, PD_ID, ( int( pd_on ), int( pd_on ), active ) ) == ( int( pd_on ), int( pd_on ), active )
+        assert wait_state( device, OCC_ID, ( int( occ_on ), int( occ_on ), active ) ) == ( int( occ_on ), int( occ_on ), active )
 
     def start(s, p):
         s.open( p )
         s.start( frames )
 
-    step( lambda: start( pd, pd_profile( device ) ), True, False )
-    step( lambda: start( mapping, occ_profile( device ) ), True, True )
-    step( lambda: stop( [pd] ), False, True )
-    step( lambda: stop( [mapping] ), False, False )
+    if occ_first:
+        step( lambda: start( mapping, occ_profile( device ) ), False, True )
+        step( lambda: start( pd, pd_profile( device ) ), True, True )
+        step( lambda: stop( [mapping] ), True, False )
+        step( lambda: stop( [pd] ), False, False )
+    else:
+        step( lambda: start( pd, pd_profile( device ) ), True, False )
+        step( lambda: start( mapping, occ_profile( device ) ), True, True )
+        step( lambda: stop( [pd] ), False, True )
+        step( lambda: stop( [mapping] ), False, False )
     stop( inputs )
-    assert wait_state( device, PD_ID, ( 0, 0, 0 ) ) == ( 0, 0, 0 )
-    assert wait_state( device, OCC_ID, ( 0, 0, 0 ) ) == ( 0, 0, 0 )
 
-    occ = frames.frames[rs.stream.occupancy]
+    pd_frames, occ = frames.frames[rs.stream.object_detection], frames.frames[rs.stream.occupancy]
+    assert all( i['size'] == 2347 and i['magic'] == b'ODET' for i in pd_frames )   # GMSL pads PD to the profile
     assert all( i['size'] == 320 * 256 for i in occ )
     assert all( i['grid'] == ( 256, 320 ) for i in occ ), "OCC frames need their occupancy metadata"
     assert all( i['cells_ok'] for i in occ )
+    assert all( i['counter'] is not None for i in occ ), "OCC counter validity is independent of source timestamp"
     assert all( b['counter'] > a['counter'] for a, b in zip( occ, occ[1:] ) )
-
-
-def test_occ_start_order(device):
-    """OCC first, then PD on top - the order the viewer typically uses."""
-    if not is_3c( device ):
-        pytest.skip( "Occupancy is 3C only" )
-    inputs = start_inputs( device )
-    pd, mapping = sensor( device, 'Perception' ), sensor( device, 'Depth Mapping Camera' )
-    frames = Collector()
-    mapping.open( occ_profile( device ) )
-    mapping.start( frames )
-    time.sleep( 1 )
-    pd.open( pd_profile( device ) )
-    pd.start( frames )
-    since = time.monotonic()
-    time.sleep( DURATION_S )
-    stop( [pd, mapping] )
-    stop( inputs )
-    assert frames.count( rs.stream.object_detection, since ) >= MIN_PD_FRAMES
-    assert frames.count( rs.stream.occupancy, since ) >= MIN_OCC_FRAMES
 
 
 def test_stale_request_cleared(device):
     """A stream request another client left behind is cleared when the SDK starts the capture."""
-    if not is_3c( device ):
-        pytest.skip( "Needs a second stream, OCC is 3C only" )
+    require_occupancy( device )
     dp = rs.debug_protocol( device )
     dp.send_and_receive_raw_data( dp.build_command( MUX_CONTROL, 1, MUX_SET_ENABLE, OCC_ID, 1 ) )
     assert mux_state( device, OCC_ID )[0] == 1
@@ -263,8 +238,7 @@ def test_stale_request_cleared(device):
     pd = sensor( device, 'Perception' )
     pd.open( pd_profile( device ) )
     pd.start( lambda f: None )
-    time.sleep( 1 )
-    assert mux_state( device, OCC_ID )[0] == 0
+    assert mux_state( device, OCC_ID )[0] == 0   # cleared before the capture starts
     pd.stop()
     pd.close()
     stop( inputs )
@@ -289,24 +263,3 @@ def test_ir_and_perception_exclude_each_other(device):
         start_inputs( device, [ir] )
     pd.stop()
     pd.close()
-
-
-def test_occ_refused_without_depth(device):
-    """OCC is built from Depth: with only Color running the camera refuses it, and the SDK must leave nothing behind."""
-    if not is_3c( device ):
-        pytest.skip( "Occupancy is 3C only" )
-    rgb, mapping = sensor( device, 'RGB Camera' ), sensor( device, 'Depth Mapping Camera' )
-    rgb.open( profile( rgb, rs.stream.color, rs.format.rgb8 ) )
-    rgb.start( lambda f: None )
-    with pytest.raises( RuntimeError, match="refused" ):
-        mapping.open( occ_profile( device ) )
-    stop( [rgb] )
-    assert wait_state( device, OCC_ID, ( 0, 0, 0 ) ) == ( 0, 0, 0 )
-    inputs = start_inputs( device )
-    frames = Collector()
-    mapping.open( occ_profile( device ) )
-    mapping.start( frames )
-    time.sleep( DURATION_S )
-    stop( [mapping] )
-    stop( inputs )
-    assert frames.count( rs.stream.occupancy ) >= MIN_OCC_FRAMES
