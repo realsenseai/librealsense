@@ -479,6 +479,8 @@ EXPORTS
     rs2_set_calibration_config
     rs2_get_application_config
     rs2_set_application_config
+    rs2_get_depth_mapping_params
+    rs2_set_depth_mapping_params
     rs2_get_composite_option
     rs2_set_composite_option
     rs2_get_composite_option_range

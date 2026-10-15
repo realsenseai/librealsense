@@ -808,6 +808,15 @@ namespace librealsense
     {
     public:
         void update(std::shared_ptr< extension_snapshot > ext) override {}
+        // A recording holds no depth mapping params, and "" is not valid JSON to hand back
+        std::string get_depth_mapping_params() const override
+        {
+            throw not_implemented_exception( "Depth mapping params are not available on a playback device" );
+        }
+        void set_depth_mapping_params( const std::string & params_json_str ) const override
+        {
+            throw not_implemented_exception( "Depth mapping params are not available on a playback device" );
+        }
     };
 
     class perception_sensor_snapshot

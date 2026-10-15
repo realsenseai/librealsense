@@ -785,6 +785,37 @@ namespace rs2
             error::handle(e);
         }
         operator bool() const { return _sensor.get() != nullptr; }
+
+        /**
+        * Get the occupancy grid and labeled point cloud params
+        * \return   the params as a JSON string
+        */
+        std::string get_depth_mapping_params() const
+        {
+            rs2_error* e = nullptr;
+            std::shared_ptr<const rs2_raw_data_buffer> buffer(rs2_get_depth_mapping_params(_sensor.get(), &e), rs2_delete_raw_data);
+            error::handle(e);
+
+            auto size = rs2_get_raw_data_size(buffer.get(), &e);
+            error::handle(e);
+
+            auto start = rs2_get_raw_data(buffer.get(), &e);
+            error::handle(e);
+
+            return std::string(start, start + size);
+        }
+
+        /**
+        * Set occupancy grid and labeled point cloud params. Only the named fields change.
+        * Blocks until the device has applied the params.
+        * \param[in] params_json_str   partial params as a JSON string
+        */
+        void set_depth_mapping_params(const std::string& params_json_str) const
+        {
+            rs2_error* e = nullptr;
+            rs2_set_depth_mapping_params(_sensor.get(), params_json_str.c_str(), &e);
+            error::handle(e);
+        }
     };
 
     class perception_sensor : public sensor

@@ -4924,6 +4924,30 @@ void rs2_set_application_config(
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, sensor, application_config_json_str)
 
+const rs2_raw_data_buffer* rs2_get_depth_mapping_params(
+    rs2_sensor const* sensor,
+    rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(sensor);
+    auto depth_mapping_sensor = VALIDATE_INTERFACE(sensor->sensor, librealsense::depth_mapping_sensor);
+    auto ret_str = depth_mapping_sensor->get_depth_mapping_params();
+    std::vector<uint8_t> vec(ret_str.begin(), ret_str.end());
+    return new rs2_raw_data_buffer{ std::move(vec) };
+}
+HANDLE_EXCEPTIONS_AND_RETURN(nullptr, sensor)
+
+void rs2_set_depth_mapping_params(
+    rs2_sensor const* sensor,
+    const char* params_json_str,
+    rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(sensor);
+    VALIDATE_NOT_NULL(params_json_str);
+    auto depth_mapping_sensor = VALIDATE_INTERFACE(sensor->sensor, librealsense::depth_mapping_sensor);
+    depth_mapping_sensor->set_depth_mapping_params(params_json_str);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, sensor, params_json_str)
+
 // See rs_composite_option.h. One generic family of entry points for every composite option,
 // keyed by rs2_composite_option_id, a separate id space from rs2_option. Each call performs
 // exactly one UVC transaction, looked up directly in the container's own composite registry.

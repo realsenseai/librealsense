@@ -1,0 +1,14 @@
+{
+    "camera_position": {
+        "rotation": [[0.0, 0.0, 1.0],
+                     [-1.0, 0.0, 0.0],
+                     [0.0, -1.0, 0.0]],
+        "translation": [0.0, 0.0, 0.27]
+    },
+    "occupancy_grid_params": {
+        "grid_cell_size": 50,
+        "cell_threshold_factor": 0.02,
+        "polynomial_bias": 4.0,
+        "surface_height": 0.1
+    }
+}

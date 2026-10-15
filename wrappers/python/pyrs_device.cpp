@@ -29,6 +29,7 @@ void init_device(py::module &m) {
         .def("first_fisheye_sensor", [](rs2::device& self) { return self.first<rs2::fisheye_sensor>(); }) // No docstring in C++
         .def("first_safety_sensor", [](rs2::device& self) { return self.first<rs2::safety_sensor>(); }) // No docstring in C++
         .def("first_perception_sensor", [](rs2::device& self) { return self.first<rs2::perception_sensor>(); }) // No docstring in C++
+        .def("first_depth_mapping_sensor", [](rs2::device& self) { return self.first<rs2::depth_mapping_sensor>(); }) // No docstring in C++
         .def("supports", &rs2::device::supports, "Check if specific camera info is supported.", "info"_a)
         .def("get_info", &rs2::device::get_info, "Retrieve camera specific information, "
              "like versions of various internal components", "info"_a)

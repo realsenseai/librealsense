@@ -24,7 +24,10 @@ using rs_fourcc = rsutils::type::fourcc;
 #include "pose.h"   // identity_matrix
 
 #include <src/metadata-parser.h>
-#include <thread>
+#include <rsutils/json.h>
+#include <rsutils/number/crc32.h>
+#include <set>
+#include <cstring>
 
 namespace librealsense
 {
@@ -74,6 +77,7 @@ namespace librealsense
             return;
 
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
+        _supports_depth_mapping_params = d5x5_family_pids.count( pid ) > 0;
 
         const uint32_t mapping_stream_mi = _is_safety_layout ? 13 : 11;
         auto mapping_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, mapping_stream_mi);
@@ -107,6 +111,11 @@ namespace librealsense
             get_backend()->create_uvc_device(occupancy_devices_info.front()),
             std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(ds_timestamp_reader_metadata), _tf_keeper, enable_global_time_option)),
             this);
+        if( _supports_depth_mapping_params )
+        {
+            raw_mapping_ep->register_xu( ds::mapping_xu ); // ensure the XU is initialized every time we power the camera
+            _raw_depth_mapping_ep = raw_mapping_ep;
+        }
 
         auto mapping_ep = std::make_shared<d500_depth_mapping_sensor>(this,
             raw_mapping_ep,
@@ -641,5 +650,120 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
     rs2_intrinsics d500_depth_mapping_sensor::get_intrinsics(const stream_profile& profile) const
     {
         return rs2_intrinsics();
+    }
+
+    // FW replies with the header followed by { "result": { "code", "message" }, "configured", "params" }.
+    // "result" is the outcome of the last SET ("OK", "OUT_OF_RANGE", ...; "IDLE" before any); the rest is read from flash.
+    static rsutils::json read_depth_mapping_reply( uvc_sensor & raw_ep )
+    {
+        std::vector< uint8_t > reply( ds::DEPTH_MAPPING_PARAMS_LEN, 0 );
+        raw_ep.invoke_powered( [&]( platform::uvc_device & dev )
+        {
+            if( ! dev.get_xu( ds::mapping_xu, ds::DEPTH_MAPPING_PARAMS, reply.data(), ds::DEPTH_MAPPING_PARAMS_LEN ) )
+                throw io_exception( "Failed to read depth mapping params" );
+        } );
+
+        ds::depth_mapping_params_header header;
+        std::memcpy( &header, reply.data(), sizeof( header ) );
+        auto json = reply.data() + sizeof( header );
+        if( header.version != ds::DEPTH_MAPPING_PARAMS_VERSION )
+            throw io_exception( rsutils::string::from() << "Unsupported depth mapping params version " << header.version );
+        if( header.json_size == 0 || header.json_size > ds::DEPTH_MAPPING_PARAMS_LEN - sizeof( header ) )
+            throw io_exception( rsutils::string::from() << "Invalid depth mapping params JSON size " << header.json_size );
+        if( rsutils::number::calc_crc32( json, header.json_size ) != header.json_crc )
+            throw io_exception( "Depth mapping params CRC mismatch" );
+        auto reply_json = rsutils::json::parse( std::string( json, json + header.json_size ), nullptr, false );
+        if( reply_json.is_discarded() || ! reply_json.is_object() )
+            throw io_exception( "Depth mapping params reply is not a JSON object" );
+        return reply_json;
+    }
+
+    // A missing key means FW broke the reply contract; say which key instead of surfacing a bare json error
+    static rsutils::json const & depth_mapping_reply_field( rsutils::json const & j, char const * key )
+    {
+        auto it = j.find( key );
+        if( it == j.end() )
+            throw io_exception( rsutils::string::from() << "Depth mapping params reply is missing '" << key << "'" );
+        return *it;
+    }
+
+    std::string d500_depth_mapping::get_depth_mapping_params() const
+    {
+        if( ! _raw_depth_mapping_ep )
+            throw not_implemented_exception( "Depth mapping params are not supported on this device" );
+        std::lock_guard< std::mutex > lock( _depth_mapping_params_mutex );
+        auto reply = read_depth_mapping_reply( *_raw_depth_mapping_ep );
+        return depth_mapping_reply_field( reply, "params" ).dump();
+    }
+
+    void d500_depth_mapping::set_depth_mapping_params( const std::string & params_json_str ) const
+    {
+        if( ! _raw_depth_mapping_ep )
+            throw not_implemented_exception( "Depth mapping params are not supported on this device" );
+
+        ds::depth_mapping_params_header header;
+        const size_t max_json_size = ds::DEPTH_MAPPING_PARAMS_LEN - sizeof( header );
+        if( params_json_str.empty() || params_json_str.size() > max_json_size )
+            throw invalid_value_exception( rsutils::string::from() << "Depth mapping params JSON is " << params_json_str.size()
+                                                                   << " bytes; must be 1.." << max_json_size );
+
+        auto json = reinterpret_cast< const uint8_t * >( params_json_str.data() );
+        header.version = ds::DEPTH_MAPPING_PARAMS_VERSION;
+        header.json_size = static_cast< uint16_t >( params_json_str.size() );
+        header.json_crc = rsutils::number::calc_crc32( json, params_json_str.size() );
+
+        // Held across SET_CUR and the GET that explains a failure, so that GET reads this call's result
+        std::lock_guard< std::mutex > lock( _depth_mapping_params_mutex );
+        auto & raw_ep = *_raw_depth_mapping_ep;
+        std::vector< uint8_t > data( ds::DEPTH_MAPPING_PARAMS_LEN, 0 );
+        std::memcpy( data.data(), &header, sizeof( header ) );
+        std::copy( params_json_str.begin(), params_json_str.end(), data.begin() + sizeof( header ) );
+
+        // FW validates and writes flash before completing SET_CUR, and STALLs a rejected payload. Depending on the
+        // backend a STALL either throws or returns false; both send us to GET_CUR for FW's reason.
+        bool set_ok = false;
+        std::string transfer_error;
+        try
+        {
+            raw_ep.invoke_powered( [&]( platform::uvc_device & dev )
+            {
+                set_ok = dev.set_xu( ds::mapping_xu, ds::DEPTH_MAPPING_PARAMS, data.data(), ds::DEPTH_MAPPING_PARAMS_LEN );
+            } );
+        }
+        catch( std::exception const & e )
+        {
+            transfer_error = e.what();
+        }
+        if( set_ok )
+            return;
+
+        std::string const failed = transfer_error.empty() ? std::string( "Failed to set depth mapping params" )
+                                                          : "Failed to set depth mapping params: " + transfer_error;
+        rsutils::json reply;
+        try
+        {
+            reply = read_depth_mapping_reply( raw_ep );
+        }
+        catch( std::exception const & )
+        {
+            throw io_exception( failed );
+        }
+        auto & result = depth_mapping_reply_field( reply, "result" );
+        auto & code_field = depth_mapping_reply_field( result, "code" );
+        if( ! code_field.is_string() )
+            throw io_exception( "Depth mapping params reply has a non-string 'code'" );
+        auto code = code_field.get< std::string >();
+        // A transfer that failed without FW rejecting it leaves no reason of its own
+        if( code == "OK" || code == "IDLE" )
+            throw io_exception( failed );
+
+        std::string error = rsutils::string::from() << "Failed to set depth mapping params: " << code << ": "
+                                                    << result.value( "message", std::string() );
+        // Codes caused by the caller's JSON are invalid values; header, CRC and flash failures are I/O errors
+        static const std::set< std::string > invalid_input_codes
+            = { "PARSE_ERROR", "UNKNOWN_KEY", "WRONG_TYPE", "OUT_OF_RANGE", "MISSING_MANDATORY" };
+        if( invalid_input_codes.count( code ) )
+            throw invalid_value_exception( error );
+        throw io_exception( error );
     }
 }

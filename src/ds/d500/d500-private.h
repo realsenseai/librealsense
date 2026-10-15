@@ -50,6 +50,23 @@ namespace librealsense
         const platform::extension_unit inference_xu = { 0, 0x10, 2,
         { 0xf6c3c3d1, 0x5cde, 0x4477, { 0xad, 0xf0, 0x41, 0x33, 0xf5, 0x8d, 0xa6, 0xf4 } } };
 
+        // Mapping EU on the depth mapping interface (D5x5 family only); carries the OG/LPCL params as JSON.
+        const platform::extension_unit mapping_xu = { 0, 0x18, 2,
+        { 0x794c4ff5, 0x7919, 0x4657, { 0x81, 0xc0, 0x30, 0xc0, 0x47, 0x1f, 0x62, 0xde } } };
+        const uint8_t DEPTH_MAPPING_PARAMS = 0x0A;
+        const int DEPTH_MAPPING_PARAMS_LEN = 1024;  // fixed control length; caps the JSON
+        const uint16_t DEPTH_MAPPING_PARAMS_VERSION = 1;
+
+#pragma pack(push, 1)
+        // Precedes the JSON in both directions, so each side can verify the JSON arrived intact
+        struct depth_mapping_params_header
+        {
+            uint16_t version;
+            uint16_t json_size;  // JSON bytes that follow, no NUL
+            uint32_t json_crc;   // CRC-32 of those bytes
+        };
+#pragma pack(pop)
+
 
         // d500 Devices supported by the current version
         static const std::set<std::uint16_t> rs500_sku_pid = {
