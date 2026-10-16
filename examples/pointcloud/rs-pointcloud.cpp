@@ -23,8 +23,11 @@ int main(int argc, char * argv[]) try
     // We want the points object to be persistent so we can display the last cloud when a frame drops
     rs2::points points;
 
+    rs2::context ctx;
+    wait_for_devices( ctx );
+
     // Declare RealSense pipeline, encapsulating the actual device and sensors
-    rs2::pipeline pipe;
+    rs2::pipeline pipe( ctx );
     // Start streaming with default recommended configuration
     pipe.start();
 
