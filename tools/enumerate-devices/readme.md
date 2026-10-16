@@ -36,7 +36,7 @@ Device info:
 |`-c`,`--calib_data`|Provide calibration (Intrinsic/Extrinsic) and streaming modes information|
 |`-p <path>`,`--playback_device <path>`|Enumerate streams contained in ROSBag record file|
 |`-d`,`--defaults`|Show the default streams configuration|
-|`--dds-domain <0-232>`|Set the DDS domain ID (default to 0)|
+|`--domain-id <0-232>`|Set the DDS domain ID (default to 0)|
 |`-v`,`--verbose`|Show extra information|
 |`--debug`|Turn on LibRS debug logs|
 |`--`,`--ignore_rest`|Ignores the rest of the labeled arguments following this flag|

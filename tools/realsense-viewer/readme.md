@@ -31,4 +31,3 @@ For further information please refer to [D400 Advanced Mode](https://github.com/
 |Flag   |Description   |
 |---|---|
 |`--debug`|Turn on LibRS debug logs to console, regardless of other settings|
-|`--sw-only`|Show only software devices: playback, DDS, etc. -- but not USB/HID/etc.|

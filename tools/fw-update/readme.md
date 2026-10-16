@@ -71,10 +71,8 @@ Recovery done
 
 |Flag   |Description   |
 |---|---|
-|`--sw-only`|Show only software devices (playback, DDS, etc. -- but not USB/HID/etc.)|
 |`-b`|Create a backup to the camera flash and saved it to the given path|
 |`-s`|The serial number of the device to be update, this is mandetory if more than one device is connected|
-|`-m`|Path of the safety MCU image file |
 |`-f`|Path of the firmware image file|
 |`-u`|Update unsigned firmware, available only for unlocked cameras|
 |`-r`|Recover all connected devices which are in recovery mode|
