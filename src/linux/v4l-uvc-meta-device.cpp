@@ -52,18 +52,12 @@ namespace librealsense
 
         void v4l_uvc_meta_device::streamoff() const
         {
-            bool jetson_platform = is_platform_jetson();
-            // IPU6 platform should stop md, then video
-            if (jetson_platform)
-                v4l_uvc_device::streamoff();
+            // Video first: uvcvideo keeps completing video URBs into the metadata queue,
+            // and a metadata STREAMOFF racing them can panic the kernel (RSDEV-14191).
+            v4l_uvc_device::streamoff();
 
             if (_md_fd != -1)
-            {
-                // D457 development - added for mipi device, for IR because no metadata there
                 stream_off(_md_fd, _md_type);
-            }
-            if (!jetson_platform)
-                v4l_uvc_device::streamoff();
         }
 
         void v4l_uvc_meta_device::negotiate_kernel_buffers(size_t num) const
