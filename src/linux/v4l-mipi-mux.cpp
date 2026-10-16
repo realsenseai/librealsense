@@ -9,9 +9,11 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <thread>
 
 namespace librealsense
 {
@@ -23,12 +25,14 @@ namespace librealsense
             {
                 constexpr uint32_t RSVL_FOURCC = 0x5253564C;  // shared carrier format of the logical streams
                 constexpr uint32_t GREY_FOURCC = 0x47524559;
+                constexpr uint32_t PAL8_FOURCC = 0x50414C38;  // USB Mapping selector for labeled point cloud
 
                 // HWMC opcode 0xC0 controls one logical stream: { version, action, stream id, enable }
                 constexpr uint32_t MUX_CONTROL_OPCODE = 0xC0;
                 constexpr uint32_t MUX_CONTROL_VERSION = 1;
                 constexpr uint32_t MUX_SET_ENABLE = 1;
                 constexpr uint32_t MUX_GET_STATE = 2;
+                constexpr int32_t MUX_AGAIN = -10;
 
                 // HWMC rides the depth XU (subdevice 0, unit 3) selector 1, in fixed size buffers
                 const extension_unit HWMC_XU = { 0, 3, 2, {} };
@@ -67,16 +71,22 @@ namespace librealsense
                 {
                     uint16_t mi;                // interface number of the stream on the USB device
                     uint32_t stream_id;         // HWMC MUX control id
-                    uint32_t metadata_type_id;  // also the id of the stream's own metadata block
+                    uint32_t metadata_type_id;  // MUX Capture Timing discriminator
+                    uint32_t native_id;         // USB-compatible native metadata block ID
                     uint32_t native_min_size;
                     bool native_required;
-                    stream_profile profile;     // the stream's USB profile
+                    size_t payload_size;
+                    stream_profile profile;     // the stream's USB logical profile
                 };
 
-                constexpr size_t MUX_MEMBER_COUNT = 2;
+                constexpr size_t MUX_MEMBER_COUNT = 3;
+                constexpr int PD_MEMBER = 0;
+                constexpr int OCC_MEMBER = 1;
+                constexpr int LPCL_MEMBER = 2;
                 const std::array< mux_member, MUX_MEMBER_COUNT > MUX_MEMBERS = { {
-                    { 9, 6, 0x80000020, 83, false, { 2347, 1, 30, GREY_FOURCC } },    // object detection
-                    { 11, 7, 0x80000016, 136, true, { 320, 256, 30, GREY_FOURCC } },  // occupancy
+                    { 9, 6, 0x80000020, 0x80000020, 83, false, 2347, { 2347, 1, 30, GREY_FOURCC } },
+                    { 11, 7, 0x80000016, 0x80000016, 136, true, 81920, { 320, 256, 30, GREY_FOURCC } },
+                    { 11, 8, 0x80000043, 0x80000017, 136, true, 2995200, { 640, 360, 30, PAL8_FOURCC } },
                 } };
 
                 struct mux_state
@@ -118,6 +128,7 @@ namespace librealsense
                     mux( const uvc_device_info & carrier_info, const uvc_device_info & control_info )
                         : _control( std::make_shared< retry_controls_work_around >( std::make_shared< v4l_mipi_device >( control_info ) ) )
                         , _carrier( std::make_shared< v4l_mipi_device >( carrier_info ) )
+                        , _lpcl_sku( carrier_info.pid == 0x0C07 || carrier_info.pid == 0x0C08 )
                     {
                     }
 
@@ -127,7 +138,11 @@ namespace librealsense
                     std::vector< stream_profile > get_profiles( int m ) const
                     {
                         if( m != PRIMARY )
+                        {
+                            if( m == OCC_MEMBER && lpcl_available() )
+                                return { MUX_MEMBERS[OCC_MEMBER].profile, MUX_MEMBERS[LPCL_MEMBER].profile };
                             return { MUX_MEMBERS[m].profile };
+                        }
                         auto profiles = _carrier->get_profiles();
                         profiles.erase( std::remove_if( profiles.begin(), profiles.end(),
                                                         []( const stream_profile & p ) { return p.format == RSVL_FOURCC; } ),
@@ -170,9 +185,14 @@ namespace librealsense
                                 throw wrong_api_call_sequence_exception( "Perception streams are unavailable while the GMSL IR channel streams" );
                             if( _slots[m].committed )
                                 throw wrong_api_call_sequence_exception( "Device already streaming!" );
+                            if( m == LPCL_MEMBER && ( ! lpcl_available() ||
+                                ( _members_committed && size_t( _carrier_profile.width ) * _carrier_profile.height
+                                                        < MUX_MEMBERS[m].payload_size ) ) )
+                                throw wrong_api_call_sequence_exception(
+                                    "LPCL needs a 1024x2925 RSVL queue: close all Perception streams and open LPCL first" );
                             // Claiming the queue first keeps a process that cannot capture from touching camera state
                             if( ! _members_committed )
-                                _carrier->probe_and_commit( carrier_profile(),
+                                _carrier->probe_and_commit( carrier_profile( m ),
                                                             [this]( stream_profile, frame_object f, std::function< void() > release )
                                                             { dispatch( f, std::move( release ) ); },
                                                             buffers );
@@ -196,7 +216,7 @@ namespace librealsense
                         {
                             clear_stale_requests();
                             set_enable( m, true );
-                            // The camera starts the capture here, and refuses it when a stream's inputs are not running
+                            // Firmware owns the backing graph, including standalone Perception inputs.
                             try
                             {
                                 _carrier->stream_on( error_handler );
@@ -204,8 +224,7 @@ namespace librealsense
                             catch( const std::exception & e )
                             {
                                 throw backend_exception( rsutils::string::from()
-                                                         << "The camera refused to start Perception streams; Occupancy needs Depth "
-                                                            "streaming at 1280x720 or 640x360 (" << e.what() << ")" );
+                                                         << "The camera refused to start Perception streams (" << e.what() << ")" );
                             }
                             _streaming = true;
                         }
@@ -264,6 +283,20 @@ namespace librealsense
                     }
 
                 private:
+                    bool lpcl_available() const
+                    {
+                        if( ! _lpcl_sku )
+                            return false;
+                        // The V4L2 fd is opened by set_power(D0), not by this object's constructor.
+                        // Check capacity only when the sensor enumerates profiles or opens a stream.
+                        const auto profiles = _carrier->get_profiles();
+                        return std::any_of( profiles.begin(), profiles.end(), []( const stream_profile & p )
+                        {
+                            return p.format == RSVL_FOURCC &&
+                                size_t( p.width ) * p.height >= MUX_MEMBERS[LPCL_MEMBER].payload_size;
+                        } );
+                    }
+
                     struct slot
                     {
                         frame_callback callback;
@@ -272,12 +305,20 @@ namespace librealsense
                         bool enabled = false;
                     };
 
-                    stream_profile carrier_profile()
+                    stream_profile carrier_profile( int m )
                     {
+                        // With no public capacity-selection API, reserve LPCL capacity at the first
+                        // open. This permits PD -> LPCL without resizing a live shared V4L2 queue.
+                        const size_t required = lpcl_available() ? MUX_MEMBERS[LPCL_MEMBER].payload_size
+                                                                 : MUX_MEMBERS[m].payload_size;
+                        stream_profile chosen{};
                         for( auto const & p : _carrier->get_profiles() )
-                            if( p.format == RSVL_FOURCC )
-                                return _carrier_profile = p;
-                        throw backend_exception( "The GMSL IR node offers no RSVL format" );
+                            if( p.format == RSVL_FOURCC && size_t( p.width ) * p.height >= required
+                                && ( ! chosen.width || size_t( p.width ) * p.height < size_t( chosen.width ) * chosen.height ) )
+                                chosen = p;
+                        if( ! chosen.width )
+                            throw backend_exception( "The GMSL IR node offers no sufficient RSVL capacity" );
+                        return _carrier_profile = chosen;
                     }
 
                     // False, with the camera's error code, when the camera rejects the request
@@ -316,7 +357,17 @@ namespace librealsense
                     {
                         mux_state state;
                         int32_t error;
-                        if( ! command( MUX_SET_ENABLE, MUX_MEMBERS[m].stream_id, on, state, error ) )
+                        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 1500 );
+                        bool accepted;
+                        do
+                        {
+                            accepted = command( MUX_SET_ENABLE, MUX_MEMBERS[m].stream_id, on, state, error );
+                            if( accepted || ! on || m == PD_MEMBER || error != MUX_AGAIN || std::chrono::steady_clock::now() >= deadline )
+                                break;
+                            // A Mapping switch may still be draining STOP/CLOSE on the camera worker.
+                            std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+                        } while( true );
+                        if( ! accepted )
                             throw backend_exception( rsutils::string::from() << "Perception stream " << MUX_MEMBERS[m].stream_id
                                                                              << " enable(" << on << ") rejected, error " << error );
                         // The camera applies the request asynchronously; routing by metadata makes waiting for it unnecessary
@@ -388,13 +439,13 @@ namespace librealsense
                             if( native_size < sizeof( native ) )
                                 return reject( "native metadata size", native_size );
                             std::memcpy( &native, raw + MUX_MD_SIZE, sizeof( native ) );
-                            if( native.id != it->metadata_type_id )
+                            if( native.id != it->native_id )
                                 return reject( "native metadata id", native.id );
                             if( native.size != native_size || native.size < it->native_min_size )
                                 return reject( "native metadata size", native.size );
                         }
 
-                        const size_t payload_size = size_t( it->profile.width ) * it->profile.height;
+                        const size_t payload_size = it->payload_size;
                         if( f.frame_size < payload_size )
                             return reject( "frame size", static_cast< uint32_t >( f.frame_size ) );
 
@@ -431,6 +482,7 @@ namespace librealsense
                     int _power_users = 0;
                     size_t _rejected = 0;
                     std::shared_ptr< uvc_device > _carrier;  // last, so its capture thread stops before the rest goes
+                    bool _lpcl_sku;
                 };
 
                 // One shared multiplexer per node, whichever of its users is created first
@@ -460,20 +512,38 @@ namespace librealsense
                     mux_device( std::shared_ptr< mux > owner, int m )
                         : _mux( std::move( owner ) )
                         , _member( m )
+                        , _active_member( m )
                     {
                     }
 
                     void probe_and_commit( stream_profile profile, frame_callback callback, int buffers ) override
                     {
-                        _mux->commit( _member, profile, std::move( callback ), buffers );
+                        if( _committed )
+                            throw wrong_api_call_sequence_exception( "GMSL stream profile already committed" );
+                        int selected = _member == OCC_MEMBER && profile.format == PAL8_FOURCC ? LPCL_MEMBER : _member;
+                        if( selected != PRIMARY )
+                        {
+                            auto const & expected = MUX_MEMBERS[selected].profile;
+                            if( profile.format != expected.format || profile.width != expected.width ||
+                                profile.height != expected.height || profile.fps != expected.fps )
+                                throw backend_exception( "Unsupported GMSL Perception logical profile" );
+                        }
+                        _mux->commit( selected, profile, std::move( callback ), buffers );
+                        _active_member = selected;
+                        _committed = true;
                     }
                     void stream_on( std::function< void( const notification & n ) > error_handler ) override
                     {
-                        _mux->stream_on( _member, error_handler );
+                        _mux->stream_on( _active_member, error_handler );
                     }
-                    void start_callbacks() override { _mux->set_started( _member, true ); }
-                    void stop_callbacks() override { _mux->set_started( _member, false ); }
-                    void close( stream_profile profile ) override { _mux->close( _member, profile ); }
+                    void start_callbacks() override { _mux->set_started( _active_member, true ); }
+                    void stop_callbacks() override { _mux->set_started( _active_member, false ); }
+                    void close( stream_profile profile ) override
+                    {
+                        _mux->close( _active_member, profile );
+                        _active_member = _member;
+                        _committed = false;
+                    }
 
                     void set_power_state( power_state state ) override
                     {
@@ -516,6 +586,8 @@ namespace librealsense
 
                     std::shared_ptr< mux > _mux;
                     int _member;
+                    int _active_member;
+                    bool _committed = false;
                     power_state _state = D3;
                 };
             }  // namespace
@@ -527,10 +599,10 @@ namespace librealsense
                 {
                     if( ! is_carrier( node.first ) )
                         continue;
-                    for( auto const & m : MUX_MEMBERS )
+                    for( size_t i = 0; i <= OCC_MEMBER; ++i )
                     {
                         members.push_back( node );
-                        members.back().first.mi = m.mi;
+                        members.back().first.mi = MUX_MEMBERS[i].mi;
                     }
                 }
                 nodes.insert( nodes.end(), members.begin(), members.end() );
