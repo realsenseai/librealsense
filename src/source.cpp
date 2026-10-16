@@ -212,6 +212,8 @@ namespace librealsense
             return RS2_EXTENSION_MOTION_FRAME;
         case RS2_STREAM_LABELED_POINT_CLOUD:
             return RS2_EXTENSION_LABELED_POINTS;
+        case RS2_STREAM_POINT_CLOUD:
+            return RS2_EXTENSION_POINTS;
 
         case RS2_STREAM_OBJECT_DETECTION:
             return RS2_EXTENSION_OBJECT_DETECTION_FRAME;

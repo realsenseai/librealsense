@@ -834,7 +834,8 @@ namespace rs2
         }
         /**
         * Retrieve the texture coordinates (uv map) for the point cloud
-        * \return texture_coordinate* - pointer of texture coordinates.
+        * \return texture_coordinate* - pointer of texture coordinates; nullptr for a device point cloud
+        *         (RS2_STREAM_POINT_CLOUD), which carries vertices only.
         */
         const texture_coordinate* get_texture_coordinates() const
         {

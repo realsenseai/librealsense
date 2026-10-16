@@ -18,12 +18,10 @@ namespace rs2
         static const float3 DARK_PURPLE_COL = { 0.2f, 0.1f, 0.2f };
         static const float3 WHITE_COL = { 1.0f, 1.0f, 1.0f };
         static const float3 GREEN_COL = { 0.0f, 1.0f, 0.0f };
-        static const float3 RED_COL = { 1.0f, 0.0f, 0.0f };
         static const float3 TURQUOISE_COL = { 0.0f, 1.0f, 1.0f };
         static const float3 BLUE_COL = { 0.0f, 0.0f, 1.0f };
         static const float3 PINK_COL = { 1.0f, 0.75f, 0.8f };
         static const float3 GREY_COL = { 0.5f, 0.5f, 0.5f };
-        static const float3 YELLOW_COL = { 1.0f, 1.0f, 0.0f };
         std::map<rs2_point_cloud_label, float3> label_to_color3f;
 
         label_to_color3f[RS2_POINT_CLOUD_LABEL_UNKNOWN] = ORANGE_COL;
@@ -38,8 +36,8 @@ namespace rs2
         label_to_color3f[RS2_POINT_CLOUD_LABEL_MASKED] = GREY_COL;
         label_to_color3f[RS2_POINT_CLOUD_LABEL_CLIFF] = DARK_PURPLE_COL;
         label_to_color3f[RS2_POINT_CLOUD_LABEL_OBSTACLE] = PINK_COL;
-        label_to_color3f[RS2_POINT_CLOUD_LABEL_OBSTACLE_DANGER] = RED_COL;
-        label_to_color3f[RS2_POINT_CLOUD_LABEL_OBSTACLE_WARNING] = YELLOW_COL;
+        label_to_color3f[RS2_POINT_CLOUD_LABEL_OBSTACLE_DANGER] = PINK_COL;   // drawn as obstacles
+        label_to_color3f[RS2_POINT_CLOUD_LABEL_OBSTACLE_WARNING] = PINK_COL;  // drawn as obstacles
 
 
 

@@ -230,6 +230,7 @@ namespace librealsense
                         case RS2_STREAM_OBJECT_DETECTION:
                         case RS2_STREAM_OCCUPANCY:
                         case RS2_STREAM_LABELED_POINT_CLOUD:
+                        case RS2_STREAM_POINT_CLOUD:
                             return true;
                         default:
                             break;

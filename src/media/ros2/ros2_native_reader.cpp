@@ -79,7 +79,7 @@ namespace librealsense
         auto vf = dynamic_cast<video_frame*>(frame_ptr);
         if (!vf)
         {
-            if (dynamic_cast<labeled_points*>(frame_ptr)) return;
+            if (dynamic_cast<labeled_points*>(frame_ptr) || dynamic_cast<points*>(frame_ptr)) return;  // no 2D geometry
             throw std::runtime_error("Profile is video stream but frame is not video frame");
         }
 

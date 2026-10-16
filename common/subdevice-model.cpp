@@ -499,7 +499,7 @@ namespace rs2
                 push_back_if_not_exists(shared_fps_values, profile.fps());
                 push_back_if_not_exists(fpses_per_stream[profile.unique_id()], fps.str());
                 push_back_if_not_exists(shared_fpses, fps.str());
-                stream_display_names[profile.unique_id()] = profile.stream_name();
+                stream_display_names[profile.unique_id()] = viewer_stream_name( profile.stream_name() );
 
                 std::string format = rs2_format_to_string(profile.format());
 

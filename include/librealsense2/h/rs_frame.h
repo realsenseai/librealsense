@@ -357,7 +357,8 @@ void rs2_export_to_ply(const rs2_frame* frame, const char* fname, rs2_frame* tex
 * Each coordinate represent a (u,v) pair within [0,1] range, to be mapped to texture image
 * \param[in] frame       Points frame
 * \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
-* \return                Pointer to an array of texture coordinates, lifetime is managed by the frame
+* \return                Pointer to an array of texture coordinates, lifetime is managed by the frame;
+*                        nullptr for a device point cloud (RS2_STREAM_POINT_CLOUD), which carries vertices only
 */
 rs2_pixel* rs2_get_frame_texture_coordinates(const rs2_frame* frame, rs2_error** error);
 

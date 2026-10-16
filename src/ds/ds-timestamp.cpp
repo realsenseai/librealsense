@@ -165,8 +165,7 @@ namespace librealsense
         }
 
         uint32_t counter = 0;
-        uint64_t timestamp = 0;
-        if( get_mapping_capture_timing( *f, counter, timestamp ) )
+        if( get_mapping_frame_counter( *f, counter ) )
             return counter;
 
         return _backup_timestamp_reader->get_frame_counter(frame);

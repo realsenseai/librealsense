@@ -27,6 +27,7 @@
 #include <common/utilities/imgui/wrap.h>
 #include <common/labeled-point-cloud-utilities.h>
 #include <common/utilities/com/center-of-mass.h>
+#include <librealsense2/rsutil.h>
 
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <regex>
@@ -197,7 +198,7 @@ namespace rs2
             if( ImGui::Button( "Export", ImVec2( font_size * 8.f, 0 ) ) )
             {
                 apply();
-                if (!last_points)
+                if (!last_points && !_device_pc_host_points)
                     error_message = "No depth data available";
                 else
                 {
@@ -207,7 +208,7 @@ namespace rs2
                     else if (auto ret = file_dialog_open(save_file, curr_exporter->second.filters.data(), NULL, NULL))
                     {
                         frame tex;
-                        if (selected_tex_source_uid >= 0 && streams.find(selected_tex_source_uid) != streams.end())
+                        if (last_points && selected_tex_source_uid >= 0 && streams.find(selected_tex_source_uid) != streams.end())
                         {
                             tex = streams[selected_tex_source_uid].texture->get_last_frame(true);
                             if (tex) ppf.update_texture(tex);
@@ -219,7 +220,22 @@ namespace rs2
                         std::unique_ptr<rs2::filter> exporter;
                         if (tab == export_type::ply)
                             exporter = std::unique_ptr<rs2::filter>(new rs2::save_to_ply(fname));
-                        auto data = frameset_alloc.process(last_points);
+                        rs2::frame data;
+                        if (last_points)
+                            data = frameset_alloc.process(last_points);
+                        else
+                        {
+                            // HKR cloud with the texture it is drawn with
+                            if (!_device_pc_frameset_maker)
+                                _device_pc_frameset_maker = std::make_shared< rs2::filter >( [this]( rs2::frame f, rs2::frame_source & src )
+                                {
+                                    if( _device_pc_tex_frame )
+                                        src.frame_ready( src.allocate_composite_frame( { _device_pc_tex_frame, f } ) );
+                                    else
+                                        src.frame_ready( f );
+                                } );
+                            data = _device_pc_frameset_maker->process(_device_pc_host_points);
+                        }
 
                         for (auto& option : curr_exporter->second.options)
                         {
@@ -367,7 +383,9 @@ namespace rs2
                  s.second.profile.stream_type() == RS2_STREAM_INFRARED ||
                  s.second.profile.stream_type() == RS2_STREAM_CONFIDENCE ||
                  s.second.profile.stream_type() == RS2_STREAM_DEPTH ||
-                 s.second.profile.stream_type() == RS2_STREAM_FISHEYE))
+                 s.second.profile.stream_type() == RS2_STREAM_FISHEYE ||
+                 s.second.profile.stream_type() == RS2_STREAM_POINT_CLOUD ||
+                 s.second.profile.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD))
             {
                 auto profile_unique_id = s.second.profile.unique_id();
                 auto stream_origin_iter = streams_origin.find(profile_unique_id);
@@ -392,9 +410,13 @@ namespace rs2
                     tex_profiles.push_back(s.second.profile);
 
                     auto dev_name = s.second.dev ? s.second.dev->dev.get_info(RS2_CAMERA_INFO_NAME) : "Unknown";
-                    std::string stream_name = rs2_stream_to_string(s.second.profile.stream_type());
+                    std::string stream_name = viewer_stream_name( rs2_stream_to_string(s.second.profile.stream_type()) );
                     if (s.second.profile.stream_index())
                         stream_name += "_" + std::to_string(s.second.profile.stream_index());
+                    if (s.second.profile.stream_type() == RS2_STREAM_POINT_CLOUD)
+                        stream_name += " (depth colors)";
+                    else if (s.second.profile.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
+                        stream_name += " (labels)";
                     tex_sources_str.push_back( rsutils::string::from() << dev_name << " " << stream_name );
 
                     i++;
@@ -408,8 +430,10 @@ namespace rs2
             auto it = std::find(begin(last_tex_sources), end(last_tex_sources), id);
             if (it == last_tex_sources.end())
             {
-                // Don't auto-switch to IR stream
-                if (tex_profiles[i].format() != RS2_FORMAT_Y8)
+                // Don't auto-switch to IR stream, nor to the device cloud's own depth colors
+                if (tex_profiles[i].format() != RS2_FORMAT_Y8
+                    && tex_profiles[i].stream_type() != RS2_STREAM_POINT_CLOUD
+                    && tex_profiles[i].stream_type() != RS2_STREAM_LABELED_POINT_CLOUD)
                     selected_tex_source_uid = id;
                 texture_update_time = glfwGetTime();
             }
@@ -437,13 +461,17 @@ namespace rs2
         float button_width = win.get_font_size() * 3.8f;
 
         const auto has_stream = tex_sources_str.size() && depth_sources_str.size();
+        // HKR clouds (PCL, LPCL): no host Depth needed for pause or texture
+        const bool has_hkr_cloud = bool( last_device_points ) || bool( last_labeled_points );
+        const bool can_pause = has_stream || has_hkr_cloud;
+        const bool can_texture = has_stream || ( has_hkr_cloud && tex_sources_str.size() );
 
         // ------------ Pause Stream    --------------
 
         if (paused)
         {
             bool active = true;
-            if (big_button(&active, win, 5 + left, 0, textual_icons::play, "Resume", false, has_stream, "Resume streaming"))
+            if (big_button(&active, win, 5 + left, 0, textual_icons::play, "Resume", false, can_pause, "Resume streaming"))
             {
                 for(auto&& s : streams)
                     if (s.second.dev) s.second.dev->resume();
@@ -453,7 +481,7 @@ namespace rs2
         else
         {
             bool active = false;
-            if (big_button(&active, win, 5 + left, 0, textual_icons::pause, "Pause", false, has_stream, "Pause streaming"))
+            if (big_button(&active, win, 5 + left, 0, textual_icons::pause, "Pause", false, can_pause, "Pause streaming"))
             {
                 for(auto&& s : streams)
                     if (s.second.dev) s.second.dev->pause();
@@ -559,7 +587,7 @@ namespace rs2
         const auto tex_selection_popup = "Tex Selection";
         if (big_button(&select_tex_source, win, left, 0, textual_icons::palette,
                        "Texture", true,
-                       has_stream,
+                       can_texture,
                        "List of available texture sources", text_color))
         {
             ImGui::OpenPopup(tex_selection_popup);
@@ -668,7 +696,7 @@ namespace rs2
         set_export_popup(large_font, font, stream_rect, error_message, temp_cfg);
 
         active = false;
-        if (big_button(&active, win, 5 + left, 0, textual_icons::save, "Export", false, last_points, "Export 3D model to 3rd-party application"))
+        if (big_button(&active, win, 5 + left, 0, textual_icons::save, "Export", false, last_points || _device_pc_host_points, "Export 3D model to 3rd-party application"))
         {
             _measurements.disable();
             temp_cfg = config_file::instance();
@@ -690,7 +718,7 @@ namespace rs2
             const auto lpc_popup = "LPC Draw";
             if (big_button(&select_lpc_point_size, win, left, 0, textual_icons::grid_6,
                 "Point Size", true, true,
-                "Labeled Point Cloud"))
+                "Labeled PCL"))
             {
                 ImGui::OpenPopup(lpc_popup);
             }
@@ -1078,6 +1106,11 @@ namespace rs2
                 last_labeled_points = labeled_points();
             }
 
+            if (last_device_points && last_device_points.get_profile().unique_id() == i)
+            {
+                last_device_points = points();
+            }
+
             if (selected_tex_source_uid == i)
             {
                 last_texture.reset();
@@ -1111,6 +1144,33 @@ namespace rs2
             {
                 last_points = points();
                 ppf.depth_stream_active = false;
+            }
+        }
+
+        // Labeled point cloud: once its stream stops, the next start switches to 3D again
+        if (_lpcl_active && !is_streaming(RS2_STREAM_LABELED_POINT_CLOUD))
+            _lpcl_active = false;
+        // Occupancy grid: same, its next start switches to 2D again
+        if (_occupancy_active && !is_streaming(RS2_STREAM_OCCUPANCY))
+            _occupancy_active = false;
+
+        // Same for the device point cloud: once its stream stops (e.g. switching to the host cloud), drop the
+        // last frame, otherwise the 3D view keeps drawing it behind whatever streams next.
+        if (last_device_points)
+        {
+            const int uid = last_device_points.get_profile().unique_id();
+            auto origin_it = streams_origin.find(uid);
+            const int key = origin_it != streams_origin.end() ? origin_it->second : uid;
+
+            if (!is_stream_streaming(key))
+            {
+                last_device_points = points();
+                _device_pc_colors = rs2::frame();
+                _device_pc_host_points = points();
+                _device_pc_frame_number = 0;
+                _device_pc_timestamp = 0.;
+                _device_pc_tex_uid = -1;
+                _device_pc_tex_frame = rs2::frame();
             }
         }
     }
@@ -1720,20 +1780,53 @@ namespace rs2
             {
                 auto f = frame.second;
 
-                if (f.is< points >())  // find and store the 3d points frame for later use
+                const bool device_pc = f.is< points >() && f.get_profile().stream_type() == RS2_STREAM_POINT_CLOUD;
+                if (device_pc)
+                {
+                    // Device point cloud: drawn on its own in 3D; still uploaded below for its 2D tile
+                    if (!paused)
+                    {
+                        // A point cloud has no 2D picture of its own: go to 3D when the stream starts (once, so
+                        // switching back to 2D while it streams is respected)
+                        const bool starting = !last_device_points;
+                        update_device_points(f.as< points >());
+                        if (starting)
+                            switch_to_3d_view(window, viewer_rect);
+                    }
+                }
+                else if (f.is< points >())  // find and store the 3d points frame for later use
                 {
                     if (!paused)
                         p = f.as< points >();
                     continue;
                 }
 
+                // Occupancy grid is an image: go to 2D when it starts (once)
+                if (!paused && f.get_profile().stream_type() == RS2_STREAM_OCCUPANCY && !_occupancy_active)
+                {
+                    _occupancy_active = true;
+                    switch_to_2d_view();
+                }
+
                 if (f.is<labeled_points>())
                 {
                     if (!paused)
+                    {
                         lab_points = f.as<labeled_points>();
+                        // Labeled point cloud is a 3D stream too: go to 3D when it starts (once)
+                        if (!_lpcl_active)
+                        {
+                            _lpcl_active = true;
+                            switch_to_3d_view(window, viewer_rect);
+                        }
+                    }
                 }
 
                 auto texture = upload_frame( std::move( f ) );
+
+                // 2D tile of the device cloud: the colorized depth image, as the host depth tile, not raw x,y,z
+                if (device_pc && texture && _device_pc_colors)
+                    texture->upload(_device_pc_colors);
 
                 // A split stream's passive frames carry the offset key; the point cloud texture follows the active class
                 if ( frame.first == f.get_profile().unique_id() && should_texture_frame_be_updated(f) )
@@ -2578,6 +2671,14 @@ namespace rs2
                 draw_color_ruler(active_mouse, streams[stream], stream_rect,
                                  rgb_per_distance_vec, bounds, depth_units);
             }
+
+            if (stream_mv.profile.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
+            {
+                float top = stream_rect.y + 50;
+                if (streams[stream].show_stream_details)
+                    top = streams[stream].curr_info_rect.y + streams[stream].curr_info_rect.h + 10;
+                draw_label_legend(stream_rect.x + stream_rect.w - 10, top, true, false);
+            }
         }
 
         // Re-arrange mode: outline the tiles and show drag-to-swap feedback. The grab area
@@ -2803,6 +2904,7 @@ namespace rs2
 
         check_gl_error();
 
+        bool host_picked = false;
         if (last_points && last_texture)
         {
             auto vf_profile = last_points.get_profile().as<video_stream_profile>();
@@ -2858,28 +2960,8 @@ namespace rs2
                     _pc_renderer.get_option(gl::pointcloud_renderer::OPTION_NORMAL_Y),
                     _pc_renderer.get_option(gl::pointcloud_renderer::OPTION_NORMAL_Z),
                 };
-                _measurements.mouse_pick(win, p, normal);
-
-                // Adjust track-ball controller based on picked position
-                // 1. Place target at the closest point to p, along (pos, target) interval
-                // 2. When zooming-in, move camera target and position toward p
-                if (!win.get_mouse().mouse_down[0])
-                {
-                    auto x1x2 = target - pos;
-                    auto x1x0 = p - pos;
-                    auto t = (x1x2 * x1x0) / (x1x2 * x1x2);
-                    auto p1 = pos + x1x2* t;
-
-                    if (t > 0) { // Don't adjust if pointcloud is behind us
-                        target = lerp(p1, target, 0.9f);
-
-                        if (win.get_mouse().mouse_wheel > 0)
-                        {
-                            pos = lerp(p, pos, 0.9f);
-                            target = lerp(p, target, 0.9f);
-                        }
-                    }
-                }
+                on_point_picked(win, p, normal);
+                host_picked = true;
 
                 //try_select_pointcloud(win);
             }
@@ -2926,9 +3008,47 @@ namespace rs2
 
         check_gl_error();
 
+        // HKR clouds: the same renderer as the host cloud (shading, picking, measure); the first cloud that picks
+        // a point under the cursor wins
+        bool picked = host_picked;
+        if (last_device_points)
+        {
+            prepare_device_cloud();
+            auto profile = _device_pc_host_points ? _device_pc_host_points.get_profile().as<video_stream_profile>()
+                                                  : video_stream_profile();
+            auto tex = device_cloud_texture();
+            if (profile && profile.width() > 0 && tex)
+                picked |= render_hkr_cloud(_device_pc_renderer, _device_pc_host_points, *tex,
+                                           std::sqrt(viewer_rect.w / profile.width()), viewer_rect, win,
+                                           r2 * view_mat, perspective_mat, !picked);
+        }
+
         if (last_labeled_points)
         {
-            draw_3d_labeled_points(viewer_rect, last_labeled_points);
+            prepare_labeled_cloud();
+            auto profile = _lpcl_host_points ? _lpcl_host_points.get_profile().as<video_stream_profile>()
+                                             : video_stream_profile();
+            auto lpcl_tex = labeled_cloud_texture();
+            if (profile && profile.width() > 0 && lpcl_tex)
+            {
+                float point_size = std::sqrt(viewer_rect.w / profile.width());
+                if (selected_lpc_points_size == lpc_points_size::lpc_medium)
+                    point_size *= 3.f;
+                else if (selected_lpc_points_size == lpc_points_size::lpc_large)
+                    point_size *= 5.f;
+                picked |= render_hkr_cloud(_lpcl_renderer, _lpcl_host_points, *lpcl_tex, point_size, viewer_rect, win,
+                                           r2 * view_mat, perspective_mat, !picked);
+            }
+
+            glPushMatrix();
+            draw_3d_labeled_points(viewer_rect, last_labeled_points);  // safety zones
+            glPopMatrix();
+
+            if (_lpcl_tex_uid < 0)  // drawn in label colors; viewer_rect is in framebuffer pixels, the legend in window pixels
+            {
+                const float sx = float(win.width()) / win.framebuf_width(), sy = float(win.height()) / win.framebuf_height();
+                draw_label_legend((viewer_rect.x + 10) * sx, (viewer_rect.y + viewer_rect.h - 10) * sy, false, true);
+            }
         }
 
         _measurements.draw(win);
@@ -4726,25 +4846,51 @@ namespace rs2
         glLineWidth(1.0f);
     }
 
+    void viewer_model::draw_label_legend(float x, float y, bool right, bool bottom)
+    {
+        struct entry { const char * name; rs2_point_cloud_label label; };
+        static const entry entries[] = {
+            { "Ground", RS2_POINT_CLOUD_LABEL_GROUND },
+            { "Obstacle", RS2_POINT_CLOUD_LABEL_OBSTACLE },
+            { "Overhead", RS2_POINT_CLOUD_LABEL_OVERHEAD },
+            { "Unknown / invalid", RS2_POINT_CLOUD_LABEL_UNKNOWN },
+        };
+        static const auto colors = labeled_point_cloud_utilities::get_label_to_color3f();
+
+        const float font = ImGui::GetFontSize();
+        const float pad = 6.f, swatch = font * 0.8f, gap = 6.f, line = font + 3.f;
+        float text_w = 0.f;
+        for (auto& e : entries)
+            text_w = std::max(text_w, ImGui::CalcTextSize(e.name).x);
+        const float w = pad * 2 + swatch + gap + text_w;
+        const float h = pad * 2 + line * (sizeof(entries) / sizeof(entries[0])) - 3.f;
+        const float x0 = right ? x - w : x;
+        const float y0 = bottom ? y - h : y;
+
+        auto dl = ImGui::GetForegroundDrawList();
+        dl->AddRectFilled({ x0, y0 }, { x0 + w, y0 + h }, ImColor(0.f, 0.f, 0.f, 0.6f), 3.f);
+        float ly = y0 + pad;
+        for (auto& e : entries)
+        {
+            auto c = colors.find(e.label);
+            const float3 col = c != colors.end() ? c->second : float3{ 1.f, 1.f, 1.f };
+            const float sy = ly + (font - swatch) / 2;
+            dl->AddRectFilled({ x0 + pad, sy }, { x0 + pad + swatch, sy + swatch }, ImColor(col.x, col.y, col.z));
+            dl->AddText({ x0 + pad + swatch + gap, ly }, ImColor(1.f, 1.f, 1.f), e.name);
+            ly += line;
+        }
+    }
+
+    // Safety zones of the labeled point cloud, in its mapping frame; the points themselves are drawn by the
+    // point-cloud renderer (render_hkr_cloud)
     void viewer_model::draw_3d_labeled_points(const rect& viewer_rect, rs2::labeled_points labeled_points)
     {
+        if (!show_safety_zones_3d)
+            return;
+
         auto labeled_points_profile = last_labeled_points.get_profile().as<video_stream_profile>();
-        // Non-linear correspondence customized for non-flat surface exploration
-        if (labeled_points_profile.width() <= 0)
-            throw std::runtime_error("Profile width must be greater than 0.");
-
-        float point_size = std::sqrt(viewer_rect.w / labeled_points_profile.width());
-        if (selected_lpc_points_size == lpc_points_size::lpc_medium)
-            point_size *= 3.f;
-        else if (selected_lpc_points_size == lpc_points_size::lpc_large)
-            point_size *= 5.f;
-        glPointSize(point_size);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture_border_mode);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture_border_mode);
-        
         auto& lpc_stream_model = streams.at(labeled_points_profile.unique_id());
-        
+
         rs2_extrinsics lpc_to_depth = lpc_stream_model.dev->get_extrinsics_from_depth();
         auto rot = lpc_to_depth.rotation;
         GLfloat rotation_matrix[16] = { rot[0], rot[3], rot[6], 0,
@@ -4755,49 +4901,504 @@ namespace rs2
 
         // getting inverse of the translation, in depth coordinates, as this is the one needed by OpenGL
         glTranslatef(-lpc_to_depth.translation[0], -lpc_to_depth.translation[1], -lpc_to_depth.translation[2]);
-        
-        if (show_safety_zones_3d)
+
+        draw_zone_3d(Zone::Danger, labeled_points);
+        draw_zone_3d(Zone::Warning, labeled_points);
+        draw_zone_3d(Zone::Diagnostic, labeled_points);
+
+        glColor4f(1.f, 1.f, 1.f, 1.f);
+
+        check_gl_error();
+    }
+
+    // Wrap the device cloud's Z (organized W x H, depth frame) in a Z16 depth frame with 1 mm units and
+    // colorize it with the settings of the depth colorizer that textures the host cloud.
+    rs2::frame viewer_model::colorize_device_points( int width, int height )
+    {
+        const float depth_units = 0.001f;
+        if( ! _device_pc_sw_device || _device_pc_sw_profile.as< video_stream_profile >().width() != width
+            || _device_pc_sw_profile.as< video_stream_profile >().height() != height )
         {
-            draw_zone_3d(Zone::Danger, labeled_points);
-            draw_zone_3d(Zone::Warning, labeled_points);
-            draw_zone_3d(Zone::Diagnostic, labeled_points);
+            _device_pc_sw_device = std::make_shared< rs2::software_device >();
+            _device_pc_sw_sensor = std::make_shared< rs2::software_sensor >(
+                _device_pc_sw_device->add_sensor( "Device point cloud depth" ) );
+            rs2_intrinsics intrinsics{};
+            intrinsics.width = width;
+            intrinsics.height = height;
+            _device_pc_sw_profile = _device_pc_sw_sensor->add_video_stream(
+                { RS2_STREAM_DEPTH, 0, 0, width, height, 30, 2, RS2_FORMAT_Z16, intrinsics } );
+            _device_pc_sw_queue = std::make_shared< rs2::frame_queue >( 1 );
+            _device_pc_sw_sensor->open( _device_pc_sw_profile );
+            _device_pc_sw_sensor->start( *_device_pc_sw_queue );
         }
+
+        // Settings of the depth stream that textures the host cloud, else of the device cloud's own stream
+        std::shared_ptr< rs2::colorizer > source;
+        auto depth_it = streams.find( selected_depth_source_uid );
+        if( depth_it != streams.end() && depth_it->second.texture && depth_it->second.texture->colorize )
+            source = depth_it->second.texture->colorize;
+        auto pc_it = streams.find( last_device_points.get_profile().unique_id() );
+        if( ! source && pc_it != streams.end() && pc_it->second.texture && pc_it->second.texture->colorize )
+            source = pc_it->second.texture->colorize;
+        if( ! _device_pc_colorizer )
+            _device_pc_colorizer = std::make_shared< rs2::colorizer >();
+        if( source )
+            copy_colorizer_options( *source, *_device_pc_colorizer );
+
+        _device_pc_sw_sensor->on_video_frame( { (void *)_device_pc_z16.data(),
+                                                []( void * ) {},
+                                                width * 2,
+                                                2,
+                                                last_device_points.get_timestamp(),
+                                                RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME,
+                                                static_cast< int >( last_device_points.get_frame_number() ),
+                                                _device_pc_sw_profile,
+                                                depth_units } );
+        rs2::frame depth;
+        if( ! _device_pc_sw_queue->try_wait_for_frame( &depth, 100 ) )
+            return {};
+        return _device_pc_colorizer->colorize( depth );
+    }
+
+    // A new device point-cloud frame: keep it and colorize it once, for both the 3D view and the 2D tile
+    void viewer_model::update_device_points( rs2::points pc )
+    {
+        last_device_points = pc;
+        _device_pc_colors = rs2::frame();
+
+        auto profile = pc.get_profile().as< video_stream_profile >();
+        if( ! profile || profile.width() <= 0 )
+            return;
+        const int width = profile.width(), height = profile.height();
+
+        const rs2::vertex * vertices = nullptr;
+        size_t count = 0;
+        try
+        {
+            vertices = pc.get_vertices();
+            count = pc.size();
+        }
+        catch( const std::exception & e )
+        {
+            LOG_ERROR( "Failed to read device point cloud data: " << e.what() );
+            return;
+        }
+        if( count != size_t( width ) * height )
+            return;  // not organized: no image to colorize
+
+        _device_pc_z16.assign( count, 0 );
+        for( size_t i = 0; i < count; ++i )
+        {
+            const auto & v = vertices[i];
+            if( v.z > 0.f && std::isfinite( v.x ) && std::isfinite( v.y ) && std::isfinite( v.z ) )
+                _device_pc_z16[i] = static_cast< uint16_t >( std::min( v.z * 1000.f + .5f, 65535.f ) );
+        }
+        try
+        {
+            _device_pc_colors = colorize_device_points( width, height );
+        }
+        catch( const std::exception & e )
+        {
+            LOG_ERROR( "Failed to colorize device point cloud: " << e.what() );
+        }
+    }
+
+    // Any stream of this type enabled and streaming (or paused) on its sensor
+    bool viewer_model::is_streaming(rs2_stream type) const
+    {
+        for (auto&& kv : streams)
+            if (kv.second.profile.stream_type() == type && is_stream_streaming(kv.first))
+                return true;
+        return false;
+    }
+
+    // The stream with this key enabled and streaming (or paused) on its sensor
+    bool viewer_model::is_stream_streaming(int key) const
+    {
+        auto it = streams.find(key);
+        if (it == streams.end() || !it->second.dev)
+            return false;
+        auto& sub = *it->second.dev;
+        auto enabled_it = sub.stream_enabled.find(key);
+        return sub.is_paused() || (sub.streaming && enabled_it != sub.stream_enabled.end() && enabled_it->second);
+    }
+
+    // Image streams such as the occupancy grid: show the 2D view when one starts
+    void viewer_model::switch_to_2d_view()
+    {
+        if (!is_3d_view)
+            return;
+        is_3d_view = false;
+        config_file::instance().set(configurations::viewer::is_3d_view, is_3d_view);
+    }
+
+    // Point-cloud streams have no 2D picture of their own: show the 3D view when one starts
+    void viewer_model::switch_to_3d_view(ux_window& win, const rect& viewer_rect)
+    {
+        if (is_3d_view)
+            return;
+        is_3d_view = true;
+        config_file::instance().set(configurations::viewer::is_3d_view, is_3d_view);
+        update_3d_camera(win, viewer_rect, true);
+    }
+
+    // A point under the cursor, from either point cloud: measurement tool, coordinates tooltip, and track-ball
+    void viewer_model::on_point_picked(ux_window& win, const float3& p, const float3& normal)
+    {
+        _measurements.mouse_pick(win, p, normal);
+
+        // Adjust track-ball controller based on picked position
+        // 1. Place target at the closest point to p, along (pos, target) interval
+        // 2. When zooming-in, move camera target and position toward p
+        if (!win.get_mouse().mouse_down[0])
+        {
+            auto x1x2 = target - pos;
+            auto x1x0 = p - pos;
+            auto t = (x1x2 * x1x0) / (x1x2 * x1x2);
+            auto p1 = pos + x1x2* t;
+
+            if (t > 0) { // Don't adjust if pointcloud is behind us
+                target = lerp(p1, target, 0.9f);
+
+                if (win.get_mouse().mouse_wheel > 0)
+                {
+                    pos = lerp(p, pos, 0.9f);
+                    target = lerp(p, target, 0.9f);
+                }
+            }
+        }
+    }
+
+    // Host-style points (W x H vertices, then texture coordinates at each texel center) from _host_points_xyz,
+    // so the HKR clouds go through the host point-cloud renderer
+    rs2::points viewer_model::make_host_points(rs2::frame source)
+    {
+        if (!_host_points_maker)
+            _host_points_maker = std::make_shared< rs2::filter >( [this]( rs2::frame f, rs2::frame_source & src )
+            {
+                auto vsp = f.get_profile().as< rs2::video_stream_profile >();
+                auto it = _host_points_profiles.find( vsp.unique_id() );
+                if( it == _host_points_profiles.end() )
+                    it = _host_points_profiles.emplace( vsp.unique_id(), vsp.clone( RS2_STREAM_DEPTH, 0, RS2_FORMAT_XYZ32F ) ).first;
+                auto out = src.allocate_points( it->second, f ).as< rs2::points >();
+                const int w = vsp.width(), h = vsp.height();
+                auto v = const_cast< rs2::vertex * >( out.get_vertices() );
+                auto t = const_cast< rs2::texture_coordinate * >( out.get_texture_coordinates() );
+                const size_t n = std::min( out.size(), _host_points_xyz.size() );
+                const bool uv = _host_points_uv.size() == _host_points_xyz.size();
+                for( size_t i = 0; i < n; ++i )
+                {
+                    v[i] = _host_points_xyz[i];
+                    t[i] = uv ? _host_points_uv[i]
+                              : rs2::texture_coordinate{ ( float( i % w ) + .5f ) / w, ( float( i / w ) + .5f ) / h };
+                }
+                src.frame_ready( out );
+            } );
+        return _host_points_maker->process(source).as< rs2::points >();
+    }
+
+    // Device point cloud: host-style points (invalid -> 0,0,0), once per frame. Texture: the selected Color / IR
+    // stream, each point projected into it as rs2::pointcloud does; else the colorized depth
+    void viewer_model::prepare_device_cloud()
+    {
+        rs2::video_frame tex_frame{ rs2::frame() };
+        int tex_uid = selected_texture_stream( tex_frame );
+
+        if (last_device_points.get_frame_number() == _device_pc_frame_number
+            && last_device_points.get_timestamp() == _device_pc_timestamp && _device_pc_host_points
+            && tex_uid == _device_pc_tex_uid)
+            return;
+        _device_pc_frame_number = last_device_points.get_frame_number();
+        _device_pc_timestamp = last_device_points.get_timestamp();
+        _device_pc_host_points = points();
+        _device_pc_tex_frame = rs2::frame();
+
+        auto profile = last_device_points.get_profile().as<video_stream_profile>();
+        auto colors = _device_pc_colors.as<video_frame>();
+        if (!profile || (!colors && tex_uid < 0) || last_device_points.size() != size_t(profile.width()) * profile.height())
+            return;
+
+        auto vertices = last_device_points.get_vertices();
+        _host_points_xyz.resize(last_device_points.size());
+        for (size_t i = 0; i < _host_points_xyz.size(); ++i)
+        {
+            const auto& v = vertices[i];
+            const bool valid = v.z > 0.f && std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+            _host_points_xyz[i] = valid ? v : rs2::vertex{ 0.f, 0.f, 0.f };
+        }
+
+        auto host_points = make_textured_host_points( last_device_points, _host_points_xyz.data(), tex_frame, tex_uid );
+        if( tex_uid < 0 && ! colors )
+            return;
+        _device_pc_tex_uid = tex_uid;
+        _device_pc_host_points = host_points;
+        if( tex_uid >= 0 )
+            _device_pc_tex_frame = tex_frame;
+        else
+        {
+            if (!_device_pc_texture)
+                _device_pc_texture = std::make_shared< texture_buffer >();
+            _device_pc_texture->upload_image(colors.get_width(), colors.get_height(), (void*)colors.get_data(), GL_RGB);
+            _device_pc_tex_frame = colors;
+        }
+    }
+
+    // The Color / IR stream selected as 3D texture (selected_tex_source_uid holds the origin uid): its streams key
+    // and last frame, or -1 when the selection is depth, a cloud's own colors, or not streaming yet
+    int viewer_model::selected_texture_stream( rs2::video_frame & frame )
+    {
+        for( auto && s : streams )
+        {
+            auto origin = streams_origin.find( s.second.profile.unique_id() );
+            const bool selected = s.first == selected_tex_source_uid
+                               || ( origin != streams_origin.end() && origin->second == selected_tex_source_uid );
+            const auto type = s.second.profile.stream_type();
+            if( ! selected || s.second.passive || ! s.second.texture || type == RS2_STREAM_DEPTH
+                || type == RS2_STREAM_POINT_CLOUD || type == RS2_STREAM_LABELED_POINT_CLOUD )
+                continue;
+            frame = s.second.texture->get_last_frame( true ).as< video_frame >();
+            return frame ? s.first : -1;
+        }
+        return -1;
+    }
+
+    // Texture coordinates (_host_points_uv) of each point, as rs2::pointcloud: vertices in the frame of "from",
+    // projected into the texture stream; points invalid in _host_points_xyz (0,0,0) get none
+    bool viewer_model::project_to_texture( const rs2::stream_profile & from, const rs2::vertex * vertices,
+                                           const rs2::video_frame & tex )
+    {
+        try
+        {
+            auto tex_profile = tex.get_profile().as< video_stream_profile >();
+            const rs2_intrinsics intr = tex_profile.get_intrinsics();
+            const rs2_extrinsics ext = from.get_extrinsics_to( tex_profile );
+            _host_points_uv.resize( _host_points_xyz.size() );
+            for( size_t i = 0; i < _host_points_xyz.size(); ++i )
+            {
+                const auto & q = _host_points_xyz[i];
+                if( q.x == 0.f && q.y == 0.f && q.z == 0.f )
+                {
+                    _host_points_uv[i] = { -1.f, -1.f };
+                    continue;
+                }
+                float p[3], px[2];
+                rs2_transform_point_to_point( p, &ext, &vertices[i].x );
+                if( p[2] <= 0.f )  // behind the texture camera
+                {
+                    _host_points_uv[i] = { -1.f, -1.f };
+                    continue;
+                }
+                rs2_project_point_to_pixel( px, &intr, p );
+                _host_points_uv[i] = { px[0] / intr.width, px[1] / intr.height };
+            }
+            return true;
+        }
+        catch( const std::exception & e )
+        {
+            LOG_DEBUG( "Failed to map the HKR point cloud to the texture stream: " << e.what() );
+            _host_points_uv.clear();
+            return false;
+        }
+    }
+
+    // Host points of an HKR cloud from _host_points_xyz, textured by tex when tex_uid >= 0;
+    // tex_uid is set to -1 when the cloud cannot be projected into tex
+    rs2::points viewer_model::make_textured_host_points( rs2::frame cloud, const rs2::vertex * vertices,
+                                                         const rs2::video_frame & tex, int & tex_uid )
+    {
+        _host_points_uv.clear();
+        if( tex_uid >= 0 && ! project_to_texture( cloud.get_profile(), vertices, tex ) )
+            tex_uid = -1;
+        auto pts = make_host_points( cloud );
+        _host_points_uv.clear();
+        return pts;
+    }
+
+    // Texture the labeled cloud is drawn with (see prepare_labeled_cloud)
+    texture_buffer * viewer_model::labeled_cloud_texture()
+    {
+        if( _lpcl_tex_uid >= 0 )
+        {
+            auto it = streams.find( _lpcl_tex_uid );
+            if( it != streams.end() && it->second.texture )
+                return it->second.texture.get();
+        }
+        return _lpcl_texture.get();
+    }
+
+    // Texture the device cloud is drawn with (see prepare_device_cloud)
+    texture_buffer * viewer_model::device_cloud_texture()
+    {
+        if( _device_pc_tex_uid >= 0 )
+        {
+            auto it = streams.find( _device_pc_tex_uid );
+            if( it != streams.end() && it->second.texture )
+                return it->second.texture.get();
+        }
+        return _device_pc_texture.get();
+    }
+
+    // Labeled point cloud: points moved from the mapping frame into the depth frame (as the host cloud), over a
+    // texture of label colors, once per frame
+    void viewer_model::prepare_labeled_cloud()
+    {
+        rs2::video_frame tex_frame{ rs2::frame() };
+        int tex_uid = selected_texture_stream( tex_frame );
+
+        if (last_labeled_points.get_frame_number() == _lpcl_frame_number
+            && last_labeled_points.get_timestamp() == _lpcl_timestamp && _lpcl_host_points
+            && tex_uid == _lpcl_tex_uid)
+            return;
+        _lpcl_frame_number = last_labeled_points.get_frame_number();
+        _lpcl_timestamp = last_labeled_points.get_timestamp();
+        _lpcl_host_points = points();
+
+        auto profile = last_labeled_points.get_profile().as<video_stream_profile>();
+        if (!profile || profile.width() <= 0)
+            return;
+        const int w = profile.width(), h = profile.height();
 
         const rs2::vertex* vertices = nullptr;
         const uint8_t* labels = nullptr;
-        size_t vertices_size = 0;
+        size_t count = 0;
         try
         {
             vertices = last_labeled_points.get_vertices();
             labels = last_labeled_points.get_labels();
-            vertices_size = last_labeled_points.size();
+            count = last_labeled_points.size();
         }
         catch (const std::exception& e)
         {
             LOG_ERROR("Failed to read labeled point cloud data: " << e.what());
             return;
         }
-
-        auto label_to_color3f = labeled_point_cloud_utilities::get_label_to_color3f();
-
-        glBegin(GL_POINTS);
-        /* this segment actually renders the labeled pointcloud */
-        for (size_t i = 0; i < vertices_size; ++i)
+        if (count != size_t(w) * h)
         {
-            // Set the vertex color from the label value
-            auto label = labels[i];
-            auto color = label_to_color3f[static_cast<rs2_point_cloud_label>(label)];
-            glColor3f(color.x, color.y, color.z);
-
-            // Draw the vertex
-            rs2::vertex vtx = { vertices[i].x, vertices[i].y, vertices[i].z };
-            glVertex3fv(std::move(vtx));
+            LOG_DEBUG("Labeled point cloud: " << count << " vertices, expected " << w << "x" << h);
+            return;
         }
-        glEnd();
 
-        glColor4f(1.f, 1.f, 1.f, 1.f);
+        // The stream of this frame: by its profile, else by its origin (as the texture source)
+        auto stream_it = streams.find(profile.unique_id());
+        if (stream_it == streams.end())
+        {
+            auto origin = streams_origin.find(profile.unique_id());
+            if (origin != streams_origin.end())
+                stream_it = streams.find(origin->second);
+        }
+        if (stream_it == streams.end() || !stream_it->second.dev)
+        {
+            LOG_DEBUG("Labeled point cloud: no stream for profile " << profile.unique_id());
+            return;
+        }
+        // p_depth = R^T (p_mapping - T), the inverse of the depth -> mapping extrinsics
+        rs2_extrinsics e = { { 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f }, { 0.f, 0.f, 0.f } };
+        try
+        {
+            e = stream_it->second.dev->get_extrinsics_from_depth();
+        }
+        catch (const std::exception& ex)
+        {
+            static bool warned = false;
+            if (!warned)
+            {
+                warned = true;
+                LOG_WARNING("Labeled point cloud: no depth -> mapping extrinsics (" << ex.what() << "), drawn in the mapping frame");
+            }
+        }
+        const float* r = e.rotation;
+        const float* t = e.translation;
 
+        static const auto label_to_color3f = labeled_point_cloud_utilities::get_label_to_color3f();
+        _host_points_xyz.resize(count);
+        _lpcl_rgb.resize(count * 3);
+        for (size_t i = 0; i < count; ++i)
+        {
+            const auto& v = vertices[i];
+            const float invalid = labeled_point_cloud_utilities::invalid_value;
+            if (std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z)
+                && v.x != invalid && v.y != invalid && v.z != invalid)
+            {
+                const float d[3] = { v.x - t[0], v.y - t[1], v.z - t[2] };
+                _host_points_xyz[i] = { r[0] * d[0] + r[1] * d[1] + r[2] * d[2],
+                                        r[3] * d[0] + r[4] * d[1] + r[5] * d[2],
+                                        r[6] * d[0] + r[7] * d[1] + r[8] * d[2] };
+                if (_host_points_xyz[i].z >= labeled_point_cloud_utilities::saturated_depth)
+                    _host_points_xyz[i] = { 0.f, 0.f, 0.f };
+            }
+            else
+                _host_points_xyz[i] = { 0.f, 0.f, 0.f };
+
+            auto c = label_to_color3f.find(static_cast<rs2_point_cloud_label>(labels[i]));
+            const float3 color = c != label_to_color3f.end() ? c->second : float3{ 1.f, 1.f, 1.f };
+            _lpcl_rgb[i * 3 + 0] = static_cast<uint8_t>(std::min(color.x, 1.f) * 255.f + .5f);
+            _lpcl_rgb[i * 3 + 1] = static_cast<uint8_t>(std::min(color.y, 1.f) * 255.f + .5f);
+            _lpcl_rgb[i * 3 + 2] = static_cast<uint8_t>(std::min(color.z, 1.f) * 255.f + .5f);
+        }
+        _lpcl_host_points = make_textured_host_points(last_labeled_points, vertices, tex_frame, tex_uid);
+        _lpcl_tex_uid = tex_uid;
+
+        if (tex_uid < 0)
+        {
+            if (!_lpcl_texture)
+                _lpcl_texture = std::make_shared< texture_buffer >();
+            _lpcl_texture->upload_image(w, h, _lpcl_rgb.data(), GL_RGB);
+        }
+    }
+
+    // One HKR cloud through a point-cloud renderer, as the host cloud: shading, matrices, GPU picking
+    bool viewer_model::render_hkr_cloud(rs2::gl::pointcloud_renderer& renderer, rs2::points pts, texture_buffer& tex,
+                                        float point_size, const rect& viewer_rect, ux_window& win,
+                                        matrix4 camera, matrix4 projection, bool pick)
+    {
+        glPointSize(point_size);
+
+        glBindTexture(GL_TEXTURE_2D, tex.get_gl_handle());
+        glEnable(GL_TEXTURE_2D);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, texture_border_mode);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, texture_border_mode);
+
+        renderer.set_option(gl::pointcloud_renderer::OPTION_FILLED, selected_shader != shader_type::points ? 1.f : 0.f);
+        renderer.set_option(gl::pointcloud_renderer::OPTION_SHADED, selected_shader == shader_type::diffuse ? 1.f : 0.f);
+        renderer.set_matrix(RS2_GL_MATRIX_CAMERA, camera);
+        renderer.set_matrix(RS2_GL_MATRIX_PROJECTION, projection);
+        renderer.set_option(gl::pointcloud_renderer::OPTION_SELECTED, 0.f);
+
+        auto cursor = win.get_mouse().cursor;
+        auto scaled_cursor = cursor;
+        scaled_cursor.x *= win.get_scale_factor();
+        scaled_cursor.y *= win.get_scale_factor();
+        const bool pick_here = pick && viewer_rect.contains(scaled_cursor);
+        renderer.set_option(gl::pointcloud_renderer::OPTION_MOUSE_PICK, pick_here ? 1.f : 0.f);
+        if (pick_here)
+        {
+            renderer.set_option(gl::pointcloud_renderer::OPTION_SCALE_FACTOR, win.get_scale_factor());
+            renderer.set_option(gl::pointcloud_renderer::OPTION_MOUSE_X, cursor.x);
+            renderer.set_option(gl::pointcloud_renderer::OPTION_MOUSE_Y, win.framebuf_height() / win.get_scale_factor() - cursor.y);
+        }
+
+        pts.apply_filter(renderer);
+
+        bool picked = false;
+        if (pick_here && renderer.get_option(gl::pointcloud_renderer::OPTION_PICKED_ID) > 0.f)
+        {
+            float3 p {
+                renderer.get_option(gl::pointcloud_renderer::OPTION_PICKED_X),
+                renderer.get_option(gl::pointcloud_renderer::OPTION_PICKED_Y),
+                renderer.get_option(gl::pointcloud_renderer::OPTION_PICKED_Z),
+            };
+            float3 normal {
+                renderer.get_option(gl::pointcloud_renderer::OPTION_NORMAL_X),
+                renderer.get_option(gl::pointcloud_renderer::OPTION_NORMAL_Y),
+                renderer.get_option(gl::pointcloud_renderer::OPTION_NORMAL_Z),
+            };
+            on_point_picked(win, p, normal);
+            picked = true;
+        }
+
+        glDisable(GL_TEXTURE_2D);
         check_gl_error();
+        return picked;
     }
 
     bool viewer_model::should_texture_frame_be_updated(const rs2::frame& f) const

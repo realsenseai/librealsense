@@ -2,6 +2,9 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 #include "rendering.h"
+#include "labeled-point-cloud-utilities.h"
+
+#include <cmath>
 
 namespace rs2
 {
@@ -205,5 +208,50 @@ namespace rs2
 
         // Restore default alignment
         glPixelStorei(GL_UNPACK_ALIGNMENT, unpackAlignment);
+    }
+
+    void texture_buffer::upload_label_colors( const labeled_points & lpc )
+    {
+        static const auto lut = []()
+        {
+            std::array< std::array< uint8_t, 3 >, 256 > res;
+            for( auto & c : res )
+                c = { 255, 255, 255 };
+            for( auto & lc : labeled_point_cloud_utilities::get_label_to_color3f() )
+                res[uint8_t( lc.first )] = { uint8_t( std::min( lc.second.x, 1.f ) * 255.f + .5f ),
+                                             uint8_t( std::min( lc.second.y, 1.f ) * 255.f + .5f ),
+                                             uint8_t( std::min( lc.second.z, 1.f ) * 255.f + .5f ) };
+            return res;
+        }();
+
+        const int w = int( lpc.get_width() ), h = int( lpc.get_height() );
+        const uint8_t * labels = lpc.get_labels();
+        if( ! labels || w <= 0 || h <= 0 || lpc.size() < size_t( w ) * h )
+            return;
+
+        // Points without depth are drawn black, as the 3D view skips them: FW labels them OVERHEAD
+        // (their vertex is 404, but labeling sees z = INT16_MAX mm)
+        const rs2::vertex * vertices = lpc.get_vertices();
+        auto is_invalid = []( const rs2::vertex & v )
+        {
+            const float bad = labeled_point_cloud_utilities::invalid_value;
+            return ! std::isfinite( v.x ) || ! std::isfinite( v.y ) || ! std::isfinite( v.z ) || v.x == bad || v.y == bad
+                || v.z == bad
+                || v.x * v.x + v.y * v.y + v.z * v.z
+                       >= labeled_point_cloud_utilities::saturated_depth * labeled_point_cloud_utilities::saturated_depth;
+        };
+        std::vector< uint8_t > rgb( size_t( w ) * h * 3, 0 );
+        for( size_t i = 0; i < size_t( w ) * h; ++i )
+            if( ! vertices || ! is_invalid( vertices[i] ) )
+                std::memcpy( &rgb[i * 3], lut[labels[i]].data(), 3 );
+
+        GLint unpack_alignment;
+        glGetIntegerv( GL_UNPACK_ALIGNMENT, &unpack_alignment );
+        glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
+        glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, rgb.data() );
+        glPixelStorei( GL_UNPACK_ALIGNMENT, unpack_alignment );
+
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
     }
 }  // namespace rs2
