@@ -16,7 +16,6 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
-    pytest.mark.device_exclude("D585 Proto"),
     pytest.mark.context("nightly"),
 ]
 
@@ -33,6 +32,17 @@ def get_known_errors_for_firmware(current_fw_version):
         # Add other version-specific known errors here as needed
 
     return known_errors
+
+def error_polling_expected(device):
+    """D400 GMSL serves FW errors only from FW 5.17.6 with d4xx driver 1.0.7.6"""
+    connection = device.get_info(rs.camera_info.connection_type)
+    if connection == "DDS":
+        return False
+    if connection == "GMSL" and device.get_info(rs.camera_info.product_line) == "D400":
+        fw = rsutils.version(device.get_info(rs.camera_info.firmware_version))
+        driver = rsutils.version(device.get_info(rs.camera_info.mipi_driver_version))
+        return fw >= rsutils.version(5, 17, 6, 0) and driver >= rsutils.version(1, 0, 7, 6)
+    return True
 
 class FirmwareErrorMonitor:
     def __init__(self, known_errors=None):
@@ -143,6 +153,10 @@ def test_firmware_error_monitoring(test_device):
             log.warning("Could not register notification callback for %s: %s", sensor_name, e)
 
     log.info("Monitoring firmware errors on %d sensors: %s", len(registered_sensors), ', '.join(registered_sensors))
+
+    # Without error polling the callbacks register fine but FW errors are never reported
+    if error_polling_expected(device):
+        assert any(s.supports(rs.option.error_polling_enabled) for s in sensors), "no sensor supports FW error polling"
 
     # Start streaming
     pipe = rs.pipeline(ctx)
