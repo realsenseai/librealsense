@@ -96,12 +96,6 @@ if(${FORCE_RSUSB_BACKEND})
         ../../src/hid/hid-device.cpp
         ../../src/hid/hid-device.h
     )
-    if(APPLE)
-        list(APPEND RAW_RS
-            ../../third-party/hidapi/hidapi.cpp
-            ../../third-party/hidapi/hidapi.h
-        )
-    endif()
 endif()
 
 if(${BUILD_EASYLOGGINGPP})
@@ -144,12 +138,6 @@ if( BUILD_LEGACY_PYBACKEND )
             FOLDER Library/Python
         )
     target_include_directories(pybackend2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
-
-    if(${FORCE_RSUSB_BACKEND})
-        if(APPLE)
-            target_include_directories(pybackend2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../third-party/hidapi/)
-        endif()
-    endif()
 
     if(${BACKEND} STREQUAL RS2_USE_V4L2_BACKEND)
         if(UDEV_FOUND)

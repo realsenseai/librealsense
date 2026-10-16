@@ -79,7 +79,6 @@ This notice may not be removed or altered from any source distribution.
 
 | Component | Home Page | License| Copyright |
 | ------- | ------- | ------- | ------- |
-| HIDAPI library | https://github.com/signal11/hidapi|  BSD-3-Clause license  |  Copyright (c) 2010, Alan Ott, Signal 11 Software |
 | ross_comm | https://github.com/ros/ros_comm | BSD-3-Clause  | Copyright (c) 2008, Willow Garage, Inc.  |
 | class_loader (rosbag2) | https://github.com/ros/class_loader | BSD-3-Clause | Copyright (c) Willow Garage, Inc. |
 | pluginlib (rosbag2) | https://github.com/ros/pluginlib | BSD-3-Clause | Copyright (c) Willow Garage, Inc. |

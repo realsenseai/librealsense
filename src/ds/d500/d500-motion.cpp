@@ -120,7 +120,6 @@ namespace librealsense
 
             using namespace ds;
 
-#if !defined(__APPLE__) // Motion sensors not supported on macOS
             std::shared_ptr<synthetic_sensor> sensor_ep;
             if( _is_mipi_device )
             {
@@ -155,7 +154,6 @@ namespace librealsense
                 if( ! _is_mipi_device )
                     get_raw_motion_sensor()->set_accel_scale_factor( 1.0 / get_accel_default_scale() );
             }
-#endif
         }
         catch (const std::exception& e)
         {
@@ -271,21 +269,13 @@ namespace librealsense
 
     ds_motion_sensor & d500_motion::get_motion_sensor()
     {
-#if defined(__APPLE__)
-        throw std::runtime_error( "Motion sensors are not supported on macOS" );
-#else
         return dynamic_cast< ds_motion_sensor & >( get_sensor( _motion_module_device_idx.value() ) );
-#endif
     }
 
     std::shared_ptr< hid_sensor > d500_motion::get_raw_motion_sensor()
     {
-#if defined(__APPLE__)
-        return nullptr;
-#else
         auto raw_sensor = get_motion_sensor().get_raw_sensor();
         return std::dynamic_pointer_cast< hid_sensor >( raw_sensor );
-#endif
     }
 
     void d500_motion::register_gyro_sensitivity()
