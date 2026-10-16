@@ -74,6 +74,7 @@ namespace librealsense
             return;
 
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
+        _is_d585s = ( pid == D585S_PID );
 
         const uint32_t mapping_stream_mi = _is_safety_layout ? 13 : 11;
         auto mapping_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, mapping_stream_mi);
@@ -211,7 +212,25 @@ namespace librealsense
 
     void d500_depth_mapping::register_options(std::shared_ptr<d500_depth_mapping_sensor> occupancy_ep, std::shared_ptr<uvc_sensor> raw_mapping_sensor)
     {
+        // Segmentation is supported on all D500 cameras except D585S
+        if( _is_d585s )
+            return;
 
+        raw_mapping_sensor->register_xu( ds::mapping_xu ); // make sure the XU is initialized every time we power the camera
+
+        occupancy_ep->register_option( RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION,
+            std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor,
+                                                          ds::mapping_xu,
+                                                          ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
+                                                          "OccupancyGrid_Segmentation: Off = depth-only labeling, On = segmentation labels in the occupancy grid",
+                                                          false /* not settable while streaming */ ) );
+
+        occupancy_ep->register_option( RS2_OPTION_LPCL_SEGMENTATION,
+            std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor,
+                                                          ds::mapping_xu,
+                                                          ds::d500_mapping_xu_id::LPCL_SEGMENTATION,
+                                                          "LPCL_Segmentation: Off = depth-only labeling, On = segmentation labels in the labeled point cloud",
+                                                          false /* not settable while streaming */ ) );
     }
 
     void d500_depth_mapping::register_metadata(std::shared_ptr<uvc_sensor> raw_mapping_ep)

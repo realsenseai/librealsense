@@ -149,6 +149,8 @@ extern "C" {
         RS2_OPTION_DUAL_RGB_EXPOSURE, /**< D585 2C: RGB exposure time in 100 microsecond units, like other color sensors. Setting any value disables RGB auto-exposure */
         RS2_OPTION_DUAL_RGB_GAIN, /**< D585 2C: RGB gain. Setting any value disables RGB auto-exposure */
         RS2_OPTION_ACCEL_SENSITIVITY, /**< Control of the accel sensitivity (dynamic range) level, see rs2_accel_sensitivity for values. Selects the saturation point only, the reported unit scale is unchanged */
+        RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION, /**< OccupancyGrid_Segmentation: Off (0) = depth-only labeling, On (1) = OG uses the segmentation mode and classes (pre-stream only) */
+        RS2_OPTION_LPCL_SEGMENTATION, /**< LPCL_Segmentation: Off (0) = depth-only labeling, On (1) = Labeled PCL uses the segmentation mode and classes (pre-stream only) */
         RS2_OPTION_COUNT /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
     } rs2_option;
 
