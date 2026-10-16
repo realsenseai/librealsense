@@ -13,6 +13,9 @@ import os.path
 import pyrealsense2 as rs
 from pytest_check import check
 from rspy import repo
+import pytest
+
+pytestmark = pytest.mark.infra  # reads recordings served from Artifactory: runs in LibCI (--live), not in GitHub
 
 RECORDING = "d455_depth_non_native.db3"
 NUM_STEPS = 3

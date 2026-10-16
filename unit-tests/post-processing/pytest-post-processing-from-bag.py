@@ -6,6 +6,9 @@ from pytest_check import check
 from rspy import repo
 import os.path
 import time
+import pytest
+
+pytestmark = pytest.mark.infra  # reads recordings served from Artifactory: runs in LibCI (--live), not in GitHub
 ################################################################################################
 
 

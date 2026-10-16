@@ -345,8 +345,8 @@ def pytest_configure(config):
         "markers", "dds: test requires a DDS-enabled build (selected by --tag dds / -m dds)"
     )
     config.addinivalue_line(
-        "markers", "infra: harness-level test with no device requirement that still runs under --live "
-                   "(and is skipped under --not-live)"
+        "markers", "infra: harness-level or LibCI-only test (e.g. needs recordings served from Artifactory) with "
+                   "no device requirement that still runs under --live (and is skipped under --not-live)"
     )
 
     # Configure standard logging with format matching legacy rspy.log output
