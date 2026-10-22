@@ -9,17 +9,12 @@ option(BUILD_WITH_CUDA "Enable CUDA" OFF)
 
 # Zero-copy GPU memory path (Jetson / integrated-GPU only). Requires BUILD_WITH_CUDA.
 # Eliminates the per-frame CPU->frame copy (capture) and the GPU host<->device round-trips.
-# Activates at runtime only on integrated GPUs; discrete GPUs keep the copy path. Default OFF
-# so a plain CUDA build is byte-for-byte identical to today.
+# Activates at runtime only on integrated GPUs; discrete GPUs keep the copy path.
 option(BUILD_WITH_CUDA_ZEROCOPY "Enable zero-copy GPU memory path (Jetson/integrated GPU only, requires BUILD_WITH_CUDA)" ${BUILD_WITH_CUDA})
+# Zero-copy needs no flag of its own on the HIP side: global_config.cmake always defines
+# RS2_USE_CUDA_ZEROCOPY for a HIP build, and rs_frame_zc_enabled() then enables the mapped
+# path per-device at runtime via rs2_is_hip_integrated(), so discrete GPUs keep the copy path.
 option(BUILD_WITH_HIP "Enable HIP/ROCm for AMD GPUs" OFF)
-# Zero-copy GPU memory path for HIP (unified-memory AMD APUs, e.g. Ryzen AI / MI300A,
-# only -- not applicable to discrete RDNA3/CDNA3 GPUs). Requires BUILD_WITH_HIP. Mirrors
-# BUILD_WITH_CUDA_ZEROCOPY: shares the same RS2_USE_CUDA_ZEROCOPY macro and the vendor-
-# neutral try_device_ptr() fast path in rscuda_utils.cuh/cuda-pointcloud.cu, which fall
-# back to the persistent-buffer copy path whenever a buffer is not pinned/mapped -- so
-# enabling this on discrete GPUs is safe (falls back every time) but pointless.
-option(BUILD_WITH_HIP_ZEROCOPY "Enable zero-copy GPU memory path (unified-memory AMD APUs only, requires BUILD_WITH_HIP)" OFF)
 
 
 
