@@ -395,10 +395,10 @@ namespace rsutils {
         return cached;
     }
 
-    // Vendor-agnostic entry point used by the 12 frame-conversion call sites in
-    // librealsense (align.cpp, pointcloud.cpp, the *-formats-converter.cpp files,
-    // backend-v4l2.cpp, backend-hid.cpp).  True if either probe finds a device;
-    // each probe caches internally so this is two cheap atomic loads after warm-up.
+    // Vendor-agnostic entry point for the frame-conversion dispatch sites under src/proc.
+    // Those compile to CUDA or HIP kernels depending on the build, so they must not gate on
+    // one vendor's driver. True if either probe finds a device; each probe caches internally
+    // so this is two cheap atomic loads after warm-up.
     bool rs2_is_gpu_available()
     {
         return rs2_is_cuda_available() || rs2_is_hip_available();

@@ -8,7 +8,7 @@
 
 #ifdef RS2_USE_CUDA
 #include "cuda/cuda-rggb.cuh"
-#include "rsutils/accelerators/gpu.h"   // rsutils::rs2_is_cuda_available
+#include "rsutils/accelerators/gpu.h"   // rsutils::rs2_is_gpu_available
 #endif
 
 namespace librealsense {
@@ -85,7 +85,7 @@ void dual_rgb_rectify_filter::ensure_maps()
 
 #ifdef RS2_USE_CUDA
     // Upload the (constant) remap tables to the device once so the GPU remap reads them directly.
-    if( rsutils::rs2_is_cuda_available() )
+    if( rsutils::rs2_is_gpu_available() )
     {
         const size_t lbytes = _rc.left.sx.size()  * sizeof( float );
         const size_t rbytes = _rc.right.sx.size() * sizeof( float );
@@ -153,7 +153,7 @@ rs2::frame dual_rgb_rectify_filter::process_frame( const rs2::frame_source & sou
 
 #ifdef RS2_USE_CUDA
     // GPU remap straight into the output frame (in place under zero-copy, no host round-trip).
-    if( rsutils::rs2_is_cuda_available() && _dmap_sx[eye] && _dmap_sy[eye] )
+    if( rsutils::rs2_is_gpu_available() && _dmap_sx[eye] && _dmap_sy[eye] )
     {
         rscuda::rggb_remap_rgb8_cuda( static_cast< const uint8_t * >( vf.get_data() ), w, h, src_stride,
                                       static_cast< const float * >( _dmap_sx[eye] ),
