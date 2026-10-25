@@ -397,7 +397,7 @@ namespace librealsense
                     return inference_xu_to_cid( control );
                 // Selectors repeat across XUs, so another unit must not be looked up in the depth table
                 if( xu.unit != RS_DEPTH_XU_UNIT )
-                    throw linux_backend_exception( rsutils::string::from() << "no v4l2 mipi cid for XU unit " << std::dec << int( xu.unit ) << " control " << int( control ) );
+                    throw not_implemented_exception( rsutils::string::from() << "no v4l2 mipi cid for XU unit " << std::dec << int( xu.unit ) << " control " << int( control ) );
                 return depth_xu_to_cid( control, is_d5xx );
             }
         }  // namespace v4l_mipi_logic
