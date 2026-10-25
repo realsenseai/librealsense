@@ -402,19 +402,24 @@ namespace librealsense
 
         raw_mapping_sensor->register_xu( ds::mapping_xu ); // make sure the XU is initialized every time we power the camera
 
-        occupancy_ep->register_option( RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION,
-            std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor,
-                                                          ds::mapping_xu,
-                                                          ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
-                                                          "OccupancyGrid_Segmentation: Off = depth-only labeling, On = segmentation labels in the occupancy grid",
-                                                          false /* not settable while streaming */ ) );
+        // Not every transport exposes these controls (no GMSL driver CIDs yet)
+        if( is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
+                             sizeof( uint8_t ), RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION ) )
+            occupancy_ep->register_option( RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION,
+                std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor,
+                                                              ds::mapping_xu,
+                                                              ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
+                                                              "OccupancyGrid_Segmentation: Off = depth-only labeling, On = segmentation labels in the occupancy grid",
+                                                              false /* not settable while streaming */ ) );
 
-        occupancy_ep->register_option( RS2_OPTION_LPCL_SEGMENTATION,
-            std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor,
-                                                          ds::mapping_xu,
-                                                          ds::d500_mapping_xu_id::LPCL_SEGMENTATION,
-                                                          "LPCL_Segmentation: Off = depth-only labeling, On = segmentation labels in the labeled point cloud",
-                                                          false /* not settable while streaming */ ) );
+        if( is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::LPCL_SEGMENTATION,
+                             sizeof( uint8_t ), RS2_OPTION_LPCL_SEGMENTATION ) )
+            occupancy_ep->register_option( RS2_OPTION_LPCL_SEGMENTATION,
+                std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor,
+                                                              ds::mapping_xu,
+                                                              ds::d500_mapping_xu_id::LPCL_SEGMENTATION,
+                                                              "LPCL_Segmentation: Off = depth-only labeling, On = segmentation labels in the labeled point cloud",
+                                                              false /* not settable while streaming */ ) );
     }
 
     void d500_depth_mapping::register_metadata(std::shared_ptr<uvc_sensor> raw_mapping_ep)

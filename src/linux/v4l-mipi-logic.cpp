@@ -76,6 +76,9 @@ namespace librealsense
 
             static constexpr uint8_t GVD_VALID_OPCODE = 0x10;
 
+            // MIPI depth XU unit (subdevice 0), matching ds::depth_xu.
+            static constexpr uint8_t RS_DEPTH_XU_UNIT = 0x03;
+
             // MIPI depth-XU selector identifiers (subdevice 0).
             static constexpr uint8_t RS_HWMONITOR                       = 0x01;
             static constexpr uint8_t RS_DEPTH_EMITTER_ENABLED           = 0x02;
@@ -394,6 +397,9 @@ namespace librealsense
 
                 if( is_d5xx && xu.unit == RS_INFERENCE_XU_UNIT )
                     return inference_xu_to_cid( control );
+                // Selectors repeat across XUs, so another unit must not be looked up in the depth table
+                if( xu.unit != RS_DEPTH_XU_UNIT )
+                    throw not_implemented_exception( rsutils::string::from() << "no v4l2 mipi cid for XU unit " << std::dec << int( xu.unit ) << " control " << int( control ) );
                 return depth_xu_to_cid( control, is_d5xx );
             }
         }  // namespace v4l_mipi_logic
