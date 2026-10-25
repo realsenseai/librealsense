@@ -18,8 +18,6 @@
 #include <src/backend.h>
 #include <src/platform/platform-utils.h>
 
-#include <cstring>
-
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
 
@@ -156,58 +154,6 @@ namespace librealsense
                     << "All streams must share one frame rate while color is streaming ("
                     << stream_name( *first ) << " requested " << first->get_framerate() << " FPS, "
                     << stream_name( *p ) << " requested " << p->get_framerate() << " FPS)" );
-        }
-    }
-
-    static int32_t range_field( const std::vector< uint8_t > & raw )
-    {
-        int32_t value = 0;
-        if( ! raw.empty() )
-            std::memcpy( &value, raw.data(), std::min( raw.size(), sizeof( value ) ) );
-        return value;
-    }
-
-    // A control the firmware does not publish answers with an all-zero range (V4L2) or fails the query
-    // outright (WMF). Not every platform publishes the same set - e.g. no backlight compensation over GMSL.
-    static bool is_published( const platform::control_range & range )
-    {
-        return range_field( range.min ) || range_field( range.max )
-            || range_field( range.def ) || range_field( range.step );
-    }
-
-    // Both probes ask the hardware directly, so a control the firmware lacks never costs an option object
-    // that is built only to be dropped.
-    static bool is_xu_published( const std::shared_ptr< uvc_sensor > & ep, const platform::extension_unit & xu,
-                                 uint8_t control, int size, rs2_option id )
-    {
-        if( ! ep )
-            return false;
-        try
-        {
-            return is_published( ep->invoke_powered( [&]( platform::uvc_device & dev )
-                                                     { return dev.get_xu_range( xu, control, size ); } ) );
-        }
-        catch( const std::exception & e )
-        {
-            LOG_DEBUG( "Control " << id << " not published: " << e.what() );
-            return false;
-        }
-    }
-
-    static bool is_pu_published( const std::shared_ptr< uvc_sensor > & ep, const platform::processing_unit & pu,
-                                 rs2_option id )
-    {
-        if( ! ep )
-            return false;
-        try
-        {
-            return is_published( ep->invoke_powered( [&]( platform::uvc_device & dev )
-                                                     { return dev.get_pu_range( pu, id ); } ) );
-        }
-        catch( const std::exception & e )
-        {
-            LOG_DEBUG( "Control " << id << " not published: " << e.what() );
-            return false;
         }
     }
 
