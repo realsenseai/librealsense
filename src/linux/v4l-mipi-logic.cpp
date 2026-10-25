@@ -76,8 +76,10 @@ namespace librealsense
 
             static constexpr uint8_t GVD_VALID_OPCODE = 0x10;
 
+            // MIPI depth XU unit (subdevice 0), matching ds::depth_xu.
+            static constexpr uint8_t RS_DEPTH_XU_UNIT = 0x03;
+
             // MIPI depth-XU selector identifiers (subdevice 0).
-            static constexpr uint8_t RS_DEPTH_XU_UNIT                   = 0x03;
             static constexpr uint8_t RS_HWMONITOR                       = 0x01;
             static constexpr uint8_t RS_DEPTH_EMITTER_ENABLED           = 0x02;
             static constexpr uint8_t RS_EXPOSURE                        = 0x03;
