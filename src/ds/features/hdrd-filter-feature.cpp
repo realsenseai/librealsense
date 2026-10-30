@@ -49,7 +49,7 @@ static std::shared_ptr< video_stream_profile_interface > find_depth_profile( con
     return nullptr;
 }
 
-static bool embedded_decimation_enabled( const d500_depth_sensor & depth_sensor )
+static bool embedded_decimation_enabled( const sensor_interface & depth_sensor )
 {
     for( auto & filter : depth_sensor.get_supported_embedded_filters() )
         if( filter->supports_composite_option( RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ) )
@@ -70,13 +70,17 @@ static bool embedded_decimation_enabled( const d500_depth_sensor & depth_sensor 
             std::memcpy( &cfg, raw.data(), sizeof( cfg ) );
             return cfg.enabled != 0;
         }
+        // DDS exposes Decimation as scalar options
+        else if( filter->get_type() == RS2_EMBEDDED_FILTER_TYPE_DECIMATION )
+            return filter->supports_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED )
+                && filter->get_option( RS2_OPTION_EMBEDDED_FILTER_ENABLED ).query() != 0;
     return false;
 }
 
 // FW rejects unsupported MinZ profiles only once streaming starts, with an obscure error (Depth+IR on Windows even
-// needs a replug) - so the SDK checks the D585 MinZ profile limits first.
+// needs a replug) - so the SDK checks the MinZ profile limits first.
 static void minz_allowed_or_throw( const void * hdrd_control, size_t size, const video_stream_profile_interface & depth,
-                                   const d500_depth_sensor & depth_sensor )
+                                   const sensor_interface & depth_sensor )
 {
     if( ! hdrd_control || size != sizeof( rs2_hdrd_control ) )
         return;
@@ -122,29 +126,29 @@ static void minz_allowed_or_throw( const void * hdrd_control, size_t size, const
             << " at up to " << max_fps << " FPS, but Depth is " << w << "x" << h << " @ " << fps << " FPS" );
 }
 
-// Rejects enabling MinZ while a Depth profile it cannot process is open.
+// Rejects enabling MinZ while a Depth profile it cannot process is open. `control` is the transport (XU or DDS).
 class minz_option : public composite_option_interface
 {
 public:
-    minz_option( std::shared_ptr< composite_xu_option > xu, const d500_depth_sensor & depth_sensor )
-        : _xu( std::move( xu ) )
+    minz_option( std::shared_ptr< composite_option_interface > control, const sensor_interface & depth_sensor )
+        : _control( std::move( control ) )
         , _depth_sensor( depth_sensor )
     {
     }
 
-    std::vector< uint8_t > get_raw() const override { return _xu->get_raw(); }
+    std::vector< uint8_t > get_raw() const override { return _control->get_raw(); }
     void set_raw( const void * data, size_t size ) override
     {
         auto active = _depth_sensor.get_active_streams();
         geometry_unchanged_or_throw( data, size, active );
         if( auto depth = find_depth_profile( active ) )
             minz_allowed_or_throw( data, size, *depth, _depth_sensor );
-        _xu->set_raw( data, size );
+        _control->set_raw( data, size );
     }
-    std::vector< uint8_t > get_raw_range() const override { return _xu->get_raw_range(); }
-    bool is_read_only() const override { return _xu->is_read_only(); }
-    bool is_enabled() const override { return _xu->is_enabled(); }
-    const char * get_description() const override { return _xu->get_description(); }
+    std::vector< uint8_t > get_raw_range() const override { return _control->get_raw_range(); }
+    bool is_read_only() const override { return _control->is_read_only(); }
+    bool is_enabled() const override { return _control->is_enabled(); }
+    const char * get_description() const override { return _control->get_description(); }
 
 private:
     // FW rejects changing Filter Type or Downscale Ratio while Depth or IR stream, with an obscure error
@@ -157,7 +161,7 @@ private:
         rs2_hdrd_control next;
         rs2_hdrd_control current;
         std::memcpy( &next, data, sizeof( next ) );
-        auto raw = _xu->get_raw();
+        auto raw = _control->get_raw();
         if( raw.size() != sizeof( current ) )
             return;
         std::memcpy( &current, raw.data(), sizeof( current ) );
@@ -166,30 +170,36 @@ private:
                                                      "changed while Depth or Infrared is streaming" );
     }
 
-    std::shared_ptr< composite_xu_option > _xu;
-    const d500_depth_sensor & _depth_sensor;
+    std::shared_ptr< composite_option_interface > _control;
+    const sensor_interface & _depth_sensor;
 };
 
 
 /* static */ const feature_id hdrd_filter_feature::ID = "Improved Close Range filter feature";
 
 hdrd_filter_feature::hdrd_filter_feature( d500_device & owner, d500_depth_sensor & depth_sensor, bool is_mipi )
-{
-    // Registers the ONE composite option this filter exposes, mirroring temporal_filter_feature.
     // ds::DS5_HKR_HDRD_CONTROL drives the same physical XU control formerly exposed as the
     // scalar "Improved Close Range Depth" option (close_range_xu_option, since removed).
-    auto raw_depth_ep = std::dynamic_pointer_cast< uvc_sensor >( depth_sensor.get_raw_sensor() );
-    auto option = std::make_shared< minz_option >(
-        composite_xu_option::create(
-            is_mipi,
-            raw_depth_ep,
-            ds::depth_xu,
-            ds::DS5_HKR_HDRD_CONTROL,
-            static_cast< uint32_t >( sizeof( rs2_hdrd_control ) ),
-            "Improved Close Range Control (prototype) - use rs2_set/get_composite_option, see rs_hdrd_control.h",
-            minz_desc ),
-        depth_sensor );
-    depth_sensor.add_embedded_filter( std::make_shared< hdrd_embedded_filter >( option, RS2_COMPOSITE_OPTION_HDRD_CONTROL ) );
+    : hdrd_filter_feature( owner,
+                           depth_sensor,
+                           composite_xu_option::create(
+                               is_mipi,
+                               std::dynamic_pointer_cast< uvc_sensor >( depth_sensor.get_raw_sensor() ),
+                               ds::depth_xu,
+                               ds::DS5_HKR_HDRD_CONTROL,
+                               static_cast< uint32_t >( sizeof( rs2_hdrd_control ) ),
+                               "Improved Close Range Control (prototype) - use rs2_set/get_composite_option, see rs_hdrd_control.h",
+                               minz_desc ) )
+{
+    depth_sensor.add_embedded_filter( _filter );
+}
+
+hdrd_filter_feature::hdrd_filter_feature( device & owner, const sensor_interface & depth_sensor,
+                                          std::shared_ptr< composite_option_interface > control )
+{
+    // Registers the ONE composite option this filter exposes, mirroring temporal_filter_feature.
+    auto option = std::make_shared< minz_option >( std::move( control ), depth_sensor );
+    _filter = std::make_shared< hdrd_embedded_filter >( option, RS2_COMPOSITE_OPTION_HDRD_CONTROL );
 
     // MinZ may have been enabled while the sensor was closed - check it against the Depth profile being opened
     owner.add_stream_combination_validator(

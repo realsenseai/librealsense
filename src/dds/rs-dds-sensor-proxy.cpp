@@ -37,6 +37,8 @@
 #include <dds/rs-dds-embedded-decimation-filter.h>
 #include <dds/rs-dds-embedded-temporal-filter.h>
 #include <dds/rs-dds-embedded-close-range-filter.h>
+#include <dds/rs-dds-close-range-control.h>
+#include <src/ds/features/hdrd-filter-feature.h>
 
 #include <src/ds/ds-private.h>
 
@@ -1093,7 +1095,9 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
             });
         rs_embedded_filter = filter;
     }
-    else if (auto close_range_filter = std::dynamic_pointer_cast< dds_close_range_filter >(embedded_filter))
+    // Older FW publishes Enable/Downscale/Disparity Shift/Threshold only, exposed as scalar options
+    else if( std::dynamic_pointer_cast< dds_close_range_filter >( embedded_filter )
+             && ! find_dds_option_by_name( embedded_filter->get_options(), "Filter Type" ) )
     {
         rs_embedded_filter = std::make_shared< rs_dds_embedded_close_range_filter >(
             embedded_filter,
@@ -1106,6 +1110,21 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
             {
                 return _dev->query_embedded_filter(embedded_filter);
             });
+    }
+    else if (auto close_range_filter = std::dynamic_pointer_cast< dds_close_range_filter >(embedded_filter))
+    {
+        // All parameters as rs2_hdrd_control. Same feature as USB, only the transport of the payload differs
+        auto feature = std::make_shared< hdrd_filter_feature >(
+            *_owner,
+            *this,
+            std::make_shared< rs_dds_close_range_control >( embedded_filter,
+                                                            [=]( json options_value )
+                                                            {
+                                                                // The local values get cached as part of the reply
+                                                                _dev->set_embedded_filter( embedded_filter, std::move( options_value ) );
+                                                            } ) );
+        _owner->register_feature( feature );
+        rs_embedded_filter = feature->get_filter();
     }
     else
     {

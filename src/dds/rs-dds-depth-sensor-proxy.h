@@ -32,6 +32,7 @@ public:
     bool extend_to( rs2_extension, void ** ptr ) override;  // extendable_interface
     embedded_filters get_supported_embedded_filters() const override;
     void add_embedded_filter(std::shared_ptr< embedded_filter_interface > embedded_filter);
+    void open( const stream_profiles & profiles ) override;
 
 protected:
     void add_no_metadata( frame *, streaming_impl & ) override;

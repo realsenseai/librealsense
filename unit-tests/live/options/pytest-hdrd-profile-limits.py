@@ -13,9 +13,8 @@ import logging
 log = logging.getLogger(__name__)
 
 pytestmark = [
-    pytest.mark.device_each("D585"),
+    pytest.mark.device_each("D555", "D585"),
     pytest.mark.device_exclude("D585S"),
-    pytest.mark.device_type_exclude("DDS"),  # DDS devices expose a different close range filter
 ]
 
 HDRD = rs.composite_option_id.hdrd_control
@@ -86,9 +85,18 @@ def _set_hdrd(hdrd, mode, enable):
 
 
 def _set_decimation(decimation, enabled):
+    if DECIMATION not in decimation.get_supported_composite_options():  # DDS exposes Decimation as scalar options
+        decimation.set_option(rs.option.embedded_filter_enabled, enabled)
+        return
     cfg = decimation.get_decimation_filter_dpp_config(DECIMATION)
     cfg.enabled = enabled
     decimation.set_decimation_filter_dpp_config(DECIMATION, cfg)
+
+
+def _decimation_enabled(decimation):
+    if DECIMATION not in decimation.get_supported_composite_options():
+        return int(decimation.get_option(rs.option.embedded_filter_enabled))
+    return decimation.get_decimation_filter_dpp_config(DECIMATION).enabled
 
 
 @pytest.fixture
@@ -98,19 +106,19 @@ def filters(test_device):
     dev, ctx = test_device
     sensor = dev.first_depth_sensor()
     hdrd = _find_filter(sensor, HDRD)
-    decimation = _find_filter(sensor, DECIMATION)
+    decimation = next((f for f in sensor.query_embedded_filters() if f.get_type() == rs.embedded_filter_type.decimation), None)
     if hdrd is None or decimation is None:
-        pytest.skip("Improved Close Range Depth / Decimation composite options not supported on this device")
+        pytest.skip("Improved Close Range Depth / Decimation filters not supported on this device")
     original_hdrd = bytearray(hdrd.get_composite_option(HDRD))
     original_hdrd[-4:] = bytes(4)  # reserved MUST be zero on SET
-    original_decimation = decimation.get_composite_option(DECIMATION)
+    original_decimation = _decimation_enabled(decimation)
     _set_decimation(decimation, 0)
     _set_hdrd(hdrd, "downscale_x2", 0)
     yield sensor, hdrd, decimation
     if sensor.get_active_streams():  # an unsupported profile that opened by mistake; never started
         sensor.close()
     hdrd.set_composite_option(HDRD, bytes(original_hdrd))
-    decimation.set_composite_option(DECIMATION, original_decimation)
+    _set_decimation(decimation, original_decimation)
 
 
 def _profiles_by_support(sensor, mode):
@@ -204,9 +212,9 @@ def test_enable_while_streaming(filters, mode):
 @pytest.mark.context("nightly")
 def test_geometry_change_while_streaming_rejected(filters):
     sensor, hdrd, _ = filters
-    profile = next((p for p in _depth_profiles(sensor) if _describe(p) == "640x480@30"), None)
+    profile = next((p for p in _depth_profiles(sensor) if _describe(p) == "640x360@30"), None)
     if profile is None:
-        pytest.skip("Depth 640x480@30 not available")
+        pytest.skip("Depth 640x360@30 not available")
 
     _set_hdrd(hdrd, "downscale_x2", 1)
     with _streaming(sensor, profile):

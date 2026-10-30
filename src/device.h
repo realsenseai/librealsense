@@ -13,6 +13,7 @@
 #include <rsutils/lazy.h>
 #include <rsutils/subscription.h>
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <vector>
 #include <atomic>
@@ -92,6 +93,20 @@ public:
 
     format_conversion get_format_conversion() const;
 
+    // Adds a rule that vetoes stream combinations this device cannot run: feature mixins register
+    // their hardware's restrictions at construction, and each throws when a request violates it.
+    void add_stream_combination_validator( std::function< void( const stream_profiles & ) > validator )
+    {
+        _stream_combination_validators.push_back( std::move( validator ) );
+    }
+
+    // Throws if the profiles cannot stream together. A device with no registered rule allows everything.
+    void stream_combination_allowed_or_throw( const stream_profiles & requests ) const
+    {
+        for( auto & validator : _stream_combination_validators )
+            validator( requests );
+    }
+
 
 protected:
     int add_sensor(const std::shared_ptr<sensor_interface>& sensor_base);
@@ -114,6 +129,7 @@ private:
     rsutils::subscription _device_change_subscription;
     rsutils::lazy< std::vector< tagged_profile > > _profiles_tags;
     rsutils::lazy< format_conversion > _format_conversion;
+    std::vector< std::function< void( const stream_profiles & ) > > _stream_combination_validators;
 };
 
 

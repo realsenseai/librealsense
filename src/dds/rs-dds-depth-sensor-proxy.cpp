@@ -6,6 +6,7 @@
 
 #include <realdds/topics/dds-topic-names.h>
 #include <src/dds/rs-dds-embedded-filter.h>
+#include <src/device.h>
 
 #include <src/stream.h>
 #include <src/librealsense-exception.h>
@@ -120,6 +121,12 @@ embedded_filters dds_depth_sensor_proxy::get_supported_embedded_filters() const
 void dds_depth_sensor_proxy::add_embedded_filter(std::shared_ptr< embedded_filter_interface > embedded_filter)
 {
     _embedded_filters.insert(std::make_pair(embedded_filter->get_type(), embedded_filter));
+}
+
+void dds_depth_sensor_proxy::open( const stream_profiles & profiles )
+{
+    _owner->stream_combination_allowed_or_throw( profiles );
+    super::open( profiles );
 }
 
 }  // namespace librealsense
