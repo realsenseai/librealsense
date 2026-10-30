@@ -10,6 +10,15 @@ include(${_proc_rel_path}/sse/CMakeLists.txt)
 
 include(${_proc_rel_path}/neon/CMakeLists.txt)
 
+if(BUILD_WITH_VPL)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(VPL REQUIRED IMPORTED_TARGET vpl libva libva-drm)
+    target_sources(${LRS_TARGET} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/h264-decoder-vpl.cpp")
+    target_link_libraries(${LRS_TARGET} PRIVATE PkgConfig::VPL)
+    target_compile_definitions(${LRS_TARGET} PRIVATE RS2_USE_VPL_H264_DECODER)
+    message(STATUS "Building H.264 GPU decoding through oneVPL ${VPL_vpl_VERSION}")
+endif()
+
 target_sources(${LRS_TARGET}
     PRIVATE
         "${CMAKE_CURRENT_LIST_DIR}/processing-blocks-factory.cpp"
@@ -39,6 +48,7 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/units-transform.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/rotation-transform.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/color-formats-converter.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/h264-decoder.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/rggb-debayer.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/rggb-converter.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/stereo-rectify.cpp"
@@ -76,6 +86,7 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/units-transform.h"
         "${CMAKE_CURRENT_LIST_DIR}/rotation-transform.h"
         "${CMAKE_CURRENT_LIST_DIR}/color-formats-converter.h"
+        "${CMAKE_CURRENT_LIST_DIR}/h264-decoder.h"
         "${CMAKE_CURRENT_LIST_DIR}/rggb-debayer.h"
         "${CMAKE_CURRENT_LIST_DIR}/rggb-converter.h"
         "${CMAKE_CURRENT_LIST_DIR}/stereo-rectify.h"

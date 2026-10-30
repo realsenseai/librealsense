@@ -34,6 +34,7 @@
 #include "proc/spatial-filter.h"
 #include "proc/hole-filling-filter.h"
 #include "proc/color-formats-converter.h"
+#include "proc/h264-decoder.h"
 #include "proc/y411-converter.h"
 #include "proc/rates-printer.h"
 #include "proc/hdr-merge.h"
@@ -3051,6 +3052,12 @@ NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
 rs2_processing_block* rs2_create_mjpeg_decoder(rs2_error** error) BEGIN_API_CALL
 {
     return new rs2_processing_block{ std::make_shared<mjpeg_converter>(RS2_FORMAT_RGB8) };
+}
+NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
+
+rs2_processing_block* rs2_create_h264_decoder(rs2_error** error) BEGIN_API_CALL
+{
+    return new rs2_processing_block{ std::make_shared<h264_decoder>(RS2_FORMAT_RGB8) };
 }
 NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
 

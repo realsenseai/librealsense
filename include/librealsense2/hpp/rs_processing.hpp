@@ -609,6 +609,33 @@ namespace rs2
         }
     };
 
+    class h264_decoder : public filter
+    {
+    public:
+        /**
+        * Creates H264 decoder processing block.
+        * This block accepts H.264 access units and outputs RGB8 frames. Decoding is stateful, so feed
+        * one block a single stream in order; no frame is produced until the first keyframe and its
+        * parameter sets arrive, nor on platforms that have no decoder.
+        */
+        h264_decoder() : filter(init(), 1) { }
+
+    protected:
+        h264_decoder(std::shared_ptr<rs2_processing_block> block) : filter(block, 1) {}
+
+    private:
+        std::shared_ptr<rs2_processing_block> init()
+        {
+            rs2_error* e = nullptr;
+            auto block = std::shared_ptr<rs2_processing_block>(
+                rs2_create_h264_decoder(&e),
+                rs2_delete_processing_block);
+            error::handle(e);
+
+            return block;
+        }
+    };
+
     class y411_decoder : public filter
     {
     public:
