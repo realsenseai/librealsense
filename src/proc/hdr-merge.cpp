@@ -267,11 +267,15 @@ namespace librealsense
         if (use_ir)
         {
             // on devices that does not support meta data on IR frames, do not use IR for hdr merging
-            if (!first_ir.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP)  ||
-                !second_ir.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP) ||
-                !first_ir.supports_frame_metadata(RS2_FRAME_METADATA_SEQUENCE_ID)       ||
+            if (!first_ir.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP)     ||
+                !second_ir.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP)    ||
+                !first_depth.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP)  ||
+                !second_depth.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP) ||
+                !first_ir.supports_frame_metadata(RS2_FRAME_METADATA_SEQUENCE_ID)          ||
                 !second_ir.supports_frame_metadata(RS2_FRAME_METADATA_SEQUENCE_ID))
-            return false;
+            {
+                return false;
+            }
 
             use_ir = (first_depth.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP) ==
                       first_ir.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP));
