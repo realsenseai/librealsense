@@ -262,26 +262,25 @@ namespace librealsense
                 use_ir = false;
         }
 
-        // checking frame counter of first depth and ir are the same
+        // checking first depth and ir come from the same exposure
+        // (frame counters are per stream and may be offset between depth and ir, sensor timestamps are not)
         if (use_ir)
         {
             // on devices that does not support meta data on IR frames, do not use IR for hdr merging
-            if (!first_ir.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_COUNTER)  ||
-                !second_ir.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_COUNTER) ||
-                !first_ir.supports_frame_metadata(RS2_FRAME_METADATA_SEQUENCE_ID)    ||
+            if (!first_ir.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP)  ||
+                !second_ir.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP) ||
+                !first_ir.supports_frame_metadata(RS2_FRAME_METADATA_SEQUENCE_ID)       ||
                 !second_ir.supports_frame_metadata(RS2_FRAME_METADATA_SEQUENCE_ID))
             return false;
 
-            int depth_frame_counter = static_cast<int>(first_depth.get_frame_metadata(RS2_FRAME_METADATA_FRAME_COUNTER));
-            int ir_frame_counter = static_cast<int>(first_ir.get_frame_metadata(RS2_FRAME_METADATA_FRAME_COUNTER));
-            use_ir = (depth_frame_counter == ir_frame_counter);
+            use_ir = (first_depth.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP) ==
+                      first_ir.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP));
 
-            // checking frame counter of second depth and ir are the same
+            // checking second depth and ir come from the same exposure
             if (use_ir)
             {
-                depth_frame_counter = static_cast<int>(second_depth.get_frame_metadata(RS2_FRAME_METADATA_FRAME_COUNTER));
-                ir_frame_counter = static_cast<int>(second_ir.get_frame_metadata(RS2_FRAME_METADATA_FRAME_COUNTER));
-                use_ir = (depth_frame_counter == ir_frame_counter);
+                use_ir = (second_depth.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP) ==
+                          second_ir.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP));
 
                 // checking sequence id of first depth and ir are the same
                 if (use_ir)
