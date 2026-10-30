@@ -487,6 +487,7 @@ const char * get_string( rs2_extension value )
     CASE( PERCEPTION_SENSOR )
     CASE( PERCEPTION_PROFILE )
     CASE( GPU_FRAME )
+    CASE( NN_LOADER )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;
@@ -676,6 +677,20 @@ const char * get_string( rs2_eth_link_priority value )
         CASE( USB_FIRST )
         CASE( DYNAMIC_ETH_FIRST )
         CASE( DYNAMIC_USB_FIRST )
+    default:
+        assert( ! is_valid( value ) );
+        return UNKNOWN_VALUE;
+    }
+#undef CASE
+}
+
+const char * get_string( rs2_nn_target value )
+{
+#define CASE( X ) STRCASE( NN_TARGET, X )
+    switch( value )
+    {
+        CASE( FLASH )
+        CASE( DDR )
     default:
         assert( ! is_valid( value ) );
         return UNKNOWN_VALUE;
@@ -1147,4 +1162,5 @@ const char * rs2_embedded_filter_type_to_string(rs2_embedded_filter_type embedde
 const char * rs2_gyro_sensitivity_to_string( rs2_gyro_sensitivity mode ){return librealsense::get_string( mode );}
 const char * rs2_accel_sensitivity_to_string( rs2_accel_sensitivity mode ){return librealsense::get_string( mode );}
 const char * rs2_eth_link_priority_to_string( rs2_eth_link_priority priority ){return librealsense::get_string( priority );}
+const char * rs2_nn_target_to_string( rs2_nn_target target ) { return librealsense::get_string( target ); }
 const char * rs2_composite_option_id_to_string( rs2_composite_option_id id ) { return librealsense::get_string( id ).c_str(); }

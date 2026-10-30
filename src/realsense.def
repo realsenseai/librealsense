@@ -519,6 +519,11 @@ EXPORTS
     rs2_set_udp_ttl
     rs2_restore_default_eth_config
 
+    rs2_nn_target_to_string
+    rs2_nn_upload
+    rs2_nn_upload_cpp
+    rs2_nn_is_upload_supported
+
     rs2_query_embedded_filters
     rs2_delete_embedded_filter_list
     rs2_get_embedded_filters_count

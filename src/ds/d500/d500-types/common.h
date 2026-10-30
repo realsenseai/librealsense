@@ -23,6 +23,16 @@ namespace librealsense
         {
         }
 
+        uint16_t get_table_type() const
+        {
+            return m_table_type;
+        }
+
+        uint32_t get_table_size() const
+        {
+            return m_table_size;
+        }
+
         uint32_t get_crc32() const
         {
             return m_crc32;

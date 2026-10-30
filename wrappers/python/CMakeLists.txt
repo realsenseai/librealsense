@@ -11,6 +11,7 @@ set(PYRS_CPP
     pyrs_eth_config.cpp
     pyrs_export.cpp
     pyrs_frame.cpp
+    pyrs_nn.cpp
     pyrs_internal.cpp
     pyrs_options.cpp
     pyrs_pipeline.cpp
