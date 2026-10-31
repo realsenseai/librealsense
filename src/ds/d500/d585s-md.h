@@ -521,6 +521,19 @@ namespace librealsense
         uint32_t    payload_crc32;                   // Crc32 for the payload data only, not including the metadata header.
     };
     static_assert( sizeof( md_point_cloud ) == 136, "Point-cloud metadata ABI" );
+    // Field offsets are counted from the start of the attributes, after md_header (design 3.4)
+    static_assert( offsetof( md_point_cloud, number_of_3d_vertices ) - sizeof( md_header ) == 104, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, profile_id ) - sizeof( md_header ) == 108, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, stream_generation ) - sizeof( md_header ) == 110, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, color_frame_counter ) - sizeof( md_header ) == 112, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, color_sync_delta_us ) - sizeof( md_header ) == 116, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, point_stride ) - sizeof( md_header ) == 118, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, point_format ) - sizeof( md_header ) == 119, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, segmentation_mode ) - sizeof( md_header ) == 120, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, segmentation_classes ) - sizeof( md_header ) == 121, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, occlusion_removal ) - sizeof( md_header ) == 122, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, segmentation_status ) - sizeof( md_header ) == 123, "Point-cloud metadata ABI" );
+    static_assert( offsetof( md_point_cloud, payload_crc32 ) - sizeof( md_header ) == 124, "Point-cloud metadata ABI" );
     REGISTER_MD_TYPE(md_point_cloud, md_type::META_DATA_INTEL_POINT_CLOUD_ID)
 
 
