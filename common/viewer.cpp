@@ -1084,6 +1084,7 @@ namespace rs2
     void viewer_model::gc_streams()
     {
         std::lock_guard<std::mutex> lock(streams_mutex);
+        update_passive_streams();
         std::vector<int> streams_to_remove;
         for (auto&& kvp : streams)
         {
@@ -4234,7 +4235,7 @@ namespace rs2
 
     // Only Alternating Passive Depth interleaves the two exposure classes on one profile. Full Passive
     // delivers passive frames alone, so they stay on the stream's own tile.
-    static bool splits_passive_depth( const std::shared_ptr<subdevice_model>& d, const rs2::stream_profile& p )
+    static bool is_alternating_depth( const std::shared_ptr<subdevice_model>& d, const rs2::stream_profile& p )
     {
         if( p.stream_type() != RS2_STREAM_DEPTH && p.stream_type() != RS2_STREAM_INFRARED )
             return false;
@@ -4243,29 +4244,74 @@ namespace rs2
         return d->s->get_option( RS2_OPTION_PASSIVE_DEPTH_MODE ) == RS2_PASSIVE_DEPTH_MODE_ALTERNATING;
     }
 
+    void viewer_model::update_passive_streams()
+    {
+        for( auto & entry : streams )
+        {
+            auto & active = entry.second;
+            if( active.passive || ! active.passive_depth_alternating )
+                continue;
+
+            bool depth_streaming = false;
+            bool color_streaming = false;
+            if( active.dev && active.dev->dev_model )
+                for( auto const & sub : active.dev->dev_model->subdevices )
+                {
+                    if( ! sub->streaming )
+                        continue;
+                    for( auto const & profile : sub->s->get_active_streams() )
+                    {
+                        if( sub == active.dev && profile.unique_id() == entry.first )
+                            depth_streaming = true;
+                        if( profile.stream_type() == RS2_STREAM_COLOR )
+                            color_streaming = true;
+                    }
+                }
+            bool const split = depth_streaming && color_streaming;
+            if( active.split == split )
+                continue;
+
+            int const passive_key = entry.first + PASSIVE_STREAM_KEY_OFFSET;
+            if( split )
+            {
+                auto & passive = streams[passive_key];
+                passive.begin_stream( active.dev, active.original_profile, *this );
+                passive.passive = passive.split = true;
+                passive.ui_key = passive_key;
+                passive_streams[entry.first] = passive_key;
+            }
+            else
+            {
+                auto passive = streams.find( passive_key );
+                if( passive != streams.end() && selected_stream == &passive->second )
+                    selected_stream = &active;
+                _gpu_ruler_samples.erase( passive_key );
+                streams.erase( passive_key );
+                passive_streams.erase( entry.first );
+            }
+            active.split = split;
+        }
+    }
+
     void viewer_model::begin_stream(std::shared_ptr<subdevice_model> d, rs2::stream_profile p)
     {
         {
             std::lock_guard< std::mutex > lock( streams_mutex );
             auto & active = streams[p.unique_id()];
             active.begin_stream(d, p, *this);
+            active.passive_depth_alternating = is_alternating_depth( d, p );
             {
                 std::lock_guard< std::mutex > queue_lock( ppf.frames_queue_mutex );
                 ppf.frames_queue.emplace(p.unique_id(), rs2::frame_queue(5));
             }
 
-            if( splits_passive_depth( d, p ) )
-            {
-                int const passive_key = p.unique_id() + PASSIVE_STREAM_KEY_OFFSET;
-                auto & passive = streams[passive_key];
-                passive.begin_stream( d, p, *this );
-                passive.passive = passive.split = true;
-                passive.ui_key = passive_key;
-                active.split = true;
-                passive_streams[p.unique_id()] = passive_key;
-            }
-            else
-                passive_streams.erase( p.unique_id() );  // a mode change may have left the last run's split behind
+            int const passive_key = p.unique_id() + PASSIVE_STREAM_KEY_OFFSET;
+            auto passive = streams.find( passive_key );
+            if( passive != streams.end() && selected_stream == &passive->second )
+                selected_stream = &active;
+            streams.erase( passive_key );
+            passive_streams.erase( p.unique_id() );
+            update_passive_streams();
         }
 
         // Starting post processing filter rendering thread

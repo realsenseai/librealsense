@@ -39,7 +39,18 @@ def depth_sensor(test_device):
 
 def depth_profile(sensor):
     return next(p for p in sensor.profiles
-                if p.stream_type() == rs.stream.depth and p.format() == rs.format.z16)
+                if p.stream_type() == rs.stream.depth and p.format() == rs.format.z16
+                and p.fps() == 30 and p.as_video_stream_profile().width() == 1280
+                and p.as_video_stream_profile().height() == 720)
+
+
+@pytest.fixture
+def emitter_controls(depth_sensor):
+    options = (rs.option.emitter_enabled, rs.option.emitter_on_off)
+    original = {option: depth_sensor.get_option(option) for option in options}
+    yield
+    for option, value in original.items():
+        depth_sensor.set_option(option, value)
 
 
 def test_passive_depth_range(depth_sensor):
@@ -131,22 +142,68 @@ def test_full_passive_hides_hybrid_ae(depth_sensor):
     assert depth_sensor.get_option_range(AE_MODE).max == POLICIES.hybrid
 
 
-def test_alternating_passive_delivers_both_classes(depth_sensor):
-    # Mode 1 alternates the laser, so one stream carries both exposure classes, told apart by metadata.
-    emitter_mode = rs.frame_metadata_value.frame_emitter_mode
+@pytest.mark.parametrize("with_rgb,with_ir", [(False, False), (False, True),
+                                             (True, False), (True, True)])
+def test_alternating_requires_rgb_tdm(depth_sensor, emitter_controls, with_rgb, with_ir):
     depth_sensor.set_option(PASSIVE_DEPTH, MODES.alternating)
+    depth_sensor.set_option(rs.option.emitter_enabled, 1)
+    depth_sensor.set_option(rs.option.emitter_on_off, 0)
+    depth = depth_profile(depth_sensor)
+    video = depth.as_video_stream_profile()
+    profiles = [depth]
+    required = [(rs.stream.infrared, 1)] if with_ir else []
+    if with_rgb:
+        required += [(rs.stream.color, 1), (rs.stream.color, 2)]
+    for stream, index in required:
+        profiles.append(next(
+            p for p in depth_sensor.profiles
+            if p.stream_type() == stream and p.stream_index() == index
+            and p.fps() == depth.fps()
+            and p.as_video_stream_profile().width() == video.width()
+            and p.as_video_stream_profile().height() == video.height()))
 
+    seen = capture_depth_emitters(depth_sensor, profiles)
+    expected = {0, 1} if with_rgb else {1}
+    assert seen == expected, f"expected emitter modes {expected}, got {seen}"
+    assert depth_sensor.get_option(PASSIVE_DEPTH) == MODES.alternating
+
+
+def capture_depth_emitters(sensor, profiles):
+    emitter_mode = rs.frame_metadata_value.frame_emitter_mode
     queue = rs.frame_queue(50)
-    depth_sensor.open(depth_profile(depth_sensor))
-    depth_sensor.start(queue)
+    sensor.open(profiles)
+    started = False
     try:
+        sensor.start(queue)
+        started = True
         seen = set()
-        for _ in range(50):
+        depth_frames = 0
+        for _ in range(300):
             frame = queue.wait_for_frame(5000)
-            if frame.supports_frame_metadata(emitter_mode):
-                seen.add(frame.get_frame_metadata(emitter_mode))
+            if frame.profile.stream_type() != rs.stream.depth:
+                continue
+            assert frame.supports_frame_metadata(emitter_mode), "missing depth emitter metadata"
+            seen.add(frame.get_frame_metadata(emitter_mode))
+            depth_frames += 1
+            if depth_frames == 50:
+                break
+        assert depth_frames == 50, "insufficient Depth frames"
+        assert sensor.get_option(PASSIVE_DEPTH) == MODES.alternating
     finally:
-        depth_sensor.stop()
-        depth_sensor.close()
+        try:
+            if started:
+                sensor.stop()
+        finally:
+            sensor.close()
+    return seen
 
-    assert seen == {0, 1}, f"expected both active and passive frames, got emitter modes {seen}"
+
+@pytest.mark.parametrize("emitter,alternate,expected", [(0, 0, {0}), (1, 1, {0, 1})])
+def test_depth_only_alternating_preserves_explicit_emitter(
+        depth_sensor, emitter_controls, emitter, alternate, expected):
+    depth_sensor.set_option(PASSIVE_DEPTH, MODES.alternating)
+    depth_sensor.set_option(rs.option.emitter_enabled, emitter)
+    depth_sensor.set_option(rs.option.emitter_on_off, alternate)
+    seen = capture_depth_emitters(depth_sensor, [depth_profile(depth_sensor)])
+    assert seen == expected, f"explicit emitter control expected {expected}, got {seen}"
+    assert depth_sensor.get_option(PASSIVE_DEPTH) == MODES.alternating
