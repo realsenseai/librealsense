@@ -15,7 +15,7 @@ To get started controlling the RealSense Cameras with Matlab® in Windows 10, we
 [`realsense.rosbag_example`](./rosbag_example.m)  - Playback pre-recorded video and data streams stored in [rosbag](http://wiki.ros.org/rosbag) format.  
 [`realsense.pointcloud_example`](./pointcloud_example.m)  -  Generate and visualize 3D point cloud from live stream.  
 [`realsense.depth_view_example`](./depth_view_example.m)  -  Capture and render Depth example based on apps.AppBase component.  
-[`realsense.capture_example`](./cupture_example.m)  -  Capture and render multiple streams  
+[`realsense.capture_example`](./capture_example.m)  -  Capture and render multiple streams  
 
 ### Windows Installer
 1. Run the Windows Installer and select the Matlab Developer Package checkbox.
