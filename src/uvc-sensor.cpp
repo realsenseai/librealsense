@@ -21,7 +21,7 @@
 #include <thread>
 
 #ifdef RS2_USE_CUDA_ZEROCOPY
-#include <rsutils/accelerators/gpu.h>
+#include "cuda/cuda-frame-memory.h"  // rs_frame_zc_enabled
 #endif
 
 
@@ -44,8 +44,9 @@ void log_callback_end( uint32_t fps,
 static bool capture_zerocopy_enabled()
 {
 #ifdef RS2_USE_CUDA_ZEROCOPY
-    static bool const enabled = rsutils::rs2_is_cuda_integrated();
-    return enabled;
+    // Same switch the frame allocator uses, so capture and frame memory agree on one answer
+    // and the integrated-GPU probe is dispatched to the right vendor for this build.
+    return rs_frame_zc_enabled();
 #else
     return false;
 #endif

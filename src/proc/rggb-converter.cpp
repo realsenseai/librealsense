@@ -12,7 +12,7 @@
 
 #ifdef RS2_USE_CUDA
 #include "cuda/cuda-rggb.cuh"
-#include "rsutils/accelerators/gpu.h"   // rsutils::rs2_is_cuda_available
+#include "rsutils/accelerators/gpu.h"   // rsutils::rs2_is_gpu_available
 #endif
 
 namespace librealsense
@@ -167,7 +167,7 @@ namespace librealsense
 #ifdef RS2_USE_CUDA
         // GPU path: fused RAW10 unpack + demosaic + tone to native RGB, then crop-to-aspect +
         // bilinear scale, writing the output frame in place under zero-copy (no host round-trip).
-        if( rsutils::rs2_is_cuda_available() )
+        if( rsutils::rs2_is_gpu_available() )
         {
             rscuda::rggb_isp_params ip{};
             ip.black_level = isp.black_level;
