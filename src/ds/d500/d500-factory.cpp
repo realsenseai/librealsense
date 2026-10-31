@@ -21,6 +21,7 @@
 #include "d500-safety.h"
 #include "d500-depth-mapping.h"
 #include "d500-object-detection.h"
+#include "d500-nn-loader.h"
 #include "sync.h"
 #include <src/ds/ds-thermal-monitor.h>
 #include <src/ds/d500/d500-options.h>
@@ -121,6 +122,7 @@ namespace librealsense
         , public d500_motion
         , public d500_dual_color
         , public d500_object_detection
+        , public d500_nn_loader
         , public d500_depth_mapping
         , public ds_advanced_mode_base
         , public extended_firmware_logger_device
@@ -134,6 +136,7 @@ namespace librealsense
             , d500_motion( dev_info )
             , d500_dual_color( dev_info )
             , d500_object_detection( dev_info )
+            , d500_nn_loader( dev_info )
             , d500_depth_mapping( dev_info )
             , ds_advanced_mode_base()
             , extended_firmware_logger_device( dev_info, d500_device::_hw_monitor, get_firmware_logs_command() )
@@ -224,6 +227,7 @@ namespace librealsense
         , public d500_color
         , public d500_motion
         , public d500_object_detection
+        , public d500_nn_loader
         , public d500_depth_mapping
         , public ds_advanced_mode_base
         , public extended_firmware_logger_device
@@ -237,6 +241,7 @@ namespace librealsense
             , d500_color( dev_info, RS2_FORMAT_NV12 )
             , d500_motion( dev_info )
             , d500_object_detection( dev_info )
+            , d500_nn_loader( dev_info )
             , d500_depth_mapping( dev_info )
             , ds_advanced_mode_base()
             , extended_firmware_logger_device( dev_info, d500_device::_hw_monitor, get_firmware_logs_command() )

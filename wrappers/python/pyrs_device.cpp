@@ -6,6 +6,7 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 #include <librealsense2/hpp/rs_device.hpp>
 #include <librealsense2/hpp/rs_safety_sensor.hpp>
 #include <librealsense2/hpp/rs_record_playback.hpp> // for downcasts
+#include <librealsense2/hpp/rs_nn.hpp>
 #include <common/metadata-helper.h>
 
 #include <iostream>
@@ -54,6 +55,7 @@ void init_device(py::module &m) {
         .def(BIND_DOWNCAST(device, device_calibration))
         .def(BIND_DOWNCAST(device, calibration_change_device))
         .def(BIND_DOWNCAST(device, firmware_logger))
+        .def(BIND_DOWNCAST(device, nn_loader))
         .def("__repr__", [](const rs2::device &self) {
             std::ostringstream ss;
             auto name = self.get_info( RS2_CAMERA_INFO_NAME );
