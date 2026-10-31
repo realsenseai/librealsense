@@ -861,6 +861,7 @@ void rs2_open_multiple(rs2_sensor* sensor,
     std::vector<std::shared_ptr<stream_profile_interface>> request;
     for (auto i = 0; i < count; i++)
     {
+        VALIDATE_NOT_NULL(profiles[i]);
         request.push_back(std::dynamic_pointer_cast<stream_profile_interface>(profiles[i]->profile->shared_from_this()));
     }
     sensor->sensor->open(request);
