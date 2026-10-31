@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include <common/cli.h>
+#include "../example-utils.hpp"
 
 // Hello RealSense example demonstrates the basics of connecting to a RealSense device
 // and taking advantage of depth data
@@ -13,8 +14,11 @@ int main(int argc, char * argv[]) try
     auto settings = rs2::cli( "hello-realsense example" )
         .process( argc, argv );
 
+    rs2::context ctx( settings.dump() );
+    wait_for_devices( ctx );
+
     // Create a Pipeline - this serves as a top-level API for streaming and processing frames
-    rs2::pipeline p( settings.dump() );
+    rs2::pipeline p( ctx );
 
     // Configure and start the pipeline
     p.start();

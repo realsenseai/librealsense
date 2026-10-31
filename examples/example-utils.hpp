@@ -7,15 +7,50 @@
 #include <map>
 #include <librealsense2/rs.hpp>
 #include <algorithm>
+#include <chrono>
+#include <thread>
 
 //////////////////////////////
 // Demos Helpers            //
 //////////////////////////////
 
+// USB devices are normally visible immediately, while Ethernet/DDS discovery is
+// asynchronous. Keep the wait bounded so examples still fail predictably when no
+// camera is connected.
+inline rs2::device_list wait_for_devices( rs2::context & ctx, int timeout_seconds = 30 )
+{
+    constexpr int device_mask = RS2_PRODUCT_LINE_ANY | RS2_PRODUCT_LINE_SW_ONLY;
+    for( int waited = 0; waited < timeout_seconds; ++waited )
+    {
+        auto devices = ctx.query_devices( device_mask );
+        if( devices.size() )
+            return devices;
+
+        if( waited == 0 )
+            std::cout << "Waiting for RealSense device (USB instant; Ethernet/DDS discovery up to "
+                      << timeout_seconds << "s)..." << std::endl;
+        std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+    }
+
+    auto devices = ctx.query_devices( device_mask );
+    if( ! devices.size() )
+        throw std::runtime_error( "No RealSense device found before discovery timeout" );
+    return devices;
+}
+
 // Find devices with specified streams
 bool device_with_streams( rs2::context & ctx, std::vector< rs2_stream > stream_requests, std::string & out_serial )
 {
-    auto devs = ctx.query_devices();
+    rs2::device_list devs;
+    try
+    {
+        devs = wait_for_devices( ctx );
+    }
+    catch( std::runtime_error const & error )
+    {
+        std::cerr << error.what() << std::endl;
+        return false;
+    }
     std::vector <rs2_stream> unavailable_streams = stream_requests;
     for (auto dev : devs)
     {
