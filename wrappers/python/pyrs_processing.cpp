@@ -225,6 +225,7 @@ void init_processing(py::module &m) {
     py::class_<rs2::embedded_filter, rs2::options> embedded_filter(m, "embedded_filter", "Define the embedded filter workflow.");
     embedded_filter.def( BIND_DOWNCAST( embedded_filter, embedded_decimation_filter ) )
         .def( BIND_DOWNCAST( embedded_filter, embedded_temporal_filter ) )
+        .def( BIND_DOWNCAST( embedded_filter, embedded_close_range_filter ) )
         .def( "__bool__", &rs2::embedded_filter::operator bool )  // Called to implement truth value testing in Python 3
         .def( "get_type", &rs2::embedded_filter::get_type, "Get the embedded filter type" );
 
@@ -233,6 +234,9 @@ void init_processing(py::module &m) {
 
     py::class_<rs2::embedded_temporal_filter, rs2::embedded_filter> embedded_temporal_filter(m, "embedded_temporal_filter",
         "Define the embedded temporal filter workflow.");
+
+    py::class_<rs2::embedded_close_range_filter, rs2::embedded_filter> embedded_close_range_filter(m, "embedded_close_range_filter",
+        "Define the embedded Improved Close Range Depth filter workflow.");
 
     /** end rs_processing.hpp **/
 }

@@ -79,6 +79,15 @@ def test_close_range_filter_present( test_device ):
     log.info( f"close-range exposes {len(options)} option(s): {[str(o) for o in options]}" )
 
 
+def test_close_range_dedicated_getter( test_device ):
+    dev, _ = test_device
+    _skip_if_fw_below_minimum( dev )
+    embedded_filter = dev.first_depth_sensor().get_embedded_close_range_filter()
+    assert embedded_filter, "get_embedded_close_range_filter() returned an invalid filter"
+    assert isinstance( embedded_filter, rs.embedded_close_range_filter )
+    assert embedded_filter.get_type() == rs.embedded_filter_type.improved_close_range_depth
+
+
 def test_close_range_enable_round_trip( test_device ):
     _, embedded_filter = _get_close_range_filter( test_device )
     _set_get_round_trip( embedded_filter, rs.option.embedded_filter_enabled, 1.0 )
