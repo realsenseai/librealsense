@@ -10,5 +10,17 @@
         "cell_threshold_factor": 0.02,
         "polynomial_bias": 4.0,
         "surface_height": 0.1
+    },
+    "depth_mapping_params": {
+        "enable_ray_casting": true,
+        "ray_casting_threshold": 50,
+        "enable_cliffs": false,
+        "cliffs_threshold": 3,
+        "cliffs_max_range": 2.5,
+        "cliffs_min_drop": 0.05,
+        "segmentation_range_height": 0.1,
+        "surface_height_slope": 0.0,
+        "surface_height_slope_start": 1.0,
+        "surface_height_max": 0.1
     }
 }

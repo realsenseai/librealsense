@@ -37,6 +37,7 @@
 #include <rsutils/type/fourcc.h>
 using rsutils::type::fourcc;
 #include <set>
+#include <thread>
 
 #include <rsutils/string/hexdump.h>
 #include <regex>
@@ -284,6 +285,7 @@ namespace librealsense
             set_frame_metadata_modifier([&](frame_additional_data& data) {data.depth_units = _depth_units.load(); });
 
             synthetic_sensor::open(requests);
+            _min_open_timer.start();
 
             // Activate Thermal Compensation tracking
             if (supports_option(RS2_OPTION_THERMAL_COMPENSATION))
@@ -296,6 +298,10 @@ namespace librealsense
         // Deactivate Thermal Compensation tracking
         if (supports_option(RS2_OPTION_THERMAL_COMPENSATION))
             _owner->_thermal_monitor->update(false);
+
+        // FW restarts depth for RGB sync shortly after streaming starts; a stream-off during that restart leaves
+        // depth stuck until power cycle, so keep depth open until the timer expires (no wait if it already has)
+        std::this_thread::sleep_until( _min_open_timer.expiration_time() );
 
         synthetic_sensor::close();
     }

@@ -631,6 +631,18 @@ namespace librealsense
             _preset_opt->set( RS2_RS400_VISUAL_PRESET_CUSTOM );
     }
 
+    void ds_advanced_mode_base::set( const STDepthTableControl & table, EtAdvancedModeRegGroup cmd ) const
+    {
+        set< STDepthTableControl >( table, cmd );
+        // Advanced controls and JSON/presets share this write path. Keep the
+        // depth sensor's cached scale in sync without writing the table twice.
+        if( auto option = _depth_sensor->get_option_handler( RS2_OPTION_DEPTH_UNITS ) )
+        {
+            if( auto observable = dynamic_cast< observable_option * >( option.get() ) )
+                observable->notify( static_cast< float >( table.depthUnits ) * 0.000001f );
+        }
+    }
+
     void ds_advanced_mode_base::set_depth_table_control( const STDepthTableControl & val )
     {
         set( val, advanced_mode_traits< STDepthTableControl >::group );

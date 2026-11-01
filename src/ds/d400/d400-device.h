@@ -20,6 +20,7 @@
 #include <src/depth-sensor.h>
 
 #include "ds/ds-device-common.h"
+#include <rsutils/time/timer.h>
 #include "backend-device.h"
 
 namespace librealsense
@@ -56,6 +57,7 @@ namespace librealsense
     protected:
         const d400_device * _owner;
         mutable std::atomic< float > _depth_units;
+        rsutils::time::timer _min_open_timer{ std::chrono::seconds( 2 ) };
         float _stereo_baseline_mm;
         std::shared_ptr< hdr_config > _hdr_cfg;
     };

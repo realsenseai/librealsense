@@ -288,7 +288,7 @@ public:
             : _owner(owner)
         {}
 
-        bool was_stopped() const { return _owner->_was_stopped.load(); }
+        bool was_stopped() const { return _owner->_was_stopped.load() || _owner->_stopping.load(); }
 
         // Replacement for sleep() -- try to sleep for a time, but stop if the
         // dispatcher is stopped
@@ -476,6 +476,7 @@ private:
     std::thread _thread;
 
     std::atomic<bool> _was_stopped;
+    std::atomic<bool> _stopping{ false };  // wakes cancellable sleeps while stop() waits for the in-flight item
     std::condition_variable _was_stopped_cv;
     std::mutex _was_stopped_mutex;
 

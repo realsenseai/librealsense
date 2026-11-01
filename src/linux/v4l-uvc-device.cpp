@@ -160,11 +160,12 @@ namespace librealsense
                 // Synchronise stream requests for meta and video data.
                 streamon();
 
+                // Start the video/metadata syncer before the capture thread: frames can already be queued when
+                // streamon() returns, and buffers pushed to a syncer that is not ready are never re-queued
+                _video_md_syncer.start();
+
                 _is_capturing = true;
                 _thread = std::unique_ptr<std::thread>(new std::thread([this](){ capture_loop(); }));
-
-                // Starting the video/metadata syncer
-                _video_md_syncer.start();
             }
         }
 

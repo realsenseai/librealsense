@@ -25,6 +25,9 @@ namespace librealsense
             control_range get_pu_range(rs2_option option) const override;
             void set_metadata_attributes(buffers_mgr& buf_mgr, __u32 bytesused, uint8_t* md_start) override;
             bool is_platform_jetson() const override;
+
+        protected:
+            void streamoff() const override;
         };
     }  // namespace platform
 }  // namespace librealsense

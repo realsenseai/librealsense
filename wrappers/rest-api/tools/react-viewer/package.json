@@ -60,6 +60,7 @@
   },
   "overrides": {
     "ws": "8.21.1",
-    "form-data": "4.0.6"
+    "form-data": "4.0.6",
+    "follow-redirects": "1.16.1"
   }
 }

@@ -251,6 +251,8 @@ namespace librealsense
         void register_to_depth_scale_option();
         void unregister_from_depth_scale_option();
 
+        void set( const STDepthTableControl & table, EtAdvancedModeRegGroup cmd ) const;
+
         template<class T>
         void set(const T& strct, EtAdvancedModeRegGroup cmd) const
         {

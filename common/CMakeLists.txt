@@ -44,6 +44,7 @@ set(COMMON_SRC
     "${CMAKE_CURRENT_LIST_DIR}/measurement.h"
     "${CMAKE_CURRENT_LIST_DIR}/measurement.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/objects-in-frame.h"
+    "${CMAKE_CURRENT_LIST_DIR}/detection-distance.h"
     "${CMAKE_CURRENT_LIST_DIR}/objects-in-frame.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/utilities/com/center-of-mass.h"
     "${CMAKE_CURRENT_LIST_DIR}/utilities/com/center-of-mass.cpp"

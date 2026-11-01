@@ -179,6 +179,25 @@ namespace librealsense
             return create_default_matcher( streams );
         }
 
+        // Color may run at a resolution of its own, shared by both color streams; every stream shares the frame rate.
+        bool contradicts( const stream_profile_interface * a, const std::vector< stream_profile > & others ) const override
+        {
+            bool const a_is_color = a->get_stream_type() == RS2_STREAM_COLOR;
+            std::vector< stream_profile > same_group;
+            for( auto & sp : others )
+            {
+                if( ( sp.stream == RS2_STREAM_COLOR ) == a_is_color )
+                    same_group.push_back( sp );
+                else if( a->get_framerate() != 0 && sp.fps != 0 && a->get_framerate() != sp.fps )
+                    return true;
+            }
+            return device::contradicts( a, same_group );
+        }
+
+        // On Windows, starting the IMU after the depth sensor was opened stops one of its video streams unless all
+        // run at 1280x720@30, so each sensor starts before the next one opens. Linux streams fine either way.
+        bool start_sensors_when_opened() const override { return true; }
+
         std::vector<tagged_profile> get_profiles_tags() const override
         {
             std::vector<tagged_profile> tags;
@@ -454,7 +473,7 @@ namespace librealsense
             if( d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
             {
                 register_feature( std::make_shared< hdrd_filter_feature >(
-                    dynamic_cast< d500_depth_sensor & >( depth_sensor ), _is_mipi_device ) );
+                    *this, dynamic_cast< d500_depth_sensor & >( depth_sensor ), _is_mipi_device ) );
             }
         }
 

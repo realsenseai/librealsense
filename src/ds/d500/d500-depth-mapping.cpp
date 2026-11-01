@@ -12,6 +12,7 @@
 #include <rsutils/string/from.h>
 #include "d500-types/safety-interface-config.h"
 
+#include <algorithm>
 #include <vector>
 #include <map>
 #include <cstddef>
@@ -211,10 +212,6 @@ namespace librealsense
 
         const auto pid = dev_info->get_group().uvc_devices.front().pid;
 
-        // Over GMSL only 3C devices produce occupancy
-        if( _is_mipi_device && is_dual_rgb_pid( pid ) )
-            return;
-
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
         _is_d585s = ( pid == D585S_PID );
 
@@ -232,8 +229,63 @@ namespace librealsense
         }
 
         auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_devs_info );
-        add_sensor(mapping_ep);
+        _depth_mapping_idx = add_sensor(mapping_ep);
         _depth_mapping_active = true;
+        if( ! _is_safety_layout )
+            add_stream_combination_validator( [this]( const stream_profiles & requests )
+                                              { depth_sensor_allowed_or_throw( requests ); } );
+    }
+
+    // The camera builds occupancy from depth at these sizes only, at the occupancy rate
+    static bool is_occupancy_depth_source( const stream_profile_interface & p, uint32_t fps, bool fixed_source_only )
+    {
+        auto vp = dynamic_cast< const video_stream_profile_interface * >( &p );
+        if( p.get_stream_type() != RS2_STREAM_DEPTH || ! vp || p.get_framerate() != fps )
+            return false;
+        bool const native = vp->get_width() == 640 && vp->get_height() == 360;
+        return native || ( ! fixed_source_only && vp->get_width() == 1280 && vp->get_height() == 720 );
+    }
+
+    static std::shared_ptr< stream_profile_interface > find_stream( const stream_profiles & profiles, rs2_stream type )
+    {
+        auto it = std::find_if( profiles.begin(), profiles.end(),
+                                [type]( const std::shared_ptr< stream_profile_interface > & p ) { return p && p->get_stream_type() == type; } );
+        return it == profiles.end() ? nullptr : *it;
+    }
+
+    void d500_depth_mapping::occupancy_allowed_or_throw( const stream_profiles & requests ) const
+    {
+        auto const occupancy = find_stream( requests, RS2_STREAM_OCCUPANCY );
+        if( _is_safety_layout || ! occupancy )
+            return;
+        auto const running = get_sensor( _depth_device_idx ).get_active_streams();
+        uint32_t const fps = occupancy->get_framerate();
+        if( running.empty() )
+            return;
+        if( std::none_of( running.begin(), running.end(),
+                          [fps]( const std::shared_ptr< stream_profile_interface > & p ) { return p && is_occupancy_depth_source( *p, fps, false ); } ) )
+            throw wrong_api_call_sequence_exception( rsutils::string::from()
+                << "Occupancy needs Depth at 640x360 or 1280x720, " << fps << " fps, while the depth sensor streams" );
+        // Over USB the camera keeps the colors open but stops delivering them
+        if( ! _is_mipi_device && find_stream( running, RS2_STREAM_COLOR ) )
+            throw wrong_api_call_sequence_exception( "Occupancy cannot start while the depth sensor streams color" );
+    }
+
+    void d500_depth_mapping::depth_sensor_allowed_or_throw( const stream_profiles & requests ) const
+    {
+        auto const occupancy = find_stream( get_sensor( _depth_mapping_idx ).get_active_streams(), RS2_STREAM_OCCUPANCY );
+        if( ! occupancy )
+            return;
+        // Keep the existing Depth/Color join rules; the GMSL MUX backend enforces IR exclusion.
+        uint32_t const fps = occupancy->get_framerate();
+        if( find_stream( requests, RS2_STREAM_DEPTH ) )
+        {
+            if( requests.size() != 1 || ! is_occupancy_depth_source( *requests.front(), fps, true ) )
+                throw wrong_api_call_sequence_exception( rsutils::string::from()
+                    << "While Occupancy streams, Depth can start only alone at 640x360, " << fps << " fps" );
+        }
+        else if( find_stream( requests, RS2_STREAM_COLOR ) )
+            throw wrong_api_call_sequence_exception( "Color cannot start while Occupancy streams" );
     }
 
     std::shared_ptr<synthetic_sensor> d500_depth_mapping::create_depth_mapping_device(std::shared_ptr<context> ctx,
@@ -402,19 +454,24 @@ namespace librealsense
 
         raw_mapping_sensor->register_xu( ds::mapping_xu ); // make sure the XU is initialized every time we power the camera
 
-        occupancy_ep->register_option( RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION,
-            std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor,
-                                                          ds::mapping_xu,
-                                                          ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
-                                                          "OccupancyGrid_Segmentation: Off = depth-only labeling, On = segmentation labels in the occupancy grid",
-                                                          false /* not settable while streaming */ ) );
+        // Not every transport exposes these controls (no GMSL driver CIDs yet)
+        if( is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
+                             sizeof( uint8_t ), RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION ) )
+            occupancy_ep->register_option( RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION,
+                std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor,
+                                                              ds::mapping_xu,
+                                                              ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
+                                                              "OccupancyGrid_Segmentation: Off = depth-only labeling, On = segmentation labels in the occupancy grid",
+                                                              false /* not settable while streaming */ ) );
 
-        occupancy_ep->register_option( RS2_OPTION_LPCL_SEGMENTATION,
-            std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor,
-                                                          ds::mapping_xu,
-                                                          ds::d500_mapping_xu_id::LPCL_SEGMENTATION,
-                                                          "LPCL_Segmentation: Off = depth-only labeling, On = segmentation labels in the labeled point cloud",
-                                                          false /* not settable while streaming */ ) );
+        if( is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::LPCL_SEGMENTATION,
+                             sizeof( uint8_t ), RS2_OPTION_LPCL_SEGMENTATION ) )
+            occupancy_ep->register_option( RS2_OPTION_LPCL_SEGMENTATION,
+                std::make_shared< uvc_xu_option< uint8_t > >( raw_mapping_sensor,
+                                                              ds::mapping_xu,
+                                                              ds::d500_mapping_xu_id::LPCL_SEGMENTATION,
+                                                              "LPCL_Segmentation: Off = depth-only labeling, On = segmentation labels in the labeled point cloud",
+                                                              false /* not settable while streaming */ ) );
     }
 
     void d500_depth_mapping::register_metadata(std::shared_ptr<uvc_sensor> raw_mapping_ep)
@@ -871,6 +928,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             && _owner->get_depth_sensor().is_streaming() )
             throw wrong_api_call_sequence_exception( "Point Cloud cannot start while Depth is streaming; stop Depth first" );
 
+        _owner->occupancy_allowed_or_throw(requests);
         synthetic_sensor::open(requests);
     }
 
