@@ -32,7 +32,7 @@ namespace librealsense
 
             if (xioctl(_fd, VIDIOC_G_EXT_CTRLS, &ctrls_block) < 0)
             {
-                if (errno == EIO || errno == EAGAIN) // TODO: Log?
+                if (errno == EIO || errno == EAGAIN || errno == EBUSY) // TODO: Log?
                     return false;
 
                 throw linux_backend_exception(rsutils::string::from()
@@ -57,7 +57,7 @@ namespace librealsense
             v4l2_ext_controls ctrls_block{ control.id & 0xffff0000, 1, 0, 0, 0, &control };
             if (xioctl(_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block) < 0)
             {
-                if (errno == EIO || errno == EAGAIN) // TODO: Log?
+                if (errno == EIO || errno == EAGAIN || errno == EBUSY) // TODO: Log?
                     return false;
 
                 throw linux_backend_exception(rsutils::string::from()
@@ -106,7 +106,7 @@ namespace librealsense
             int retVal = xioctl(_fd, VIDIOC_S_EXT_CTRLS, &ctrls_block);
             if (retVal < 0)
             {
-                if (errno == EIO || errno == EAGAIN) // TODO: Log?
+                if (errno == EIO || errno == EAGAIN || errno == EBUSY) // TODO: Log?
                     return false;
 
                 throw linux_backend_exception(rsutils::string::from()
@@ -147,7 +147,7 @@ namespace librealsense
             }
 
             // sending error on ioctl failure
-            if (errno == EIO || errno == EAGAIN) // TODO: Log?
+            if (errno == EIO || errno == EAGAIN || errno == EBUSY) // TODO: Log?
                 return false;
             throw linux_backend_exception(rsutils::string::from() << "xioctl(VIDIOC_G_EXT_CTRLS) failed on control " << static_cast<int>(control) << ", errno=" << errno);
         }
