@@ -6,8 +6,8 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
     message(STATUS "Building libcurl enabled")
     
     # HTTP(S) only, with no optional dependencies: anything curl finds on its own (e.g. Homebrew's nghttp2/brotli/zstd)
-    # would need linking below. HTTP_ONLY and CURL_DISABLE_CRYPTO_AUTH are gone in newer curl, so the protocols and
-    # dependencies are also switched off one by one.
+    # would need linking below. HTTP_ONLY and CURL_DISABLE_CRYPTO_AUTH still work in this version but are gone in later
+    # curl, so the protocols and dependencies are also switched off one by one to keep a future bump safe.
     set(CURL_FLAGS -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DUSE_WIN32_LDAP=OFF -DBUILD_TESTING=OFF -DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF
         -DHTTP_ONLY=ON -DCURL_DISABLE_CRYPTO_AUTH=ON
         -DCURL_DISABLE_DICT=ON -DCURL_DISABLE_FILE=ON -DCURL_DISABLE_FTP=ON -DCURL_DISABLE_GOPHER=ON -DCURL_DISABLE_IMAP=ON
