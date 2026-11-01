@@ -125,6 +125,7 @@ void dds_depth_sensor_proxy::add_embedded_filter(std::shared_ptr< embedded_filte
 
 void dds_depth_sensor_proxy::open( const stream_profiles & profiles )
 {
+    // Called for every device; only devices whose features registered a validator check anything
     _owner->stream_combination_allowed_or_throw( profiles );
     super::open( profiles );
 }

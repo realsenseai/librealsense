@@ -178,8 +178,6 @@ private:
 /* static */ const feature_id hdrd_filter_feature::ID = "Improved Close Range filter feature";
 
 hdrd_filter_feature::hdrd_filter_feature( d500_device & owner, d500_depth_sensor & depth_sensor, bool is_mipi )
-    // ds::DS5_HKR_HDRD_CONTROL drives the same physical XU control formerly exposed as the
-    // scalar "Improved Close Range Depth" option (close_range_xu_option, since removed).
     : hdrd_filter_feature( owner,
                            depth_sensor,
                            composite_xu_option::create(
@@ -197,7 +195,6 @@ hdrd_filter_feature::hdrd_filter_feature( d500_device & owner, d500_depth_sensor
 hdrd_filter_feature::hdrd_filter_feature( device & owner, const sensor_interface & depth_sensor,
                                           std::shared_ptr< composite_option_interface > control )
 {
-    // Registers the ONE composite option this filter exposes, mirroring temporal_filter_feature.
     auto option = std::make_shared< minz_option >( std::move( control ), depth_sensor );
     _filter = std::make_shared< hdrd_embedded_filter >( option, RS2_COMPOSITE_OPTION_HDRD_CONTROL );
 

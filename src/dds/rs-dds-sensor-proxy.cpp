@@ -1064,6 +1064,13 @@ rs2_frame_callback_sptr dds_sensor_proxy::get_frames_callback() const
 
 void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedded_filter > embedded_filter )
 {
+    if( ! _embedded_filter_names.insert( embedded_filter->get_name() ).second )
+    {
+        // Filter might already be added by another stream of this sensor, in that case, we just ignore it.
+        LOG_DEBUG( "embedded filter '" << embedded_filter->get_name() << "' already exists in sensor '" << get_name() << "'" );
+        return;
+    }
+
     std::shared_ptr< embedded_filter_interface > rs_embedded_filter = nullptr;
     if (auto decimation_filter = std::dynamic_pointer_cast< dds_decimation_filter >(embedded_filter) )
     {

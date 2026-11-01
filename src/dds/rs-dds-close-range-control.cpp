@@ -30,16 +30,16 @@ namespace librealsense {
                    "field_names must match the contiguous int32_t fields of rs2_hdrd_control" );
 
     // The downscale ratio is a DDS enum of "2"/"4"; rs2_hdrd_control holds 1 = x2, 2 = x4
-    static int32_t to_field( size_t i, json const & dds_value )
+    static int32_t to_field( size_t field_index, json const & dds_value )
     {
         if( dds_value.is_null() )
             return 0;
-        return i == downscale_ratio_field ? std::stoi( dds_value.get< std::string >() ) / 2 : dds_value.get< int32_t >();
+        return field_index == downscale_ratio_field ? std::stoi( dds_value.get< std::string >() ) / 2 : dds_value.get< int32_t >();
     }
 
-    static json to_dds( size_t i, int32_t field )
+    static json to_dds( size_t field_index, int32_t field )
     {
-        return i == downscale_ratio_field ? json( std::to_string( field * 2 ) ) : json( field );
+        return field_index == downscale_ratio_field ? json( std::to_string( field * 2 ) ) : json( field );
     }
 
     rs_dds_close_range_control::rs_dds_close_range_control(
