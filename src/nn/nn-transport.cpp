@@ -77,6 +77,7 @@ void nn_transport::wait_for_commit( uint32_t seq_before, const progress_callback
         {
             err = read_status( status );
             read = true;
+            failure.clear();
         }
         catch( std::exception const & e )
         {

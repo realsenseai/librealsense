@@ -110,13 +110,20 @@ namespace librealsense
         }
     }
 
-    // NN_STATUS shows an install by any process. FW without the NN tables answers an error: not installing
+    // NN_STATUS shows an install by any process. A status that FW without the NN tables refuses, or that can't be read,
+    // doesn't block the update: the FW itself refuses an update during the flash write
     void d500_nn_loader::enter_update_state() const
     {
-        nn::status status;
-        if( supports_nn_upload()
-            && nn_transport_hwm( _hw_monitor ).read_status( status ) == ds::d500_hwmon_response::SUCCESS
-            && nn::is_busy( status.state ) )
+        nn::status status = {};
+        try
+        {
+            if( supports_nn_upload() )
+                nn_transport_hwm( _hw_monitor ).read_status( status );
+        }
+        catch( std::exception const & )
+        {
+        }
+        if( nn::is_busy( status.state ) )
             throw wrong_api_call_sequence_exception( nn::INSTALLING_MESSAGE );
         d500_device::enter_update_state();
     }
