@@ -72,7 +72,9 @@ std::string error_message( int32_t code )
     case -15:
         return "writing the model to the camera failed. The camera has no detection model until an upload succeeds; "
                "upload again";
-    case -19: return "this model package format is not supported by this camera's firmware";
+    case -19:
+        return "this model package is not supported by this camera's firmware (its format, codec, signature or model "
+               "type)";
     case -20: return "incomplete transfer";
     case -21: return "the camera could not allocate resources for the upload; reset the camera and try again";
     case -41: return "the camera is busy: stop the Perception sensor and any other upload, then try again";

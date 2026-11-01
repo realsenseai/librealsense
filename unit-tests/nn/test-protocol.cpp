@@ -102,7 +102,7 @@ TEST_CASE( "error mapping" )
     CHECK_THAT( nn::error_message( -1 ), ContainsSubstring( "invalid command" ) );
     CHECK_THAT( nn::error_message( -5 ), ContainsSubstring( "not valid for this camera" ) && ContainsSubstring( "converted for" ) );
     CHECK_THAT( nn::error_message( -15 ), ContainsSubstring( "no detection model" ) );
-    CHECK_THAT( nn::error_message( -19 ), ContainsSubstring( "package format is not supported" ) );
+    CHECK_THAT( nn::error_message( -19 ), ContainsSubstring( "package is not supported" ) );
     CHECK_THAT( nn::error_message( -21 ), ContainsSubstring( "allocate resources" ) );
     CHECK_THAT( nn::error_message( -41 ), ContainsSubstring( "busy" ) );
     CHECK( nn::error_message( -99 ) == "device error -99" );
