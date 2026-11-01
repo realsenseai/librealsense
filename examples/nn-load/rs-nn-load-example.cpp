@@ -31,19 +31,25 @@ int main( int argc, char * argv[] ) try
     }
     std::vector< uint8_t > package( ( std::istreambuf_iterator< char >( file ) ), std::istreambuf_iterator< char >() );
 
+    // Declared before ctx: the devices-changed callback below uses them until the context is destroyed
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool reconnected = false;
+
     // Find a camera that accepts NN models
     rs2::context ctx;
     rs2::nn_loader loader;
+    std::string reason = "No camera that accepts NN models was found";
     for( auto && dev : ctx.query_devices() )
-        if( ( loader = rs2::nn_loader( dev ) ) )
-            break;
-    if( ! loader )
     {
-        std::cerr << "No camera that accepts NN models was found" << std::endl;
-        return EXIT_FAILURE;
+        rs2::nn_loader candidate( dev );
+        if( candidate && candidate.is_upload_supported( &reason ) )
+        {
+            loader = candidate;
+            break;
+        }
     }
-    std::string reason;
-    if( ! loader.is_upload_supported( &reason ) )
+    if( ! loader )
     {
         std::cerr << reason << std::endl;
         return EXIT_FAILURE;
@@ -51,16 +57,13 @@ int main( int argc, char * argv[] ) try
     std::string const serial = loader.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER );
 
     // Once the model is installed the camera resets: watch for it to come back
-    std::mutex mutex;
-    std::condition_variable cv;
-    bool reconnected = false;
-    ctx.set_devices_changed_callback( [&]( rs2::event_information & info )
+    ctx.set_devices_changed_callback( [&, serial]( rs2::event_information & info )
     {
         try
         {
             for( auto && dev : info.get_new_devices() )
             {
-                if( dev.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) != serial )
+                if( ! dev.supports( RS2_CAMERA_INFO_SERIAL_NUMBER ) || dev.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) != serial )
                     continue;
                 std::lock_guard< std::mutex > lock( mutex );
                 reconnected = true;

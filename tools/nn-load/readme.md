@@ -3,8 +3,10 @@
 ## Goal
 `rs-nn-load` is a console application for uploading an NN model package from the Perception Service to a camera.
 
+## Supported Cameras
+D585 and D585F over USB, unlocked, with firmware that supports NN model upload. Other cameras, including D555, D535 and D585S, and D585 over GMSL, don't support it. Run `rs-nn-load -l` to check a camera.
+
 ## Prerequisites
-- A camera that accepts NN models (D585 over USB), with firmware that supports NN model upload.
 - An unlocked camera: in this release, models can only be uploaded to unlocked cameras.
 - The Perception sensor must not be streaming during the upload.
 

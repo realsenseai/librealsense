@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#define WAIT_FOR_DEVICE_TIMEOUT 15
+static constexpr int WAIT_FOR_DEVICE_TIMEOUT = 15;  // seconds
 
 #if _WIN32
 #include <io.h>
@@ -82,7 +82,7 @@ try
 
     auto settings = cmd.process( argc, argv );
 
-    // Declared before ctx so the devices they hold are released before it
+    // Declared before ctx: the devices-changed callback uses them until the context is destroyed
     std::condition_variable cv;
     std::mutex mutex;
     rs2::device reconnected;
@@ -138,7 +138,7 @@ try
     std::vector< uint8_t > package = read_file( file_arg.getValue() );
 
     // The camera resets once the model is installed: catch it coming back
-    ctx.set_devices_changed_callback( [&]( rs2::event_information & ev )
+    ctx.set_devices_changed_callback( [&, serial]( rs2::event_information & ev )
     {
         try
         {
@@ -160,14 +160,20 @@ try
     std::cout << "Uploading " << file_arg.getValue() << " to " << info( loader, RS2_CAMERA_INFO_NAME ) << " s/n "
               << serial << ". Please don't disconnect the device!" << std::endl;
     bool activate = ! no_activate_arg.isSet();
+    int last = -1;
     if( ISATTY( FILENO( stdout ) ) )
         loader.nn_upload( package, target, slot_arg.getValue(), activate, []( float progress )
         {
             printf( "\rNN model upload progress: %d[%%]", int( progress * 100 ) );
             fflush( stdout );
         } );
-    else
-        loader.nn_upload( package, target, slot_arg.getValue(), activate );
+    else  // a log gets a line every 10%
+        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&last]( float progress )
+        {
+            int pct = int( progress * 10 ) * 10;
+            if( pct != last )
+                std::cout << "NN model upload progress: " << ( last = pct ) << "%" << std::endl;
+        } );
     std::cout << std::endl << "NN model installed, waiting for the device to reconnect..." << std::endl;
 
     std::unique_lock< std::mutex > lk( mutex );
