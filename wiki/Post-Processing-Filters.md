@@ -301,5 +301,5 @@ if (filter.supports_composite_option(id))
 - [[API How To]], [[Code Samples]], [[GPU Acceleration]], [[Depth from Stereo]]
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`84e42c1`](https://github.com/realsenseai/librealsense/commit/84e42c1d2ce717c57dcf11f155bbe68bb41bbd1c)._
+_Maintained from librealsense `development`; last checked at commit [`5b6ddcd`](https://github.com/realsenseai/librealsense/commit/5b6ddcda07ec99a28bce6098e908a43e5c23ef25)._
 <!-- /wikigen:footer -->
