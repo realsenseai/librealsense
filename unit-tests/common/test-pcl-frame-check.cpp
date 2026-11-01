@@ -6,9 +6,11 @@
 #include <unit-tests/catch.h>
 
 #include <src/ds/d500/mapping-pcl-check.h>
+#include <src/metadata-parser.h>
 #include <rsutils/number/crc32.h>
 
 #include <cstring>
+#include <memory>
 #include <vector>
 
 using namespace librealsense;
@@ -180,4 +182,59 @@ TEST_CASE( "pcl frame check: stream generation" )
     CHECK( s.generation == 8 );
     CHECK( check( payload, &m, s ) == pcl_frame_check::ok );
     CHECK( s.restarts == 1 );
+}
+
+TEST_CASE( "pcl metadata parsers: 0x00020002 fields" )
+{
+    md_point_cloud m;
+    std::memset( &m, 0, sizeof( m ) );
+    m.header.md_type_id = md_type::META_DATA_INTEL_POINT_CLOUD_ID;
+    m.header.md_size = sizeof( m );
+    m.version = 0x00020002;
+    m.color_frame_counter = 1000;
+    m.color_sync_delta_us = -1234;
+    m.segmentation_mode = 2;
+    m.segmentation_classes = 0x05;
+    m.occlusion_removal = 1;
+
+    // Same offset and parsers as d500_depth_mapping::register_point_cloud_metadata()
+    auto const offset = metadata_raw_mode_offset + offsetof( md_mapping_mode, intel_point_cloud );
+    struct entry
+    {
+        std::shared_ptr< md_attribute_parser_base > parser;
+        rs2_metadata_type expected;
+    };
+    std::vector< entry > entries = {
+        { make_attribute_parser( &md_point_cloud::color_frame_counter, md_point_cloud_attributes::color_frame_counter_attribute, offset ), 1000 },
+        { make_attribute_parser( &md_point_cloud::color_sync_delta_us, md_point_cloud_attributes::color_sync_delta_attribute, offset ), -1234 },
+        { make_attribute_parser( &md_point_cloud::segmentation_mode, md_point_cloud_attributes::segmentation_mode_attribute, offset ), 2 },
+        { make_attribute_parser( &md_point_cloud::segmentation_classes, md_point_cloud_attributes::segmentation_classes_attribute, offset ), 5 },
+        { make_attribute_parser( &md_point_cloud::occlusion_removal, md_point_cloud_attributes::occlusion_removal_attribute, offset ), 1 } };
+
+    librealsense::frame f;
+    REQUIRE( f.additional_data.metadata_blob.size() >= offset + sizeof( m ) );
+
+    SECTION( "bits set: values reported, the delta sign-extended" )
+    {
+        m.flags = bit( md_point_cloud_attributes::color_frame_counter_attribute )
+                | bit( md_point_cloud_attributes::color_sync_delta_attribute )
+                | bit( md_point_cloud_attributes::segmentation_mode_attribute )
+                | bit( md_point_cloud_attributes::segmentation_classes_attribute )
+                | bit( md_point_cloud_attributes::occlusion_removal_attribute );
+        std::memcpy( f.additional_data.metadata_blob.data() + offset, &m, sizeof( m ) );
+        for( auto const & e : entries )
+        {
+            rs2_metadata_type value = 0;
+            REQUIRE( e.parser->find( f, &value ) );
+            CHECK( value == e.expected );
+        }
+    }
+
+    SECTION( "bits clear: not supported" )
+    {
+        m.flags = 0;
+        std::memcpy( f.additional_data.metadata_blob.data() + offset, &m, sizeof( m ) );
+        for( auto const & e : entries )
+            CHECK_FALSE( e.parser->find( f, nullptr ) );
+    }
 }

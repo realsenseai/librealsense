@@ -604,6 +604,14 @@ namespace librealsense
             make_attribute_parser(&md_occupancy::grid_origin_y_mm,
                 md_occupancy_attributes::grid_origin_y_attribute, md_prop_offset));
 
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_SEGMENTATION_MODE,
+            make_attribute_parser(&md_occupancy::segmentation_mode,
+                md_occupancy_attributes::segmentation_mode_attribute, md_prop_offset));
+
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_SEGMENTATION_CLASS,
+            make_attribute_parser(&md_occupancy::segmentation_classes,
+                md_occupancy_attributes::segmentation_classes_attribute, md_prop_offset));
+
         raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_CRC,
             make_attribute_parser(&md_occupancy::payload_crc32,
                 md_occupancy_attributes::payload_crc32_attribute, md_prop_offset));
