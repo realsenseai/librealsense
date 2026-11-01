@@ -168,6 +168,14 @@ TEST_CASE( "device errors" )
                                      && ContainsSubstring( "device disconnected" ) );
         CHECK( t.chunks.size() == 2 );
     }
+    SECTION( "device lost on the last chunk: it may be committing" )
+    {
+        fake_transport t;
+        t.statuses = { make_status( nn::upload_state::idle, 7 ) };
+        t.lost_at_chunk = 2;
+        CHECK_THAT( upload( t ), ContainsSubstring( "did not complete" ) && ContainsSubstring( "device disconnected" ) );
+        CHECK( t.chunks.size() == 3 );
+    }
     SECTION( "in the commit" )
     {
         fake_transport t;

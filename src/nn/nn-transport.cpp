@@ -35,8 +35,10 @@ void nn_transport::send_table( uint16_t table_id, uint32_t param1, uint32_t para
         }
         catch( std::exception const & e )
         {
-            // The device writes nothing until the last chunk arrives
-            throw io_exception( rsutils::string::from() << nn::INTERRUPTED_MESSAGE << " (" << e.what() << ")" );
+            // The device writes nothing before the last chunk, but it may already have that one and be committing
+            throw io_exception( rsutils::string::from()
+                                << ( i + 1 < n_chunks ? nn::INTERRUPTED_MESSAGE : nn::INCOMPLETE_MESSAGE ) << " ("
+                                << e.what() << ")" );
         }
         if( err )
             nn::throw_error( err );
