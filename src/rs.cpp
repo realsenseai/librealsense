@@ -74,6 +74,7 @@
 #include "object-detection-frame.h"
 #include "perception-frame.h"
 #include "eth-config-device.h"
+#include "nn/nn-loader.h"
 #include "embedded-filter-interface.h"
 
 #ifdef RS2_USE_CUDA_ZEROCOPY
@@ -2113,6 +2114,11 @@ int rs2_is_device_extendable_to(const rs2_device* dev, rs2_extension extension, 
         case RS2_EXTENSION_FW_LOGGER             : return VALIDATE_INTERFACE_NO_THROW(dev->device, librealsense::firmware_logger_extensions)    != nullptr;
         case RS2_EXTENSION_CALIBRATION_CHANGE_DEVICE: return VALIDATE_INTERFACE_NO_THROW(dev->device, librealsense::calibration_change_device)  != nullptr;
         case RS2_EXTENSION_ETH_CONFIG            : return VALIDATE_INTERFACE_NO_THROW(dev->device, librealsense::eth_config_device )            != nullptr;
+        case RS2_EXTENSION_NN_LOADER:
+        {
+            auto nn_loader = VALIDATE_INTERFACE_NO_THROW( dev->device, librealsense::nn_loader_interface );
+            return nn_loader && nn_loader->supports_nn_upload();
+        }
 
         default:
             return false;
@@ -3846,6 +3852,54 @@ void rs2_update_firmware(const rs2_device* device, const void* fw_image, int fw_
     }
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, device, fw_image)
+
+void rs2_nn_upload_cpp( const rs2_device * device, const void * file, int file_size, rs2_nn_target target, int slot,
+                        int activate, rs2_update_progress_callback * callback, rs2_error ** error ) BEGIN_API_CALL
+{
+    rs2_update_progress_callback_sptr callback_ptr;
+    if( callback )
+        callback_ptr.reset( callback, []( rs2_update_progress_callback * p ) { p->release(); } );
+
+    VALIDATE_NOT_NULL( device );
+    VALIDATE_RANGE( file_size, 0, std::numeric_limits< int >::max() );  // an empty package gets the library's message
+    if( file_size )
+        VALIDATE_NOT_NULL( file );
+    VALIDATE_ENUM( target );
+    auto nn_loader = VALIDATE_INTERFACE( device->device, librealsense::nn_loader_interface );
+    nn_loader->nn_upload( static_cast< const uint8_t * >( file ), static_cast< size_t >( file_size ), target, slot, activate != 0, callback_ptr );
+}
+HANDLE_EXCEPTIONS_AND_RETURN( , device, file, file_size, target, slot, activate )
+
+void rs2_nn_upload( const rs2_device * device, const void * file, int file_size, rs2_nn_target target, int slot,
+                    int activate, rs2_update_progress_callback_ptr callback, void * client_data, rs2_error ** error ) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL( device );
+    VALIDATE_RANGE( file_size, 0, std::numeric_limits< int >::max() );  // an empty package gets the library's message
+    if( file_size )
+        VALIDATE_NOT_NULL( file );
+    VALIDATE_ENUM( target );
+    auto nn_loader = VALIDATE_INTERFACE( device->device, librealsense::nn_loader_interface );
+    rs2_update_progress_callback_sptr cb;
+    if( callback )
+        cb.reset( new update_progress_callback( callback, client_data ), []( update_progress_callback * p ) { delete p; } );
+    nn_loader->nn_upload( static_cast< const uint8_t * >( file ), static_cast< size_t >( file_size ), target, slot, activate != 0, std::move( cb ) );
+}
+HANDLE_EXCEPTIONS_AND_RETURN( , device, file, file_size, target, slot, activate )
+
+int rs2_nn_is_upload_supported( const rs2_device * device, char * reason, int reason_size, rs2_error ** error ) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL( device );
+    auto nn_loader = VALIDATE_INTERFACE( device->device, librealsense::nn_loader_interface );
+    std::string why;
+    bool supported = nn_loader->is_upload_supported( why );
+    if( reason && reason_size > 0 )
+    {
+        strncpy( reason, why.c_str(), reason_size - 1 );
+        reason[reason_size - 1] = 0;
+    }
+    return supported;
+}
+HANDLE_EXCEPTIONS_AND_RETURN( 0, device, reason_size )
 
 const rs2_raw_data_buffer* rs2_create_flash_backup_cpp(const rs2_device* device, rs2_update_progress_callback* callback, rs2_error** error) BEGIN_API_CALL
 {

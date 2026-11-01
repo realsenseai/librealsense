@@ -120,6 +120,15 @@ namespace librealsense
             D585_3C_PROTO_PID
         };
 
+        // The products the FW implements the NN upload for; others sharing the FW (D535 in the same device classes) never report it
+        static const std::set<std::uint16_t> nn_upload_pids = {
+            D585_2C_PID,
+            D585_3C_PID,
+            D585F_PID,
+            D585_2C_PROTO_PID,
+            D585_3C_PROTO_PID
+        };
+
         // SKUs allowed to toggle Dual-RGB (2C) vs Dedicated-Color (3C) via the DUAL_RGB_MODE XU (0x12).
         // The F SKUs are left out: their L/R imagers have IR-only covers.
         static const std::set<std::uint16_t> d5x5_dual_rgb_mode_pids = {
