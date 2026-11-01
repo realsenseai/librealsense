@@ -78,6 +78,8 @@ if(BUILD_ROSBAG2)
         else()
             message(FATAL_ERROR "can't link external libdeflate with BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}")
         endif()
+        set(REALSENSE2_LIBDEFLATE_DEPENDENCIES
+            "include(CMakeFindDependencyMacro)\nfind_dependency(libdeflate CONFIG REQUIRED)\n" )
     else()
         include(${PROJECT_SOURCE_DIR}/CMake/external_libdeflate.cmake)
         set(LIBDEFLATE_DIR "${LIBDEFLATE_SOURCE_DIR}")
@@ -97,6 +99,7 @@ if(BUILD_ROSBAG2)
             # C sources: -fvisibility-inlines-hidden from hide_sources_symbols is C++-only
             set_source_files_properties(${LIBDEFLATE_SOURCES} PROPERTIES COMPILE_FLAGS "-fvisibility=hidden")
         endif()
+        set(REALSENSE2_LIBDEFLATE_DEPENDENCIES "")
     endif()
 
     target_sources(${LRS_TARGET} PRIVATE ${ROS2_SOURCE_FILES})
