@@ -102,8 +102,10 @@ def test_one_color_streams_alone(depth_sensor, index):
     check_stream( frames, name )
 
 
-def test_colors_held_by_slow_consumer(depth_sensor):
-    """Each color stream has its own frame pool: holding frames of one does not starve the other (RSDEV-15260)."""
+@pytest.mark.parametrize( "fmt", [rs.format.rgb8, rs.format.nv12] )
+def test_colors_held_by_slow_consumer(depth_sensor, fmt):
+    """Each color stream has its own frame pools, converted or passed through: holding frames of one does not
+    starve the other (RSDEV-15260, RSDEV-15315)."""
     HOLD = 12   # frames kept per stream, as a slow viewer does; both colors together exceed one pool (16)
     held = {}
     frames = {}
@@ -119,7 +121,7 @@ def test_colors_held_by_slow_consumer(depth_sensor):
             q.append( f )
             del q[:-HOLD]
     depth_sensor.open( [profile( depth_sensor, rs.stream.depth, 0, rs.format.z16 ),
-                        color( depth_sensor, 1 ), color( depth_sensor, 2 )] )
+                        color( depth_sensor, 1, fmt ), color( depth_sensor, 2, fmt )] )
     depth_sensor.start( on_frame )
     time.sleep( DURATION_S )
     depth_sensor.stop()

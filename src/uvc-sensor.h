@@ -8,10 +8,14 @@
 
 #include <atomic>
 #include <memory>
+#include <set>
 #include <vector>
 
 
 namespace librealsense {
+
+
+class stream_profile_base;
 
 
 class uvc_sensor : public raw_sensor_base
@@ -38,12 +42,17 @@ public:
     // Lets the owning device override the SDK stream type/index derived for a raw backend profile.
     // Needed when several pins expose identical {w,h,fps,format} and must become distinct SDK streams.
     // The resolver receives the full backend profile list (so it can classify a pin by its companion formats),
-    // the profile being resolved, and the type/index to adjust in place.
+    // the profile being resolved, and the type/indexes to adjust in place. Several indexes make a multiplexed pin.
     using stream_id_resolver = std::function< void( const std::vector< platform::stream_profile > & all_profiles,
                                                      const platform::stream_profile & profile,
                                                      rs2_stream & type,
-                                                     int & index ) >;
+                                                     std::vector< int > & indexes ) >;
     void set_stream_id_resolver( stream_id_resolver resolver ) { _stream_id_resolver = std::move( resolver ); }
+
+    // A multiplexed pin is enumerated once per stream it carries and opened once for all of them. The resolver
+    // sets the stream index of each captured frame (from its metadata), or returns false to drop the frame.
+    using frame_stream_resolver = std::function< bool( const frame_interface * frame, int & index ) >;
+    void set_frame_stream_resolver( frame_stream_resolver resolver ) { _frame_stream_resolver = std::move( resolver ); }
 
     // Opt in to a per-stream software frame number for color, for devices whose color pins share one
     // hardware frame counter (D401 GMSL dual-RGB). Off by default: it makes get_frame_number() count
@@ -91,6 +100,7 @@ public:
 protected:
     stream_profiles init_stream_profiles() override;
     void verify_supported_requests( const stream_profiles & requests ) const;
+    frame_stream_resolver multiplexed_pin_resolver( const stream_profile_base & profile ) const;
 
 private:
     void acquire_power();
@@ -133,6 +143,8 @@ private:
 
     std::shared_ptr< platform::uvc_device > _device;
     stream_id_resolver _stream_id_resolver;
+    frame_stream_resolver _frame_stream_resolver;
+    std::set< uint32_t > _multiplexed_pins;  // pins the stream-id resolver gave several indexes
     std::vector< platform::stream_profile > _internal_config;
     std::atomic< int > _user_count;
     std::mutex _power_lock;

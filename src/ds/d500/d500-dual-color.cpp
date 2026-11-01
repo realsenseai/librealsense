@@ -63,10 +63,10 @@ namespace librealsense
         raw_depth_sensor->set_stream_id_resolver( [this]( const std::vector< platform::stream_profile > & all,
                                                           const platform::stream_profile & p,
                                                           rs2_stream & type,
-                                                          int & index )
-                                                  { resolve_color_stream( all, p, type, index ); } );
-        depth_sensor.set_frame_stream_resolver( RS2_STREAM_COLOR,
-                                                [this]( const frame_interface * f, int & index ) { return resolve_color_frame( f, index ); } );
+                                                          std::vector< int > & indexes )
+                                                  { resolve_color_stream( all, p, type, indexes ); } );
+        raw_depth_sensor->set_frame_stream_resolver( [this]( const frame_interface * f, int & index )
+                                                     { return resolve_color_frame( f, index ); } );
 
         // NV12 registered before M420 so RGB targets resolve to NV12 when present, and to M420 when it is not
         // (converter breaks ties by registration order).
@@ -387,7 +387,8 @@ namespace librealsense
     // Color 2 in descending pin order, so the color indexes line up with the infrared 1 / 2 imagers (the lowest
     // color pin is co-located with the right / infrared-2 imager).
     void d500_dual_color::resolve_color_stream( const std::vector< platform::stream_profile > & all,
-                                              const platform::stream_profile & p, rs2_stream & type, int & index )
+                                              const platform::stream_profile & p, rs2_stream & type,
+                                              std::vector< int > & indexes )
     {
         if( ! color_pin_formats.count( p.format ) )
             return;
@@ -411,20 +412,20 @@ namespace librealsense
             ++rank;
         }
 
-        _color_pins = static_cast< int >( color_pins.size() );
         type = RS2_STREAM_COLOR;
         // A single pin carries both sources multiplexed; resolve_color_frame assigns Color 1 / 2 per frame.
         // Separate pins are assigned in descending order so the highest pin -> Color 1, matching infrared 1 / 2.
-        index = _color_pins == 1 ? 0 : _color_pins - rank;
+        int const pin_count = static_cast< int >( color_pins.size() );
+        if( pin_count == 1 )
+            indexes = { 1, 2 };
+        else
+            indexes = { pin_count - rank };
     }
 
     // Configuration metadata v4 names the source of every frame on a multiplexed pin; without it such a pin
-    // carries the left source only. Separate pins keep the identity assigned at enumeration.
+    // carries the left source only. Only the multiplexed pin is resolved; separate pins keep their enumerated identity.
     bool d500_dual_color::resolve_color_frame( const frame_interface * f, int & index )
     {
-        if( _color_pins != 1 )
-            return true;
-
         constexpr size_t configuration_offset = metadata_raw_mode_offset + offsetof( md_rgb_mode, rgb_mode )
                                               + offsetof( md_rgb_normal_mode, intel_configuration );
         constexpr uint32_t source_index_version = 4;

@@ -18,6 +18,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
+#include <map>
 #include <thread>
 
 #ifdef RS2_USE_CUDA_ZEROCOPY
@@ -56,6 +57,73 @@ static bool capture_zerocopy_enabled()
 // When the cap is hit we fall back to the copy path for that frame, so the ring is never
 // drained and the camera never stalls regardless of how long the app holds frames.
 static constexpr int ZC_MAX_INFLIGHT = 2;
+
+
+namespace {
+
+// A stream captured from a pin, tracking its own frame numbers and timestamps
+struct pin_stream
+{
+    std::shared_ptr< stream_profile_interface > profile;
+    std::shared_ptr< stream_profile_base > base;
+    unsigned long long last_frame_number = 0;
+    rs2_time_t last_timestamp = 0;
+    unsigned long long color_fn = 0;  // see per_stream_color_fn
+};
+
+// Requests grouped by backend pin; a multiplexed pin holds several streams and is opened once for all of them
+std::vector< std::vector< pin_stream > > group_by_pin( const stream_profiles & requests )
+{
+    // Groups stay in request order, so pins are committed in the order they always were; a map keyed by pin
+    // would reorder them. The map only finds a pin's group.
+    std::map< uint32_t, size_t > pin_to_group;
+    std::vector< std::vector< pin_stream > > groups;
+    for( auto && req : requests )
+    {
+        auto base = std::dynamic_pointer_cast< stream_profile_base >( req );
+        auto const pin_index = base->get_backend_profile().pin_index;
+        auto it = pin_to_group.find( pin_index );
+        if( it == pin_to_group.end() )
+        {
+            it = pin_to_group.emplace( pin_index, groups.size() ).first;
+            groups.emplace_back();
+        }
+        groups[it->second].push_back( { req, base } );
+    }
+    return groups;
+}
+
+// The stream a multiplexed-pin frame belongs to, re-stamping the frame with that stream's profile and history.
+// Null when the frame cannot be attributed or belongs to a stream that was not requested.
+pin_stream * attribute_frame( std::vector< pin_stream > & streams,
+                              const uvc_sensor::frame_stream_resolver & resolver,
+                              frame & fr,
+                              bool & reported_unnamed )
+{
+    int index = -1;  // the resolver must name the stream; an unattributed frame is dropped
+    if( ! resolver( &fr, index ) )
+        return nullptr;
+    if( index == -1 )
+    {
+        // A resolver bug repeats on every frame; report it once per open
+        if( ! reported_unnamed )
+            LOG_ERROR( "Frame stream resolver named no stream for a " << get_string( streams.front().base->get_stream_type() )
+                       << " frame; dropping such frames" );
+        reported_unnamed = true;
+        return nullptr;
+    }
+    for( auto & stream : streams )
+        if( stream.base->get_stream_index() == index )
+        {
+            fr.set_stream( stream.base );
+            fr.additional_data.last_frame_number = stream.last_frame_number;
+            fr.additional_data.last_timestamp = stream.last_timestamp;
+            return &stream;
+        }
+    return nullptr;
+}
+
+}  // namespace
 
 
 uvc_sensor::uvc_sensor( std::string const & name,
@@ -128,17 +196,30 @@ void uvc_sensor::verify_supported_requests( const stream_profiles & requests ) c
             "Wrong configuration requested - GYRO and ACCEL streams' fps to be equal for this device" ) );
     }
 
-    // A backend pin holds one configuration at a time, so two requests on the same pin can never coexist.
+    // A backend pin holds one configuration at a time, so two requests on the same pin coexist only as streams
+    // multiplexed on that pin, in that one configuration.
     std::map< uint32_t, std::shared_ptr< stream_profile_interface > > requests_per_pin;
     for( auto && req : requests )
     {
         auto && req_base = std::dynamic_pointer_cast< stream_profile_base >( req );
-        auto inserted = requests_per_pin.emplace( req_base->get_backend_profile().pin_index, req );
-        if( ! inserted.second )
+        auto const & backend = req_base->get_backend_profile();
+        auto inserted = requests_per_pin.emplace( backend.pin_index, req );
+        if( inserted.second )
+            continue;
+        auto && other_base = std::dynamic_pointer_cast< stream_profile_base >( inserted.first->second );
+        if( ! _multiplexed_pins.count( backend.pin_index ) || ! ( other_base->get_backend_profile() == backend ) )
             throw std::runtime_error( rsutils::string::from()
                                       << "Wrong configuration requested - " << inserted.first->second << " and " << req
                                       << " are served by the same hardware endpoint and cannot stream together" );
     }
+}
+
+// Only a multiplexed pin needs its frames attributed to streams; empty for any other pin
+uvc_sensor::frame_stream_resolver uvc_sensor::multiplexed_pin_resolver( const stream_profile_base & profile ) const
+{
+    if( _multiplexed_pins.count( profile.get_backend_profile().pin_index ) )
+        return _frame_stream_resolver;
+    return {};
 }
 
 void uvc_sensor::open( const stream_profiles & requests )
@@ -171,13 +252,12 @@ void uvc_sensor::open( const stream_profiles & requests )
                 ++color_stream_count;
     const bool per_stream_color_fn = ( color_stream_count > 1 );
 
-    for( auto && req_profile : requests )
+    for( auto && streams : group_by_pin( requests ) )
     {
-        auto && req_profile_base = std::dynamic_pointer_cast< stream_profile_base >( req_profile );
+        auto && req_profile_base = streams.front().base;
+        auto resolver = multiplexed_pin_resolver( *req_profile_base );
         try
         {
-            unsigned long long last_frame_number = 0;
-            rs2_time_t last_timestamp = 0;
             // Shared across the capture lambda and every deferred zero-copy release: counts
             // backend buffers currently pinned by in-flight zero-copy frames. shared_ptr so
             // it outlives the lambda if a frame is released later, on another thread.
@@ -185,8 +265,7 @@ void uvc_sensor::open( const stream_profiles & requests )
             _zc_inflight.push_back( zc_inflight );  // close() drains this before buffers are freed
             _device->probe_and_commit(
                 req_profile_base->get_backend_profile(),
-                [this, req_profile_base, req_profile, last_frame_number, last_timestamp, zc_inflight,
-                 per_stream_color_fn, color_fn = 0ull](
+                [this, streams, resolver, zc_inflight, per_stream_color_fn, reported_unnamed = false](
                     platform::stream_profile p,
                     platform::frame_object f,
                     std::function< void() > continuation ) mutable
@@ -196,18 +275,34 @@ void uvc_sensor::open( const stream_profiles & requests )
                     if( ! this->is_streaming() )
                     {
                         LOG_WARNING( "Frame received with streaming inactive,"
-                                     << librealsense::get_string( req_profile_base->get_stream_type() )
-                                     << req_profile_base->get_stream_index() << ", Arrived," << std::fixed
+                                     << librealsense::get_string( streams.front().base->get_stream_type() )
+                                     << streams.front().base->get_stream_index() << ", Arrived," << std::fixed
                                      << f.backend_time << " " << system_time );
                         return;
                     }
 
+                    pin_stream * stream = &streams.front();
                     auto && fr = generate_frame_from_data( f,
                                                                  system_time,
                                                                  _timestamp_reader.get(),
-                                                                 last_timestamp,
-                                                                 last_frame_number,
-                                                                 req_profile_base );
+                                                                 stream->last_timestamp,
+                                                                 stream->last_frame_number,
+                                                                 stream->base );
+                    // Attribute the frame before allocating it, so it comes from its own stream's frame pool
+                    if( resolver )
+                    {
+                        stream = attribute_frame( streams, resolver, *fr, reported_unnamed );
+                        if( ! stream )
+                        {
+                            continuation();
+                            return;
+                        }
+                    }
+                    auto const & req_profile = stream->profile;
+                    auto const & req_profile_base = stream->base;
+                    auto & last_frame_number = stream->last_frame_number;
+                    auto & last_timestamp = stream->last_timestamp;
+
                     auto timestamp_domain = _timestamp_reader->get_frame_timestamp_domain( fr );
                     auto bpp = get_image_bpp( req_profile_base->get_format() );
                     auto & frame_counter = fr->additional_data.frame_number;
@@ -240,7 +335,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // (see per_stream_color_fn). Mirrors the accel/gyro override above.
                     if( per_stream_color_fn && req_profile_base->get_stream_type() == RS2_STREAM_COLOR )
                     {
-                        fr->additional_data.frame_number = ++color_fn;
+                        fr->additional_data.frame_number = ++stream->color_fn;
                         frame_counter = fr->additional_data.frame_number;
                     }
 
@@ -676,22 +771,29 @@ stream_profiles uvc_sensor::init_stream_profiles()
         }
         else
         {
-            auto profile = std::make_shared< platform::stream_profile_impl< video_stream_profile > >( p );
-            if( ! profile )
-                throw librealsense::invalid_value_exception( "null pointer passed for argument \"profile\"." );
-
-            profile->set_dims( p.width, p.height );
             rs2_stream stream_type = fourcc_to_rs2_stream( p.format );
-            int stream_index = 0;
+            std::vector< int > stream_indexes = { 0 };
             // Allow the device to remap type/index per pin (e.g. two identical M420 pins -> Color 1/2). Without this,
             // pins sharing {w,h,fps,format} would collapse to a single SDK profile in the set below.
             if( _stream_id_resolver )
-                _stream_id_resolver( uvc_profiles, p, stream_type, stream_index );
-            profile->set_stream_type( stream_type );
-            profile->set_stream_index( stream_index );
-            profile->set_format( rs2_fmt );
-            profile->set_framerate( p.fps );
-            video_profiles.insert( profile );
+                _stream_id_resolver( uvc_profiles, p, stream_type, stream_indexes );
+            if( stream_indexes.size() > 1 )
+                _multiplexed_pins.insert( p.pin_index );
+
+            // A multiplexed pin gets a profile per stream it carries, all opening the same backend profile
+            for( int stream_index : stream_indexes )
+            {
+                auto profile = std::make_shared< platform::stream_profile_impl< video_stream_profile > >( p );
+                if( ! profile )
+                    throw librealsense::invalid_value_exception( "null pointer passed for argument \"profile\"." );
+
+                profile->set_dims( p.width, p.height );
+                profile->set_stream_type( stream_type );
+                profile->set_stream_index( stream_index );
+                profile->set_format( rs2_fmt );
+                profile->set_framerate( p.fps );
+                video_profiles.insert( profile );
+            }
         }
     }
 
