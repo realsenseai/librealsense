@@ -59,6 +59,7 @@ add_subdirectory(on-chip-calib)
 add_subdirectory(eth-config)
 add_subdirectory(embedded-filters)
 add_subdirectory(object-detection)
+add_subdirectory(nn-load)
 add_subdirectory(composite-option-mock)
 add_subdirectory(composite-option)
 
