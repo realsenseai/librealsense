@@ -7,7 +7,7 @@ Write occupancy grid and labeled point cloud params to a D5x5 camera.
 Usage: python d5x5_set_depth_mapping_params.py [params.json]
 Defaults to d5x5_depth_mapping_params.json next to this script. Only the keys in the
 file change; the camera keeps the rest. The first write to a never-configured camera
-must include camera_position.
+must include camera_position. Each param is described in doc/perception.md#parameters.
 """
 
 import json
