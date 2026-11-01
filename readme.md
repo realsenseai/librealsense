@@ -138,7 +138,7 @@ cmake .. -G Ninja -DBUILD_WITH_HIP=ON
 cmake --build .
 ```
 
-By default, this targets multiple AMD architectures (gfx90a, gfx942, gfx1100, gfx1101 -- covering MI200, MI300, and RDNA3 GPUs). To build for a specific GPU:
+By default, this targets multiple AMD architectures (gfx90a, gfx942, gfx1100, gfx1101, gfx1151 -- covering MI200, MI300, RDNA3, and RDNA3.5 / Strix Halo GPUs). To build for a specific GPU:
 
 ```bash
 cmake .. -DBUILD_WITH_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1100
