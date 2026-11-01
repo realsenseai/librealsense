@@ -37,6 +37,7 @@ PYBIND11_MODULE(NAME, m) {
     init_serializable_device(m);
     init_util(m);
     init_eth_config(m);
+    init_nn(m);
     init_rum(m);
     
     /** rs_export.hpp **/

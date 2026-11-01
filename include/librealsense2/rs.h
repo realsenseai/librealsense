@@ -24,6 +24,7 @@ extern "C" {
 #include "h/rs_sensor.h"
 #include "h/rs_safety_sensor.h"
 #include "h/rs_eth_config.h"
+#include "h/rs_nn.h"
 #include "h/rs_rum.h"
 #include "h/rs_composite_option.h"
 #include "h/rs_temporal_filter_dpp.h"
