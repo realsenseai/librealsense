@@ -6,7 +6,8 @@
 # Both run off the same imagers, so together they cap at 45 FPS and must share one frame rate:
 # the enumerated 60/90 FPS profiles, and any rate mismatch, stream no frames at all. The SDK
 # rejects those combinations at sensor open with a user-friendly error, surfaced as a
-# RuntimeError in Python. Resolutions may differ freely and are not restricted.
+# RuntimeError in Python. Depth/IR and color resolutions may differ, but the two color streams
+# must share one resolution.
 # Full Passive Depth raises the cap to 60 FPS.
 #
 # The test adapts to the device: each case skips when the device does not publish the profiles
@@ -186,6 +187,19 @@ def test_color_streams_mismatched_fps_rejected(depth_sensor):
     color2 = pick( depth_sensor, rs.stream.color, 2, 60, (color1.width(), color1.height()) )
     if color2 is None:
         pytest.skip( "Device publishes no Color 2 profile at 60 FPS on Color 1's resolution" )
+
+    expect_rejected( depth_sensor, [color1, color2] )
+
+
+def test_color_streams_mismatched_resolution_rejected(depth_sensor):
+    """The color pins must share one resolution - a mismatch would starve Color 1, so the SDK rejects it."""
+    color1 = pick( depth_sensor, rs.stream.color, 1, 30 )
+    if color1 is None:
+        pytest.skip( "Device publishes no Color 1 profile at 30 FPS" )
+    color2 = next( (c for c in video_profiles( depth_sensor, rs.stream.color, 2 )
+                    if c.fps() == 30 and (c.width(), c.height()) != (color1.width(), color1.height())), None )
+    if color2 is None:
+        pytest.skip( "Device publishes no Color 2 profile at 30 FPS on another resolution" )
 
     expect_rejected( depth_sensor, [color1, color2] )
 

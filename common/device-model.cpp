@@ -408,33 +408,12 @@ namespace rs2
         return subdevice_has_stream_enabled( sub, RS2_STREAM_OBJECT_DETECTION );
     }
 
-    bool device_model::subdevice_needs_depth( const subdevice_model & sub ) const
-    {
-        // Over GMSL the camera builds occupancy from the running depth stream
-        return fw_update::is_mipi_device( dev ) && subdevice_has_stream_enabled( sub, RS2_STREAM_OCCUPANCY );
-    }
-
-    bool device_model::is_depth_resolution_valid_for_occupancy() const
-    {
-        // Over GMSL the camera computes occupancy only from these depth resolutions
-        for( auto const & sub : subdevices )
-            if( sub->streaming )
-                for( auto const & p : sub->s->get_active_streams() )
-                    if( auto vp = p.as< video_stream_profile >() )
-                        if( p.stream_type() == RS2_STREAM_DEPTH )
-                            return ( vp.width() == 1280 && vp.height() == 720 ) || ( vp.width() == 640 && vp.height() == 360 );
-        return false;
-    }
-
     void device_model::stop_perception_if_video_stopped( viewer_model & viewer )
     {
-        // Stop a perception stream whose input stopped: color for object detection, depth for GMSL occupancy
         bool const color_active = is_stream_active( RS2_STREAM_COLOR );
-        bool const depth_active = is_stream_active( RS2_STREAM_DEPTH );
         for( auto & sub : subdevices )
         {
-            if( sub->streaming && ( ( ! color_active && subdevice_needs_color( *sub ) )
-                                    || ( ! depth_active && subdevice_needs_depth( *sub ) ) ) )
+            if( sub->streaming && ! color_active && subdevice_needs_color( *sub ) )
                 sub->stop( viewer.not_model );
         }
     }
@@ -2684,13 +2663,11 @@ namespace rs2
                         }
                         if (can_stream)
                         {
-                            // Disable the start button for object detection unless color streams, and for GMSL occupancy unless
-                            // depth streams at a supported resolution. Over GMSL perception and infrared share the IR channel.
+                            // Object detection overlays need Color. Over GMSL perception and infrared share the IR channel.
                             bool blocking_ir_active = subdevice_has_perception( *sub ) && fw_update::is_mipi_device( dev )
                                                    && is_stream_active( RS2_STREAM_INFRARED );
                             bool missing_color = subdevice_needs_color( *sub ) && ! is_stream_active( RS2_STREAM_COLOR );
-                            bool missing_depth = subdevice_needs_depth( *sub ) && ! is_depth_resolution_valid_for_occupancy();
-                            bool disable_perception = missing_color || missing_depth || blocking_ir_active;
+                            bool disable_perception = missing_color || blocking_ir_active;
                             if( disable_perception )
                                 ImGui::BeginDisabled();
 
@@ -2733,9 +2710,7 @@ namespace rs2
                                 if( ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
                                     RsImGui::CustomTooltip( blocking_ir_active
                                         ? "Stop the Infrared streams before starting perception (they share the GMSL IR channel)"
-                                        : missing_color
-                                        ? "Object detection needs a Color stream running; detections are drawn on it"
-                                        : "Occupancy needs Depth streaming at 1280x720 or 640x360" );
+                                        : "Object detection needs a Color stream running; detections are drawn on it" );
                             }
                             else if (ImGui::IsItemHovered())
                             {

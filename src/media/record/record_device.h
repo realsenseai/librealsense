@@ -50,6 +50,7 @@ namespace librealsense
         void tag_profiles(stream_profiles profiles) const override { m_device->tag_profiles(profiles); }
         bool compress_while_record() const override { return true; }
         bool contradicts(const stream_profile_interface* a, const std::vector<stream_profile>& others) const override { return m_device->contradicts(a, others); }
+        bool start_sensors_when_opened() const override { return m_device->start_sensors_when_opened(); }
 
     private:
         template <typename T> void write_device_extension_changes(const T& ext);

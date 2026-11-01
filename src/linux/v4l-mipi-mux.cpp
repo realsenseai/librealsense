@@ -24,6 +24,8 @@ namespace librealsense
                 constexpr uint32_t RSVL_FOURCC = 0x5253564C;  // shared carrier format of the logical streams
                 constexpr uint32_t GREY_FOURCC = 0x47524559;
 
+                constexpr uint32_t MUX_CARRIER_WIDTH = 1024;
+
                 // HWMC opcode 0xC0 controls one logical stream: { version, action, stream id, enable }
                 constexpr uint32_t MUX_CONTROL_OPCODE = 0xC0;
                 constexpr uint32_t MUX_CONTROL_VERSION = 1;
@@ -196,7 +198,7 @@ namespace librealsense
                         {
                             clear_stale_requests();
                             set_enable( m, true );
-                            // The camera starts the capture here, and refuses it when a stream's inputs are not running
+                            // Firmware owns the backing graph, including standalone Perception inputs.
                             try
                             {
                                 _carrier->stream_on( error_handler );
@@ -204,8 +206,7 @@ namespace librealsense
                             catch( const std::exception & e )
                             {
                                 throw backend_exception( rsutils::string::from()
-                                                         << "The camera refused to start Perception streams; Occupancy needs Depth "
-                                                            "streaming at 1280x720 or 640x360 (" << e.what() << ")" );
+                                                         << "The camera refused to start Perception streams (" << e.what() << ")" );
                             }
                             _streaming = true;
                         }
@@ -274,17 +275,27 @@ namespace librealsense
 
                     stream_profile carrier_profile()
                     {
-                        for( auto const & p : _carrier->get_profiles() )
-                            if( p.format == RSVL_FOURCC )
-                                return _carrier_profile = p;
-                        throw backend_exception( "The GMSL IR node offers no RSVL format" );
+                        size_t capacity = 0;
+                        for( const auto & member : MUX_MEMBERS )
+                            capacity = std::max( capacity, size_t( member.profile.width ) * member.profile.height );
+                        // Reserve the largest member's capacity; a late start must not resize the queue.
+                        const auto profiles = _carrier->get_profiles();
+                        auto best = profiles.end();
+                        for( auto it = profiles.begin(); it != profiles.end(); ++it )
+                            if( it->format == RSVL_FOURCC && it->width == MUX_CARRIER_WIDTH && it->fps == 30
+                                && size_t( it->width ) * it->height >= capacity
+                                && ( best == profiles.end() || it->height < best->height ) )
+                                best = it;
+                        if( best != profiles.end() )
+                            return _carrier_profile = *best;
+                        throw backend_exception( "The GMSL IR node offers no RSVL capacity for PD and Occupancy" );
                     }
 
                     // False, with the camera's error code, when the camera rejects the request
                     bool command( uint32_t action, uint32_t stream_id, uint32_t enable, mux_state & state, int32_t & error ) const
                     {
                         std::vector< uint8_t > buf( HWMC_BUFFER_SIZE, 0 );
-                        const uint16_t header[] = { 0x14, 0xCDAB };  // size of opcode and parameters, HWMC magic
+                        const uint16_t header[] = { 20, 0xCDAB };
                         const uint32_t request[] = { MUX_CONTROL_OPCODE, MUX_CONTROL_VERSION, action, stream_id, enable };
                         std::memcpy( buf.data(), header, sizeof( header ) );
                         std::memcpy( buf.data() + sizeof( header ), request, sizeof( request ) );
@@ -303,10 +314,11 @@ namespace librealsense
                             error = static_cast< int32_t >( opcode );
                             return false;
                         }
-                        if( size < sizeof( state ) || size > HWMC_DATA_SIZE_OFFSET )
+                        // Allow appended fields, but keep the response before the size trailer.
+                        if( size < sizeof( state )
+                            || size > HWMC_DATA_SIZE_OFFSET - sizeof( opcode ) )
                         {
-                            error = static_cast< int16_t >( size );
-                            return false;
+                            throw backend_exception( "Perception MUX response size does not match the FW contract" );
                         }
                         std::memcpy( &state, buf.data() + sizeof( opcode ), sizeof( state ) );
                         return true;
@@ -327,7 +339,7 @@ namespace librealsense
                                                                              << state.requested );
                     }
 
-                    // The camera keeps requests across sessions. Owning the capture, any stream not opened here is a leftover.
+                    // Queue ownership precedes this first enable: even this member's armed profile may be stale.
                     // A stream the camera does not support rejects the query and is skipped.
                     void clear_stale_requests()
                     {
@@ -335,7 +347,7 @@ namespace librealsense
                         int32_t error;
                         for( size_t i = 0; i < MUX_MEMBERS.size(); ++i )
                         {
-                            if( ! _slots[i].committed && command( MUX_GET_STATE, MUX_MEMBERS[i].stream_id, 0, state, error )
+                            if( ! _slots[i].enabled && command( MUX_GET_STATE, MUX_MEMBERS[i].stream_id, 0, state, error )
                                 && state.requested )
                             {
                                 LOG_INFO( "Clearing a stale request of Perception stream " << MUX_MEMBERS[i].stream_id );

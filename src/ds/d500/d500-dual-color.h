@@ -36,6 +36,7 @@ namespace librealsense
     private:
         // Stream-combination rules for the shared imagers, registered as validators at construction.
         void frame_rates_allowed_or_throw( const stream_profiles & requests ) const;
+        static void color_resolutions_allowed_or_throw( const stream_profiles & requests );
 
         void register_color_extrinsics();
         void register_color_metadata();

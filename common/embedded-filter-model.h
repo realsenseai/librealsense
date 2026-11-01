@@ -108,7 +108,11 @@ namespace rs2
         void register_options_changed_callback();
 
     protected:
+        // The viewer stops sensors in the background; a SET sent meanwhile blocks the UI and sees the stream as still open
+        bool sensor_stopping() const;
+
         viewer_model& _viewer;
+        subdevice_model * _owner;  // holds this model in its embedded_filters, so it always outlives it
         std::atomic<bool> _destructing;
         bool _enabled = true;
         std::shared_ptr<rs2::embedded_filter> _embedded_filter;

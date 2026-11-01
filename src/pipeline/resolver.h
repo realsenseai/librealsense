@@ -144,22 +144,16 @@ namespace librealsense
                     // As a workaround for pipeline API usage, we use the assumption that depth sensor is first in the map if it is added to the configuration,
                     // When we reverse iterate it, the depth sensor opening will be last This should not affect other stream
                     // which are capable of being opened decoupled from other sensors
-
-                    // Producer streams must be opened before the streams derived from them.
-                    // Keep the reverse order among all other sensors, open derived ones last.
-                    std::vector< int > derived_sensor_indices;
-                    for( auto it = _dev_to_profiles.rbegin(); it != _dev_to_profiles.rend(); it++ )
+                    _opened.clear();
+                    _started.clear();
+                    with_rollback( [&]
                     {
-                        if( has_derived_stream( it->second ) )
+                        for( int index : ordered_sensor_indices( true ) )
                         {
-                            derived_sensor_indices.push_back( it->first );
-                            continue;
+                            _results.at( index )->open( _dev_to_profiles.at( index ) );
+                            _opened.push_back( _results.at( index ) );
                         }
-                        auto && sub = _results.at( it->first );
-                        sub->open( it->second );
-                    }
-                    for( auto sensor_index : derived_sensor_indices )
-                        _results.at( sensor_index )->open( _dev_to_profiles.at( sensor_index ) );
+                    } );
                 }
 
                 template<class T>
@@ -168,18 +162,14 @@ namespace librealsense
                     // Same order as open(): producers first, derived streams last. On USB the pipe is
                     // established at open(); on DDS only at start() - a fixed order (rather than
                     // reversing between open() and start()) is what's actually correct for both.
-                    std::vector< int > derived_sensor_indices;
-                    for( auto && sensor : _results )
+                    with_rollback( [&]
                     {
-                        if( has_derived_stream( _dev_to_profiles.at( sensor.first ) ) )
+                        for( int index : ordered_sensor_indices( false ) )
                         {
-                            derived_sensor_indices.push_back( sensor.first );
-                            continue;
+                            _results.at( index )->start( callback );
+                            _started.push_back( _results.at( index ) );
                         }
-                        sensor.second->start( callback );
-                    }
-                    for( auto sensor_index : derived_sensor_indices )
-                        _results.at( sensor_index )->start( callback );
+                    } );
                 }
 
                 template< class T >
@@ -187,12 +177,19 @@ namespace librealsense
                 {
                     // Calling open() than start() opens all relevant sensors before starting any of them.
                     // For some device backends we want to open and start each sensor before opening the next sensor.
-                    for( auto it = _dev_to_profiles.rbegin(); it != _dev_to_profiles.rend(); it++ )
+                    _opened.clear();
+                    _started.clear();
+                    with_rollback( [&]
                     {
-                        auto && sub = _results.at( it->first );
-                        sub->open( it->second );
-                        sub->start( callback );
-                    }
+                        for( int index : ordered_sensor_indices( true ) )
+                        {
+                            auto sub = _results.at( index );
+                            sub->open( _dev_to_profiles.at( index ) );
+                            _opened.push_back( sub );
+                            sub->start( callback );
+                            _started.push_back( sub );
+                        }
+                    } );
                 }
 
                 void stop()
@@ -217,6 +214,43 @@ namespace librealsense
                 }
             private:
                 friend class config;
+
+                // On failure, stops and closes only what this multistream started and opened, then rethrows: the
+                // pipeline never becomes active, so nothing else would release them.
+                template< class F >
+                void with_rollback( F && action )
+                {
+                    try
+                    {
+                        action();
+                    }
+                    catch( ... )
+                    {
+                        for( auto sub : _started )
+                            try { sub->stop(); } catch( ... ) {}
+                        for( auto sub : _opened )
+                            try { sub->close(); } catch( ... ) {}
+                        _started.clear();
+                        _opened.clear();
+                        throw;
+                    }
+                }
+
+                // Sensor indices in open/start order: producers first (in the given direction), derived-stream sensors last
+                std::vector< int > ordered_sensor_indices( bool reverse ) const
+                {
+                    std::vector< int > producers, derived;
+                    auto add = [&]( int index )
+                    { ( has_derived_stream( _dev_to_profiles.at( index ) ) ? derived : producers ).push_back( index ); };
+                    if( reverse )
+                        for( auto it = _dev_to_profiles.rbegin(); it != _dev_to_profiles.rend(); ++it )
+                            add( it->first );
+                    else
+                        for( auto & kvp : _dev_to_profiles )
+                            add( kvp.first );
+                    producers.insert( producers.end(), derived.begin(), derived.end() );
+                    return producers;
+                }
 
                 // Streams the device computes from another stream it produces: object detection
                 // runs on color; the D5xx mapping streams (occupancy, labeled point cloud) are built
@@ -243,6 +277,7 @@ namespace librealsense
                 std::map<index_type, sensor_interface*> _devices;
                 std::map<int, sensor_interface*> _results;
                 std::map<int, stream_profiles> _dev_to_profiles;
+                std::vector< sensor_interface * > _opened, _started;   // for rollback when open/start fails
             };
 
             config() : require_all(true) {}

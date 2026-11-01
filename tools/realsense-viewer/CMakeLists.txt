@@ -36,6 +36,7 @@ if(BUILD_GRAPHICAL_EXAMPLES)
     ../../common/post-processing-worker-filter.h
     ../../common/post-processing-filters-list.h
     ../../common/objects-in-frame.h
+    ../../common/detection-distance.h
     ../../third-party/glad/glad.c
     ../../third-party/tinyfiledialogs/tinyfiledialogs.c
     ../../third-party/tinyfiledialogs/tinyfiledialogs.h

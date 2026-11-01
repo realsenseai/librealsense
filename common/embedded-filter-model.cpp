@@ -103,7 +103,7 @@ namespace rs2
         std::shared_ptr<rs2::embedded_filter> filter,
         viewer_model& viewer,
         std::string& error_message)
-        : _embedded_filter(filter), _viewer(viewer), _destructing(false)
+        : _embedded_filter(filter), _viewer(viewer), _owner(owner), _destructing(false)
     {
         _name = rs2_embedded_filter_type_to_string(type);
 
@@ -196,6 +196,7 @@ namespace rs2
                                     const std::shared_ptr< rs2::embedded_filter > & filter,
                                     rs2_composite_option_id id,
                                     bool enabled,
+                                    bool hold_commit,
                                     std::string & error_message,
                                     const std::function< bool() > & draw_fields,
                                     const std::function< void( T & ) > & sanitize,
@@ -216,7 +217,8 @@ namespace rs2
             ImGui::Dummy( ImVec2( 0, 6 ) );   // bottom padding inside the pending-commit border
 
             ImVec2 frame_max( frame_min.x + frame_width, ImGui::GetCursorScreenPos().y );
-            editor.end_frame_and_maybe_commit( filter, id, error_message, frame_min, frame_max, any_field_active, before_commit );
+            editor.end_frame_and_maybe_commit( filter, id, error_message, frame_min, frame_max, any_field_active, hold_commit,
+                                               before_commit );
 
             if( ! enabled )
                 ImGui::PopStyleVar();
@@ -278,7 +280,7 @@ namespace rs2
         // The device also rejects a SET once Depth/IR is streaming (read-only while active) -
         // end_frame_and_maybe_commit()'s own error_message surfaces that rejection.
         draw_composite_editor< rs2_decimation_filter_dpp_config, rs2_decimation_filter_dpp_range >(
-            _decimation_filter_dpp_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, error_message,
+            _decimation_filter_dpp_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
             [&]() { return draw_decimation_filter_dpp_fields( error_message ); },
             sanitize_decimation_filter_dpp_config,
             [this]( rs2_decimation_filter_dpp_config & v )
@@ -318,7 +320,7 @@ namespace rs2
         sanitize_temporal_filter_dpp_config( _temporal_filter_dpp_editor.value );
 
         draw_composite_editor< rs2_temporal_filter_dpp_config, rs2_temporal_filter_dpp_range >(
-            _temporal_filter_dpp_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, error_message,
+            _temporal_filter_dpp_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
             [&]() { return draw_temporal_filter_dpp_fields( error_message ); },
             sanitize_temporal_filter_dpp_config,
             [this]( rs2_temporal_filter_dpp_config & v )
@@ -339,7 +341,8 @@ namespace rs2
 
         auto & v = _hdrd_editor.value;
         bool any_field_active = _hdrd_editor.draw_enum_field( "Filter Type",
-            "Downscale: reduce resolution by a fixed ratio. Lookup Shift: shift the disparity lookup by a pixel count.",
+            "Downscale: reduce resolution by a fixed ratio. Lookup Shift: shift the disparity lookup by a pixel count.\n"
+            "Not all Depth resolutions and frame rates are supported.",
             "hdrd_filter_type", filter_type_labels, v.filter_type );
 
         const bool downscale_relevant = ( v.filter_type == 0 );
@@ -388,12 +391,18 @@ namespace rs2
     void embedded_filter_model::draw_hdrd_control_editor( std::string & error_message )
     {
         const auto id = RS2_COMPOSITE_OPTION_HDRD_CONTROL;
-        if( ! _hdrd_editor.ensure_initialized( _embedded_filter, id, error_message, print_hdrd_control ) )
+        // A rejected enable (e.g. unsupported Depth profile) leads to a re-read here - keep the toggle in sync with it
+        auto on_read = [this]( const rs2_hdrd_control & v )
+        {
+            print_hdrd_control( v );
+            _enabled = v.enable != 0;
+        };
+        if( ! _hdrd_editor.ensure_initialized( _embedded_filter, id, error_message, on_read ) )
             return;
         sanitize_hdrd_control( _hdrd_editor.value );
 
         draw_composite_editor< rs2_hdrd_control, rs2_hdrd_control_range >(
-            _hdrd_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, error_message,
+            _hdrd_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
             [&]() { return draw_hdrd_fields( error_message ); },
             sanitize_hdrd_control,
             [this]( rs2_hdrd_control & v )
@@ -401,6 +410,11 @@ namespace rs2
                 v.enable = 1;
                 _enabled = true;
             } );
+    }
+
+    bool embedded_filter_model::sensor_stopping() const
+    {
+        return _owner && _owner->is_stopping();
     }
 
     void embedded_filter_model::embedded_filter_enable_disable(bool actual, std::string * error_message)
