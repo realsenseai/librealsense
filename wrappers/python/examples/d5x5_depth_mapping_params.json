@@ -18,7 +18,7 @@
         "cliffs_threshold": 3,
         "cliffs_max_range": 2.5,
         "cliffs_min_drop": 0.05,
-        "segmentation_range_height": 0.1,
+        "segmentation_merge_height": 0.1,
         "surface_height_slope": 0.0,
         "surface_height_slope_start": 1.0,
         "surface_height_max": 0.1
