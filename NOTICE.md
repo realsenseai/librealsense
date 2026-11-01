@@ -25,6 +25,8 @@ The AMD HIP/ROCm GPU acceleration support and the related build and unit-test in
 | yaml-cpp (rosbag2) | https://github.com/jbeder/yaml-cpp | MIT License | Copyright (c) Jesse Beder |
 | imgui_md | https://github.com/mekhontsev/imgui_md | MIT License | Copyright (c) 2021 Dmitry Mekhontsev |
 | md4c | https://github.com/mity/md4c | MIT License | Copyright (c) 2016-2026 Martin Mitáš |
+| oneVPL (libvpl) | https://github.com/intel/libvpl | MIT License | Copyright (c) Intel Corporation |
+| libva | https://github.com/intel/libva | MIT License | Copyright (c) 2007 Intel Corporation |
 
 ###### MIT License 
 The MIT License (MIT)

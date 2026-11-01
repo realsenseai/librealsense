@@ -14,7 +14,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <algorithm>
+#include <chrono>
 #include <string>
+#include <thread>
 #include <vector>
 #include <cstring>
 
@@ -55,19 +57,40 @@ namespace librealsense
                 // Each call carries exactly one access unit, so the decoder need not look for frame boundaries itself
                 bs.DataFlag = MFX_BITSTREAM_COMPLETE_FRAME;
 
+                if( _refused )
+                    return false;
                 if( ! _initialized && ! start( bs ) )
                     return false;
 
-                mfxFrameSurface1 * work = free_surface();
-                if( ! work )
-                {
-                    LOG_WARNING( "H264 oneVPL surface pool exhausted" );
-                    return false;
-                }
-
+                // Several statuses mean "call again" rather than "failed", and the access unit is only partly consumed.
+                // Returning on one of them would break the reference chain until the next keyframe, a second away.
                 mfxFrameSurface1 * out = nullptr;
                 mfxSyncPoint sync = nullptr;
-                mfxStatus s = MFXVideoDECODE_DecodeFrameAsync( _session, &bs, work, &out, &sync );
+                mfxStatus s = MFX_ERR_NONE;
+                for( int busy = 0; ; )
+                {
+                    mfxFrameSurface1 * work = free_surface();
+                    if( ! work )
+                    {
+                        LOG_WARNING( "H264 oneVPL surface pool exhausted" );
+                        return false;
+                    }
+                    s = MFXVideoDECODE_DecodeFrameAsync( _session, &bs, work, &out, &sync );
+                    if( s == MFX_WRN_DEVICE_BUSY )
+                    {
+                        if( ++busy > max_device_busy_retries )
+                        {
+                            LOG_WARNING( "H264 oneVPL device busy for " << max_device_busy_retries << "ms" );
+                            return false;
+                        }
+                        std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
+                        continue;
+                    }
+                    if( s == MFX_ERR_MORE_SURFACE || s == MFX_WRN_VIDEO_PARAM_CHANGED )
+                        continue;
+                    break;
+                }
+
                 if( s == MFX_ERR_MORE_DATA )
                     return false;  // priming, or waiting for parameter sets
                 if( s < MFX_ERR_NONE || ! sync )
@@ -198,6 +221,16 @@ namespace librealsense
                 if( s != MFX_ERR_NONE )
                     return false;  // not enough of the stream yet; the caller feeds us the next access unit
 
+                if( par.mfx.FrameInfo.CropW < _width || par.mfx.FrameInfo.CropH < _height )
+                {
+                    // copy_out() crops the decoded picture down to the profile, so a stream smaller than the profile
+                    // claims - a firmware mismatch - would have it read past the surface. Refuse the stream instead.
+                    LOG_ERROR( "H264 stream codes " << par.mfx.FrameInfo.CropW << 'x' << par.mfx.FrameInfo.CropH
+                                                    << " for a " << _width << 'x' << _height << " profile; cannot decode" );
+                    _refused = true;
+                    return false;
+                }
+
                 if( ( s = MFXVideoDECODE_Init( _session, &par ) ) < MFX_ERR_NONE )
                 {
                     LOG_WARNING( "H264 DECODE_Init=" << mfx_string( s ) );
@@ -255,6 +288,7 @@ namespace librealsense
 
             static constexpr mfxU32 sync_timeout_ms = 2000;
             static constexpr size_t extra_surfaces = 8;
+            static constexpr int max_device_busy_retries = 100;  // one per millisecond
 
             mfxLoader _loader = nullptr;
             mfxSession _session = nullptr;
@@ -265,6 +299,7 @@ namespace librealsense
             int _width, _height;
             int _coded_width = 0, _coded_height = 0;
             bool _initialized = false;
+            bool _refused = false;  // sticky: the stream cannot be decoded, so stop retrying and stop logging
         };
     }
 

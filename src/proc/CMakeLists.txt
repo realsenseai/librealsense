@@ -10,7 +10,9 @@ include(${_proc_rel_path}/sse/CMakeLists.txt)
 
 include(${_proc_rel_path}/neon/CMakeLists.txt)
 
-if(BUILD_WITH_VPL)
+if(BUILD_WITH_VPL AND (NOT UNIX OR APPLE))
+    message(WARNING "BUILD_WITH_VPL is Linux-only and is ignored here; Windows decodes H.264 through Media Foundation")
+elseif(BUILD_WITH_VPL)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(VPL REQUIRED IMPORTED_TARGET vpl libva libva-drm)
     target_sources(${LRS_TARGET} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/h264-decoder-vpl.cpp")

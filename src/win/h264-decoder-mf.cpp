@@ -18,8 +18,6 @@
 #include <wmcodecdsp.h>
 #include <d3d11_4.h>
 
-#include <thread>
-
 #pragma comment( lib, "mfplat.lib" )
 #pragma comment( lib, "mfuuid.lib" )
 #pragma comment( lib, "wmcodecdspuuid.lib" )
@@ -39,6 +37,22 @@ namespace librealsense
             return buf;
         }
 
+        // COM has to be live on every thread that calls into MF, and this backend is built on one thread and then driven
+        // from the frame callback on another. A thread_local guard initializes each one once and balances it on thread exit.
+        void ensure_com()
+        {
+            thread_local struct com_guard
+            {
+                bool owned;
+                com_guard()
+                    : owned( SUCCEEDED( CoInitializeEx( nullptr, COINIT_MULTITHREADED ) ) )  // not ours on RPC_E_CHANGED_MODE
+                {
+                }
+                ~com_guard() { if( owned ) CoUninitialize(); }
+            } guard;
+            (void)guard;
+        }
+
         // The Microsoft H.264 Video Decoder MFT. Handles High profile (CABAC, 8x8 transform), which
         // Constrained-Baseline-only decoders cannot. Driven one access unit in / one picture out,
         // which suits a stream with no B-frames.
@@ -51,10 +65,9 @@ namespace librealsense
                 , _fps( fps )
                 , _frame_duration( 10000000 / ( fps > 0 ? fps : 30 ) )  // 100ns units
             {
-                HRESULT hr = CoInitializeEx( nullptr, COINIT_MULTITHREADED );
-                _co_owned = ( hr == S_OK || hr == S_FALSE );  // not ours on RPC_E_CHANGED_MODE
-                _co_thread = std::this_thread::get_id();
+                ensure_com();
 
+                HRESULT hr;
                 if( FAILED( hr = MFStartup( MF_VERSION, MFSTARTUP_NOSOCKET ) ) )
                     throw std::runtime_error( "MFStartup failed, hr=" + hr_string( hr ) );
                 _mf_started = true;
@@ -75,14 +88,11 @@ namespace librealsense
                 _dxgi_manager.Reset();
                 if( _mf_started )
                     MFShutdown();
-                // CoUninitialize only balances the thread that initialized, and frames may be handled
-                // on a different thread than the one we are destroyed on
-                if( _co_owned && _co_thread == std::this_thread::get_id() )
-                    CoUninitialize();
             }
 
             bool decode( uint8_t const * data, size_t size, std::vector< uint8_t > & nv12 ) override
             {
+                ensure_com();
                 if( ! feed( data, size ) )
                     return false;
 
@@ -312,6 +322,18 @@ namespace librealsense
             {
                 int const cw = _coded_width > 0 ? _coded_width : _width;
                 int const ch = _coded_height > 0 ? _coded_height : _height;
+                if( cw < _width || ch < _height )
+                {
+                    // Cropping assumes the coded picture is the larger of the two. A stream narrower than the profile
+                    // claims - a firmware mismatch - would otherwise have us read past the decoded picture.
+                    if( ! _reported_undersized )
+                    {
+                        _reported_undersized = true;
+                        LOG_ERROR( "H264 stream codes " << cw << 'x' << ch << " for a " << _width << 'x' << _height
+                                                        << " profile; cannot decode" );
+                    }
+                    return E_UNEXPECTED;
+                }
                 size_t const coded_size = static_cast< size_t >( cw ) * ch * 3 / 2;
                 _scratch.resize( coded_size );
 
@@ -381,7 +403,6 @@ namespace librealsense
             ComPtr< IMFSample > _in_sample;
             ComPtr< IMFSample > _out_sample;
             std::vector< uint8_t > _scratch;
-            std::thread::id _co_thread;
             LONGLONG _sample_time = 0;
             int _width, _height, _fps;
             LONGLONG _frame_duration;
@@ -389,7 +410,7 @@ namespace librealsense
             bool _dxva = false;
             bool _readback_failed = false;
             bool _mf_started = false;
-            bool _co_owned = false;
+            bool _reported_undersized = false;
         };
     }
 

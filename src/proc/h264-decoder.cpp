@@ -5,6 +5,7 @@
 
 #include <rsutils/easylogging/easyloggingpp.h>
 
+#include <algorithm>
 #include <chrono>
 
 namespace librealsense
@@ -30,10 +31,44 @@ namespace librealsense
         return supported;
     }
 
+    // The parameter sets sit in front of the first slice, so their whole span is cached in one piece, while a type-5 slice
+    // marks the keyframe they describe. Everything else in the access unit is the decoder's business, not ours.
+    void h264_decoder::scan( uint8_t const * data, size_t size, bool & carries_parameter_sets, bool & is_keyframe )
+    {
+        size_t first = 0, parameters_end = 0;
+        for( size_t i = 0; i + 4 <= size; ++i )
+        {
+            if( data[i] || data[i + 1] || data[i + 2] != 1 )
+                continue;
+            size_t const start = ( i && ! data[i - 1] ) ? i - 1 : i;  // a 4-byte start code carries one more zero
+            switch( data[i + 3] & 0x1f )
+            {
+            case 5:  // IDR slice
+                is_keyframe = true;
+                break;
+            case 7:  // SPS
+            case 8:  // PPS
+                if( ! carries_parameter_sets )
+                    first = start;
+                carries_parameter_sets = true;
+                parameters_end = 0;
+                break;
+            default:
+                if( carries_parameter_sets && ! parameters_end )
+                    parameters_end = start;
+                break;
+            }
+            i += 3;
+        }
+        if( carries_parameter_sets )
+            _parameter_sets.assign( data + first, data + ( parameters_end ? parameters_end : size ) );
+    }
+
     rs2::frame h264_decoder::process_frame( const rs2::frame_source & source, const rs2::frame & f )
     {
+        // This is a public block, and a frameset hands every one of its frames to it - depth included, at its own geometry
         auto vf = f.as< rs2::video_frame >();
-        if( ! vf )
+        if( ! vf || vf.get_profile().format() != RS2_FORMAT_H264 )
             return {};
 
         // Short-circuit before anything is allocated: without a decoder, every geometry would otherwise start a thread and
@@ -41,8 +76,20 @@ namespace librealsense
         if( ! is_supported() )
             return {};
 
-        uint8_t const * const data = static_cast< uint8_t const * >( f.get_data() );
-        size_t const size = f.get_data_size();
+        uint8_t const * data = static_cast< uint8_t const * >( f.get_data() );
+        size_t size = f.get_data_size();
+
+        bool carries_parameter_sets = false, is_keyframe = false;
+        scan( data, size, carries_parameter_sets, is_keyframe );
+        if( is_keyframe && ! carries_parameter_sets && ! _parameter_sets.empty() )
+        {
+            // A backend built after the parameter sets went by - a geometry change, or Media Foundation falling back to
+            // software - has never seen them, so put them back in front of the keyframe that would otherwise start it
+            _prefixed.assign( _parameter_sets.begin(), _parameter_sets.end() );
+            _prefixed.insert( _prefixed.end(), data, data + size );
+            data = _prefixed.data();
+            size = _prefixed.size();
+        }
 
         if( vf.get_width() != _width || vf.get_height() != _height )
         {
@@ -54,7 +101,15 @@ namespace librealsense
             // A future from std::async blocks in its destructor, so overwriting one that is still running would stall the
             // frame callback for as long as the old start takes. Park it instead and let it retire in its own time.
             if( _starting.valid() )
+            {
+                // Each parked backend holds a GPU device until its future is released, so let go of the finished ones
+                _abandoned.erase( std::remove_if( _abandoned.begin(), _abandoned.end(),
+                                                  []( std::future< std::unique_ptr< h264_decoder_backend > > & started )
+                                                  { return started.wait_for( std::chrono::seconds( 0 ) )
+                                                        == std::future_status::ready; } ),
+                                  _abandoned.end() );
                 _abandoned.push_back( std::move( _starting ) );
+            }
             // Building a backend costs ~0.2s - D3D11 device, decoder, type negotiation - far too long to spend on the frame
             // callback, so it happens on its own thread. Once per geometry, never once per frame.
             _starting = std::async( std::launch::async,
@@ -66,6 +121,13 @@ namespace librealsense
         {
             if( _starting.wait_for( std::chrono::seconds( 0 ) ) != std::future_status::ready )
             {
+                // Nothing before a keyframe is of any use to a decoder that starts on it, and the parameter sets are
+                // cached by now, so the backlog never has to reach further back than one GOP
+                if( is_keyframe )
+                {
+                    _queued.clear();
+                    _reported_overflow = false;
+                }
                 // Hold these back instead of dropping them: the camera sends SPS/PPS once, inside the very first access unit,
                 // and never repeats them, so losing that one would leave the decoder unable to start on any later keyframe
                 if( _queued.size() < max_queued_while_starting )
@@ -120,6 +182,7 @@ namespace librealsense
     {
         // No results means process_frame decoded no picture, which is routine while starting up or waiting for a keyframe.
         // The base class would then forward the input unchanged - here the H.264 bitstream, to a caller expecting RGB8.
+        // A frameset holding one is dropped whole for those first frames, rather than arriving without its color.
         if( results.empty() )
             return {};
         return color_converter::prepare_output( source, input, results );

@@ -163,11 +163,12 @@ default. Without it the stream is still delivered as passthrough, for the applic
     ```sh
     sudo usermod -aG render $USER
     ```
-    **Note:** Without the `render` group the process cannot open `/dev/dri/renderD128`, and decoding is unavailable with no
-    error on the camera side -- the `RGB8` option simply never appears.
-  * Confirm the GPU advertises the profile, `VAProfileH264High` with `VAEntrypointVLD`:
+    **Note:** Without the `render` group the process cannot open the GPU's render node, so the `RGB8` option never appears
+    and the SDK log carries `no oneVPL H.264 decoder: ... is this user in the 'render' group?` at warning level.
+  * Confirm the GPU advertises the profile, `VAProfileH264High` with `VAEntrypointVLD`. The Intel node is usually
+    `/dev/dri/renderD128`, but with more than one GPU it can be any of them, so check them all:
     ```sh
-    vainfo --display drm --device /dev/dri/renderD128 | grep VAProfileH264
+    for node in /dev/dri/renderD*; do echo $node; vainfo --display drm --device $node 2>/dev/null | grep VAProfileH264; done
     ```
 
   

@@ -51,10 +51,16 @@ namespace librealsense
         // only trips if something is badly wrong, and even then the oldest units, carrying the parameter sets, are kept.
         static constexpr size_t max_queued_while_starting = 64;
 
+        // Walks the Annex-B start codes to cache the stream's parameter sets and to recognize a keyframe. The camera sends
+        // SPS/PPS once and never repeats them, so a backend built later has to be handed them again to decode anything.
+        void scan( uint8_t const * data, size_t size, bool & carries_parameter_sets, bool & is_keyframe );
+
         std::unique_ptr< h264_decoder_backend > _backend;
         std::future< std::unique_ptr< h264_decoder_backend > > _starting;  // backend creation, kept off the frame callback
         std::vector< std::future< std::unique_ptr< h264_decoder_backend > > > _abandoned;  // superseded starts, retired on destruction
         std::vector< std::vector< uint8_t > > _queued;                     // access units that arrived while starting
+        std::vector< uint8_t > _parameter_sets;  // the SPS/PPS prefix, kept exactly as it appeared in the stream
+        std::vector< uint8_t > _prefixed;        // a keyframe with the parameter sets put back in front of it
         std::vector< uint8_t > _nv12;  // what the backend decodes into, converted to the target format before it goes out
         int _width = 0;
         int _height = 0;
