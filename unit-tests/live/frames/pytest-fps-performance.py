@@ -1167,29 +1167,23 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
     # Frame counters and timing
     depth_frame_count = 0
     color_frame_count = 0
-    depth_fps_measurements = []
-    color_fps_measurements = []
 
-    depth_monitor = FPSMonitor(window_size=60)
-    color_monitor = FPSMonitor(window_size=60)
+    depth_monitor = FPSMonitor()
+    color_monitor = FPSMonitor()
 
-    # Adaptive parameters based on the slower FPS (reduced for faster multistream testing)
+    # Adaptive warmup based on the slower FPS (reduced for faster multistream testing)
     min_fps = min(depth_fps, color_fps)
     if min_fps <= 6:
         warmup_frames = 4  # Must cover the start-of-stream burst, as in the single-stream test
-        measurement_interval = 2
     elif min_fps <= 15:
         warmup_frames = 8  # Reduced from 10
-        measurement_interval = 10
     elif min_fps <= 30:
         warmup_frames = 15  # Reduced from 20
-        measurement_interval = 15
     else:
         warmup_frames = 20  # Reduced from 25
-        measurement_interval = 20
 
     # Frame callbacks
-    # Each window is anchored at the stream's last warmup frame, as in the single-stream test
+    # Each rate is measured from the stream's last warmup frame, as in the single-stream test
     def depth_callback(frame):
         nonlocal depth_frame_count
         current_time = time.time()
@@ -1198,11 +1192,6 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
             depth_monitor.reset()
         depth_monitor.update(current_time)
 
-        if depth_frame_count > warmup_frames and depth_frame_count % measurement_interval == 0:
-            current_fps = depth_monitor.get_current_fps()
-            if current_fps > 0:
-                depth_fps_measurements.append(current_fps)
-
     def color_callback(frame):
         nonlocal color_frame_count
         current_time = time.time()
@@ -1210,11 +1199,6 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
         if color_frame_count == warmup_frames:
             color_monitor.reset()
         color_monitor.update(current_time)
-
-        if color_frame_count > warmup_frames and color_frame_count % measurement_interval == 0:
-            current_fps = color_monitor.get_current_fps()
-            if current_fps > 0:
-                color_fps_measurements.append(current_fps)
 
     depth_sensor = None
     color_sensor = None
@@ -1286,20 +1270,22 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
 
     # no_frames marks a stream that never started, as opposed to one merely too slow to measure.
     # Both counts are reported either way: the stream that died is often not the one short of
-    # measurements, and naming only that one sends triage after the wrong stream.
+    # frames, and naming only that one sends triage after the wrong stream.
     no_frames = depth_frame_count == 0 or color_frame_count == 0
     frame_counts = f"got depth {depth_frame_count}, color {color_frame_count} frames"
 
-    if len(depth_fps_measurements) < 2:
-        return False, {"error": f"Insufficient depth measurements: {len(depth_fps_measurements)} ({frame_counts})",
-                       "no_frames": no_frames}
-
-    if len(color_fps_measurements) < 2:
-        return False, {"error": f"Insufficient color measurements: {len(color_fps_measurements)} ({frame_counts})",
-                       "no_frames": no_frames}
-
+    # Gaps first: a stalled stream returns below, and that is when they explain the failure
     depth_monitor.log_gaps("Depth", depth_fps)
     color_monitor.log_gaps("Color", color_fps)
+
+    # A rate needs at least one frame after the last warmup frame
+    if depth_frame_count <= warmup_frames:
+        return False, {"error": f"Too few depth frames after {warmup_frames} warmup frames ({frame_counts})",
+                       "no_frames": no_frames}
+
+    if color_frame_count <= warmup_frames:
+        return False, {"error": f"Too few color frames after {warmup_frames} warmup frames ({frame_counts})",
+                       "no_frames": no_frames}
 
     # Overall rate since the anchor; a mean of window rates over-weights a gap early in the stream
     depth_avg_fps = depth_monitor.get_average_fps()
@@ -1318,7 +1304,6 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
             "expected_fps": depth_fps,
             "actual_fps": depth_avg_fps,
             "frame_count": depth_frame_count,
-            "measurements": len(depth_fps_measurements),
             "deviation": depth_deviation,
             "passed": depth_passed
         },
@@ -1326,13 +1311,11 @@ def check_multistream_fps_accuracy(device, depth_config, color_config, test_dura
             "expected_fps": color_fps,
             "actual_fps": color_avg_fps,
             "frame_count": color_frame_count,
-            "measurements": len(color_fps_measurements),
             "deviation": color_deviation,
             "passed": color_passed
         },
         "overall_passed": overall_passed,
-        "warmup_frames": warmup_frames,
-        "measurement_interval": measurement_interval
+        "warmup_frames": warmup_frames
     }
 
     return overall_passed, stats
