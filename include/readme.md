@@ -8,7 +8,7 @@ Under `librealsense2` folder you will find two subfolers:
 
 In addition, you can include [<librealsense2/rs.h>](./librealsense2/rs.h) and [<librealsense2/rs.hpp>](./librealsense2/rs.hpp) to get most of SDK functionality in C and C++ respectively. 
 
-[<librealsense2/rs_advanced_mode.h>](./librealsense2/rs_advanced_mode.h) and [<librealsense2/rs_advanced_mode.hpp>](./librealsense2/rs_advanced_mode.hpp) can be included to get the extra [Advanced Mode](../doc/rs400_advanced_mode.md) functionality (in C and C++ respectively).
+[<librealsense2/rs_advanced_mode.h>](./librealsense2/rs_advanced_mode.h) and [<librealsense2/rs_advanced_mode.hpp>](./librealsense2/rs_advanced_mode.hpp) can be included to get the extra [Advanced Mode](../doc/rs400/rs400_advanced_mode.md) functionality (in C and C++ respectively).
 
 [<librealsense2/rsutil.h>](./librealsense2/rsutil.h) contains mathematical helper functions for projection of 2D points into 3D space and back. 
 
@@ -18,7 +18,7 @@ In addition, you can include [<librealsense2/rs.h>](./librealsense2/rs.h) and [<
 
 ## [rs_types.hpp](librealsense2/hpp/rs_types.hpp):
 
-This file contains common functionality like the exception types. See [Error Handling](..doc/error_handling.md)
+This file contains common functionality like the exception types. See [Error Handling](../doc/error_handling.md)
 
 |Class|Description|
 |-----|-----------|
@@ -99,7 +99,7 @@ Pipeline is a high-level primitive combining several sensors and processing step
 |[config](librealsense2/hpp/rs_pipeline.hpp#L128)| Desired pipeline configuration |
 
 ## [rs_record_playback.hpp](librealsense2/hpp/rs_record_playback.hpp):
-This file adds playback and record capability using ROS-bag files. See [src/media](src/media)
+This file adds playback and record capability using ROS-bag files. See [src/media](../src/media)
 
 |Class|Description|
 |-----|-----------|
