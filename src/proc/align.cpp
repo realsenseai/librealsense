@@ -30,7 +30,7 @@ namespace librealsense
         #if defined(RS2_USE_CUDA)
         if (rsutils::rs2_is_gpu_available())
         {
-            LOG_INFO("Using CUDA-optimized align implementation");
+            LOG_INFO("Using GPU-optimized align implementation");
             return std::make_shared<librealsense::align_cuda>(align_to);
         }
         #endif

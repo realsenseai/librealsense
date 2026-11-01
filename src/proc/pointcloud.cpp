@@ -418,7 +418,7 @@ namespace librealsense
         #ifdef RS2_USE_CUDA
         if (rsutils::rs2_is_gpu_available())
         {
-            LOG_INFO("Using CUDA-optimized pointcloud implementation");
+            LOG_INFO("Using GPU-optimized pointcloud implementation");
             return std::make_shared<librealsense::pointcloud_cuda>();
         }
         #endif
