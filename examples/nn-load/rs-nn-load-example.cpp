@@ -56,13 +56,20 @@ int main( int argc, char * argv[] ) try
     bool reconnected = false;
     ctx.set_devices_changed_callback( [&]( rs2::event_information & info )
     {
-        for( auto && dev : info.get_new_devices() )
+        try
         {
-            if( dev.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) != serial )
-                continue;
-            std::lock_guard< std::mutex > lock( mutex );
-            reconnected = true;
-            cv.notify_one();
+            for( auto && dev : info.get_new_devices() )
+            {
+                if( dev.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) != serial )
+                    continue;
+                std::lock_guard< std::mutex > lock( mutex );
+                reconnected = true;
+                cv.notify_one();
+            }
+        }
+        catch( const rs2::error & )
+        {
+            // The camera went away again before it could be opened: wait for the next arrival
         }
     } );
 

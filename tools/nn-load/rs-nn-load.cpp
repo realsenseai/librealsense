@@ -140,13 +140,20 @@ try
     // The camera resets once the model is installed: catch it coming back
     ctx.set_devices_changed_callback( [&]( rs2::event_information & ev )
     {
-        for( auto && d : ev.get_new_devices() )
+        try
         {
-            if( info( d, RS2_CAMERA_INFO_SERIAL_NUMBER ) != serial )
-                continue;
-            std::lock_guard< std::mutex > lk( mutex );
-            reconnected = d;
-            cv.notify_one();
+            for( auto && d : ev.get_new_devices() )
+            {
+                if( info( d, RS2_CAMERA_INFO_SERIAL_NUMBER ) != serial )
+                    continue;
+                std::lock_guard< std::mutex > lk( mutex );
+                reconnected = d;
+                cv.notify_one();
+            }
+        }
+        catch( const rs2::error & )
+        {
+            // The device went away again before it could be opened: wait for the next arrival
         }
     } );
 
