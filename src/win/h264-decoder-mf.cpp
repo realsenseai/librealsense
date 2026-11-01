@@ -65,34 +65,24 @@ namespace librealsense
                 , _fps( fps )
                 , _frame_duration( 10000000 / ( fps > 0 ? fps : 30 ) )  // 100ns units
             {
-                ensure_com();
-
-                HRESULT hr;
-                if( FAILED( hr = MFStartup( MF_VERSION, MFSTARTUP_NOSOCKET ) ) )
-                    throw std::runtime_error( "MFStartup failed, hr=" + hr_string( hr ) );
-                _mf_started = true;
-
-                init_mft( fps, true );  // prefer DXVA; falls back to software on its own
-            }
-
-            ~mf_h264_decoder() override
-            {
-                if( _mft )
+                try
                 {
-                    _mft->ProcessMessage( MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0 );
-                    _mft->ProcessMessage( MFT_MESSAGE_NOTIFY_END_STREAMING, 0 );
-                    _mft.Reset();
+                    build( fps );
                 }
-                _in_sample.Reset();
-                _out_sample.Reset();
-                _dxgi_manager.Reset();
-                if( _mf_started )
-                    MFShutdown();
+                catch( ... )
+                {
+                    release();
+                    throw;
+                }
             }
+
+            ~mf_h264_decoder() override { release(); }
 
             bool decode( uint8_t const * data, size_t size, std::vector< uint8_t > & nv12 ) override
             {
                 ensure_com();
+                if( ! _mft )
+                    return false;  // a failed rebuild below leaves nothing to decode with
                 if( ! feed( data, size ) )
                     return false;
 
@@ -107,7 +97,16 @@ namespace librealsense
                         // useless if we cannot read the result, so rebuild in software.
                         LOG_WARNING( "H264 DXVA readback failed (hr=" << hr_string( hr ) << "), falling back to software" );
                         _readback_failed = false;
-                        init_mft( _fps, false );
+                        try
+                        {
+                            init_mft( _fps, false );
+                        }
+                        catch( std::exception const & e )
+                        {
+                            // We are on the frame callback, where an exception would take the process down with it
+                            LOG_ERROR( "H264 software fallback failed: " << e.what() );
+                            _mft.Reset();
+                        }
                         return false;
                     }
                     if( hr == MF_E_TRANSFORM_NEED_MORE_INPUT )
@@ -125,6 +124,35 @@ namespace librealsense
             }
 
         private:
+            void build( int fps )
+            {
+                ensure_com();
+
+                HRESULT hr;
+                if( FAILED( hr = MFStartup( MF_VERSION, MFSTARTUP_NOSOCKET ) ) )
+                    throw std::runtime_error( "MFStartup failed, hr=" + hr_string( hr ) );
+                _mf_started = true;
+
+                init_mft( fps, true );  // prefer DXVA; falls back to software on its own
+            }
+
+            // A constructor that throws leaves no destructor to run, so whatever it already took has to go back here
+            void release()
+            {
+                if( _mft )
+                {
+                    _mft->ProcessMessage( MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0 );
+                    _mft->ProcessMessage( MFT_MESSAGE_NOTIFY_END_STREAMING, 0 );
+                    _mft.Reset();
+                }
+                _in_sample.Reset();
+                _out_sample.Reset();
+                _dxgi_manager.Reset();
+                if( _mf_started )
+                    MFShutdown();
+                _mf_started = false;
+            }
+
             // Creates the decoder MFT and negotiates types. With try_dxva the MFT decodes on the GPU
             // when the driver supports it; any failure along the way just leaves us in software.
             void init_mft( int fps, bool try_dxva )

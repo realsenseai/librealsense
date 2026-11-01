@@ -46,22 +46,22 @@ namespace librealsense
             if( data[i] || data[i + 1] || data[i + 2] != 1 )
                 continue;
             size_t const start = ( i && ! data[i - 1] ) ? i - 1 : i;  // a 4-byte start code carries one more zero
-            switch( data[i + 3] & 0x1f )
+            uint8_t const type = data[i + 3] & 0x1f;
+            if( type == 7 || type == 8 )  // SPS / PPS
             {
-            case 5:  // IDR slice
-                is_keyframe = true;
-                break;
-            case 7:  // SPS
-            case 8:  // PPS
                 if( ! carries_parameter_sets )
                     first = start;
                 carries_parameter_sets = true;
                 parameters_end = 0;
-                break;
-            default:
+            }
+            else
+            {
+                if( type == 5 )  // IDR slice
+                    is_keyframe = true;
+                // Any other NAL ends the parameter sets, the keyframe they describe included: cache the sets alone,
+                // or prefixing a later keyframe would put a stale picture in front of it
                 if( carries_parameter_sets && ! parameters_end )
                     parameters_end = start;
-                break;
             }
             i += 3;
         }
@@ -84,24 +84,15 @@ namespace librealsense
         uint8_t const * data = static_cast< uint8_t const * >( f.get_data() );
         size_t size = f.get_data_size();
 
-        bool carries_parameter_sets = false, is_keyframe = false;
-        scan( data, size, carries_parameter_sets, is_keyframe );
-        if( is_keyframe && ! carries_parameter_sets && ! _parameter_sets.empty() )
-        {
-            // A backend built after the parameter sets went by - a geometry change, or Media Foundation falling back to
-            // software - has never seen them, so put them back in front of the keyframe that would otherwise start it
-            _prefixed.assign( _parameter_sets.begin(), _parameter_sets.end() );
-            _prefixed.insert( _prefixed.end(), data, data + size );
-            data = _prefixed.data();
-            size = _prefixed.size();
-        }
-
         if( vf.get_width() != _width || vf.get_height() != _height )
         {
             _width = vf.get_width();
             _height = vf.get_height();
             _backend.reset();
             _queued.clear();
+            // The SPS describes the geometry we are leaving, so prefixing a keyframe of the new one with it would
+            // hand the decoder the wrong picture size
+            _parameter_sets.clear();
             _reported_overflow = false;
             // A future from std::async blocks in its destructor, so overwriting one that is still running would stall the
             // frame callback for as long as the old start takes. Park it instead and let it retire in its own time.
@@ -120,6 +111,19 @@ namespace librealsense
             _starting = std::async( std::launch::async,
                                     [width = _width, height = _height, fps = f.get_profile().fps()]
                                     { return h264_decoder_backend::create( width, height, fps ); } );
+        }
+
+        // After the geometry check, so this access unit's own parameter sets survive the reset above
+        bool carries_parameter_sets = false, is_keyframe = false;
+        scan( data, size, carries_parameter_sets, is_keyframe );
+        if( is_keyframe && ! carries_parameter_sets && ! _parameter_sets.empty() )
+        {
+            // A backend built after the parameter sets went by - a geometry change, or Media Foundation falling back to
+            // software - has never seen them, so put them back in front of the keyframe that would otherwise start it
+            _prefixed.assign( _parameter_sets.begin(), _parameter_sets.end() );
+            _prefixed.insert( _prefixed.end(), data, data + size );
+            data = _prefixed.data();
+            size = _prefixed.size();
         }
 
         if( _starting.valid() )
