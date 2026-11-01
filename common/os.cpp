@@ -39,6 +39,8 @@
 #if defined __linux__ || defined __APPLE__
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <spawn.h>
 #include <pwd.h>
 #endif
 
@@ -66,6 +68,19 @@ namespace rs2
         return std::regex_match( url, url_regex );
     }
 
+#if defined __linux__ || defined __APPLE__
+    // Runs argv[0] directly (no shell), so url can never be interpreted as shell syntax
+    static bool run_command_no_shell( const char* const argv[] )
+    {
+        extern char** environ;
+        pid_t pid;
+        if( posix_spawnp( &pid, argv[0], nullptr, nullptr, const_cast< char** >( argv ), environ ) != 0 )
+            return false;
+        int status = 0;
+        return waitpid( pid, &status, 0 ) == pid && WIFEXITED( status ) && WEXITSTATUS( status ) == 0;
+    }
+#endif
+
     bool open_url(const char* url)
     {
         if( !url || !is_valid_url( url ) )
@@ -77,13 +92,11 @@ namespace rs2
 #if (defined(_WIN32) || defined(_WIN64))
         bool ok = reinterpret_cast<INT_PTR>(ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOW)) >= 32;
 #elif defined __linux__ || defined(__linux__)
-        std::string command_name = "xdg-open ";
-        std::string command = command_name + url;
-        bool ok = system(command.c_str()) == 0;
+        const char* argv[] = { "xdg-open", url, nullptr };
+        bool ok = run_command_no_shell( argv );
 #elif __APPLE__
-        std::string command_name = "open ";
-        std::string command = command_name + url;
-        bool ok = system(command.c_str()) == 0;
+        const char* argv[] = { "open", url, nullptr };
+        bool ok = run_command_no_shell( argv );
 #else
 #pragma message ( "\nLibrealsense couldn't establish OS/Build environment. \
 Some auxillary functionalities might be affected. Please report this message if encountered")
