@@ -25,6 +25,9 @@ namespace librealsense
 
         // nullptr when the platform has no H.264 decoder at all, or when it refused this particular geometry
         static std::unique_ptr< h264_decoder_backend > create( int width, int height, int fps );
+
+        // True when this platform can decode H.264 at all. How that is established is up to each backend.
+        static bool is_supported();
     };
 
     // Decodes an H.264 stream to a color format. Unlike the stateless color converters a frame here depends on the frames

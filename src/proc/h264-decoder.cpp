@@ -15,15 +15,20 @@ namespace librealsense
     {
         return nullptr;
     }
+
+    bool h264_decoder_backend::is_supported()
+    {
+        return false;
+    }
 #endif
 
     bool h264_decoder::is_supported()
     {
-        // Building one is the only way to find out whether the platform has a decoder, so probe once with an arbitrary
-        // small profile and keep the answer. This is the single place that fact is established, so warn here and nowhere else.
+        // Ask the backend once and keep the answer. This is the single place that fact is established, so the warning
+        // belongs here and nowhere else.
         static bool const supported = []
         {
-            if( h264_decoder_backend::create( 640, 360, 30 ) )
+            if( h264_decoder_backend::is_supported() )
                 return true;
             LOG_WARNING( "no H.264 decoder on this platform - H264 streams can be received, not decoded" );
             return false;

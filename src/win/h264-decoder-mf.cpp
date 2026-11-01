@@ -414,6 +414,23 @@ namespace librealsense
         };
     }
 
+    // Asks the registry whether an H.264 decoder MFT exists, which is all we need to know: without DXVA the MFT still
+    // decodes in software. Deliberately builds nothing - no MF startup, no D3D11 device, no type negotiation.
+    bool h264_decoder_backend::is_supported()
+    {
+        ensure_com();
+
+        MFT_REGISTER_TYPE_INFO input = { MFMediaType_Video, MFVideoFormat_H264 };
+        IMFActivate ** activates = nullptr;
+        UINT32 count = 0;
+        if( FAILED( MFTEnumEx( MFT_CATEGORY_VIDEO_DECODER, MFT_ENUM_FLAG_ALL, &input, nullptr, &activates, &count ) ) )
+            return false;
+        for( UINT32 i = 0; i < count; ++i )
+            activates[i]->Release();
+        CoTaskMemFree( activates );
+        return count > 0;
+    }
+
     std::unique_ptr< h264_decoder_backend > h264_decoder_backend::create( int width, int height, int fps )
     {
         try

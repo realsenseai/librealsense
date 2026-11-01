@@ -17,6 +17,7 @@
 #include <chrono>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 #include <cstring>
 
@@ -25,6 +26,72 @@ namespace librealsense
     namespace
     {
         std::string mfx_string( mfxStatus s ) { return std::to_string( static_cast< int >( s ) ); }
+
+        void require( mfxLoader loader, mfxU32 value, char const * property )
+        {
+            mfxConfig cfg = MFXCreateConfig( loader );
+            mfxVariant v = {};
+            v.Version.Version = MFX_VARIANT_VERSION;
+            v.Type = MFX_VARIANT_TYPE_U32;
+            v.Data.U32 = value;
+            MFXSetConfigFilterProperty( cfg, reinterpret_cast< mfxU8 const * >( property ), v );
+        }
+
+        bool decodes_h264( VADisplay va )
+        {
+            std::vector< VAProfile > profiles( std::max( vaMaxNumProfiles( va ), 0 ) );
+            int count = 0;
+            if( profiles.empty() || vaQueryConfigProfiles( va, profiles.data(), &count ) != VA_STATUS_SUCCESS )
+                return false;
+            for( int i = 0; i < count; ++i )
+            {
+                if( profiles[i] != VAProfileH264High && profiles[i] != VAProfileH264Main
+                    && profiles[i] != VAProfileH264ConstrainedBaseline )
+                    continue;
+                std::vector< VAEntrypoint > entrypoints( std::max( vaMaxNumEntrypoints( va ), 0 ) );
+                int entries = 0;
+                if( entrypoints.empty()
+                    || vaQueryConfigEntrypoints( va, profiles[i], entrypoints.data(), &entries ) != VA_STATUS_SUCCESS )
+                    continue;
+                if( std::find( entrypoints.begin(), entrypoints.begin() + entries, VAEntrypointVLD )
+                    != entrypoints.begin() + entries )
+                    return true;
+            }
+            return false;
+        }
+
+        // The Intel GPU is not always renderD128 - with more than one GPU it can be any of them - so take the first
+        // node that initializes and reports an H.264 decode entrypoint. Throws when none does.
+        std::pair< int, VADisplay > open_h264_display()
+        {
+            std::vector< std::string > nodes;
+            if( DIR * dir = opendir( "/dev/dri" ) )
+            {
+                while( dirent * entry = readdir( dir ) )
+                    if( ! strncmp( entry->d_name, "renderD", 7 ) )
+                        nodes.push_back( std::string( "/dev/dri/" ) + entry->d_name );
+                closedir( dir );
+            }
+            std::sort( nodes.begin(), nodes.end() );
+
+            for( auto const & node : nodes )
+            {
+                int fd = open( node.c_str(), O_RDWR );
+                if( fd < 0 )
+                    continue;  // most often this user is not in the 'render' group
+                VADisplay va = vaGetDisplayDRM( fd );
+                int major = 0, minor = 0;
+                if( va && vaInitialize( va, &major, &minor ) == VA_STATUS_SUCCESS )
+                {
+                    if( decodes_h264( va ) )
+                        return { fd, va };
+                    vaTerminate( va );
+                }
+                close( fd );
+            }
+            throw std::runtime_error( "no DRM render node decodes H.264; "
+                                      + std::string( nodes.empty() ? "none found" : "is this user in the 'render' group?" ) );
+        }
 
         // oneVPL decoding on an Intel GPU, the counterpart of the Media Foundation backend on Windows. Like that one it is
         // a stateful API - the library parses the SPS/PPS and manages reference frames, we only hand it access units.
@@ -113,15 +180,15 @@ namespace librealsense
             {
                 _loader = MFXLoad();
                 if( ! _loader ) throw std::runtime_error( "MFXLoad failed" );
-                require( MFX_IMPL_TYPE_HARDWARE, "mfxImplDescription.Impl" );
-                require( MFX_CODEC_AVC, "mfxImplDescription.mfxDecoderDescription.decoder.CodecID" );
+                require( _loader, MFX_IMPL_TYPE_HARDWARE, "mfxImplDescription.Impl" );
+                require( _loader, MFX_CODEC_AVC, "mfxImplDescription.mfxDecoderDescription.decoder.CodecID" );
 
                 mfxStatus s = MFXCreateSession( _loader, 0, &_session );
                 if( s != MFX_ERR_NONE )
                     throw std::runtime_error( "no hardware oneVPL H.264 decoder, MFXCreateSession=" + mfx_string( s ) );
 
                 // The Linux runtime decodes through VA-API and will not initialize until we give it a display
-                open_display();
+                std::tie( _drm_fd, _va ) = open_h264_display();
                 if( ( s = MFXVideoCORE_SetHandle( _session, MFX_HANDLE_VA_DISPLAY, (mfxHDL)_va ) ) != MFX_ERR_NONE )
                     throw std::runtime_error( "MFXVideoCORE_SetHandle=" + mfx_string( s ) );
             }
@@ -139,76 +206,6 @@ namespace librealsense
                 _loader = nullptr;
                 _va = nullptr;
                 _drm_fd = -1;
-            }
-
-            // The Intel GPU is not always renderD128 - with more than one GPU it can be any of them - so take the first
-            // node that initializes and reports an H.264 decode entrypoint
-            void open_display()
-            {
-                std::vector< std::string > nodes;
-                if( DIR * dir = opendir( "/dev/dri" ) )
-                {
-                    while( dirent * entry = readdir( dir ) )
-                        if( ! strncmp( entry->d_name, "renderD", 7 ) )
-                            nodes.push_back( std::string( "/dev/dri/" ) + entry->d_name );
-                    closedir( dir );
-                }
-                std::sort( nodes.begin(), nodes.end() );
-
-                for( auto const & node : nodes )
-                {
-                    int fd = open( node.c_str(), O_RDWR );
-                    if( fd < 0 )
-                        continue;  // most often this user is not in the 'render' group
-                    VADisplay va = vaGetDisplayDRM( fd );
-                    int major = 0, minor = 0;
-                    if( va && vaInitialize( va, &major, &minor ) == VA_STATUS_SUCCESS )
-                    {
-                        if( decodes_h264( va ) )
-                        {
-                            _drm_fd = fd;
-                            _va = va;
-                            return;
-                        }
-                        vaTerminate( va );
-                    }
-                    close( fd );
-                }
-                throw std::runtime_error( "no DRM render node decodes H.264; "
-                                          + std::string( nodes.empty() ? "none found" : "is this user in the 'render' group?" ) );
-            }
-
-            static bool decodes_h264( VADisplay va )
-            {
-                std::vector< VAProfile > profiles( std::max( vaMaxNumProfiles( va ), 0 ) );
-                int count = 0;
-                if( profiles.empty() || vaQueryConfigProfiles( va, profiles.data(), &count ) != VA_STATUS_SUCCESS )
-                    return false;
-                for( int i = 0; i < count; ++i )
-                {
-                    if( profiles[i] != VAProfileH264High && profiles[i] != VAProfileH264Main
-                        && profiles[i] != VAProfileH264ConstrainedBaseline )
-                        continue;
-                    std::vector< VAEntrypoint > entrypoints( std::max( vaMaxNumEntrypoints( va ), 0 ) );
-                    int entries = 0;
-                    if( entrypoints.empty()
-                        || vaQueryConfigEntrypoints( va, profiles[i], entrypoints.data(), &entries ) != VA_STATUS_SUCCESS )
-                        continue;
-                    if( std::find( entrypoints.begin(), entrypoints.begin() + entries, VAEntrypointVLD )
-                        != entrypoints.begin() + entries )
-                        return true;
-                }
-                return false;
-            }
-
-            void require( mfxU32 value, char const * property )
-            {
-                mfxConfig cfg = MFXCreateConfig( _loader );
-                mfxVariant v = {};
-                v.Version.Version = MFX_VARIANT_VERSION;
-                v.Type = MFX_VARIANT_TYPE_U32;
-                v.Data.U32 = value;
-                MFXSetConfigFilterProperty( cfg, reinterpret_cast< mfxU8 const * >( property ), v );
             }
 
             // The parameter sets ride in the first access unit, so the stream itself tells us the geometry to allocate for
@@ -301,6 +298,38 @@ namespace librealsense
             bool _initialized = false;
             bool _refused = false;  // sticky: the stream cannot be decoded, so stop retrying and stop logging
         };
+    }
+
+    // Asks the dispatcher for a hardware AVC decoder and checks that a render node is actually reachable, which is what
+    // the 'render' group governs. Deliberately builds no session and no decoder.
+    bool h264_decoder_backend::is_supported()
+    {
+        mfxLoader loader = MFXLoad();
+        if( ! loader )
+            return false;
+        require( loader, MFX_IMPL_TYPE_HARDWARE, "mfxImplDescription.Impl" );
+        require( loader, MFX_CODEC_AVC, "mfxImplDescription.mfxDecoderDescription.decoder.CodecID" );
+
+        mfxHDL description = nullptr;
+        bool supported = MFXEnumImplementations( loader, 0, MFX_IMPLCAPS_IMPLDESCSTRUCTURE, &description ) == MFX_ERR_NONE;
+        if( description )
+            MFXDispReleaseImplDescription( loader, description );
+        MFXUnload( loader );
+        if( ! supported )
+            return false;
+
+        try
+        {
+            std::pair< int, VADisplay > display = open_h264_display();
+            vaTerminate( display.second );
+            close( display.first );
+            return true;
+        }
+        catch( std::exception const & e )
+        {
+            LOG_WARNING( "no oneVPL H.264 decoder: " << e.what() );
+            return false;
+        }
     }
 
     std::unique_ptr< h264_decoder_backend > h264_decoder_backend::create( int width, int height, int )
