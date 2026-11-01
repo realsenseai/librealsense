@@ -66,6 +66,16 @@ def fw_version(test_device):
     return dev.get_info(rs.camera_info.firmware_version)
 
 
+def test_decimation_embedded_filter_dedicated_getter(depth_sensor, fw_version):
+    if is_fw_version_below(fw_version, '7.56.36850.1229'):
+        pytest.skip("Decimation Embedded Filter not supported in this FW")
+
+    decimation_embedded_filter = depth_sensor.get_embedded_decimation_filter()
+    assert decimation_embedded_filter, "get_embedded_decimation_filter() returned an invalid filter"
+    assert isinstance(decimation_embedded_filter, rs.embedded_decimation_filter)
+    check.equal(decimation_embedded_filter.get_type(), rs.embedded_filter_type.decimation)
+
+
 # this test will get options values for the decimation embedded filter, from the depth sensor
 # - get DDS device
 # - get depth sensor
@@ -143,6 +153,16 @@ def test_decimation_embedded_filter_metadata(depth_sensor, depth_profile, fw_ver
 
 
 # below FW number should be adjusted after Embedded Temporal Filter is in FW
+def test_temporal_embedded_filter_dedicated_getter(depth_sensor, fw_version):
+    if is_fw_version_below(fw_version, '9.9.9.9'):
+        pytest.skip("Temporal Embedded Filter not supported in this FW")
+
+    temporal_embedded_filter = depth_sensor.get_embedded_temporal_filter()
+    assert temporal_embedded_filter, "get_embedded_temporal_filter() returned an invalid filter"
+    assert isinstance(temporal_embedded_filter, rs.embedded_temporal_filter)
+    check.equal(temporal_embedded_filter.get_type(), rs.embedded_filter_type.temporal)
+
+
 def test_temporal_embedded_filter_options(depth_sensor, fw_version):
     if is_fw_version_below(fw_version, '9.9.9.9'):
         pytest.skip("Temporal Embedded Filter not supported in this FW")
