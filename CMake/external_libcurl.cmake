@@ -5,7 +5,16 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
     include(ExternalProject)
     message(STATUS "Building libcurl enabled")
     
-    set(CURL_FLAGS -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DUSE_WIN32_LDAP=OFF -DHTTP_ONLY=ON -DCURL_ZLIB=OFF -DCURL_DISABLE_CRYPTO_AUTH=ON -DCURL_USE_LIBSSH2=OFF -DBUILD_TESTING=OFF -DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF -DCURL_USE_LIBPSL=OFF -DUSE_LIBIDN2=OFF )
+    # HTTP(S) only, with no optional dependencies: anything curl finds on its own (e.g. Homebrew's nghttp2/brotli/zstd)
+    # would need linking below. HTTP_ONLY and CURL_DISABLE_CRYPTO_AUTH are gone in newer curl, so the protocols and
+    # dependencies are also switched off one by one.
+    set(CURL_FLAGS -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DUSE_WIN32_LDAP=OFF -DBUILD_TESTING=OFF -DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF
+        -DHTTP_ONLY=ON -DCURL_DISABLE_CRYPTO_AUTH=ON
+        -DCURL_DISABLE_DICT=ON -DCURL_DISABLE_FILE=ON -DCURL_DISABLE_FTP=ON -DCURL_DISABLE_GOPHER=ON -DCURL_DISABLE_IMAP=ON
+        -DCURL_DISABLE_LDAP=ON -DCURL_DISABLE_LDAPS=ON -DCURL_DISABLE_MQTT=ON -DCURL_DISABLE_POP3=ON -DCURL_DISABLE_RTSP=ON
+        -DCURL_DISABLE_SMTP=ON -DCURL_DISABLE_TELNET=ON -DCURL_DISABLE_TFTP=ON -DCURL_DISABLE_WEBSOCKETS=ON
+        -DCURL_DISABLE_DIGEST_AUTH=ON
+        -DCURL_ZLIB=OFF -DCURL_BROTLI=OFF -DCURL_ZSTD=OFF -DUSE_NGHTTP2=OFF -DCURL_USE_LIBSSH2=OFF -DCURL_USE_LIBPSL=OFF -DUSE_LIBIDN2=OFF )
     if (WIN32)
         set(CURL_FLAGS ${CURL_FLAGS} -DCURL_STATIC_CRT=ON )
     endif()
@@ -15,6 +24,10 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
         set(CURL_FLAGS ${CURL_FLAGS} -DCURL_USE_SCHANNEL=ON )
     else()
         set(CURL_FLAGS ${CURL_FLAGS} -DCURL_USE_OPENSSL=ON )
+        # Build curl against the same OpenSSL we link below (e.g. with both openssl@3 and openssl@4 installed)
+        if(OPENSSL_ROOT_DIR)
+            set(CURL_FLAGS ${CURL_FLAGS} -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} )
+        endif()
     endif()
     
     set(CURL_DEBUG_TARGET_NAME "libcurl-d")
@@ -32,7 +45,8 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
         libcurl
         PREFIX libcurl
         GIT_REPOSITORY "https://github.com/curl/curl.git"
-        GIT_TAG "curl-8_8_0"
+        # 8.19.0: first with OpenSSL 4 support (opaque ASN1 types), last that builds with CMake < 3.18
+        GIT_TAG "curl-8_19_0"
         SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/third-party/libcurl
         CMAKE_ARGS  --no-warn-unused-cli
                     -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
@@ -66,7 +80,7 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
    # libcurl required libs per OS 
    # (Linux require that the link dependency will be added after the libcurl link target that use it)
     if (WIN32)
-        target_link_libraries(curl INTERFACE ws2_32.lib crypt32.lib)
+        target_link_libraries(curl INTERFACE ws2_32.lib crypt32.lib secur32.lib iphlpapi.lib)
     else()
         find_package(OpenSSL REQUIRED)
         target_link_libraries(curl INTERFACE OpenSSL::SSL OpenSSL::Crypto)
