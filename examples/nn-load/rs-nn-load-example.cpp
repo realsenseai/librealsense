@@ -78,7 +78,17 @@ int main( int argc, char * argv[] ) try
 
     // The upload blocks until the model is installed; the Perception sensor must not be streaming
     std::cout << "Uploading " << argv[1] << " to " << loader.get_info( RS2_CAMERA_INFO_NAME ) << " " << serial << std::endl;
-    loader.nn_upload( package, []( float progress ) { std::cout << "\rProgress: " << int( progress * 100 ) << "%" << std::flush; } );
+    bool writing = false;
+    loader.nn_upload( package, [&writing]( float progress )
+    {
+        std::cout << "\rProgress: " << int( progress * 100 + 0.001f ) << "%" << std::flush;
+        // The camera reports little progress while it writes the model to flash
+        if( progress >= 0.8999f && ! writing )
+        {
+            writing = true;
+            std::cout << std::endl << "Writing the model to the camera, this can take about 15 seconds" << std::endl;
+        }
+    } );
     std::cout << std::endl << "Model installed, waiting for the camera to reset" << std::endl;
     {
         std::unique_lock< std::mutex > lock( mutex );

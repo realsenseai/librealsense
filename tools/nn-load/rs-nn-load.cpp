@@ -161,18 +161,30 @@ try
               << serial << ". Please don't disconnect the device!" << std::endl;
     bool activate = ! no_activate_arg.isSet();
     int last = -1;
-    if( ISATTY( FILENO( stdout ) ) )
-        loader.nn_upload( package, target, slot_arg.getValue(), activate, []( float progress )
+    bool writing = false;
+    // The camera reports little progress while it writes the model to flash (90-99%): say what it is doing
+    auto note_writing = [&writing]( float progress )
+    {
+        if( progress >= 0.8999f && ! writing )
         {
-            printf( "\rNN model upload progress: %d[%%]", int( progress * 100 ) );
+            writing = true;
+            std::cout << std::endl << "Writing the model to the camera, this can take about 15 seconds..." << std::endl;
+        }
+    };
+    if( ISATTY( FILENO( stdout ) ) )
+        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&note_writing]( float progress )
+        {
+            printf( "\rNN model upload progress: %d[%%]", int( progress * 100 + 0.001f ) );
             fflush( stdout );
+            note_writing( progress );
         } );
     else  // a log gets a line every 10%
-        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&last]( float progress )
+        loader.nn_upload( package, target, slot_arg.getValue(), activate, [&last, &note_writing]( float progress )
         {
-            int pct = int( progress * 10 ) * 10;
+            int pct = int( progress * 10 + 0.001f ) * 10;  // the last chunk's 0.9 may come as 0.8999999
             if( pct != last )
                 std::cout << "NN model upload progress: " << ( last = pct ) << "%" << std::endl;
+            note_writing( progress );
         } );
     std::cout << std::endl << "NN model installed, waiting for the device to reconnect..." << std::endl;
 
