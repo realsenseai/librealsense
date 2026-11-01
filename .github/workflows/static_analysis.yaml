@@ -217,43 +217,66 @@ jobs:
             else
                 echo "No ASAN output file found. No errors detected."
             fi
-  # We verify the minimal CMake version we support is preserved when building with default CMake flags
+  # We verify the minimal CMake version we support is preserved when building with default CMake flags.
+  # Fast path: download only the declared minimal CMake version and try to configure with it.
+  #            If that works, we are done (a minimal version lower than declared is fine too).
+  # Slow path: only if the fast path fails, run nlohmann/cmake_min_version over all CMake releases
+  #            to report which version actually is the minimal working one, so the fix is clear.
   minimal_cmake_version:
     name: "Minimal CMake version"
     timeout-minutes: 30
     runs-on: ubuntu-22.04
+    env:
+      EXPECTED_CMAKE_MAJOR_VER: 3
+      EXPECTED_CMAKE_MINOR_VER: 10
+      # Latest patch release of the minimal version line, used for the fast path only
+      EXPECTED_CMAKE_PATCH_VER: 3
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
 
       - name: "Install Dependencies"
         run: |
-          work_dir=$(pwd)       
-          # Go back from RealSense directory to parent directory  
-          cd ..
-          
+          echo "Install LibRealSense pre-installed packages requirements"
+          sudo apt-get update
+          sudo apt-get install -y libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev at
+
+      - name: "Download minimal CMake"
+        run: |
+          ver="${EXPECTED_CMAKE_MAJOR_VER}.${EXPECTED_CMAKE_MINOR_VER}.${EXPECTED_CMAKE_PATCH_VER}"
+          url="https://cmake.org/files/v${EXPECTED_CMAKE_MAJOR_VER}.${EXPECTED_CMAKE_MINOR_VER}/cmake-${ver}-Linux-x86_64.tar.gz"
+          echo "Downloading $url"
+          mkdir -p "$RUNNER_TEMP/cmake-min"
+          curl -fsSL "$url" | tar -xz -C "$RUNNER_TEMP/cmake-min" --strip-components=1
+          "$RUNNER_TEMP/cmake-min/bin/cmake" --version
+
+      - name: "Configure with minimal CMake"
+        id: fast_path
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/build-min-cmake"
+          cd "$RUNNER_TEMP/build-min-cmake"
+          "$RUNNER_TEMP/cmake-min/bin/cmake" "$GITHUB_WORKSPACE"
+
+      - name: "Find actual minimal CMake version"
+        if: steps.fast_path.outcome == 'failure'
+        id: slow_path
+        run: |
+          work_dir=$(pwd)
+          cd "$RUNNER_TEMP"
+
           git clone https://github.com/nlohmann/cmake_min_version.git
           cd cmake_min_version
           # We clone a specific commit which we tested the process as working
           git checkout 687dc56e1cf52c865cebf6ac94ad67906d6e1369
-          
-          echo "Install LibRealSense pre-installed packages requirements"
-          sudo apt-get update 
-          sudo apt-get install libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev at
-          
+
           python3 -mvenv venv
           venv/bin/pip3 install -r requirements.txt
-          
-      - name: "Get Current CMake version"
-        id: cmake_version
-        run: |
-          work_dir=$(pwd)
-          cd ..
-          
-          cd cmake_min_version
+
+          # Download the first patch of every CMake minor release and binary-search for the minimal working one
           venv/bin/python3 cmake_downloader.py --first_minor
           output=$(venv/bin/python3 cmake_min_version.py $work_dir)
-          
+
           # Sample of Expected Output of cmake_min_version.py ***
           # [  0%] CMake 3.9.2    ✔ works
           # [ 12%] CMake 3.2.2    ✘ error
@@ -264,55 +287,29 @@ jobs:
           # [ 80%] CMake 3.7.2    ✘ error
           #        CMakeLists.txt:16 (target_compile_features)
           # [100%] Minimal working version: CMake 3.8.0
-          
+          #
           # cmake_minimum_required(VERSION 3.8.0)
-          
+
           echo "$output"
-                    
+
           # Retrieve CMake minimal version from the last line of the tool output.
-          current_cmake_version=$(echo ${output} | grep -oP "VERSION \d+\.\d+" || echo "VERSION NOT FOUND")
-          
-          if [ "$current_cmake_version" == "VERSION NOT FOUND" ]
-          then
-            echo "Error - CMake version not found."
-            exit 1
-          fi
-          
-          current_cmake_major_ver=$(echo $current_cmake_version | grep -oP "\d+\.\d+" | cut -d'.' -f 1)
-          current_cmake_minor_ver=$(echo $current_cmake_version | grep -oP "\d+\.\d+" | cut -d'.' -f 2)
-          
-          # Saving cmake output in GitHub output
-          echo "current_cmake_major_ver=$current_cmake_major_ver" >> $GITHUB_OUTPUT
-          echo "current_cmake_minor_ver=$current_cmake_minor_ver" >> $GITHUB_OUTPUT
-        
+          actual=$(echo ${output} | grep -oP "VERSION \d+\.\d+" | grep -oP "\d+\.\d+" || echo "NOT FOUND")
+          echo "actual_cmake_version=$actual" >> $GITHUB_OUTPUT
+
       - name: "Check minimal CMake version"
         env:
-          EXPECTED_CMAKE_MAJOR_VER: 3
-          EXPECTED_CMAKE_MINOR_VER: 10
-          CURRENT_CMAKE_MAJOR_VER: ${{ steps.cmake_version.outputs.current_cmake_major_ver }}
-          CURRENT_CMAKE_MINOR_VER: ${{ steps.cmake_version.outputs.current_cmake_minor_ver }}
-
+          FAST_PATH_OUTCOME: ${{ steps.fast_path.outcome }}
+          ACTUAL_CMAKE_VERSION: ${{ steps.slow_path.outputs.actual_cmake_version }}
         run: |
-          if [ $CURRENT_CMAKE_MAJOR_VER -lt ${EXPECTED_CMAKE_MAJOR_VER} ]
+          EXPECTED="${EXPECTED_CMAKE_MAJOR_VER}.${EXPECTED_CMAKE_MINOR_VER}"
+          if [ "$FAST_PATH_OUTCOME" == "success" ]
           then
-            STATUS="PASSED"
-          elif [ $CURRENT_CMAKE_MAJOR_VER -eq ${EXPECTED_CMAKE_MAJOR_VER} ] && [ $CURRENT_CMAKE_MINOR_VER -eq ${EXPECTED_CMAKE_MINOR_VER} ]
-          then
-            STATUS="PASSED"
-          elif [ $CURRENT_CMAKE_MAJOR_VER -eq ${EXPECTED_CMAKE_MAJOR_VER} ] && [ $CURRENT_CMAKE_MINOR_VER -lt ${EXPECTED_CMAKE_MINOR_VER} ]
-          then
-            STATUS="PASSED"
+            echo "The test PASSED, LibRS configures with the minimal CMake version ${EXPECTED}"
           else
-            STATUS="FAILED"
-          fi
-          
-          if [ $STATUS == "PASSED" ]
-          then
-            echo "The test PASSED, current CMake version is $CURRENT_CMAKE_MAJOR_VER.$CURRENT_CMAKE_MINOR_VER and it is not higher than VERSION ${EXPECTED_CMAKE_MAJOR_VER}.${EXPECTED_CMAKE_MINOR_VER}"
-          else
-            echo "Error - The minimal CMake version required for LibRS is ${EXPECTED_CMAKE_MAJOR_VER}.${EXPECTED_CMAKE_MINOR_VER} but on this build the minimal CMake version that works is $CURRENT_CMAKE_MAJOR_VER.$CURRENT_CMAKE_MINOR_VER"
+            echo "Error - The minimal CMake version required for LibRS is ${EXPECTED} but on this build the minimal CMake version that works is ${ACTUAL_CMAKE_VERSION}"
+            echo "See the 'Configure with minimal CMake' step above for the CMake error with version ${EXPECTED}"
             exit 1
-          fi              
+          fi
 
   build_flags_docs:
     name: "Generate build-flags.html"
