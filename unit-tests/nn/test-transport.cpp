@@ -35,6 +35,8 @@ public:
     int32_t send_chunk( uint16_t, uint32_t, uint32_t, uint32_t param4, const uint8_t * data, size_t size ) override
     {
         chunks.push_back( { param4, size, data[0] } );
+        if( chunks.size() - 1 == lost_at_chunk )
+            throw io_exception( "device disconnected" );
         auto it = chunk_errors.find( chunks.size() - 1 );
         return it == chunk_errors.end() ? 0 : it->second;
     }
@@ -57,6 +59,7 @@ public:
 
     std::vector< chunk > chunks;
     std::map< size_t, int32_t > chunk_errors;
+    size_t lost_at_chunk = SIZE_MAX;
     std::deque< nn::status > statuses;
     std::function< nn::status() > next_status;
     int32_t status_error = 0;
@@ -155,6 +158,15 @@ TEST_CASE( "device errors" )
         CHECK_THROWS_AS( t.send_table( nn::PACKAGE_TABLE_ID, 1, 0, make_table( 2501 ), {} ), invalid_value_exception );
         CHECK( t.chunks.size() == 2 );
         CHECK( t.status_reads == 1 );
+    }
+    SECTION( "device lost on a chunk: the model is unchanged" )
+    {
+        fake_transport t;
+        t.statuses = { make_status( nn::upload_state::idle, 7 ) };
+        t.lost_at_chunk = 1;
+        CHECK_THAT( upload( t ), ContainsSubstring( "interrupted" ) && ContainsSubstring( "unchanged" )
+                                     && ContainsSubstring( "device disconnected" ) );
+        CHECK( t.chunks.size() == 2 );
     }
     SECTION( "in the commit" )
     {

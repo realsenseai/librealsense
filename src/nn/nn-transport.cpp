@@ -27,8 +27,18 @@ void nn_transport::send_table( uint16_t table_id, uint32_t param1, uint32_t para
     for( size_t i = 0; i < n_chunks; ++i )
     {
         size_t const offset = i * nn::CHUNK_SIZE;
-        if( auto err = send_chunk( table_id, param1, param3, nn::chunk_param( n_chunks, i ), table.data() + offset,
-                                   std::min( nn::CHUNK_SIZE, table.size() - offset ) ) )
+        int32_t err;
+        try
+        {
+            err = send_chunk( table_id, param1, param3, nn::chunk_param( n_chunks, i ), table.data() + offset,
+                              std::min( nn::CHUNK_SIZE, table.size() - offset ) );
+        }
+        catch( std::exception const & e )
+        {
+            // The device writes nothing until the last chunk arrives
+            throw io_exception( rsutils::string::from() << nn::INTERRUPTED_MESSAGE << " (" << e.what() << ")" );
+        }
+        if( err )
             nn::throw_error( err );
         if( progress )
             progress( 0.9f * ( i + 1 ) / n_chunks );
