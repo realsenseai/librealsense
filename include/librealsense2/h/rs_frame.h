@@ -165,7 +165,7 @@ typedef enum rs2_frame_metadata_value
     RS2_FRAME_METADATA_COLOR_FRAME_COUNTER                  , /**< Point cloud: RGB frame matched to the cloud, or used by the segmentation (LPCL) */
     RS2_FRAME_METADATA_COLOR_SYNC_DELTA                     , /**< Point cloud: signed Depth - RGB capture timestamp delta, in microseconds */
     RS2_FRAME_METADATA_SEGMENTATION_MODE                    , /**< OG / LPCL: 0 - segmentation not applied, otherwise the mode applied */
-    RS2_FRAME_METADATA_SEGMENTATION_CLASS                   , /**< OG / LPCL: bitmask of the segmentation classes applied */
+    RS2_FRAME_METADATA_SEGMENTATION_CLASSES                 , /**< OG / LPCL: bitmask of the segmentation classes applied */
     RS2_FRAME_METADATA_PCL_OCCLUSION_REMOVAL                , /**< Point cloud: 0 - occlusion removal off, 1 - on */
     RS2_FRAME_METADATA_COUNT
 } rs2_frame_metadata_value;

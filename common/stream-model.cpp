@@ -1510,7 +1510,7 @@ namespace rs2
         descriptions[RS2_FRAME_METADATA_COLOR_FRAME_COUNTER] = "RGB frame matched to the cloud, or used by the segmentation";
         descriptions[RS2_FRAME_METADATA_COLOR_SYNC_DELTA] = "Signed Depth - RGB capture timestamp delta, in microseconds";
         descriptions[RS2_FRAME_METADATA_SEGMENTATION_MODE] = "0 - segmentation not applied, otherwise the mode applied";
-        descriptions[RS2_FRAME_METADATA_SEGMENTATION_CLASS] = "Bitmask of the segmentation classes applied";
+        descriptions[RS2_FRAME_METADATA_SEGMENTATION_CLASSES] = "Bitmask of the segmentation classes applied";
         descriptions[RS2_FRAME_METADATA_PCL_OCCLUSION_REMOVAL] = "0 - occlusion removal off, 1 - on";
 
         meanings =

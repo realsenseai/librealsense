@@ -608,7 +608,7 @@ namespace librealsense
             make_attribute_parser(&md_occupancy::segmentation_mode,
                 md_occupancy_attributes::segmentation_mode_attribute, md_prop_offset));
 
-        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_SEGMENTATION_CLASS,
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_SEGMENTATION_CLASSES,
             make_attribute_parser(&md_occupancy::segmentation_classes,
                 md_occupancy_attributes::segmentation_classes_attribute, md_prop_offset));
 
@@ -783,7 +783,7 @@ namespace librealsense
             make_attribute_parser(&md_point_cloud::segmentation_mode,
                 md_point_cloud_attributes::segmentation_mode_attribute, md_prop_offset));
 
-        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_SEGMENTATION_CLASS,
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_SEGMENTATION_CLASSES,
             make_attribute_parser(&md_point_cloud::segmentation_classes,
                 md_point_cloud_attributes::segmentation_classes_attribute, md_prop_offset));
 
