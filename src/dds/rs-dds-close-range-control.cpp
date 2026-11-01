@@ -70,9 +70,10 @@ namespace librealsense {
         int32_t fields[field_count];
         for( size_t i = 0; i < field_count; ++i )
             fields[i] = _fields[i] ? get( i, *_fields[i] ) : 0;
-        auto bytes = reinterpret_cast< uint8_t * >( &cfg );
-        std::memcpy( bytes + fields_offset, fields, sizeof( fields ) );
-        return { bytes, bytes + sizeof( cfg ) };
+        std::vector< uint8_t > raw( sizeof( cfg ) );
+        std::memcpy( raw.data(), &cfg, sizeof( cfg ) );
+        std::memcpy( raw.data() + fields_offset, fields, sizeof( fields ) );
+        return raw;
     }
 
     std::vector< uint8_t > rs_dds_close_range_control::get_raw() const
