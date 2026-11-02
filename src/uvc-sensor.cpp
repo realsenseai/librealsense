@@ -283,12 +283,13 @@ void uvc_sensor::open( const stream_profiles & requests )
 
                     pin_stream * stream = &streams.front();
                     auto && fr = generate_frame_from_data( f,
-                                                                 system_time,
-                                                                 _timestamp_reader.get(),
-                                                                 stream->last_timestamp,
-                                                                 stream->last_frame_number,
-                                                                 stream->base );
-                    // Attribute the frame before allocating it, so it comes from its own stream's frame pool
+                                                           system_time,
+                                                           _timestamp_reader.get(),
+                                                           stream->last_timestamp,
+                                                           stream->last_frame_number,
+                                                           stream->base );
+                    // fr only holds the metadata; attribute it before alloc_frame below takes the frame from its
+                    // stream's pool, and re-stamp it with that stream's history
                     if( resolver )
                     {
                         stream = attribute_frame( streams, resolver, *fr, reported_unnamed );
