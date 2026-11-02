@@ -229,10 +229,10 @@ jobs:
     env:
       EXPECTED_CMAKE_MAJOR_VER: 3
       EXPECTED_CMAKE_MINOR_VER: 10
-      # Latest patch release of the minimal version line, used for the fast path only
-      EXPECTED_CMAKE_PATCH_VER: 3
+      # First release of the minimal version line (the real floor), used for the fast path only
+      EXPECTED_CMAKE_PATCH_VER: 0
       # SHA-256 of cmake-<ver>-Linux-x86_64.tar.gz, from https://cmake.org/files/v<major>.<minor>/cmake-<ver>-SHA-256.txt
-      EXPECTED_CMAKE_SHA256: 9e7c48b797484f74c5ee3ae55132b40b16ed8e81ee762402da8971205b0a896b
+      EXPECTED_CMAKE_SHA256: 6b5ea290042fac96023fd5387cd65cc69fdf4f48bad91177eb8697ba37e3deb3
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
