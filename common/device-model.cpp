@@ -3408,10 +3408,10 @@ namespace rs2
             {
                 if (sub->s->is<rs2::depth_mapping_sensor>() && sub->streaming)
                 {
-                    // The device point cloud is self-contained; only the other streams need depth to be viewed in 3D
-                    auto active = sub->s->get_active_streams();
-                    depth_mapping_sensor_streaming = active.empty() || std::any_of(active.begin(), active.end(),
-                        [](const rs2::stream_profile& p) { return p.stream_type() != RS2_STREAM_POINT_CLOUD; });
+                    // The device point cloud is self-contained; only LPC and occupancy need depth to be viewed in 3D
+                    if( subdevice_has_stream_enabled( *sub, RS2_STREAM_LABELED_POINT_CLOUD )
+                        || subdevice_has_stream_enabled( *sub, RS2_STREAM_OCCUPANCY ) )
+                        depth_mapping_sensor_streaming = true;
                 }
                 if (sub->s->is<rs2::depth_stereo_sensor>() && sub->streaming)
                 {
