@@ -118,6 +118,11 @@ namespace librealsense
 
     void d500_object_detection_sensor::open( const stream_profiles & requests )
     {
+        auto & depth_sensor = _owner->get_depth_sensor();
+        if( depth_sensor.supports_option( RS2_OPTION_DUAL_RGB_RECTIFICATION )
+            && depth_sensor.get_option( RS2_OPTION_DUAL_RGB_RECTIFICATION ).query() != 0.f )
+            throw wrong_api_call_sequence_exception( "Object detection is not supported while dual RGB rectification is on" );
+
         synthetic_sensor::open( requests );
     }
 
