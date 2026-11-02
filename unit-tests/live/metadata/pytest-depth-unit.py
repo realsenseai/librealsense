@@ -67,17 +67,18 @@ def test_depth_units_from_advanced_mode(test_device_wrapped, restore_depth_table
     dev, ctx = test_device_wrapped
     require_dds_depth_units(dev)
 
-    def median_distance():
+    def depth_meters():
         # Let the FW apply the change and older frames drain; the stream restarts with a few empty frames.
-        # Saturated pixels follow the units, so they are not distances; a too-sparse scene gives None.
+        # Saturated pixels follow the units, so they are not distances: NaN, like holes.
         for i in range(90):
             frame = pipeline.wait_for_frames().get_depth_frame()
             raw = np.asanyarray(frame.get_data())
-            valid = raw[(raw > 0) & (raw < 0xFFFF)]
-            if i >= 30 and valid.size >= raw.size // 20:
-                return frame.get_units(), float(np.median(valid)) * frame.get_units()
-        log.warning(f"only {valid.size} of {raw.size} depth pixels are valid, not checking distance")
-        return frame.get_units(), None
+            valid = (raw > 0) & (raw < 0xFFFF)
+            if i >= 30 and valid.sum() >= raw.size // 20:
+                break
+        if valid.sum() < raw.size // 20:
+            log.warning(f"only {valid.sum()} of {raw.size} depth pixels are valid")
+        return frame.get_units(), np.where(valid, raw * frame.get_units(), np.nan)
 
     pipeline = start_depth(dev, ctx)
     try:
@@ -85,13 +86,13 @@ def test_depth_units_from_advanced_mode(test_device_wrapped, restore_depth_table
         streaming_dev = pipeline.get_active_profile().get_device()
         am = rs.rs400_advanced_mode(streaming_dev)
         ds = streaming_dev.first_depth_sensor()
-        _, baseline = median_distance()
+        _, baseline = depth_meters()
         for units in (2000, 500):  # micrometers; 500 still covers 32m, so no far pixel saturates
             dt = am.get_depth_table()
             dt.depthUnits = units
             am.set_depth_table(dt)
             expected = units * 1e-6
-            frame_units, distance = median_distance()
+            frame_units, distance = depth_meters()
             # Over DDS the option value follows the frames by about a second
             deadline = time.time() + 3
             while ds.get_depth_scale() != pytest.approx(expected, rel=1e-3) and time.time() < deadline:
@@ -100,8 +101,13 @@ def test_depth_units_from_advanced_mode(test_device_wrapped, restore_depth_table
             check.almost_equal(ds.get_depth_scale(), expected, rel=1e-3, msg=f"depth scale after setting {units}um")
             if ds.supports(rs.option.depth_units):
                 check.almost_equal(ds.get_option(rs.option.depth_units), expected, rel=1e-3)
-            # The scene did not move, so the measured distance must not follow the units
-            if baseline is not None and distance is not None:
-                check.almost_equal(distance, baseline, rel=0.15, msg=f"median distance after setting {units}um")
+            # The scene did not move, so each pixel's distance must not follow the units. Only pixels valid
+            # in both frames count (NaN otherwise), so a change in fill or clamping cannot move the result.
+            ratio = distance / baseline
+            usable = np.isfinite(ratio)  # pixels valid in both frames
+            if np.count_nonzero(usable) >= 0.05 * usable.size:  # at least 5% of the image
+                check.almost_equal(float(np.nanmedian(ratio)), 1.0, rel=0.10, msg=f"distance ratio after setting {units}um")
+            else:
+                log.warning(f"too few depth pixels valid in both frames after setting {units}um, not checking distance")
     finally:
         pipeline.stop()
