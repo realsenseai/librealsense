@@ -229,6 +229,7 @@ EXPORTS
     rs2_create_m420_decoder
     rs2_create_nv12_decoder
     rs2_create_mjpeg_decoder
+    rs2_create_h264_decoder
     rs2_create_threshold
     rs2_create_units_transform
     rs2_create_decimation_filter_block
