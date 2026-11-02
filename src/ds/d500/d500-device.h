@@ -90,20 +90,6 @@ namespace librealsense
         std::shared_ptr<synthetic_sensor> create_depth_device(std::shared_ptr<context> ctx,
             const std::vector<platform::uvc_device_info>& all_device_infos);
 
-        // Adds a rule that vetoes stream combinations this device cannot run: feature mixins register
-        // their hardware's restrictions at construction, and each throws when a request violates it.
-        void add_stream_combination_validator( std::function< void( const stream_profiles & ) > validator )
-        {
-            _stream_combination_validators.push_back( std::move( validator ) );
-        }
-
-        // Throws if the profiles cannot stream together. A device with no registered rule allows everything.
-        void stream_combination_allowed_or_throw( const stream_profiles & requests ) const
-        {
-            for( auto & validator : _stream_combination_validators )
-                validator( requests );
-        }
-
         synthetic_sensor& get_depth_sensor()
         {
             return dynamic_cast<synthetic_sensor&>(get_sensor(_depth_device_idx));
@@ -201,7 +187,6 @@ namespace librealsense
         bool _is_symmetrization_enabled = true;
         bool _is_mipi_device = false;
 
-        std::vector< std::function< void( const stream_profiles & ) > > _stream_combination_validators;
         // Populated in init() only when _is_mipi_device is true.
         std::unique_ptr< d500_mipi_device > _mipi_device;
     };
