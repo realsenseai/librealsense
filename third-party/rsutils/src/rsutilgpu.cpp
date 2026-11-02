@@ -396,12 +396,15 @@ namespace rsutils {
     }
 
     // Vendor-agnostic entry point for the frame-conversion dispatch sites under src/proc.
-    // Those compile to CUDA or HIP kernels depending on the build, so they must not gate on
-    // one vendor's driver. True if either probe finds a device; each probe caches internally
-    // so this is two cheap atomic loads after warm-up.
+    // Those compile to CUDA or HIP kernels depending on the build (never both), so this asks
+    // only the probe of the vendor the build was compiled for.
     bool rs2_is_gpu_available()
     {
-        return rs2_is_cuda_available() || rs2_is_hip_available();
+#ifdef RS2_USE_HIP
+        return rs2_is_hip_available();
+#else
+        return rs2_is_cuda_available();
+#endif
     }
 
 } // namespace rsutils
