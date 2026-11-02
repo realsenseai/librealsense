@@ -60,7 +60,8 @@ namespace rs2
 
     bool is_valid_url( const std::string & url )
     {
-        static const std::regex url_regex( R"(^(https?):\/\/([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/[^\s]*)?$)",
+        // No single quotes: open_url() single-quotes the URL for the shell on Linux/macOS
+        static const std::regex url_regex( R"(^(https?):\/\/([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/[^\s']*)?$)",
                                            std::regex::icase );
 
         return std::regex_match( url, url_regex );
@@ -73,15 +74,6 @@ namespace rs2
             LOG_ERROR( "Invalid URL: " << ( url ? url : "(null)" ) );
             return false;
         }
-#if defined __linux__ || defined __APPLE__
-        // The URL is single-quoted below so the shell does not interpret it; a quote inside
-        // would break out of that quoting, so reject it (Windows uses no shell, so no check there)
-        if( std::string( url ).find( '\'' ) != std::string::npos )
-        {
-            LOG_ERROR( "Invalid URL: " << url );
-            return false;
-        }
-#endif
         // No browser or no handler is the user's environment, not a program error
 #if (defined(_WIN32) || defined(_WIN64))
         bool ok = reinterpret_cast<INT_PTR>(ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOW)) >= 32;
