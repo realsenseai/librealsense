@@ -254,8 +254,8 @@ void uvc_sensor::open( const stream_profiles & requests )
 
     for( auto && streams : group_by_pin( requests ) )
     {
-        auto && req_profile_base = streams.front().base;
-        auto resolver = multiplexed_pin_resolver( *req_profile_base );
+        auto && pin_profile = streams.front().base;  // a multiplexed pin's streams share one backend profile
+        auto resolver = multiplexed_pin_resolver( *pin_profile );
         try
         {
             // Shared across the capture lambda and every deferred zero-copy release: counts
@@ -264,7 +264,7 @@ void uvc_sensor::open( const stream_profiles & requests )
             auto zc_inflight = std::make_shared< std::atomic< int > >( 0 );
             _zc_inflight.push_back( zc_inflight );  // close() drains this before buffers are freed
             _device->probe_and_commit(
-                req_profile_base->get_backend_profile(),
+                pin_profile->get_backend_profile(),
                 [this, streams, resolver, zc_inflight, per_stream_color_fn, reported_unnamed = false](
                     platform::stream_profile p,
                     platform::frame_object f,
@@ -524,7 +524,7 @@ void uvc_sensor::open( const stream_profiles & requests )
             }
             throw;
         }
-        commited.push_back( req_profile_base->get_backend_profile() );
+        commited.push_back( pin_profile->get_backend_profile() );
     }
 
     _internal_config = commited;
@@ -778,6 +778,13 @@ stream_profiles uvc_sensor::init_stream_profiles()
             // pins sharing {w,h,fps,format} would collapse to a single SDK profile in the set below.
             if( _stream_id_resolver )
                 _stream_id_resolver( uvc_profiles, p, stream_type, stream_indexes );
+            if( stream_indexes.empty() )
+            {
+                // A resolver bug; keep the pin visible rather than drop all its profiles
+                LOG_ERROR( "Stream-id resolver gave no stream index for " << get_string( stream_type ) << " pin "
+                           << p.pin_index << "; using index 0" );
+                stream_indexes = { 0 };
+            }
             if( stream_indexes.size() > 1 )
                 _multiplexed_pins.insert( p.pin_index );
 

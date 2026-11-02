@@ -50,7 +50,8 @@ public:
     void set_stream_id_resolver( stream_id_resolver resolver ) { _stream_id_resolver = std::move( resolver ); }
 
     // A multiplexed pin is enumerated once per stream it carries and opened once for all of them. The resolver
-    // sets the stream index of each captured frame (from its metadata), or returns false to drop the frame.
+    // sets the stream index of each captured frame (from its metadata), or returns false to drop the frame. It is
+    // called only for multiplexed pins (several indexes from the stream-id resolver), never for ordinary pins.
     using frame_stream_resolver = std::function< bool( const frame_interface * frame, int & index ) >;
     void set_frame_stream_resolver( frame_stream_resolver resolver ) { _frame_stream_resolver = std::move( resolver ); }
 
