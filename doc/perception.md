@@ -1,6 +1,6 @@
 # Perception on D5x5 Cameras
 
-D5x5 cameras (D585, D535) process depth on the camera itself and stream perception outputs, like occupancy grid and point clouds, instead of only raw depth.
+D5x5 cameras process depth on the camera itself and stream perception outputs, like occupancy grid and point clouds, instead of only raw depth.
 
 ## Table of Contents
 * [Sensors](#sensors)
