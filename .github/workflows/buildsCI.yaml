@@ -396,8 +396,7 @@ jobs:
       run: |
         cd build
         # `OPENSSL_ROOT_DIR` setting is Used by libcurl for 'CHECK_FOR_UPDATES' capability
-        # We use "greadlink -f" which is mac-os parallel command to "readlink -f" from Linux (-f to convert relative link to absolute link)
-        export OPENSSL_ROOT_DIR=`greadlink -f /usr/local/opt/openssl@1.1`        
+        export OPENSSL_ROOT_DIR=$(brew --prefix openssl)
         echo "OPENSSL_ROOT_DIR = ${OPENSSL_ROOT_DIR}"
         cmake .. -DCMAKE_CXX_STANDARD=20 -DCMAKE_BUILD_TYPE=${{env.LRS_BUILD_CONFIG}} -DBUILD_EXAMPLES=true -DBUILD_WITH_OPENMP=false -DHWM_OVER_XU=false -DCHECK_FOR_UPDATES=true -DBUILD_WITH_DDS=true
         cmake --build . -- -j4

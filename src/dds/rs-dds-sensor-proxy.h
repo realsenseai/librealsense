@@ -17,6 +17,7 @@
 #include <rsutils/json-fwd.h>
 #include <memory>
 #include <map>
+#include <set>
 
 
 namespace realdds {
@@ -54,6 +55,7 @@ class dds_sensor_proxy : public software_sensor
     static void frame_releaser( syncer_type::frame_type * f ) { static_cast< frame * >( f )->release(); }
 
     std::shared_ptr< roi_sensor_interface > _roi_support;
+    std::set< std::string > _embedded_filter_names;
 
 protected:
     struct streaming_impl

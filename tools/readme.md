@@ -4,6 +4,7 @@
 2. [Depth Quality Tool](./depth-quality) - Application that calculates and visualizes depth metrics to assess and characterize the quality of the depth data.
 3. [Convert Tool](./convert) - Console application for converting recording files to various formats, including legacy `.bag` to `.db3` conversion
 4. [Recorder](./recorder) - Simple command line data recorder (records to `.db3`)
+5. [NN-Load](./nn-load) - Console application for uploading NN model packages to the camera
 
 ### Debug Tools
 
