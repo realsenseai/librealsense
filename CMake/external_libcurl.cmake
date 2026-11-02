@@ -14,9 +14,16 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
     endif()
     
     # Add SSL library flag
+    # 8.19.0: supports OpenSSL 4 (opaque ASN1 types), last that builds with CMake < 3.18
+    set(CURL_GIT_TAG "curl-8_19_0")
     if (WIN32)
         set(CURL_FLAGS ${CURL_FLAGS} -DCURL_USE_SCHANNEL=ON )
     else()
+        find_package(OpenSSL REQUIRED)
+        # curl dropped OpenSSL 1.1.x in 8.18.0 (e.g. Ubuntu 20.04 / JetPack 5); no single curl supports both 1.1 and 4
+        if(OPENSSL_VERSION VERSION_LESS 3)
+            set(CURL_GIT_TAG "curl-8_8_0")
+        endif()
         set(CURL_FLAGS ${CURL_FLAGS} -DCURL_USE_OPENSSL=ON )
         # Build curl against the same OpenSSL we link below (e.g. with both openssl@3 and openssl@4 installed)
         if(OPENSSL_ROOT_DIR)
@@ -39,8 +46,7 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
         libcurl
         PREFIX libcurl
         GIT_REPOSITORY "https://github.com/curl/curl.git"
-        # 8.19.0: first with OpenSSL 4 support (opaque ASN1 types), last that builds with CMake < 3.18
-        GIT_TAG "curl-8_19_0"
+        GIT_TAG ${CURL_GIT_TAG}
         SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/third-party/libcurl
         CMAKE_ARGS  --no-warn-unused-cli
                     -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
@@ -76,7 +82,6 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
     if (WIN32)
         target_link_libraries(curl INTERFACE ws2_32.lib crypt32.lib secur32.lib iphlpapi.lib)
     else()
-        find_package(OpenSSL REQUIRED)
         target_link_libraries(curl INTERFACE OpenSSL::SSL OpenSSL::Crypto)
         if (APPLE)
             target_link_libraries(curl INTERFACE "-framework CoreFoundation -framework SystemConfiguration")
