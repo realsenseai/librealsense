@@ -251,7 +251,8 @@ namespace librealsense
 
         // Each control is probed before it is built - registering an unpublished one would only add a
         // dead control, and building one to find that out wastes an object.
-        for( auto id : { RS2_OPTION_BACKLIGHT_COMPENSATION, RS2_OPTION_BRIGHTNESS, RS2_OPTION_CONTRAST,
+        // Backlight compensation is deliberately not exposed: it is not a supported D585 RGB control.
+        for( auto id : { RS2_OPTION_BRIGHTNESS, RS2_OPTION_CONTRAST,
                          RS2_OPTION_SATURATION, RS2_OPTION_GAMMA, RS2_OPTION_SHARPNESS, RS2_OPTION_HUE } )
             if( is_pu_published( raw_ep, rgb_pu, id ) )
                 color_ep.register_option( id, make_rgb_option( id ) );
