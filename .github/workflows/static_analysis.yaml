@@ -231,6 +231,8 @@ jobs:
       EXPECTED_CMAKE_MINOR_VER: 10
       # Latest patch release of the minimal version line, used for the fast path only
       EXPECTED_CMAKE_PATCH_VER: 3
+      # SHA-256 of cmake-<ver>-Linux-x86_64.tar.gz, from https://cmake.org/files/v<major>.<minor>/cmake-<ver>-SHA-256.txt
+      EXPECTED_CMAKE_SHA256: 9e7c48b797484f74c5ee3ae55132b40b16ed8e81ee762402da8971205b0a896b
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
@@ -248,6 +250,7 @@ jobs:
           echo "Downloading $url"
           mkdir -p "$RUNNER_TEMP/cmake-min"
           curl -fsSL "$url" -o "$RUNNER_TEMP/cmake-min.tar.gz"
+          echo "${EXPECTED_CMAKE_SHA256}  $RUNNER_TEMP/cmake-min.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/cmake-min.tar.gz" -C "$RUNNER_TEMP/cmake-min" --strip-components=1
           "$RUNNER_TEMP/cmake-min/bin/cmake" --version
 
