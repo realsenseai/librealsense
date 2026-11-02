@@ -68,13 +68,20 @@ namespace rs2
 
     bool open_url(const char* url)
     {
-        // Reject single quotes: on Linux/macOS the URL is single-quoted below so the shell
-        // does not interpret it, and a quote inside would break out of that quoting
-        if( !url || !is_valid_url( url ) || std::string( url ).find( '\'' ) != std::string::npos )
+        if( !url || !is_valid_url( url ) )
         {
             LOG_ERROR( "Invalid URL: " << ( url ? url : "(null)" ) );
             return false;
         }
+#if defined __linux__ || defined __APPLE__
+        // The URL is single-quoted below so the shell does not interpret it; a quote inside
+        // would break out of that quoting, so reject it (Windows uses no shell, so no check there)
+        if( std::string( url ).find( '\'' ) != std::string::npos )
+        {
+            LOG_ERROR( "Invalid URL: " << url );
+            return false;
+        }
+#endif
         // No browser or no handler is the user's environment, not a program error
 #if (defined(_WIN32) || defined(_WIN64))
         bool ok = reinterpret_cast<INT_PTR>(ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOW)) >= 32;
