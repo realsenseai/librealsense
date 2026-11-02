@@ -4,6 +4,9 @@
 import pyrealsense2 as rs, os, random, csv
 from pytest_check import check
 from rspy import repo
+import pytest
+
+pytestmark = pytest.mark.infra  # reads recordings served from Artifactory: runs in LibCI (--live), not in GitHub
 
 # The post-processing reference dataset (the 1551*.Input/.Output .raw/.csv files) is
 # provisioned at build time by CMake (unit-tests/live/CMakeLists.txt downloads

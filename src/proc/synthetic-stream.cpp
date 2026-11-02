@@ -257,14 +257,16 @@ namespace librealsense
         auto&& ret = prepare_frame(source, f);
         int width = 0;
         int height = 0;
-        int raw_size = 0;
+        // Source buffer length; software-device frames report 0 and hold height*stride by contract
+        int raw_size = f.get_data_size();
         auto vf = ret.as<rs2::video_frame>();
         if (vf)
         {
             width = vf.get_width();
             height = vf.get_height();
-            if (f.supports_frame_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE))
-                raw_size = static_cast<int>(f.get_frame_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE));
+            if (auto src = f.as<rs2::video_frame>())
+                if (!raw_size)
+                    raw_size = src.get_height() * src.get_stride_in_bytes();
         }
         uint8_t * planes[1];
         planes[0] = (uint8_t *)ret.get_data();

@@ -161,6 +161,8 @@ private:
     on_device_log_signal _on_device_log;
     on_notification_signal _on_notification;
     on_calibration_changed_signal _on_calibration_changed;
+    // Sensors open and close from their own threads; each change and its control message must not interleave
+    std::mutex _open_profiles_mutex;
     dds_stream_profiles _open_profiles_list;
 };
 

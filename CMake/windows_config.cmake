@@ -76,7 +76,6 @@ macro(os_set_flags)
         endif()
         
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj /wd4819")
-        set(LRS_TRY_USE_AVX true)
         add_definitions(-D_UNICODE)
     endif()
     set(DOTNET_VERSION_LIBRARY "3.5" CACHE STRING ".Net Version, defaulting to '3.5', the Unity wrapper currently supports only .NET 3.5")
@@ -88,8 +87,12 @@ macro(os_set_flags)
 endmacro()
 
 macro(os_target_config)
-    message(STATUS "Building with SSE optimizations")
-    add_definitions(-D__SSSE3__ -D_CRT_SECURE_NO_WARNINGS)
+    # MSVC's SSE headers are x86/x64-only
+    if(NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID MATCHES "ARM")
+        message(STATUS "Building with SSE optimizations")
+        add_definitions(-D__SSSE3__)
+    endif()
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
     if(FORCE_RSUSB_BACKEND)
         if (NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR)

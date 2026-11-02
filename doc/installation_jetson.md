@@ -74,6 +74,16 @@ You can also double-TAB after typing `rs-` to see the full list of SDK examples.
 > Note: you may need to also run the driver patch script in order for the camera to work on your platform:
 See [building-from-source-using-native-backend](https://github.com/realsenseai/librealsense/edit/development/doc/installation_jetson.md#building-from-source-using-native-backend)
 
+### 5. Install the Python Wrapper with pip
+
+The [`pyrealsense2`](https://pypi.org/project/pyrealsense2/) `aarch64` wheels are CUDA builds, one per JetPack line, and **the wheel's Python version selects the JetPack it was built for**. Install with the Python version that matches your JetPack; the JetPack ↔ Python table for the current release is on the [PyPI project page](https://pypi.org/project/pyrealsense2/).
+
+```sh
+python3.<X> -m pip install pyrealsense2
+```
+
+Installing with a different Python silently pulls a wheel built for another JetPack's CUDA and GPU-accelerated paths will fail. For any other Python version, or to run without CUDA, [build the wrapper from source](../wrappers/python/readme.md#building-from-source).
+
 ## Building from Source using **RSUSB** Backend
 
 ⮕ Use the RSUSB backend without the kernel patching

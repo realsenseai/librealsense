@@ -13,10 +13,6 @@ sudo examples/rs-hello-realsense
 sudo examples/rs-depth
  ```
 
-**Current Limitations:**
-- **RealSense Viewer is not supported** on macOS in the current release
-- **Motion sensors (IMU) are disabled** on macOS in the current release
-
 ## Building from Source
 
 1. Install CommandLineTools `sudo xcode-select --install` or download XCode 6.0+ via the AppStore

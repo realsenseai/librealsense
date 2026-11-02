@@ -11,11 +11,14 @@
 #include <rsutils/os/os.h>  // get_os_name, cpu_arch
 #include <rsutils/json.h>
 #include <rsutils/json-config.h>
+#include <rsutils/easylogging/easyloggingpp.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <random>
 #include <chrono>
+#include <vector>
 
 
 #ifdef _WIN32
@@ -31,6 +34,9 @@ namespace librealsense {
 namespace rum {
 
 static constexpr int rum_schema_version = 1;
+
+// The server rejects a body over this; an uncapped report would grow past it and never be sent again.
+static constexpr size_t max_report_bytes = 64 * 1024;
 
 
 // Report file: <app-data>/rum/rum.json. Forward slashes work on Windows and POSIX.
@@ -228,9 +234,17 @@ void rum_collector::record_notification( std::string const & category )
 }
 
 
-std::string rum_collector::get_report() const
+std::string rum_collector::get_report()
 {
     std::lock_guard< std::mutex > lk( _mutex );
+    json report = build_report();
+    trim_to_limit( report );
+    return report.dump( 2 );   // stored readable; the uploader compacts it before sending
+}
+
+
+json rum_collector::build_report() const
+{
     json report = json::object();
     report["schema_version"] = rum_schema_version;
     report["source_id"] = _source_id;
@@ -267,7 +281,7 @@ std::string rum_collector::get_report() const
         {
             json stream = json::object();
             stream["count"] = se.second.count;
-            stream["duration_seconds"] = se.second.duration_seconds;
+            stream["duration_seconds"] = std::round( se.second.duration_seconds * 10. ) / 10.;
             device["streams"][se.first] = stream;
         }
 
@@ -295,7 +309,41 @@ std::string rum_collector::get_report() const
         notification["count"] = entry.second;
         report["notifications"].push_back( notification );
     }
-    return report.dump( 2 );
+    return report;
+}
+
+
+void rum_collector::trim_to_limit( json & report )
+{
+    // The limit is on what gets uploaded, so measure the compact form - the file is the same report
+    // written readable.
+    size_t size = report.dump().size();
+    if( size <= max_report_bytes )
+        return;
+
+    // Streams are the only entry whose key count is unbounded - one per configuration ever opened -
+    // so they are what grows a report past the limit. Drop the least-used ones first.
+    struct entry { int count; device_stat * device; std::string label; };
+    std::vector< entry > streams;
+    for( auto & de : _devices )
+        for( auto const & se : de.second.streams )
+            streams.push_back( { se.second.count, &de.second, se.first } );
+    std::sort( streams.begin(), streams.end(),
+               []( entry const & l, entry const & r ) { return l.count < r.count; } );
+
+    size_t dropped = 0;
+    while( dropped < streams.size() && size > max_report_bytes )
+    {
+        size_t const per_entry = std::max< size_t >( 1, size / ( streams.size() - dropped ) );
+        size_t const batch = std::max< size_t >( 1, ( size - max_report_bytes ) / per_entry );
+        for( size_t n = 0; n < batch && dropped < streams.size(); ++n, ++dropped )
+            streams[dropped].device->streams.erase( streams[dropped].label );
+        report = build_report();
+        size = report.dump().size();
+    }
+    // Reports the resulting size, which stays over the limit if dropping every stream wasn't enough.
+    LOG_WARNING( "RUM report over " << max_report_bytes << " bytes: dropped " << dropped
+                 << " least-used stream entries, now " << size );
 }
 
 

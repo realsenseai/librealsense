@@ -24,6 +24,7 @@ extern "C" {
 #include "h/rs_sensor.h"
 #include "h/rs_safety_sensor.h"
 #include "h/rs_eth_config.h"
+#include "h/rs_nn.h"
 #include "h/rs_rum.h"
 #include "h/rs_composite_option.h"
 #include "h/rs_temporal_filter_dpp.h"
@@ -32,7 +33,7 @@ extern "C" {
 
 #define RS2_API_MAJOR_VERSION    2
 #define RS2_API_MINOR_VERSION    59
-#define RS2_API_PATCH_VERSION    1
+#define RS2_API_PATCH_VERSION    0
 #define RS2_API_BUILD_VERSION    0
 
 #ifndef STRINGIFY

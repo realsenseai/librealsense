@@ -3,6 +3,9 @@
 
 #include "image-neon.h"
 
+#include <cstring>
+#include <vector>
+
 #ifndef ANDROID
     #if defined(__ARM_NEON) && defined(BUILD_WITH_NEON)
     #include <arm_neon.h>
@@ -259,10 +262,16 @@
             const int bpp = FORMAT == RS2_FORMAT_RGB8 || FORMAT == RS2_FORMAT_BGR8 ? 3 : 4;
             const auto y_plane = s;
             const auto uv_plane = s + width * height;
+            // Zero-copy capture buffers are uncached, where 16-byte loads are ~7x slower than a bulk copy
+            thread_local std::vector<uint8_t> cached_rows;
+            cached_rows.resize(2 * width);
+            auto y = cached_rows.data();
+            auto uv = y + width;
             for (int row = 0; row < height; ++row)
             {
-                const auto y = y_plane + row * width;
-                const auto uv = uv_plane + (row / 2) * width;
+                memcpy(y, y_plane + row * width, width);
+                if (row % 2 == 0) // a UV row is shared by two Y rows
+                    memcpy(uv, uv_plane + (row / 2) * width, width);
                 auto output = d[0] + row * width * bpp;
                 for (int column = 0; column < width; column += 16)
                 {

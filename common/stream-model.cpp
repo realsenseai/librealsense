@@ -73,7 +73,8 @@ namespace rs2
         frame_number = f.get_frame_number();
         timestamp_domain = f.get_frame_timestamp_domain();
         timestamp = f.get_timestamp();
-        fps.add_timestamp(f.get_timestamp(), f.get_frame_number());
+        // Alternating passive depth numbers both exposure classes on one counter, so each tile sees every 2nd number
+        fps.add_timestamp( f.get_timestamp(), split ? frame_number / 2 : frame_number );
 
         view_fps.add_timestamp(glfwGetTime() * 1000, count++);
 
@@ -256,10 +257,13 @@ namespace rs2
         }
 
         profile = p;
+        ui_key = p.unique_id();  // viewer_model::begin_stream overrides these for a split stream
+        passive = split = false;
         texture->colorize = d->depth_colorizer;
         texture->yuy2rgb = d->yuy2rgb;
         texture->m420_to_rgb = d->m420_to_rgb;
         texture->nv12_to_rgb = d->nv12_to_rgb;
+        texture->mjpeg_to_rgb = d->mjpeg_to_rgb;
         texture->y411 = d->y411;
 
         if (auto vd = p.as<video_stream_profile>())
@@ -523,7 +527,7 @@ namespace rs2
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, header_window_bg);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, header_window_bg);
 
-        std::string label = rsutils::string::from() << "Stream of " << profile.unique_id();
+        std::string label = rsutils::string::from() << "Stream of " << ui_key;
 
         ImGui::GetWindowDrawList()->AddRectFilled({ stream_rect.x, stream_rect.y - top_bar_height },
             { stream_rect.x + stream_rect.w, stream_rect.y }, ImColor(sensor_bg));
@@ -539,6 +543,9 @@ namespace rs2
         ImGui::SetCursorScreenPos({ stream_rect.x + 4 + offset, stream_rect.y - top_bar_height + 7 });
 
         std::string tooltip;
+        // Keep room next to the label for the BETA badge of maturing perception streams
+        const bool beta = is_beta_stream(profile.stream_type());
+        const float beta_badge_width = beta ? RsImGui::BetaBadgeWidth() + ImGui::GetStyle().ItemSpacing.x : 0.f;
         if (dev->dev.supports(RS2_CAMERA_INFO_NAME) &&
             dev->dev.supports(RS2_CAMERA_INFO_SERIAL_NUMBER) &&
             dev->s->supports(RS2_CAMERA_INFO_NAME))
@@ -546,12 +553,15 @@ namespace rs2
             std::string dev_name = dev->dev.get_info(RS2_CAMERA_INFO_NAME);
             std::string dev_serial = dev->dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
             std::string sensor_name = dev->s->get_info(RS2_CAMERA_INFO_NAME);
-            std::string stream_name = profile.stream_name();
+            // A split stream fills two tiles off one profile, so the exposure class has to tell them apart.
+            std::string stream_name = viewer_stream_name( profile.stream_name() );
+            if( split )
+                stream_name += passive ? " Passive" : " Active";
             std::string stream_index_str;
 
             tooltip = rsutils::string::from() << dev_name << " s.n:" << dev_serial << " | " << sensor_name << ", " << stream_name << stream_index_str << " stream";
             const auto approx_char_width = 12;
-            if (stream_rect.w - 32 * num_of_buttons >= (dev_name.size() + dev_serial.size() + sensor_name.size() + stream_name.size() + stream_index_str.size()) * approx_char_width)
+            if (stream_rect.w - 32 * num_of_buttons - beta_badge_width >= (dev_name.size() + dev_serial.size() + sensor_name.size() + stream_name.size() + stream_index_str.size()) * approx_char_width)
                 label = tooltip;
             else
             {
@@ -564,7 +574,7 @@ namespace rs2
                 auto short_sn = dev_serial;
                 short_sn.erase(0, dev_serial.size() - 5).replace(0, 2, "..");
 
-                auto label_length = stream_rect.w - 32 * num_of_buttons;
+                auto label_length = stream_rect.w - 32 * num_of_buttons - beta_badge_width;
                 
 
                 if (label_length >= (short_name.size() + dev_serial.size() + sensor_name.size() + stream_name.size() + stream_index_str.size()) * approx_char_width)
@@ -585,17 +595,23 @@ namespace rs2
             tooltip = label;
         }
 
-        ImGui::PushTextWrapPos(stream_rect.x + stream_rect.w - 32 * num_of_buttons - 5);
+        ImGui::PushTextWrapPos(stream_rect.x + stream_rect.w - 32 * num_of_buttons - beta_badge_width - 5);
         ImGui::Text("%s", label.c_str());
         if (tooltip != label && ImGui::IsItemHovered())
             RsImGui::CustomTooltip("%s", tooltip.c_str());
         ImGui::PopTextWrapPos();
+        // A narrow window can leave no room between the label and the buttons; the badge is dropped rather than drawn under them
+        if (beta && ImGui::GetItemRectMax().x + beta_badge_width <= stream_rect.x + stream_rect.w - 32 * num_of_buttons)
+        {
+            ImGui::SameLine();
+            RsImGui::BetaBadge("Beta feature - still maturing, behavior and output may change");
+        }
 
         ImGui::SetCursorScreenPos({ stream_rect.x + stream_rect.w - 32 * num_of_buttons, stream_rect.y - top_bar_height });
         
         if (graph)
         {
-            label = rsutils::string::from() << textual_icons::bar_chart << "##graph view" << profile.unique_id();
+            label = rsutils::string::from() << textual_icons::bar_chart << "##graph view" << ui_key;
             if (show_graph)
             {
                 ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
@@ -625,7 +641,7 @@ namespace rs2
             ImGui::SameLine();
         }
         
-        label = rsutils::string::from() << textual_icons::list_ul << "##Metadata" << profile.unique_id();
+        label = rsutils::string::from() << textual_icons::list_ul << "##Metadata" << ui_key;
         if (show_metadata)
         {
             ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
@@ -655,7 +671,7 @@ namespace rs2
 
         if (profile.as<rs2::video_stream_profile>()) // Grid/crosshair overlay is only meaningful on 2D video streams
         {
-            label = rsutils::string::from() << textual_icons::grid << "##Grid " << profile.unique_id();
+            label = rsutils::string::from() << textual_icons::grid << "##Grid " << ui_key;
             if (show_crosshair)
             {
                 ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
@@ -789,7 +805,7 @@ namespace rs2
 
         if (RS2_STREAM_OCCUPANCY == profile.stream_type() && _normalized_zoom.w == 1) // hide polygons button when zooming in
         {
-            label = rsutils::string::from() << textual_icons::draw_polygon << "##Safety zones " << profile.unique_id();
+            label = rsutils::string::from() << textual_icons::draw_polygon << "##Safety zones " << ui_key;
             if (show_safety_zones_2d)
             {
                 ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
@@ -822,7 +838,7 @@ namespace rs2
 
         if (show_distance_grid_button)
         {
-            label = rsutils::string::from() << textual_icons::grid << "##Distance grid " << profile.unique_id();
+            label = rsutils::string::from() << textual_icons::grid << "##Distance grid " << ui_key;
             if (show_distance_grid_2d)
             {
                 ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
@@ -843,7 +859,7 @@ namespace rs2
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, header_window_bg);
                 // Edits the member directly - a fresh local copy each frame fought with ImGui's
                 // in-progress edit buffer while typing.
-                std::string cell_size_id = rsutils::string::from() << "##Distance grid cell size " << profile.unique_id();
+                std::string cell_size_id = rsutils::string::from() << "##Distance grid cell size " << ui_key;
                 if (ImGui::InputInt(cell_size_id.c_str(), &distance_grid_cell_size_cm, 0, 0))
                 {
                     distance_grid_cell_size_cm = clamp_distance_grid_cell_size(distance_grid_cell_size_cm);
@@ -874,7 +890,7 @@ namespace rs2
         {
             ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
             ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue);
-            label = rsutils::string::from() << textual_icons::play << "##Resume " << profile.unique_id();
+            label = rsutils::string::from() << textual_icons::play << "##Resume " << ui_key;
             if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
             {
                 dev->resume();
@@ -888,7 +904,7 @@ namespace rs2
         }
         else
         {
-            label = rsutils::string::from() << textual_icons::pause << "##Pause " << profile.unique_id();
+            label = rsutils::string::from() << textual_icons::pause << "##Pause " << ui_key;
             if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
             {
                 dev->pause();
@@ -901,7 +917,7 @@ namespace rs2
         }
         ImGui::SameLine();
 
-        label = rsutils::string::from() << textual_icons::camera << "##Snapshot " << profile.unique_id();
+        label = rsutils::string::from() << textual_icons::camera << "##Snapshot " << ui_key;
         if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
         {
             auto filename = file_dialog_open(save_file, "Portable Network Graphics (PNG)\0*.png\0", nullptr, nullptr);
@@ -917,7 +933,7 @@ namespace rs2
         }
         ImGui::SameLine();
 
-        label = rsutils::string::from() << textual_icons::info_circle << "##Info " << profile.unique_id();
+        label = rsutils::string::from() << textual_icons::info_circle << "##Info " << ui_key;
         if (show_stream_details)
         {
             ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
@@ -957,7 +973,7 @@ namespace rs2
         {
             if (!viewer.fullscreen)
             {
-                label = rsutils::string::from() << textual_icons::window_maximize << "##Maximize " << profile.unique_id();
+                label = rsutils::string::from() << textual_icons::window_maximize << "##Maximize " << ui_key;
 
                 if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
                 {
@@ -976,7 +992,7 @@ namespace rs2
                 ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
                 ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue);
 
-                label = rsutils::string::from() << textual_icons::window_restore << "##Restore " << profile.unique_id();
+                label = rsutils::string::from() << textual_icons::window_restore << "##Restore " << ui_key;
 
                 if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
                 {
@@ -998,7 +1014,7 @@ namespace rs2
 
         if (viewer.allow_stream_close)
         {
-            label = rsutils::string::from() << textual_icons::times << "##Stop " << profile.unique_id();
+            label = rsutils::string::from() << textual_icons::times << "##Stop " << ui_key;
             if (ImGui::Button(label.c_str(), { 24, top_bar_height }))
             {
                 dev->stop(viewer.not_model);
@@ -1255,11 +1271,17 @@ namespace rs2
             { RS2_FRAME_METADATA_POWER_LINE_FREQUENCY                 , "Power Line Frequency for anti-flickering Off/50Hz/60Hz/Auto. " },
         };
 
-
         //add_descriptions_for_d500_metadata_fields(descriptions);
         bool use_depth_mapping_metadata_adaptations = false;
         if (dev)
         {
+            // A separate color sensor, and the D500 color streams, report the exposure in 100 usec units.
+            // Color streams of the depth sensor (e.g. D405) report the depth exposure, in usec.
+            bool const is_d500 = dev->dev.supports( RS2_CAMERA_INFO_PRODUCT_LINE )
+                              && std::string( dev->dev.get_info( RS2_CAMERA_INFO_PRODUCT_LINE ) ) == "D500";
+            if( profile.stream_type() == RS2_STREAM_COLOR && ( is_d500 || ( dev->s && dev->s->is< color_sensor >() ) ) )
+                descriptions[RS2_FRAME_METADATA_ACTUAL_EXPOSURE] = "Sensor's exposure width. When Auto Exposure (AE) is on the value is controlled by firmware. 100 usec units";
+
             // D555 shares the white-balance metadata quirk with the other depth-mapping
             // devices, so it rides along on the same check here.
             use_depth_mapping_metadata_adaptations = device_has_depth_mapping(dev->dev);
@@ -1300,7 +1322,7 @@ namespace rs2
         ImGui::SetCursorScreenPos( { stream_rect.x, stream_rect.y } );
 
         // Creating layer for metadata
-        std::string metadata_layer_id = rsutils::string::from() << "##Metadata-" << profile.unique_id();
+        std::string metadata_layer_id = rsutils::string::from() << "##Metadata-" << ui_key;
         ImGui::BeginChild( metadata_layer_id.c_str(), ImVec2( stream_rect.w + 2, stream_rect.h ) );
         auto screen_pos = ImGui::GetCursorScreenPos( );
         const float space_between_columns = 20.f;
@@ -1338,7 +1360,7 @@ namespace rs2
                     ImGui::SetCursorScreenPos( { screen_pos.x + space_from_left, line_y } ); // create space from left for metadata labels column.
                     ImGui::PushItemWidth(warning_size.x + 5);
 
-                    std::string metadata_id = rsutils::string::from() << "##" << at.name << "-" << profile.unique_id();
+                    std::string metadata_id = rsutils::string::from() << "##" << at.name << "-" << ui_key;
                     ImGui::InputText( metadata_id.c_str(),
                                       (char *)warning_lines[i].c_str(),
                                       warning_lines[i].size(),
@@ -1364,7 +1386,7 @@ namespace rs2
 
                 ImGui::PushItemWidth(label_size.x + 5);  // Set input text width for label.
 
-                std::string label_id = rsutils::string::from() << "##" << at.name << "-" << profile.unique_id();
+                std::string label_id = rsutils::string::from() << "##" << at.name << "-" << ui_key;
                 ImGui::InputText( label_id.c_str(),
                                   (char *)text.c_str(),
                                   text.size(),
@@ -1394,7 +1416,7 @@ namespace rs2
 
                 ImGui::PushItemWidth(value_size.x + 5);  // Set input text width for label value.
 
-                std::string value_id = rsutils::string::from() << "##" << at.name << "-" << at.value << "-" << profile.unique_id();
+                std::string value_id = rsutils::string::from() << "##" << at.name << "-" << at.value << "-" << ui_key;
                 ImGui::InputText( value_id.c_str(),
                                   (char *)text.c_str(),
                                   text.size(),
@@ -1484,7 +1506,12 @@ namespace rs2
         descriptions[RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS] = "Number of rows in the grid. Max value is 250 (corresponding to 5M width with 2cm tile)";
         descriptions[RS2_FRAME_METADATA_OCCUPANCY_GRID_COLUMNS] = "Number of columns in the grid. Max value is 320 (corresponding to ~6.5M depth with 2cm tile)";
         descriptions[RS2_FRAME_METADATA_OCCUPANCY_CELL_SIZE] = "Edge size of each tile, measured in cm";
-        descriptions[RS2_FRAME_METADATA_NUMBER_OF_3D_VERTICES] = "The max number of points is 640*360";
+        descriptions[RS2_FRAME_METADATA_NUMBER_OF_3D_VERTICES] = "W x H of the organized cloud";
+        descriptions[RS2_FRAME_METADATA_COLOR_FRAME_COUNTER] = "RGB frame matched to the cloud, or used by the segmentation";
+        descriptions[RS2_FRAME_METADATA_COLOR_SYNC_DELTA] = "Signed Depth - RGB capture timestamp delta, in microseconds";
+        descriptions[RS2_FRAME_METADATA_SEGMENTATION_MODE] = "0 - segmentation not applied, otherwise the mode applied";
+        descriptions[RS2_FRAME_METADATA_SEGMENTATION_CLASSES] = "Bitmask of the segmentation classes applied";
+        descriptions[RS2_FRAME_METADATA_PCL_OCCLUSION_REMOVAL] = "0 - occlusion removal off, 1 - on";
 
         meanings =
         {
@@ -1851,7 +1878,7 @@ namespace rs2
 
             ImGui::SetCursorScreenPos({ pos.x + 10, pos.y + 5 });
 
-            std::string label = rsutils::string::from() << "Footer for stream of " << profile.unique_id();
+            std::string label = rsutils::string::from() << "Footer for stream of " << ui_key;
 
             ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
             ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, white);
@@ -1895,7 +1922,7 @@ namespace rs2
                 y_offset += 30;
             }
 
-            std::string label = rsutils::string::from() << "IMU Stream Info of " << profile.unique_id();
+            std::string label = rsutils::string::from() << "IMU Stream Info of " << ui_key;
 
             int const line_h = 18;
 
@@ -1947,7 +1974,7 @@ namespace rs2
 
                 ImGui::PushItemWidth(100);
                 ImGui::SetCursorPos({ rc.x + 27 + motion.nameExtraSpace, rc.y + 1 });
-                std::string label = rsutils::string::from() << "##" << profile.unique_id() << "." << rc.y << " " << motion.name.c_str();
+                std::string label = rsutils::string::from() << "##" << ui_key << "." << rc.y << " " << motion.name.c_str();
                 std::string coordinate = rsutils::string::from() << std::fixed << std::setprecision(precision) << std::showpos << motion.coordinate;
                 ImGui::InputText(label.c_str(), (char*)coordinate.c_str(), coordinate.size() + 1, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_ReadOnly);
                 ImGui::PopItemWidth();
@@ -1977,7 +2004,7 @@ namespace rs2
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, header_window_bg);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, header_window_bg);
 
-        std::string label = rsutils::string::from() << "Pose Stream Info of " << profile.unique_id();
+        std::string label = rsutils::string::from() << "Pose Stream Info of " << ui_key;
 
         ImVec2 pos{ stream_rect.x, stream_rect.y + y_offset };
         ImGui::SetCursorScreenPos({ pos.x + 5, pos.y + 5 });
@@ -2062,7 +2089,7 @@ namespace rs2
             }
 
             ImGui::SetCursorPos({ rc.x + 100 + (fullScreen ? pose.nameExtraSpace : 0), rc.y + 1 });
-            std::string label = rsutils::string::from() << "##" << profile.unique_id() << " " << pose.name.c_str();
+            std::string label = rsutils::string::from() << "##" << ui_key << " " << pose.name.c_str();
             std::string data = "";
 
             if (pose.strData.empty())

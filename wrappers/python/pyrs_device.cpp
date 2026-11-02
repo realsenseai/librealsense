@@ -6,6 +6,7 @@ Copyright(c) 2017 RealSense, Inc. All Rights Reserved. */
 #include <librealsense2/hpp/rs_device.hpp>
 #include <librealsense2/hpp/rs_safety_sensor.hpp>
 #include <librealsense2/hpp/rs_record_playback.hpp> // for downcasts
+#include <librealsense2/hpp/rs_nn.hpp>
 #include <common/metadata-helper.h>
 
 #include <iostream>
@@ -29,6 +30,7 @@ void init_device(py::module &m) {
         .def("first_fisheye_sensor", [](rs2::device& self) { return self.first<rs2::fisheye_sensor>(); }) // No docstring in C++
         .def("first_safety_sensor", [](rs2::device& self) { return self.first<rs2::safety_sensor>(); }) // No docstring in C++
         .def("first_perception_sensor", [](rs2::device& self) { return self.first<rs2::perception_sensor>(); }) // No docstring in C++
+        .def("first_depth_mapping_sensor", [](rs2::device& self) { return self.first<rs2::depth_mapping_sensor>(); }) // No docstring in C++
         .def("supports", &rs2::device::supports, "Check if specific camera info is supported.", "info"_a)
         .def("get_info", &rs2::device::get_info, "Retrieve camera specific information, "
              "like versions of various internal components", "info"_a)
@@ -53,6 +55,7 @@ void init_device(py::module &m) {
         .def(BIND_DOWNCAST(device, device_calibration))
         .def(BIND_DOWNCAST(device, calibration_change_device))
         .def(BIND_DOWNCAST(device, firmware_logger))
+        .def(BIND_DOWNCAST(device, nn_loader))
         .def("__repr__", [](const rs2::device &self) {
             std::ostringstream ss;
             auto name = self.get_info( RS2_CAMERA_INFO_NAME );

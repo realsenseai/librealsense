@@ -39,7 +39,7 @@ function WelcomeModal({ isOpen, sdkVersion, onClose }: WelcomeModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-rs-dark border border-gray-600 rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-rs-blue to-blue-600 px-6 py-5">
+        <div className="bg-gradient-to-r from-rs-blue to-rs-accent px-6 py-5">
           <div className="flex items-center gap-3">
             <img src="/realsense-logo.png" alt="RealSense" className="h-8 w-auto" />
             <div>

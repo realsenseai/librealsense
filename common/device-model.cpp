@@ -28,6 +28,7 @@
 #include "d500-on-chip-calib.h"
 #include "subdevice-model.h"
 #include "device-model.h"
+#include "fw-update-common.h"
 
 using namespace rs400;
 using rsutils::json;
@@ -297,8 +298,9 @@ namespace rs2
         {
             auto s = std::make_shared<sensor>(sub);
             auto objects = std::make_shared< atomic_objects_in_frame >();
-            // checking if the sensor is color_sensor or is D405 (with integrated RGB in depth sensor)
-            if (s->is<color_sensor>() || (dev.supports(RS2_CAMERA_INFO_PRODUCT_ID) && !strcmp(dev.get_info(RS2_CAMERA_INFO_PRODUCT_ID), "0B5B")))
+            // The subdevice carrying the color streams owns the detection overlay - a dedicated RGB
+            // sensor, or a stereo module that carries them too (D500 dual-RGB, D405).
+            if (sensor_has_color_stream(s->get_stream_profiles()))
                 objects = _detected_objects;
             auto model = std::make_shared<subdevice_model>(dev, std::make_shared<sensor>(sub), objects, error_message, viewer, this, new_device_connected);
             subdevices.push_back(model);
@@ -374,65 +376,46 @@ namespace rs2
         }
     }
 
-    bool device_model::subdevice_has_perception_stream_enabled( const subdevice_model & sub ) const
+    bool device_model::subdevice_has_stream_enabled( const subdevice_model & sub, rs2_stream type ) const
     {
         for( auto const & kv : sub.stream_enabled )
         {
             if( ! kv.second ) continue;
             for( auto const & p : sub.profiles )
-                if( p.unique_id() == kv.first && p.stream_type() == RS2_STREAM_OBJECT_DETECTION )
+                if( p.unique_id() == kv.first && p.stream_type() == type )
                     return true;
         }
         return false;
     }
 
-    bool device_model::are_color_and_depth_streaming() const
-    {
-        bool has_color = false, has_depth = false;
-        for( auto const & sub : subdevices )
-        {
-            if( ! sub->streaming ) continue;
-            for( auto const & p : sub->profiles )
-            {
-                if( p.stream_type() == RS2_STREAM_COLOR ) has_color = true;
-                if( p.stream_type() == RS2_STREAM_DEPTH ) has_depth = true;
-            }
-            if( has_color && has_depth ) return true;
-        }
-        return false;
-    }
-
-    void device_model::stop_perception_if_video_stopped( viewer_model & viewer )
-    {
-        // If color or depth are no longer both streaming, stop any perception subdevice that is still running.
-        if( are_color_and_depth_streaming() )
-            return;
-        for( auto & sub : subdevices )
-        {
-            if( sub->streaming && subdevice_has_perception_stream_enabled( *sub ) )
-                sub->stop( viewer.not_model );
-        }
-    }
-
-    bool device_model::is_perception_streaming() const
+    bool device_model::is_stream_active( rs2_stream type ) const
     {
         for( auto const & sub : subdevices )
-            if( sub->streaming && subdevice_has_perception_stream_enabled( *sub ) )
+            if( sub->streaming && subdevice_has_stream_enabled( *sub, type ) )
                 return true;
         return false;
     }
 
-    bool device_model::is_perception_blocking_filter_enabled() const
+    bool device_model::subdevice_has_perception( const subdevice_model & sub ) const
     {
-        for( auto const & sub : subdevices )
-            for( auto const & ef : sub->embedded_filters )
-            {
-                auto type = ef->get_filter()->get_type();
-                if( ( type == RS2_EMBEDDED_FILTER_TYPE_DECIMATION || type == RS2_EMBEDDED_FILTER_TYPE_TEMPORAL )
-                    && ef->is_enabled() )
-                    return true;
-            }
-        return false;
+        return subdevice_has_stream_enabled( sub, RS2_STREAM_OBJECT_DETECTION )
+            || subdevice_has_stream_enabled( sub, RS2_STREAM_OCCUPANCY );
+    }
+
+    bool device_model::subdevice_needs_color( const subdevice_model & sub ) const
+    {
+        // Object detection results are drawn on the color stream
+        return subdevice_has_stream_enabled( sub, RS2_STREAM_OBJECT_DETECTION );
+    }
+
+    void device_model::stop_perception_if_video_stopped( viewer_model & viewer )
+    {
+        bool const color_active = is_stream_active( RS2_STREAM_COLOR );
+        for( auto & sub : subdevices )
+        {
+            if( sub->streaming && ! color_active && subdevice_needs_color( *sub ) )
+                sub->stop( viewer.not_model );
+        }
     }
 
     void device_model::play_defaults(viewer_model& viewer)
@@ -537,7 +520,7 @@ namespace rs2
         const int playback_control_height = 35;
         const float combo_box_width = 90.f;
         const float icon_width = 28;
-        const float line_width = 255; //Ideally should use: ImGui::GetContentRegionMax().x
+        const float line_width = 255 + viewer.panel_extra_width(); //Ideally should use: ImGui::GetContentRegionMax().x
         //Line looks like this ("-" == space, "[]" == icon, "[     ]" == combo_box):  |-[]-[]-[]-[]-[]-[     ]-[]-|
         const int num_icons_in_line = 6;
         const int num_combo_boxes_in_line = 1;
@@ -774,7 +757,7 @@ namespace rs2
         return stream.str();
     }
 
-    int device_model::draw_seek_bar()
+    int device_model::draw_seek_bar(float extra_width)
     {
         auto pos = ImGui::GetCursorPos();
 
@@ -789,7 +772,7 @@ namespace rs2
         {
             seek_pos = 0;
         }
-        float seek_bar_width = 300.f;
+        float seek_bar_width = 300.f + extra_width;
         ImGui::PushItemWidth(seek_bar_width);
         std::string label1 = "## " + id;
         if (ImGui::SliderInt(label1.c_str(), &seek_pos, 0, 100, ""))
@@ -832,7 +815,7 @@ namespace rs2
         float seek_bar_left_alignment = 4.f;
         ImGui::SetCursorPos({ pos.x + seek_bar_left_alignment, pos.y + controls_height });
         ImGui::PushFont(font);
-        auto seek_bar_height = draw_seek_bar();
+        auto seek_bar_height = draw_seek_bar(view.panel_extra_width());
         ImGui::PopFont();
         ImGui::PopStyleColor(5);
         return controls_height + seek_bar_height;
@@ -2052,7 +2035,7 @@ namespace rs2
                         }
 
                         ImGui::SameLine();
-                        ImGui::PushItemWidth(185);
+                        ImGui::PushItemWidth(185 + panel_width - viewer_model::default_panel_width);
 
                         ///////////////////////////////////////////
                         //TODO: make this a member function
@@ -2143,7 +2126,15 @@ namespace rs2
 
                     auto & visual_preset_opt_model = sub->options_metadata.at(RS2_OPTION_VISUAL_PRESET);
                     visual_preset_opt_model.custom_draw_method = draw_preset_combo_box;
-                    
+
+                    // The preset can change outside the GUI (e.g. by calibration), re-read the controls it affects
+                    auto const visual_preset = visual_preset_opt_model.value_as_string();
+                    if( visual_preset != _last_visual_preset )
+                    {
+                        _last_visual_preset = visual_preset;
+                        get_curr_advanced_controls = true;
+                    }
+
                     if (sub->draw_option(RS2_OPTION_VISUAL_PRESET, dev.is<playback>() || update_read_only_options, error_message, *viewer.not_model))
                     {
                         get_curr_advanced_controls = true;
@@ -2475,8 +2466,9 @@ namespace rs2
         if (_allow_remove)
         {
             ImGui::Columns(1);
-            float horizontal_distance_from_right_side_of_panel = 47;
-            ImGui::SetCursorPos({ panel_width - horizontal_distance_from_right_side_of_panel, pos.y + 9 + (header_h - panel_height) / 2 });
+            // From the content edge, so it stays aligned with the sensor toggles
+            float horizontal_distance_from_right_side_of_panel = 33;
+            ImGui::SetCursorPos({ windows_width - horizontal_distance_from_right_side_of_panel, pos.y + 9 + (header_h - panel_height) / 2 });
             std::string remove_source_button_label = rsutils::string::from() << textual_icons::times << "##" << id;
             if (ImGui::Button(remove_source_button_label.c_str(), { 33,35 }))
             {
@@ -2671,11 +2663,11 @@ namespace rs2
                         }
                         if (can_stream)
                         {
-                            // Disable the start button for perception streams unless color and depth are already
-                            // streaming, and while a decimation/temporal embedded filter is enabled (mutually exclusive).
-                            bool sub_has_perception = subdevice_has_perception_stream_enabled( *sub );
-                            bool blocking_filter_enabled = sub_has_perception && is_perception_blocking_filter_enabled();
-                            bool disable_perception = ( sub_has_perception && ! are_color_and_depth_streaming() ) || blocking_filter_enabled;
+                            // Object detection overlays need Color. Over GMSL perception and infrared share the IR channel.
+                            bool blocking_ir_active = subdevice_has_perception( *sub ) && fw_update::is_mipi_device( dev )
+                                                   && is_stream_active( RS2_STREAM_INFRARED );
+                            bool missing_color = subdevice_needs_color( *sub ) && ! is_stream_active( RS2_STREAM_COLOR );
+                            bool disable_perception = missing_color || blocking_ir_active;
                             if( disable_perception )
                                 ImGui::BeginDisabled();
 
@@ -2716,9 +2708,9 @@ namespace rs2
                             {
                                 ImGui::EndDisabled();
                                 if( ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
-                                    RsImGui::CustomTooltip( blocking_filter_enabled
-                                        ? "Disable the decimation/temporal embedded filter before starting perception (cannot run together)"
-                                        : "Color and Depth streams must be streaming before starting perception" );
+                                    RsImGui::CustomTooltip( blocking_ir_active
+                                        ? "Stop the Infrared streams before starting perception (they share the GMSL IR channel)"
+                                        : "Object detection needs a Color stream running; detections are drawn on it" );
                             }
                             else if (ImGui::IsItemHovered())
                             {
@@ -2887,7 +2879,7 @@ namespace rs2
                         float clear_button_room = 0.f;
                         if( ! sub->options_filter.empty() )
                             clear_button_room = 18.f + ImGui::GetStyle().ItemSpacing.x;
-                        ImGui::PushItemWidth(295 - ImGui::GetCursorPosX() - clear_button_room);
+                        ImGui::PushItemWidth(295 + panel_width - viewer_model::default_panel_width - ImGui::GetCursorPosX() - clear_button_room);
                         if (ImGui::InputTextWithHint("##options_filter", "Search controls...", filter_buf, sizeof(filter_buf)))
                             sub->options_filter = filter_buf;
                         ImGui::PopItemWidth();
@@ -3053,8 +3045,7 @@ namespace rs2
             //Left line
             ImGui::GetWindowDrawList()->AddLine({ initial_screen_pos.x + left_space,initial_screen_pos.y + upper_space }, { end_screen_pos.x + left_space, end_screen_pos.y }, ImColor(header_color));
             //Right line
-            const float compenstaion_right = 17.f;;
-            ImGui::GetWindowDrawList()->AddLine({ initial_screen_pos.x + panel_width - compenstaion_right, initial_screen_pos.y + upper_space }, { end_screen_pos.x + panel_width - compenstaion_right, end_screen_pos.y }, ImColor(header_color));
+            ImGui::GetWindowDrawList()->AddLine({ initial_screen_pos.x + windows_width - 1, initial_screen_pos.y + upper_space }, { end_screen_pos.x + windows_width - 1, end_screen_pos.y }, ImColor(header_color));
             //Button line
             const float compenstaion_button = 1.0f;
             ImGui::GetWindowDrawList()->AddLine({ end_screen_pos.x + left_space, end_screen_pos.y - compenstaion_button }, { end_screen_pos.x + left_space + panel_width, end_screen_pos.y - compenstaion_button }, ImColor(header_color));
@@ -3286,16 +3277,11 @@ namespace rs2
                     ImGui::SetCursorPos({ windows_width - 42, pos.y - 3 });
 
                     const bool pb_available = pb->is_available();
-                    // Block turning a decimation/temporal filter on while perception streams (mutually exclusive).
                     auto ef_type = pb->get_filter()->get_type();
-                    const bool block_enable_while_perception = !pb->is_enabled()
-                        && ( ef_type == RS2_EMBEDDED_FILTER_TYPE_DECIMATION
-                          || ef_type == RS2_EMBEDDED_FILTER_TYPE_TEMPORAL )
-                        && is_perception_streaming();
                     // Decimation is FW-side read-only while depth streams - lock both directions.
                     const bool block_decimation_while_depth_streams = sub->streaming
                         && ef_type == RS2_EMBEDDED_FILTER_TYPE_DECIMATION;
-                    disable_guard dg( !pb_available || block_enable_while_perception || block_decimation_while_depth_streams );
+                    disable_guard dg( !pb_available || block_decimation_while_depth_streams );
                     try
                     {
                         ImGui::PushFont(window.get_font());
@@ -3306,14 +3292,6 @@ namespace rs2
                         int font_size = window.get_font_size();
                         const ImVec2 button_size = { font_size * 2.f, font_size * 1.5f };
 
-                        // While this filter's composite editor has a debounced commit pending,
-                        // tint the toggle with the same gold->blue ramp the editor's own
-                        // framed box fades through, so the row header echoes "about to send".
-                        float dirty_progress = 0.0f;
-                        const bool composite_dirty = pb->has_pending_composite_commit(dirty_progress);
-                        ImVec4 dirty_tint = composite_control_dirty_blend(dirty_progress);
-                        dirty_tint.w = 1.0f;   // full opacity for text - the fill's own alpha ramp doesn't apply here
-
                         if (!pb->is_enabled())
                         {
                             std::string label = rsutils::string::from()
@@ -3321,9 +3299,8 @@ namespace rs2
                                 << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
                                 << pb->get_name();
 
-                            const ImVec4 text_color = composite_dirty ? dirty_tint : redish;
-                            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
-                            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_color + 0.1f);
+                            ImGui::PushStyleColor(ImGuiCol_Text, redish);
+                            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, redish + 0.1f);
 
                             if (ImGui::Button(label.c_str(), button_size))
                             {
@@ -3342,9 +3319,8 @@ namespace rs2
                                 << " " << textual_icons::toggle_on << "##" << id << ","
                                 << sub->s->get_info(RS2_CAMERA_INFO_NAME) << ","
                                 << pb->get_name();
-                            const ImVec4 text_color = composite_dirty ? dirty_tint : light_blue;
-                            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
-                            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, text_color + 0.1f);
+                            ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
+                            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, light_blue + 0.1f);
 
                             if (ImGui::Button(label.c_str(), button_size))
                             {
@@ -3363,8 +3339,6 @@ namespace rs2
                         if( !pb_available && !pb->unavailable_tooltip.empty()
                             && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
                             RsImGui::CustomTooltip( "%s", pb->unavailable_tooltip.c_str() );
-                        else if( block_enable_while_perception && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
-                            RsImGui::CustomTooltip( "Stop the perception stream before enabling this filter (cannot run together)" );
                         else if( block_decimation_while_depth_streams && ImGui::IsItemHovered( ImGuiHoveredFlags_AllowWhenDisabled ) )
                             RsImGui::CustomTooltip( "Stop streaming before toggling this filter (read-only while active)" );
 

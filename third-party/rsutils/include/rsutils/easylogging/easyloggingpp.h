@@ -5,12 +5,13 @@
 // When including this file outside LibRealSense you also need to:
 // 1. Compile the easylogging++.cc file
 // 2. With static linkage, ELPP is initialized by librealsense, so doing it here will
-//    create errors. When we're using the shared .so/.dll, the two are separate and we have
-//    to initialize ours if we want to use the APIs!
+//    create errors. When we're using the shared .dll/.dylib, the two are separate and we have
+//    to initialize ours if we want to use the APIs! On Linux, librealsense exports its storage and
+//    we share it: initializing ours would destroy it twice at exit.
 // Use this code snippet:
 // 
 //#include <easylogging++.h>
-//#ifdef BUILD_SHARED_LIBS
+//#if defined( BUILD_SHARED_LIBS ) && ! defined( __linux__ )
 //INITIALIZE_EASYLOGGINGPP
 //#endif
 

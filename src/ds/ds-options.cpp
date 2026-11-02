@@ -34,6 +34,14 @@ namespace librealsense
         }
     }
 
+    const char * get_accel_sensitivity_value_description( float value )
+    {
+        static constexpr const char * descriptions[] = { "+/-3g", "+/-6g", "+/-12g", "+/-24g" };
+        if( value < 0.f || value >= RS2_ACCEL_SENSITIVITY_COUNT || value != static_cast< int >( value ) )
+            throw invalid_value_exception( "Invalid accel sensitivity value" );
+        return descriptions[static_cast< int >( value )];
+    }
+
     double gyro_sensitivity_to_scale( float value )
     {
         return get_gyro_sensitivity_entry( value ).full_scale_dps / 32768.;

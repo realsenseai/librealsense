@@ -94,6 +94,11 @@ class TestFindMatchingDevices:
         sns, _ = find_matching_devices(markers, each=True)
         assert set(sns) == {'111', '555'}
 
+    def test_multi_arg_marker_union(self):
+        """device_each("D455", "D515") matches every pattern, not just the first."""
+        sns, _ = find_matching_devices([make_device_marker('device_each', 'D455', 'D515')], each=True)
+        assert sns == ['111', '555']
+
     def test_exclude_plus_cli_include(self):
         markers = [make_device_marker('device_each', 'D400*'),
                    make_device_marker('device_exclude', 'D401')]
@@ -356,3 +361,19 @@ class TestResolveDeviceEachSentinels:
         resolve_device_each_serials(metafunc)
 
         assert captured.get('values') == ['111']
+
+    # --- multi-arg device_each → one instance per pattern ---
+
+    def test_multi_arg_device_each_all_patterns(self):
+        """device_each("D455", "D515"): both devices are parametrized."""
+        metafunc, captured = _make_metafunc([make_device_marker('device_each', 'D455', 'D515')])
+        resolve_device_each_serials(metafunc)
+
+        assert captured.get('values') == ['111', '555']
+
+    def test_multi_arg_device_each_no_match_skip_lists_all(self):
+        """device_each("D888", "D999"): no match → one SKIP sentinel naming both patterns."""
+        metafunc, captured = _make_metafunc([make_device_marker('device_each', 'D888', 'D999')])
+        resolve_device_each_serials(metafunc)
+
+        assert captured.get('values') == [f"{_SKIP_SENTINEL_PREFIX}D888,D999"]

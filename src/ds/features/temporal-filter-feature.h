@@ -18,7 +18,7 @@ class temporal_filter_feature : public feature_interface
 public:
     static const feature_id ID;
 
-    explicit temporal_filter_feature( d500_depth_sensor & depth_sensor );
+    explicit temporal_filter_feature( d500_depth_sensor & depth_sensor, bool is_mipi );
 
     feature_id get_id() const override;
 };

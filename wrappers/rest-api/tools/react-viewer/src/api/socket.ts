@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client'
 import type { MetadataUpdate } from './types'
 import { useAppStore } from '../store'
+import { BACKEND_ORIGIN } from './backend'
 
 class SocketService {
   private socket: Socket | null = null
@@ -13,12 +14,7 @@ class SocketService {
 
     this.isConnecting = true
 
-    // Connect directly to the backend server in development
-    const serverUrl = import.meta.env.DEV 
-      ? 'http://localhost:8000' 
-      : window.location.origin
-
-    this.socket = io(serverUrl, {
+    this.socket = io(BACKEND_ORIGIN, {
       path: '/socket',
       // Websocket first: metadata is broadcast at 30 Hz, and HTTP long-polling
       // at that rate competes with the WebRTC event loop. tryAllTransports
@@ -28,8 +24,8 @@ class SocketService {
       tryAllTransports: true,
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 10,
+      // Short cap: the local backend may come up any moment, and each retry is cheap.
+      reconnectionDelayMax: 1000,
       timeout: 20000,
     })
 

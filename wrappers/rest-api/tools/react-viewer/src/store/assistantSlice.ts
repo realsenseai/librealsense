@@ -20,20 +20,20 @@ let currentAssistantAbortController: AbortController | null = null
 
 const ASSISTANT_CONVERSATION_ID_STORAGE_KEY = 'rsai_conversation_id'
 
-function loadPersistedAssistantConversationId(): string | null {
+export function loadPersisted(key: string): string | null {
   try {
-    return localStorage.getItem(ASSISTANT_CONVERSATION_ID_STORAGE_KEY)
+    return localStorage.getItem(key)
   } catch {
     return null
   }
 }
 
-function persistAssistantConversationId(id: string | null) {
+export function persist(key: string, value: string | null) {
   try {
-    if (id) localStorage.setItem(ASSISTANT_CONVERSATION_ID_STORAGE_KEY, id)
-    else localStorage.removeItem(ASSISTANT_CONVERSATION_ID_STORAGE_KEY)
+    if (value) localStorage.setItem(key, value)
+    else localStorage.removeItem(key)
   } catch {
-    // localStorage may be unavailable — conversation just won't survive a reload
+    // localStorage may be unavailable — the value just won't survive a reload
   }
 }
 
@@ -77,7 +77,7 @@ async function streamAssistantTurn(
     })) {
       switch (evt.type) {
         case 'conversationId':
-          persistAssistantConversationId(evt.conversationId)
+          persist(ASSISTANT_CONVERSATION_ID_STORAGE_KEY, evt.conversationId)
           set({ assistantConversationId: evt.conversationId })
           break
         case 'chunk':
@@ -148,7 +148,7 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
   isAssistantOnline: true, // optimistic default; corrected by pingAssistantHealth()
   isAssistantLoading: false,
   assistantMessages: [],
-  assistantConversationId: loadPersistedAssistantConversationId(),
+  assistantConversationId: loadPersisted(ASSISTANT_CONVERSATION_ID_STORAGE_KEY),
   assistantSize: 'compact',
 
   toggleAssistant: () => set((state) => ({ isAssistantOpen: !state.isAssistantOpen })),
@@ -225,7 +225,7 @@ export const createAssistantSlice: StateCreator<AppState, [], [], AssistantSlice
   },
 
   clearAssistantChat: () => {
-    persistAssistantConversationId(null)
+    persist(ASSISTANT_CONVERSATION_ID_STORAGE_KEY, null)
     set({
       assistantMessages: [],
       assistantConversationId: null,

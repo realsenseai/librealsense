@@ -710,6 +710,11 @@ void log_callback_end( uint32_t fps,
         _formats_converter.register_converter( pbf );
     }
 
+    void synthetic_sensor::set_frame_stream_resolver( rs2_stream stream, formats_converter::frame_stream_resolver resolver )
+    {
+        _formats_converter.set_frame_stream_resolver( stream, std::move( resolver ) );
+    }
+
     void synthetic_sensor::register_processing_block( const std::vector< processing_block_factory > & pbfs )
     {
         _formats_converter.register_converters( pbfs );

@@ -298,7 +298,6 @@ namespace librealsense
             return res;
         }
 
-        std::shared_ptr<ds_advanced_mode_base> preset_recover;
         if (calib_type == 0)
         {
             LOG_DEBUG("run_on_chip_calibration with parameters: speed = " << speed << " scan_parameter = " << scan_parameter << " data_sampling = " << data_sampling);
@@ -731,7 +730,7 @@ namespace librealsense
         }
         else
         {
-            std::shared_ptr<ds_advanced_mode_base> preset_recover;
+            rsutils::deferred preset_recover;
             if (depth == 0)
             {
                 if (apply_preset)
@@ -1369,7 +1368,7 @@ namespace librealsense
     }
 
 
-    std::shared_ptr<ds_advanced_mode_base> auto_calibrated::change_preset()
+    rsutils::deferred auto_calibrated::change_preset()
     {
         preset old_preset_values{};
         rs2_rs400_visual_preset old_preset = { RS2_RS400_VISUAL_PRESET_DEFAULT };
@@ -1383,18 +1382,25 @@ namespace librealsense
             old_preset_values = advanced_mode->get_all();
         advanced_mode->_preset_opt->set(RS2_RS400_VISUAL_PRESET_HIGH_ACCURACY);
 
-        std::shared_ptr<ds_advanced_mode_base> recover_preset(advanced_mode, [old_preset, advanced_mode, old_preset_values](ds_advanced_mode_base* adv)
+        return rsutils::deferred([old_preset, advanced_mode, old_preset_values]
         {
-            if (old_preset == RS2_RS400_VISUAL_PRESET_CUSTOM)
+            // Runs from a non-throwing destructor, an escaping exception would terminate the process
+            try
             {
-                advanced_mode->_preset_opt->set(RS2_RS400_VISUAL_PRESET_CUSTOM);
-                adv->set_all(old_preset_values);
+                // Controls first, so whoever reacts to the preset change reads the restored values
+                if (old_preset == RS2_RS400_VISUAL_PRESET_CUSTOM)
+                {
+                    advanced_mode->set_all(old_preset_values);
+                    advanced_mode->_preset_opt->set(RS2_RS400_VISUAL_PRESET_CUSTOM);
+                }
+                else
+                    advanced_mode->_preset_opt->set(static_cast<float>(old_preset));
             }
-            else
-                advanced_mode->_preset_opt->set(static_cast<float>(old_preset));
+            catch (const std::exception& e)
+            {
+                LOG_ERROR("Failed to restore visual preset after calibration: " << e.what());
+            }
         });
-
-        return recover_preset;
     }
 
     void auto_calibrated::change_preset_and_stay()
@@ -1418,10 +1424,11 @@ namespace librealsense
             if (!advanced_mode)
                 throw std::runtime_error("Can not cast to advance mode base");
 
+            // Controls first, so whoever reacts to the preset change reads the restored values
             if (_old_preset == RS2_RS400_VISUAL_PRESET_CUSTOM)
             {
-                advanced_mode->_preset_opt->set(RS2_RS400_VISUAL_PRESET_CUSTOM);
                 advanced_mode->set_all(_old_preset_values);
+                advanced_mode->_preset_opt->set(RS2_RS400_VISUAL_PRESET_CUSTOM);
             }
             else
                 advanced_mode->_preset_opt->set(static_cast<float>(_old_preset));

@@ -42,12 +42,41 @@ namespace librealsense
             PROJECTOR_TEMPERATURE = 0x16,
             OHM_TEMPERATURE       = 0x17,
             COLORED_IR_AE_POLICY  = 0x19,
-            EXTERNAL_SYNC_MODE    = 0x1A
+            EXTERNAL_SYNC_MODE    = 0x1A,
+            PASSIVE_DEPTH         = 0x1B   // Dual RGB Passive Depth Mode
         };
 
         // Same GUID as safety_xu. FW publishes as either safety or inference, not both.
         const platform::extension_unit inference_xu = { 0, 0x10, 2,
         { 0xf6c3c3d1, 0x5cde, 0x4477, { 0xad, 0xf0, 0x41, 0x33, 0xf5, 0x8d, 0xa6, 0xf4 } } };
+
+        // Mapping function XU (vfID_UnitExtPointCloud), in the EP12 Mapping UVC function.
+        // GUID: {794C4FF5-7919-4657-81C0-30C0471F62DE}, as in the FW Mapping XU descriptor.
+        const platform::extension_unit mapping_xu = { 0, 0x18, 2,
+        { 0x794c4ff5, 0x7919, 0x4657, { 0x81, 0xc0, 0x30, 0xc0, 0x47, 0x1f, 0x62, 0xde } } };
+
+        enum d500_mapping_xu_id : uint8_t
+        {
+            STREAM_SELECT               = 0x01,  // Phase 2: 0 auto, 1 PCL, 2 LPCL, 3 OG, 4 Segmentation (SDK-internal)
+            SEGMENTATION_MODE           = 0x02,  // 1 = high speed (RGB), 2 = high accuracy (RGBD)
+            SEGMENTATION_CLASS          = 0x03,  // bitmask of segmentation classes
+            PCL_FORMAT                  = 0x04,  // Phase 2: 0 = XYZ, 1 = XYZRGB (SDK-internal)
+            OCCUPANCY_GRID_SEGMENTATION = 0x05,  // OccupancyGrid_Segmentation: 0 = off, 1 = on
+            LPCL_SEGMENTATION           = 0x06,  // LPCL_Segmentation (Labeled PCL): 0 = off, 1 = on
+            DEPTH_MAPPING_PARAMS        = 0x0A   // OG/LPCL params as JSON (D5x5 family only)
+        };
+        const int DEPTH_MAPPING_PARAMS_LEN = 1024;  // fixed control length; caps the JSON
+        const uint16_t DEPTH_MAPPING_PARAMS_VERSION = 1;
+
+#pragma pack(push, 1)
+        // Precedes the JSON in both directions, so each side can verify the JSON arrived intact
+        struct depth_mapping_params_header
+        {
+            uint16_t version;
+            uint16_t json_size;  // JSON bytes that follow, no NUL
+            uint32_t json_crc;   // CRC-32 of those bytes
+        };
+#pragma pack(pop)
 
 
         // d500 Devices supported by the current version
@@ -79,7 +108,6 @@ namespace librealsense
         };
 
         // D5x5 (non-safety, non-legacy) SKU family: D535 and D585 in their 2C/3C/F/proto variants.
-        // Gates the DUAL_RGB_MODE XU (0x12) selector that toggles Dual-RGB (2C) vs Dedicated-Color (3C).
         // D585S has no dual-RGB variant, so it stays out of this set — see uses_interactive_triggered_calibration below.
         static const std::set<std::uint16_t> d5x5_family_pids = {
             D535_2C_PID,
@@ -92,11 +120,37 @@ namespace librealsense
             D585_3C_PROTO_PID
         };
 
+        // The products the FW implements the NN upload for; others sharing the FW (D535 in the same device classes) never report it
+        static const std::set<std::uint16_t> nn_upload_pids = {
+            D585_2C_PID,
+            D585_3C_PID,
+            D585F_PID,
+            D585_2C_PROTO_PID,
+            D585_3C_PROTO_PID
+        };
+
+        // SKUs allowed to toggle Dual-RGB (2C) vs Dedicated-Color (3C) via the DUAL_RGB_MODE XU (0x12).
+        // The F SKUs are left out: their L/R imagers have IR-only covers.
+        static const std::set<std::uint16_t> d5x5_dual_rgb_mode_pids = {
+            D535_2C_PID,
+            D535_3C_PID,
+            D585_2C_PID,
+            D585_3C_PID,
+            D585_2C_PROTO_PID,
+            D585_3C_PROTO_PID
+        };
+
         // Interactive Triggered Calibration eligibility: D5x5 family + D585S safety.
         // D555 stays on the D400 OCC path; D585_LEGACY_PID stays on the current D500 triggered-calibration flow.
         inline bool uses_interactive_triggered_calibration( uint16_t pid )
         {
             return d5x5_family_pids.count( pid ) || pid == D585S_PID;
+        }
+
+        // Dual RGB (2C) variants of the D5x5 family: two RGB streams on the depth sensor, no dedicated color sensor
+        inline bool is_dual_rgb_pid( uint16_t pid )
+        {
+            return pid == D535_2C_PID || pid == D585_2C_PID || pid == D585_2C_PROTO_PID;
         }
 
         static const std::map< std::uint16_t, std::string > rs500_sku_names = {

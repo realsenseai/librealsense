@@ -10,6 +10,8 @@
 #include "imgui_te_engine.h"
 #include "imgui_te_context.h"
 
+#include <chrono>
+#include <thread>
 #include <vector>
 #include <memory>
 #include <string>
@@ -114,15 +116,24 @@ public:
     void click_stream_toggle_off( rs2::device_model & model,
                                   std::shared_ptr< rs2::subdevice_model > sub );
 
-    // Wait real wall-clock time (not skipped in --auto mode)
-    void sleep( float seconds ) { imgui->SleepNoSkip( seconds, 1.0f ); }
+    // Wait real wall-clock time. Each iteration yields one imgui frame via SleepNoSkip
+    // (so refresh_devices() ticks at ~20 Hz) then sleep_for accumulates 50 ms of real time.
+    void sleep( float seconds )
+    {
+        auto const deadline = std::chrono::steady_clock::now() + std::chrono::duration< float >( seconds );
+        while( std::chrono::steady_clock::now() < deadline )
+        {
+            imgui->SleepNoSkip( 0.05f, 0.05f );
+            std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+        }
+    }
 
-    // Poll a condition up to max_attempts times, sleeping interval seconds between checks
+    // Poll cond up to max_attempts times, sleeping interval real seconds between checks.
     template< typename Pred >
     bool wait_until( int max_attempts, float interval, Pred cond )
     {
         for( int i = 0; i < max_attempts && !cond(); ++i )
-            imgui->SleepNoSkip( interval, 0.05f );
+            sleep( interval );
         return cond();
     }
 

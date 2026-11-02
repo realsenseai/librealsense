@@ -90,20 +90,6 @@ namespace librealsense
         std::shared_ptr<synthetic_sensor> create_depth_device(std::shared_ptr<context> ctx,
             const std::vector<platform::uvc_device_info>& all_device_infos);
 
-        // Adds a rule that vetoes stream combinations this device cannot run: feature mixins register
-        // their hardware's restrictions at construction, and each throws when a request violates it.
-        void add_stream_combination_validator( std::function< void( const stream_profiles & ) > validator )
-        {
-            _stream_combination_validators.push_back( std::move( validator ) );
-        }
-
-        // Throws if the profiles cannot stream together. A device with no registered rule allows everything.
-        void stream_combination_allowed_or_throw( const stream_profiles & requests ) const
-        {
-            for( auto & validator : _stream_combination_validators )
-                validator( requests );
-        }
-
         synthetic_sensor& get_depth_sensor()
         {
             return dynamic_cast<synthetic_sensor&>(get_sensor(_depth_device_idx));
@@ -166,7 +152,15 @@ namespace librealsense
         void init( std::shared_ptr< context > ctx, const platform::backend_device_group & group );
         void register_connection_info( platform::usb_spec usb_spec );
         void register_features();
+        // Registers the DPP composite embedded filters (decimation, temporal, close range) shared by
+        // every non-safety D5X5 subclass. Gated per transport - USB and MIPI publish these on
+        // different FW versions. Called from each subclass ctor; no-op below the required FW.
+        void register_dpp_embedded_filters();
         void set_imu_type( const std::vector< uint8_t > & gvd_buf, ds::d500_gvd_parsed_fields * parsed_fields );
+        static bool is_xu_published( const std::shared_ptr< uvc_sensor > & ep, const platform::extension_unit & xu,
+                                     uint8_t control, int size, rs2_option id );
+        static bool is_pu_published( const std::shared_ptr< uvc_sensor > & ep, const platform::processing_unit & pu,
+                                     rs2_option id );
         friend class d500_depth_sensor;
 
         std::shared_ptr<hw_monitor_extended_buffers> _hw_monitor;
@@ -193,7 +187,6 @@ namespace librealsense
         bool _is_symmetrization_enabled = true;
         bool _is_mipi_device = false;
 
-        std::vector< std::function< void( const stream_profiles & ) > > _stream_combination_validators;
         // Populated in init() only when _is_mipi_device is true.
         std::unique_ptr< d500_mipi_device > _mipi_device;
     };

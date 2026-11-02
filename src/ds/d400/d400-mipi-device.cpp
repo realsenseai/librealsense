@@ -29,10 +29,10 @@ namespace librealsense
         rs2_camera_info _dfu_port_info = (is_mipi_recovery)?
                     (RS2_CAMERA_INFO_PHYSICAL_PORT):(RS2_CAMERA_INFO_DFU_DEVICE_PATH);
 
-        // Delegate the DFU chardev write + options-watcher pause to the shared
+        // Delegate the DFU chardev write + options-watcher / error-poller pause to the shared
         // helper at src/ds/ds-mipi-device.cpp. D457 burn is ~95 s.
         std::string dfu_path = get_info(_dfu_port_info);
-        ds_mipi_device( _ds_device_common ).perform_dfu_write(
+        ds_mipi_device( _ds_device_common, _polling_error_handler ).perform_dfu_write(
             dfu_path, image.data(), image.size(), callback, 95,
             []() {
                 // Settle before hardware_reset(): the D4xx driver returns as

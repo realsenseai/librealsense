@@ -76,6 +76,13 @@ rs2_processing_block* rs2_create_m420_decoder(rs2_error** error);
 rs2_processing_block* rs2_create_nv12_decoder(rs2_error** error);
 
 /**
+* Creates MJPEG decoder processing block.
+* This block accepts compressed MJPEG frames and outputs RGB8 frames.
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+rs2_processing_block* rs2_create_mjpeg_decoder(rs2_error** error);
+
+/**
 * Creates y411 decoder processing block. This block accepts raw y411 frames and outputs frames in RGB8.
 *     https://www.fourcc.org/pixel-format/yuv-y411/
 * Y411 is disguised as NV12 to allow Linux compatibility. Both are 12bpp encodings that allow high-resolution

@@ -72,6 +72,9 @@ public:
 
     virtual bool contradicts( const stream_profile_interface * a,
                               const std::vector< stream_profile > & others ) const = 0;
+
+    // True when the pipeline must start each sensor right after opening it, rather than opening all sensors first
+    virtual bool start_sensors_when_opened() const { return false; }
 };
 
 

@@ -11,10 +11,11 @@ namespace fs = cv::utils::fs;
 #include <rs-vino/detected-object.h>
 
 #include <rsutils/easylogging/easyloggingpp.h>
-#ifdef BUILD_SHARED_LIBS
+#if defined( BUILD_SHARED_LIBS ) && ! defined( __linux__ )
 // With static linkage, ELPP is initialized by librealsense, so doing it here will
-// create errors. When we're using the shared .so/.dll, the two are separate and we have
-// to initialize ours if we want to use the APIs!
+// create errors. When we're using the shared .dll/.dylib, the two are separate and we have
+// to initialize ours if we want to use the APIs! On Linux we share the storage exported
+// by librealsense; initializing ours would destroy it twice at exit.
 INITIALIZE_EASYLOGGINGPP
 #endif
 

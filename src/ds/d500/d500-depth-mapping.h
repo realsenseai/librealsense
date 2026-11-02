@@ -8,6 +8,7 @@
 #include "core/video.h"
 #include <src/core/tagged-profile.h>
 #include <rsutils/lazy.h>
+#include <mutex>
 
 namespace librealsense
 {
@@ -21,14 +22,20 @@ namespace librealsense
 
         d500_depth_mapping( std::shared_ptr< const d500_info > const & );
 
-        // False when depth mapping was skipped for this device (currently: MIPI/GMSL
-        // transport, or USB FW that doesn't yet expose the interface).
+        // False when the device does not expose a Mapping interface.
         bool is_depth_mapping_active() const { return _depth_mapping_active; }
 
         // Append the occupancy/point-cloud streams (and default profile tag) only when
         // active; go through these instead of the raw members so a call site can't forget.
         void add_streams_if_active( std::vector< std::shared_ptr< stream_interface > > & streams ) const;
         void add_profile_tag_if_active( std::vector< tagged_profile > & tags ) const;
+
+        // Occupancy grid and labeled point cloud params, exposed through the depth mapping sensor
+        std::string get_depth_mapping_params() const;
+        void set_depth_mapping_params( const std::string & params_json_str ) const;
+
+        // Throws if the camera would refuse occupancy with the running depth sensor streams, or starve them
+        void occupancy_allowed_or_throw( const stream_profiles & requests ) const;
 
     private:
 
@@ -43,13 +50,23 @@ namespace librealsense
         void register_occupancy_metadata(std::shared_ptr<uvc_sensor> raw_mapping_ep);
         void register_point_cloud_metadata(std::shared_ptr<uvc_sensor> raw_mapping_ep);
 
+        // Depth sensor counterpart of occupancy_allowed_or_throw, for streams added while occupancy runs
+        void depth_sensor_allowed_or_throw( const stream_profiles & requests ) const;
+
+        int _depth_mapping_idx = -1;
+
     protected:
         std::shared_ptr<stream_interface> _occupancy_stream;
         std::shared_ptr<stream_interface> _point_cloud_stream;
+        std::shared_ptr<stream_interface> _pcl_stream;  // device point cloud (RS2_STREAM_POINT_CLOUD)
+        std::shared_ptr<uvc_sensor> _raw_depth_mapping_ep;
         bool _depth_mapping_active = false;
         // True for D585S (mapping on MI 13, 2880-wide payloads), false for every other
         // D5xx (mapping on MI 11, OCCG 320x256 and LPCL 640x360).
         bool _is_safety_layout = false;
+        bool _is_d585s = false;
+        // Serializes get/set of the depth mapping params, so the GET that explains a failed set reads that set's result
+        mutable std::mutex _depth_mapping_params_mutex;
         std::shared_ptr<rsutils::lazy<rs2_extrinsics>> _depth_to_depth_mapping_extrinsics;
     };
 
@@ -68,8 +85,16 @@ namespace librealsense
 
         rs2_intrinsics get_intrinsics(const stream_profile& profile) const override;
         stream_profiles init_stream_profiles() override;
+        // EP12 carries one Mapping stream at a time (PCL, LPCL, or OG)
+        void open(const stream_profiles& requests) override;
+
+        std::string get_depth_mapping_params() const override { return _owner->get_depth_mapping_params(); }
+        void set_depth_mapping_params( const std::string & params_json_str ) const override
+        {
+            _owner->set_depth_mapping_params( params_json_str );
+        }
 
     protected:
-        const d500_depth_mapping* _owner;
+        d500_depth_mapping* _owner;
     };
 }

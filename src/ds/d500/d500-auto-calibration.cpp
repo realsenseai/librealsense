@@ -664,7 +664,7 @@ namespace librealsense
             ds_calib_common::update_value_if_exists( jsn, "apply preset", apply_preset );
         }
 
-        std::shared_ptr< option > preset_recover;
+        rsutils::deferred preset_recover;
         if( apply_preset )
         {
             preset_recover = change_preset();
@@ -1011,7 +1011,7 @@ namespace librealsense
         return calib;
     }
 
-    std::shared_ptr< option > d500_auto_calibrated::change_preset()
+    rsutils::deferred d500_auto_calibrated::change_preset()
     {
         if( ! _depth_sensor )
             throw not_implemented_exception( "Depth sensor must be supplied to d500_auto_calibrated" );
@@ -1020,26 +1020,49 @@ namespace librealsense
         {
             auto & opt = _depth_sensor->get_option( RS2_OPTION_VISUAL_PRESET );
             auto old_preset = opt.get_value();
+            rsutils::json custom, high_accuracy;
             switch( opt.get_value_type() )
             {
                 case RS2_OPTION_TYPE_FLOAT: // USB visual preset type is float
-                    if( old_preset == RS2_RS400_VISUAL_PRESET_CUSTOM )
-                        throw not_implemented_exception( "Calibration with custom visual preset is not supported" );
-                    opt.set_value( RS2_RS400_VISUAL_PRESET_HIGH_ACCURACY );
+                    custom = RS2_RS400_VISUAL_PRESET_CUSTOM;
+                    high_accuracy = RS2_RS400_VISUAL_PRESET_HIGH_ACCURACY;
                     break;
                 case RS2_OPTION_TYPE_STRING:  // DDS visual preset type is a string
-                    opt.set_value( std::string( "High Accuracy") );
+                    custom = "Custom";
+                    high_accuracy = "High Accuracy";
                     break;
                 default:
                     throw invalid_value_exception( "Unsupported option type" );
             }
 
-            std::shared_ptr< option > recover_option( &opt, [old_preset]( option * opt )
+            // Custom preset cannot be re-applied by name, save the current controls to restore them later
+            bool const is_custom = old_preset == custom;
+            auto advanced_mode = dynamic_cast< ds_advanced_mode_base * >( _debug_dev );
+            preset old_preset_values{};
+            if( is_custom )
             {
-                opt->set_value( old_preset );
-            });
+                if( ! advanced_mode )
+                    throw not_implemented_exception( "Calibration with custom visual preset requires advanced mode support" );
+                old_preset_values = advanced_mode->get_all();
+            }
+            opt.set_value( high_accuracy );
 
-            return recover_option;
+            return rsutils::deferred( [&opt, old_preset, is_custom, advanced_mode, old_preset_values]
+            {
+                // Runs from a non-throwing destructor, an escaping exception would terminate the process
+                try
+                {
+                    // Controls first: a host-side preset then changes only once they are restored (a FW-side one turns
+                    // Custom on the first write anyway, so setting it here is redundant but harmless)
+                    if( is_custom )
+                        advanced_mode->set_all( old_preset_values );
+                    opt.set_value( old_preset );
+                }
+                catch( const std::exception & e )
+                {
+                    LOG_ERROR( "Failed to restore visual preset after calibration: " << e.what() );
+                }
+            } );
         }
 
         return {};

@@ -27,6 +27,8 @@ set(REALSENSE_GL_CPP
     ../../common/opengl3.h
     ../../common/rendering.cpp
     ../../common/rendering.h
+    ../../common/labeled-point-cloud-utilities.cpp
+    ../../common/labeled-point-cloud-utilities.h
     pc-shader.cpp
     pc-shader.h
     camera-shader.cpp

@@ -15,6 +15,7 @@ namespace librealsense
 {
     double gyro_sensitivity_to_scale( float value );
     const char * get_gyro_sensitivity_value_description( float value );
+    const char * get_accel_sensitivity_value_description( float value );
 
     class emitter_option : public uvc_xu_option<uint8_t>
     {

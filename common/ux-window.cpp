@@ -248,6 +248,7 @@ namespace rs2
             glfwDestroyWindow(_win);
             glfwDestroyCursor(_hand_cursor);
             glfwDestroyCursor(_cross_cursor);
+            glfwDestroyCursor(_resize_cursor);
             glfwTerminate();
         }
 
@@ -258,6 +259,7 @@ namespace rs2
 
         _hand_cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
         _cross_cursor = glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR);
+        _resize_cursor = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
 
         {
             glfwWindowHint(GLFW_VISIBLE, 0);
@@ -682,12 +684,15 @@ namespace rs2
         // reset graphic pipe
         begin_frame();
 
-        if (_link_hovered)
+        if (_resize_hovered)
+            glfwSetCursor(_win, _resize_cursor);
+        else if (_link_hovered)
             glfwSetCursor(_win, _hand_cursor);
         else if (_cross_hovered)
             glfwSetCursor(_win, _cross_cursor);
         else
             glfwSetCursor(_win, nullptr);
+        _resize_hovered = false;
         _cross_hovered = false;
         _link_hovered = false;
         _hovers_any_input_window = false;

@@ -17,6 +17,7 @@
 #include <rsutils/json-fwd.h>
 #include <memory>
 #include <map>
+#include <set>
 
 
 namespace realdds {
@@ -47,12 +48,14 @@ class dds_sensor_proxy : public software_sensor
     std::shared_ptr< realdds::dds_device > const _dev;
     std::string const _name;
     bool const _md_enabled;
+    bool const _imu_xz_flipped;  // D555 FW streams the IMU in its sensor frame, USB aligns it to depth
     options_watcher _options_watcher;
 
     typedef realdds::dds_metadata_syncer syncer_type;
     static void frame_releaser( syncer_type::frame_type * f ) { static_cast< frame * >( f )->release(); }
 
     std::shared_ptr< roi_sensor_interface > _roi_support;
+    std::set< std::string > _embedded_filter_names;
 
 protected:
     struct streaming_impl

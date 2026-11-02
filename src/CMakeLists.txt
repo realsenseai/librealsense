@@ -10,6 +10,7 @@ include(${_rel_path}/pipeline/CMakeLists.txt)
 include(${_rel_path}/usb/CMakeLists.txt)
 include(${_rel_path}/fw-logs/CMakeLists.txt)
 include(${_rel_path}/fw-update/CMakeLists.txt)
+include(${_rel_path}/nn/CMakeLists.txt)
 
 include(${_rel_path}/rum/CMakeLists.txt)
 
@@ -53,10 +54,6 @@ endif()
 
 if(BUILD_WITH_CUDA OR BUILD_WITH_HIP)
     include(${_rel_path}/cuda/CMakeLists.txt)
-endif()
-
-if(LRS_TRY_USE_AVX)
-    set_source_files_properties(image-avx.cpp PROPERTIES COMPILE_FLAGS -mavx2)
 endif()
 
 if(BUILD_SHARED_LIBS)

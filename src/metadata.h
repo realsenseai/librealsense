@@ -525,7 +525,8 @@ namespace librealsense
         uint16_t            calibration_count;
         uint8_t             gpioInputData;
         uint32_t            sub_preset_info;
-        uint8_t             reserved[1];
+        uint8_t             source_index;   //  Version 4+: which of several sources multiplexed on one stream
+                                            //  produced the frame (D5x dual RGB: 0 = left, 1 = right)
 
         typedef enum sub_preset_bit_mask
         {

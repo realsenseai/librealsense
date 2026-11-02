@@ -71,6 +71,8 @@ void init_c_files(py::module &m) {
     BIND_ENUM(m, rs2_d500_intercam_sync_mode, RS2_D500_INTERCAM_SYNC_COUNT, "For D500: intercamera synchronization mode")
     BIND_ENUM(m, rs2_colored_ir_auto_exposure_mode, RS2_COLORED_IR_AUTO_EXPOSURE_COUNT, "For colored-IR devices: how auto exposure is arbitrated between the color and depth pipelines")
     BIND_ENUM(m, rs2_emitter_mode, RS2_EMITTER_MODE_COUNT, "Values for the emitter mode option")
+    BIND_ENUM(m, rs2_passive_depth_mode, RS2_PASSIVE_DEPTH_MODE_COUNT, "Which exposure classes produce depth, for the passive depth mode option")
+    BIND_ENUM(m, rs2_accel_sensitivity, RS2_ACCEL_SENSITIVITY_COUNT, "Accelerometer full-scale range levels, for the accel sensitivity option")
 
     /** rs_types.h **/
     py::class_<rs2_intrinsics> intrinsics(m, "intrinsics", "Video stream intrinsics.");

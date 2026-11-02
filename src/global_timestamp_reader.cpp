@@ -225,8 +225,6 @@ namespace librealsense
             return false;
         LOG_DEBUG(__FUNCTION__ << "(" << base_x << ")");
 
-        double a, b;
-        get_a_b(x + base_x, a, b);
         for (auto &&sample : _last_values)
         {
             sample._x -= base_x;

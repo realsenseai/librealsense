@@ -870,7 +870,7 @@ namespace rs2
                 frameset f;
                 if (_pipe.poll_for_frames(&f))
                 {
-                    _viewer_model.ppf.frames_queue[f.get_profile().unique_id()].enqueue(f);
+                    _viewer_model.ppf.get_frame_queue(f.get_profile().unique_id()).enqueue(f);
                 }
                 frame dpt = _viewer_model.handle_ready_frames(viewer_rect, win, 1, _error_message);
                 if (dpt)

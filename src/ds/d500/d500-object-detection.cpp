@@ -44,7 +44,7 @@ namespace librealsense
         // Skip if the device does not expose the stream; the rest of the device enumerates normally.
         if( od_devs_info.empty() )
         {
-            LOG_DEBUG( "Object detection interface not present - sensor not created" );
+            LOG_WARNING( "Object detection interface not present - sensor not created" );
             return;
         }
         if( od_devs_info.size() != 1 )
@@ -118,8 +118,6 @@ namespace librealsense
 
     void d500_object_detection_sensor::open( const stream_profiles & requests )
     {
-        // Perception and some embedded filters cannot run together. Reject here before the device is touched.
-        _owner->throw_if_perception_blocking_filter_enabled();
         synthetic_sensor::open( requests );
     }
 

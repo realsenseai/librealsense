@@ -168,6 +168,21 @@ class TestRealSenseAPIIntegration:
         for key in ("sensor_id", "name", "type", "supported_stream_profiles", "options"):
             assert key in sensors[0]
 
+    def test_start_sensor_default_profile_rs(self):
+        """Start a sensor with its SDK default profile, as listed by the sensors endpoint"""
+        client = real_client()
+        device_id = first_device_id(client)
+
+        sensor = client.get(f"/api/v1/devices/{device_id}/sensors").json()[0]
+        default = next(p for p in sensor["supported_stream_profiles"] if p["default"])
+        url = f"/api/v1/devices/{device_id}/sensors/{sensor['sensor_id']}"
+
+        response = client.post(f"{url}/start", json={"profiles": [default]})
+        try:
+            assert response.status_code == 200, response.text
+        finally:
+            client.post(f"{url}/stop")
+
     def test_options_endpoint_rs(self):
         """Test the options endpoints with real devices"""
         client = real_client()

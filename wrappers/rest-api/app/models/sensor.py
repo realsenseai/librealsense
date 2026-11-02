@@ -2,34 +2,25 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 
 from app.models.option import OptionInfo
 
-class SensorBase(BaseModel):
-    name: str
-    type: str  # color, depth, IMU, etc.
-
-class SensorCreate(SensorBase):
-    pass
-
-class Sensor(SensorBase):
-    sensor_id: str
-    supported_formats: List[str] = []
-    options: List[str] = []
-
-    class Config:
-        from_attributes = True
-
-class SupportedStreamProfile(BaseModel):
+class StreamProfile(BaseModel):
     stream_type: str
-    resolutions: List[tuple[int, int]] # List of tuples (width, height)
-    fps: List[int] # List of frames per second
-    formats: List[str] # List of supported formats
+    stream_index: int
+    format: str
+    width: int  # 0 for motion, as the SDK reports it
+    height: int
+    fps: int
+    default: bool
+
+class SensorStartRequest(BaseModel):
+    profiles: List[StreamProfile]  # from the sensor's supported_stream_profiles, e.g. depth + IR
 
 class SensorInfo(BaseModel):
     sensor_id: str
     name: str
     type: str
-    supported_stream_profiles: List[SupportedStreamProfile] = []
+    supported_stream_profiles: List[StreamProfile] = []
     options: List[OptionInfo] = []

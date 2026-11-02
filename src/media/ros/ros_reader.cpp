@@ -449,7 +449,7 @@ namespace librealsense
             LOG_WARNING("Failed to allocate new frame");
             return nullptr;
         }
-        if (stream_id.stream_type != RS2_STREAM_LABELED_POINT_CLOUD)
+        if (stream_id.stream_type != RS2_STREAM_LABELED_POINT_CLOUD && stream_id.stream_type != RS2_STREAM_POINT_CLOUD)
         {
             librealsense::video_frame* video_frame = static_cast<librealsense::video_frame*>(frame);
             video_frame->assign(msg->width, msg->height, msg->step, msg->step / msg->width * 8);
@@ -468,7 +468,8 @@ namespace librealsense
         }
         else
         {
-            librealsense::labeled_points* lab_points = static_cast<librealsense::labeled_points*>(frame);
+            // Labeled point cloud or device point cloud: the raw buffer, no 2D geometry
+            librealsense::frame* lab_points = static_cast<librealsense::frame*>(frame);
             rs2_format stream_format;
             convert(msg->encoding, stream_format);
             //attaching a temp stream to the frame. Playback sensor should assign the real stream
@@ -985,6 +986,15 @@ namespace librealsense
     {
     public:
         void update(std::shared_ptr< extension_snapshot > ext) override {}
+        // A recording holds no depth mapping params, and "" is not valid JSON to hand back
+        std::string get_depth_mapping_params() const override
+        {
+            throw not_implemented_exception( "Depth mapping params are not available on a playback device" );
+        }
+        void set_depth_mapping_params( const std::string & params_json_str ) const override
+        {
+            throw not_implemented_exception( "Depth mapping params are not available on a playback device" );
+        }
     };
 
     }  // namespace

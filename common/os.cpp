@@ -60,7 +60,8 @@ namespace rs2
 
     bool is_valid_url( const std::string & url )
     {
-        static const std::regex url_regex( R"(^(https?):\/\/([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/[^\s]*)?$)",
+        // No single quotes: open_url() single-quotes the URL for the shell on Linux/macOS
+        static const std::regex url_regex( R"(^(https?):\/\/([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/[^\s']*)?$)",
                                            std::regex::icase );
 
         return std::regex_match( url, url_regex );
@@ -77,12 +78,10 @@ namespace rs2
 #if (defined(_WIN32) || defined(_WIN64))
         bool ok = reinterpret_cast<INT_PTR>(ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOW)) >= 32;
 #elif defined __linux__ || defined(__linux__)
-        std::string command_name = "xdg-open ";
-        std::string command = command_name + url;
+        std::string command = std::string( "xdg-open '" ) + url + "'";
         bool ok = system(command.c_str()) == 0;
 #elif __APPLE__
-        std::string command_name = "open ";
-        std::string command = command_name + url;
+        std::string command = std::string( "open '" ) + url + "'";
         bool ok = system(command.c_str()) == 0;
 #else
 #pragma message ( "\nLibrealsense couldn't establish OS/Build environment. \

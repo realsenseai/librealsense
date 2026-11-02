@@ -22,3 +22,10 @@ def test_flaky_soft_check():
     global _flaky_attempt
     _flaky_attempt += 1
     check.equal(_flaky_attempt, 2, "fails on attempt 1, passes on attempt 2")
+
+
+def test_soft_check_context():
+    def helper():
+        check.is_true(False, "first")
+    helper()
+    check.equal(1, 2, "second")
