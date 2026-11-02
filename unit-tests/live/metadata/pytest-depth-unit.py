@@ -76,6 +76,8 @@ def test_depth_units_from_advanced_mode(test_device_wrapped, restore_depth_table
             valid = (raw > 0) & (raw < 0xFFFF)
             if i >= 30 and valid.sum() >= raw.size // 20:
                 break
+        if valid.sum() < raw.size // 20:
+            log.warning(f"only {valid.sum()} of {raw.size} depth pixels are valid")
         return frame.get_units(), np.where(valid, raw * frame.get_units(), np.nan)
 
     pipeline = start_depth(dev, ctx)
