@@ -68,7 +68,9 @@ namespace rs2
 
     bool open_url(const char* url)
     {
-        if( !url || !is_valid_url( url ) )
+        // Reject single quotes: on Linux/macOS the URL is single-quoted below so the shell
+        // does not interpret it, and a quote inside would break out of that quoting
+        if( !url || !is_valid_url( url ) || std::string( url ).find( '\'' ) != std::string::npos )
         {
             LOG_ERROR( "Invalid URL: " << ( url ? url : "(null)" ) );
             return false;
@@ -77,12 +79,10 @@ namespace rs2
 #if (defined(_WIN32) || defined(_WIN64))
         bool ok = reinterpret_cast<INT_PTR>(ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOW)) >= 32;
 #elif defined __linux__ || defined(__linux__)
-        std::string command_name = "xdg-open ";
-        std::string command = command_name + url;
+        std::string command = std::string( "xdg-open '" ) + url + "'";
         bool ok = system(command.c_str()) == 0;
 #elif __APPLE__
-        std::string command_name = "open ";
-        std::string command = command_name + url;
+        std::string command = std::string( "open '" ) + url + "'";
         bool ok = system(command.c_str()) == 0;
 #else
 #pragma message ( "\nLibrealsense couldn't establish OS/Build environment. \
