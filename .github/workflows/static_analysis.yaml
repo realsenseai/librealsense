@@ -247,7 +247,8 @@ jobs:
           url="https://cmake.org/files/v${EXPECTED_CMAKE_MAJOR_VER}.${EXPECTED_CMAKE_MINOR_VER}/cmake-${ver}-Linux-x86_64.tar.gz"
           echo "Downloading $url"
           mkdir -p "$RUNNER_TEMP/cmake-min"
-          curl -fsSL "$url" | tar -xz -C "$RUNNER_TEMP/cmake-min" --strip-components=1
+          curl -fsSL "$url" -o "$RUNNER_TEMP/cmake-min.tar.gz"
+          tar -xzf "$RUNNER_TEMP/cmake-min.tar.gz" -C "$RUNNER_TEMP/cmake-min" --strip-components=1
           "$RUNNER_TEMP/cmake-min/bin/cmake" --version
 
       - name: "Configure with minimal CMake"
@@ -261,6 +262,8 @@ jobs:
       - name: "Find actual minimal CMake version"
         if: steps.fast_path.outcome == 'failure'
         id: slow_path
+        # Diagnostic only - a failure here (e.g. network) must not hide the final check's message
+        continue-on-error: true
         run: |
           work_dir=$(pwd)
           cd "$RUNNER_TEMP"
@@ -302,6 +305,7 @@ jobs:
           ACTUAL_CMAKE_VERSION: ${{ steps.slow_path.outputs.actual_cmake_version }}
         run: |
           EXPECTED="${EXPECTED_CMAKE_MAJOR_VER}.${EXPECTED_CMAKE_MINOR_VER}"
+          [ -z "$ACTUAL_CMAKE_VERSION" ] && ACTUAL_CMAKE_VERSION="(could not determine, see the 'Find actual minimal CMake version' step)"
           if [ "$FAST_PATH_OUTCOME" == "success" ]
           then
             echo "The test PASSED, LibRS configures with the minimal CMake version ${EXPECTED}"
