@@ -661,6 +661,14 @@ namespace librealsense
             make_attribute_parser(&md_occupancy::grid_origin_y_mm,
                 md_occupancy_attributes::grid_origin_y_attribute, md_prop_offset));
 
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_SEGMENTATION_MODE,
+            make_attribute_parser(&md_occupancy::segmentation_mode,
+                md_occupancy_attributes::segmentation_mode_attribute, md_prop_offset));
+
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_SEGMENTATION_CLASSES,
+            make_attribute_parser(&md_occupancy::segmentation_classes,
+                md_occupancy_attributes::segmentation_classes_attribute, md_prop_offset));
+
         raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_CRC,
             make_attribute_parser(&md_occupancy::payload_crc32,
                 md_occupancy_attributes::payload_crc32_attribute, md_prop_offset));
@@ -819,6 +827,26 @@ namespace librealsense
         raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_NUMBER_OF_3D_VERTICES,
             make_attribute_parser(&md_point_cloud::number_of_3d_vertices,
                 md_point_cloud_attributes::number_of_3d_vertices_attribute, md_prop_offset));
+
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_COLOR_FRAME_COUNTER,
+            make_attribute_parser(&md_point_cloud::color_frame_counter,
+                md_point_cloud_attributes::color_frame_counter_attribute, md_prop_offset));
+
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_COLOR_SYNC_DELTA,
+            make_attribute_parser(&md_point_cloud::color_sync_delta_us,
+                md_point_cloud_attributes::color_sync_delta_attribute, md_prop_offset));
+
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_SEGMENTATION_MODE,
+            make_attribute_parser(&md_point_cloud::segmentation_mode,
+                md_point_cloud_attributes::segmentation_mode_attribute, md_prop_offset));
+
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_SEGMENTATION_CLASSES,
+            make_attribute_parser(&md_point_cloud::segmentation_classes,
+                md_point_cloud_attributes::segmentation_classes_attribute, md_prop_offset));
+
+        raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_PCL_OCCLUSION_REMOVAL,
+            make_attribute_parser(&md_point_cloud::occlusion_removal,
+                md_point_cloud_attributes::occlusion_removal_attribute, md_prop_offset));
 
         raw_mapping_ep->register_metadata(RS2_FRAME_METADATA_CRC,
             make_attribute_parser(&md_point_cloud::payload_crc32,
