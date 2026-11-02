@@ -3408,7 +3408,10 @@ namespace rs2
             {
                 if (sub->s->is<rs2::depth_mapping_sensor>() && sub->streaming)
                 {
-                    depth_mapping_sensor_streaming = true;
+                    // The device point cloud is self-contained; only LPC and occupancy need depth to be viewed in 3D
+                    if( subdevice_has_stream_enabled( *sub, RS2_STREAM_LABELED_POINT_CLOUD )
+                        || subdevice_has_stream_enabled( *sub, RS2_STREAM_OCCUPANCY ) )
+                        depth_mapping_sensor_streaming = true;
                 }
                 if (sub->s->is<rs2::depth_stereo_sensor>() && sub->streaming)
                 {
