@@ -624,6 +624,10 @@ namespace librealsense
             rf = source->allocate_video_frame(_right_target_stream_profile, frame, _right_target_bpp,
                 w, h, w * _right_target_bpp, _right_extension_type);
 
+            // The new frames inherit the interleaved source's raw size; report each one's own.
+            static_cast< librealsense::frame * >( lf.frame )->additional_data.raw_size = w * h * _left_target_bpp;
+            static_cast< librealsense::frame * >( rf.frame )->additional_data.raw_size = w * h * _right_target_bpp;
+
             // process the frame
             uint8_t * planes[2];
             planes[0] = (uint8_t *)lf.frame->get_frame_data();
