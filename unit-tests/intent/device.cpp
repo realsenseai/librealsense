@@ -340,6 +340,15 @@ int main(int argc, char **argv) {
               true);
       return 0;
     }
+    // After reset, device discovery can briefly leave HID activity visible.
+    // Wait for a stable idle device before this exclusive test clears Intent.
+    unsigned idleSamples = 0;
+    for (unsigned i = 0; i < 50 && idleSamples < 3; ++i) {
+      const auto status = json::parse(intent.get_intent())["status"];
+      idleSamples = status["active_mask"] == 0 ? idleSamples + 1 : 0;
+      delay(100);
+    }
+    require(idleSamples == 3, "Device did not become idle before test");
     intent.set_intent(R"({"op":"CLEAR"})");
     if (mode == "negative") {
       auto doc = declaration(1, dual);
