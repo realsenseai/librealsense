@@ -14,7 +14,7 @@ if(${FORCE_LIBUVC} OR ${FORCE_WINUSB_UVC} OR ${ANDROID_USB_HOST_UVC})
     MESSAGE(DEPRECATION "FORCE_LIBUVC, FORCE_WINUSB_UVC and ANDROID_USB_HOST_UVC are deprecated, use FORCE_RSUSB_BACKEND instead")
     set(FORCE_RSUSB_BACKEND ON)
 endif()
-if(DEFINED BUILD_WITH_HIP_ZEROCOPY)
+if(BUILD_WITH_HIP_ZEROCOPY)
     MESSAGE(DEPRECATION "BUILD_WITH_HIP_ZEROCOPY is deprecated and has no effect, zero-copy is enabled at runtime on integrated GPUs")
 endif()
 

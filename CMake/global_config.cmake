@@ -72,10 +72,6 @@ macro(global_set_flags)
     if (BUILD_WITH_HIP)
         add_definitions(-DRS2_USE_CUDA)
         add_definitions(-DRS2_USE_HIP)
-        # Zero-copy needs no build flag: rs_frame_zc_enabled() already enables it per-device
-        # at runtime via rs2_is_hip_integrated(), so a discrete GPU still gets plain malloc.
-        # Shares RS2_USE_CUDA_ZEROCOPY with the CUDA path, whose guarded code is already
-        # vendor-neutral (it falls back whenever try_device_ptr() returns nullptr).
         add_definitions(-DRS2_USE_CUDA_ZEROCOPY)
     endif()
 
