@@ -411,9 +411,10 @@ namespace librealsense
 
                             if (_is_started)
                             {
-                                if(buf.bytesused == 0)
+                                // Error-flagged buffers (e.g. after a capture-channel reset) carry a stale sequence that desyncs video/metadata pairing
+                                if(buf.bytesused == 0 || (buf.flags & V4L2_BUF_FLAG_ERROR))
                                 {
-                                    LOG_DEBUG_V4L("Empty video frame arrived, index " << buf.index);
+                                    LOG_DEBUG("Empty or error-flagged video frame dropped, index " << buf.index << ", seq " << buf.sequence);
                                     return;
                                 }
 
