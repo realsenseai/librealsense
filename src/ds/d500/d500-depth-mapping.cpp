@@ -307,8 +307,7 @@ namespace librealsense
         if( ! _is_d585s )
             _raw_depth_mapping_ep = raw_mapping_ep;
 
-        // The mapping function reports every EP12 output as GREY; the PCL XYZ tuples are the
-        // device point cloud, not occupancy (D5xx layout only).
+        // D5xx EP12 outputs share GREY; identify their streams by the native profile tuple.
         if( ! _is_safety_layout )
         {
             raw_mapping_ep->set_stream_id_resolver( []( const std::vector< platform::stream_profile > &,
@@ -316,8 +315,13 @@ namespace librealsense
                                                         rs2_stream & type,
                                                         int & )
                 {
-                    if( p.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) && is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
-                        type = RS2_STREAM_POINT_CLOUD;
+                    if( p.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) )
+                    {
+                        if( is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
+                            type = RS2_STREAM_POINT_CLOUD;
+                        else if( p.width == 640 && p.height == 360 && p.fps == 30 )
+                            type = RS2_STREAM_LABELED_POINT_CLOUD;
+                    }
                 } );
         }
 
@@ -454,7 +458,7 @@ namespace librealsense
 
         raw_mapping_sensor->register_xu( ds::mapping_xu ); // make sure the XU is initialized every time we power the camera
 
-        // Not every transport exposes these controls (no GMSL driver CIDs yet)
+        // Register only controls published by the current transport and firmware.
         if( is_xu_published( raw_mapping_sensor, ds::mapping_xu, ds::d500_mapping_xu_id::OCCUPANCY_GRID_SEGMENTATION,
                              sizeof( uint8_t ), RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION ) )
             occupancy_ep->register_option( RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION,

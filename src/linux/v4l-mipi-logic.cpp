@@ -73,11 +73,16 @@ namespace librealsense
 
             static constexpr uint32_t RS_CAMERA_CID_ALIGNED_DEPTH           = ( RS_CAMERA_CID_BASE + 55 );
             static constexpr uint32_t RS_CAMERA_CID_PASSIVE_DEPTH           = ( RS_CAMERA_CID_BASE + 17 ); // D500 reuses D400's manual-exposure offset
+            static constexpr uint32_t RS_CAMERA_CID_OCCG_SEGMENTATION       = ( RS_CAMERA_CID_BASE + 58 );
+            static constexpr uint32_t RS_CAMERA_CID_LPCL_SEGMENTATION       = ( RS_CAMERA_CID_BASE + 59 );
 
             static constexpr uint8_t GVD_VALID_OPCODE = 0x10;
 
             // MIPI depth XU unit (subdevice 0), matching ds::depth_xu.
             static constexpr uint8_t RS_DEPTH_XU_UNIT = 0x03;
+            static constexpr uint8_t RS_MAPPING_XU_UNIT = 0x18;
+            static constexpr uint8_t RS_OCCG_SEGMENTATION = 0x05;
+            static constexpr uint8_t RS_LPCL_SEGMENTATION = 0x06;
 
             // MIPI depth-XU selector identifiers (subdevice 0).
             static constexpr uint8_t RS_HWMONITOR                       = 0x01;
@@ -393,10 +398,19 @@ namespace librealsense
             uint32_t xu_to_cid( const extension_unit & xu, uint8_t control, bool is_d5xx )
             {
                 if( 0 != xu.subdevice )
-                    throw linux_backend_exception( rsutils::string::from() << "MIPI Controls mapping is for Depth XU only, requested for subdevice " << xu.subdevice );
+                    throw linux_backend_exception( rsutils::string::from() << "MIPI Controls mapping requires subdevice 0, requested for subdevice " << xu.subdevice );
 
                 if( is_d5xx && xu.unit == RS_INFERENCE_XU_UNIT )
                     return inference_xu_to_cid( control );
+                if( is_d5xx && xu.unit == RS_MAPPING_XU_UNIT )
+                {
+                    switch( control )
+                    {
+                    case RS_OCCG_SEGMENTATION: return RS_CAMERA_CID_OCCG_SEGMENTATION;
+                    case RS_LPCL_SEGMENTATION: return RS_CAMERA_CID_LPCL_SEGMENTATION;
+                    default: throw not_implemented_exception( rsutils::string::from() << "no v4l2 mipi cid for Mapping XU control " << std::dec << int( control ) );
+                    }
+                }
                 // Selectors repeat across XUs, so another unit must not be looked up in the depth table
                 if( xu.unit != RS_DEPTH_XU_UNIT )
                     throw not_implemented_exception( rsutils::string::from() << "no v4l2 mipi cid for XU unit " << std::dec << int( xu.unit ) << " control " << int( control ) );

@@ -228,27 +228,29 @@ namespace librealsense
 
         control_range rs_uvc_device::get_xu_range(const extension_unit& xu, uint8_t control, int len) const
         {
+            if (len <= 0)
+                throw invalid_value_exception("XU range length must be positive");
             bool status;
-            int max;
-            int min;
-            int step;
-            int def;
-            status = uvc_get_ctrl(xu.unit, control, &max, sizeof(int32_t),
+            std::vector<uint8_t> max(len);
+            std::vector<uint8_t> min(len);
+            std::vector<uint8_t> step(len);
+            std::vector<uint8_t> def(len);
+            status = uvc_get_ctrl(xu.unit, control, max.data(), len,
                                   UVC_GET_MAX);
             if (!status)
                 throw std::runtime_error("uvc_get_ctrl(UVC_GET_MAX) failed");
 
-            status = uvc_get_ctrl(xu.unit, control, &min, sizeof(int32_t),
+            status = uvc_get_ctrl(xu.unit, control, min.data(), len,
                                   UVC_GET_MIN);
             if (!status)
                 throw std::runtime_error("uvc_get_ctrl(UVC_GET_MIN) failed");
 
-            status = uvc_get_ctrl(xu.unit, control, &step, sizeof(int32_t),
+            status = uvc_get_ctrl(xu.unit, control, step.data(), len,
                                   UVC_GET_RES);
             if (!status)
                 throw std::runtime_error("uvc_get_ctrl(UVC_GET_RES) failed");
 
-            status = uvc_get_ctrl(xu.unit, control, &def, sizeof(int32_t),
+            status = uvc_get_ctrl(xu.unit, control, def.data(), len,
                                   UVC_GET_DEF);
             if (!status)
                 throw std::runtime_error("uvc_get_ctrl(UVC_GET_DEF) failed");
