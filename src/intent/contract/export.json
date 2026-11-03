@@ -1,11 +1,11 @@
 {
   "upstream_repository": "https://github.com/RealSenseAI-Internal/soc-rs-hkr-common",
-  "upstream_commit": "8ee17cb0732fa1c08f982213851ad97ede496bf3",
+  "upstream_commit": "14fb9e598aac57d6ff51b2f1489498ba53ef729e",
   "upstream_directory": "intent",
-  "dictionary_sha256": "39af11d1e450ea064d20ac7f708f8006f746369318469e82409b1e6bd929025f",
+  "dictionary_sha256": "cc6b2780823de10b4b0d1fe5836bc5169d31083035c5303e892bdecc3f8a86f2",
   "files": {
-    "IntentDictionary.h": "01c19731209f53bd711112dd093b5c6c426d20a354cfcd0979942036f56569e3",
+    "IntentDictionary.h": "6f2e2c49ed9417f30477e7c8d2252d1f0c1a7d22e601ee78e28d261860318487",
     "IntentProtocol.h": "1f60e6e3c9b3c12d1475b123fbce086cb7bbb9868c51744262bb582c8627fe86",
-    "IntentProtocol.cpp": "f624ac1b137f9e7df86e17270d6b05e8e76f1860a56eee12c651dfc428c169de"
+    "IntentProtocol.cpp": "4c730cefd8ce8c3a98c5ce39c6e9894b0cd025eaa78961c05ff80bb1db9b2f2e"
   }
 }

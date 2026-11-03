@@ -2,11 +2,11 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "39af11d1e450ea064d20ac7f708f8006f746369318469e82409b1e6bd929025f";
+static const char dictionary_sha256[] = "cc6b2780823de10b4b0d1fe5836bc5169d31083035c5303e892bdecc3f8a86f2";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned wire_size = 1024U;
-static const unsigned rule_revision = 1U;
+static const unsigned rule_revision = 2U;
 enum Selectors {
     GLOBAL_INTENT = 28,
     GLOBAL_INTENT_STATUS = 29,
@@ -25,15 +25,29 @@ enum Records {
 };
 struct BranchDefinition { uint8_t id, sensor; uint16_t sku; uint32_t format; const char* name; };
 static const BranchDefinition branches[] = {
-    {1U, 1U, 3076U, 0x2036315aU, "DEPTH"},
-    {1U, 1U, 3077U, 0x2036315aU, "DEPTH"},
-    {2U, 1U, 3076U, 0x20203859U, "IR_L"},
-    {2U, 1U, 3077U, 0x20203859U, "IR_L"},
-    {4U, 1U, 3076U, 0x20493859U, "IR_LR"},
-    {4U, 1U, 3077U, 0x20493859U, "IR_LR"},
-    {5U, 1U, 3076U, 0x3231564eU, "RGB_L"},
-    {6U, 1U, 3076U, 0x3231564eU, "RGB_R"},
-    {7U, 2U, 3077U, 0x32595559U, "RGB"},
+    {1U, 1U, 3078U, 0x2036315aU, "DEPTH"},
+    {1U, 1U, 3079U, 0x2036315aU, "DEPTH"},
+    {1U, 1U, 3080U, 0x2036315aU, "DEPTH"},
+    {2U, 1U, 3078U, 0x20203859U, "IR_L"},
+    {2U, 1U, 3079U, 0x20203859U, "IR_L"},
+    {2U, 1U, 3080U, 0x20203859U, "IR_L"},
+    {4U, 1U, 3078U, 0x20493859U, "IR_LR"},
+    {4U, 1U, 3079U, 0x20493859U, "IR_LR"},
+    {4U, 1U, 3080U, 0x20493859U, "IR_LR"},
+    {5U, 1U, 3079U, 0x3231564eU, "RGB_L"},
+    {6U, 1U, 3079U, 0x3231564eU, "RGB_R"},
+    {7U, 2U, 3078U, 0x32595559U, "RGB"},
+    {7U, 2U, 3080U, 0x32595559U, "RGB"},
+};
+struct FormatDefinition { uint8_t branch; uint32_t format; };
+static const FormatDefinition formats[] = {
+    {1U, 0x2036315aU},
+    {2U, 0x20203859U},
+    {4U, 0x20493859U},
+    {5U, 0x3231564eU},
+    {6U, 0x3231564eU},
+    {7U, 0x32595559U},
+    {7U, 0x3231564eU},
 };
 struct ProfileDefinition { uint16_t width, height, fps; };
 static const ProfileDefinition profiles[] = {

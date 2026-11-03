@@ -106,7 +106,7 @@ void register_intent_options(d500_depth_sensor &sensor) {
         if (wire.size() != 32U || wire[0] != rsintent::major)
             return;
         sku = rsintent::read16(wire.data() + 8);
-        if (sku != 0x0c04U && sku != 0x0c05U)
+        if (rsintent::defaultModel(sku).count == 0U)
             return;
     } catch (const std::exception &) {
         return;

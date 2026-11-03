@@ -31,14 +31,14 @@ int main(int argc, char **argv) {
         {"sensors", json::array({{{"sensor", "STEREO"}, {"streams", json::array({depth})}}})}};
     auto bytes = encode_intent_json(document.dump());
     assert(bytes == golden); // Golden created independently with Python struct.pack.
-    assert(fw_accept(bytes.data(), 0xc04) == 0 && fw_accept(bytes.data(), 0xc05) == 0);
+    assert(fw_accept(bytes.data(), 0xc07) == 0 && fw_accept(bytes.data(), 0xc08) == 0);
     std::vector<uint8_t> status(32);
     status[0] = 1;
     assert(encode_intent_json(decode_intent_json(bytes, status)) == bytes);
-    for (unsigned sku : {0xc04U, 0xc05U}) {
+    for (unsigned sku : {0xc07U, 0xc08U}) {
         fw_template(sku, bytes.data());
         assert(encode_intent_json(decode_intent_json(bytes, status)) == bytes);
-        assert((unsigned(bytes[2]) | (unsigned(bytes[3]) << 8)) == (sku == 0xc04U ? 112U : 104U));
+        assert((unsigned(bytes[2]) | (unsigned(bytes[3]) << 8)) == (sku == 0xc07U ? 112U : 104U));
     }
     auto bad = document;
     bad["version"]["major"] = 2;
@@ -76,14 +76,14 @@ int main(int argc, char **argv) {
     bad = document;
     bad["sensors"][0]["streams"][0]["fps"] = 15;
     bytes = encode_intent_json(bad.dump());
-    assert(fw_accept(bytes.data(), 0xc04) == 4); // FW rules authoritative.
+    assert(fw_accept(bytes.data(), 0xc07) == 4); // FW rules authoritative.
     bad = document;
     bad["op"] = "VALIDATE_ONLY";
     assert(encode_intent_json(bad.dump())[1] == 1);
     bytes = encode_intent_json(R"({"op":"CLEAR"})");
     assert(bytes[1] == 2 && bytes[2] == 0);
     rejected(json{{"op", "CLEAR"}, {"sensors", json::array()}});
-    fw_template(0xc04, bytes.data());
+    fw_template(0xc07, bytes.data());
     bytes[6] = 1;
     bool newer = false;
     try {

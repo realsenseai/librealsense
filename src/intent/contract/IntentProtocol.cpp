@@ -263,7 +263,7 @@ Model defaultModel(uint16_t sku) {
     return m;
 }
 Error validate(const Model &m, uint16_t sku) {
-    if ((sku != 0x0c04U && sku != 0x0c05U) || m.count > max_streams)
+    if (defaultModel(sku).count == 0U || m.count > max_streams)
         return Error(CONSTRAINT, 0, 0, 0, 1);
     // Stable branch-ID order, independent of JSON/TLV record order. Absent streams are OFF.
     for (unsigned id = 1U; id < 16U; ++id) {
@@ -278,7 +278,10 @@ Error validate(const Model &m, uint16_t sku) {
             return Error(CONSTRAINT, s->sensor, s->branch, 0, 2);
         if (!s->enabled)
             continue;
-        if (s->format != def->format)
+        bool formatSupported = false;
+        for (const auto &f : formats)
+            formatSupported |= f.branch == s->branch && f.format == s->format;
+        if (!formatSupported)
             return Error(CONSTRAINT, s->sensor, s->branch, 0, 3);
         bool supported = false;
         for (size_t j = 0; j < sizeof(profiles) / sizeof(profiles[0]); ++j)
