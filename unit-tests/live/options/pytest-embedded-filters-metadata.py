@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 """Verifies RS2_FRAME_METADATA_EMBEDDED_FILTERS correctly and additively reflects which DPP
-composite-option filters are applied to a depth frame, for Temporal Filter DPP and ICR/Improved
+composite-option filters are applied to a depth frame, for Temporal Filter DPP and Improved
 Close Range Control. Decimation Filter DPP is excluded - see pytest-decimation-filter-dpp-effect.py,
 its bit never sets (RSDEV-14424).
 
@@ -103,7 +103,7 @@ def test_temporal_filter_dpp_sets_embedded_filters_metadata_bit(test_device):
 
 
 def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
-    """Enabling ICR/Improved Close Range Control before streaming is expected to set RS2_FRAME_
+    """Enabling Improved Close Range Control before streaming is expected to set RS2_FRAME_
     METADATA_EMBEDDED_FILTERS's empirically-observed bit (1u<<5) on the resulting depth frames,
     and disabling it again is expected to clear it. Streams at 1280x720 - ICR only activates at
     720p/960p (see rs_icr_control.h)."""

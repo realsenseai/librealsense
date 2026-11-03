@@ -17,7 +17,7 @@ class device;
 class sensor_interface;
 class composite_option_interface;
 
-// Wires the HKR Improved Close Range (MinZ) Control composite-option embedded filter (icr_embedded_filter) onto a
+// Wires the HKR Improved Close Range (ICR) Control composite-option embedded filter (icr_embedded_filter) onto a
 // depth sensor, and rejects enabling it on Depth profiles the FW cannot process.
 class icr_filter_feature : public feature_interface
 {

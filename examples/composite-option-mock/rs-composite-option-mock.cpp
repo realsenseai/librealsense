@@ -256,7 +256,7 @@ bool test_icr_control()
     modified.downscale_ratio = 2;  // change one field to prove this second round trip is independent
 
     return run_round_trip_and_atomicity_test< rs2_icr_control >(
-        RS2_COMPOSITE_OPTION_ICR_CONTROL, "ICR/Improved Close Range Control (fake, for testing)", initial, modified,
+        RS2_COMPOSITE_OPTION_ICR_CONTROL, "Improved Close Range Control (fake, for testing)", initial, modified,
         []( const rs2_icr_control & a, const rs2_icr_control & b )
         {
             return a.enable == b.enable && a.filter_type == b.filter_type

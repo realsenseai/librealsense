@@ -77,8 +77,8 @@ static bool embedded_decimation_enabled( const sensor_interface & depth_sensor )
     return false;
 }
 
-// FW rejects unsupported Improved Close Range profiles only once streaming starts, with an obscure error (Depth+IR on Windows even
-// needs a replug) - so the SDK checks the Improved Close Range profile limits first.
+// FW rejects unsupported ICR profiles only once streaming starts, with an obscure error (Depth+IR on Windows even
+// needs a replug) - so the SDK checks the ICR profile limits first.
 static void icr_allowed_or_throw( const void * icr_control, size_t size, const video_stream_profile_interface & depth,
                                    const sensor_interface & depth_sensor )
 {
@@ -126,7 +126,7 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
             << " at up to " << max_fps << " FPS, but Depth is " << w << "x" << h << " @ " << fps << " FPS" );
 }
 
-// Rejects enabling Improved Close Range while a Depth profile it cannot process is open. `control` is the transport (XU or DDS).
+// Rejects enabling ICR while a Depth profile it cannot process is open. `control` is the transport (XU or DDS).
 class icr_option : public composite_option_interface
 {
 public:
@@ -227,7 +227,7 @@ icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface &
     auto option = std::make_shared< icr_option >( std::move( control ), depth_sensor );
     _filter = std::make_shared< icr_embedded_filter >( option, RS2_COMPOSITE_OPTION_ICR_CONTROL );
 
-    // Improved Close Range may have been enabled while the sensor was closed - check it against the Depth profile being opened
+    // ICR may have been enabled while the sensor was closed - check it against the Depth profile being opened
     owner.add_stream_combination_validator(
         [option, &depth_sensor]( const stream_profiles & requests )
         {
