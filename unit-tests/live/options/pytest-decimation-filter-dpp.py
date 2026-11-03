@@ -66,7 +66,7 @@ def _restore_original_raw(embedded_filter, option_id, original_raw):
 def test_decimation_filter_dpp_basic_parameter_changes(test_device):
     """Check whether Decimation Filter DPP is supported; if so, bounce its writable fields to new
     in-range values (verifying each readback) and restore the original value at the end. Unlike
-    Temporal Filter DPP/HDRD, the device itself also rejects a SET here once Depth/IR starts
+    Temporal Filter DPP/ICR, the device itself also rejects a SET here once Depth/IR starts
     streaming - not exercised here since this test never opens a stream."""
     dev, ctx = test_device
     depth_sensor = dev.first_depth_sensor()

@@ -2,8 +2,8 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Improved Close Range Depth over DDS. Older FW publishes Enable, Downscale Ratio, Disparity Shift and
-# Threshold, exposed as scalar options; newer FW publishes the 7 hdrd_control fields, exposed as the
-# hdrd_control composite option same as over USB (field round trips in live/options/pytest-hdrd-control.py).
+# Threshold, exposed as scalar options; newer FW publishes the 7 icr_control fields, exposed as the
+# icr_control composite option same as over USB (field round trips in live/options/pytest-icr-control.py).
 
 import time
 
@@ -50,11 +50,11 @@ def _skip_if_fw_below_minimum( dev ):
         pytest.skip( f"FW {fw} below minimum {min_fw} for Improved Close Range Depth on {name}" )
 
 
-HDRD = rs.composite_option_id.hdrd_control
+ICR = rs.composite_option_id.icr_control
 
 
 def _get_close_range_filter( test_device, composite=None ):
-    """composite: True/False skips unless the FW exposes the hdrd_control / scalar form; None accepts both"""
+    """composite: True/False skips unless the FW exposes the icr_control / scalar form; None accepts both"""
     dev, _ = test_device
     _skip_if_fw_below_minimum( dev )
     depth_sensor = dev.first_depth_sensor()
@@ -67,14 +67,14 @@ def _get_close_range_filter( test_device, composite=None ):
 
 
 def _is_composite( embedded_filter ):
-    return HDRD in embedded_filter.get_supported_composite_options()
+    return ICR in embedded_filter.get_supported_composite_options()
 
 
 def _set_fields( embedded_filter, **fields ):
-    cfg = embedded_filter.get_hdrd_control( HDRD )
+    cfg = embedded_filter.get_icr_control( ICR )
     for name, value in fields.items():
         setattr( cfg, name, value )
-    embedded_filter.set_hdrd_control( HDRD, cfg )
+    embedded_filter.set_icr_control( ICR, cfg )
 
 
 def _set_enable( embedded_filter, value ):
@@ -157,29 +157,29 @@ def test_close_range_disparity_shift( test_device ):
     _set_get_round_trip( embedded_filter, rs.option.disparity_shift, 100.0 )
 
 
-def test_hdrd_control_present( test_device ):
+def test_icr_control_present( test_device ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
-    cfg = embedded_filter.get_hdrd_control( HDRD )
+    cfg = embedded_filter.get_icr_control( ICR )
     assert cfg.header.version == 1
     assert cfg.header.param_count == 7
 
 
-def test_hdrd_control_enable_round_trip( test_device ):
+def test_icr_control_enable_round_trip( test_device ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
-    original = embedded_filter.get_hdrd_control( HDRD ).enable
+    original = embedded_filter.get_icr_control( ICR ).enable
     for value in ( 1, 0 ):
         _set_fields( embedded_filter, enable=value )
-        check.equal( embedded_filter.get_hdrd_control( HDRD ).enable, value )
+        check.equal( embedded_filter.get_icr_control( ICR ).enable, value )
     _set_fields( embedded_filter, enable=original )
 
 
 @pytest.mark.parametrize( "field, value", [( "enable", 2 ), ( "enable", -1 ), ( "downscale_ratio", 3 ), ( "shift_pixels", 257 )] )
-def test_hdrd_control_invalid_value_rejected( test_device, field, value ):
+def test_icr_control_invalid_value_rejected( test_device, field, value ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
-    before = embedded_filter.get_hdrd_control( HDRD )
+    before = embedded_filter.get_icr_control( ICR )
     with pytest.raises( RuntimeError ):
         _set_fields( embedded_filter, **{ field: value } )
-    check.equal( getattr( embedded_filter.get_hdrd_control( HDRD ), field ), getattr( before, field ) )
+    check.equal( getattr( embedded_filter.get_icr_control( ICR ), field ), getattr( before, field ) )
 
 
 def _find_depth_profile( depth_sensor ):

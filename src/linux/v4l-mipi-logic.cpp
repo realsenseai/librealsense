@@ -107,7 +107,7 @@ namespace librealsense
             static constexpr uint8_t RS_DECIMATION_FILTER_DPP = 0x11; // vs RS_DEPTH_AUTO_EXPOSURE_MODE
             static constexpr uint8_t RS_DUAL_RGB_MODE         = 0x12; // vs RS_EXTERNAL_SYNC
             static constexpr uint8_t RS_TEMPORAL_FILTER_DPP   = 0x13; // vs RS_READOUT_SHAPING
-            static constexpr uint8_t RS_HDRD_CONTROL          = 0x14; // D500 only, no D400 counterpart
+            static constexpr uint8_t RS_ICR_CONTROL          = 0x14; // D500 only, no D400 counterpart
 
             // D500 inference XU, on subdevice 0 like the depth XU but with its own unit and selectors.
             static constexpr uint8_t RS_INFERENCE_XU_UNIT     = 0x10;
@@ -344,10 +344,10 @@ namespace librealsense
                     case RS_COLORED_IR_AE_POLICY: return RS_CAMERA_CID_2C_AE_POLICY;
                     // D500 composite DPP controls - LibRS-side ctrl ids from ds-private.h that
                     // route to the driver's D500_CAMERA_CID_MINZ / _DECIMATION_FILTER_DPP /
-                    // _TEMPORAL_FILTER_DPP composite CIDs. MINZ is what LibRS calls HDRD.
+                    // _TEMPORAL_FILTER_DPP composite CIDs. MINZ is what LibRS calls ICR.
                     case RS_DECIMATION_FILTER_DPP: return RS_CAMERA_CID_DECIMATION_FILTER_DPP;
                     case RS_TEMPORAL_FILTER_DPP:   return RS_CAMERA_CID_TEMPORAL_FILTER_DPP;
-                    case RS_HDRD_CONTROL:          return RS_CAMERA_CID_MINZ;
+                    case RS_ICR_CONTROL:          return RS_CAMERA_CID_MINZ;
                     case RS_ALIGN_DEPTH:           return RS_CAMERA_CID_ALIGNED_DEPTH;
                     case RS_PASSIVE_DEPTH:         return RS_CAMERA_CID_PASSIVE_DEPTH;
                     default: break;  // the rest are common to both families

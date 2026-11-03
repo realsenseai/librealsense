@@ -26,7 +26,7 @@ def _find_temporal_filter_dpp_filter(sensor):
 
 def _bounce_field(embedded_filter, option_id, original, range, field):
     """Every field here is a plain range-bounded number - no conditional-relevance branching,
-    unlike HDRD. Sets `field` to a new in-range value, verifies the readback, then restores it.
+    unlike ICR. Sets `field` to a new in-range value, verifies the readback, then restores it.
     Returns whether there was room to change `field` at all."""
     lo, hi = getattr(range.min, field), getattr(range.max, field)
     if lo >= hi:

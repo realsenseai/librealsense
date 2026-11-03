@@ -2,11 +2,11 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 """Verifies RS2_FRAME_METADATA_EMBEDDED_FILTERS correctly and additively reflects which DPP
-composite-option filters are applied to a depth frame, for Temporal Filter DPP and HDRD/Improved
+composite-option filters are applied to a depth frame, for Temporal Filter DPP and ICR/Improved
 Close Range Control. Decimation Filter DPP is excluded - see pytest-decimation-filter-dpp-effect.py,
 its bit never sets (RSDEV-14424).
 
-Temporal's bit is documented (1u<<2); HDRD's (1u<<5) is empirically observed only and should be
+Temporal's bit is documented (1u<<2); ICR's (1u<<5) is empirically observed only and should be
 added to the spec. Both together produce 0x24 (0x04 | 0x20), confirming additive bitmask behavior.
 """
 
@@ -23,9 +23,9 @@ pytestmark = [
 ]
 
 STREAM_WIDTH, STREAM_HEIGHT = 640, 360
-HDRD_WIDTH, HDRD_HEIGHT = 1280, 720  # HDRD only activates at 720p/960p (see rs_hdrd_control.h)
+ICR_WIDTH, ICR_HEIGHT = 1280, 720  # ICR only activates at 720p/960p (see rs_icr_control.h)
 TEMPORAL_APPLIED_BIT = 1 << 2  # documented
-HDRD_APPLIED_BIT = 1 << 5      # empirically observed only, undocumented
+ICR_APPLIED_BIT = 1 << 5      # empirically observed only, undocumented
 
 
 def _find_filter(sensor, composite_option_id):
@@ -102,43 +102,43 @@ def test_temporal_filter_dpp_sets_embedded_filters_metadata_bit(test_device):
         embedded_filter.set_temporal_filter_dpp_config(option_id, cfg)
 
 
-def test_hdrd_control_sets_embedded_filters_metadata_bit(test_device):
-    """Enabling HDRD/Improved Close Range Control before streaming is expected to set RS2_FRAME_
+def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
+    """Enabling ICR/Improved Close Range Control before streaming is expected to set RS2_FRAME_
     METADATA_EMBEDDED_FILTERS's empirically-observed bit (1u<<5) on the resulting depth frames,
-    and disabling it again is expected to clear it. Streams at 1280x720 - HDRD only activates at
-    720p/960p (see rs_hdrd_control.h)."""
+    and disabling it again is expected to clear it. Streams at 1280x720 - ICR only activates at
+    720p/960p (see rs_icr_control.h)."""
     dev, ctx = test_device
     depth_sensor = dev.first_depth_sensor()
-    option_id = rs.composite_option_id.hdrd_control
+    option_id = rs.composite_option_id.icr_control
     embedded_filter = _find_filter(depth_sensor, option_id)
     if embedded_filter is None:
-        pytest.skip("HDRD control composite option not supported on this device")
+        pytest.skip("ICR control composite option not supported on this device")
     try:
         embedded_filter.get_composite_option(option_id)
     except RuntimeError as e:
-        pytest.skip(f"HDRD control registered but not functional on this device/FW: {e}")
+        pytest.skip(f"ICR control registered but not functional on this device/FW: {e}")
 
     try:
-        cfg = embedded_filter.get_hdrd_control(option_id)
+        cfg = embedded_filter.get_icr_control(option_id)
         cfg.enable = 1
-        embedded_filter.set_hdrd_control(option_id, cfg)
-        frame = _stream_one_depth_frame(dev, ctx, HDRD_WIDTH, HDRD_HEIGHT)
-        assert frame is not None, "No depth frame received with HDRD control enabled"
+        embedded_filter.set_icr_control(option_id, cfg)
+        frame = _stream_one_depth_frame(dev, ctx, ICR_WIDTH, ICR_HEIGHT)
+        assert frame is not None, "No depth frame received with ICR control enabled"
         value = _embedded_filters_value(frame)
-        assert value & HDRD_APPLIED_BIT, (
-            f"RS2_FRAME_METADATA_EMBEDDED_FILTERS = {value:#x}, HDRD bit (1<<5) not set "
-            f"with HDRD control enabled")
+        assert value & ICR_APPLIED_BIT, (
+            f"RS2_FRAME_METADATA_EMBEDDED_FILTERS = {value:#x}, ICR bit (1<<5) not set "
+            f"with ICR control enabled")
 
-        cfg = embedded_filter.get_hdrd_control(option_id)
+        cfg = embedded_filter.get_icr_control(option_id)
         cfg.enable = 0
-        embedded_filter.set_hdrd_control(option_id, cfg)
-        frame = _stream_one_depth_frame(dev, ctx, HDRD_WIDTH, HDRD_HEIGHT)
-        assert frame is not None, "No depth frame received with HDRD control disabled"
+        embedded_filter.set_icr_control(option_id, cfg)
+        frame = _stream_one_depth_frame(dev, ctx, ICR_WIDTH, ICR_HEIGHT)
+        assert frame is not None, "No depth frame received with ICR control disabled"
         value = _embedded_filters_value(frame)
-        assert not (value & HDRD_APPLIED_BIT), (
-            f"RS2_FRAME_METADATA_EMBEDDED_FILTERS = {value:#x}, HDRD bit (1<<5) still set "
-            f"with HDRD control disabled")
+        assert not (value & ICR_APPLIED_BIT), (
+            f"RS2_FRAME_METADATA_EMBEDDED_FILTERS = {value:#x}, ICR bit (1<<5) still set "
+            f"with ICR control disabled")
     finally:
-        cfg = embedded_filter.get_hdrd_control(option_id)
+        cfg = embedded_filter.get_icr_control(option_id)
         cfg.enable = 0
-        embedded_filter.set_hdrd_control(option_id, cfg)
+        embedded_filter.set_icr_control(option_id, cfg)

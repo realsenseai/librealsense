@@ -8,7 +8,7 @@
 #include <librealsense2/rs.hpp>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_hdrd_control.h>
+#include <librealsense2/h/rs_icr_control.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -27,7 +27,7 @@ namespace
         {
         case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  return "DECIMATION_FILTER_DPP";
         case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    return "TEMPORAL_FILTER_DPP";
-        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:           return "HDRD_CONTROL";
+        case RS2_COMPOSITE_OPTION_ICR_CONTROL:           return "ICR_CONTROL";
         default:                                           return "UNKNOWN";
         }
     }
@@ -127,7 +127,7 @@ namespace
     }
 
     // Overload for a field nested one level down through a composed sub-struct, e.g.
-    // rs2_hdrd_control::header (a dpp_header) then dpp_header::version.
+    // rs2_icr_control::header (a dpp_header) then dpp_header::version.
     template< class S, class H, class Attribute >
     std::shared_ptr< field_printer_base > make_field_printer( const char * name, H S::* header_field, Attribute H::* field )
     {
@@ -205,21 +205,21 @@ namespace
         return fields;
     }
 
-    const std::vector< std::shared_ptr< field_printer_base > > & hdrd_fields()
+    const std::vector< std::shared_ptr< field_printer_base > > & icr_fields()
     {
         static const std::vector< std::shared_ptr< field_printer_base > > fields = {
-            make_field_printer( "version", &rs2_hdrd_control::header, &dpp_header::version ),
-            make_field_printer( "flags", &rs2_hdrd_control::header, &dpp_header::flags ),
-            make_field_printer( "ctl_id", &rs2_hdrd_control::header, &dpp_header::ctl_id ),
-            make_field_printer( "param_count", &rs2_hdrd_control::header, &dpp_header::param_count ),
-            make_field_printer( "param_type", &rs2_hdrd_control::header, &dpp_header::param_type ),
-            make_field_printer( "enable", &rs2_hdrd_control::enable ),
-            make_field_printer( "filter_type", &rs2_hdrd_control::filter_type ),
-            make_field_printer( "downscale_ratio", &rs2_hdrd_control::downscale_ratio ),
-            make_field_printer( "shift_mode", &rs2_hdrd_control::shift_mode ),
-            make_field_printer( "shift_pixels", &rs2_hdrd_control::shift_pixels ),
-            make_field_printer( "threshold_mode", &rs2_hdrd_control::threshold_mode ),
-            make_field_printer( "threshold_mm", &rs2_hdrd_control::threshold_mm ),
+            make_field_printer( "version", &rs2_icr_control::header, &dpp_header::version ),
+            make_field_printer( "flags", &rs2_icr_control::header, &dpp_header::flags ),
+            make_field_printer( "ctl_id", &rs2_icr_control::header, &dpp_header::ctl_id ),
+            make_field_printer( "param_count", &rs2_icr_control::header, &dpp_header::param_count ),
+            make_field_printer( "param_type", &rs2_icr_control::header, &dpp_header::param_type ),
+            make_field_printer( "enable", &rs2_icr_control::enable ),
+            make_field_printer( "filter_type", &rs2_icr_control::filter_type ),
+            make_field_printer( "downscale_ratio", &rs2_icr_control::downscale_ratio ),
+            make_field_printer( "shift_mode", &rs2_icr_control::shift_mode ),
+            make_field_printer( "shift_pixels", &rs2_icr_control::shift_pixels ),
+            make_field_printer( "threshold_mode", &rs2_icr_control::threshold_mode ),
+            make_field_printer( "threshold_mm", &rs2_icr_control::threshold_mm ),
         };
         return fields;
     }
@@ -318,27 +318,27 @@ namespace
     }
 
     // Prints one verdict line for a just-completed Set - shared by every step below.
-    void verify_hdrd_fields_written( const char * step_label, const rs2_hdrd_control & written, bool matches )
+    void verify_icr_fields_written( const char * step_label, const rs2_icr_control & written, bool matches )
     {
         std::cout << "Set (" << step_label << "): "
                   << ( matches ? "matches what was sent" : "differs - FW may quantize/clamp on write" ) << '\n';
-        print_struct( std::cout, hdrd_fields(), written );
+        print_struct( std::cout, icr_fields(), written );
     }
 
     // Full read-modify-write + range + metadata sequence. Exercises both of the struct's
     // conditional axes (filter_type -> downscale_ratio/shift_mode+shift_pixels, threshold_mode ->
     // threshold_mm) instead of a single-field toggle, then restores the original value.
-    void exercise_hdrd_control( rs2::options & opts, rs2_composite_option_id id )
+    void exercise_icr_control( rs2::options & opts, rs2_composite_option_id id )
     {
         // Raw bytes and the typed cast, shown side by side to illustrate both APIs.
         print_bytes( "Get Raw Data:", opts.get_composite_option( id ) );
-        auto original = opts.get_composite_option_as< rs2_hdrd_control >( id );
+        auto original = opts.get_composite_option_as< rs2_icr_control >( id );
         std::cout << "Get Structured Data:\n";
-        print_struct( std::cout, hdrd_fields(), original );
+        print_struct( std::cout, icr_fields(), original );
 
         // Read-modify-write: wire header carried over untouched from what the device just
         // reported, not zero-initialized, on every Set below.
-        rs2_hdrd_control cfg = original;
+        rs2_icr_control cfg = original;
         cfg.enable = 1;
 
         // 1) Lookup Shift + Manual shift pixels - exercises filter_type together with the
@@ -347,8 +347,8 @@ namespace
         cfg.shift_mode = 2;    // Manual
         cfg.shift_pixels = 100;
         opts.set_composite_option_from( id, cfg );
-        auto after_shift = opts.get_composite_option_as< rs2_hdrd_control >( id );
-        verify_hdrd_fields_written( "filter_type=Lookup Shift, shift_mode=Manual, shift_pixels=100", after_shift,
+        auto after_shift = opts.get_composite_option_as< rs2_icr_control >( id );
+        verify_icr_fields_written( "filter_type=Lookup Shift, shift_mode=Manual, shift_pixels=100", after_shift,
             after_shift.filter_type == cfg.filter_type && after_shift.shift_mode == cfg.shift_mode
                 && after_shift.shift_pixels == cfg.shift_pixels );
 
@@ -356,8 +356,8 @@ namespace
         cfg.filter_type = 0;   // Downscale
         cfg.downscale_ratio = 2;   // x4
         opts.set_composite_option_from( id, cfg );
-        auto after_downscale = opts.get_composite_option_as< rs2_hdrd_control >( id );
-        verify_hdrd_fields_written( "filter_type=Downscale, downscale_ratio=x4", after_downscale,
+        auto after_downscale = opts.get_composite_option_as< rs2_icr_control >( id );
+        verify_icr_fields_written( "filter_type=Downscale, downscale_ratio=x4", after_downscale,
             after_downscale.filter_type == cfg.filter_type && after_downscale.downscale_ratio == cfg.downscale_ratio );
 
         // 3) Cycle threshold_mode through all three rungs - threshold_mm only matters for Manual,
@@ -367,9 +367,9 @@ namespace
             cfg.threshold_mode = mode;
             cfg.threshold_mm = ( mode == 2 ) ? 300 : 0;
             opts.set_composite_option_from( id, cfg );
-            auto after_threshold = opts.get_composite_option_as< rs2_hdrd_control >( id );
+            auto after_threshold = opts.get_composite_option_as< rs2_icr_control >( id );
             std::string step_label = "threshold_mode=" + std::to_string( mode );
-            verify_hdrd_fields_written( step_label.c_str(), after_threshold,
+            verify_icr_fields_written( step_label.c_str(), after_threshold,
                 after_threshold.threshold_mode == cfg.threshold_mode );
         }
 
@@ -377,7 +377,7 @@ namespace
         // consequential state changes (unlike a single-field toggle), so leaving no lasting effect
         // on the device matters more here.
         opts.set_composite_option_from( id, original );
-        auto restored = opts.get_composite_option_as< rs2_hdrd_control >( id );
+        auto restored = opts.get_composite_option_as< rs2_icr_control >( id );
         std::cout << "Restore original value: "
                   << ( restored.filter_type == original.filter_type && restored.downscale_ratio == original.downscale_ratio
                            && restored.shift_mode == original.shift_mode && restored.shift_pixels == original.shift_pixels
@@ -385,13 +385,13 @@ namespace
                        ? "ok" : "FAILED to restore - device may be left in the sample's last test state" )
                   << '\n';
 
-        // range.min/max/step/def are each a FULL rs2_hdrd_control - the same struct
+        // range.min/max/step/def are each a FULL rs2_icr_control - the same struct
         // as `original`/`cfg` above, header fields included - and those bytes ARE exactly what the
         // device's real get_xu_range() call returned.
         print_bytes( "Get Range", opts.get_composite_option_range( id ) );
-        auto range = opts.get_composite_option_range_as< rs2_hdrd_control_range >( id );
+        auto range = opts.get_composite_option_range_as< rs2_icr_control_range >( id );
         std::cout << "      Range:\n";
-        print_range( std::cout, hdrd_fields(), range.min, range.max, range.def, range.step );
+        print_range( std::cout, icr_fields(), range.min, range.max, range.def, range.step );
 
         std::cout << "      Read-only: " << ( opts.is_composite_option_read_only( id ) ? "true" : "false" ) << '\n';
         std::cout << "      Description: \"" << opts.get_composite_option_description( id ) << "\"\n";
@@ -406,7 +406,7 @@ namespace
         {
         case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  exercise_decimation_filter_dpp( opts, id ); return true;
         case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    exercise_temporal_filter_dpp( opts, id ); return true;
-        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:           exercise_hdrd_control( opts, id ); return true;
+        case RS2_COMPOSITE_OPTION_ICR_CONTROL:           exercise_icr_control( opts, id ); return true;
         default:
             std::cout << "      (no typed handler registered for this composite option id)\n";
             return false;

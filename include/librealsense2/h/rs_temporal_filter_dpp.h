@@ -4,7 +4,7 @@
 /** \file rs_temporal_filter_dpp.h
 * \brief
 * Cast-target struct for RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP (see rs_composite_option.h).
-* Same shared HKR DPP wire layout (see rs_hdrd_control.h): dpp_header + 8 int32 param slots,
+* Same shared HKR DPP wire layout (see rs_icr_control.h): dpp_header + 8 int32 param slots,
 * 4 used (38 bytes, little-endian, pack(1)); ctl_id = 0x0002.
 */
 

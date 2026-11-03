@@ -17,14 +17,14 @@ install(TARGETS rs-composite-option RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Sweeps every connected device's depth sensor(s), enumerates whichever
 # composite options each one supports, and prints the current value of each - against REAL
-# connected devices (no fake transport). See rs-hdrd-control.cpp.
-add_executable(rs-hdrd-control
-    rs-hdrd-control.cpp
+# connected devices (no fake transport). See rs-icr-control.cpp.
+add_executable(rs-icr-control
+    rs-icr-control.cpp
 )
-set_property(TARGET rs-hdrd-control PROPERTY CXX_STANDARD 14)
-target_link_libraries(rs-hdrd-control PRIVATE ${LRS_TARGET})
-set_target_properties (rs-hdrd-control PROPERTIES FOLDER Examples)
-install(TARGETS rs-hdrd-control RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+set_property(TARGET rs-icr-control PROPERTY CXX_STANDARD 14)
+target_link_libraries(rs-icr-control PRIVATE ${LRS_TARGET})
+set_target_properties (rs-icr-control PROPERTIES FOLDER Examples)
+install(TARGETS rs-icr-control RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # The C99 raw-API counterpart of rs-composite-option.cpp lives under examples/C/composite-ctl
 # (see rs-composite-ctl.c there) - Examples/C, not Examples, matching where every other pure-C

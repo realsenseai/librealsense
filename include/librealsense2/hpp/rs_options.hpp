@@ -570,7 +570,7 @@ namespace rs2
 
         // ---- typed composite-option cast helpers (get_composite_option_as() and friends) -----
         // Detects whether T has a `.header.version` member via a composed dpp_header - value
-        // structs like rs2_hdrd_control.
+        // structs like rs2_icr_control.
         template< typename U >
         class has_header_version
         {
@@ -581,8 +581,8 @@ namespace rs2
         };
 
         // Detects whether T is a {min,max,step,def} range wrapper whose ELEMENTS each carry their
-        // own `.header.version` - e.g. rs2_hdrd_control_range. The wrapper itself has no version
-        // field of its own (see rs_hdrd_control.h) - each of its four bounds does.
+        // own `.header.version` - e.g. rs2_icr_control_range. The wrapper itself has no version
+        // field of its own (see rs_icr_control.h) - each of its four bounds does.
         template< typename U >
         class has_min_header_version
         {
@@ -617,7 +617,7 @@ namespace rs2
                                              "doesn't know yet?" );
         }
 
-        // Range wrapper (e.g. rs2_hdrd_control_range) - checks each of the four bounds' own
+        // Range wrapper (e.g. rs2_icr_control_range) - checks each of the four bounds' own
         // header.version the same way, since the wrapper carries none of its own.
         template< typename T >
         static typename std::enable_if< has_min_header_version< T >::value >::type

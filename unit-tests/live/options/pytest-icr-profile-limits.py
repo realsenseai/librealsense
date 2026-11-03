@@ -17,7 +17,7 @@ pytestmark = [
     pytest.mark.device_exclude("D585S"),
 ]
 
-HDRD = rs.composite_option_id.hdrd_control
+ICR = rs.composite_option_id.icr_control
 DECIMATION = rs.composite_option_id.decimation_filter_dpp
 MAX_FPS = 30
 
@@ -75,13 +75,13 @@ def _stream_until_frame(sensor, profile, timeout=5):
     return len(frames)
 
 
-def _set_hdrd(hdrd, mode, enable):
+def _set_icr(icr, mode, enable):
     filter_type, ratio, _, _, _ = MODES[mode]
-    cfg = hdrd.get_hdrd_control(HDRD)
+    cfg = icr.get_icr_control(ICR)
     cfg.enable = enable
     cfg.filter_type = filter_type
     cfg.downscale_ratio = ratio
-    hdrd.set_hdrd_control(HDRD, cfg)
+    icr.set_icr_control(ICR, cfg)
 
 
 def _set_decimation(decimation, enabled):
@@ -101,23 +101,23 @@ def _decimation_enabled(decimation):
 
 @pytest.fixture
 def filters(test_device):
-    """Yields (depth sensor, hdrd filter, decimation filter) with both filters off, and restores their original
+    """Yields (depth sensor, icr filter, decimation filter) with both filters off, and restores their original
     values afterwards."""
     dev, ctx = test_device
     sensor = dev.first_depth_sensor()
-    hdrd = _find_filter(sensor, HDRD)
+    icr = _find_filter(sensor, ICR)
     decimation = next((f for f in sensor.query_embedded_filters() if f.get_type() == rs.embedded_filter_type.decimation), None)
-    if hdrd is None or decimation is None:
+    if icr is None or decimation is None:
         pytest.skip("Improved Close Range Depth / Decimation filters not supported on this device")
-    original_hdrd = bytearray(hdrd.get_composite_option(HDRD))
-    original_hdrd[-4:] = bytes(4)  # reserved MUST be zero on SET
+    original_icr = bytearray(icr.get_composite_option(ICR))
+    original_icr[-4:] = bytes(4)  # reserved MUST be zero on SET
     original_decimation = _decimation_enabled(decimation)
     _set_decimation(decimation, 0)
-    _set_hdrd(hdrd, "downscale_x2", 0)
-    yield sensor, hdrd, decimation
+    _set_icr(icr, "downscale_x2", 0)
+    yield sensor, icr, decimation
     if sensor.get_active_streams():  # an unsupported profile that opened by mistake; never started
         sensor.close()
-    hdrd.set_composite_option(HDRD, bytes(original_hdrd))
+    icr.set_composite_option(ICR, bytes(original_icr))
     _set_decimation(decimation, original_decimation)
 
 
@@ -131,8 +131,8 @@ def _profiles_by_support(sensor, mode):
 
 @pytest.mark.parametrize("mode", MODES)
 def test_unsupported_profiles_rejected(filters, mode):
-    sensor, hdrd, _ = filters
-    _set_hdrd(hdrd, mode, 1)
+    sensor, icr, _ = filters
+    _set_icr(icr, mode, 1)
     _, unsupported = _profiles_by_support(sensor, mode)
     for profile in unsupported:
         log.info(f"{mode} {_describe(profile)}: expecting rejection")
@@ -156,8 +156,8 @@ def _unsupported_depth_ir(sensor, mode):
 
 @pytest.mark.parametrize("mode", MODES)
 def test_unsupported_depth_ir_rejected(filters, mode):
-    sensor, hdrd, _ = filters
-    _set_hdrd(hdrd, mode, 1)
+    sensor, icr, _ = filters
+    _set_icr(icr, mode, 1)
     with pytest.raises(RuntimeError, match="Improved Close Range Depth .* requires Depth"):
         sensor.open(_unsupported_depth_ir(sensor, mode))
 
@@ -166,8 +166,8 @@ def test_unsupported_depth_ir_rejected(filters, mode):
 @pytest.mark.parametrize("mode", MODES)
 def test_depth_streams_after_rejection(filters, mode):
     """Both tickets expect a rejected profile not to affect normal Depth output"""
-    sensor, hdrd, _ = filters
-    _set_hdrd(hdrd, mode, 1)
+    sensor, icr, _ = filters
+    _set_icr(icr, mode, 1)
     with pytest.raises(RuntimeError, match="Improved Close Range Depth .* requires Depth"):
         sensor.open(_unsupported_depth_ir(sensor, mode))
     supported, _ = _profiles_by_support(sensor, mode)
@@ -177,8 +177,8 @@ def test_depth_streams_after_rejection(filters, mode):
 @pytest.mark.context("nightly")
 @pytest.mark.parametrize("mode", MODES)
 def test_supported_profiles_accepted(filters, mode):
-    sensor, hdrd, _ = filters
-    _set_hdrd(hdrd, mode, 1)
+    sensor, icr, _ = filters
+    _set_icr(icr, mode, 1)
     supported, _ = _profiles_by_support(sensor, mode)
     by_resolution = {}  # one profile per resolution, at the highest supported FPS, keeps the run short
     for p in supported:
@@ -194,43 +194,43 @@ def test_supported_profiles_accepted(filters, mode):
 @pytest.mark.context("nightly")
 @pytest.mark.parametrize("mode", MODES)
 def test_enable_while_streaming(filters, mode):
-    sensor, hdrd, _ = filters
-    _set_hdrd(hdrd, mode, 0)  # filter_type/downscale_ratio cannot change while streaming
+    sensor, icr, _ = filters
+    _set_icr(icr, mode, 0)  # filter_type/downscale_ratio cannot change while streaming
     supported, unsupported = _profiles_by_support(sensor, mode)
     assert supported and unsupported, f"{mode}: need both a supported and an unsupported Depth profile"
 
     with _streaming(sensor, unsupported[0]):
         with pytest.raises(RuntimeError, match="Improved Close Range Depth .* requires Depth"):
-            _set_hdrd(hdrd, mode, 1)
-    assert hdrd.get_hdrd_control(HDRD).enable == 0, f"{mode} {_describe(unsupported[0])}: filter got enabled"
+            _set_icr(icr, mode, 1)
+    assert icr.get_icr_control(ICR).enable == 0, f"{mode} {_describe(unsupported[0])}: filter got enabled"
 
     with _streaming(sensor, supported[0]):
-        _set_hdrd(hdrd, mode, 1)
-    assert hdrd.get_hdrd_control(HDRD).enable == 1, f"{mode} {_describe(supported[0])}: filter not enabled"
+        _set_icr(icr, mode, 1)
+    assert icr.get_icr_control(ICR).enable == 1, f"{mode} {_describe(supported[0])}: filter not enabled"
 
 
 @pytest.mark.context("nightly")
 def test_geometry_change_while_streaming_rejected(filters):
-    sensor, hdrd, _ = filters
+    sensor, icr, _ = filters
     profile = next((p for p in _depth_profiles(sensor) if _describe(p) == "640x360@30"), None)
     if profile is None:
         pytest.skip("Depth 640x360@30 not available")
 
-    _set_hdrd(hdrd, "downscale_x2", 1)
+    _set_icr(icr, "downscale_x2", 1)
     with _streaming(sensor, profile):
         with pytest.raises(RuntimeError, match="cannot be changed while Depth or Infrared is streaming"):
-            _set_hdrd(hdrd, "lookup_shift", 1)
-        _set_hdrd(hdrd, "downscale_x2", 0)  # same Filter Type and Downscale Ratio - allowed
-    assert hdrd.get_hdrd_control(HDRD).filter_type == 0, "Filter Type changed while streaming"
+            _set_icr(icr, "lookup_shift", 1)
+        _set_icr(icr, "downscale_x2", 0)  # same Filter Type and Downscale Ratio - allowed
+    assert icr.get_icr_control(ICR).filter_type == 0, "Filter Type changed while streaming"
 
 
 def test_downscale_x4_with_decimation_rejected(filters):
-    sensor, hdrd, decimation = filters
+    sensor, icr, decimation = filters
     profile = next((p for p in _depth_profiles(sensor) if _describe(p) == "640x360@30"), None)
     if profile is None:
         pytest.skip("Depth 640x360@30 not available")
 
     _set_decimation(decimation, 1)
-    _set_hdrd(hdrd, "downscale_x4", 1)
+    _set_icr(icr, "downscale_x4", 1)
     with pytest.raises(RuntimeError, match="cannot be combined with the embedded Decimation filter"):
         sensor.open(profile)

@@ -5,7 +5,7 @@
 * \brief
 * Wire header shared by every control in the HKR Depth Post-Processing (DPP) composite-option
 * family: this header + a fixed 8-slot int32 param block; param_count says how many are active,
-* the rest MUST be zero on SET. See rs_hdrd_control.h for a control that uses it.
+* the rest MUST be zero on SET. See rs_icr_control.h for a control that uses it.
 */
 
 #ifndef LIBREALSENSE_RS2_DPP_HEADER_H

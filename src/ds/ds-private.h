@@ -71,8 +71,8 @@ namespace librealsense
         // D500/HKR-only, on ds::depth_xu - shares the numeric value with DS5_READOUT_SHAPING
         // above only because that one is D400-only and never reaches this XU.
         const uint8_t DS5_HKR_TEMPORAL_FILTER_DPP           = 0x13;
-        // Backs RS2_COMPOSITE_OPTION_HDRD_CONTROL - see src/ds/d500/hdrd-embedded-filter.h.
-        const uint8_t DS5_HKR_HDRD_CONTROL = 0x14;
+        // Backs RS2_COMPOSITE_OPTION_ICR_CONTROL - see src/ds/d500/icr-embedded-filter.h.
+        const uint8_t DS5_HKR_ICR_CONTROL = 0x14;
                 
 
         // DS5 fisheye XU identifiers

@@ -11,7 +11,7 @@
 #include <librealsense2/rs.hpp>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_hdrd_control.h>
+#include <librealsense2/h/rs_icr_control.h>
 #include "helper.h"
 
 using namespace helper;
@@ -433,9 +433,9 @@ public:
                 std::cout << "  persistency_index : " << v.persistency_index << std::endl;
                 break;
             }
-            case RS2_COMPOSITE_OPTION_HDRD_CONTROL:
+            case RS2_COMPOSITE_OPTION_ICR_CONTROL:
             {
-                rs2_hdrd_control v = filter.get_composite_option_as<rs2_hdrd_control>(id);
+                rs2_icr_control v = filter.get_composite_option_as<rs2_icr_control>(id);
                 std::cout << "  enable          : " << v.enable << std::endl;
                 std::cout << "  filter_type     : " << v.filter_type << std::endl;
                 std::cout << "  downscale_ratio : " << v.downscale_ratio << std::endl;
@@ -587,12 +587,12 @@ public:
             }
             break;
         }
-        case RS2_COMPOSITE_OPTION_HDRD_CONTROL:
+        case RS2_COMPOSITE_OPTION_ICR_CONTROL:
         {
-            rs2_hdrd_control cfg;
+            rs2_icr_control cfg;
             try
             {
-                cfg = filter.get_composite_option_as<rs2_hdrd_control>(id);
+                cfg = filter.get_composite_option_as<rs2_icr_control>(id);
             }
             catch (const rs2::error& e)
             {
@@ -600,10 +600,10 @@ public:
                 return;
             }
 
-            rs2_hdrd_control_range range;
+            rs2_icr_control_range range;
             try
             {
-                range = filter.get_composite_option_range_as<rs2_hdrd_control_range>(id);
+                range = filter.get_composite_option_range_as<rs2_icr_control_range>(id);
             }
             catch (const rs2::error& e)
             {

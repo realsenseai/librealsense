@@ -39,7 +39,7 @@
 #include <dds/rs-dds-embedded-temporal-filter.h>
 #include <dds/rs-dds-embedded-close-range-filter.h>
 #include <dds/rs-dds-close-range-control.h>
-#include <src/ds/features/hdrd-filter-feature.h>
+#include <src/ds/features/icr-filter-feature.h>
 
 #include <src/ds/ds-private.h>
 
@@ -1143,8 +1143,8 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
     }
     else if (auto close_range_filter = std::dynamic_pointer_cast< dds_close_range_filter >(embedded_filter))
     {
-        // All parameters as rs2_hdrd_control. Same feature as USB, only the transport of the payload differs
-        auto feature = std::make_shared< hdrd_filter_feature >(
+        // All parameters as rs2_icr_control. Same feature as USB, only the transport of the payload differs
+        auto feature = std::make_shared< icr_filter_feature >(
             *_owner,
             *this,
             std::make_shared< rs_dds_close_range_control >( embedded_filter,

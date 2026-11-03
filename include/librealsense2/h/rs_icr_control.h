@@ -1,15 +1,15 @@
 /* License: Apache 2.0. See LICENSE file in root directory.
    Copyright(c) 2026 RealSense, Inc. All Rights Reserved. */
 
-/** \file rs_hdrd_control.h
+/** \file rs_icr_control.h
 * \brief
-* Cast-target struct for RS2_COMPOSITE_OPTION_HDRD_CONTROL (see rs_composite_option.h). Wire
+* Cast-target struct for RS2_COMPOSITE_OPTION_ICR_CONTROL (see rs_composite_option.h). Wire
 * layout: dpp_header + 8 int32 param slots, 7 used (38 bytes, little-endian, pack(1)); ctl_id =
 * 0x0008. Only some Depth profiles are supported; others are rejected when enabling or opening the stream.
 */
 
-#ifndef LIBREALSENSE_RS2_HDRD_CONTROL_H
-#define LIBREALSENSE_RS2_HDRD_CONTROL_H
+#ifndef LIBREALSENSE_RS2_ICR_CONTROL_H
+#define LIBREALSENSE_RS2_ICR_CONTROL_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,7 +21,7 @@ extern "C" {
 #pragma pack(push, 1)
 
 /** The entire 38-byte HKR Improved Close Range payload, header included. */
-typedef struct rs2_hdrd_control
+typedef struct rs2_icr_control
 {
     dpp_header header;
 
@@ -39,25 +39,25 @@ typedef struct rs2_hdrd_control
                                      * Default 0 */
 
     int32_t  reserved[1];           /**< MUST be zero on SET */
-} rs2_hdrd_control;
+} rs2_icr_control;
 
 #pragma pack(pop)
 
 /* Fails to compile if padding/field changes push this off the documented 38-byte wire size. */
-typedef char rs2_hdrd_control_wire_size_check[ ( sizeof( rs2_hdrd_control ) == 38 ) ? 1 : -1 ];
+typedef char rs2_icr_control_wire_size_check[ ( sizeof( rs2_icr_control ) == 38 ) ? 1 : -1 ];
 
-/** {min, max, step, def} bounds for rs2_hdrd_control, as returned by
-* rs2_get_composite_option_range(RS2_COMPOSITE_OPTION_HDRD_CONTROL). Read-only - each
+/** {min, max, step, def} bounds for rs2_icr_control, as returned by
+* rs2_get_composite_option_range(RS2_COMPOSITE_OPTION_ICR_CONTROL). Read-only - each
 * bound already carries its own header.version, so this wrapper has no version field of its own. */
-typedef struct rs2_hdrd_control_range
+typedef struct rs2_icr_control_range
 {
-    rs2_hdrd_control min;
-    rs2_hdrd_control max;
-    rs2_hdrd_control step;
-    rs2_hdrd_control def;
-} rs2_hdrd_control_range;
+    rs2_icr_control min;
+    rs2_icr_control max;
+    rs2_icr_control step;
+    rs2_icr_control def;
+} rs2_icr_control_range;
 
 #ifdef __cplusplus
 }
 #endif
-#endif  // LIBREALSENSE_RS2_HDRD_CONTROL_H
+#endif  // LIBREALSENSE_RS2_ICR_CONTROL_H

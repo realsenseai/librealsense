@@ -37,7 +37,7 @@ target_sources(${LRS_TARGET}
         "${CMAKE_CURRENT_LIST_DIR}/hw_monitor_extended_buffers.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-options.h"
         "${CMAKE_CURRENT_LIST_DIR}/composite-embedded-filter.h"
-        "${CMAKE_CURRENT_LIST_DIR}/hdrd-embedded-filter.h"
+        "${CMAKE_CURRENT_LIST_DIR}/icr-embedded-filter.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-info.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-fw-update-device.h"
         "${CMAKE_CURRENT_LIST_DIR}/d500-mipi-device.h"

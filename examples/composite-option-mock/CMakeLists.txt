@@ -7,7 +7,7 @@ project(RealsenseExamplesCompositeOptionMock)
 # Test scaffolding proving the atomicity + round-trip behavior of the generic composite-option
 # mechanism against a fake in-memory composite_option_interface standing in for real HKR/D500
 # hardware, driven through the real public entry points - see rs-composite-option-mock.cpp. One
-# parameterized binary covers all three DPP structs (Decimation/Temporal/HDRD); not install()-ed,
+# parameterized binary covers all three DPP structs (Decimation/Temporal/ICR); not install()-ed,
 # this is a unit test, not an SDK example end users need.
 add_executable(rs-composite-option-mock
     rs-composite-option-mock.cpp
