@@ -17,8 +17,7 @@ static void require(bool ok, const std::string &why) {
 static void delay(unsigned ms) {
   std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
-static json declaration(unsigned mask, bool dual, bool left_ir = false,
-                        bool yuyv = false) {
+static json declaration(unsigned mask, bool dual, bool yuyv = false) {
   json stereo = json::array(), color = json::array();
   auto stream = [](const char *b, const char *f) {
     return json{{"branch", b},
@@ -30,8 +29,7 @@ static json declaration(unsigned mask, bool dual, bool left_ir = false,
   if (mask & 1)
     stereo.push_back(stream("DEPTH", "Z16"));
   if (mask & 2)
-    stereo.push_back(
-        stream(left_ir ? "IR_L" : "IR_LR", left_ir ? "Y8" : "Y8I"));
+    stereo.push_back(stream("IR_LR", "Y8I"));
   if (dual) {
     if (mask & 4)
       stereo.push_back(stream("RGB_L", "NV12"));
@@ -86,7 +84,8 @@ struct Counts {
   }
 };
 static std::vector<Group> groups(rs2::device dev, unsigned mask, bool dual,
-                                 bool left_ir, bool yuyv) {
+                                 bool left_ir, bool yuyv,
+                                 bool right_ir = false) {
   struct Want {
     rs2_stream type;
     int index;
@@ -96,7 +95,8 @@ static std::vector<Group> groups(rs2::device dev, unsigned mask, bool dual,
   if (mask & 1)
     wants.push_back({RS2_STREAM_DEPTH, 0, RS2_FORMAT_Z16});
   if (mask & 2) {
-    wants.push_back({RS2_STREAM_INFRARED, 1, RS2_FORMAT_Y8});
+    if (!right_ir)
+      wants.push_back({RS2_STREAM_INFRARED, 1, RS2_FORMAT_Y8});
     if (!left_ir)
       wants.push_back({RS2_STREAM_INFRARED, 2, RS2_FORMAT_Y8});
   }
@@ -159,24 +159,23 @@ static void rejected(rs2::intent_device &intent, json request,
             << std::endl;
 }
 static void run_set(rs2::device dev, unsigned mask, bool dual, bool left_ir,
-                    bool yuyv, bool legacy = false) {
+                    bool yuyv, bool legacy = false, bool right_ir = false) {
   rs2::intent_device intent(dev);
-  auto doc = declaration(mask, dual, left_ir, yuyv);
+  auto doc = declaration(mask, dual, yuyv);
   if (!legacy) {
     intent.set_intent(doc.dump());
     require(json::parse(intent.get_intent())["status"]["state"] == 2,
             "SET did not configure");
   }
-  auto gs = groups(dev, mask, dual, left_ir, yuyv);
+  auto gs = groups(dev, mask, dual, left_ir, yuyv, right_ir);
   Counts counts;
   try {
     for (auto &g : gs) {
       g.sensor.open(g.profiles);
       g.opened = true;
     }
-    if (!legacy)
-      require(json::parse(intent.get_intent())["status"]["active_mask"] == 0,
-              "COMMIT started a stream");
+    // V4L2 open() already issues STREAMON (UVC COMMIT plus START). SDK
+    // start() enables callbacks; it is not the firmware START boundary.
     for (auto &g : gs) {
       g.sensor.start([&](rs2::frame f) { counts.accept(f); });
       g.started = true;
@@ -203,7 +202,7 @@ static void run_set(rs2::device dev, unsigned mask, bool dual, bool left_ir,
       auto st = json::parse(intent.get_intent())["status"];
       require(st["state"] == 4, "Not LOCKED while running");
       unsigned expected = (mask & 1 ? (1U << 1) : 0U) |
-                          (mask & 2 ? (1U << (left_ir ? 2 : 4)) : 0U) |
+                          (mask & 2 ? (1U << 4) : 0U) |
                           (mask & 4 ? (1U << (dual ? 5 : 7)) : 0U) |
                           (dual && (mask & 8) ? (1U << 6) : 0U);
       require(st["active_mask"] == expected,
@@ -217,14 +216,40 @@ static void run_set(rs2::device dev, unsigned mask, bool dual, bool left_ir,
     if (gs.size() > 1) {
       gs.back().sensor.stop();
       gs.back().started = false;
+      gs.back().sensor.close();
+      gs.back().opened = false;
       delay(200);
       auto before = counts.total();
       delay(600);
       require(counts.total() > before + 5, "Peer stopped when RGB stopped");
       continuity = true;
+      if (!legacy) {
+        auto st = json::parse(intent.get_intent())["status"];
+        require(st["state"] == 4 &&
+                    (st["active_mask"].get<unsigned>() & (1U << 7)) == 0,
+                "Color close did not detach its native gate");
+      }
+      const auto stopped = counts.snapshot()["frames"];
+      gs.back().sensor.open(gs.back().profiles);
+      gs.back().opened = true;
       gs.back().sensor.start([&](rs2::frame f) { counts.accept(f); });
       gs.back().started = true;
-      delay(400);
+      bool resumed = false;
+      for (unsigned i = 0; i < 30 && !resumed; ++i) {
+        delay(100);
+        const auto after = counts.snapshot()["frames"];
+        resumed = true;
+        for (auto p : gs.back().profiles) {
+          const auto key = std::to_string(p.stream_type()) + ":" +
+                           std::to_string(p.stream_index());
+          resumed &=
+              after.contains(key) &&
+              after[key].get<unsigned>() >= stopped[key].get<unsigned>() + 5;
+        }
+      }
+      require(resumed, "Color failed to resume after reopen");
+      require(counts.snapshot()["bad_frames"] == 0,
+              "Invalid frame after peer restart");
     }
     stop(gs);
     if (!legacy) {
@@ -236,6 +261,7 @@ static void run_set(rs2::device dev, unsigned mask, bool dual, bool left_ir,
                       {"mask", mask},
                       {"dual", dual},
                       {"left_ir", left_ir},
+                      {"right_ir", right_ir},
                       {"yuyv", yuyv},
                       {"peer_continuity", continuity},
                       {"capture", snap},
@@ -243,6 +269,14 @@ static void run_set(rs2::device dev, unsigned mask, bool dual, bool left_ir,
                      .dump()
               << std::endl;
   } catch (...) {
+    std::cerr << json{{"mask", mask}, {"capture", counts.snapshot()}}.dump()
+              << std::endl;
+    if (!legacy) {
+      try {
+        std::cerr << intent.get_intent() << std::endl;
+      } catch (...) {
+      }
+    }
     try {
       stop(gs);
     } catch (...) {
@@ -252,9 +286,11 @@ static void run_set(rs2::device dev, unsigned mask, bool dual, bool left_ir,
 }
 int main(int argc, char **argv) {
   try {
-    require(argc >= 3, "Usage: intent-device SERIAL "
-                       "status|matrix|left-ir|yuyv|negative|pipeline|legacy|"
-                       "switch-2c|switch-3c [mask]");
+    require(
+        argc >= 3,
+        "Usage: intent-device SERIAL "
+        "status|matrix|left-ir|right-ir|yuyv|negative|guard|pipeline|legacy|"
+        "switch-2c|switch-3c [mask]");
     rs2::context ctx;
     rs2::device dev;
     for (auto d : ctx.query_devices())
@@ -392,27 +428,38 @@ int main(int argc, char **argv) {
       cfg.enable_stream(RS2_STREAM_COLOR, dual ? 1 : 0, 1280, 720,
                         RS2_FORMAT_RGB8, 30);
       pipeline.start(cfg);
-      for (int i = 0; i < 30; ++i) {
-        auto f = pipeline.wait_for_frames(10000);
-        require(f.get_depth_frame() && f.get_color_frame(),
-                "Missing pipeline frame");
+      unsigned complete = 0;
+      const auto deadline =
+          std::chrono::steady_clock::now() + std::chrono::seconds(10);
+      while (complete < 30 && std::chrono::steady_clock::now() < deadline) {
+        auto f = pipeline.wait_for_frames(1000);
+        auto color = f.get_color_frame(dual ? 1 : 0);
+        if (f.get_depth_frame() && color) {
+          require(color.get_profile().format() == RS2_FORMAT_RGB8 &&
+                      color.get_width() == 1280 && color.get_height() == 720,
+                  "Unexpected converted color frame");
+          ++complete;
+        }
       }
       pipeline.stop();
+      require(complete >= 30, "Insufficient complete Depth/Color framesets");
       std::cout
           << json{{"case", "pipeline RGB8→native NV12"}, {"pass", true}}.dump()
           << std::endl;
     } else {
-      require(mode == "matrix" || mode == "left-ir" || mode == "yuyv",
+      require(mode == "matrix" || mode == "left-ir" || mode == "right-ir" ||
+                  mode == "yuyv",
               "Unknown mode");
       unsigned max = dual ? 15 : 7;
       unsigned first = argc > 3 ? std::stoul(argv[3]) : 1;
       unsigned last = argc > 3 ? first : max;
       for (unsigned mask = first; mask <= last; ++mask) {
-        if (mode == "left-ir" && !(mask & 2))
+        if ((mode == "left-ir" || mode == "right-ir") && !(mask & 2))
           continue;
         if (mode == "yuyv" && (!(mask & 4) || dual))
           continue;
-        run_set(dev, mask, dual, mode == "left-ir", mode == "yuyv");
+        run_set(dev, mask, dual, mode == "left-ir", mode == "yuyv", false,
+                mode == "right-ir");
       }
     }
     intent.set_intent(R"({"op":"CLEAR"})");

@@ -2,11 +2,11 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "cc6b2780823de10b4b0d1fe5836bc5169d31083035c5303e892bdecc3f8a86f2";
+static const char dictionary_sha256[] = "dfda8f15b1280f67d77baff070a0150a5fd8d820faaaf2224d212849c7fa05ab";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned wire_size = 1024U;
-static const unsigned rule_revision = 2U;
+static const unsigned rule_revision = 3U;
 enum Selectors {
     GLOBAL_INTENT = 28,
     GLOBAL_INTENT_STATUS = 29,
@@ -28,9 +28,6 @@ static const BranchDefinition branches[] = {
     {1U, 1U, 3078U, 0x2036315aU, "DEPTH"},
     {1U, 1U, 3079U, 0x2036315aU, "DEPTH"},
     {1U, 1U, 3080U, 0x2036315aU, "DEPTH"},
-    {2U, 1U, 3078U, 0x20203859U, "IR_L"},
-    {2U, 1U, 3079U, 0x20203859U, "IR_L"},
-    {2U, 1U, 3080U, 0x20203859U, "IR_L"},
     {4U, 1U, 3078U, 0x20493859U, "IR_LR"},
     {4U, 1U, 3079U, 0x20493859U, "IR_LR"},
     {4U, 1U, 3080U, 0x20493859U, "IR_LR"},
@@ -42,7 +39,6 @@ static const BranchDefinition branches[] = {
 struct FormatDefinition { uint8_t branch; uint32_t format; };
 static const FormatDefinition formats[] = {
     {1U, 0x2036315aU},
-    {2U, 0x20203859U},
     {4U, 0x20493859U},
     {5U, 0x3231564eU},
     {6U, 0x3231564eU},

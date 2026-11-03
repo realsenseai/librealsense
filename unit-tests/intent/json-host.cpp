@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
     for (unsigned sku : {0xc07U, 0xc08U}) {
         fw_template(sku, bytes.data());
         assert(encode_intent_json(decode_intent_json(bytes, status)) == bytes);
-        assert((unsigned(bytes[2]) | (unsigned(bytes[3]) << 8)) == (sku == 0xc07U ? 112U : 104U));
+        assert((unsigned(bytes[2]) | (unsigned(bytes[3]) << 8)) == (sku == 0xc07U ? 92U : 84U));
     }
     auto bad = document;
     bad["version"]["major"] = 2;
