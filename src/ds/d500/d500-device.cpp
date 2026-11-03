@@ -1,3 +1,4 @@
+#include <src/intent/intent-json.h>
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2022-4 RealSense, Inc. All Rights Reserved.
 
@@ -883,6 +884,8 @@ namespace librealsense
 
     void d500_device::register_dpp_embedded_filters()
     {
+        if (!_is_mipi_device && (_pid == 0x0c04 || _pid == 0x0c05))
+            register_intent_options(dynamic_cast<d500_depth_sensor&>(get_depth_sensor()));
         // MIPI publishes these CIDs later than USB. Older firmware on either transport ignores
         // the composite protocol entirely, so we skip registration below the transport's gate.
         const auto min_fw = _is_mipi_device

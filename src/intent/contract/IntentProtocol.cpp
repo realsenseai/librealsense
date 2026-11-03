@@ -1,0 +1,296 @@
+// Copyright (C) 2026 RealSense, Inc. SPDX-License-Identifier: Apache-2.0
+#include "IntentProtocol.h"
+#include <string.h>
+namespace rsintent {
+uint16_t read16(const uint8_t *p) {
+    return static_cast<uint16_t>(p[0] | (static_cast<unsigned>(p[1]) << 8));
+}
+uint32_t read32(const uint8_t *p) {
+    return static_cast<uint32_t>(read16(p)) | (static_cast<uint32_t>(read16(p + 2)) << 16);
+}
+void write16(uint8_t *p, uint16_t v) {
+    p[0] = static_cast<uint8_t>(v);
+    p[1] = static_cast<uint8_t>(v >> 8);
+}
+void write32(uint8_t *p, uint32_t v) {
+    write16(p, static_cast<uint16_t>(v));
+    write16(p + 2, static_cast<uint16_t>(v >> 16));
+}
+uint16_t bit(uint8_t branch) { return static_cast<uint16_t>(branch < 16U ? (1U << branch) : 0U); }
+const Stream *find(const Model &m, uint8_t b) {
+    for (size_t i = 0; i < m.count; ++i)
+        if (m.streams[i].branch == b)
+            return &m.streams[i];
+    return nullptr;
+}
+bool same(const Stream &a, const Stream &b) {
+    return a.sensor == b.sensor && a.branch == b.branch && a.enabled == b.enabled &&
+           (!a.enabled ||
+            (a.format == b.format && a.width == b.width && a.height == b.height && a.fps == b.fps));
+}
+namespace {
+struct Record {
+    uint8_t type, flags;
+    size_t length, start, value, next;
+};
+bool next(const uint8_t *data, size_t &cursor, size_t end, Record &r) {
+    if (cursor > end || end - cursor < 4U)
+        return false;
+    r.start = cursor;
+    r.type = data[cursor];
+    r.flags = data[cursor + 1U];
+    r.length = read16(data + cursor + 2U);
+    r.value = cursor + 4U;
+    const size_t padded = (r.length + 3U) & ~size_t(3U);
+    if ((r.flags & ~3U) != 0U || padded > end - r.value)
+        return false;
+    r.next = r.value + padded;
+    for (size_t p = r.value + r.length; p < r.next; ++p)
+        if (data[p] != 0U)
+            return false;
+    cursor = r.next;
+    return true;
+}
+Error bad(const Record &r, uint8_t sensor = 0, uint8_t branch = 0) {
+    return Error(INVALID, sensor, branch, static_cast<uint16_t>(r.start));
+}
+Error stream(const uint8_t *data, const Record &parent, uint8_t sensor, Stream &s) {
+    if ((parent.flags & 2U) == 0U)
+        return bad(parent, sensor);
+    s = Stream{};
+    s.sensor = sensor;
+    s.enabled = true;
+    unsigned seen = 0U;
+    size_t pos = parent.value;
+    const size_t end = pos + parent.length;
+    while (pos < end) {
+        Record r = {};
+        r.start = pos;
+        if (!next(data, pos, end, r))
+            return bad(r, sensor);
+        if (r.type < BRANCH_ID || r.type > STATE) {
+            if ((r.flags & 1U) != 0U || r.type == CONTROL)
+                return bad(r, sensor);
+            continue;
+        }
+        const unsigned field = 1U << (r.type - BRANCH_ID);
+        const size_t width =
+            (r.type == FORMAT) ? 4U : ((r.type == BRANCH_ID || r.type == STATE) ? 1U : 2U);
+        if ((seen & field) != 0U || (r.flags & 2U) != 0U || r.length != width)
+            return bad(r, sensor, s.branch);
+        seen |= field;
+        switch (r.type) {
+        case BRANCH_ID:
+            s.branch = data[r.value];
+            break;
+        case FORMAT:
+            s.format = read32(data + r.value);
+            break;
+        case WIDTH:
+            s.width = read16(data + r.value);
+            break;
+        case HEIGHT:
+            s.height = read16(data + r.value);
+            break;
+        case FPS:
+            s.fps = read16(data + r.value);
+            break;
+        case STATE:
+            if (data[r.value] != 0U)
+                return bad(r, sensor, s.branch);
+            s.enabled = false;
+            break;
+        default:
+            break;
+        }
+    }
+    if (seen != (s.enabled ? 31U : 33U))
+        return Error(INCOMPLETE, sensor, s.branch, static_cast<uint16_t>(parent.start));
+    if (s.branch == 0U || s.branch >= 16U)
+        return bad(parent, sensor, s.branch);
+    return Error();
+}
+void header(uint8_t *p, uint8_t type, uint8_t flags, uint16_t length) {
+    p[0] = type;
+    p[1] = flags;
+    write16(p + 2, length);
+}
+void attr(uint8_t *p, uint8_t type, uint16_t length, uint32_t value) {
+    header(p, type, 1U, length);
+    write32(p + 4, value);
+}
+} // namespace
+Error decode(const uint8_t *data, size_t size, Request &output) {
+    if (!data || size != wire_size)
+        return Error(INVALID);
+    if (data[0] != major || data[1] > CLEAR || read16(data + 4) != 0U || data[7] != 0U)
+        return Error(INVALID);
+    const size_t length = read16(data + 2);
+    if (length > size - 8U || (length & 3U) != 0U || (data[1] == CLEAR && length != 0U))
+        return Error(INVALID);
+    Request candidate = {};
+    candidate.op = static_cast<Operation>(data[1]);
+    candidate.minorVersion = data[6];
+    size_t pos = 8U;
+    const size_t end = pos + length;
+    unsigned sensors = 0U;
+    uint16_t branchesSeen = 0U;
+    while (pos < end) {
+        Record r = {};
+        r.start = pos;
+        if (!next(data, pos, end, r))
+            return bad(r);
+        if (r.type != SENSOR) {
+            if ((r.flags & 1U) != 0U || r.type == CONTROL)
+                return bad(r);
+            continue;
+        }
+        if ((r.flags & 2U) == 0U)
+            return bad(r);
+        size_t child = r.value;
+        const size_t childEnd = child + r.length;
+        Record id = {};
+        id.start = child;
+        if (!next(data, child, childEnd, id) || id.type != SENSOR_ID || id.length != 4U ||
+            (id.flags & 2U) != 0U)
+            return bad(id);
+        const uint8_t sensor = data[id.value];
+        if (sensor == 0U || sensor > 5U || (sensors & (1U << sensor)) != 0U ||
+            data[id.value + 1U] || data[id.value + 2U] || data[id.value + 3U])
+            return bad(id, sensor);
+        sensors |= 1U << sensor;
+        while (child < childEnd) {
+            Record c = {};
+            c.start = child;
+            if (!next(data, child, childEnd, c))
+                return bad(c, sensor);
+            if (c.type != STREAM) {
+                if ((c.flags & 1U) != 0U || c.type == CONTROL || c.type == SENSOR_ID)
+                    return bad(c, sensor);
+                continue;
+            }
+            if (candidate.model.count >= max_streams)
+                return bad(c, sensor);
+            Stream value = {};
+            Error e = stream(data, c, sensor, value);
+            if (e.code != OK)
+                return e;
+            if ((branchesSeen & bit(value.branch)) != 0U)
+                return bad(c, sensor, value.branch);
+            branchesSeen = static_cast<uint16_t>(branchesSeen | bit(value.branch));
+            candidate.model.streams[candidate.model.count++] = value;
+        }
+    }
+    // Ignore transport padding after tlv_size; never interpret it as records.
+    output = candidate;
+    return Error();
+}
+Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
+    if (!data || size != wire_size || m.count > max_streams || op > CLEAR)
+        return Error(INVALID);
+    size_t needed = 8U;
+    for (unsigned sensor = 1U; sensor <= 5U; ++sensor) {
+        size_t children = 0U;
+        for (size_t i = 0; i < m.count; ++i)
+            if (m.streams[i].sensor == sensor)
+                children += m.streams[i].enabled ? 44U : 20U;
+        if (children)
+            needed += 12U + children;
+    }
+    for (size_t i = 0; i < m.count; ++i) {
+        const Stream &s = m.streams[i];
+        if (s.sensor == 0U || s.sensor > 5U || s.branch == 0U || s.branch >= 16U)
+            return Error(INVALID);
+        for (size_t j = 0; j < i; ++j)
+            if (m.streams[j].branch == s.branch)
+                return Error(INVALID);
+    }
+    if (needed > size)
+        return Error(INVALID);
+    memset(data, 0, size);
+    data[0] = static_cast<uint8_t>(major);
+    data[1] = op;
+    data[6] = static_cast<uint8_t>(minor);
+    if (op == CLEAR)
+        return Error();
+    size_t pos = 8U;
+    for (unsigned sensor = 1U; sensor <= 5U; ++sensor) {
+        size_t children = 0U;
+        for (size_t i = 0; i < m.count; ++i)
+            if (m.streams[i].sensor == sensor)
+                children += m.streams[i].enabled ? 44U : 20U;
+        if (!children)
+            continue;
+        header(data + pos, SENSOR, 3U, static_cast<uint16_t>(8U + children));
+        pos += 4U;
+        attr(data + pos, SENSOR_ID, 4U, sensor);
+        pos += 8U;
+        for (unsigned branch = 1U; branch < 16U; ++branch) {
+            const Stream *s = find(m, static_cast<uint8_t>(branch));
+            if (!s || s->sensor != sensor)
+                continue;
+            header(data + pos, STREAM, 3U, s->enabled ? 40U : 16U);
+            pos += 4U;
+            attr(data + pos, BRANCH_ID, 1U, s->branch);
+            pos += 8U;
+            if (!s->enabled) {
+                attr(data + pos, STATE, 1U, 0U);
+                pos += 8U;
+                continue;
+            }
+            attr(data + pos, FORMAT, 4U, s->format);
+            pos += 8U;
+            attr(data + pos, WIDTH, 2U, s->width);
+            pos += 8U;
+            attr(data + pos, HEIGHT, 2U, s->height);
+            pos += 8U;
+            attr(data + pos, FPS, 2U, s->fps);
+            pos += 8U;
+        }
+    }
+    write16(data + 2, static_cast<uint16_t>(pos - 8U));
+    return Error();
+}
+Model defaultModel(uint16_t sku) {
+    Model m = {};
+    for (size_t i = 0; i < sizeof(branches) / sizeof(branches[0]); ++i)
+        if (branches[i].sku == sku && m.count < max_streams) {
+            Stream s = {};
+            s.sensor = branches[i].sensor;
+            s.branch = branches[i].id;
+            m.streams[m.count++] = s;
+        }
+    return m;
+}
+Error validate(const Model &m, uint16_t sku) {
+    if ((sku != 0x0c04U && sku != 0x0c05U) || m.count > max_streams)
+        return Error(CONSTRAINT, 0, 0, 0, 1);
+    // Stable branch-ID order, independent of JSON/TLV record order. Absent streams are OFF.
+    for (unsigned id = 1U; id < 16U; ++id) {
+        const Stream *s = find(m, static_cast<uint8_t>(id));
+        if (!s)
+            continue;
+        const BranchDefinition *def = nullptr;
+        for (size_t j = 0; j < sizeof(branches) / sizeof(branches[0]); ++j)
+            if (branches[j].id == id && branches[j].sku == sku)
+                def = &branches[j];
+        if (!def || s->sensor != def->sensor)
+            return Error(CONSTRAINT, s->sensor, s->branch, 0, 2);
+        if (!s->enabled)
+            continue;
+        if (s->format != def->format)
+            return Error(CONSTRAINT, s->sensor, s->branch, 0, 3);
+        bool supported = false;
+        for (size_t j = 0; j < sizeof(profiles) / sizeof(profiles[0]); ++j)
+            supported |= s->width == profiles[j].width && s->height == profiles[j].height &&
+                         s->fps == profiles[j].fps;
+        if (!supported)
+            return Error(CONSTRAINT, s->sensor, s->branch, 0, 4);
+    }
+    const Stream *left = find(m, 2U);
+    const Stream *pair = find(m, 4U);
+    if (left && pair && left->enabled && pair->enabled)
+        return Error(CONSTRAINT, 1U, 4U, 0, 5);
+    return Error();
+}
+} // namespace rsintent
