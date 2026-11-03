@@ -15,7 +15,6 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D500*"),
-    pytest.mark.device_exclude("D585S"),
     pytest.mark.device_type_exclude("DDS"),  # DDS motion goes through a separate transport and scale
     pytest.mark.context("nightly"),  # needs a stationary camera
 ]
