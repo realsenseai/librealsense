@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix='intent-json-') as temp:
                            (root / 'unit-tests/intent/fw-bridge.cpp', 'bridge.o')):
         subprocess.run(flags + ['-Drsintent=fwintent', '-c', str(source), '-o', str(out / target)], check=True)
     subprocess.run(flags + [str(root / 'src/intent/intent-json.cpp'), str(contract / 'IntentProtocol.cpp'),
-                            str(root / 'unit-tests/intent/test-json.cpp'), str(out / 'fw.o'), str(out / 'bridge.o'),
+                            str(root / 'unit-tests/intent/json-host.cpp'), str(out / 'fw.o'), str(out / 'bridge.o'),
                             '-o', str(out / 'test')], check=True)
     subprocess.run([str(out / 'test'), str(out / 'golden.bin')], check=True)
 
@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='intent-json-') as temp:
         executable = out / 'public-api'
         subprocess.run([cxx, '-std=c++11', '-Wall', '-Wextra', '-Werror',
                         '-isystem', str(root / 'include'),
-                        str(root / 'unit-tests/intent/test-public-api.cpp'),
+                        str(root / 'unit-tests/intent/public-api.cpp'),
                         '-L' + str(lib), '-Wl,-rpath,' + str(lib), '-lrealsense2',
                         '-o', str(executable)], check=True)
         subprocess.run([str(executable)], check=True)
