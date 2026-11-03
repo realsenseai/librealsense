@@ -664,6 +664,11 @@ stream_profiles uvc_sensor::init_stream_profiles()
         // D457 development
         if( rs2_fmt == RS2_FORMAT_MOTION_XYZ32F )
         {
+            // The IMU node may also offer a wider line that carries extra data (FW health reports); motion uses the narrowest
+            if( std::any_of( uvc_profiles.begin(), uvc_profiles.end(), [&]( const platform::stream_profile & other ) {
+                    return other.format == p.format && other.fps == p.fps && other.width < p.width; } ) )
+                continue;
+
             auto profile = std::make_shared< platform::stream_profile_impl< motion_stream_profile > >( p );
             if( ! profile )
                 throw librealsense::invalid_value_exception( "null pointer passed for argument \"profile\"." );
