@@ -44,7 +44,7 @@ namespace librealsense
         // First FW that sends the GMSL gyro in 0.0001 dps per count, independent of the range option.
         const firmware_version MIN_FW_PHYSICAL_GYRO_GMSL( "7.59.46653.0" );
 
-        // First Safety (D585S) FW that sends int32 physical-unit gyro in a 38-byte HID report (USB only).
+        // First Safety (D585S) FW that sends int32 physical-unit gyro in a 38-byte HID report.
         const firmware_version MIN_FW_PHYSICAL_UNITS_D585S( "8.58.40658.12556" );
     }
 
@@ -66,7 +66,7 @@ namespace librealsense
     {
         static const firmware_version min_fw_supporting_physical_units( "7.58.40672.12546" );
         if( get_pid() == ds::D585S_PID )
-            return ! _is_mipi_device && _fw_version >= MIN_FW_PHYSICAL_UNITS_D585S;
+            return _fw_version >= MIN_FW_PHYSICAL_UNITS_D585S;
         return _fw_version >= ( _is_mipi_device ? MIN_FW_INT32_IMU
                                                 : min_fw_supporting_physical_units );
     }
