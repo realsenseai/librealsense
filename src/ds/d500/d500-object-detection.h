@@ -20,7 +20,8 @@ namespace librealsense
         d500_object_detection( std::shared_ptr< const d500_info > const & );
 
         std::shared_ptr< synthetic_sensor > create_object_detection_device( std::shared_ptr< context > ctx,
-                                                                            const std::vector< platform::uvc_device_info > & od_devices_info );
+                                                                            std::shared_ptr< platform::uvc_device > od_device,
+                                                                            const std::string & physical_port );
 
     private:
         friend class d500_object_detection_sensor;

@@ -31,36 +31,55 @@ namespace librealsense
         { rs_fourcc( 'G', 'R', 'E', 'Y' ), RS2_STREAM_OBJECT_DETECTION },
     };
 
+    // The stream as the GMSL IR node multiplexes it: MUX stream id, metadata id (routing, and its own optional
+    // block of 83+ bytes) and the ODET blob padded to 2347 bytes
+    const platform::muxed_stream od_muxed_stream = { "Object Detection", 6,
+                                                     uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ),
+                                                     uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ),
+                                                     83, false, 2347,
+                                                     2347, 1, rs_fourcc( 'G', 'R', 'E', 'Y' ) };
+
     d500_object_detection::d500_object_detection( std::shared_ptr< const d500_info > const & dev_info )
         : device( dev_info )
         , d500_device( dev_info )
         , _object_detection_stream( new stream( RS2_STREAM_OBJECT_DETECTION ) )
     {
-        // OD VideoControl is MI 9 on all currently supported layouts (D555/D555e,
-        // D585 0x0C08 and legacy 0x0B6A) - confirmed with the HKR firmware team.
-        constexpr uint32_t od_control_mi = 9;
-        auto od_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, od_control_mi );
-
-        // Skip if the device does not expose the stream; the rest of the device enumerates normally.
-        if( od_devs_info.empty() )
+        // Over GMSL the stream is multiplexed on the depth sensor's IR node; over USB it has its own interface
+        auto od_dev = get_raw_depth_sensor()->get_uvc_device()->create_muxed_stream_device( od_muxed_stream );
+        std::string physical_port;
+        if( od_dev )
+            physical_port = od_dev->get_device_location();
+        else
         {
-            LOG_WARNING( "Object detection interface not present - sensor not created" );
-            return;
-        }
-        if( od_devs_info.size() != 1 )
-        {
-            LOG_WARNING( "Expected a single object detection interface, found " << od_devs_info.size()
-                                                                                << " - OD sensor not created" );
-            return;
+            // OD VideoControl is MI 9 on all currently supported layouts (D555/D555e,
+            // D585 0x0C08 and legacy 0x0B6A) - confirmed with the HKR firmware team.
+            constexpr uint32_t od_control_mi = 9;
+            auto od_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, od_control_mi );
+
+            // Skip if the device does not expose the stream; the rest of the device enumerates normally.
+            if( od_devs_info.empty() )
+            {
+                LOG_WARNING( "Object detection interface not present - sensor not created" );
+                return;
+            }
+            if( od_devs_info.size() != 1 )
+            {
+                LOG_WARNING( "Expected a single object detection interface, found " << od_devs_info.size()
+                                                                                    << " - OD sensor not created" );
+                return;
+            }
+            od_dev = get_backend()->create_uvc_device( od_devs_info.front() );
+            physical_port = od_devs_info.front().device_path;
         }
 
-        auto od_ep = create_object_detection_device( dev_info->get_context(), od_devs_info );
+        auto od_ep = create_object_detection_device( dev_info->get_context(), od_dev, physical_port );
         _object_detection_device_idx = add_sensor( od_ep );
     }
 
     std::shared_ptr< synthetic_sensor >
     d500_object_detection::create_object_detection_device( std::shared_ptr< context > ctx,
-                                                           const std::vector< platform::uvc_device_info > & od_devices_info )
+                                                           std::shared_ptr< platform::uvc_device > od_device,
+                                                           const std::string & physical_port )
     {
         auto enable_global_time_option = std::shared_ptr< global_time_option >( new global_time_option() );
 
@@ -70,7 +89,7 @@ namespace librealsense
         // we need to convert it from ds timestamp to global timestamp? etc
         auto raw_od_ep = std::make_shared< uvc_sensor >(
             "Raw Object Detection Device",
-            get_backend()->create_uvc_device( od_devices_info.front() ),
+            od_device,
             std::unique_ptr< frame_timestamp_reader >( new global_timestamp_reader( std::move( ts_reader_backup ),
                                                                                     _tf_keeper,
                                                                                     enable_global_time_option ) ),
@@ -94,7 +113,7 @@ namespace librealsense
             od_ep->register_option( RS2_OPTION_DETECTION_DISTANCE, detection_distance );
         }
 
-        od_ep->register_info( RS2_CAMERA_INFO_PHYSICAL_PORT, od_devices_info.front().device_path );
+        od_ep->register_info( RS2_CAMERA_INFO_PHYSICAL_PORT, physical_port );
 
         register_metadata( raw_od_ep );
         register_processing_blocks( od_ep );
