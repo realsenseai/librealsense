@@ -231,10 +231,12 @@ The SDK no longer ships a bundled firmware blob, so `pytest-fw-update` **require
 python3 -m pytest pytest-fw-update.py --custom-fw-d400 /path/to/firmware.bin
 python3 -m pytest pytest-fw-update.py --custom-fw-d555 /path/to/firmware.bin
 python3 -m pytest pytest-fw-update.py --custom-fw-d585 /path/to/firmware.bin
+python3 -m pytest pytest-fw-update.py --custom-fw-d585s /path/to/rvp-xflash-dfu-sc11-release-x.y.z.w.img
 ```
 
-`--custom-fw-d585` targets the non-safety D585 only (e.g. "D585 Prototype"). The safety SKU is kept
-out of the test by `pytest.mark.device_exclude("D585S")`, so it is never collected and never flashed.
+`--custom-fw-d585` targets the non-safety D585 only (e.g. "D585 Prototype"). `--custom-fw-d585s` takes the
+safety SKU's SC1.1 image and targets D585S only. The two never cross-flash: a D585S without
+`--custom-fw-d585s` is skipped. A D585S found in recovery fails the test rather than being flashed.
 
 ## Troubleshooting
 

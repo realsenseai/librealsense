@@ -24,7 +24,7 @@ pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D555"),
     pytest.mark.device_each("D585"),
-    pytest.mark.device_exclude("D585S"),
+    pytest.mark.device_each("D585S"),
     pytest.mark.priority(1),
     pytest.mark.timeout(1600),
     pytest.mark.skipif(bool(os.environ.get('GITHUB_ACTIONS')), reason="not runnable on GHA"),
@@ -257,6 +257,7 @@ def test_fw_update( request, module_device_setup, test_context_var ):
     custom_fw_d400 = abs_fw_path( request.config.getoption( '--custom-fw-d400' ) )
     custom_fw_d555 = abs_fw_path( request.config.getoption( '--custom-fw-d555' ) )
     custom_fw_d585 = abs_fw_path( request.config.getoption( '--custom-fw-d585' ) )
+    custom_fw_d585s = abs_fw_path( request.config.getoption( '--custom-fw-d585s' ) )
 
     # FW-compat pre-flash gate (was harness-side, in run-unit-tests.py): refuse to flash a
     # below-min image, or substitute the per-device fallback image registered in
@@ -300,11 +301,15 @@ def test_fw_update( request, module_device_setup, test_context_var ):
         custom_fw_path = custom_fw_d400
     elif "D555" in product_name and custom_fw_d555:
         custom_fw_path = custom_fw_d555
+    elif "D585S" in product_name:
+        # Check before D585 ("D585" is a substring of "D585S"), and never fall back to the D585
+        # image: a D585S only ever gets its own (SC1.1) image
+        custom_fw_path = custom_fw_d585s
     elif "D585" in product_name and custom_fw_d585:
         custom_fw_path = custom_fw_d585
 
     if not custom_fw_path:
-        pytest.skip("No custom FW path provided (use --custom-fw-d400 / --custom-fw-d555 / --custom-fw-d585); skipping FW update test")
+        pytest.skip("No custom FW path provided (use --custom-fw-d400 / --custom-fw-d555 / --custom-fw-d585 / --custom-fw-d585s); skipping FW update test")
 
     # check if recovery on the configured domain (e.g. a D400 USB recovery device). If so recover.
     # (recovered may already be True from the domain-0 DDS recovery handled above.)
