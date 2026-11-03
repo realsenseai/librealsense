@@ -2365,8 +2365,8 @@ namespace rs2
 
         auto pos = ImGui::GetCursorPos();
         ImGui::PushFont(window.get_large_font());
-        ImGui::PushStyleColor(ImGuiCol_Button, (ImVec4&)device_header_background_color);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, (ImVec4&)device_header_background_color);
+        ImGui::PushStyleColor(ImGuiCol_Button, device_header_background_color.Value);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, device_header_background_color.Value);
 
         ////////////////////////////////////////
         // Draw device name
