@@ -314,7 +314,7 @@ namespace librealsense
             raw_mapping_ep->set_stream_id_resolver( []( const std::vector< platform::stream_profile > &,
                                                         const platform::stream_profile & p,
                                                         rs2_stream & type,
-                                                        int & )
+                                                        std::vector< int > & )
                 {
                     if( p.format == rs_fourcc( 'G', 'R', 'E', 'Y' ) && is_pcl_xyz_tuple( p.width, p.height, p.fps ) )
                         type = RS2_STREAM_POINT_CLOUD;

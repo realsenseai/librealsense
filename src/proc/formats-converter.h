@@ -47,12 +47,6 @@ namespace librealsense
         rs2_frame_callback_sptr get_frames_callback() const;
         void convert_frame( frame_holder & f );
 
-        // A raw profile can carry several streams at once (e.g. dual-color streams multiplexed on one pin, told apart by metadata).
-        // Such a raw profile is enumerated at index 0 and feeds every indexed target of its type; the resolver then picks
-        // the target index per frame, or returns false to drop a frame it cannot attribute.
-        using frame_stream_resolver = std::function< bool( const frame_interface * frame, int & index ) >;
-        void set_frame_stream_resolver( rs2_stream stream, frame_stream_resolver resolver );
-
         stream_profiles const & get_source_profiles_from_target( std::shared_ptr< stream_profile_interface > const & target_profile ) const;
 
     protected:
@@ -70,16 +64,11 @@ namespace librealsense
         std::shared_ptr< stream_profile_interface > find_cached_profile_for_frame( rs2_format format, rs2_stream stream, int index );
 
         std::vector< std::shared_ptr< processing_block_factory > > _pb_factories;
-        std::unordered_map< rs2_stream, frame_stream_resolver > _frame_stream_resolvers;
         std::unordered_map< processing_block_factory *, stream_profiles > _pbf_supported_profiles;
         std::unordered_map< stream_profile, stream_profiles > _target_profiles_to_raw_profiles;
 
         std::unordered_map< std::shared_ptr< stream_profile_interface >,
                             std::unordered_set< std::shared_ptr< processing_block > > > _raw_profile_to_converters;
-        // Same converters, split by target stream index, for raw profiles whose streams have a frame stream resolver
-        std::unordered_map< std::shared_ptr< stream_profile_interface >,
-                            std::map< int, std::unordered_set< std::shared_ptr< processing_block > > > >
-            _raw_profile_to_indexed_converters;
         std::unordered_map< rs2_format, stream_profiles > _format_mapping_to_from_profiles;
 
         // Swapped from the record sensor's start/stop while converter threads may be using it; copy it under the

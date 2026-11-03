@@ -47,15 +47,14 @@ namespace librealsense
             std::shared_ptr< const d500_info > const & dev_info,
             const platform::processing_unit & rgb_pu );
 
-        // Stream-id resolver: route color pins (NV12/M420/YUY2) to Color 1 / Color 2 streams, or to a single
-        // multiplexed color stream (index 0) when one pin carries both sources.
+        // Stream-id resolver: route color pins (NV12/M420/YUY2) to Color 1 / Color 2 streams, or to both when one
+        // pin carries both sources multiplexed.
         void resolve_color_stream( const std::vector< platform::stream_profile > & all,
-                                   const platform::stream_profile & p, rs2_stream & type, int & index );
+                                   const platform::stream_profile & p, rs2_stream & type, std::vector< int > & indexes );
         // Frame resolver for the multiplexed pin: Color 1 / Color 2 from the frame's source index metadata
         bool resolve_color_frame( const frame_interface * frame, int & index );
         static bool is_color_pin( const std::vector< platform::stream_profile > & all, uint32_t pin );
 
-        std::atomic< int > _color_pins{ 0 };
         std::atomic< bool > _warned_no_source_index{ false };
     };
 }

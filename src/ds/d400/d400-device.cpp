@@ -95,7 +95,8 @@ namespace librealsense
     // The FW sends the left imager on the IR node and the right one on the color node, while pin order
     // differs per transport, so rank by node role: the raw pin that also carries IR is Color 0 (left).
     static void resolve_d401_color_stream( const std::vector< platform::stream_profile > & all,
-                                           const platform::stream_profile & p, rs2_stream & type, int & index )
+                                           const platform::stream_profile & p, rs2_stream & type,
+                                           std::vector< int > & indexes )
     {
         const auto ba81 = fourcc( 'B', 'A', '8', '1' );   // SBGGR8  (older MIPI driver)
         const auto pbaa = fourcc( 'p', 'B', 'A', 'A' );   // SBGGR10P (MIPI driver 1.0.6.10+)
@@ -129,7 +130,7 @@ namespace librealsense
         }
 
         type = RS2_STREAM_COLOR;
-        index = rank;   // Color 0 (left imager), Color 1 (right)
+        indexes = { rank };   // Color 0 (left imager), Color 1 (right)
     }
 
     std::vector<uint8_t> d400_device::send_receive_raw_data(const std::vector<uint8_t>& input)
