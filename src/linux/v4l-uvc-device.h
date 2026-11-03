@@ -25,6 +25,8 @@ namespace librealsense
 {
     namespace platform
     {
+        std::vector<uint8_t*> get_imu_reports(uint8_t* buffer, size_t buffer_size);
+
         class v4l_uvc_interface
         {
             virtual void capture_loop() = 0;

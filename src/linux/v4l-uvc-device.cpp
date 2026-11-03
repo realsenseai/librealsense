@@ -36,6 +36,42 @@ namespace librealsense
 {
     namespace platform
     {
+        std::vector<uint8_t*> get_imu_reports(uint8_t* buffer, size_t buffer_size)
+        {
+            size_t const report_size = sizeof(hid_mipi_data_32);
+            uint8_t const accel = 1, gyro = 2, state_valid = 2;  // typeID 0 means no second report; skip1 is the state
+
+            // Frame too small for two IMU values, assuming only one is present
+            if (buffer_size < 2 * report_size)
+                return { buffer };
+
+            auto const * first = reinterpret_cast<const hid_mipi_data_32*>(buffer);
+            auto const * second = first + 1;
+            auto is_valid = [&](const hid_mipi_data_32* report)
+            {
+                return (report->typeID == accel || report->typeID == gyro) && report->skip1 == state_valid;
+            };
+            auto is_zero_from = [&](size_t offset)
+            {
+                return std::all_of(buffer + offset, buffer + buffer_size, [](uint8_t b) { return b == 0; });
+            };
+
+            // Frame big enough for two reports but only one exists, return it
+            if (second->typeID == 0)
+            {
+                if (is_valid(first) && is_zero_from(report_size))
+                    return { buffer };
+                return {};
+            }
+
+            // Expecting two IMU values
+            if (! is_valid(first) || ! is_valid(second) || first->typeID == second->typeID || ! is_zero_from(2 * report_size))
+                return {};
+            if (second->hwTs < first->hwTs)
+                return { buffer + report_size, buffer };
+            return { buffer, buffer + report_size };
+        }
+
         v4l_uvc_device::v4l_uvc_device(const uvc_device_info& info, bool use_memory_map)
             : _name(info.id), 
               _device_path(info.device_path),
@@ -522,20 +558,29 @@ namespace librealsense
                                                 void* md_start = buf_mgr.metadata_start();
 
                                                 // IMU node (mi=4) delivers data with no metadata node, synthesize the metadata from the payload.
-                                                // Frame size is 64 bytes on D400 but 256 on D500.
+                                                // Frame size is 64 bytes on D400 but 256 on D500, which may bundle two reports: each is its own frame.
                                                 metadata_hid_raw meta_data{};
-                                                if (md_size == 0 && _info.mi == 4)
+                                                bool const is_imu = md_size == 0 && _info.mi == 4;
+                                                auto frame_start = buffer->get_frame_start();
+                                                auto const reports = is_imu ? get_imu_reports(frame_start, frame_sz) : std::vector<uint8_t*>{ frame_start };
+                                                if (reports.empty())
                                                 {
-                                                    populate_imu_data(meta_data, buffer->get_frame_start(), md_size, &md_start);
-                                                }
-
-                                                frame_object fo{ frame_sz, md_size,
-                                                            buffer->get_frame_start(), md_start, timestamp };
-
-                                                //Invoke user callback and enqueue next frame
-                                                _callback(_profile, fo, [buf_mgr]() mutable {
+                                                    LOG_DEBUG("Malformed IMU buffer of " << frame_sz << " bytes dropped");
                                                     buf_mgr.request_next_frame();
-                                                });
+                                                }
+                                                for (auto report : reports)
+                                                {
+                                                    if (is_imu)
+                                                        populate_imu_data(meta_data, report, md_size, &md_start);
+                                                    frame_object fo{ frame_sz - size_t(report - frame_start), md_size, report, md_start, timestamp };
+
+                                                    //Invoke user callback; enqueue next frame after the last report (motion frames are copied synchronously)
+                                                    bool const is_last = report == reports.back();
+                                                    _callback(_profile, fo, [buf_mgr, is_last]() mutable {
+                                                        if (is_last)
+                                                            buf_mgr.request_next_frame();
+                                                    });
+                                                }
                                             }
                                             else
                                             {
