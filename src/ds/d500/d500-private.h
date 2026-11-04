@@ -521,6 +521,7 @@ namespace librealsense
             EHU_IDX_PIPE_TASK_TIMEOUT_ERR      = 137U,
             EHU_IDX_POT_FAIL                   = 138U,
             EHU_IDX_IPU_SW_FUNCTION_ERR        = 139U,
+            EHU_IDX_APM_COMM_ERR               = 140U,
         };
 
         const std::map< int, std::string > d500_fw_error_report = { // Received from HKR team [RSDEV-643]
@@ -664,6 +665,7 @@ namespace librealsense
             { EHU_IDX_PIPE_TASK_TIMEOUT_ERR, "PIPE TASK TIMEOUT ERROR" },
             { EHU_IDX_POT_FAIL, "POT FAIL" },
             { EHU_IDX_IPU_SW_FUNCTION_ERR, "IPU SW FUNCTION ERROR" },
+            { EHU_IDX_APM_COMM_ERR, "APM COMMUNICATION FAILURE" },
         };
 
         class d500_hwmon_response : public hwmon_response_interface
