@@ -92,6 +92,14 @@ rs2_processing_block* rs2_create_mjpeg_decoder(rs2_error** error);
 rs2_processing_block* rs2_create_h264_decoder(rs2_error** error);
 
 /**
+* Checks whether this platform has an available H.264 decoder backend.
+* H.264 passthrough does not require a decoder. A supported backend may still reject a particular stream.
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return           non-zero if an H.264 decoder backend is available, zero otherwise
+*/
+int rs2_is_h264_decoder_supported(rs2_error** error);
+
+/**
 * Creates y411 decoder processing block. This block accepts raw y411 frames and outputs frames in RGB8.
 *     https://www.fourcc.org/pixel-format/yuv-y411/
 * Y411 is disguised as NV12 to allow Linux compatibility. Both are 12bpp encodings that allow high-resolution

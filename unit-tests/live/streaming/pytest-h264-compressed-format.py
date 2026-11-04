@@ -35,11 +35,6 @@ def context():
 
 
 @pytest.fixture(scope="module")
-def color_sensor(context, module_device_setup):
-    yield _target_device(context, module_device_setup).first_color_sensor()
-
-
-@pytest.fixture(scope="module")
 def h264_profile(module_device_setup):
     """The device's H.264 profile. A fixture, so every test stands on its own whatever the run order."""
     # Raw, because only there do the profiles still carry the device's own default flag; conversion drops it
@@ -57,21 +52,12 @@ def h264_profile(module_device_setup):
     yield profile
 
 
-@pytest.fixture(scope="module")
-def decoded_profile(color_sensor, h264_profile):
-    """The RGB8 profile the H.264 stream decodes to, or a skip where the platform has no decoder."""
-    vp = h264_profile.as_video_stream_profile()
-    decoded = next(
-        (p for p in color_sensor.profiles
-         if p.format() == rs.format.rgb8 and p.stream_index() == vp.stream_index()
-         and p.as_video_stream_profile().width() == vp.width()
-         and p.as_video_stream_profile().height() == vp.height()),
-        None
-    )
-    if decoded is None:
-        # No decoder on this machine: Linux without BUILD_WITH_VPL, or without an Intel GPU to back it
-        pytest.skip(f"No RGB8 profile at {vp.width()}x{vp.height()}; this platform cannot decode H.264")
-    return decoded
+@pytest.fixture
+def decoder():
+    # RGB8 profiles can also come from MJPEG on the same compressed stream index.
+    if not rs.h264_decoder.is_supported():
+        pytest.skip("This platform has no H.264 decoder backend")
+    return rs.h264_decoder()
 
 
 def _start_pipeline(context, module_device_setup, profile):
@@ -90,44 +76,47 @@ def test_h264_format_support(h264_profile):
     assert h264_profile.as_video_stream_profile().width() > 0
 
 
-def test_h264_streaming_conversion(context, module_device_setup, decoded_profile):
-    """Stream H.264 color and verify decoding to RGB8 succeeds for 10 frames."""
-    vp = decoded_profile.as_video_stream_profile()
-    pipeline = _start_pipeline(context, module_device_setup, decoded_profile)
-    try:
-        for i in range(10):
-            frames = pipeline.wait_for_frames()
-            # H.264 has a color index of its own, so the default get_color_frame() would look at the wrong stream
-            color = frames.get_color_frame(vp.stream_index())
-            assert color.get_width() == vp.width() and color.get_height() == vp.height()
-            assert color.get_data_size() == vp.width() * vp.height() * 3
-            log.debug(frames)
-    finally:
-        pipeline.stop()
-
-
-def test_h264_passthrough(context, module_device_setup, h264_profile, decoded_profile):
-    """Take the undecoded access units and decode them through the public block, as an application would."""
+def test_h264_streaming_conversion(context, module_device_setup, h264_profile, decoder):
+    """Decode explicitly selected H.264 access units to RGB8, without resolving RGB8 to MJPEG."""
     vp = h264_profile.as_video_stream_profile()
-    decoder = rs.h264_decoder()
     queue = rs.frame_queue(capacity=10, keep_frames=False)
     decoder.start(queue)
-
-    sizes, decoded = set(), 0
+    decoded = 0
     pipeline = _start_pipeline(context, module_device_setup, h264_profile)
     try:
-        for i in range(30):
+        for _ in range(30):
             color = pipeline.wait_for_frames().get_color_frame(vp.stream_index())
-            sizes.add(color.get_data_size())
-            # The decoder yields nothing until it starts, so feed it rather than process() it, which would throw
+            assert color.get_profile().format() == rs.format.h264
+            # Backend startup is asynchronous; invoke() allows initial access units to produce no output.
             decoder.invoke(color)
             out = queue.poll_for_frame()
             if out:
                 assert out.get_profile().format() == rs.format.rgb8
-                assert out.as_video_frame().get_data_size() == vp.width() * vp.height() * 3
+                video = out.as_video_frame()
+                assert video.get_width() == vp.width() and video.get_height() == vp.height()
+                assert video.get_data_size() == vp.width() * vp.height() * 3
                 decoded += 1
+                if decoded == 10:
+                    break
+    finally:
+        pipeline.stop()
+
+    assert decoded == 10, f"Expected 10 decoded H.264 pictures, got {decoded}"
+
+
+def test_h264_passthrough(context, module_device_setup, h264_profile):
+    """Receive compressed access units even on platforms without an H.264 decoder."""
+    vp = h264_profile.as_video_stream_profile()
+    sizes = set()
+    pipeline = _start_pipeline(context, module_device_setup, h264_profile)
+    try:
+        for _ in range(30):
+            color = pipeline.wait_for_frames().get_color_frame(vp.stream_index())
+            assert color.get_profile().format() == rs.format.h264
+            assert color.get_width() == vp.width() and color.get_height() == vp.height()
+            assert color.get_data_size() > 0
+            sizes.add(color.get_data_size())
     finally:
         pipeline.stop()
 
     assert len(sizes) > 1, f"Access units should vary in size, all were {sizes}"
-    assert decoded > 0, "Decoder produced no pictures from the passthrough stream"

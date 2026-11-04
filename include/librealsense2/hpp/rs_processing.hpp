@@ -620,6 +620,15 @@ namespace rs2
         */
         h264_decoder() : filter(init(), 1) { }
 
+        /** Checks whether this platform has an available H.264 decoder backend. */
+        static bool is_supported()
+        {
+            rs2_error* e = nullptr;
+            auto supported = rs2_is_h264_decoder_supported(&e);
+            error::handle(e);
+            return supported != 0;
+        }
+
     protected:
         h264_decoder(std::shared_ptr<rs2_processing_block> block) : filter(block, 1) {}
 
