@@ -36,7 +36,7 @@ On NVIDIA Jetson (detected through `/etc/nv_tegra_release`) the RealSense Viewer
 
 ## What CUDA accelerates
 
-Only the paths below call CUDA code at `development`. Each one checks `rs2_is_cuda_available()` first and falls back to the CPU otherwise.
+Only the paths below call CUDA code at `master`. Each one checks `rs2_is_cuda_available()` first and falls back to the CPU otherwise.
 
 | Processing | Where the switch is | CUDA code |
 |---|---|---|
@@ -102,16 +102,16 @@ Frames produced on the GPU can be detected with `frame.as<rs2::gl::gpu_frame>()`
 
 ## AVX2 path (x86-64)
 
-On x86-64, YUY2 unpacking to RGB8, RGBA8, BGR8 and BGRA8 can use AVX2 kernels from [`src/image-avx.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/image-avx.cpp) *(changed in the next release)*. In v2.59.1 these kernels were compiled only when the compiler defined `__AVX2__`, and Y8 and Y16 output also had AVX2 versions.
+On x86-64, YUY2 unpacking to Y8, Y16, RGB8, RGBA8, BGR8 and BGRA8 can use AVX2 kernels from [`src/image-avx.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/image-avx.cpp).
 
 How the path is chosen in [`src/proc/color-formats-converter.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/proc/color-formats-converter.cpp):
 
 1. On a CUDA build with a GPU available, the CUDA kernel is used and the CPU paths are skipped.
-2. Otherwise, if the build has SSSE3 (`__SSSE3__`), is not Android and targets x86-64, the AVX2 kernels are compiled in (`AVX2_SUPPORT` in [`src/image-avx.h`](https://github.com/realsenseai/librealsense/blob/master/src/image-avx.h)). Only these functions get the AVX2 target attribute, so the rest of the library does not require an AVX2 CPU.
-3. At runtime the AVX2 kernel runs when `rsutils::os::cpu_supports_avx2()` is true, the pixel count is a multiple of 32, and the output is not Y8 or Y16. Otherwise the SSSE3 loop is used.
+2. Otherwise, if the build has SSSE3 (`__SSSE3__`) and is not Android, the SSE path is compiled in. The AVX2 kernels are declared in [`src/image-avx.h`](https://github.com/realsenseai/librealsense/blob/master/src/image-avx.h) and called from the converter only when the compiler also defines `__AVX2__`.
+3. At runtime the AVX2 kernel runs when `has_avx()` (a CPUID check in the converter) returns true. Otherwise the SSSE3 loop is used.
 
-On Unix builds for targets other than ARM, PowerPC and RISC-V, `CMake/unix_config.cmake` adds `-mssse3`; on Windows for non-ARM targets, `CMake/windows_config.cmake` defines `__SSSE3__` *(changed in the next release)*. In v2.59.1 Windows defined it for ARM targets too. In both cases CMake prints `Building with SSE optimizations`. No CMake option is needed to enable the AVX2 path.
+On Unix builds for targets other than ARM, PowerPC and RISC-V, `CMake/unix_config.cmake` adds `-mssse3`; on Windows, `CMake/windows_config.cmake` defines `__SSSE3__`. In both cases CMake prints `Building with SSE optimizations`. These configs also set `LRS_TRY_USE_AVX` (on Windows, for MSVC), which makes [`src/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/src/CMakeLists.txt) compile `image-avx.cpp` with `-mavx2`. `color-formats-converter.cpp` gets no such flag, so the AVX2 calls are present only if your compiler flags define `__AVX2__` for the whole build.
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`84e42c1`](https://github.com/realsenseai/librealsense/commit/84e42c1d2ce717c57dcf11f155bbe68bb41bbd1c)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
