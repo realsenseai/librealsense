@@ -1,6 +1,6 @@
 # RealSense Viewer
 
-<p align="center"><img src="https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/realsense-viewer-backup.gif" /></p>
+<p align="center"><img src="https://librealsense.realsenseai.com/wiki-media/res/realsense-viewer-backup.gif" /></p>
 
 ## Overview
 
@@ -388,7 +388,7 @@ A related control, **Set ROI**, appears next to **Enable auto exposure** on ROI-
 
 Advanced Mode exposes low-level ASIC/algorithm registers on D400 and D500 family devices, beyond the normal sensor options. On D400 devices it is toggled from the device's ["More" menu](#device-more-menu) (or via the **Turn on Advanced Mode** button shown inside the **Advanced Controls** section until enabled); D500 devices cannot toggle it — see the screenshot below. The setting is stored on the device's flash and persists across camera resets.
 
-<p align="center"><img src="https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/viewer-advanced-mode.png" width="50%" /></p>
+<p align="center"><img src="https://librealsense.realsenseai.com/wiki-media/res/viewer-advanced-mode.png" width="50%" /></p>
 
 Once enabled, the **Advanced Controls** section (per depth sensor) exposes the following groups. Each numeric field also has an inline edit-mode toggle (pencil icon) to type an exact value instead of dragging its slider:
 

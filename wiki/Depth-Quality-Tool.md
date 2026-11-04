@@ -1,6 +1,6 @@
 The Depth Quality Tool (`rs-depth-quality`) is a graphical application that streams depth from a RealSense camera pointed at a flat surface, fits a plane to the depth inside a region of interest (ROI) and computes depth quality metrics live: fill rate, Z accuracy against a measured ground truth, plane fit RMS error (spatial noise), subpixel RMS error and temporal noise. Use it to evaluate depth performance of a camera and its settings, and to record metrics and raw frames for offline analysis.
 
-![Depth Quality Tool](res/depth-quality-glimpse.gif)
+![Depth Quality Tool](https://librealsense.realsenseai.com/wiki-media/res/depth-quality-glimpse.gif)
 
 The source is in [`tools/depth-quality`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality): the entry point and metric formulas in [`rs-depth-quality.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality/rs-depth-quality.cpp), the plane fit and per-frame analysis in [`depth-metrics.h`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality/depth-metrics.h), and the UI, guidance and recording in [`depth-quality-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality/depth-quality-model.cpp).
 

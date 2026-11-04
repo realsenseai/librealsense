@@ -24,22 +24,22 @@ The resolution range is:
 
 | Resolution \ Preset| Use Cases recommended for usage| JSON files |
 | ------------------------- | ------------------------------------------------ |------- |
-| High Density | Higher Fill factor, sees more objects. (Ex. BGS and 3D Enhanced Photography,  Object recognition) |[HighDensityPreset.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/HighDensityPreset.json)|
-| Medium Density | Balance between Fill factor and accuracy. |[MedDensityPreset.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/MidDensityPreset.json)|
-| High Accuracy | High confidence threshold value of depth, lower fill factor.  (Ex. Object Scanning,  Collision Avoidance, Robots) |[HighAccuracyPreset.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/HighAccuracyPreset.json)|
-| Hand | Good for Hand Tracking,  Gesture recognition, good edges |[HandGesturePreset.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/HandGesturePreset.json)|	 
-| Left Imager Color w/o IR Pattern | Removes the Projector-generated IR pattern from left imager when streaming synthetic RGB.<br> Applies to D400, D410, D415 and D460 Devices.<br> Supported since FW ver 5.9.10+|[D415_RemoveIR.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/D415_RemoveIR.json), [D460_RemoveIR.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/D460_RemoveIR.json) |
-| Default | Best Visual appeal, Clean edges,  Reduced PointCloud Spraying | [DefaultPreset_D415.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/DefaultPreset_D415.json), [DefaultPreset_D435.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/DefaultPreset_D435.json), [DefaultPreset_D455.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/DefaultPreset_D455.json)  |
-| Edge Enhancement | Stronger edge preservation (same depth-control settings as the Edge Map preset below) | [EdgeMapD435.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/EdgeMapD435.json) |
+| High Density | Higher Fill factor, sees more objects. (Ex. BGS and 3D Enhanced Photography,  Object recognition) |[HighDensityPreset.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/HighDensityPreset.json)|
+| Medium Density | Balance between Fill factor and accuracy. |[MedDensityPreset.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/MidDensityPreset.json)|
+| High Accuracy | High confidence threshold value of depth, lower fill factor.  (Ex. Object Scanning,  Collision Avoidance, Robots) |[HighAccuracyPreset.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/HighAccuracyPreset.json)|
+| Hand | Good for Hand Tracking,  Gesture recognition, good edges |[HandGesturePreset.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/HandGesturePreset.json)|	 
+| Left Imager Color w/o IR Pattern | Removes the Projector-generated IR pattern from left imager when streaming synthetic RGB.<br> Applies to D400, D410, D415 and D460 Devices.<br> Supported since FW ver 5.9.10+|[D415_RemoveIR.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/D415_RemoveIR.json), [D460_RemoveIR.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/D460_RemoveIR.json) |
+| Default | Best Visual appeal, Clean edges,  Reduced PointCloud Spraying | [DefaultPreset_D415.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/DefaultPreset_D415.json), [DefaultPreset_D435.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/DefaultPreset_D435.json), [DefaultPreset_D455.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/DefaultPreset_D455.json)  |
+| Edge Enhancement | Stronger edge preservation (same depth-control settings as the Edge Map preset below) | [EdgeMapD435.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/EdgeMapD435.json) |
 
 
 <br>Additional Presets not in the Viewer (the Edge Map depth-control settings are available in the Viewer as the Edge Enhancement preset):
 
 | Preset Use case | JSON file | Notes
 | ------------------------- | --------------- | -- |
-| Vacuum Cleaner | [ShortRangePreset.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/ShortRangePreset.json) |
-| Body Scan | [BodyScanPreset.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/BodyScanPreset.json)|
-| Edge Map| [EdgeMapD435.json](https://raw.githubusercontent.com/wiki/realsenseai/librealsense/d400_presets/EdgeMapD435.json) | <p align="center"><b>Edges</b><br><img width=80% src="https://raw.githubusercontent.com/wiki/realsenseai/librealsense/res/edgemap.jpg" /></p>|
+| Vacuum Cleaner | [ShortRangePreset.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/ShortRangePreset.json) |
+| Body Scan | [BodyScanPreset.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/BodyScanPreset.json)|
+| Edge Map| [EdgeMapD435.json](https://librealsense.realsenseai.com/wiki-media/d400_presets/EdgeMapD435.json) | <p align="center"><b>Edges</b><br><img width=80% src="https://librealsense.realsenseai.com/wiki-media/res/edgemap.jpg" /></p>|
 
 ## Example Pictures
 Please refer to the example pictures below captured with the various presets. The depth presets are evaluated and compared based on:
