@@ -3067,6 +3067,12 @@ rs2_processing_block* rs2_create_h264_decoder(rs2_error** error) BEGIN_API_CALL
 }
 NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
 
+int rs2_is_h264_decoder_supported(rs2_error** error) BEGIN_API_CALL
+{
+    return h264_decoder::is_supported() ? 1 : 0;
+}
+NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(0)
+
 rs2_processing_block* rs2_create_y411_decoder(rs2_error** error) BEGIN_API_CALL
 {
     return new rs2_processing_block{ std::make_shared<y411_converter>(RS2_FORMAT_RGB8) };

@@ -28,7 +28,9 @@ namespace librealsense
         // belongs here and nowhere else.
         static bool const supported = []
         {
-            if( h264_decoder_backend::is_supported() )
+            // On a thread of ours, not the caller's: probing costs COM initialization on Windows, and this is
+            // public API, so the first call can come from an application thread that wants COM its own way
+            if( std::async( std::launch::async, [] { return h264_decoder_backend::is_supported(); } ).get() )
                 return true;
             LOG_WARNING( "no H.264 decoder on this platform - H264 streams can be received, not decoded" );
             return false;
