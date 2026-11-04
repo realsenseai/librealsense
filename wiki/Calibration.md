@@ -134,7 +134,7 @@ calibration_table run_tare_calibration(float ground_truth_mm, std::string json_c
 | `depth` | `0` | | D400 |
 | `resize factor` | `5` (a value given in an earlier OCC or tare call is kept) | | D400 |
 
-When `apply preset` is 1, the code switches the visual preset to High Accuracy for the calibration and restores the previous preset afterwards. On D500 devices other than DDS devices, tare calibration with the Custom preset throws `Calibration with custom visual preset is not supported`.
+When `apply preset` is 1, the code switches the visual preset to High Accuracy for the calibration and restores the previous preset afterwards. On D500 devices other than DDS devices, tare calibration with `apply preset` 1 and the Custom preset throws `Calibration with custom visual preset is not supported`.
 
 ### Host-assisted calibration (D400)
 
