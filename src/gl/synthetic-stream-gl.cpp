@@ -74,6 +74,7 @@ namespace librealsense
 
         void rendering_lane::init(glfw_binding binding, bool use_glsl)
         {
+            std::lock_guard<std::recursive_mutex> gl_lock(shared_gl_mutex());
             std::lock_guard<std::mutex> lock(_data.mutex);
 
             gladLoadGLLoader((GLADloadproc)binding.glfwGetProcAddress);
@@ -93,6 +94,7 @@ namespace librealsense
 
         void rendering_lane::shutdown()
         {
+            std::lock_guard<std::recursive_mutex> gl_lock(shared_gl_mutex());
             std::lock_guard<std::mutex> lock(_data.mutex);
             LOG_DEBUG("Shutting down rendering");
             for (auto&& obj : _data.objs)
@@ -127,6 +129,7 @@ namespace librealsense
 
         void processing_lane::init(GLFWwindow* share_with, glfw_binding binding, bool use_glsl)
         {
+            std::lock_guard<std::recursive_mutex> gl_lock(shared_gl_mutex());
             std::lock_guard<std::mutex> lock(_data.mutex);
 
             LOG_DEBUG("Initializing processing, GLSL=" << use_glsl);
@@ -148,6 +151,7 @@ namespace librealsense
 
         void processing_lane::shutdown()
         {
+            std::lock_guard<std::recursive_mutex> gl_lock(shared_gl_mutex());
             std::lock_guard<std::mutex> lock(_data.mutex);
 
             LOG_DEBUG("Shutting down processing");
