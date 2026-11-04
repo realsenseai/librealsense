@@ -16,7 +16,7 @@ The D500 device classes are created in [`d500-factory.cpp`](https://github.com/r
 
 Two features depend on the camera interface and firmware:
 
-- **Depth mapping** is added only when the camera exposes the mapping interface. If it does not, the SDK logs `depth mapping device not found (expected 1, found N) - occupancy/point-cloud streams will not be available` and creates the device without these streams ([`d500-depth-mapping.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-depth-mapping.cpp)). A code comment there says older firmware is the usual reason. In v2.59.1 depth mapping is also never added on MIPI/GMSL cameras *(changed in the next release)*.
+- **Depth mapping** is added only when the camera exposes the mapping interface. If it does not, the SDK logs `depth mapping device not found (expected 1, found N) - occupancy/point-cloud streams will not be available` and creates the device without these streams ([`d500-depth-mapping.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-depth-mapping.cpp)). A code comment there says older firmware is the usual reason. Depth mapping is also never added on MIPI/GMSL cameras; the code supports it over USB only.
 - **Object detection** is added only when the camera exposes the object detection interface. Otherwise the SDK logs `Object detection interface not present - sensor not created` ([`d500-object-detection.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-object-detection.cpp)).
 
 Object detection can also come from a network (DDS) camera. When a DDS device publishes a stream of type `object_detection`, librealsense creates a perception sensor for it and converts the received JSON detections into object detection frames ([`rs-dds-device-proxy.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/dds/rs-dds-device-proxy.cpp), [`rs-dds-sensor-proxy.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/dds/rs-dds-sensor-proxy.cpp)). The DDS path does not provide the safety, occupancy or labeled point cloud streams. See [[Ethernet and DDS Cameras]].
@@ -28,13 +28,10 @@ Object detection can also come from a network (DDS) camera. When a DDS device pu
 | Safety | `Safety Camera` | `RS2_EXTENSION_SAFETY_SENSOR` (`rs2::safety_sensor`) | `RS2_STREAM_SAFETY` | `RS2_FORMAT_Y8` |
 | Occupancy grid | `Depth Mapping Camera` | `RS2_EXTENSION_DEPTH_MAPPING_SENSOR` (`rs2::depth_mapping_sensor`) | `RS2_STREAM_OCCUPANCY` | `RS2_FORMAT_Y8` |
 | Labeled point cloud | `Depth Mapping Camera` | `RS2_EXTENSION_DEPTH_MAPPING_SENSOR` | `RS2_STREAM_LABELED_POINT_CLOUD` | `RS2_FORMAT_Y8` |
-| Device point cloud | `Depth Mapping Camera` | `RS2_EXTENSION_DEPTH_MAPPING_SENSOR` | `RS2_STREAM_POINT_CLOUD` *(new in the next release)* | `RS2_FORMAT_XYZ32F` |
 | Object detection | `Perception` (stream name `Object Detection`) | `RS2_EXTENSION_PERCEPTION_SENSOR` (`rs2::perception_sensor`) | `RS2_STREAM_OBJECT_DETECTION` | `RS2_FORMAT_Y8` |
 
 Notes from the code:
 
-- `RS2_STREAM_POINT_CLOUD` is added to the depth mapping streams on every D500 device with depth mapping except `RealSense D585S` and the `RealSense D585` with PID `0x0B6A` (`add_streams_if_active()` in `d500-depth-mapping.cpp`).
-- Except on `RealSense D585S` and the `RealSense D585` with PID `0x0B6A`, the depth mapping sensor sends one mapping stream at a time. On every device that has `RS2_STREAM_POINT_CLOUD`, that stream cannot start while the depth sensor is streaming (`Point Cloud cannot start while Depth is streaming; stop Depth first`) (`d500_depth_mapping_sensor::open()`) *(new in the next release)*.
 - The `Y8` format on the safety, labeled point cloud and object detection streams is a transport format. Read these frames through the frame classes below, not as images.
 
 ## Streaming the labeled point cloud
@@ -87,8 +84,6 @@ Enable `RS2_STREAM_OCCUPANCY` like any other stream. Each occupancy frame carrie
 | `RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS` | Number of rows in the grid |
 | `RS2_FRAME_METADATA_OCCUPANCY_GRID_COLUMNS` | Number of columns in the grid |
 | `RS2_FRAME_METADATA_OCCUPANCY_CELL_SIZE` | Edge size of each tile, in cm |
-| `RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_X` *(new in the next release)* | Grid origin on the forward axis, in mm |
-| `RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_Y` *(new in the next release)* | Grid origin on the lateral axis, in mm |
 
 ```cpp
 rs2::frame og = data.first_or_default( RS2_STREAM_OCCUPANCY );
@@ -101,53 +96,6 @@ if( og && og.supports_frame_metadata( RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS ) )
 ```
 
 On `RealSense D585S` and the `RealSense D585` with PID `0x0B6A`, the default occupancy profile is 256×320, `Y8`, 30 fps (`add_profile_tag_if_active()`).
-
-### Stream combination rules *(new in the next release)*
-
-On every other D500 device with depth mapping, the SDK checks that the camera can build the occupancy grid from the depth that is already streaming, and rejects a combination it cannot serve. The checks are in `occupancy_allowed_or_throw()` and `depth_sensor_allowed_or_throw()` in [`d500-depth-mapping.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-depth-mapping.cpp):
-
-| Situation | Error message |
-|---|---|
-| Starting occupancy while depth streams at another size or frame rate (depth must be 640×360 or 1280×720 at the occupancy frame rate) | `Occupancy needs Depth at 640x360 or 1280x720, <fps> fps, while the depth sensor streams` |
-| Starting occupancy while the depth sensor streams color (USB only) | `Occupancy cannot start while the depth sensor streams color` |
-| Starting depth while occupancy streams, with other streams or at another size or rate | `While Occupancy streams, Depth can start only alone at 640x360, <fps> fps` |
-| Starting color while occupancy streams | `Color cannot start while Occupancy streams` |
-
-## Configuring depth mapping
-
-### Depth mapping parameters *(new in the next release)*
-
-`rs2::depth_mapping_sensor` reads and writes the occupancy grid and labeled point cloud parameters as JSON. On `RealSense D585S` both calls fail with `Depth mapping params are not supported on this device`:
-
-```cpp
-for( auto && s : dev.query_sensors() )
-{
-    rs2::depth_mapping_sensor dms( s );
-    if( ! dms )
-        continue;
-    std::string params = dms.get_depth_mapping_params();   // current params as JSON
-    // dms.set_depth_mapping_params( partial_json );        // only the named fields change
-}
-```
-
-From the code ([`rs_sensor.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_sensor.h), `d500-depth-mapping.cpp`):
-
-- `set_depth_mapping_params()` takes partial JSON: only the fields you name change. Read the current JSON with `get_depth_mapping_params()` to see the field names your firmware uses.
-- The call blocks until the camera has applied the parameters. If the camera rejects them, the call fails with the camera's message.
-- An empty string, or JSON larger than the camera's parameter buffer, is rejected with `Depth mapping params JSON is N bytes; must be 1..M`.
-
-The C functions are `rs2_get_depth_mapping_params()` (release the result with `rs2_delete_raw_data()`) and `rs2_set_depth_mapping_params()`.
-
-### Segmentation options *(new in the next release)*
-
-The `Depth Mapping Camera` sensor can register two options. Both can be changed only while the sensor is not streaming:
-
-| Option | Values |
-|---|---|
-| `RS2_OPTION_OCCUPANCY_GRID_SEGMENTATION` | Off (0): depth-only labeling. On (1): segmentation labels in the occupancy grid |
-| `RS2_OPTION_LPCL_SEGMENTATION` | Off (0): depth-only labeling. On (1): segmentation labels in the labeled point cloud |
-
-They are not registered on `RealSense D585S`, and are registered only when the camera's transport publishes the control (`register_options()` in `d500-depth-mapping.cpp`). Check with `supports( option )` before use.
 
 ## Reading object detection results
 
@@ -263,7 +211,7 @@ The C API is declared in [`rs_safety_sensor.h`](https://github.com/realsenseai/l
 | `rs2::perception_stream_profile` | `rs_frame.hpp` | Stream profile of a perception stream |
 | `rs2::frameset` | `rs_frame.hpp` | `get_labeled_point_cloud_frame()`, `get_object_detection_frame(index = 0)` |
 | `rs2::safety_sensor` | `rs_safety_sensor.hpp` | See the table above |
-| `rs2::depth_mapping_sensor` | [`rs_sensor.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_sensor.hpp) | `get_depth_mapping_params()`, `set_depth_mapping_params()` *(both new in the next release)* |
+| `rs2::depth_mapping_sensor` | [`rs_sensor.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_sensor.hpp) | Sensor that produces the occupancy and labeled point cloud streams |
 | `rs2::perception_sensor` | `rs_sensor.hpp` | Sensor that produces perception streams |
 
 ### C functions for frames
@@ -293,5 +241,5 @@ To feed perception frames from your own code, a software sensor can add a percep
 See also [[Code Samples]] and [[API How To]].
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`bc496cd`](https://github.com/realsenseai/librealsense/commit/bc496cdb16beca36c41d2b96170e309fceb38d6e)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
