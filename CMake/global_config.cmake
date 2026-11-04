@@ -72,16 +72,6 @@ macro(global_set_flags)
     if (BUILD_WITH_HIP)
         add_definitions(-DRS2_USE_CUDA)
         add_definitions(-DRS2_USE_HIP)
-    endif()
-
-    if (BUILD_WITH_HIP_ZEROCOPY)
-        if (NOT BUILD_WITH_HIP)
-            message(FATAL_ERROR "BUILD_WITH_HIP_ZEROCOPY requires BUILD_WITH_HIP=ON")
-        endif()
-        # Shares RS2_USE_CUDA_ZEROCOPY with the CUDA path: the guarded code in
-        # rscuda_utils.cuh / cuda-pointcloud.cu is already vendor-neutral (it falls back
-        # to the persistent-buffer path whenever try_device_ptr() returns nullptr), so a
-        # single macro is enough for both backends.
         add_definitions(-DRS2_USE_CUDA_ZEROCOPY)
     endif()
 

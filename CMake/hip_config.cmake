@@ -69,6 +69,13 @@ if(NOT DEFINED CMAKE_HIP_COMPILER_ROCM_ROOT)
     set(CMAKE_HIP_COMPILER_ROCM_ROOT "${ROCM_PATH}")
 endif()
 
+# Default architectures: MI200, MI300, RDNA3, RDNA3.5 (Strix Halo).
+# Must precede enable_language(HIP), which otherwise probes rocm_agent_enumerator and
+# caches only the build machine's GPU -- leaving the binary unusable on any other.
+if(NOT DEFINED CMAKE_HIP_ARCHITECTURES OR CMAKE_HIP_ARCHITECTURES STREQUAL "")
+    set(CMAKE_HIP_ARCHITECTURES "gfx90a;gfx942;gfx1100;gfx1101;gfx1151")
+endif()
+
 enable_language(HIP)
 
 find_package(hip REQUIRED CONFIG
@@ -81,11 +88,6 @@ find_package(hip REQUIRED CONFIG
 # every target in the build tree.
 
 message(STATUS "HIP_INCLUDE_DIRS: ${HIP_INCLUDE_DIRS}")
-
-# Default architectures: MI200, MI300, RDNA3
-if(NOT DEFINED CMAKE_HIP_ARCHITECTURES OR CMAKE_HIP_ARCHITECTURES STREQUAL "")
-    set(CMAKE_HIP_ARCHITECTURES "gfx90a;gfx942;gfx1100;gfx1101")
-endif()
 
 # Define HIP platform for .cpp files that include hip_runtime.h
 add_definitions(-D__HIP_PLATFORM_AMD__)

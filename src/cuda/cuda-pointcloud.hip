@@ -92,10 +92,9 @@ void kernel_deproject_depth_cuda(float * points, const rs2_intrinsics * intrin, 
 // rationale). This is a mechanical per-API port: hipMemcpy/hipMalloc/hipGetLastError/
 // hipStreamSynchronize in place of the cuda* names; try_device_ptr() and RS_CUDA_MEMTYPE
 // resolve to their HIP equivalents via the macros in rscuda_utils.cuh / cuda-compat.h.
-// Zero-copy only activates when BUILD_WITH_HIP_ZEROCOPY is enabled (-> RS2_USE_CUDA_ZEROCOPY);
-// it is a no-op (try_device_ptr() always returns nullptr) on a plain HIP build, so the
-// persistent-buffer path below is exercised unconditionally and zero-copy is strictly
-// additive.
+// Zero-copy only activates at runtime on an integrated GPU (see rs_frame_zc_enabled());
+// try_device_ptr() returns nullptr otherwise (e.g. discrete GPU), so the persistent-buffer
+// path below is exercised unconditionally and zero-copy is strictly additive.
 void rscuda::pointcloud_cuda_helper::deproject_depth_cuda(float * points, const rs2_intrinsics & intrin, const uint16_t * depth, float depth_scale)
 {
     const int count = intrin.width * intrin.height;
