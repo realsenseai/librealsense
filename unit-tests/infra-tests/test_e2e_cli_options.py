@@ -166,12 +166,13 @@ class TestCliOptionsRegistered:
         assert_outcomes(out, passed=1, skipped=1)
 
     def test_custom_fw_options(self):
-        """--custom-fw-d400/-d555/-d585 are accepted and their values reach the tests
+        """--custom-fw-d400/-d555/-d585/-d585s are accepted and their values reach the tests
         via request.config.getoption (consumed by pytest-fw-update)."""
         rc, out, *_ = run_e2e("pytest-custom-fw.py", "-k", "test_values",
                                "--custom-fw-d400", "d400.bin",
                                "--custom-fw-d555", "d555.bin",
-                               "--custom-fw-d585", "d585.bin")
+                               "--custom-fw-d585", "d585.bin",
+                               "--custom-fw-d585s", "d585s.img")
         assert_outcomes(out, passed=1)
 
     def test_custom_fw_defaults(self):

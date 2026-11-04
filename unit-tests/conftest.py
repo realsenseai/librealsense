@@ -212,7 +212,14 @@ def pytest_addoption(parser):
         action="store",
         default=None,
         help="Path to a custom D585 (non-safety) firmware image; pytest-fw-update flashes it if "
-             "it differs from the installed FW. Applies to D585 only -- never flashed onto D585S."
+             "it differs from the installed FW. Applies to D585 only -- D585S uses --custom-fw-d585s."
+    )
+    group.addoption(
+        "--custom-fw-d585s",
+        action="store",
+        default=None,
+        help="Path to a custom D585S (safety, SC1.1) firmware image; pytest-fw-update flashes it "
+             "if it differs from the installed FW. Applies to D585S only -- never flashed onto D585."
     )
     # --debug and -r/--regex conflict with pytest built-ins and are consumed before
     # pytest parses args. Document them here so they show up in --help:
