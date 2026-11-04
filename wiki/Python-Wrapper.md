@@ -129,8 +129,6 @@ All examples are in [`wrappers/python/examples`](https://github.com/realsenseai/
 | [`depth_ucal_example.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/depth_ucal_example.py) | Auto-calibration APIs for the OCC and Tare flows. |
 | [`d500_triggered_calibration.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/d500_triggered_calibration.py) | Triggered calibration API, comparing depth before and after. |
 | [`d5x5_interactive_triggered_calibration.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/d5x5_interactive_triggered_calibration.py) | Interactive triggered calibration (run, optional try new/old, then commit or cancel) for cameras whose name contains D535 or D585, excluding D585S. |
-| [`d5x5_get_depth_mapping_params.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/d5x5_get_depth_mapping_params.py) *(new in the next release)* | Read the occupancy grid and labeled point cloud parameters of a D5x5 camera. |
-| [`d5x5_set_depth_mapping_params.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/d5x5_set_depth_mapping_params.py) *(new in the next release)* | Write those parameters from a JSON file (default [`d5x5_depth_mapping_params.json`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/d5x5_depth_mapping_params.json)). |
 | [`box_dimensioner_multicam/box_dimensioner_multicam_demo.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/box_dimensioner_multicam/box_dimensioner_multicam_demo.py) | Measure a box's length, width and height with multiple cameras, calibrated with a chessboard. |
 | [`pybackend_example_1_general.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/pybackend_example_1_general.py) | Control a device through the legacy `pybackend2` module (needs `BUILD_LEGACY_PYBACKEND`). |
 
@@ -163,5 +161,5 @@ All examples are in [`wrappers/python/examples`](https://github.com/realsenseai/
 - **`pybackend2`.** A separate, deprecated module built only with `BUILD_LEGACY_PYBACKEND`, from [`pybackend.cpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/pybackend.cpp). It gives direct access to the platform backend; `build_wheel.py` does not package it.
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`46cf1a6`](https://github.com/realsenseai/librealsense/commit/46cf1a67cc441ad9f55ce339a0de30f2a1c6fed0)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
