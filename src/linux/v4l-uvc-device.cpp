@@ -559,26 +559,36 @@ namespace librealsense
 
                                                 // IMU node (mi=4) delivers data with no metadata node, synthesize the metadata from the payload.
                                                 // Frame size is 64 bytes on D400 but 256 on D500, which may bundle two reports: each is its own frame.
-                                                metadata_hid_raw meta_data{};
-                                                bool const is_imu = md_size == 0 && _info.mi == 4;
                                                 auto frame_start = buffer->get_frame_start();
-                                                auto const reports = is_imu ? get_imu_reports(frame_start, frame_sz) : std::vector<uint8_t*>{ frame_start };
-                                                if (reports.empty())
+                                                if (md_size == 0 && _info.mi == 4)
                                                 {
-                                                    LOG_DEBUG("Malformed IMU buffer of " << frame_sz << " bytes dropped");
-                                                    buf_mgr.request_next_frame();
-                                                }
-                                                for (auto report : reports)
-                                                {
-                                                    if (is_imu)
+                                                    auto const reports = get_imu_reports(frame_start, frame_sz);
+                                                    if (reports.empty())
+                                                    {
+                                                        LOG_DEBUG("Malformed IMU buffer of " << frame_sz << " bytes dropped");
+                                                        buf_mgr.request_next_frame();
+                                                    }
+                                                    for (auto report : reports)
+                                                    {
+                                                        metadata_hid_raw meta_data{};
                                                         populate_imu_data(meta_data, report, md_size, &md_start);
-                                                    frame_object fo{ frame_sz - size_t(report - frame_start), md_size, report, md_start, timestamp };
+                                                        frame_object fo{ frame_sz - size_t(report - frame_start), md_size, report, md_start, timestamp };
 
-                                                    //Invoke user callback; enqueue next frame after the last report (motion frames are copied synchronously)
-                                                    bool const is_last = report == reports.back();
-                                                    _callback(_profile, fo, [buf_mgr, is_last]() mutable {
-                                                        if (is_last)
-                                                            buf_mgr.request_next_frame();
+                                                        //Invoke user callback; enqueue next frame after the last report (motion frames are copied synchronously)
+                                                        bool const is_last = report == reports.back();
+                                                        _callback(_profile, fo, [buf_mgr, is_last]() mutable {
+                                                            if (is_last)
+                                                                buf_mgr.request_next_frame();
+                                                        });
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    frame_object fo{ frame_sz, md_size, frame_start, md_start, timestamp };
+
+                                                    //Invoke user callback and enqueue next frame
+                                                    _callback(_profile, fo, [buf_mgr]() mutable {
+                                                        buf_mgr.request_next_frame();
                                                     });
                                                 }
                                             }
