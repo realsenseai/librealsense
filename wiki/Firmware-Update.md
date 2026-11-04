@@ -136,7 +136,7 @@ sudo rmmod d4xx && sudo modprobe d4xx
 or reboot the system
 ```
 
-For GMSL recovery devices the library writes the image to the device's DFU character device in 1 KB blocks and reports progress per block ([`src/fw-update/fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/fw-update/fw-update-device.cpp)). For GMSL devices in normal mode it writes the whole image at once and reports progress estimated from the elapsed time, held below 100% until the write finishes ([`src/ds/ds-mipi-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-mipi-device.cpp)).
+For GMSL recovery devices the library writes the image to the device's DFU character device in 1 KB blocks and reports progress per block ([`src/fw-update/fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/fw-update/fw-update-device.cpp)). For GMSL devices in normal mode it writes the whole image at once and reports progress estimated from the elapsed time, capped at 99% ([`src/ds/ds-mipi-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-mipi-device.cpp)); 100% is reported only after a settle wait and a camera reset ([`src/ds/d400/d400-mipi-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-mipi-device.cpp), [`src/ds/d500/d500-mipi-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-mipi-device.cpp)).
 
 In the Viewer, a recovery device shows the same **Update Firmware** menu item; the Viewer writes the image to it directly and then waits for the camera to reconnect, except for GMSL recovery devices, where it logs the driver-reload message shown above instead.
 
