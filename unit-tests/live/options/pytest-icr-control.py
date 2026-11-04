@@ -35,6 +35,12 @@ def _field_from_raw(raw, field):
     return int.from_bytes(bytes(raw)[offset:offset + 4], 'little', signed=True)
 
 
+def _require_8_params(range):
+    """The 7-parameter FW has no Smoothing, Completion or MinZ fields: the SDK reports their range as [0, 0]"""
+    if range.max.smoothing_offset_mm == 0:
+        pytest.skip("8-parameter ICR FW required")
+
+
 def _set_fields(embedded_filter, option_id, **fields):
     """Read-modify-write: the header and every other field are carried over as the device just reported them."""
     cfg = embedded_filter.get_icr_control(option_id)
@@ -93,6 +99,8 @@ def test_icr_mode_is_a_single_tri_state(icr):
 ])
 def test_icr_writable_field_round_trip(icr, field, values):
     embedded_filter, option_id, range, _ = icr
+    if field in ('smoothing_offset_mm', 'completion_offset_mm'):
+        _require_8_params(range)
     for value in values:
         assert getattr(range.min, field) <= value <= getattr(range.max, field)
         assert getattr(_set_fields(embedded_filter, option_id, **{field: value}), field) == value
@@ -102,6 +110,8 @@ def test_icr_writable_field_round_trip(icr, field, values):
 def test_icr_out_of_range_rejected_locally(icr, field):
     """Every param, read-only MinZ telemetry included, is range-checked before anything is sent."""
     embedded_filter, option_id, range, _ = icr
+    if field in ('smoothing_offset_mm', 'completion_offset_mm') + READ_ONLY_FIELDS:
+        _require_8_params(range)
     before = embedded_filter.get_composite_option(option_id)
     for bad_value in (getattr(range.min, field) - 1, getattr(range.max, field) + 1):
         cfg = embedded_filter.get_icr_control(option_id)
@@ -114,7 +124,8 @@ def test_icr_out_of_range_rejected_locally(icr, field):
 @pytest.mark.parametrize("field", READ_ONLY_FIELDS)
 def test_icr_read_only_telemetry_is_never_written(icr, field):
     """An in-range SET of MinZ / Improved MinZ is accepted but the device keeps its own computed value."""
-    embedded_filter, option_id, _, _ = icr
+    embedded_filter, option_id, range, _ = icr
+    _require_8_params(range)
     before = getattr(embedded_filter.get_icr_control(option_id), field)
     attempted = 100 if before != 100 else 200
     assert getattr(_set_fields(embedded_filter, option_id, **{field: attempted}), field) == before
@@ -155,7 +166,8 @@ def _stop(depth_sensor):
 
 def test_icr_downscale_fields_settable_while_streaming(icr, streaming_1280x720_30):
     """Only topology-preserving changes are live: Smoothing / Completion and Off to/from the prebuilt mode"""
-    embedded_filter, option_id, _, _ = icr
+    embedded_filter, option_id, range, _ = icr
+    _require_8_params(range)
     depth_sensor, profile = streaming_1280x720_30
     _set_fields(embedded_filter, option_id, mode=DOWNSCALE_HDR, downscale_ratio=1)
     _stream(depth_sensor, profile)
@@ -201,7 +213,8 @@ def test_icr_topology_change_rejected_while_streaming(icr, streaming_1280x720_30
 
 def test_icr_manual_offset_126_matches_126px_preset(icr, streaming_1280x720_30):
     """The 126 px preset and Manual at 126 are the same shift, so Improved MinZ must not change"""
-    embedded_filter, option_id, _, _ = icr
+    embedded_filter, option_id, range, _ = icr
+    _require_8_params(range)
     depth_sensor, profile = streaming_1280x720_30
     _set_fields(embedded_filter, option_id, mode=HIGH_RES, high_res_mode=0)
     _stream(depth_sensor, profile)
