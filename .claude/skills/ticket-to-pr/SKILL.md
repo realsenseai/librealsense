@@ -11,7 +11,13 @@ Argument: Jira ticket ID.
 2. IMPLEMENT: new branch off development (no username prefix). Follow the cpp-coding,
    add-api, file-creation and pytest-infra skills. Build and test per the build/testing
    skills. Commit with short messages.
-3. REVIEW LOOP (max 4 rounds):
+3. VALIDATE (max 3 rounds): spawn the `lrs-tester` subagent with the design file and
+   `.review/<ticket>/test-report.md`. It reports whether existing tests cover the change
+   (run them), need a small extension, or a new test is needed, and runs the result.
+   On `RESULT: FAIL`, fix the product code (never weaken the test without a reason you
+   can state), commit, and respawn it. `NOT RUN` (no device available) is not a pass:
+   report it to the user, who may claim a lab machine via `/lab-machine`.
+4. REVIEW LOOP (max 4 rounds):
    a. Spawn the `lrs-reviewer` subagent (fresh each round) with the review file
       `.review/<ticket>/review.md` and the round number.
    b. If it reports `OPEN: 0`, exit the loop.
@@ -20,5 +26,6 @@ Argument: Jira ticket ID.
       Rebuild and rerun affected tests. Commit.
    d. Go to (a).
    If still open after round 4, stop and report the remaining findings to the user.
-4. PR: follow the pr-create skill. Show the title and description and wait for the user's
+   If the loop changed product code, rerun `lrs-tester` once more before the PR.
+5. PR: follow the pr-create skill. Show the title and description and wait for the user's
    explicit OK before any push or `gh pr create`.
