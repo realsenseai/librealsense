@@ -126,6 +126,11 @@ namespace rs2
     {
         _name = rs2_embedded_filter_type_to_string(type);
 
+        // Only DDS has other clients that can change a filter behind the Viewer's back (and a cheap cached read)
+        bool const is_dds = owner && owner->dev.supports( RS2_CAMERA_INFO_CONNECTION_TYPE )
+                         && std::string( owner->dev.get_info( RS2_CAMERA_INFO_CONNECTION_TYPE ) ) == "DDS";
+        _decimation_filter_dpp_editor.auto_refresh = _temporal_filter_dpp_editor.auto_refresh = _icr_editor.auto_refresh = is_dds;
+
         std::stringstream ss;
         ss << "##" << ((owner) ? owner->dev.get_info(RS2_CAMERA_INFO_NAME) : _name)
             << "/" << ((owner) ? (*owner->s).get_info(RS2_CAMERA_INFO_NAME) : "_")
