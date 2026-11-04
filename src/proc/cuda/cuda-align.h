@@ -24,7 +24,7 @@ namespace librealsense
     protected:
         void reset_cache(rs2_stream from, rs2_stream to) override
         {
-            aligners[std::tuple<rs2_stream, rs2_stream>(from, to)] = align_cuda_helper();
+            aligners.clear();
         }
 
         void align_z_to_other(rs2::video_frame& aligned, const rs2::video_frame& depth, const rs2::video_stream_profile& other_profile, float z_scale) override
