@@ -9,11 +9,11 @@ This page is a short orientation for building the RealSense SDK 2.0 (librealsens
 ## Key facts
 
 - The Raspberry Pi build is the Linux build: [`CMake/unix_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/unix_config.cmake) detects the compiler target. On 32-bit ARM it prints `Building for 32-bit ARM - using compiler default FPU settings`; on ARM64/AArch64 it prints `Building for ARM64 with NEON optimizations` or `Building for ARM64 without NEON optimizations`.
-- `BUILD_WITH_NEON` exists only on 64-bit ARM processors and defaults to `ON` there ([`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake)).
-- The repository guide builds with `-DFORCE_LIBUVC=true`. That option is deprecated: the top-level [`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/CMakeLists.txt) turns it into `FORCE_RSUSB_BACKEND=ON`, which selects the RS USB (libusb) backend instead of V4L2.
+- `BUILD_WITH_NEON` exists only when `CMAKE_SYSTEM_PROCESSOR` is arm64/aarch64 and defaults to `ON` there ([`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake)).
+- The Raspbian guide builds with `-DFORCE_LIBUVC=true` (according to doc/installation_raspbian.md). That option is deprecated: the top-level [`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/CMakeLists.txt) turns it into `FORCE_RSUSB_BACKEND=ON`, which selects the RS USB (libusb) backend instead of V4L2.
 - The udev rules for the RS USB backend are in [`config/99-realsense-libusb.rules`](https://github.com/realsenseai/librealsense/blob/master/config/99-realsense-libusb.rules).
 - When the build type is not set, it becomes `Release` (`CMake/unix_config.cmake`). Python bindings are built only with `BUILD_PYTHON_BINDINGS=ON` (default `OFF`).
-- The repository guide says that on a Raspberry Pi 3 (USB2 only) camera capabilities are severely reduced for lack of bandwidth, and that boards with little RAM may need a larger swap file to compile the SDK.
+- On a Raspberry Pi 3 (USB2 only) camera capabilities are severely reduced for lack of bandwidth, and boards with little RAM may need a larger swap file to compile the SDK (according to doc/RaspberryPi3.md and doc/installation_raspbian.md).
 
 ## Full guide
 
