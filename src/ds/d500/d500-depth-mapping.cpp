@@ -203,12 +203,12 @@ namespace librealsense
     };
 
     // Occupancy as the GMSL IR node multiplexes it: MUX stream id, metadata id (routing, and its own required
-    // block of 136+ bytes) and the 320x256 grid
+    // block of 136+ bytes) and the 320x256 grid; 80 KB, so reserved on every capture
     const platform::muxed_stream occupancy_muxed_stream
         = { "Occupancy",
             7,
             { uint32_t( md_type::META_DATA_INTEL_OCCUPANCY_ID ), uint32_t( md_type::META_DATA_INTEL_OCCUPANCY_ID ), 136, true },
-            { 320, 256, rs_fourcc( 'G', 'R', 'E', 'Y' ), 320 * 256 } };
+            { 320, 256, rs_fourcc( 'G', 'R', 'E', 'Y' ), 320 * 256, true } };
 
     d500_depth_mapping::d500_depth_mapping( std::shared_ptr< const d500_info > const & dev_info)
         : device( dev_info ), d500_device( dev_info ),
@@ -227,8 +227,11 @@ namespace librealsense
         // own interface
         auto mapping_dev = get_raw_depth_sensor()->get_uvc_device()->create_muxed_stream_device(
             occupancy_muxed_stream,
-            [this]( uint32_t stream_id, bool on, const platform::stream_profile & p )
-            { enable_muxed_stream( stream_id, on, p.width, p.height, p.fps ); } );
+            [this, alive = _is_alive]( uint32_t stream_id, bool on, const platform::stream_profile & p )
+            {
+                if( *alive )  // sensors outlive the device's HW monitor
+                    enable_muxed_stream( stream_id, on, p.width, p.height, p.fps );
+            } );
         std::string physical_port;
         if( mapping_dev )
         {

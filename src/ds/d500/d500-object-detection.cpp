@@ -32,12 +32,12 @@ namespace librealsense
     };
 
     // The stream as the GMSL IR node multiplexes it: MUX stream id, metadata id (routing, and its own optional
-    // block of 83+ bytes) and the ODET blob padded to 2347 bytes
+    // block of 83+ bytes) and the ODET blob padded to 2347 bytes; 3 KB, so reserved on every capture
     const platform::muxed_stream od_muxed_stream
         = { "Object Detection",
             6,
             { uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ), uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ), 83, false },
-            { 2347, 1, rs_fourcc( 'G', 'R', 'E', 'Y' ), 2347 } };
+            { 2347, 1, rs_fourcc( 'G', 'R', 'E', 'Y' ), 2347, true } };
 
     d500_object_detection::d500_object_detection( std::shared_ptr< const d500_info > const & dev_info )
         : device( dev_info )
@@ -45,11 +45,14 @@ namespace librealsense
         , _object_detection_stream( new stream( RS2_STREAM_OBJECT_DETECTION ) )
     {
         // Over GMSL the stream is multiplexed on the depth sensor's IR node, and the camera takes it by rate alone;
-        // over USB it has its own interface
+        // over USB it has its own interface. Sensors outlive the device's HW monitor, so a close at teardown skips it.
         auto od_dev = get_raw_depth_sensor()->get_uvc_device()->create_muxed_stream_device(
             od_muxed_stream,
-            [this]( uint32_t stream_id, bool on, const platform::stream_profile & p )
-            { enable_muxed_stream( stream_id, on, 0, 0, p.fps ); } );
+            [this, alive = _is_alive]( uint32_t stream_id, bool on, const platform::stream_profile & p )
+            {
+                if( *alive )
+                    enable_muxed_stream( stream_id, on, 0, 0, p.fps );
+            } );
         // A muxed stream has no controls of its own; its XU is the depth node's
         std::shared_ptr< uvc_sensor > xu_host = od_dev ? get_raw_depth_sensor() : nullptr;
         std::string physical_port;

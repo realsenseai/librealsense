@@ -94,6 +94,7 @@ namespace librealsense
                         bool started = false;
                         bool committed = false;
                         bool enabled = false;
+                        mutable bool no_record_warned = false;
                     };
 
                     explicit mux( const uvc_device_info & carrier_info )
@@ -109,10 +110,9 @@ namespace librealsense
                         std::lock_guard< std::recursive_mutex > route( _route_mtx );
                         for( auto const & s : _slots )
                         {
-                            // Another device object may register the same stream again, never a different one under its ids
+                            // Streams can register once per profile and from another device object. Two streams never share metadata id
                             bool same_stream = s->desc.stream_id == desc.stream_id;
-                            if( same_stream != ( s->desc.metadata.type_id == desc.metadata.type_id )
-                                || ( same_stream && s->desc.frame.payload_size != desc.frame.payload_size ) )
+                            if( same_stream != ( s->desc.metadata.type_id == desc.metadata.type_id ) )
                                 throw invalid_value_exception( desc.name + " conflicts with " + s->desc.name + " on the GMSL MUX" );
                         }
                         _slots.push_back( std::make_unique< slot >() );
@@ -145,8 +145,14 @@ namespace librealsense
                     std::vector< stream_profile > get_profiles( const slot & s ) const
                     {
                         std::vector< stream_profile > profiles;
-                        for( auto const & p : exact_record( _carrier->get_profiles(), s.desc.frame.payload_size ) )
+                        for( auto const & p : record_of( s ) )
                             profiles.push_back( { s.desc.frame.width, s.desc.frame.height, p.fps, s.desc.frame.format } );
+                        if( profiles.empty() && ! s.no_record_warned )
+                        {
+                            s.no_record_warned = true;
+                            LOG_WARNING( s.desc.name << " is not published: the GMSL IR node offers no RSVL record of "
+                                                     << s.desc.frame.payload_size << " bytes" );
+                        }
                         return profiles;
                     }
 
@@ -177,13 +183,21 @@ namespace librealsense
                             if( _carrier_committed )
                                 throw wrong_api_call_sequence_exception( s->desc.name + " is unavailable while the GMSL IR channel streams" );
                             if( is_committed( s->desc.stream_id ) )
-                                throw wrong_api_call_sequence_exception( "Device already streaming!" );
-                            // Claiming the queue first keeps a process that cannot capture from touching camera state
+                                throw wrong_api_call_sequence_exception( s->desc.name + " is already streaming" );
+                            // Claiming the queue first keeps a process that cannot capture from touching camera state.
+                            // The streams arrive in bursts, one frame each, so the ring holds a burst over the usual depth.
                             if( ! _streams_committed )
-                                _carrier->probe_and_commit( carrier_profile(),
+                                _carrier->probe_and_commit( carrier_profile( *s ),
                                                             [this]( stream_profile, frame_object f, std::function< void() > release )
                                                             { dispatch( f, std::move( release ) ); },
-                                                            buffers );
+                                                            buffers + registered_streams() - 1 );
+                            else
+                            {
+                                auto record = record_of( *s );
+                                if( record.empty() || capacity( record.front() ) > capacity( _carrier_profile ) )
+                                    throw wrong_api_call_sequence_exception( s->desc.name + " needs a larger GMSL capture than "
+                                                                             + committed_names() + " use; stop them first" );
+                            }
                             s->committed = true;
                             s->profile = profile;
                             ++_streams_committed;
@@ -272,6 +286,15 @@ namespace librealsense
                     }
 
                 private:
+                    // Distinct stream ids, however many profiles or device objects registered them
+                    int registered_streams() const
+                    {
+                        std::set< uint32_t > ids;
+                        for( auto const & s : _slots )
+                            ids.insert( s->desc.stream_id );
+                        return int( ids.size() );
+                    }
+
                     bool is_committed( uint32_t stream_id ) const
                     {
                         return std::any_of( _slots.begin(), _slots.end(), [&]( const std::unique_ptr< slot > & s )
@@ -288,19 +311,26 @@ namespace librealsense
                         return names;
                     }
 
-                    // The record holding every registered stream, at its highest rate; a late joiner must not resize the queue
-                    stream_profile carrier_profile()
+                    std::vector< stream_profile > record_of( const slot & s ) const
                     {
-                        const auto profiles = _carrier->get_profiles();
-                        std::vector< stream_profile > best;
+                        return exact_record( _carrier->get_profiles(), s.desc.frame.payload_size );
+                    }
+
+                    // The record holding `first` and every reserved registration, at its highest rate: the capture is
+                    // sized once, and a later joiner must fit it
+                    stream_profile carrier_profile( const slot & first )
+                    {
+                        auto best = record_of( first );
                         for( auto const & s : _slots )
                         {
-                            auto record = exact_record( profiles, s->desc.frame.payload_size );
+                            if( ! s->desc.frame.reserved )
+                                continue;
+                            auto record = record_of( *s );
                             if( ! record.empty() && ( best.empty() || capacity( record.front() ) > capacity( best.front() ) ) )
                                 best = std::move( record );
                         }
                         if( best.empty() )
-                            throw backend_exception( "The GMSL IR node offers no RSVL record for its multiplexed streams" );
+                            throw backend_exception( "The GMSL IR node offers no RSVL record for " + first.desc.name );
                         return _carrier_profile = best.front();
                     }
 
@@ -406,6 +436,8 @@ namespace librealsense
                         s->callback( s->profile, f, std::move( release ) );
                     }
 
+                    // _mtx is taken before _route_mtx. An enable callback runs under _mtx and takes the device's HW monitor
+                    // and power locks, then _power_mtx and the nodes' named mutexes; none of those paths takes _mtx back.
                     std::mutex _mtx;                  // capture lifecycle and stream enables
                     std::recursive_mutex _route_mtx;  // the streams' callbacks, held while delivering
                     std::mutex _power_mtx;

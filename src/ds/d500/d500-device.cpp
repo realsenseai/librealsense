@@ -902,37 +902,41 @@ namespace librealsense
             return state;
         };
 
+        d500_mux_state state;
         if( ! on )
         {
             if( ! send( MUX_GET_STATE, 0 ).requested )
                 return;
-            if( send( MUX_SET_ENABLE, 0 ).requested || response != d500_hwmon_response::SUCCESS )
+            state = send( MUX_SET_ENABLE, 0 );
+            if( state.requested || response != d500_hwmon_response::SUCCESS )
                 throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
                                                                        << " disable rejected, error " << response );
-            return;
         }
-
-        const uint64_t packed = ( uint64_t( width ) << 32 ) | ( uint64_t( height ) << 16 ) | fps;
-        std::vector< uint8_t > profile( sizeof( packed ) );
-        std::memcpy( profile.data(), &packed, sizeof( packed ) );
-        // A Mapping switch may still be draining on the camera worker, so a not-ready camera is given some time
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 1500 );
-        d500_mux_state state;
-        while( ( state = send( MUX_ENABLE_WITH_PROFILE, 1, profile ) ).requested == 0
-               && response == d500_hwmon_response::SW_NOT_READY && std::chrono::steady_clock::now() < deadline )
-            std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-        // Camera firmware without the profile action picks the rate itself
-        if( response != d500_hwmon_response::SUCCESS && response != d500_hwmon_response::SW_NOT_READY )
+        else
         {
-            LOG_DEBUG( "MUX stream " << stream_id << " profile enable rejected (" << response << "); enabling without one" );
-            state = send( MUX_SET_ENABLE, 1 );
+            const uint64_t packed = ( uint64_t( width ) << 32 ) | ( uint64_t( height ) << 16 ) | fps;
+            std::vector< uint8_t > profile( sizeof( packed ) );
+            std::memcpy( profile.data(), &packed, sizeof( packed ) );
+            // A Mapping switch may still be draining on the camera worker, so a not-ready camera is given some time
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 1500 );
+            while( ( state = send( MUX_ENABLE_WITH_PROFILE, 1, profile ) ).requested == 0
+                   && response == d500_hwmon_response::SW_NOT_READY && std::chrono::steady_clock::now() < deadline )
+                std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+            // Camera firmware without the profile action picks the rate itself
+            if( response != d500_hwmon_response::SUCCESS && response != d500_hwmon_response::SW_NOT_READY )
+            {
+                LOG_DEBUG( "MUX stream " << stream_id << " profile action rejected (" << response << "); enabling without a rate" );
+                state = send( MUX_SET_ENABLE, 1 );
+            }
+            if( response != d500_hwmon_response::SUCCESS )
+                throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
+                                                                       << " enable rejected, error " << response );
+            if( ! state.requested )
+                throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
+                                                                       << " enable returned requested 0" );
         }
-        if( response != d500_hwmon_response::SUCCESS )
-            throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
-                                                                   << " enable rejected, error " << response );
-        if( ! state.requested )
-            throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
-                                                                   << " enable returned requested 0" );
+        LOG_DEBUG( "MUX stream " << stream_id << " enable(" << on << "): requested " << state.requested << ", applied "
+                                 << state.applied << ", capture active " << state.capture_active );
     }
 
     void d500_device::register_dpp_embedded_filters()

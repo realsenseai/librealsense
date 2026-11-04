@@ -143,6 +143,10 @@ struct muxed_stream
     {
         uint32_t width, height, format;  // as the sensor sees it
         size_t payload_size;             // bytes of one frame on the wire
+        // The carrier's buffers are sized once, when its first stream starts, and a stream whose frames do not fit
+        // cannot join later. A reserved stream is always counted in, so it can join any running capture; an
+        // unreserved one, say a point cloud of many MB a frame, gets its size only when it starts first.
+        bool reserved;
     } frame;
 };
 
