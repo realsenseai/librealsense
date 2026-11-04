@@ -15,7 +15,7 @@ The Android wrapper lets you use the RealSense SDK 2.0 (librealsense) in Android
 - The Java API is in package `com.intel.realsense.librealsense`, with classes such as `RsContext`, `Pipeline`, `Config`, `DeviceWatcher` and the processing filters.
 - The AAR declares `DeviceWatcherActivity`, which starts on `android.hardware.usb.action.USB_DEVICE_ATTACHED` for the USB vendor IDs listed in [`usb_filter.xml`](https://github.com/realsenseai/librealsense/blob/master/wrappers/android/librealsense/src/main/res/xml/usb_filter.xml).
 - The standalone [`java_example`](https://github.com/realsenseai/librealsense/blob/master/wrappers/android/examples/java_example/readme.md) and [`native_example`](https://github.com/realsenseai/librealsense/blob/master/wrappers/android/examples/native_example/readme.md) projects take the AAR from a Maven repository as `com.intel.realsense:librealsense` instead of building it.
-- The repository guide says RealSense has not explicitly validated SDK 2.0 on Android, and calibration and firmware update tools are not available on Android.
+- RealSense has not explicitly validated SDK 2.0 on Android, and the calibration and firmware update tools used in production and manufacturing are not available on Android (according to doc/android.md).
 
 ## Full guide
 
