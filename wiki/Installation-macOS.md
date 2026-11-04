@@ -14,7 +14,7 @@ This page is a short orientation for building the RealSense SDK 2.0 (librealsens
 - `CHECK_FOR_UPDATES` and `ENABLE_AI_ASSISTANT` default to `OFF` on macOS and `ON` elsewhere ([`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake)). `ENABLE_STATS` is `ON` on every platform; any of the three pulls in libcurl, which [`CMake/external_libcurl.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/external_libcurl.cmake) links against OpenSSL (`find_package(OpenSSL REQUIRED)`).
 - Motion sensors (IMU) are compiled out on macOS: the D400 and D500 motion code is guarded with `#if !defined(__APPLE__) // Motion sensors not supported on macOS` (for example [`src/ds/d400/d400-motion.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-motion.cpp)).
 - When the build type is not set, it becomes `Release` (`CMake/unix_config.cmake`).
-- The repository guide says macOS support for the full range of SDK functionality is not yet complete, that the RealSense Viewer is not supported on macOS, and that on macOS 12 and newer most tools that use libusb must be run with `sudo`.
+- macOS support for the full range of SDK functionality is not yet complete, the RealSense Viewer is not supported on macOS, and on macOS 12 and newer most tools that use libusb must be run with `sudo` (according to doc/installation_osx.md).
 
 ## Full guide
 
