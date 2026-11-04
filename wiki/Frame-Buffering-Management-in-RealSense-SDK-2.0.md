@@ -102,5 +102,5 @@ The pipeline does not expose an API for setting its internal frame queue capacit
  - Use the asynchronous callback API and buffer frames yourself.
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`84e42c1`](https://github.com/realsenseai/librealsense/commit/84e42c1d2ce717c57dcf11f155bbe68bb41bbd1c)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
