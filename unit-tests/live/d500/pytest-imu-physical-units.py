@@ -15,7 +15,6 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.device_each("D500*"),
-    pytest.mark.device_exclude("D585S"),
     pytest.mark.device_type_exclude("DDS"),  # DDS motion goes through a separate transport and scale
     pytest.mark.context("nightly"),  # needs a stationary camera
 ]
@@ -26,6 +25,8 @@ SAMPLES = 200
 LOW, HIGH = 0.8 * GRAVITY, 1.2 * GRAVITY
 # a stationary gyro reads a few mrad/s of noise and bias; a wrong decode reads orders of magnitude more
 MAX_GYRO_REST = 0.2  # rad/s
+# a correctly decoded gyro always shows some noise; a decode that under-scales it reads a flat ~0
+MIN_GYRO_NOISE = 0.001  # rad/s
 
 
 def test_stationary_imu_magnitudes(test_device):
@@ -75,3 +76,5 @@ def test_stationary_imu_magnitudes(test_device):
     assert gyro_mean < MAX_GYRO_REST, (
         f"|gyro| = {gyro_mean:.4f} rad/s on a stationary camera, FW {fw}; "
         f"the SDK gyro decode or scale does not match this FW")
+    assert max(gyro_norms) > MIN_GYRO_NOISE, (
+        f"max |gyro| = {max(gyro_norms):.6f} rad/s on FW {fw}; a flat zero means the SDK gyro is under-scaled for this FW")
