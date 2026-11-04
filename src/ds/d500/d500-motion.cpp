@@ -46,6 +46,9 @@ namespace librealsense
 
         // First Safety (D585S) FW that sends int32 physical-unit gyro in a 38-byte HID report.
         const firmware_version MIN_FW_PHYSICAL_UNITS_D585S( "8.58.40658.12556" );
+
+        // First FW that sends physical-unit IMU samples over USB on D500 devices other than D585S.
+        const firmware_version MIN_FW_PHYSICAL_UNITS_USB( "7.58.40672.12546" );
     }
 
     const std::map<fourcc::value_type, rs2_format> d500_motion_fourcc_to_rs2_format = {
@@ -64,11 +67,10 @@ namespace librealsense
 
     bool d500_motion::supports_physical_units() const
     {
-        static const firmware_version min_fw_supporting_physical_units( "7.58.40672.12546" );
         if( get_pid() == ds::D585S_PID )
             return _fw_version >= MIN_FW_PHYSICAL_UNITS_D585S;
         return _fw_version >= ( _is_mipi_device ? MIN_FW_INT32_IMU
-                                                : min_fw_supporting_physical_units );
+                                                : MIN_FW_PHYSICAL_UNITS_USB );
     }
 
     bool d500_motion::supports_accel_range() const
