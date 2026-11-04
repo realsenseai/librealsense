@@ -134,7 +134,7 @@ calibration_table run_tare_calibration(float ground_truth_mm, std::string json_c
 | `depth` | `0` | | D400 |
 | `resize factor` | `5` (a value given in an earlier OCC or tare call is kept) | | D400 |
 
-When `apply preset` is 1, the code switches the visual preset to High Accuracy for the calibration and restores the previous preset afterwards. On D500, if the previous preset was Custom, it saves and restores the advanced-mode controls *(changed in the next release)*. In v2.59.1, tare calibration on D500 with the Custom preset throws `Calibration with custom visual preset is not supported`.
+When `apply preset` is 1, the code switches the visual preset to High Accuracy for the calibration and restores the previous preset afterwards. On D500 devices other than DDS devices, tare calibration with the Custom preset throws `Calibration with custom visual preset is not supported`.
 
 ### Host-assisted calibration (D400)
 
@@ -235,6 +235,7 @@ Command-line options (from [common/cli.h](https://github.com/realsenseai/libreal
 | `--domain-id <0-232>` | Domain ID to use with DDS devices |
 | `-h`, `--help` | Show usage |
 | `--version` | Show version |
+| `--`, `--ignore_rest` | Ignore the rest of the labeled arguments after this flag |
 
 The DDS flags are ignored when the build has no DDS support. `--eth`, `--eth-only` and `--no-eth` are mutually exclusive, and so are `--domain-id` and `--no-eth`.
 
@@ -293,5 +294,5 @@ When librealsense opens the motion sensor, it reads the IMU calibration table fr
 See also [[Supported Devices]], [[D400 Series Visual Presets]] and [[Depth Quality Tool]].
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`65ed974`](https://github.com/realsenseai/librealsense/commit/65ed97469471f9d104969d2b7d029506058819bd)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
