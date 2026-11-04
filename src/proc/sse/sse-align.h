@@ -28,6 +28,8 @@ namespace librealsense
 
         void pre_compute_x_y_map_corners();
 
+        bool is_for_size(const rs2_intrinsics& depth) const { return _depth.width == depth.width && _depth.height == depth.height; }
+
     private:
 
         const rs2_intrinsics _depth;
