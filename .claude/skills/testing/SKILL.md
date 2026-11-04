@@ -231,7 +231,7 @@ The SDK no longer ships a bundled firmware blob, so `pytest-fw-update` **require
 python3 -m pytest pytest-fw-update.py --custom-fw-d400 /path/to/firmware.bin
 python3 -m pytest pytest-fw-update.py --custom-fw-d555 /path/to/firmware.bin
 python3 -m pytest pytest-fw-update.py --custom-fw-d585 /path/to/firmware.bin
-python3 -m pytest pytest-fw-update.py --custom-fw-d585s /path/to/rvp-xflash-dfu-sc11-release-x.y.z.w.img
+python3 -m pytest pytest-fw-update.py --custom-fw-d585s /path/to/firmware.bin
 ```
 
 `--custom-fw-d585` targets the non-safety D585 only (e.g. "D585 Prototype"). `--custom-fw-d585s` takes the
