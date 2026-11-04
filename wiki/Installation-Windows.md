@@ -15,7 +15,7 @@ This page is a short orientation for using the RealSense SDK 2.0 (librealsense) 
 - Metadata needs WinSDK 10.0.10586.0 or later. With an older SDK, [`src/mf/mf-uvc.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/mf/mf-uvc.cpp) prints `Librealsense notification: Featuring UVC Metadata requires WinSDK 10.0.10586.0 toolset.` at compile time and the library is built without metadata support.
 - `ENFORCE_METADATA` (default `OFF`, Windows only) turns that notification into a compile error, so a build without metadata support fails instead.
 - The registry keys are added by [`scripts/realsense_metadata_win10.ps1`](https://github.com/realsenseai/librealsense/blob/master/scripts/realsense_metadata_win10.ps1), run from an administrator PowerShell. It accepts `-op install` (the default), `install_all`, `remove` and `remove_all`.
-- The repository guide says installation in a virtual machine is not recommended or supported, and that Windows 7 is no longer maintained.
+- Installation in a virtual machine is not recommended or supported (according to doc/installation_windows.md), and Windows 7 is no longer maintained (according to doc/installation_win7.md).
 
 ## Full guide
 
