@@ -36,12 +36,11 @@ python3 install.py
 | `pydantic` | 2.12.5 |
 | `python-multipart` | 0.0.29 (used to parse the firmware file upload) |
 | `aiortc` | 1.15.0 (installed with `--only-binary=av`, so the prebuilt `av` wheel is used) |
+| `opencv-python` | 4.11.0.86 |
 | `numpy` | 2.2.4 on Python older than 3.11; 2.3.5 on Python 3.11 and later |
 | `python-socketio` | 5.13.0 |
 
 Every requirement carries the marker `platform_machine != "aarch64"`, so on aarch64 machines `pip` skips all of them and you must install the dependencies yourself.
-
-`opencv-python` was dropped from the requirements *(changed in the next release)*; in v2.59.1 `requirements.txt` also installed `opencv-python==4.11.0.86`.
 
 ### Using a locally built pyrealsense2
 
@@ -55,7 +54,6 @@ There are two ways to start it from `wrappers/rest-api`:
 
 ```bash
 python main.py                             # 127.0.0.1:8000, auto-reload, debug logging
-python main.py --host 0.0.0.0 --port 8080  # listen on all interfaces, other port
 ```
 
 ```bash
@@ -64,12 +62,10 @@ python main.py --host 0.0.0.0 --port 8080  # listen on all interfaces, other por
 
 | Launcher | Host | Port | Notes |
 |---|---|---|---|
-| `python main.py` | `--host`, default `127.0.0.1` | `--port`, default `8000` (1-65535) | Runs `uvicorn.run("main:combined_app", ..., reload=True, log_level="debug")`. When frozen with PyInstaller, reload is off and the log level is `info`. |
+| `python main.py` | `127.0.0.1` | `8000` | Runs `uvicorn.run("main:combined_app", ..., reload=True, log_level="debug")`. Host and port are fixed in the code; there are no command-line arguments. When frozen with PyInstaller, reload is off and the log level is `info`. |
 | [`start_server.sh`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/start_server.sh) | `0.0.0.0` | `8000` | Runs `uvicorn main:combined_app --host 0.0.0.0 --port 8000`. |
 
-The `--host` and `--port` arguments are *(new in the next release)*. In v2.59.1, `python main.py` always listened on `127.0.0.1:8000`.
-
-The default host `127.0.0.1` only accepts local clients. Use `--host 0.0.0.0` (or `start_server.sh`) to accept connections from other machines. The server has no authentication, so only do this on a trusted network.
+The host `127.0.0.1` used by `python main.py` only accepts local clients. Use `start_server.sh` (or run `uvicorn main:combined_app` with your own `--host` and `--port`) to accept connections from other machines. The server has no authentication, so only do this on a trusted network.
 
 Once it is running:
 
@@ -84,7 +80,7 @@ Settings are class attributes in [`config.py`](https://github.com/realsenseai/li
 | Setting | Default | Used for |
 |---|---|---|
 | `API_V1_STR` | `"/api/v1"` | Prefix of all REST routes and of the OpenAPI URL. |
-| `PROJECT_NAME` | `"RealSense REST API"` | FastAPI title and the `main.py` argument parser description. |
+| `PROJECT_NAME` | `"RealSense REST API"` | FastAPI title. |
 | `CORS_ORIGINS` | `["*"]` | Allowed origins for the CORS middleware. |
 | `STUN_SERVER` | `None` | If set, added as an ICE server for WebRTC sessions. |
 | `TURN_SERVER`, `TURN_USERNAME`, `TURN_PASSWORD` | `None` | If `TURN_SERVER` is set, added as an ICE server with these credentials. |
@@ -92,7 +88,7 @@ Settings are class attributes in [`config.py`](https://github.com/realsenseai/li
 
 ## Running the web viewer
 
-The viewer needs Node.js and npm. It takes the backend origin from [`src/api/backend.ts`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/src/api/backend.ts): the page origin in a browser, `http://localhost:8000` in the desktop app. It calls REST routes under `/api/v1` on that origin and connects Socket.IO on the path `/socket`.
+The viewer needs Node.js and npm. [`src/api/client.ts`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/src/api/client.ts) calls REST routes under the relative path `/api/v1` in a browser, and `http://localhost:8000/api/v1` in the desktop app. [`src/api/socket.ts`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/src/api/socket.ts) connects Socket.IO on the path `/socket`, to `http://localhost:8000` in Vite dev mode and to the page origin otherwise.
 
 ### Development server
 
@@ -109,11 +105,9 @@ Open `http://localhost:3000`. The Vite dev server ([`vite.config.ts`](https://gi
 ### Production build
 
 ```bash
-npm run build      # tsc && vite build --logLevel warn -> dist/
-npm run preview    # serve dist/ on port 4173, same proxy to localhost:8000
+npm run build      # tsc && vite build -> dist/
+npm run preview    # vite preview: serve dist/ locally
 ```
-
-The `preview` proxy *(new in the next release)* lets the production bundle reach the backend; dev mode React is slower than the production build.
 
 ### Serving the viewer from the API server
 
@@ -122,11 +116,17 @@ npm run build
 npm run bundle     # copies dist/ to wrappers/rest-api/static/
 ```
 
-[`scripts/bundle-for-prod.js`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/scripts/bundle-for-prod.js) replaces `wrappers/rest-api/static/` with the build output. When `static/index.html` exists, `main.py` serves that directory at the root, so the viewer and the API share one port: open `http://localhost:8000/`. Serving `static/` from `main.py` is *(new in the next release)*; in v2.59.1 the bundle script only printed instructions for mounting it yourself.
+[`scripts/bundle-for-prod.js`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/scripts/bundle-for-prod.js) replaces `wrappers/rest-api/static/` with the build output. `main.py` does not serve that directory by itself; the script prints the line to add to `main.py` so the viewer and the API share one port:
+
+```python
+from fastapi.staticfiles import StaticFiles
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
+```
 
 ### Viewer features
 
-The main screen ([`src/App.tsx`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/src/App.tsx)) has a device panel for selecting devices, streams and options, a stream view (video over WebRTC) and a 3D point cloud view. It also shows motion (gyro/accel) streams as charts and an orientation view *(changed in the next release)*, firmware update progress, server warnings from `/api/v1/health`, and an AI assistant panel. In v2.59.1, motion streams were shown as X/Y/Z values with bars.
+The main screen ([`src/App.tsx`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/src/App.tsx)) has a device panel for selecting devices, streams and options, a stream view (video over WebRTC) and a 3D point cloud view. It also shows motion (gyro/accel) streams as X/Y/Z values with bars, firmware update progress, server warnings from `/api/v1/health`, and an AI assistant panel.
 
 The assistant panel calls external services directly from the browser. Its default mode, "RealSense AI Assistant", uses a hosted RealSense AI service and needs no key. A second mode, "Device Config Chatbot", calls an LLM provider. It is enabled by Vite environment variables in a `.env` file (see [`.env.example`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/.env.example)), read in [`src/api/chat.ts`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/src/api/chat.ts) in this order:
 
@@ -163,7 +163,7 @@ curl -X POST http://localhost:8000/api/v1/devices/<serial>/stream/start \
 curl -X POST http://localhost:8000/api/v1/devices/<serial>/stream/stop
 ```
 
-Take `sensor_id`, `stream_type`, `format`, resolution and framerate values from the `GET .../sensors/` response for your device. The request body model is `StreamStart` in [`app/models/stream.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/app/models/stream.py) (`configs`, optional `align_to`, `apply_filters`).
+Take `sensor_id`, `stream_type`, `format`, resolution and framerate values from the `GET .../sensors/` response for your device. The request body model is `StreamStart` in [`app/models/stream.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/app/models/stream.py) (`configs`, optional `align_to`, `apply_filters`, `reuse_cache`).
 
 There are two ways to stream, and they cannot be used at the same time: the pipeline routes (`.../stream/start`) and the per-sensor routes (`.../sensors/{sensor_id}/start`). Stop all streams before switching between them.
 
@@ -191,17 +191,18 @@ All routes below are prefixed with `/api/v1`. They are listed in the order the r
 | POST | `/devices/{device_id}/firmware/update_from_file` | Flash a `.bin` image sent as multipart form field `file` (max 64 MiB). |
 | POST | `/devices/{device_id}/firmware/update_from_recommended` | Download the recommended firmware and flash it. |
 | POST | `/devices/{device_id}/hwm/` | Send a hardware monitor command (`opcode`, `param1`-`param4`, `data`); returns raw response bytes. |
-| POST | `/devices/{device_id}/point_cloud/activate/` | Turn on point cloud generation. |
-| POST | `/devices/{device_id}/point_cloud/deactivate/` | Turn off point cloud generation. |
+| POST | `/devices/{device_id}/point_cloud/activate` | Turn on point cloud generation. |
+| POST | `/devices/{device_id}/point_cloud/deactivate` | Turn off point cloud generation. |
 | GET | `/devices/{device_id}/point_cloud/status` | Point cloud status. |
 | GET | `/devices/{device_id}/sensors/` | List sensors, with supported stream profiles and options. |
 | GET | `/devices/{device_id}/sensors/{sensor_id}` | Details of one sensor. |
-| POST | `/devices/{device_id}/sensors/{sensor_id}/start` | Open and start one sensor with a list of `profiles` taken from its `supported_stream_profiles`. |
+| POST | `/devices/{device_id}/sensors/{sensor_id}/start` | Open and start one sensor with a single `config` or a list of `configs` (`stream_type`, `format`, `resolution`, `framerate`); returns the sensor stream status. |
 | POST | `/devices/{device_id}/sensors/{sensor_id}/stop` | Stop one sensor; other sensors keep streaming. |
+| GET | `/devices/{device_id}/sensors/{sensor_id}/status` | Streaming status of one sensor. |
 | GET | `/devices/{device_id}/sensors/{sensor_id}/options/` | List sensor options. |
 | GET | `/devices/{device_id}/sensors/{sensor_id}/options/{option_id}/` | Read one option. |
 | PUT | `/devices/{device_id}/sensors/{sensor_id}/options/{option_id}/` | Set one option (body `{"value": number}`). |
-| POST | `/devices/{device_id}/stream/start` | Start pipeline streaming (body `StreamStart`); returns the stream status. |
+| POST | `/devices/{device_id}/stream/start` | Start pipeline streaming (body `StreamStart`); returns the stream status with `timings`. |
 | POST | `/devices/{device_id}/stream/stop` | Stop pipeline streaming. |
 | GET | `/devices/{device_id}/stream/status` | Streaming status (`is_streaming`, `active_streams`, ...). |
 | GET | `/devices/{device_id}/stream/depth-at-pixel` | Depth in meters at query `x`, `y`. |
@@ -214,12 +215,7 @@ All routes below are prefixed with `/api/v1`. They are listed in the order the r
 | GET | `/webrtc/sessions/{session_id}/ice-candidates` | Server ICE candidates for the session. |
 | DELETE | `/webrtc/sessions/{session_id}` | Close the session. |
 
-Differences from v2.59.1 *(changed in the next release)*:
-
-- `.../sensors/{sensor_id}/start` takes `{"profiles": [...]}`. In v2.59.1 it took `config` or `configs` and returned a status object, and a `GET .../sensors/{sensor_id}/status` route existed; that route has been removed.
-- `supported_stream_profiles` in `GET .../sensors/` lists one entry per stream profile (`stream_type`, `stream_index`, `format`, `width`, `height`, `fps`, `default`). In v2.59.1 each entry grouped the `resolutions`, `fps` and `formats` lists of one stream type.
-- `.../stream/start` returns the stream status. In v2.59.1 it returned timing information and accepted a `reuse_cache` field.
-- The point cloud routes are `activate/` and `deactivate/` with a trailing slash. In v2.59.1 they had no trailing slash.
+Each entry of `supported_stream_profiles` in `GET .../sensors/` groups the `resolutions`, `fps` and `formats` lists of one `stream_type`.
 
 For firmware updates in general, see [[Firmware Update]]; for the filters, see [[Post Processing Filters]]; for advanced mode, see [[D400 Advanced Mode]].
 
@@ -271,5 +267,5 @@ The frontend suite needs `npm install` in `tools/react-viewer` first; otherwise 
 - [[Ethernet and DDS Cameras]] - cameras that connect over the network natively.
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`46cf1a6`](https://github.com/realsenseai/librealsense/commit/46cf1a67cc441ad9f55ce339a0de30f2a1c6fed0)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
