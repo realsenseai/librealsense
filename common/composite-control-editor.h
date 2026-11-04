@@ -96,6 +96,7 @@ namespace rs2
     public:
         T value{};
         bool initialized = false;
+        bool auto_refresh = false;   // re-read while idle to follow other clients; off where nobody else can change the value
         static constexpr double refresh_period = 1.0;   // seconds between idle re-reads
         double _last_read = 0.;
 
@@ -107,7 +108,7 @@ namespace rs2
                                  const std::function< void( const T & ) > & on_read = nullptr )
         {
             // While idle, re-read periodically to pick up changes made by other clients (e.g. ROS2 over DDS)
-            bool const refresh = initialized && ! is_dirty() && ImGui::GetTime() - _last_read >= refresh_period;
+            bool const refresh = auto_refresh && initialized && ! is_dirty() && ImGui::GetTime() - _last_read >= refresh_period;
             if( initialized && ! refresh )
                 return true;
             try
