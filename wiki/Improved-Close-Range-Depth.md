@@ -98,13 +98,11 @@ The control is registered by `hdrd_filter_feature` ([`hdrd-filter-feature.cpp`](
 | Devices (names from `rs500_sku_names`) | Minimum firmware |
 |---|---|
 | RealSense D555 | 7.58.45911.14188 |
-| RealSense D535 Dual RGB, RealSense D585 Dual RGB, RealSense D585 Proto Dual RGB | USB: 7.58.45911.14188; MIPI: 7.58.46315.15221 |
-| RealSense D535, RealSense D535F, RealSense D585, RealSense D585F, RealSense D585 Prototype | USB: 7.58.45911.14188; MIPI: 7.58.46315.15221 |
-| RealSense D585 (D585S without the safety function) | USB: 7.58.45911.14188; MIPI: 7.58.46315.15221 |
+| RealSense D535 Dual RGB, RealSense D585 Dual RGB, RealSense D585 Proto Dual RGB | 7.58.45911.14188 (USB only) |
+| RealSense D535, RealSense D535F, RealSense D585, RealSense D585F, RealSense D585 Prototype | 7.58.45911.14188 (USB only) |
+| RealSense D585 (D585S without the safety function) | 7.58.45911.14188 |
 
-RealSense D585S does not register the control. MIPI (GMSL) registration for the D535/D585 rows above is *(changed in the next release)*. At v2.59.1 the Dual RGB devices and the RealSense D535, D535F, D585, D585F and D585 Prototype registered it over USB only, while the RealSense D585 (D585S without the safety function) registered it on any connection from firmware 7.58.45911.14188.
-
-On MIPI, the firmware cannot report the control's range. The SDK returns a built-in table instead: min `{0, 0, 1, 0, 0, 0, 0}`, max `{1, 1, 2, 2, 256, 2, 65535}`, step 1, default `{0, 0, 1, 0, 126, 1, 0}`, in field order. On USB, the range comes from the firmware.
+RealSense D585S does not register the control. The Dual RGB devices and the RealSense D535, D535F, D585, D585F and D585 Prototype register it over USB only; they skip it on MIPI (GMSL) connections.
 
 A control can be registered and still fail on a given device or firmware. [`pytest-hdrd-control.py`](https://github.com/realsenseai/librealsense/blob/master/unit-tests/live/options/pytest-hdrd-control.py) treats a `RuntimeError` from the first read as "not functional". See also [[D500 Perception Features]] and [[Supported Devices]].
 
@@ -156,7 +154,7 @@ From [`rs_hdrd_control.h`](https://github.com/realsenseai/librealsense/blob/mast
 | `rs2_hdrd_control::downscale_ratio` | `int32_t` | Used when `filter_type` is Downscale: 1 = x2, 2 = x4 (0 is reserved) | 1 |
 | `rs2_hdrd_control::shift_mode` | `int32_t` | Used when `filter_type` is Lookup shift: 0 = 126 px, 1 = 64 px, 2 = Manual | 0 |
 | `rs2_hdrd_control::shift_pixels` | `int32_t` | Used when `shift_mode` is Manual: 0–256 | 126 |
-| `rs2_hdrd_control::threshold_mode` | `int32_t` | 0 = Zero range, 1 = MinZ range (computed by firmware), 2 = Manual | 1 *(changed in the next release)*; the v2.59.1 header documents 0 |
+| `rs2_hdrd_control::threshold_mode` | `int32_t` | 0 = Zero range, 1 = MinZ range (computed by firmware), 2 = Manual | 0 |
 | `rs2_hdrd_control::threshold_mm` | `int32_t` | Used when `threshold_mode` is Manual: 0–65535 | 0 |
 | `rs2_hdrd_control::reserved[1]` | `int32_t` | Must be zero on SET | — |
 | `rs2_hdrd_control_range` | struct | `min`, `max`, `step`, `def`, each an `rs2_hdrd_control`. Returned by `rs2_get_composite_option_range(RS2_COMPOSITE_OPTION_HDRD_CONTROL)`. Read-only | — |
@@ -172,5 +170,5 @@ Python names: `rs.hdrd_control` (fields `header`, `enable`, `filter_type`, `down
 - [[Code Samples]]
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`46cf1a6`](https://github.com/realsenseai/librealsense/commit/46cf1a67cc441ad9f55ce339a0de30f2a1c6fed0)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
