@@ -69,7 +69,7 @@ The OpenCV samples complement the core [SDK examples](https://github.com/realsen
 
 ### Converting frames to `cv::Mat`
 
-[`wrappers/opencv/cv-helpers.hpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/opencv/cv-helpers.hpp) has two helpers that the `grabcuts`, `dnn` and `latency-tool` samples use:
+[`wrappers/opencv/cv-helpers.hpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/opencv/cv-helpers.hpp) has two helpers that the `grabcuts`, `dnn` and `latency-tool` samples use (the OpenVINO samples include it too):
 
 - `frame_to_mat(const rs2::frame&)` wraps the frame buffer without copying for `RS2_FORMAT_BGR8` (`CV_8UC3`), `RS2_FORMAT_Z16` (`CV_16UC1`), `RS2_FORMAT_Y8` (`CV_8UC1`) and `RS2_FORMAT_DISPARITY32` (`CV_32FC1`). It converts `RS2_FORMAT_RGB8` into a new BGR matrix, and throws `std::runtime_error` for other formats.
 - `depth_frame_to_meters(const rs2::depth_frame&)` returns a `CV_64F` matrix of distances in meters (raw values multiplied by `get_units()`).
@@ -174,7 +174,7 @@ When you configure, [`check_vino_version.cmake`](https://github.com/realsenseai/
 
 [`dl_vino_model.cmake`](https://github.com/realsenseai/librealsense/blob/master/wrappers/openvino/dl_vino_model.cmake) downloads each model file into the sample's build folder, for example `build/wrappers/openvino/face`, and checks its SHA1. Each version family has its own set of files. Run the sample from the folder that contains the model files. When `BUILD_WITH_CPU_EXTENSIONS` (default `ON`) is off, the OpenVINO CMake script also turns off `ENABLE_AVX2` and `ENABLE_AVX512F`.
 
-In builds with `BUILD_SHARED_LIBS`, the samples no longer initialize their own EasyLogging++ storage on Linux; they use the storage that librealsense exports *(changed in the next release)*. In v2.59.1, both samples initialized it in every shared-library build.
+In builds with `BUILD_SHARED_LIBS`, both samples initialize their own EasyLogging++ storage (`INITIALIZE_EASYLOGGINGPP`); in static builds they use the one in librealsense.
 
 According to the [OpenVINO readme](https://github.com/realsenseai/librealsense/blob/master/wrappers/openvino/readme.md), the samples were tested with OpenVINO releases from 2019.3 to 2021.3. It also explains how to use the OpenCV that comes with OpenVINO (`-DOpenCV_DIR=<openvino-dir>/opencv/cmake`).
 
@@ -234,5 +234,5 @@ The model files are not in the repository. The README links to the TensorFlow Ob
 - [[Code Samples]], [[Post Processing Filters]], [[Projection in RealSense SDK 2.0]]
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`46cf1a6`](https://github.com/realsenseai/librealsense/commit/46cf1a67cc441ad9f55ce339a0de30f2a1c6fed0)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
