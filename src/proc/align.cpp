@@ -4,6 +4,7 @@
 #include <librealsense2/hpp/rs_sensor.hpp>
 #include <librealsense2/hpp/rs_processing.hpp>
 
+#include <utility>
 #include "core/video.h"
 #include "core/depth-frame.h"
 #include "proc/synthetic-stream.h"
@@ -180,11 +181,16 @@ namespace librealsense
         rs2::video_stream_profile& to_profile)
     {
         auto from_to = std::make_pair(original_profile.get()->profile, to_profile.get()->profile);
+        // Backends cache per-depth-profile state; drop it when depth switches profile (e.g. decimation toggled)
+        auto depth_side = (_to_stream_type == RS2_STREAM_DEPTH ? from_to.second : from_to.first);
         auto it = _align_stream_unique_ids.find(from_to);
         if (it != _align_stream_unique_ids.end())
         {
+            if (std::exchange(_depth_profile, depth_side) != depth_side)
+                reset_cache(original_profile.stream_type(), to_profile.stream_type());
             return it->second;
         }
+        _depth_profile = depth_side;
         auto aligned_profile = std::make_shared<rs2::video_stream_profile>(original_profile.clone(original_profile.stream_type(), original_profile.stream_index(), original_profile.format()));
         aligned_profile->get()->profile->set_framerate(original_profile.fps());
         if (auto original_video_profile = As<video_stream_profile_interface>(original_profile.get()->profile))

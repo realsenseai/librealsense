@@ -427,7 +427,7 @@ namespace librealsense
 
         auto z_pixels = reinterpret_cast<const uint16_t *>(depth.get_data());
 
-        if (!_neon_helper || !_neon_helper->is_for_size(z_intrin))
+        if (_neon_helper == nullptr)
         {
             _neon_helper = std::make_shared<align_neon_helper>(z_intrin, z_scale);
             _neon_helper->pre_compute_x_y_map_corners();
@@ -455,7 +455,7 @@ namespace librealsense
         auto z_pixels = reinterpret_cast<const uint16_t *>(depth.get_data());
         auto other_pixels = reinterpret_cast<const uint8_t *>(other.get_data());
 
-        if (!_neon_helper || !_neon_helper->is_for_size(z_intrin))
+        if (_neon_helper == nullptr)
         {
             _neon_helper = std::make_shared<align_neon_helper>(z_intrin, z_scale);
             _neon_helper->pre_compute_x_y_map_corners();

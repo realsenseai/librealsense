@@ -415,7 +415,7 @@ void align_sse::align_z_to_other(rs2::video_frame& aligned, const rs2::video_fra
 
     auto z_pixels = reinterpret_cast<const uint16_t*>(depth.get_data());
 
-    if (!_stream_transform || !_stream_transform->is_for_size(z_intrin))
+    if (_stream_transform == nullptr)
     {
         _stream_transform = std::make_shared<image_transform>(z_intrin, z_scale);
         _stream_transform->pre_compute_x_y_map_corners();
@@ -439,7 +439,7 @@ void align_sse::align_other_to_z(rs2::video_frame& aligned, const rs2::video_fra
     auto z_pixels = reinterpret_cast<const uint16_t*>(depth.get_data());
     auto other_pixels = reinterpret_cast<const uint8_t *>(other.get_data());
 
-    if (!_stream_transform || !_stream_transform->is_for_size(z_intrin))
+    if (_stream_transform == nullptr)
     {
         _stream_transform = std::make_shared<image_transform>(z_intrin, z_scale);
         _stream_transform->pre_compute_x_y_map_corners();
