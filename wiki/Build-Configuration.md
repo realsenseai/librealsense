@@ -77,5 +77,5 @@ On Linux and macOS, when `CMAKE_BUILD_TYPE` is not set, the build uses `Release`
 The table lists each option where `lrs_options.cmake` declares it; some options are declared only inside an `if(...)` block, shown in the Default column. Other files under [`CMake/`](https://github.com/realsenseai/librealsense/tree/master/CMake) can still adjust an option after it is declared, so check them when an option does not behave as listed.
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`0d4fcab`](https://github.com/realsenseai/librealsense/commit/0d4fcabf634650b821200ad38eedaa13aa4cb704)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
