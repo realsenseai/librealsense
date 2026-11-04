@@ -6,8 +6,11 @@ Argument: Jira ticket ID.
 
 1. READ: fetch the ticket via the Jira REST API (Bearer token, supplied by the user's own
    setup - never write the token into the repo). Summarize requirements and acceptance
-   criteria into `.review/<ticket>/design.md` with: goal, approach, files to touch,
-   rejected alternatives, test plan. Stop and show the design for approval.
+   criteria into a self-contained HTML page `.review/<ticket>/design.html` with: goal,
+   approach, files to touch, rejected alternatives, test plan. Add a flow diagram and/or
+   class diagram (Mermaid via cdnjs, pinned version) only where it clarifies the change;
+   omit diagrams entirely when they add nothing. Open it for the user, then stop and wait
+   for approval.
 2. IMPLEMENT: new branch off development (no username prefix). Follow the cpp-coding,
    add-api, file-creation and pytest-infra skills. Build and test per the build/testing
    skills. Commit with short messages.
