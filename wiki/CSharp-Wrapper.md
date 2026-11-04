@@ -114,7 +114,7 @@ All types are in the `Intel.RealSense` namespace, with base classes in `Intel.Re
 |---|---|
 | (root) | `Context` (`QueryDevices`, `Devices`, the `OnDevicesChanged` event, `AddDevice`/`RemoveDevice` for playback files, `ConvertBagToDb3`), `NativeMethods` (internal P/Invoke declarations) |
 | `Pipeline` | `Pipeline`, `Config` (`EnableStream`, `EnableAllStreams`, `EnableDevice`, `EnableDeviceFromFile`, `EnableRecordToFile`, ...), `PipelineProfile` |
-| `Devices` | `Device` (`Info`, `Sensors`, `FirstDepthSensor`, `FirstColorSensor`), `DeviceList`, `AdvancedDevice`, `SerializableDevice`, `CalibratedDevice`, `AutoCalibratedDevice`, `UpdatableDevice`, `UpdateDevice`, `DebugDevice`, `FirmwareLogsDevice`, `RecordDevice`, `PlaybackDevice`, `SoftwareDevice` |
+| `Devices` | `Device` (`Info`, `Sensors`, `FirstDepthSensor`, `FirstColorSensor`), `DeviceList`, `AdvancedDevice`, `SerializableDevice`, `CalibratedDevice`, `AutoCalibratedDevice`, `UpdatableDevice`, `UpdateDevice`, `DebugDevice`, `FirmwareLogsDevice`, `RecordDevice`, `PlaybackDevice`, `SoftwareDevice`, `ProxyDevice` |
 | `Sensors` | `Sensor` (`StreamProfiles`, `Open`, `Start`, `Stop`, `Close`, `DepthScale`, `ProcessingBlocks`, options), `SoftwareSensor`, `PoseSensor`, `MaxUsableRangeSensor` |
 | `StreamProfiles` | `StreamProfile`, `VideoStreamProfile`, `MotionStreamProfile`, `PoseStreamProfile` |
 | `Frames` | `Frame`, `VideoFrame`, `DepthFrame`, `DisparityFrame`, `MotionFrame`, `PoseFrame`, `Points`, `FrameSet`, `FrameQueue`, `FramesReleaser` |
@@ -134,5 +134,5 @@ Some patterns that recur in the API:
 The folder [`wrappers/csharp/Documentation`](https://github.com/realsenseai/librealsense/tree/master/wrappers/csharp/Documentation) also contains notes on the P/Invoke design ([`pinvoke.md`](https://github.com/realsenseai/librealsense/blob/master/wrappers/csharp/Documentation/pinvoke.md)).
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`46cf1a6`](https://github.com/realsenseai/librealsense/commit/46cf1a67cc441ad9f55ce339a0de30f2a1c6fed0)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
