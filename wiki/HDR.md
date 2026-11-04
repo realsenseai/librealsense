@@ -2,7 +2,7 @@ HDR (high dynamic range) on D400 cameras makes the depth sensor alternate betwee
 
 ## Which devices support it
 
-The HDR options are registered in [`src/ds/d400/d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-device.cpp) on the depth sensor of D400 devices when the firmware version is `5.12.8.100` or later. With older firmware the options are not registered, and `exposure`/`gain` stay plain sensor controls. The sequence frame metadata (`RS2_FRAME_METADATA_SEQUENCE_SIZE`, `RS2_FRAME_METADATA_SEQUENCE_ID`, `RS2_FRAME_METADATA_SEQUENCE_NAME`) is registered for D400 depth sensors under the same firmware condition. Check for support at runtime:
+The HDR options are registered in [`src/ds/d400/d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-device.cpp) on the depth sensor of D400 devices when the firmware version is `5.12.8.100` or later. With older firmware the options are not registered, and `exposure`/`gain` stay plain sensor controls. The sequence frame metadata (`RS2_FRAME_METADATA_SEQUENCE_SIZE`, `RS2_FRAME_METADATA_SEQUENCE_ID`, `RS2_FRAME_METADATA_SEQUENCE_NAME`) is registered for D400 depth sensors under the same firmware condition. Check for support at runtime:
 
 ```cpp
 rs2::depth_sensor depth_sensor = device.first< rs2::depth_sensor >();
@@ -10,13 +10,13 @@ if( ! depth_sensor.supports( RS2_OPTION_SEQUENCE_SIZE ) )
     std::cout << "HDR options are not available on this device/firmware\n";
 ```
 
-The [rs-hdr example](https://github.com/realsenseai/librealsense/blob/development/examples/hdr/rs-hdr.cpp) uses the same test. It looks for a device whose `RS2_CAMERA_INFO_PRODUCT_LINE` is `D400`. If the device does not support `RS2_OPTION_SEQUENCE_SIZE`, it prints `Firmware and/or SDK versions must be updated for the HDR feature to be supported.`
+The [rs-hdr example](https://github.com/realsenseai/librealsense/blob/master/examples/hdr/rs-hdr.cpp) uses the same test. It looks for a device whose `RS2_CAMERA_INFO_PRODUCT_LINE` is `D400`. If the device does not support `RS2_OPTION_SEQUENCE_SIZE`, it prints `Firmware and/or SDK versions must be updated for the HDR feature to be supported.`
 
 The D500 series has a different feature, HDRD, which is a depth filter configured through an embedded filter. It is not covered on this page. See [[D500 Perception Features]].
 
 ## Configure and enable HDR
 
-All HDR options live on the depth sensor. A configuration is a short sequence of frames, and each frame has its own exposure and gain. The steps below follow [`examples/hdr/rs-hdr.cpp`](https://github.com/realsenseai/librealsense/blob/development/examples/hdr/rs-hdr.cpp):
+All HDR options live on the depth sensor. A configuration is a short sequence of frames, and each frame has its own exposure and gain. The steps below follow [`examples/hdr/rs-hdr.cpp`](https://github.com/realsenseai/librealsense/blob/master/examples/hdr/rs-hdr.cpp):
 
 ```cpp
 rs2::depth_sensor depth_sensor = device.query_sensors().front();
@@ -41,7 +41,7 @@ depth_sensor.set_option(RS2_OPTION_GAIN, 16);
 depth_sensor.set_option(RS2_OPTION_HDR_ENABLED, 1);
 ```
 
-How this works in [`src/hdr-config.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/hdr-config.cpp) and [`src/ds/ds-options.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/ds-options.cpp):
+How this works in [`src/hdr-config.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/hdr-config.cpp) and [`src/ds/ds-options.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-options.cpp):
 
 - **Exposure and gain are routed by `RS2_OPTION_SEQUENCE_ID`.** If the sequence ID is `1` or `2`, setting or querying `RS2_OPTION_EXPOSURE` and `RS2_OPTION_GAIN` reads or writes that slot of the HDR configuration. Their range is the same as the depth sensor's normal exposure and gain range. If the sequence ID is `0` (described as `UVC`), the calls go to the normal sensor controls.
 - **Default slots.** If the device has no active HDR configuration, slot 1 gets exposure = default exposure minus 1000 and gain = default gain. Slot 2 gets the minimum exposure and the minimum gain. If HDR is already active in the device, the SDK reads the active exposure and gain values back from it.
@@ -51,7 +51,7 @@ How this works in [`src/hdr-config.cpp`](https://github.com/realsenseai/libreals
 
 ### Auto-exposure and HDR
 
-While HDR is enabled, auto-exposure cannot be turned on. On HDR-capable firmware, `RS2_OPTION_ENABLE_AUTO_EXPOSURE` is registered as a gated option ([`src/option.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/option.cpp)). While HDR is enabled, setting it does not throw. The SDK ignores the request and logs the warning `Auto Exposure cannot be set while HDR is enabled`. The example turns auto-exposure off itself before it sends the HDR configuration.
+While HDR is enabled, auto-exposure cannot be turned on. On HDR-capable firmware, `RS2_OPTION_ENABLE_AUTO_EXPOSURE` is registered as a gated option ([`src/option.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/option.cpp)). While HDR is enabled, setting it does not throw. The SDK ignores the request and logs the warning `Auto Exposure cannot be set while HDR is enabled`. The example turns auto-exposure off itself before it sends the HDR configuration.
 
 ### Changing exposure or gain while HDR is running
 
@@ -70,7 +70,7 @@ While HDR is enabled, auto-exposure cannot be turned on. On HDR-capable firmware
 
 ## Merge the frames with hdr_merge
 
-When HDR is on, every depth frame carries its sequence position in its metadata. `rs2::hdr_merge` ([`include/librealsense2/hpp/rs_processing.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_processing.hpp), [`src/proc/hdr-merge.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/proc/hdr-merge.cpp)) works on framesets:
+When HDR is on, every depth frame carries its sequence position in its metadata. `rs2::hdr_merge` ([`include/librealsense2/hpp/rs_processing.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_processing.hpp), [`src/proc/hdr-merge.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/proc/hdr-merge.cpp)) works on framesets:
 
 ```cpp
 rs2::config cfg;
@@ -107,7 +107,7 @@ The example notes that merging works with depth alone, but the result is better 
 
 ## Show one sequence item with sequence_id_filter
 
-To see the raw frames of a single exposure setting, use `rs2::sequence_id_filter` ([`src/proc/sequence-id-filter.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/proc/sequence-id-filter.cpp)). It works on single frames, not framesets, and only on frames that have sequence metadata with a non-zero sequence size. It has one option, `RS2_OPTION_SEQUENCE_ID`: `0` means all frames, `1` or `2` selects that sequence item, and the default is `1`.
+To see the raw frames of a single exposure setting, use `rs2::sequence_id_filter` ([`src/proc/sequence-id-filter.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/proc/sequence-id-filter.cpp)). It works on single frames, not framesets, and only on frames that have sequence metadata with a non-zero sequence size. It has one option, `RS2_OPTION_SEQUENCE_ID`: `0` means all frames, `1` or `2` selects that sequence item, and the default is `1`.
 
 ```cpp
 rs2::sequence_id_filter seq_filter(1);          // keep only sequence item 1
@@ -116,11 +116,11 @@ rs2::frame filtered = seq_filter.process(depth_frame);
 
 If a frame of the other sequence item arrives, the filter returns the last stored frame of the selected item from the same stream. If there is none yet, it returns the input frame. Note that the frame metadata `RS2_FRAME_METADATA_SEQUENCE_ID` starts at 0, while this filter's option counts items from 1.
 
-`hdr_merge` and `sequence_id_filter` are both in the recommended processing blocks of D400 and D500 depth sensors (`get_ds_depth_recommended_proccesing_blocks()` in [`src/ds/ds-device-common.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/ds-device-common.cpp)). The Python wrapper exposes them as `rs.hdr_merge` and `rs.sequence_id_filter` ([`wrappers/python/pyrs_processing.cpp`](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/pyrs_processing.cpp)). See [[Post Processing Filters]] for the other blocks.
+`hdr_merge` and `sequence_id_filter` are both in the recommended processing blocks of D400 and D500 depth sensors (`get_ds_depth_recommended_proccesing_blocks()` in [`src/ds/ds-device-common.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-device-common.cpp)). The Python wrapper exposes them as `rs.hdr_merge` and `rs.sequence_id_filter` ([`wrappers/python/pyrs_processing.cpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/pyrs_processing.cpp)). See [[Post Processing Filters]] for the other blocks.
 
 ## HDR in the RealSense Viewer
 
-The Viewer ([[Realsense Viewer Manual]]) builds its post-processing list from the sensor's recommended filters ([`common/subdevice-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/subdevice-model.cpp)):
+The Viewer ([[Realsense Viewer Manual]]) builds its post-processing list from the sensor's recommended filters ([`common/subdevice-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/subdevice-model.cpp)):
 
 - **HDR Merge.** The block is added only if the sensor supports `RS2_OPTION_SEQUENCE_ID`.
 - **Filter By Sequence id.** The block is added but starts disabled.
@@ -129,12 +129,12 @@ The HDR options themselves appear among the depth sensor's controls, like other 
 
 ### HDR Config window
 
-Some devices also get an **HDR Config** button next to the HDR enable control ([`common/option-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/option-model.cpp)). The button is drawn only when all of these hold:
+Some devices also get an **HDR Config** button next to the HDR enable control ([`common/option-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/option-model.cpp)). The button is drawn only when all of these hold:
 
 - the device name contains `D45`
 - the device supports advanced mode, and advanced mode is enabled ([[D400 Advanced Mode]])
 
-The button opens the **HDR Configuration** window ([`common/hdr-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/hdr-model.cpp)). The window edits an `hdr-preset` section of the device JSON configuration, which it reads with `serialize_json()` and writes with `load_json()`. It offers:
+The button opens the **HDR Configuration** window ([`common/hdr-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/hdr-model.cpp)). The window edits an `hdr-preset` section of the device JSON configuration, which it reads with `serialize_json()` and writes with `load_json()`. It offers:
 
 - **Preset ID** and a list of **Preset Items**, added and removed with `+` and `-`. Each item has an **Iterations** count and its gain and exposure.
 - **Auto HDR**. With it on, each item's gain and exposure are deltas applied to the auto-exposure values. With it off, they are absolute values.
@@ -146,7 +146,7 @@ The default preset has two items. Manual gain/exposure values are 16/1 and 16/32
 
 ### Options
 
-The HDR options in `rs2_option` order ([`include/librealsense2/h/rs_option.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_option.h)). Ranges and defaults are those registered by the D400 depth sensor.
+The HDR options in `rs2_option` order ([`include/librealsense2/h/rs_option.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_option.h)). Ranges and defaults are those registered by the D400 depth sensor.
 
 <!-- wikigen:table-options -->
 | Option | Meaning | Range | Default |
@@ -161,7 +161,7 @@ The sequence name option reports range default 1, but the configuration itself s
 
 ### Frame metadata
 
-These are the sequence metadata fields ([`include/librealsense2/h/rs_frame.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_frame.h)). For more on metadata, see [[Frame Metadata]].
+These are the sequence metadata fields ([`include/librealsense2/h/rs_frame.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_frame.h)). For more on metadata, see [[Frame Metadata]].
 
 <!-- wikigen:table-metadata -->
 | Metadata | Meaning |
@@ -173,9 +173,9 @@ These are the sequence metadata fields ([`include/librealsense2/h/rs_frame.h`](h
 
 ### Source and examples
 
-- [`examples/hdr`](https://github.com/realsenseai/librealsense/tree/development/examples/hdr): the `rs-hdr` example. It shows the input frames and the merged frame side by side and has sliders for exposure and gain. See also [[Code Samples]].
-- [`src/hdr-config.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/hdr-config.cpp), [`src/hdr-config.h`](https://github.com/realsenseai/librealsense/blob/development/src/hdr-config.h): the HDR configuration.
-- [`src/proc/hdr-merge.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/proc/hdr-merge.cpp), [`src/proc/sequence-id-filter.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/proc/sequence-id-filter.cpp): the processing blocks.
+- [`examples/hdr`](https://github.com/realsenseai/librealsense/tree/master/examples/hdr): the `rs-hdr` example. It shows the input frames and the merged frame side by side and has sliders for exposure and gain. See also [[Code Samples]].
+- [`src/hdr-config.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/hdr-config.cpp), [`src/hdr-config.h`](https://github.com/realsenseai/librealsense/blob/master/src/hdr-config.h): the HDR configuration.
+- [`src/proc/hdr-merge.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/proc/hdr-merge.cpp), [`src/proc/sequence-id-filter.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/proc/sequence-id-filter.cpp): the processing blocks.
 
 <!-- wikigen:footer -->
 _Maintained from librealsense `development`; last checked at commit [`bc496cd`](https://github.com/realsenseai/librealsense/commit/bc496cdb16beca36c41d2b96170e309fceb38d6e)._

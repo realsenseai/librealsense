@@ -15,7 +15,7 @@
 * [Get Frame Timestamp and Metadata](#get-frame-timestamp-and-metadata)
 * [Align Depth to Color](#align-depth-to-color)
 
-All snippets below use the librealsense2 C++ API (`#include <librealsense2/rs.hpp>`). Fuller versions of some of them (getting a device, depth units, field of view, extrinsics, changing sensor options) live in [examples/sensor-control/api_how_to.h](https://github.com/realsenseai/librealsense/blob/development/examples/sensor-control/api_how_to.h).
+All snippets below use the librealsense2 C++ API (`#include <librealsense2/rs.hpp>`). Fuller versions of some of them (getting a device, depth units, field of view, extrinsics, changing sensor options) live in [examples/sensor-control/api_how_to.h](https://github.com/realsenseai/librealsense/blob/master/examples/sensor-control/api_how_to.h).
 
 ### Get first RealSense device
 ```cpp
@@ -196,7 +196,7 @@ if (frame.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE))
     auto exposure = frame.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE);
 }
 ```
-See [Frame Metadata](https://github.com/realsenseai/librealsense/blob/development/doc/frame_metadata.md) for the list of attributes and platform requirements.
+See [Frame Metadata](https://github.com/realsenseai/librealsense/blob/master/doc/frame_metadata.md) for the list of attributes and platform requirements.
 
 ### Align Depth to Color
 ```cpp
@@ -211,7 +211,7 @@ while (true)
     rs2::video_frame color = aligned.get_color_frame();
 }
 ```
-See [Projection in RealSense SDK 2.0](https://github.com/realsenseai/librealsense/wiki/Projection-in-RealSense-SDK-2.0#frame-alignment) and [examples/align](https://github.com/realsenseai/librealsense/tree/development/examples/align).
+See [Projection in RealSense SDK 2.0](https://github.com/realsenseai/librealsense/wiki/Projection-in-RealSense-SDK-2.0#frame-alignment) and [examples/align](https://github.com/realsenseai/librealsense/tree/master/examples/align).
 
 <!-- wikigen:footer -->
 _Maintained from librealsense `development`; last checked at commit [`46cf1a6`](https://github.com/realsenseai/librealsense/commit/46cf1a67cc441ad9f55ce339a0de30f2a1c6fed0)._

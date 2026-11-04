@@ -7,7 +7,7 @@ RealSense depth cameras run firmware that can be replaced from the host. libreal
 - On Linux, the udev rules must be installed (`./scripts/setup_udev_rules.sh` when building from source). See [[Installation Linux]].
 - Do not disconnect the camera while an update is running.
 
-Which devices can be updated is decided by the device classes in the library: D400 and D500 devices implement the update interface ([`src/ds/d400/d400-device.h`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-device.h), [`src/ds/d500/d500-device.h`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-device.h)), and so do Ethernet (DDS) devices ([`src/dds/rs-dds-device-proxy.h`](https://github.com/realsenseai/librealsense/blob/development/src/dds/rs-dds-device-proxy.h)). Recovery-mode devices of the D400 and D500 product lines, over USB and over GMSL (MIPI), are handled by [`src/fw-update/fw-update-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/fw-update/fw-update-factory.cpp). See [[Supported Devices]] for the camera list.
+Which devices can be updated is decided by the device classes in the library: D400 and D500 devices implement the update interface ([`src/ds/d400/d400-device.h`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-device.h), [`src/ds/d500/d500-device.h`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-device.h)), and so do Ethernet (DDS) devices ([`src/dds/rs-dds-device-proxy.h`](https://github.com/realsenseai/librealsense/blob/master/src/dds/rs-dds-device-proxy.h)). Recovery-mode devices of the D400 and D500 product lines, over USB and over GMSL (MIPI), are handled by [`src/fw-update/fw-update-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/fw-update/fw-update-factory.cpp). See [[Supported Devices]] for the camera list.
 
 ## Update firmware with the RealSense Viewer
 
@@ -16,7 +16,7 @@ Which devices can be updated is decided by the device classes in the library: D4
 3. Pick the image in the `Signed Firmware Image` file dialog (`*.bin` or `*.img`).
 4. A `Firmware Update` window shows the progress and a log. Wait until it reports `FW update process completed successfully`, then press **OK**.
 
-What the Viewer does for a signed image on a USB device ([`common/fw-update-helper.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/fw-update-helper.cpp)):
+What the Viewer does for a signed image on a USB device ([`common/fw-update-helper.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/fw-update-helper.cpp)):
 
 1. Checks that the image is compatible with the device. If not, it fails with `The firmware version is not compatible with <device name>`.
 2. Tries to back up the camera flash (see [Flash backup](#flash-backup)).
@@ -33,11 +33,11 @@ and restart the realsense-viewer
 
 ### Unsigned firmware in the Viewer
 
-**Update Unsigned Firmware...** appears in the same menu only when the device is updatable, reports `RS2_CAMERA_INFO_CAMERA_LOCKED` with a value other than `YES` (a device that does not report it is treated as locked), and has product line `D400` ([`common/device-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/device-model.cpp)). It opens an `Unsigned Firmware Image` file dialog and writes the image straight to flash. See [Signed and unsigned images](#signed-and-unsigned-images).
+**Update Unsigned Firmware...** appears in the same menu only when the device is updatable, reports `RS2_CAMERA_INFO_CAMERA_LOCKED` with a value other than `YES` (a device that does not report it is treated as locked), and has product line `D400` ([`common/device-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/device-model.cpp)). It opens an `Unsigned Firmware Image` file dialog and writes the image straight to flash. See [Signed and unsigned images](#signed-and-unsigned-images).
 
 ## Update firmware with rs-fw-update
 
-`rs-fw-update` is built with the other tools when `BUILD_TOOLS` is ON (the default) and is installed to the binary directory. Source: [`tools/fw-update/rs-fw-update.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/fw-update/rs-fw-update.cpp). See also [[Command Line Tools]].
+`rs-fw-update` is built with the other tools when `BUILD_TOOLS` is ON (the default) and is installed to the binary directory. Source: [`tools/fw-update/rs-fw-update.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/fw-update/rs-fw-update.cpp). See also [[Command Line Tools]].
 
 ### List the connected devices
 
@@ -84,7 +84,7 @@ Warning! the camera is connected via USB 2 port, in case the process fails, conn
 
 ### Command-line flags
 
-The tool uses the shared parser in [`common/cli.h`](https://github.com/realsenseai/librealsense/blob/development/common/cli.h) (`rs2::cli`), so it also takes the shared DDS flags and the parser's own `--`, `--version` and `-h`/`--help`.
+The tool uses the shared parser in [`common/cli.h`](https://github.com/realsenseai/librealsense/blob/master/common/cli.h) (`rs2::cli`), so it also takes the shared DDS flags and the parser's own `--`, `--version` and `-h`/`--help`.
 
 <!-- wikigen:table-rs-fw-update-flags -->
 | Flag | Value | Description |
@@ -142,7 +142,7 @@ In the Viewer, a recovery device shows the same **Update Firmware** menu item; t
 
 ## Signed and unsigned images
 
-**Signed images** are the official firmware releases. They go through the DFU (device firmware upgrade) path: the device switches to an update device, the library checks that the image is compatible, then streams it to the device ([`src/fw-update/fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/fw-update/fw-update-device.cpp)). If a device is locked to a minimum version, the library reports `Device: <serial> is locked for update.` followed by `Use firmware version higher than: <version>`.
+**Signed images** are the official firmware releases. They go through the DFU (device firmware upgrade) path: the device switches to an update device, the library checks that the image is compatible, then streams it to the device ([`src/fw-update/fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/fw-update/fw-update-device.cpp)). If a device is locked to a minimum version, the library reports `Device: <serial> is locked for update.` followed by `Use firmware version higher than: <version>`.
 
 **Unsigned images** are written directly to the camera flash, bypassing DFU. This works only on unlocked cameras:
 
@@ -150,22 +150,22 @@ In the Viewer, a recovery device shows the same **Update Firmware** menu item; t
 - An image of the wrong size fails with `Unsupported firmware binary image (unsigned) provided - <n> bytes`.
 - D500 devices do not support it: `D500 device does not support unsigned FW update`.
 
-These messages come from [`src/ds/ds-device-common.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/ds-device-common.cpp) and [`src/ds/d500/d500-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-device.cpp). `rs-fw-update -u` does not run the compatibility check before writing.
+These messages come from [`src/ds/ds-device-common.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-device-common.cpp) and [`src/ds/d500/d500-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-device.cpp). `rs-fw-update -u` does not run the compatibility check before writing.
 
 The API's unsigned call takes an `update_mode`: `RS2_UNSIGNED_UPDATE_MODE_UPDATE` (0, the default), `RS2_UNSIGNED_UPDATE_MODE_READ_ONLY` (1) or `RS2_UNSIGNED_UPDATE_MODE_FULL` (2). The header warns that any mode other than `RS2_UNSIGNED_UPDATE_MODE_UPDATE` is unsafe and might damage the camera. The Viewer and `rs-fw-update` always use the default.
 
 ## Flash backup
 
-A flash backup is a copy of the camera flash. It is not a valid firmware image and cannot be loaded back to the device, but it contains the calibration and device information (`rs2::updatable::create_flash_backup` in [`include/librealsense2/hpp/rs_device.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_device.hpp)).
+A flash backup is a copy of the camera flash. It is not a valid firmware image and cannot be loaded back to the device, but it contains the calibration and device information (`rs2::updatable::create_flash_backup` in [`include/librealsense2/hpp/rs_device.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_device.hpp)).
 
 - **rs-fw-update:** `-b <path>` writes the backup to `<path>` and, when the output is a terminal, prints `Flash backup progress: <n>[%]`. If the device returns no data it prints `Backup flash is not supported`; if the file cannot be written, `Creating backup file failed`.
 - **Viewer:** before a signed or unsigned update of a non-GMSL device, the Viewer tries a backup automatically and saves it as `<update id>.<timestamp>.bin` in the application data folder: the roaming AppData folder on Windows, and the home directory as a hidden file (`~/.<update id>.<timestamp>.bin`) on Linux and macOS. The log shows `Backup completed and saved as '<path>'`, or `Backup flash is not supported`. If the backup fails the Viewer logs `WARNING: backup failed; continuing without it...` and continues.
 
-D500 devices return an empty backup ([`src/ds/d500/d500-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-device.cpp)), so for them both tools report that backup is not supported.
+D500 devices return an empty backup ([`src/ds/d500/d500-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-device.cpp)), so for them both tools report that backup is not supported.
 
 ## Update firmware from your own code
 
-The public API is in [`include/librealsense2/h/rs_device.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_device.h) (C) and [`include/librealsense2/hpp/rs_device.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_device.hpp) (C++).
+The public API is in [`include/librealsense2/h/rs_device.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_device.h) (C) and [`include/librealsense2/hpp/rs_device.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_device.hpp) (C++).
 
 | C++ | C | What it does |
 |---|---|---|
@@ -229,13 +229,13 @@ catch (const rs2::error& e)
 }
 ```
 
-For the full flow, including recovery devices, GMSL devices, several cameras and device-change callbacks, read [`tools/fw-update/rs-fw-update.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/fw-update/rs-fw-update.cpp). The Python wrapper exposes the same classes: `updatable` (`enter_update_state`, `create_flash_backup`, `update_unsigned`, `check_firmware_compatibility`), `update_device` (`update`) and `device.is_in_recovery_mode` ([`wrappers/python/pyrs_device.cpp`](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/pyrs_device.cpp)). See [[Python Wrapper]].
+For the full flow, including recovery devices, GMSL devices, several cameras and device-change callbacks, read [`tools/fw-update/rs-fw-update.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/fw-update/rs-fw-update.cpp). The Python wrapper exposes the same classes: `updatable` (`enter_update_state`, `create_flash_backup`, `update_unsigned`, `check_firmware_compatibility`), `update_device` (`update`) and `device.is_in_recovery_mode` ([`wrappers/python/pyrs_device.cpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/pyrs_device.cpp)). See [[Python Wrapper]].
 
 ## SW/FW update notifications in the Viewer
 
-The Viewer can tell you that newer software or firmware is available ([`common/device-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/device-model.cpp), [`common/updates-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/updates-model.cpp), [`common/sw-update/`](https://github.com/realsenseai/librealsense/tree/development/common/sw-update)).
+The Viewer can tell you that newer software or firmware is available ([`common/device-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/device-model.cpp), [`common/updates-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/updates-model.cpp), [`common/sw-update/`](https://github.com/realsenseai/librealsense/tree/master/common/sw-update)).
 
-- **Build option:** the feature is compiled in only with `CHECK_FOR_UPDATES`, which is ON by default except on macOS, and is turned off for Android builds and when `BUILD_GRAPHICAL_EXAMPLES` is OFF ([`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake), [`CMake/global_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/global_config.cmake)). See [[Build Configuration]].
+- **Build option:** the feature is compiled in only with `CHECK_FOR_UPDATES`, which is ON by default except on macOS, and is turned off for Android builds and when `BUILD_GRAPHICAL_EXAMPLES` is OFF ([`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake), [`CMake/global_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/global_config.cmake)). See [[Build Configuration]].
 - **Triggers:** automatically when a device is added to the Viewer (not for playback devices), and manually with **Check For Updates** in the device's More menu.
 - **Versions database:** the Viewer downloads a versions database and compares the device's software and firmware versions with it. The server is set in **Settings > Online Services > SW/FW Updates From Server**: **Official Server** or **Custom Server**. A custom URL that starts with `file://` is read as a local file.
 - **Recommended firmware:** the Viewer downloads the recommended image (up to 3 tries) and shows a `Firmware Update Recommended!` notification with the current and recommended versions and an **Install** button. Install stops any streaming on the device and runs the same signed update as **Update Firmware**. If the download fails, the Viewer logs `Error in downloading FW binary file: <link>`.
@@ -247,13 +247,13 @@ Update notifications can be dismissed or postponed. A postponed notification is 
 
 The repository's diagram of this flow:
 
-![SW/FW updates flow](https://raw.githubusercontent.com/realsenseai/librealsense/development/doc/img/updates/updates.png)
+![SW/FW updates flow](https://raw.githubusercontent.com/realsenseai/librealsense/master/doc/img/updates/updates.png)
 
 ## Troubleshooting
 
 | Message | Printed by | What to do |
 |---|---|---|
-| `Several devices are connected, serial number must be selected using -s <serial_number>` | `rs-fw-update` ([`rs-fw-update.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/fw-update/rs-fw-update.cpp)) | Add `-s`, or disconnect the other cameras. |
+| `Several devices are connected, serial number must be selected using -s <serial_number>` | `rs-fw-update` ([`rs-fw-update.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/fw-update/rs-fw-update.cpp)) | Add `-s`, or disconnect the other cameras. |
 | `Couldn't find the requested serial number` | `rs-fw-update` | Check the serial number with `-l`. |
 | `No devices were found` | `rs-fw-update` | Check the connection, cable and (on Linux) udev rules. |
 | `Device is in recovery mode, use -r to recover` | `rs-fw-update` | Run again with `-r -f <image>`. |
@@ -263,11 +263,11 @@ The repository's diagram of this flow:
 | `Failed to recover device` | `rs-fw-update` (with `-r`) | Run again with `--debug` to see the library error. |
 | `Failed to read firmware file` / `Error reading firmware file` | `rs-fw-update` | Check the path given with `-f`. |
 | `This firmware version is not compatible with <device name>` | `rs-fw-update` | Use an image made for this camera. |
-| `The firmware version is not compatible with <device name>` | Viewer ([`fw-update-helper.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/fw-update-helper.cpp)) | Use an image made for this camera. |
+| `The firmware version is not compatible with <device name>` | Viewer ([`fw-update-helper.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/fw-update-helper.cpp)) | Use an image made for this camera. |
 | `Recovery device did not connect in time!` | Viewer | The device did not show up as an update device within 60 seconds. Reconnect it and try again. |
 | `Original device did not reconnect in time!` | Viewer | The camera did not return within 60 seconds after the write. Reconnect it; if it comes up in recovery mode, update it again. |
 | `Unknown error during update.` / `Please reconnect the camera to exit recovery mode` | Viewer | Reconnect the camera and retry. |
-| `Device: <serial> failed to update firmware` / `Image is unsupported for this device or corrupted` | librealsense ([`fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/fw-update/fw-update-device.cpp)) | Use an image made for this camera; download it again if it may be damaged. |
+| `Device: <serial> failed to update firmware` / `Image is unsupported for this device or corrupted` | librealsense ([`fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/fw-update/fw-update-device.cpp)) | Use an image made for this camera; download it again if it may be damaged. |
 | `Device: <serial> failed to download firmware` / `Please verify that no other librealsense application is running` | librealsense | Close other applications that use the camera and retry. |
 | `Device: <serial> is locked for update.` / `Use firmware version higher than: <version>` | librealsense | Use a firmware version above the one shown. |
 | `Permission Denied!` / `This is often an indication of outdated or missing udev-rules.` | librealsense (Linux) | Install the udev rules: `sudo apt-get install librealsense2-dkms` for the Debian package, or `./scripts/setup_udev_rules.sh` when building from source. |

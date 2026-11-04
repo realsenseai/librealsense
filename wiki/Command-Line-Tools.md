@@ -1,10 +1,10 @@
-librealsense ships a set of small console tools next to the RealSense Viewer: they list connected cameras, record and convert recordings, collect frame statistics, read firmware logs, send raw commands to the firmware and benchmark the processing blocks. This page is for developers and support engineers who want to script these tasks or debug a camera without a GUI. It lists every tool in [`tools/`](https://github.com/realsenseai/librealsense/tree/development/tools) and how it is built, and for each tool covered here it gives every command-line flag its parser accepts.
+librealsense ships a set of small console tools next to the RealSense Viewer: they list connected cameras, record and convert recordings, collect frame statistics, read firmware logs, send raw commands to the firmware and benchmark the processing blocks. This page is for developers and support engineers who want to script these tasks or debug a camera without a GUI. It lists every tool in [`tools/`](https://github.com/realsenseai/librealsense/tree/master/tools) and how it is built, and for each tool covered here it gives every command-line flag its parser accepts.
 
 The graphical tools have their own pages: [[Realsense Viewer Manual]], [[Depth Quality Tool]] and [[Firmware Update]] (`rs-fw-update`). DDS tools for network cameras are covered in [[Ethernet and DDS Cameras]].
 
 ## Which tools are built
 
-The tool list is decided in [`tools/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/tools/CMakeLists.txt), using options from [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake) (see [[Build Configuration]]):
+The tool list is decided in [`tools/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/tools/CMakeLists.txt), using options from [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake) (see [[Build Configuration]]):
 
 | Executable | Source folder | Built when | Default build |
 |---|---|---|---|
@@ -28,7 +28,7 @@ The tool list is decided in [`tools/CMakeLists.txt`](https://github.com/realsens
 
 ## Common command-line behaviour
 
-Most tools parse their arguments with `rs2::cli` from [`common/cli.h`](https://github.com/realsenseai/librealsense/blob/development/common/cli.h), a wrapper around TCLAP. The tools use it at three levels:
+Most tools parse their arguments with `rs2::cli` from [`common/cli.h`](https://github.com/realsenseai/librealsense/blob/master/common/cli.h), a wrapper around TCLAP. The tools use it at three levels:
 
 - `rs2::cli` (used by `rs-convert`, `rs-enumerate-devices`, `rs-terminal`, `rs-record`, `rs-data-collect`, `rs-benchmark`, `rs-fw-update`, `realsense-viewer`, `rs-depth-quality`) adds `--debug` and the DDS flags `--eth`, `--eth-only`, `--no-eth`, `--domain-id`.
 - `rs2::cli_no_dds` (used by `rs-fw-logger`, `rs-dds-config`, `rs-dds-adapter`) adds only `--debug`.
@@ -44,7 +44,7 @@ Notes on the shared flags:
 
 ## Listing devices: rs-enumerate-devices
 
-`rs-enumerate-devices` prints the connected devices with their camera info. By default it also prints the stream profiles (modes) of every sensor. Other flags add options, calibration data or default profiles. It can also open a recording file as a playback device. Source: [`tools/enumerate-devices/rs-enumerate-devices.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/enumerate-devices/rs-enumerate-devices.cpp).
+`rs-enumerate-devices` prints the connected devices with their camera info. By default it also prints the stream profiles (modes) of every sensor. Other flags add options, calibration data or default profiles. It can also open a recording file as a playback device. Source: [`tools/enumerate-devices/rs-enumerate-devices.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/enumerate-devices/rs-enumerate-devices.cpp).
 
 ```
 rs-enumerate-devices -s          # one line per device: name, serial number, firmware version
@@ -82,7 +82,7 @@ rs-enumerate-devices -p rec.db3  # enumerate a recording as a playback device
 
 ## Recording: rs-record
 
-`rs-record` starts a pipeline with the default configuration, records it to a file for a set time, and prints the elapsed time once per second. Source: [`tools/recorder/rs-record.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/recorder/rs-record.cpp). The recording format depends on the build: with `BUILD_ROSBAG2` (default `ON`) the library writes rosbag2 (`.db3`) files. Without it, the library writes ROS1 `.bag` files and refuses a `.db3` output name. See [[Record and Playback]].
+`rs-record` starts a pipeline with the default configuration, records it to a file for a set time, and prints the elapsed time once per second. Source: [`tools/recorder/rs-record.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/recorder/rs-record.cpp). The recording format depends on the build: with `BUILD_ROSBAG2` (default `ON`) the library writes rosbag2 (`.db3`) files. Without it, the library writes ROS1 `.bag` files and refuses a `.db3` output name. See [[Record and Playback]].
 
 ```
 rs-record -f recording.db3 -t 5
@@ -105,7 +105,7 @@ rs-record -f recording.db3 -t 5
 
 ## Converting recordings: rs-convert
 
-`rs-convert` reads a recording and writes its frames as PNG, CSV, 3D CSV, RAW, PLY or BIN files, or as text on stdout. It can also convert a legacy ROS1 `.bag` file to `.db3`. Source: [`tools/convert/rs-convert.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/convert/rs-convert.cpp) and the writers in [`tools/convert/converters`](https://github.com/realsenseai/librealsense/tree/development/tools/convert/converters).
+`rs-convert` reads a recording and writes its frames as PNG, CSV, 3D CSV, RAW, PLY or BIN files, or as text on stdout. It can also convert a legacy ROS1 `.bag` file to `.db3`. Source: [`tools/convert/rs-convert.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/convert/rs-convert.cpp) and the writers in [`tools/convert/converters`](https://github.com/realsenseai/librealsense/tree/master/tools/convert/converters).
 
 ```
 rs-convert -i recording.bag -D recording.db3     # legacy .bag -> .db3, nothing else is done
@@ -150,11 +150,11 @@ rs-convert -i recording.db3 -l out/cloud         # point clouds to PLY
 
 ## Inspecting recordings: rs-rosbag-inspector
 
-`rs-rosbag-inspector` is a GUI tool (ImGui/OpenGL window titled "RealSense Rosbag Inspector") for browsing the topics and messages of legacy ROS1 `.bag` files. You open files with the **Load File...** menu item, which filters for `*.bag`, or by dragging them onto the window. It has no command-line flags; `main` ignores its arguments. On Windows it is built as a GUI (`WIN32`) application. For `.db3` recordings, [`tools/rosbag-inspector/readme.md`](https://github.com/realsenseai/librealsense/blob/development/tools/rosbag-inspector/readme.md) suggests third-party viewers that read rosbag2 files. To convert a `.bag` file first, use `rs-convert -D`. Source: [`tools/rosbag-inspector/rs-rosbag-inspector.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/rosbag-inspector/rs-rosbag-inspector.cpp).
+`rs-rosbag-inspector` is a GUI tool (ImGui/OpenGL window titled "RealSense Rosbag Inspector") for browsing the topics and messages of legacy ROS1 `.bag` files. You open files with the **Load File...** menu item, which filters for `*.bag`, or by dragging them onto the window. It has no command-line flags; `main` ignores its arguments. On Windows it is built as a GUI (`WIN32`) application. For `.db3` recordings, [`tools/rosbag-inspector/readme.md`](https://github.com/realsenseai/librealsense/blob/master/tools/rosbag-inspector/readme.md) suggests third-party viewers that read rosbag2 files. To convert a `.bag` file first, use `rs-convert -D`. Source: [`tools/rosbag-inspector/rs-rosbag-inspector.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/rosbag-inspector/rs-rosbag-inspector.cpp).
 
 ## Frame statistics: rs-data-collect
 
-`rs-data-collect` configures sensors on one device from a CSV configuration file, collects frame statistics through the low-level sensor API, and saves them to a CSV file. It does not save image content. Source: [`tools/data-collect/rs-data-collect.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/data-collect/rs-data-collect.cpp).
+`rs-data-collect` configures sensors on one device from a CSV configuration file, collects frame statistics through the low-level sensor API, and saves them to a CSV file. It does not save image content. Source: [`tools/data-collect/rs-data-collect.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/data-collect/rs-data-collect.cpp).
 
 ```
 rs-data-collect -c ./data_collect.cfg -f ./log.csv -t 60 -m 1000
@@ -190,7 +190,7 @@ rs-data-collect -c ./data_collect.cfg -f ./log.csv -t 60 -m 1000
 
 ## Firmware logs: rs-fw-logger
 
-`rs-fw-logger` waits for a device, by serial number or the first one found, then polls its firmware log and prints each message. Messages are printed as raw hex bytes, or parsed when you give an events XML file that the device's parser accepts. With `-f` it reads the flash log instead and exits when no flash log entries are left. Otherwise it keeps logging and waits for the device again if it disconnects. The device must support the `rs2::firmware_logger` extension; if it does not, the tool exits with an error. Library warnings are written to `librealsense.log`. Source: [`tools/fw-logger/rs-fw-logger.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/fw-logger/rs-fw-logger.cpp).
+`rs-fw-logger` waits for a device, by serial number or the first one found, then polls its firmware log and prints each message. Messages are printed as raw hex bytes, or parsed when you give an events XML file that the device's parser accepts. With `-f` it reads the flash log instead and exits when no flash log entries are left. Otherwise it keeps logging and waits for the device again if it disconnects. The device must support the `rs2::firmware_logger` extension; if it does not, the tool exits with an error. Library warnings are written to `librealsense.log`. Source: [`tools/fw-logger/rs-fw-logger.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/fw-logger/rs-fw-logger.cpp).
 
 ```
 rs-fw-logger -s <serial> -l events.xml -o fw_log.txt
@@ -222,7 +222,7 @@ rs-fw-logger -s <serial> -l events.xml -o fw_log.txt
 - a script file with `-r` (hex lines) or `-c` (named commands, needs `-l`);
 - an interactive prompt (`#>`) with auto-completion, where commands go to the selected devices, `next` waits for a device from the device hub (commands still go to the selected devices) and `exit` quits.
 
-Source: [`tools/terminal/rs-terminal.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/terminal/rs-terminal.cpp).
+Source: [`tools/terminal/rs-terminal.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/terminal/rs-terminal.cpp).
 
 ```
 rs-terminal -n <serial> -l commands.xml -c script.txt
@@ -259,7 +259,7 @@ rs-terminal -n <serial> -l commands.xml -c script.txt
 - CPU blocks: colorizer, pointcloud, spatial, temporal, disparity, threshold and decimation filters for depth, and the YUY decoder for YUYV color.
 - GPU blocks: the `rs2::gl` versions of colorizer, pointcloud and YUY decoder, run through a hidden GLFW window. They are skipped on macOS.
 
-The tool has only the shared flags. Source: [`tools/benchmark/rs-benchmark.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/benchmark/rs-benchmark.cpp).
+The tool has only the shared flags. Source: [`tools/benchmark/rs-benchmark.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/benchmark/rs-benchmark.cpp).
 
 <!-- wikigen:table-benchmark -->
 | Flag | Argument | Description | Default |
@@ -281,7 +281,7 @@ The tool has only the shared flags. Source: [`tools/benchmark/rs-benchmark.cpp`]
 - For an `.obj` 3D model, it compresses the vertex and index data with LZ4. The header holds a `<name>_obj_data` array and an `uncompress_<name>_obj(...)` function.
 - For a `.png` image, the header holds `<name>_png_size` and a `<name>_png_data` byte array.
 
-It uses plain TCLAP, so its `--version` prints the tool's own version (`0.0.0.2`), and it has no `--debug` or DDS flags. Source: [`tools/embed/rs-embed.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/embed/rs-embed.cpp).
+It uses plain TCLAP, so its `--version` prints the tool's own version (`0.0.0.2`), and it has no `--debug` or DDS flags. Source: [`tools/embed/rs-embed.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/embed/rs-embed.cpp).
 
 ```
 rs-embed -i model.obj -o model.h -n model
@@ -300,7 +300,7 @@ rs-embed -i model.obj -o model.h -n model
 
 ## RUM development server: rum_dev_server.py
 
-[`tools/rum-uploader/dev-server/rum_dev_server.py`](https://github.com/realsenseai/librealsense/blob/development/tools/rum-uploader/dev-server/rum_dev_server.py) is a Python test server for the usage-statistics uploader (see [[Usage Statistics RUM]]). It is not the production server. It listens on `127.0.0.1` for `POST /v1/rum`, saves each body as a JSON file in the output folder, prints a summary of the report, and replies `200`. The Viewer's uploader always targets the production endpoint. To send reports to this server, you must change `RUM_ENDPOINT` in [`common/rum-uploader/rum-uploader.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/rum-uploader/rum-uploader.cpp) and rebuild.
+[`tools/rum-uploader/dev-server/rum_dev_server.py`](https://github.com/realsenseai/librealsense/blob/master/tools/rum-uploader/dev-server/rum_dev_server.py) is a Python test server for the usage-statistics uploader (see [[Usage Statistics RUM]]). It is not the production server. It listens on `127.0.0.1` for `POST /v1/rum`, saves each body as a JSON file in the output folder, prints a summary of the report, and replies `200`. The Viewer's uploader always targets the production endpoint. To send reports to this server, you must change `RUM_ENDPOINT` in [`common/rum-uploader/rum-uploader.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/rum-uploader/rum-uploader.cpp) and rebuild.
 
 ```
 python rum_dev_server.py --port 8080 --dir received
@@ -318,7 +318,7 @@ The script has no `--version` flag.
 
 ## See also
 
-- [`tools/readme.md`](https://github.com/realsenseai/librealsense/blob/development/tools/readme.md): overview of the tool folders
+- [`tools/readme.md`](https://github.com/realsenseai/librealsense/blob/master/tools/readme.md): overview of the tool folders
 - [[Record and Playback]]
 - [[Firmware Update]]
 - [[Troubleshooting Q&A]]

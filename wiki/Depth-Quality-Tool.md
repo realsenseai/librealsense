@@ -2,15 +2,15 @@ The Depth Quality Tool (`rs-depth-quality`) is a graphical application that stre
 
 ![Depth Quality Tool](res/depth-quality-glimpse.gif)
 
-The source is in [`tools/depth-quality`](https://github.com/realsenseai/librealsense/blob/development/tools/depth-quality): the entry point and metric formulas in [`rs-depth-quality.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/depth-quality/rs-depth-quality.cpp), the plane fit and per-frame analysis in [`depth-metrics.h`](https://github.com/realsenseai/librealsense/blob/development/tools/depth-quality/depth-metrics.h), and the UI, guidance and recording in [`depth-quality-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/depth-quality/depth-quality-model.cpp).
+The source is in [`tools/depth-quality`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality): the entry point and metric formulas in [`rs-depth-quality.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality/rs-depth-quality.cpp), the plane fit and per-frame analysis in [`depth-metrics.h`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality/depth-metrics.h), and the UI, guidance and recording in [`depth-quality-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality/depth-quality-model.cpp).
 
 ## Building and launching
 
-The tool is built by CMake target `rs-depth-quality` in [`tools/depth-quality/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/tools/depth-quality/CMakeLists.txt). It is built only when both of these options are `ON` (both default to `ON` in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake)):
+The tool is built by CMake target `rs-depth-quality` in [`tools/depth-quality/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality/CMakeLists.txt). It is built only when both of these options are `ON` (both default to `ON` in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake)):
 
 | Option | Default | Role |
 |---|---|---|
-| `BUILD_EXAMPLES` | `ON` | The top-level `CMakeLists.txt` adds the `tools` directory when this is on; [`tools/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/tools/CMakeLists.txt) adds the graphical tools only inside its `BUILD_EXAMPLES` block. |
+| `BUILD_EXAMPLES` | `ON` | The top-level `CMakeLists.txt` adds the `tools` directory when this is on; [`tools/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/tools/CMakeLists.txt) adds the graphical tools only inside its `BUILD_EXAMPLES` block. |
 | `BUILD_GRAPHICAL_EXAMPLES` | `ON` | Adds `depth-quality` (together with the Viewer and other graphical tools). It turns `BUILD_GLSL_EXTENSIONS` on if it was off. |
 
 `BUILD_TOOLS` does not control this tool: it only adds the non-graphical tools (`convert`, `enumerate-devices`, `fw-logger`, `terminal`, `recorder`, `fw-update`, `embed`, and `dds` when `BUILD_WITH_DDS` is on). See [[Build Configuration]] for all options.
@@ -35,7 +35,7 @@ The window title is "Depth Quality Tool". If no device is connected, the tool do
 
 ## Command-line options
 
-`rs-depth-quality` parses its command line with `rs2::cli` from [`common/cli.h`](https://github.com/realsenseai/librealsense/blob/development/common/cli.h) and registers no options of its own. The resulting settings are passed to the `rs2::context` it creates.
+`rs-depth-quality` parses its command line with `rs2::cli` from [`common/cli.h`](https://github.com/realsenseai/librealsense/blob/master/common/cli.h) and registers no options of its own. The resulting settings are passed to the `rs2::context` it creates.
 
 | Flag | Argument | Description |
 |---|---|---|
@@ -105,7 +105,7 @@ When the recording stops, the tool writes:
 
 The metrics thread takes the latest depth frame, analyses it, then sleeps 80 ms, so the metrics are updated at most about 12 times per second whatever the stream frame rate.
 
-For each frame ([`analyze_depth_image`](https://github.com/realsenseai/librealsense/blob/development/tools/depth-quality/depth-metrics.h)):
+For each frame ([`analyze_depth_image`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality/depth-metrics.h)):
 
 1. Every pixel in the ROI with a non-zero depth value is converted to meters (raw value × depth scale) and deprojected to a 3D point with the depth intrinsics (`rs2_deproject_pixel_to_point`).
 2. A plane `a·x + b·y + c·z + d = 0` with a unit normal is fitted to these points by least squares (`plane_from_points`, following the [plane-from-points method](http://www.ilikebigbits.com/blog/2015/3/2/plane-from-points)). At least 3 valid points are needed; otherwise no metrics are computed for the frame.
@@ -117,7 +117,7 @@ The stereo baseline used by the subpixel metric is the absolute X translation, i
 
 ## Metrics reference
 
-Metrics are defined and computed in `main()` of [`rs-depth-quality.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/depth-quality/rs-depth-quality.cpp). All metrics are computed only for frames where a plane could be fitted to the ROI (step 2 above). Fill rate is shown at all times; the other metrics are computed and shown only while the UI reports a plane as found.
+Metrics are defined and computed in `main()` of [`rs-depth-quality.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality/rs-depth-quality.cpp). All metrics are computed only for frames where a plane could be fitted to the ROI (step 2 above). Fill rate is shown at all times; the other metrics are computed and shown only while the UI reports a plane as found.
 
 | Metric | Unit | Plot range | Needs plane fit |
 |---|---|---|---|

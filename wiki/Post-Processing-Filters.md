@@ -7,7 +7,7 @@ The SDK has two kinds of filters:
 
 ## Applying filters in C++
 
-Every host filter derives from `rs2::filter`. Call `process()` with a frame and use the frame it returns as the input to the next filter. The [rs-post-processing](https://github.com/realsenseai/librealsense/blob/development/examples/post-processing/rs-post-processing.cpp) example does this on a background thread and shows a slider for each filter option. The code below is a shortened version of that example's processing loop:
+Every host filter derives from `rs2::filter`. Call `process()` with a frame and use the frame it returns as the input to the next filter. The [rs-post-processing](https://github.com/realsenseai/librealsense/blob/master/examples/post-processing/rs-post-processing.cpp) example does this on a background thread and shows a slider for each filter option. The code below is a shortened version of that example's processing loop:
 
 ```cpp
 #include <librealsense2/rs.hpp>
@@ -53,7 +53,7 @@ The example applies its filters in this order. The comment in the example notes 
 6. Temporal
 7. Disparity-to-depth transform (only if step 4 was applied)
 
-D400 and D500 depth sensors also return an ordered list of recommended blocks from `rs2::sensor::get_recommended_filters()`. This list is built in [ds-device-common.cpp](https://github.com/realsenseai/librealsense/blob/development/src/ds/ds-device-common.cpp) and [sensor.cpp](https://github.com/realsenseai/librealsense/blob/development/src/sensor.cpp). Its order is: decimation, rotation (set for depth and infrared), HDR merge, sequence ID filter, threshold, depth to disparity, spatial, temporal, hole filling, disparity to depth. On a D401 GMSL camera, and on a device with the D405 product ID that publishes a second color stream (Color 1), the D400 depth sensor adds the dual-RGB rectify filter to the end of the list (see [[D401 GMSL Dual RGB]]). The D405 case is *(changed in the next release)*: at v2.59.1 only the D401 GMSL camera added this filter.
+D400 and D500 depth sensors also return an ordered list of recommended blocks from `rs2::sensor::get_recommended_filters()`. This list is built in [ds-device-common.cpp](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-device-common.cpp) and [sensor.cpp](https://github.com/realsenseai/librealsense/blob/master/src/sensor.cpp). Its order is: decimation, rotation (set for depth and infrared), HDR merge, sequence ID filter, threshold, depth to disparity, spatial, temporal, hole filling, disparity to depth. On a D401 GMSL camera, and on a device with the D405 product ID that publishes a second color stream (Color 1), the D400 depth sensor adds the dual-RGB rectify filter to the end of the list (see [[D401 GMSL Dual RGB]]). The D405 case is *(changed in the next release)*: at v2.59.1 only the D401 GMSL camera added this filter.
 
 Spatial and temporal filtering is usually done in the disparity domain. That is why the depth-to-disparity transform comes before these filters and the disparity-to-depth transform comes after them.
 
@@ -78,35 +78,35 @@ Some blocks inherit common options from their base class:
 - Blocks built on the stream-filter base (decimation, threshold, rotation, spatial, temporal, hole filling, colorizer, point cloud, units transform, and the YUY, M420, NV12, MJPEG and Y411 decoders) have `RS2_OPTION_FRAMES_QUEUE_SIZE`, `RS2_OPTION_STREAM_FILTER`, `RS2_OPTION_STREAM_FORMAT_FILTER` and `RS2_OPTION_STREAM_INDEX_FILTER`. The last three select the frames the block acts on.
 - The disparity transform removes `RS2_OPTION_FRAMES_QUEUE_SIZE`.
 
-See [synthetic-stream.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/synthetic-stream.cpp).
+See [synthetic-stream.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/synthetic-stream.cpp).
 
 ## Host filter reference
 
-The options, ranges and defaults below come from the constructors in [src/proc](https://github.com/realsenseai/librealsense/blob/development/src/proc). The C++ classes are declared in [rs_processing.hpp](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_processing.hpp), and the C functions that create them are in [rs_processing.h](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_processing.h).
+The options, ranges and defaults below come from the constructors in [src/proc](https://github.com/realsenseai/librealsense/blob/master/src/proc). The C++ classes are declared in [rs_processing.hpp](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_processing.hpp), and the C functions that create them are in [rs_processing.h](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_processing.h).
 
 <!-- wikigen:table-filters -->
 | C++ class | C creator | Source | Purpose |
 |---|---|---|---|
-| `rs2::pointcloud` | `rs2_create_pointcloud` | [pointcloud.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/pointcloud.cpp) | Depth to 3D points with texture coordinates |
-| `rs2::yuy_decoder` | `rs2_create_yuy_decoder` | [color-formats-converter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/color-formats-converter.cpp) | YUY2 to RGB conversion |
-| `rs2::m420_decoder` | `rs2_create_m420_decoder` | [color-formats-converter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/color-formats-converter.cpp) | M420 to RGB conversion |
-| `rs2::nv12_decoder` | `rs2_create_nv12_decoder` | [color-formats-converter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/color-formats-converter.cpp) | NV12 to RGB conversion |
-| `rs2::mjpeg_decoder` *(new in the next release)* | `rs2_create_mjpeg_decoder` | [color-formats-converter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/color-formats-converter.cpp) | MJPEG to RGB8 conversion |
-| `rs2::y411_decoder` | `rs2_create_y411_decoder` | [y411-converter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/y411-converter.cpp) | Y411 to RGB conversion |
-| `rs2::threshold_filter` | `rs2_create_threshold` | [threshold.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/threshold.cpp) | Drops depth outside a distance range |
-| `rs2::units_transform` | `rs2_create_units_transform` | [units-transform.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/units-transform.cpp) | Depth to `RS2_FORMAT_DISTANCE` |
-| `rs2::align` | `rs2_create_align` | [align.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/align.cpp) | Aligns frames to a chosen stream |
-| `rs2::colorizer` | `rs2_create_colorizer` | [colorizer.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/colorizer.cpp) | Depth to a color image |
-| `rs2::decimation_filter` | `rs2_create_decimation_filter_block` | [decimation-filter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/decimation-filter.cpp) | Reduces resolution |
-| `rs2::rotation_filter` | `rs2_create_rotation_filter_block` | [rotation-filter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/rotation-filter.cpp) | Rotates frames in 90 degree steps |
-| `rs2::temporal_filter` | `rs2_create_temporal_filter_block` | [temporal-filter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/temporal-filter.cpp) | Smooths depth over time |
-| `rs2::spatial_filter` | `rs2_create_spatial_filter_block` | [spatial-filter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/spatial-filter.cpp) | Edge-preserving spatial smoothing |
-| `rs2::disparity_transform` | `rs2_create_disparity_transform_block` | [disparity-transform.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/disparity-transform.cpp) | Depth to disparity and back |
-| `rs2::depth_huffman_decoder` | `rs2_create_huffman_depth_decompress_block` | [include/librealsense2/hpp/rs_processing.hpp](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_processing.hpp) | Deprecated: the C creator throws a "deprecated" not-implemented error |
-| `rs2::hole_filling_filter` | `rs2_create_hole_filling_filter_block` | [hole-filling-filter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/hole-filling-filter.cpp) | Fills invalid depth pixels |
-| `rs2::rates_printer` | `rs2_create_rates_printer_block` | [rates-printer.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/rates-printer.cpp) | Prints the frame rate of each stream |
-| `rs2::hdr_merge` | `rs2_create_hdr_merge_processing_block` | [hdr-merge.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/hdr-merge.cpp) | Merges HDR frame sequences |
-| `rs2::sequence_id_filter` | `rs2_create_sequence_id_filter` | [sequence-id-filter.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/sequence-id-filter.cpp) | Passes frames of one HDR sequence ID |
+| `rs2::pointcloud` | `rs2_create_pointcloud` | [pointcloud.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/pointcloud.cpp) | Depth to 3D points with texture coordinates |
+| `rs2::yuy_decoder` | `rs2_create_yuy_decoder` | [color-formats-converter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/color-formats-converter.cpp) | YUY2 to RGB conversion |
+| `rs2::m420_decoder` | `rs2_create_m420_decoder` | [color-formats-converter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/color-formats-converter.cpp) | M420 to RGB conversion |
+| `rs2::nv12_decoder` | `rs2_create_nv12_decoder` | [color-formats-converter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/color-formats-converter.cpp) | NV12 to RGB conversion |
+| `rs2::mjpeg_decoder` *(new in the next release)* | `rs2_create_mjpeg_decoder` | [color-formats-converter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/color-formats-converter.cpp) | MJPEG to RGB8 conversion |
+| `rs2::y411_decoder` | `rs2_create_y411_decoder` | [y411-converter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/y411-converter.cpp) | Y411 to RGB conversion |
+| `rs2::threshold_filter` | `rs2_create_threshold` | [threshold.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/threshold.cpp) | Drops depth outside a distance range |
+| `rs2::units_transform` | `rs2_create_units_transform` | [units-transform.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/units-transform.cpp) | Depth to `RS2_FORMAT_DISTANCE` |
+| `rs2::align` | `rs2_create_align` | [align.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/align.cpp) | Aligns frames to a chosen stream |
+| `rs2::colorizer` | `rs2_create_colorizer` | [colorizer.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/colorizer.cpp) | Depth to a color image |
+| `rs2::decimation_filter` | `rs2_create_decimation_filter_block` | [decimation-filter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/decimation-filter.cpp) | Reduces resolution |
+| `rs2::rotation_filter` | `rs2_create_rotation_filter_block` | [rotation-filter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/rotation-filter.cpp) | Rotates frames in 90 degree steps |
+| `rs2::temporal_filter` | `rs2_create_temporal_filter_block` | [temporal-filter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/temporal-filter.cpp) | Smooths depth over time |
+| `rs2::spatial_filter` | `rs2_create_spatial_filter_block` | [spatial-filter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/spatial-filter.cpp) | Edge-preserving spatial smoothing |
+| `rs2::disparity_transform` | `rs2_create_disparity_transform_block` | [disparity-transform.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/disparity-transform.cpp) | Depth to disparity and back |
+| `rs2::depth_huffman_decoder` | `rs2_create_huffman_depth_decompress_block` | [include/librealsense2/hpp/rs_processing.hpp](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_processing.hpp) | Deprecated: the C creator throws a "deprecated" not-implemented error |
+| `rs2::hole_filling_filter` | `rs2_create_hole_filling_filter_block` | [hole-filling-filter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/hole-filling-filter.cpp) | Fills invalid depth pixels |
+| `rs2::rates_printer` | `rs2_create_rates_printer_block` | [rates-printer.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/rates-printer.cpp) | Prints the frame rate of each stream |
+| `rs2::hdr_merge` | `rs2_create_hdr_merge_processing_block` | [hdr-merge.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/hdr-merge.cpp) | Merges HDR frame sequences |
+| `rs2::sequence_id_filter` | `rs2_create_sequence_id_filter` | [sequence-id-filter.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/sequence-id-filter.cpp) | Passes frames of one HDR sequence ID |
 <!-- /wikigen:table-filters -->
 
 ### Decimation filter
@@ -177,7 +177,7 @@ The filter keeps a separate history for each stream type and index. It clears th
 
 ### HDR merge and sequence ID filter
 
-`rs2::hdr_merge` merges the frames of an HDR sequence into one depth frame. It has no filter options. It needs the sequence frame metadata. When 20 frames arrive without that metadata, the library ([hdr-merge.cpp](https://github.com/realsenseai/librealsense/blob/development/src/proc/hdr-merge.cpp)) logs the warning "HDR Merge filter cannot process frames because relevant metadata params are missing". It logs it once, and again after the depth frame number starts over (a stream restart).
+`rs2::hdr_merge` merges the frames of an HDR sequence into one depth frame. It has no filter options. It needs the sequence frame metadata. When 20 frames arrive without that metadata, the library ([hdr-merge.cpp](https://github.com/realsenseai/librealsense/blob/master/src/proc/hdr-merge.cpp)) logs the warning "HDR Merge filter cannot process frames because relevant metadata params are missing". It logs it once, and again after the depth frame number starts over (a stream restart).
 
 `rs2::sequence_id_filter` passes only the frames of one sequence ID. It can be set with the constructor `sequence_id_filter(float sequence_id)`.
 
@@ -230,7 +230,7 @@ Some cameras run filters in firmware. A depth sensor lists them with `rs2::senso
 
 To get one filter by type, use `sensor.get_embedded_filter<T>()`. It throws `"Could not find requested embedded filter type!"` if the sensor does not have that filter. An embedded filter is an `rs2::options` container, so you use the normal option calls on it. It may also support composite options.
 
-The [rs-embedded-filters](https://github.com/realsenseai/librealsense/blob/development/examples/embedded-filters/rs-embedded-filters.cpp) example (see also its [README](https://github.com/realsenseai/librealsense/blob/development/examples/embedded-filters/README.md)) shows both styles:
+The [rs-embedded-filters](https://github.com/realsenseai/librealsense/blob/master/examples/embedded-filters/rs-embedded-filters.cpp) example (see also its [README](https://github.com/realsenseai/librealsense/blob/master/examples/embedded-filters/README.md)) shows both styles:
 
 ```cpp
 auto depth_sensor = dev.first<rs2::depth_sensor>();
@@ -254,15 +254,15 @@ The camera reports the ranges. In the example, setting the decimation magnitude 
 
 ### Composite options (D500 devices)
 
-D500 depth sensors (except D585S) register the decimation, temporal and close-range embedded filters when the device firmware is recent enough, over USB and GMSL/MIPI *(changed in the next release)*. At v2.59.1, every D500 model except the D555, the D585S and the D585 with product ID 0x0B6A registered them only over USB (see [d500-device.cpp](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-device.cpp) and [d500-factory.cpp](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-factory.cpp)). These filters use composite options. A composite option is a struct that is read or written in one transaction. Composite options are declared in [rs_composite_option.h](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_composite_option.h):
+D500 depth sensors (except D585S) register the decimation, temporal and close-range embedded filters when the device firmware is recent enough, over USB and GMSL/MIPI *(changed in the next release)*. At v2.59.1, every D500 model except the D555, the D585S and the D585 with product ID 0x0B6A registered them only over USB (see [d500-device.cpp](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-device.cpp) and [d500-factory.cpp](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-factory.cpp)). These filters use composite options. A composite option is a struct that is read or written in one transaction. Composite options are declared in [rs_composite_option.h](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_composite_option.h):
 
 | Composite option | Struct | Header |
 |---|---|---|
-| `RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP` | `rs2_decimation_filter_dpp_config` | [rs_decimation_filter_dpp.h](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_decimation_filter_dpp.h) |
-| `RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP` | `rs2_temporal_filter_dpp_config` | [rs_temporal_filter_dpp.h](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_temporal_filter_dpp.h) |
-| `RS2_COMPOSITE_OPTION_HDRD_CONTROL` | `rs2_hdrd_control` | [rs_hdrd_control.h](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_hdrd_control.h) |
+| `RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP` | `rs2_decimation_filter_dpp_config` | [rs_decimation_filter_dpp.h](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_decimation_filter_dpp.h) |
+| `RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP` | `rs2_temporal_filter_dpp_config` | [rs_temporal_filter_dpp.h](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_temporal_filter_dpp.h) |
+| `RS2_COMPOSITE_OPTION_HDRD_CONTROL` | `rs2_hdrd_control` | [rs_hdrd_control.h](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_hdrd_control.h) |
 
-Each struct starts with a `dpp_header` (see [rs_dpp_header.h](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_dpp_header.h)). The header has `version`, `flags`, `ctl_id`, `param_count` and `param_type`, followed by 8 `int32_t` parameter slots. The C++ typed calls (`get_composite_option_as()`, `get_composite_option_range_as()` and `set_composite_option_from()`) only accept `DPP_HEADER_CURRENT_VERSION` (1). The decimation, temporal and HDRD control structs are 38 bytes each. Unused `reserved` slots must be zero when you set the option. `rs2_get_composite_option_range()` returns the bounds as `rs2_decimation_filter_dpp_range`, `rs2_temporal_filter_dpp_range` or `rs2_hdrd_control_range`, each with `min`, `max`, `step` and `def` structs.
+Each struct starts with a `dpp_header` (see [rs_dpp_header.h](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_dpp_header.h)). The header has `version`, `flags`, `ctl_id`, `param_count` and `param_type`, followed by 8 `int32_t` parameter slots. The C++ typed calls (`get_composite_option_as()`, `get_composite_option_range_as()` and `set_composite_option_from()`) only accept `DPP_HEADER_CURRENT_VERSION` (1). The decimation, temporal and HDRD control structs are 38 bytes each. Unused `reserved` slots must be zero when you set the option. `rs2_get_composite_option_range()` returns the bounds as `rs2_decimation_filter_dpp_range`, `rs2_temporal_filter_dpp_range` or `rs2_hdrd_control_range`, each with `min`, `max`, `step` and `def` structs.
 
 Decimation fields, as documented in the header:
 
@@ -280,7 +280,7 @@ Temporal fields, as documented in the header:
 | `smooth_delta` | 1 – 100, step 1. Default 20 |
 | `persistency_index` | 0 – 8, step 1. Default 3 |
 
-In C++, read and write these options with `get_composite_option_as<T>()`, `set_composite_option_from()` and `supports_composite_option()` from [rs_options.hpp](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_options.hpp). The example does this for the close-range filter:
+In C++, read and write these options with `get_composite_option_as<T>()`, `set_composite_option_from()` and `supports_composite_option()` from [rs_options.hpp](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_options.hpp). The example does this for the close-range filter:
 
 ```cpp
 const auto id = RS2_COMPOSITE_OPTION_HDRD_CONTROL;
@@ -296,8 +296,8 @@ if (filter.supports_composite_option(id))
 
 ## See also
 
-- [rs-post-processing example](https://github.com/realsenseai/librealsense/blob/development/examples/post-processing/rs-post-processing.cpp) and [its readme](https://github.com/realsenseai/librealsense/blob/development/examples/post-processing/readme.md)
-- [doc/post-processing-filters.md](https://github.com/realsenseai/librealsense/blob/development/doc/post-processing-filters.md)
+- [rs-post-processing example](https://github.com/realsenseai/librealsense/blob/master/examples/post-processing/rs-post-processing.cpp) and [its readme](https://github.com/realsenseai/librealsense/blob/master/examples/post-processing/readme.md)
+- [doc/post-processing-filters.md](https://github.com/realsenseai/librealsense/blob/master/doc/post-processing-filters.md)
 - [[API How To]], [[Code Samples]], [[GPU Acceleration]], [[Depth from Stereo]]
 
 <!-- wikigen:footer -->

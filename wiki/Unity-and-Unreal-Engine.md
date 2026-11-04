@@ -1,14 +1,14 @@
-librealsense ships two game-engine integrations: a Unity project in [`wrappers/unity`](https://github.com/realsenseai/librealsense/tree/development/wrappers/unity), built on top of the C# wrapper, and an Unreal Engine 4 project with a RealSense plugin in [`wrappers/unrealengine4`](https://github.com/realsenseai/librealsense/tree/development/wrappers/unrealengine4), built on the native C/C++ API. They are for developers who want live depth, color, infrared and point-cloud data from a RealSense camera inside a Unity scene or an Unreal level. This page covers how each integration is set up, what scenes, prefabs, components and Blueprint classes it contains, and the limitations stated in the code and readmes.
+librealsense ships two game-engine integrations: a Unity project in [`wrappers/unity`](https://github.com/realsenseai/librealsense/tree/master/wrappers/unity), built on top of the C# wrapper, and an Unreal Engine 4 project with a RealSense plugin in [`wrappers/unrealengine4`](https://github.com/realsenseai/librealsense/tree/master/wrappers/unrealengine4), built on the native C/C++ API. They are for developers who want live depth, color, infrared and point-cloud data from a RealSense camera inside a Unity scene or an Unreal level. This page covers how each integration is set up, what scenes, prefabs, components and Blueprint classes it contains, and the limitations stated in the code and readmes.
 
 Both integrations target Windows: CMake refuses `BUILD_UNITY_BINDINGS` on other operating systems, and the Unreal plugin's module is whitelisted for `Win64` only.
 
 ## Unity: setting up the project
 
-The Unity project depends on the .NET wrapper (`Intel.RealSense.dll`, see [[CSharp Wrapper]]) and the native library (`realsense2.dll`, loaded by the wrapper through `DllImport`). Both are expected in `Assets/RealSenseSDK2.0/Plugins/`. That folder is not in the repository (it is listed in [`wrappers/unity/.gitignore`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unity/.gitignore)), so you have to put the two DLLs there yourself or let the CMake build do it.
+The Unity project depends on the .NET wrapper (`Intel.RealSense.dll`, see [[CSharp Wrapper]]) and the native library (`realsense2.dll`, loaded by the wrapper through `DllImport`). Both are expected in `Assets/RealSenseSDK2.0/Plugins/`. That folder is not in the repository (it is listed in [`wrappers/unity/.gitignore`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unity/.gitignore)), so you have to put the two DLLs there yourself or let the CMake build do it.
 
 ### Option A: build the DLLs with CMake
 
-The CMake option is `BUILD_UNITY_BINDINGS` (default `OFF`, defined in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake) with the description "Copy the unity project to the build folder with the required dependencies"). When it is on, [`wrappers/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/wrappers/CMakeLists.txt):
+The CMake option is `BUILD_UNITY_BINDINGS` (default `OFF`, defined in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake) with the description "Copy the unity project to the build folder with the required dependencies"). When it is on, [`wrappers/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/wrappers/CMakeLists.txt):
 
 - stops with `BUILD_UNITY_BINDINGS is supported only for Windows OS` on any OS other than Windows;
 - turns on `BUILD_CSHARP_BINDINGS` and sets `DOTNET_VERSION_LIBRARY` to `3.5`. If you had not enabled C# bindings yourself, it prints the warning `Enabling BUILD_CSHARP_BINDINGS and set DOTNET_VERSION_LIBRARY to 3.5 since BUILD_UNITY_BINDINGS is enabled`;
@@ -22,7 +22,7 @@ cd build
 cmake .. -DBUILD_UNITY_BINDINGS=ON -DBUILD_SHARED_LIBS=ON -DCMAKE_GENERATOR_PLATFORM=x64
 ```
 
-Open the generated `realsense2.sln` in Visual Studio and build the `Intel.RealSense` project (in the `Wrappers/csharp` solution folder) in the Release configuration. A Debug build names the native library `realsense2d.dll`, and the copy step below does not pick that file up. `Intel.RealSense` depends on `realsense2`, so both libraries get built. The Unity-specific steps live in [`wrappers/csharp/Intel.RealSense/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/wrappers/csharp/Intel.RealSense/CMakeLists.txt):
+Open the generated `realsense2.sln` in Visual Studio and build the `Intel.RealSense` project (in the `Wrappers/csharp` solution folder) in the Release configuration. A Debug build names the native library `realsense2d.dll`, and the copy step below does not pick that file up. `Intel.RealSense` depends on `realsense2`, so both libraries get built. The Unity-specific steps live in [`wrappers/csharp/Intel.RealSense/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/wrappers/csharp/Intel.RealSense/CMakeLists.txt):
 
 | Step | What happens |
 |---|---|
@@ -34,7 +34,7 @@ CMake finds Unity with `find_program(UNITY_PATH Unity\\Editor\\Unity.exe)`. To u
 
 The link target is computed from the `Intel.RealSense` project's source directory, so it points to `wrappers\csharp\Intel.RealSense\wrappers\unity` in the source tree. That folder is not in the repository, so `<build>\wrappers\unity` does not contain the Unity project. Use Option B and copy the DLLs by hand.
 
-The .NET target framework of `Intel.RealSense` is `v${DOTNET_VERSION_LIBRARY}`. On Windows that variable is a cache entry that defaults to `3.5`, described in [`CMake/windows_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/windows_config.cmake) as ".Net Version, defaulting to '3.5', the Unity wrapper currently supports only .NET 3.5".
+The .NET target framework of `Intel.RealSense` is `v${DOTNET_VERSION_LIBRARY}`. On Windows that variable is a cache entry that defaults to `3.5`, described in [`CMake/windows_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/windows_config.cmake) as ".Net Version, defaulting to '3.5', the Unity wrapper currently supports only .NET 3.5".
 
 ### Option B: copy the DLLs into the project by hand
 
@@ -42,7 +42,7 @@ The .NET target framework of `Intel.RealSense` is `v${DOTNET_VERSION_LIBRARY}`. 
 2. Copy both files into `wrappers/unity/Assets/RealSenseSDK2.0/Plugins/`. Create the folder if it does not exist.
 3. Open the `wrappers/unity` folder as a project in the Unity editor.
 
-The project's [`ProjectSettings/ProjectVersion.txt`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unity/ProjectSettings/ProjectVersion.txt) records editor version `2017.4.13f1`. The repository guide ([`wrappers/unity/readme.md`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unity/readme.md)) says the examples were designed and tested with Unity 2017-2020 versions no higher than 2020.1.8f1, and that newer versions may require code changes.
+The project's [`ProjectSettings/ProjectVersion.txt`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unity/ProjectSettings/ProjectVersion.txt) records editor version `2017.4.13f1`. The repository guide ([`wrappers/unity/readme.md`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unity/readme.md)) says the examples were designed and tested with Unity 2017-2020 versions no higher than 2020.1.8f1, and that newer versions may require code changes.
 
 ### Option C: import a Unity package
 
@@ -50,13 +50,13 @@ If you have a `realsense.unitypackage` (built by Option A when Unity is found), 
 
 ### Running the samples
 
-Open `Assets/RealSenseSDK2.0/Scenes/StartHere.unity`. It is the only scene listed in the project's build settings ([`ProjectSettings/EditorBuildSettings.asset`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unity/ProjectSettings/EditorBuildSettings.asset)). Its menu loads the sample scenes through [`SceneLoader.cs`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unity/Assets/RealSenseSDK2.0/Misc/Utils/SceneLoader.cs). `SceneLoader` loads `SampleSceneUI` and then loads the chosen sample additively. On its first `Awake` it also loads the `sample_assets` and `sample_scenes` asset bundles from `Assets/StreamingAssets`.
+Open `Assets/RealSenseSDK2.0/Scenes/StartHere.unity`. It is the only scene listed in the project's build settings ([`ProjectSettings/EditorBuildSettings.asset`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unity/ProjectSettings/EditorBuildSettings.asset)). Its menu loads the sample scenes through [`SceneLoader.cs`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unity/Assets/RealSenseSDK2.0/Misc/Utils/SceneLoader.cs). `SceneLoader` loads `SampleSceneUI` and then loads the chosen sample additively. On its first `Awake` it also loads the `sample_assets` and `sample_scenes` asset bundles from `Assets/StreamingAssets`.
 
 You can also open any scene under `Assets/RealSenseSDK2.0/Scenes/Samples/` directly.
 
 ## Unity: scenes
 
-All scenes are in [`Assets/RealSenseSDK2.0/Scenes`](https://github.com/realsenseai/librealsense/tree/development/wrappers/unity/Assets/RealSenseSDK2.0/Scenes):
+All scenes are in [`Assets/RealSenseSDK2.0/Scenes`](https://github.com/realsenseai/librealsense/tree/master/wrappers/unity/Assets/RealSenseSDK2.0/Scenes):
 
 | Scene | What it shows |
 |---|---|
@@ -74,7 +74,7 @@ All scenes are in [`Assets/RealSenseSDK2.0/Scenes`](https://github.com/realsense
 
 ## Unity: prefabs and components
 
-Prefabs in [`Assets/RealSenseSDK2.0/Prefabs`](https://github.com/realsenseai/librealsense/tree/development/wrappers/unity/Assets/RealSenseSDK2.0/Prefabs):
+Prefabs in [`Assets/RealSenseSDK2.0/Prefabs`](https://github.com/realsenseai/librealsense/tree/master/wrappers/unity/Assets/RealSenseSDK2.0/Prefabs):
 
 | Prefab | Contents |
 |---|---|
@@ -82,7 +82,7 @@ Prefabs in [`Assets/RealSenseSDK2.0/Prefabs`](https://github.com/realsenseai/lib
 | `RsProcessingPipe.prefab` | An `RsProcessingPipe` that applies an `RsProcessingProfile` to frames from another frame provider. |
 | `PointCloud.prefab` | A mesh object with `RsPointCloudRenderer`. |
 
-Scripts in [`Assets/RealSenseSDK2.0/Scripts`](https://github.com/realsenseai/librealsense/tree/development/wrappers/unity/Assets/RealSenseSDK2.0/Scripts) (assembly definition `RealSense`):
+Scripts in [`Assets/RealSenseSDK2.0/Scripts`](https://github.com/realsenseai/librealsense/tree/master/wrappers/unity/Assets/RealSenseSDK2.0/Scripts) (assembly definition `RealSense`):
 
 | Component / type | Role |
 |---|---|
@@ -124,7 +124,7 @@ Recorded files are librealsense `.bag` recordings; see [[Record and Playback]].
 
 `RsProcessingProfile` is a `ScriptableObject` marked `[CreateAssetMenu]`, so you can create one from the Unity *Create* menu. The custom editor (`Editor/RsProcessingPipeEditor.cs`) shows the blocks as a reorderable list. Its add menu lists every type that has a `ProcessingBlockData` attribute, and each new block is stored inside the profile asset. Assign the profile to an `RsProcessingPipe`, and point its `Source` at an `RsDevice` or another `RsProcessingPipe`.
 
-The blocks in [`Scripts/ProcessingBlocks`](https://github.com/realsenseai/librealsense/tree/development/wrappers/unity/Assets/RealSenseSDK2.0/Scripts/ProcessingBlocks):
+The blocks in [`Scripts/ProcessingBlocks`](https://github.com/realsenseai/librealsense/tree/master/wrappers/unity/Assets/RealSenseSDK2.0/Scripts/ProcessingBlocks):
 
 | Unity block | Wraps | Fields with defaults (from the script) |
 |---|---|---|
@@ -179,17 +179,17 @@ The bundled renderers (`RsStreamTextureRenderer`, `RsPointCloudRenderer`) follow
 
 ## Unreal Engine 4: setting up the project
 
-[`wrappers/unrealengine4`](https://github.com/realsenseai/librealsense/tree/development/wrappers/unrealengine4) is a complete UE4 C++ project (`RealSenseUE.uproject`) with two project plugins:
+[`wrappers/unrealengine4`](https://github.com/realsenseai/librealsense/tree/master/wrappers/unrealengine4) is a complete UE4 C++ project (`RealSenseUE.uproject`) with two project plugins:
 
-- `Plugins/RealSense`: the RealSense plugin. Its [`RealSense.uplugin`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unrealengine4/Plugins/RealSense/RealSense.uplugin) has the friendly name "RealSense Plugin (alpha)", version name `0.0.1` and category "Input Devices". Its runtime module `RealSense` uses loading phase `PostConfigInit` and is whitelisted for `Win64`.
+- `Plugins/RealSense`: the RealSense plugin. Its [`RealSense.uplugin`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unrealengine4/Plugins/RealSense/RealSense.uplugin) has the friendly name "RealSense Plugin (alpha)", version name `0.0.1` and category "Input Devices". Its runtime module `RealSense` uses loading phase `PostConfigInit` and is whitelisted for `Win64`.
 - `Plugins/RuntimeMeshComponent`: the third-party Runtime Mesh Component plugin (version name `3.2`). The RealSense plugin depends on it to build the point-cloud mesh.
 
-[`RealSenseUE.uproject`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unrealengine4/RealSenseUE.uproject) sets `"EngineAssociation": "4.26"` and declares one runtime module, `RealSenseUE`. The repository guide ([`wrappers/unrealengine4/README.md`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unrealengine4/README.md)) describes the wrapper as working with UE4 4.19 and later.
+[`RealSenseUE.uproject`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unrealengine4/RealSenseUE.uproject) sets `"EngineAssociation": "4.26"` and declares one runtime module, `RealSenseUE`. The repository guide ([`wrappers/unrealengine4/README.md`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unrealengine4/README.md)) describes the wrapper as working with UE4 4.19 and later.
 
 ### Building
 
 1. Install the RealSense SDK 2.0 on Windows (see [[Installation Windows]]). The plugin needs the librealsense headers, the `realsense2.lib` import library and `realsense2.dll`.
-2. Check the SDK path in [`Plugins/RealSense/Source/RealSense/RealSense.Build.cs`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unrealengine4/Plugins/RealSense/Source/RealSense/RealSense.Build.cs). For `Win64` it hard-codes:
+2. Check the SDK path in [`Plugins/RealSense/Source/RealSense/RealSense.Build.cs`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unrealengine4/Plugins/RealSense/Source/RealSense/RealSense.Build.cs). For `Win64` it hard-codes:
    ```csharp
    string RealSenseDirectory = "C:/Program Files (x86)/Intel RealSense SDK 2.0";
    ```
@@ -205,7 +205,7 @@ The first call to `IRealSensePlugin::Get().GetContext()` creates the librealsens
 
 ### Using the plugin in your own project
 
-Copy `Plugins/RealSense` and `Plugins/RuntimeMeshComponent` into your project's `Plugins` folder. For C++ use, add `"RealSense"` to your module's dependencies, the same way [`Source/RealSenseUE/RealSenseUE.Build.cs`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unrealengine4/Source/RealSenseUE/RealSenseUE.Build.cs) does (`PublicDependencyModuleNames` and `PublicIncludePathModuleNames`). If you use the Blueprint helpers, migrate `BP_RealSenseAPI` and `BP_RealSenseInspector` from `Content/` as well. The repository guide says to place `BP_RealSenseAPI` in the level whenever you create a new one with the inspector.
+Copy `Plugins/RealSense` and `Plugins/RuntimeMeshComponent` into your project's `Plugins` folder. For C++ use, add `"RealSense"` to your module's dependencies, the same way [`Source/RealSenseUE/RealSenseUE.Build.cs`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unrealengine4/Source/RealSenseUE/RealSenseUE.Build.cs) does (`PublicDependencyModuleNames` and `PublicIncludePathModuleNames`). If you use the Blueprint helpers, migrate `BP_RealSenseAPI` and `BP_RealSenseInspector` from `Content/` as well. The repository guide says to place `BP_RealSenseAPI` in the level whenever you create a new one with the inspector.
 
 ## Unreal Engine 4: content and Blueprint classes
 
@@ -219,11 +219,11 @@ Copy `Plugins/RealSense` and `Plugins/RuntimeMeshComponent` into your project's 
 | `M_Depth`, `M_Color`, `M_Infrared`, `M_BGSeg` | Materials for the stream textures. |
 | `T_Depth.uasset` | Depth texture asset. |
 
-![Unreal Engine 4 demo level](https://raw.githubusercontent.com/realsenseai/librealsense/development/wrappers/unrealengine4/doc/img/demo.jpg)
+![Unreal Engine 4 demo level](https://raw.githubusercontent.com/realsenseai/librealsense/master/wrappers/unrealengine4/doc/img/demo.jpg)
 
 ### Blueprint classes
 
-All of these are in [`Plugins/RealSense/Source/RealSense/Public`](https://github.com/realsenseai/librealsense/tree/development/wrappers/unrealengine4/Plugins/RealSense/Source/RealSense/Public) and are `BlueprintType` in class group "RealSense":
+All of these are in [`Plugins/RealSense/Source/RealSense/Public`](https://github.com/realsenseai/librealsense/tree/master/wrappers/unrealengine4/Plugins/RealSense/Source/RealSense/Public) and are `BlueprintType` in class group "RealSense":
 
 | Class | Blueprint-callable functions | Blueprint-readable properties |
 |---|---|---|
@@ -261,13 +261,13 @@ These are editable in the Details panel and from Blueprints. Defaults are taken 
 | PointCloud | `bEnablePcl` | `false` | Builds the point cloud into `PclMesh` (a `URuntimeMeshComponent`). |
 | PointCloud | `PclScale`, `PclVoxelSize`, `PclDensity`, `PclRenderRate` | `1.0`, `1.0`, `0.2`, `5` | Cloud scale, point size, fraction of points drawn, time in seconds between mesh updates. |
 
-The plugin also adds a details-panel customization ([`RealSenseDetailCustomization.cpp`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unrealengine4/Plugins/RealSense/Source/RealSense/Private/RealSenseDetailCustomization.cpp)) that acts as a hardware inspector. It has a *Refresh* button, shows each device's serial number, has *Load preset* and *Save preset* buttons (file filter `*.json`), and lists the sensor options.
+The plugin also adds a details-panel customization ([`RealSenseDetailCustomization.cpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unrealengine4/Plugins/RealSense/Source/RealSense/Private/RealSenseDetailCustomization.cpp)) that acts as a hardware inspector. It has a *Refresh* button, shows each device's serial number, has *Load preset* and *Save preset* buttons (file filter `*.json`), and lists the sensor options.
 
-![Unreal Engine 4 hardware inspector](https://raw.githubusercontent.com/realsenseai/librealsense/development/wrappers/unrealengine4/doc/img/hw_inspector.jpg)
+![Unreal Engine 4 hardware inspector](https://raw.githubusercontent.com/realsenseai/librealsense/master/wrappers/unrealengine4/doc/img/hw_inspector.jpg)
 
 ### Native C++ access
 
-`IRealSensePlugin::Get().GetContext()` returns the plugin's `URealSenseContext`. [`Source/RealSenseUE/RealSenseTestActor.cpp`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unrealengine4/Source/RealSenseUE/RealSenseTestActor.cpp) shows how to use it:
+`IRealSensePlugin::Get().GetContext()` returns the plugin's `URealSenseContext`. [`Source/RealSenseUE/RealSenseTestActor.cpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unrealengine4/Source/RealSenseUE/RealSenseTestActor.cpp) shows how to use it:
 
 ```cpp
 #include "RealSensePlugin.h"
@@ -289,7 +289,7 @@ for (auto Device : Context->Devices)
 ### Unity
 
 - Windows only through CMake (`BUILD_UNITY_BINDINGS is supported only for Windows OS`). The managed assembly targets .NET 3.5.
-- On Unity 2020.1 or newer (`UNITY_2020_1_OR_NEWER`), [`RsARBackgroundRestrictions.cs`](https://github.com/realsenseai/librealsense/blob/development/wrappers/unity/Assets/RealSenseSDK2.0/Scripts/RsARBackgroundRestrictions.cs) hides the "AR" entry in the `StartHere` menu.
+- On Unity 2020.1 or newer (`UNITY_2020_1_OR_NEWER`), [`RsARBackgroundRestrictions.cs`](https://github.com/realsenseai/librealsense/blob/master/wrappers/unity/Assets/RealSenseSDK2.0/Scripts/RsARBackgroundRestrictions.cs) hides the "AR" entry in the `StartHere` menu.
 - When the streaming device's name starts with "Intel RealSense L5", `RsProcessingPipe` disables every processing-block toggle in the PointCloudProcessingBlocks UI except the temporal filter.
 - `RsStreamTextureRenderer` converts only some formats to Unity textures (`Z16`, `Disparity16`, `Y16`, `Raw16` to `R16`; `Rgb8` to `RGB24`; `Rgba8` to `RGBA32`; `Bgra8` to `BGRA32`; `Y8`, `Raw8` to `Alpha8`; `Disparity32` to `RFloat`). Other formats, such as `Yuyv` and `Bgr8`, are not converted.
 - In `Multithread` mode, `OnNewSample` handlers run on a worker thread.

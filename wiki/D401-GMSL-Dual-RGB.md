@@ -6,15 +6,15 @@ For connecting and installing GMSL/MIPI cameras, see [[Installation Jetson]] and
 
 | Item | Value in code |
 |------|---------------|
-| Product ID | `0xABCC` (`RS401_GMSL_PID` in [`d400-private.h`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-private.h)) |
+| Product ID | `0xABCC` (`RS401_GMSL_PID` in [`d400-private.h`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-private.h)) |
 | Name string | `RealSense D401` |
-| Device class | `rs401_gmsl_device` (created in [`d400-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-factory.cpp)) |
+| Device class | `rs401_gmsl_device` (created in [`d400-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-factory.cpp)) |
 | Minimum firmware listed for the PID | `5.17.2.2` |
 | Device groups it belongs to | the supported D400 SKU, multi-sensor and MIPI device PID sets in `d400-private.h` |
 
-The PID is assigned by the Linux MIPI backend: [`camera-identifier-v4l.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/linux/camera-identifier-v4l.cpp) reads the device's GVD and maps the D400 GMSL product byte `0x13` to PID `0xABCC` under vendor ID `0x8086`. The MIPI/GMSL path is part of the Linux backend (`src/linux/`).
+The PID is assigned by the Linux MIPI backend: [`camera-identifier-v4l.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/linux/camera-identifier-v4l.cpp) reads the device's GVD and maps the D400 GMSL product byte `0x13` to PID `0xABCC` under vendor ID `0x8086`. The MIPI/GMSL path is part of the Linux backend (`src/linux/`).
 
-`rs401_gmsl_device` derives from `d400_color`, `d400_mipi_device` and `firmware_logger_device`. Depth, infrared and color are all served by the depth sensor, named `Stereo Module`: the code in [`d400-color.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-color.cpp) treats the color endpoint as part of the depth unit for this PID instead of registering a separate RGB sensor.
+`rs401_gmsl_device` derives from `d400_color`, `d400_mipi_device` and `firmware_logger_device`. Depth, infrared and color are all served by the depth sensor, named `Stereo Module`: the code in [`d400-color.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-color.cpp) treats the color endpoint as part of the depth unit for this PID instead of registering a separate RGB sensor.
 
 ## Choosing a mode
 
@@ -25,7 +25,7 @@ The PID is assigned by the Linux MIPI backend: [`camera-identifier-v4l.cpp`](htt
 
 **The second color stream selects the mode.** Enabling `Color 1` (stream `RS2_STREAM_COLOR`, index 1) selects raw dual-RGB. A single `Color` stream is ISP color in any format, including `RGB8`: the raw debayer blocks are registered after the ISP blocks, so the ISP conversion wins for a lone `Color` request and the raw path is used only when `Color 1` is also requested (see `d400_color::register_processing_blocks()`).
 
-Raw dual-RGB is only set up when the firmware is `5.17.4.13` or newer (`d400_device::is_d401_raw_dual_rgb()` in [`d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-device.cpp)). With older firmware the raw-to-RGB8 blocks are not registered, so `Color 1` is not offered and only ISP color is available.
+Raw dual-RGB is only set up when the firmware is `5.17.4.13` or newer (`d400_device::is_d401_raw_dual_rgb()` in [`d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-device.cpp)). With older firmware the raw-to-RGB8 blocks are not registered, so `Color 1` is not offered and only ISP color is available.
 
 ## Streaming raw dual-RGB from code
 
@@ -47,7 +47,7 @@ Requesting `Color 1` together with any infrared stream makes the depth sensor's 
 Color 1 and Infrared cannot stream together: in raw dual-RGB mode both imagers output Bayer
 ```
 
-This check is in `d400_depth_sensor::open()` in [`d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-device.cpp) *(new in the next release)*.
+This check is in `d400_depth_sensor::open()` in [`d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-device.cpp) *(new in the next release)*.
 
 ## Streaming ISP color with depth and infrared
 
@@ -70,7 +70,7 @@ For general pipeline usage see [[API How To]] and [[Code Samples]].
 
 ## Using the Viewer
 
-The RealSense Viewer (see [[Realsense Viewer Manual]]) applies the mode rules when it sees a dual-color device. In [`common/subdevice-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/subdevice-model.cpp), `is_dual_color_subdevice()` is true for product ID `ABCC` (and `0B5B`, *new in the next release*) when the sensor exposes `Color`, a second color stream and depth or infrared. For such a sensor:
+The RealSense Viewer (see [[Realsense Viewer Manual]]) applies the mode rules when it sees a dual-color device. In [`common/subdevice-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/subdevice-model.cpp), `is_dual_color_subdevice()` is true for product ID `ABCC` (and `0B5B`, *new in the next release*) when the sensor exposes `Color`, a second color stream and depth or infrared. For such a sensor:
 
 - Enabling `Color 1` turns off the infrared streams and switches `Color` to `RGB8` (raw dual-RGB).
 - Enabling an infrared stream turns off `Color 1` (ISP color).
@@ -81,7 +81,7 @@ With firmware that does not expose `Color 1`, none of these rules apply.
 
 ## Rectification filter
 
-For this PID the depth sensor's recommended processing blocks include `RGB Rectification` (`dual_rgb_rectify_filter`, [`src/proc/dual-rgb-rectify-filter.h`](https://github.com/realsenseai/librealsense/blob/development/src/proc/dual-rgb-rectify-filter.h)). It acts on `RGB8` color frames: once it has seen both color streams it builds stereo-rectification maps from their intrinsics and the left-to-right extrinsics, and outputs rectified images with matching rectified intrinsics. The header describes it as on by default and toggleable in the Viewer's post-processing list. See [[Post Processing Filters]].
+For this PID the depth sensor's recommended processing blocks include `RGB Rectification` (`dual_rgb_rectify_filter`, [`src/proc/dual-rgb-rectify-filter.h`](https://github.com/realsenseai/librealsense/blob/master/src/proc/dual-rgb-rectify-filter.h)). It acts on `RGB8` color frames: once it has seen both color streams it builds stereo-rectification maps from their intrinsics and the left-to-right extrinsics, and outputs rectified images with matching rectified intrinsics. The header describes it as on by default and toggleable in the Viewer's post-processing list. See [[Post Processing Filters]].
 
 ## What the SDK does in raw dual-RGB mode
 
@@ -109,7 +109,7 @@ Resolutions registered for raw dual-RGB `RGB8` output, in code order:
 
 ## What the SDK does in ISP color mode
 
-- The camera delivers `YUYV`. The host converts it to `RGB8`, `RGBA8`, `BGR8` and `BGRA8` (`map_supported_color_formats()` in [`src/device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/device.cpp)).
+- The camera delivers `YUYV`. The host converts it to `RGB8`, `RGBA8`, `BGR8` and `BGRA8` (`map_supported_color_formats()` in [`src/device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/device.cpp)).
 - On a Jetson with a MIPI driver older than `1.0.4.9`, the SDK uses a `UYVY`-based workaround converter instead, because the bytes arrive swapped.
 - Color frames get MIPI color metadata (frame timestamp, frame counter, sensor timestamp, brightness, contrast, saturation, sharpness and others), registered in `d400_color::register_metadata_mipi()`. See [[Frame Metadata]].
 
@@ -122,7 +122,7 @@ All controls are on the `Stereo Module` sensor. The depth-sensor options are reg
 - **RGB controls.** For this PID, color controls go to the dedicated color V4L2 node (a node whose path contains `color`), not the depth node. When the firmware is `5.17.3.15` or newer and the MIPI driver is `1.0.4.9` or newer, the SDK registers `RS2_OPTION_SATURATION`, `RS2_OPTION_SHARPNESS`, `RS2_OPTION_WHITE_BALANCE`, `RS2_OPTION_ENABLE_AUTO_WHITE_BALANCE` and `RS2_OPTION_POWER_LINE_FREQUENCY` on that node.
 - **Not registered for this PID.** `RS2_OPTION_AUTO_EXPOSURE_PRIORITY` and the color auto-exposure ROI feature are not registered.
 
-The `RS2_OPTION_DUAL_RGB_*` options in [`rs_option.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_option.h) belong to D500 dual-RGB devices. The D400 code does not register them for the D401 GMSL.
+The `RS2_OPTION_DUAL_RGB_*` options in [`rs_option.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_option.h) belong to D500 dual-RGB devices. The D400 code does not register them for the D401 GMSL.
 
 ## D401 over USB
 
@@ -136,12 +136,12 @@ Over USB, a D401 enumerates with the D405 PID (`0x0B5B`). When that device expos
 
 ## Related source
 
-- [`src/ds/d400/d400-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-factory.cpp): `rs401_gmsl_device`, its default profiles and matcher
-- [`src/ds/d400/d400-color.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-color.cpp): color endpoint, RGB controls, ISP and raw processing blocks
-- [`src/ds/d400/d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-device.cpp): raw stream routing, firmware gate, color intrinsics, infrared exclusion
-- [`src/proc/rggb-converter.h`](https://github.com/realsenseai/librealsense/blob/development/src/proc/rggb-converter.h) and [`src/proc/rggb-debayer.h`](https://github.com/realsenseai/librealsense/blob/development/src/proc/rggb-debayer.h): host debayer
-- [`src/linux/camera-identifier-v4l.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/linux/camera-identifier-v4l.cpp): MIPI PID identification
-- [`doc/rs400/d401_dual_rgb_gmsl.md`](https://github.com/realsenseai/librealsense/blob/development/doc/rs400/d401_dual_rgb_gmsl.md): repository guide with Viewer screenshots
+- [`src/ds/d400/d400-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-factory.cpp): `rs401_gmsl_device`, its default profiles and matcher
+- [`src/ds/d400/d400-color.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-color.cpp): color endpoint, RGB controls, ISP and raw processing blocks
+- [`src/ds/d400/d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-device.cpp): raw stream routing, firmware gate, color intrinsics, infrared exclusion
+- [`src/proc/rggb-converter.h`](https://github.com/realsenseai/librealsense/blob/master/src/proc/rggb-converter.h) and [`src/proc/rggb-debayer.h`](https://github.com/realsenseai/librealsense/blob/master/src/proc/rggb-debayer.h): host debayer
+- [`src/linux/camera-identifier-v4l.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/linux/camera-identifier-v4l.cpp): MIPI PID identification
+- [`doc/rs400/d401_dual_rgb_gmsl.md`](https://github.com/realsenseai/librealsense/blob/master/doc/rs400/d401_dual_rgb_gmsl.md): repository guide with Viewer screenshots
 
 <!-- wikigen:footer -->
 _Maintained from librealsense `development`; last checked at commit [`bc496cd`](https://github.com/realsenseai/librealsense/commit/bc496cdb16beca36c41d2b96170e309fceb38d6e)._

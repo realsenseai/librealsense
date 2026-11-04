@@ -1,4 +1,4 @@
-The librealsense repository contains a Dockerfile and helper scripts that build a small Ubuntu-based container image with the RealSense SDK 2.0 command-line tools, non-graphical examples and the Python bindings. Use it if you want to run RealSense tools or a librealsense-based application in a container on a Linux host with a camera connected over USB. Everything described here is in [`scripts/Docker/`](https://github.com/realsenseai/librealsense/tree/development/scripts/Docker).
+The librealsense repository contains a Dockerfile and helper scripts that build a small Ubuntu-based container image with the RealSense SDK 2.0 command-line tools, non-graphical examples and the Python bindings. Use it if you want to run RealSense tools or a librealsense-based application in a container on a Linux host with a camera connected over USB. Everything described here is in [`scripts/Docker/`](https://github.com/realsenseai/librealsense/tree/master/scripts/Docker).
 
 ## Overview
 
@@ -6,12 +6,12 @@ The folder has these files:
 
 | File | What it does |
 |---|---|
-| [`Dockerfile`](https://github.com/realsenseai/librealsense/blob/development/scripts/Docker/Dockerfile) | Two-stage build: a builder stage that downloads and compiles a released librealsense version, and a runtime stage that holds only the installed binaries and runtime packages. |
-| [`build_image.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/Docker/build_image.sh) | Builds the runtime image for the host platform and tags it `librealsense`. |
-| [`build_image_multi_platform.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/Docker/build_image_multi_platform.sh) | Builds the image for `linux/amd64` and `linux/arm64` with `docker buildx` and saves each one to a tar file. |
-| [`run_image.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/Docker/run_image.sh) | Starts the `librealsense` image with access to the host's camera devices. |
-| [`readme.md`](https://github.com/realsenseai/librealsense/blob/development/scripts/Docker/readme.md) | The repository guide for the Docker image. |
-| [`LRS_Docker_Depth_example.gif`](https://github.com/realsenseai/librealsense/blob/development/scripts/Docker/LRS_Docker_Depth_example.gif) | Animated image that `readme.md` shows after its `rs-depth` example command. |
+| [`Dockerfile`](https://github.com/realsenseai/librealsense/blob/master/scripts/Docker/Dockerfile) | Two-stage build: a builder stage that downloads and compiles a released librealsense version, and a runtime stage that holds only the installed binaries and runtime packages. |
+| [`build_image.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/Docker/build_image.sh) | Builds the runtime image for the host platform and tags it `librealsense`. |
+| [`build_image_multi_platform.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/Docker/build_image_multi_platform.sh) | Builds the image for `linux/amd64` and `linux/arm64` with `docker buildx` and saves each one to a tar file. |
+| [`run_image.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/Docker/run_image.sh) | Starts the `librealsense` image with access to the host's camera devices. |
+| [`readme.md`](https://github.com/realsenseai/librealsense/blob/master/scripts/Docker/readme.md) | The repository guide for the Docker image. |
+| [`LRS_Docker_Depth_example.gif`](https://github.com/realsenseai/librealsense/blob/master/scripts/Docker/LRS_Docker_Depth_example.gif) | Animated image that `readme.md` shows after its `rs-depth` example command. |
 
 The image does **not** contain your local source tree. The Dockerfile downloads the source archive of a release tag from GitHub and builds that. To containerize your own changes, you have to change the Dockerfile.
 
@@ -59,7 +59,7 @@ If `LIBRS_VERSION` is missing, the build stops at the `RUN test -n "$LIBRS_VERSI
 
 ### For x86_64 and arm64
 
-[`build_image_multi_platform.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/Docker/build_image_multi_platform.sh) needs Docker with `buildx`, and for the arm64 build on an x86 host, emulation for that platform. It computes `LIBRS_VERSION` the same way as `build_image.sh` and then runs two builds:
+[`build_image_multi_platform.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/Docker/build_image_multi_platform.sh) needs Docker with `buildx`, and for the arm64 build on an x86 host, emulation for that platform. It computes `LIBRS_VERSION` the same way as `build_image.sh` and then runs two builds:
 
 ```sh
 # Build x86_64 image
@@ -91,7 +91,7 @@ Connect the camera to the host, then run:
 ./run_image.sh
 ```
 
-[`run_image.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/Docker/run_image.sh) runs:
+[`run_image.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/Docker/run_image.sh) runs:
 
 ```sh
 docker run -it --rm \
@@ -127,7 +127,7 @@ docker run -it --rm \
     librealsense rs-depth
 ```
 
-`rs-depth` is the C example from [`examples/C/depth`](https://github.com/realsenseai/librealsense/tree/development/examples/C/depth), which draws the depth stream as text in the terminal. To get a shell inside the container, use `/bin/bash` as the command instead.
+`rs-depth` is the C example from [`examples/C/depth`](https://github.com/realsenseai/librealsense/tree/master/examples/C/depth), which draws the depth stream as text in the terminal. To get a shell inside the container, use `/bin/bash` as the command instead.
 
 ## What the Dockerfile does
 
@@ -156,12 +156,12 @@ docker run -it --rm \
    && make install
    ```
 
-What these options mean, according to [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake):
+What these options mean, according to [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake):
 
 - `-s` in the release flags makes the linker strip symbols, to keep the binaries small. `${CMAKE_C_FLAGS_RELEASE}` and `${CMAKE_CXX_FLAGS_RELEASE}` are read from the shell, where they are normally empty.
 - `BUILD_GRAPHICAL_EXAMPLES=OFF` (default `ON`) skips the OpenGL examples and the graphical tools, including `realsense-viewer` and the Depth Quality Tool.
-- `BUILD_PYTHON_BINDINGS=true` (default `OFF`) builds `pyrealsense2`. With CMake 3.12 or newer it installs into the `Python_SITEARCH` folder of the builder's `python3` ([`CMake/external_pybind11.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/external_pybind11.cmake)). The Dockerfile copies it from `/usr/lib/python3/dist-packages/pyrealsense2`.
-- All other options keep their defaults. In particular, `BUILD_EXAMPLES` and `BUILD_TOOLS` are `ON`, and `FORCE_RSUSB_BACKEND` is `OFF`, so the library uses the V4L2 backend ([`CMake/unix_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/unix_config.cmake)). See [[Build Configuration]] for all options.
+- `BUILD_PYTHON_BINDINGS=true` (default `OFF`) builds `pyrealsense2`. With CMake 3.12 or newer it installs into the `Python_SITEARCH` folder of the builder's `python3` ([`CMake/external_pybind11.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/external_pybind11.cmake)). The Dockerfile copies it from `/usr/lib/python3/dist-packages/pyrealsense2`.
+- All other options keep their defaults. In particular, `BUILD_EXAMPLES` and `BUILD_TOOLS` are `ON`, and `FORCE_RSUSB_BACKEND` is `OFF`, so the library uses the V4L2 backend ([`CMake/unix_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/unix_config.cmake)). See [[Build Configuration]] for all options.
 
 The build uses one job less than the number of CPUs (`nproc`) of the build machine.
 

@@ -8,7 +8,7 @@ For build configuration details, please refer to [build-configuration documentat
 
 ## CMake options
 
-The options below are declared in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake), which the top-level [`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/CMakeLists.txt) includes. Pass any of them on the CMake command line with `-D`, for example:
+The options below are declared in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake), which the top-level [`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/CMakeLists.txt) includes. Pass any of them on the CMake command line with `-D`, for example:
 
 ```sh
 cmake .. -DBUILD_EXAMPLES=ON -DBUILD_PYTHON_BINDINGS=ON
@@ -16,7 +16,7 @@ cmake .. -DBUILD_EXAMPLES=ON -DBUILD_PYTHON_BINDINGS=ON
 
 A value passed with `-D` is stored in the build folder's `CMakeCache.txt` and stays in effect for later CMake runs in that folder until you change it.
 
-On Linux and macOS, when `CMAKE_BUILD_TYPE` is not set, the build uses `Release` and puts its libraries and executables under `<build folder>/Release` ([`CMake/unix_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/unix_config.cmake)). To get a debug build, pass `-DCMAKE_BUILD_TYPE=Debug`.
+On Linux and macOS, when `CMAKE_BUILD_TYPE` is not set, the build uses `Release` and puts its libraries and executables under `<build folder>/Release` ([`CMake/unix_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/unix_config.cmake)). To get a debug build, pass `-DCMAKE_BUILD_TYPE=Debug`.
 
 <!-- wikigen:table-cmake-options -->
 | Option | Default | Description |
@@ -74,7 +74,7 @@ On Linux and macOS, when `CMAKE_BUILD_TYPE` is not set, the build uses `Release`
 | `ENABLE_STATS` | `ON` | Enable RUM (Real User Monitoring) usage-statistics collection |
 <!-- /wikigen:table-cmake-options -->
 
-The table lists each option where `lrs_options.cmake` declares it; some options are declared only inside an `if(...)` block, shown in the Default column. Other files under [`CMake/`](https://github.com/realsenseai/librealsense/tree/development/CMake) can still adjust an option after it is declared, so check them when an option does not behave as listed.
+The table lists each option where `lrs_options.cmake` declares it; some options are declared only inside an `if(...)` block, shown in the Default column. Other files under [`CMake/`](https://github.com/realsenseai/librealsense/tree/master/CMake) can still adjust an option after it is declared, so check them when an option does not behave as listed.
 
 <!-- wikigen:footer -->
 _Maintained from librealsense `development`; last checked at commit [`0d4fcab`](https://github.com/realsenseai/librealsense/commit/0d4fcabf634650b821200ad38eedaa13aa4cb704)._

@@ -16,7 +16,7 @@ For a rectified pair of cameras with focal length `fx` (in pixels) and baseline 
 depth = fx * B / disparity
 ```
 
-The same relation is stated in the SDK for the disparity pixel formats `RS2_FORMAT_DISPARITY16` and `RS2_FORMAT_DISPARITY32` in [`rs_sensor.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_sensor.h): *Disparity = Baseline\*FocalLength/Depth*.
+The same relation is stated in the SDK for the disparity pixel formats `RS2_FORMAT_DISPARITY16` and `RS2_FORMAT_DISPARITY32` in [`rs_sensor.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_sensor.h): *Disparity = Baseline\*FocalLength/Depth*.
 
 ### Block matching
 
@@ -108,7 +108,7 @@ Depth frames (`RS2_FORMAT_Z16`) store 16-bit integer values. The pixel value mul
 
 `rs2::depth_frame::get_distance(x, y)` returns the distance in meters at a pixel, already scaled.
 
-On D400 devices the default is 0.001 (1 mm), except for the RealSense D405 and the GMSL RealSense D401, which use 0.0001 (0.1 mm). With advanced mode enabled (firmware 5.6.3.0 or later), the D400 depth units become writable (see [[D400 Advanced Mode]]). See [`d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-device.cpp).
+On D400 devices the default is 0.001 (1 mm), except for the RealSense D405 and the GMSL RealSense D401, which use 0.0001 (0.1 mm). With advanced mode enabled (firmware 5.6.3.0 or later), the D400 depth units become writable (see [[D400 Advanced Mode]]). See [`d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-device.cpp).
 
 ### Stereo baseline
 
@@ -118,16 +118,16 @@ The distance between the two stereo imagers is exposed as:
 - `rs2::depth_stereo_sensor::get_stereo_baseline()` (C: `rs2_get_stereo_baseline`), in millimeters;
 - `rs2::disparity_frame::get_baseline()` on disparity frames.
 
-The option is registered by the D400 and D500 depth sensors ([`d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-device.cpp), [`d500-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-device.cpp)). For DDS cameras the SDK uses the option if the camera provides it, and otherwise falls back to the extrinsics between the two infrared streams ([`rs-dds-depth-sensor-proxy.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/dds/rs-dds-depth-sensor-proxy.cpp)). See [[Ethernet and DDS Cameras]].
+The option is registered by the D400 and D500 depth sensors ([`d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-device.cpp), [`d500-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-device.cpp)). For DDS cameras the SDK uses the option if the camera provides it, and otherwise falls back to the extrinsics between the two infrared streams ([`rs-dds-depth-sensor-proxy.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/dds/rs-dds-depth-sensor-proxy.cpp)). See [[Ethernet and DDS Cameras]].
 
 ### Depth to disparity and back
 
-The `rs2::disparity_transform` processing block ([`rs_processing.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_processing.hpp)) converts between the two representations:
+The `rs2::disparity_transform` processing block ([`rs_processing.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_processing.hpp)) converts between the two representations:
 
 - `rs2::disparity_transform(true)` converts a `RS2_FORMAT_Z16` depth frame into a `RS2_FORMAT_DISPARITY32` disparity frame.
 - `rs2::disparity_transform(false)` converts a disparity frame back to `RS2_FORMAT_Z16` depth.
 
-The transform only converts frames from a stereo depth sensor (one that provides a stereo baseline). It uses the frame's focal length (`fx` from the stream intrinsics), the stereo baseline and the depth units. In the implementation ([`disparity-transform.h`](https://github.com/realsenseai/librealsense/blob/development/src/proc/disparity-transform.h)) the conversion factor also includes 5 fractional bits, so the output disparity values are scaled by 32:
+The transform only converts frames from a stereo depth sensor (one that provides a stereo baseline). It uses the frame's focal length (`fx` from the stream intrinsics), the stereo baseline and the depth units. In the implementation ([`disparity-transform.h`](https://github.com/realsenseai/librealsense/blob/master/src/proc/disparity-transform.h)) the conversion factor also includes 5 fractional bits, so the output disparity values are scaled by 32:
 
 ```
 factor    = baseline_m * fx * 32 / depth_units
@@ -135,21 +135,21 @@ disparity = factor / depth_raw
 depth_raw = factor / disparity
 ```
 
-The [post-processing example](https://github.com/realsenseai/librealsense/blob/development/examples/post-processing/rs-post-processing.cpp) optionally converts to disparity before the spatial and temporal filters and converts back afterwards. See [[Post Processing Filters]] for the full filter chain.
+The [post-processing example](https://github.com/realsenseai/librealsense/blob/master/examples/post-processing/rs-post-processing.cpp) optionally converts to disparity before the spatial and temporal filters and converts back afterwards. See [[Post Processing Filters]] for the full filter chain.
 
 ### From pixel and depth to a 3D point
 
-Once you know the depth at a pixel, `rs2_deproject_pixel_to_point()` in [`rsutil.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rsutil.h) computes the 3D point in the camera coordinate system using the stream intrinsics:
+Once you know the depth at a pixel, `rs2_deproject_pixel_to_point()` in [`rsutil.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rsutil.h) computes the 3D point in the camera coordinate system using the stream intrinsics:
 
 ```cpp
 void rs2_deproject_pixel_to_point(float point[3], const rs2_intrinsics* intrin, const float pixel[2], float depth);
 ```
 
-The [measure example](https://github.com/realsenseai/librealsense/blob/development/examples/measure/rs-measure.cpp) uses it to measure the real-world distance between two pixels. See [[Projection in RealSense SDK 2.0]] for the projection model.
+The [measure example](https://github.com/realsenseai/librealsense/blob/master/examples/measure/rs-measure.cpp) uses it to measure the real-world distance between two pixels. See [[Projection in RealSense SDK 2.0]] for the projection model.
 
 ### Python example
 
-The following snippet reads the depth units and stereo baseline, gets the distance at the center pixel and deprojects it to a 3D point. It uses only APIs bound in the [Python wrapper](https://github.com/realsenseai/librealsense/tree/development/wrappers/python) (see [[Python Wrapper]]).
+The following snippet reads the depth units and stereo baseline, gets the distance at the center pixel and deprojects it to a 3D point. It uses only APIs bound in the [Python wrapper](https://github.com/realsenseai/librealsense/tree/master/wrappers/python) (see [[Python Wrapper]]).
 
 ```python
 import pyrealsense2 as rs
@@ -185,9 +185,9 @@ finally:
 - [[Projection in RealSense SDK 2.0]]: intrinsics, extrinsics, projection and deprojection.
 - [[Post Processing Filters]]: filters applied to depth, including the disparity transform.
 - [[D400 Advanced Mode]]: depth units and other depth controls on D400 devices.
-- [`examples/measure`](https://github.com/realsenseai/librealsense/tree/development/examples/measure): measuring distances using deprojection.
-- [`examples/post-processing`](https://github.com/realsenseai/librealsense/tree/development/examples/post-processing): filter chain with depth/disparity conversion.
-- [`wrappers/python/examples/opencv_pointcloud_viewer.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/opencv_pointcloud_viewer.py): Python point cloud viewer.
+- [`examples/measure`](https://github.com/realsenseai/librealsense/tree/master/examples/measure): measuring distances using deprojection.
+- [`examples/post-processing`](https://github.com/realsenseai/librealsense/tree/master/examples/post-processing): filter chain with depth/disparity conversion.
+- [`wrappers/python/examples/opencv_pointcloud_viewer.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/opencv_pointcloud_viewer.py): Python point cloud viewer.
 
 <!-- wikigen:footer -->
 _Maintained from librealsense `development`; last checked at commit [`84e42c1`](https://github.com/realsenseai/librealsense/commit/84e42c1d2ce717c57dcf11f155bbe68bb41bbd1c)._

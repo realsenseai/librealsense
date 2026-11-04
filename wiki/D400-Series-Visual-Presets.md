@@ -1,5 +1,5 @@
 ## Overview
-The [RealSense Viewer](https://github.com/realsenseai/librealsense/tree/development/tools/realsense-viewer ) tool supports several predefined depth presets that can be selected according to the user's usage.
+The [RealSense Viewer](https://github.com/realsenseai/librealsense/tree/master/tools/realsense-viewer ) tool supports several predefined depth presets that can be selected according to the user's usage.
 The predefined presets are listed in the table below. The table explains some of the recommended use cases for each predefined preset. There are also examples of images with each preset and a corresponding JSON file.<br>
 The user can also modify the settings via the Advanced Mode menu and save a customized user preset. All the settings can be saved and loaded via the tool's menu. We use machine learning algorithms and capture of ground truth datasets to optimize preset for certain conditions, and we may add more presets in the future. The developers can do this too, or just start adjusting the parameters by hand, but we do not provide guidance on this.
 The key to good depth is to start from our recommended defaults:

@@ -101,7 +101,7 @@ $ export LRS_LOG_LEVEL="<Log Level>"
 
 The level applies to the log file that librealsense writes to the current working directory, named after the date and time it was opened (for example `2026-01-31-14_05_09.log`).
 
-See also [Troubleshooting Tips and Tricks](https://github.com/realsenseai/librealsense/blob/development/doc/troubleshooting.md) for kernel-level tracing on Linux.
+See also [Troubleshooting Tips and Tricks](https://github.com/realsenseai/librealsense/blob/master/doc/troubleshooting.md) for kernel-level tracing on Linux.
 
 
 #### Q: GCC Internal Error
@@ -136,7 +136,7 @@ This is a standard warning issued since Kernel 4.4-30+, it is only a notificatio
 
 This issue is caused since the patched module kernel version is incompatible with the resident kernel.
 Verify the actual kernel version with `uname -r`.
-Revert and proceed from the [Install dependencies](https://github.com/realsenseai/librealsense/blob/development/doc/installation.md#install-dependencies) step of the Linux installation guide.
+Revert and proceed from the [Install dependencies](https://github.com/realsenseai/librealsense/blob/master/doc/installation.md#install-dependencies) step of the Linux installation guide.
 
 
 
@@ -145,7 +145,7 @@ Revert and proceed from the [Install dependencies](https://github.com/realsensea
 Running `./scripts/patch-realsense-ubuntu-lts-hwe.sh` (or the other `patch-realsense-*.sh` scripts) fails with `fatal error: openssl/opensslv.h`.
 This is usually caused due to a missing dependency.
 `patch-realsense-ubuntu-lts.sh` and `patch-realsense-ubuntu-lts-hwe.sh` check for `libssl-dev` and install it with `apt-get` when it is missing; `patch-realsense-ubuntu-L4T.sh` installs it unconditionally.
-Install the *openssl* development package (`libssl-dev`) as described in the [Install dependencies](https://github.com/realsenseai/librealsense/blob/development/doc/installation.md#install-dependencies) step.
+Install the *openssl* development package (`libssl-dev`) as described in the [Install dependencies](https://github.com/realsenseai/librealsense/blob/master/doc/installation.md#install-dependencies) step.
 
 
 

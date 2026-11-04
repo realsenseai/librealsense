@@ -4,9 +4,9 @@ Advanced mode exposes the low-level parameters of the depth-from-stereo engine o
 
 A device supports advanced mode when it can be extended to `rs400::advanced_mode` (C: `rs2_is_device_extendable_to(dev, RS2_EXTENSION_ADVANCED_MODE, ...)`). In the library this is every device class that derives from `ds_advanced_mode_base`:
 
-- all D400 device classes in [`src/ds/d400/d400-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-factory.cpp). The MIPI/GMSL classes (`rs401_gmsl_device`, `rs415_gmsl_device`, `rs430_gmsl_device`, `rs457_device`) derive from it through `d400_mipi_device`;
-- the D500 device classes in [`src/ds/d500/d500-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-factory.cpp);
-- DDS (Ethernet) device proxies in [`src/dds/rs-dds-device-proxy.h`](https://github.com/realsenseai/librealsense/blob/development/src/dds/rs-dds-device-proxy.h), see [[Ethernet and DDS Cameras]].
+- all D400 device classes in [`src/ds/d400/d400-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-factory.cpp). The MIPI/GMSL classes (`rs401_gmsl_device`, `rs415_gmsl_device`, `rs430_gmsl_device`, `rs457_device`) derive from it through `d400_mipi_device`;
+- the D500 device classes in [`src/ds/d500/d500-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-factory.cpp);
+- DDS (Ethernet) device proxies in [`src/dds/rs-dds-device-proxy.h`](https://github.com/realsenseai/librealsense/blob/master/src/dds/rs-dds-device-proxy.h), see [[Ethernet and DDS Cameras]].
 
 Always check at runtime rather than by model:
 
@@ -29,7 +29,7 @@ for (auto&& dev : ctx.query_devices())
 Supporting the interface is not the same as being able to switch it on and off:
 
 - **D400**: advanced mode is switched with `toggle_advanced_mode()` (see below).
-- **D500**: the RealSense Viewer does not offer the toggle for D500 devices (in [`common/device-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/device-model.cpp) the menu item is skipped with the comment "D500 cannot toggle Advanced Mode"), and shows "Device FW does not support advanced mode" in the Advanced Controls section when it is off.
+- **D500**: the RealSense Viewer does not offer the toggle for D500 devices (in [`common/device-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/device-model.cpp) the menu item is skipped with the comment "D500 cannot toggle Advanced Mode"), and shows "Device FW does not support advanced mode" in the Advanced Controls section when it is off.
 - **DDS devices**: `toggle_advanced_mode()` does nothing; the enabled state comes from the `advanced-mode` field of the device information sent by the camera.
 
 ## Enabling advanced mode
@@ -50,7 +50,7 @@ if (dev.is<rs400::advanced_mode>())
 
 Do this while the device is not streaming. The Viewer only offers the toggle when the device is not streaming (it shows "Advanced mode cannot be enabled when streaming").
 
-Turning advanced mode off with `toggle_advanced_mode(false)` also resets the device. While it is off, the library does not register the `RS2_OPTION_VISUAL_PRESET` option on the depth sensor of advanced-mode devices: the visual preset option is registered only when advanced mode is enabled ([`src/ds/advanced_mode/advanced_mode.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/advanced_mode/advanced_mode.cpp)).
+Turning advanced mode off with `toggle_advanced_mode(false)` also resets the device. While it is off, the library does not register the `RS2_OPTION_VISUAL_PRESET` option on the depth sensor of advanced-mode devices: the visual preset option is registered only when advanced mode is enabled ([`src/ds/advanced_mode/advanced_mode.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/advanced_mode/advanced_mode.cpp)).
 
 ### From the RealSense Viewer
 
@@ -59,11 +59,11 @@ In the RealSense Viewer (see [[Realsense Viewer Manual]]), either:
 - open the device menu (the "bars" icon on the device panel) and select **Advanced Mode**, or
 - expand the **Advanced Controls** section of the depth sensor; when advanced mode is off it shows "Device is not in advanced mode" and a **Turn on Advanced Mode** button.
 
-Both ask for confirmation, then call `toggle_advanced_mode()` and the device restarts. The button tooltip reads: "Advanced mode is a persistent camera state unlocking calibration formats and depth generation controls". The [[Depth Quality Tool]] switches a non-DDS device into advanced mode by itself when it starts streaming from it ([`tools/depth-quality/depth-quality-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/depth-quality/depth-quality-model.cpp)).
+Both ask for confirmation, then call `toggle_advanced_mode()` and the device restarts. The button tooltip reads: "Advanced mode is a persistent camera state unlocking calibration formats and depth generation controls". The [[Depth Quality Tool]] switches a non-DDS device into advanced mode by itself when it starts streaming from it ([`tools/depth-quality/depth-quality-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/depth-quality/depth-quality-model.cpp)).
 
 ### From Python
 
-The Python wrapper exposes the class as `pyrealsense2.rs400_advanced_mode` ([`wrappers/python/pyrs_advanced_mode.cpp`](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/pyrs_advanced_mode.cpp)):
+The Python wrapper exposes the class as `pyrealsense2.rs400_advanced_mode` ([`wrappers/python/pyrs_advanced_mode.cpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/pyrs_advanced_mode.cpp)):
 
 ```python
 import pyrealsense2 as rs
@@ -74,15 +74,15 @@ if not adv.is_enabled():
     adv.toggle_advanced_mode(True)   # the device resets; query it again afterwards
 ```
 
-The full Python tutorial, including waiting for the device to reconnect, is [`wrappers/python/examples/python-rs400-advanced-mode-example.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/python-rs400-advanced-mode-example.py). See also [[Python Wrapper]].
+The full Python tutorial, including waiting for the device to reconnect, is [`wrappers/python/examples/python-rs400-advanced-mode-example.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/python-rs400-advanced-mode-example.py). See also [[Python Wrapper]].
 
 ## Saving and loading JSON presets
 
 ### From code
 
-The JSON functions live in `rs2::serializable_device` ([`include/librealsense2/hpp/rs_serializable_device.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_serializable_device.hpp)), which `rs400::advanced_mode` derives from:
+The JSON functions live in `rs2::serializable_device` ([`include/librealsense2/hpp/rs_serializable_device.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_serializable_device.hpp)), which `rs400::advanced_mode` derives from:
 
-| C++ | C ([`rs_device.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_device.h)) | What it does |
+| C++ | C ([`rs_device.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_device.h)) | What it does |
 |---|---|---|
 | `std::string serialize_json() const` | `rs2_raw_data_buffer* rs2_serialize_json(rs2_device* dev, rs2_error** error)` | Reads all advanced-mode controls (and the related camera controls) and returns them as a JSON string |
 | `void load_json(const std::string& json_content) const` | `void rs2_load_json(rs2_device* dev, const void* json_content, unsigned content_size, rs2_error** error)` | Parses the JSON and applies it to the device |
@@ -109,7 +109,7 @@ In C, free the buffer returned by `rs2_serialize_json` with `rs2_delete_raw_data
 
 In Python, `rs400_advanced_mode` and `serializable_device` both have `serialize_json()` and `load_json(json_content)`.
 
-Behaviour of the advanced-mode implementation ([`advanced_mode.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/advanced_mode/advanced_mode.cpp)):
+Behaviour of the advanced-mode implementation ([`advanced_mode.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/advanced_mode/advanced_mode.cpp)):
 
 - Both calls require advanced mode to be enabled. Otherwise they throw "serialize_json() failed! Device is not in Advanced-Mode." or "load_json(...) failed! Device is not in Advanced-Mode.".
 - `load_json` starts from the device's current values and changes only the keys present in the file, then sets the visual preset option to **Custom** (not on DDS devices, where advanced mode does not register that option).
@@ -117,7 +117,7 @@ Behaviour of the advanced-mode implementation ([`advanced_mode.cpp`](https://git
 
 ### JSON file format
 
-The files are written and read by [`src/serialized-utilities.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/serialized-utilities.cpp) and [`src/ds/advanced_mode/json_loader.hpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/advanced_mode/json_loader.hpp). `serialize_json()` writes:
+The files are written and read by [`src/serialized-utilities.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/serialized-utilities.cpp) and [`src/ds/advanced_mode/json_loader.hpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/advanced_mode/json_loader.hpp). `serialize_json()` writes:
 
 - `"device"`: `"name"`, `"product line"` and `"fw version"` of the camera;
 - `"schema version"`: `1`;
@@ -143,7 +143,7 @@ If the device supports advanced mode but it is off, the Save icon (and the Load 
 
 ## Reading and writing control groups
 
-Each control group is a plain C struct from [`include/librealsense2/h/rs_advanced_mode_command.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_advanced_mode_command.h). For each group there is a getter and a setter:
+Each control group is a plain C struct from [`include/librealsense2/h/rs_advanced_mode_command.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_advanced_mode_command.h). For each group there is a getter and a setter:
 
 - the getters take a `mode`: `0` returns the current values, `1` the minimum values, `2` the maximum values. In C++ and Python `mode` defaults to `0`;
 - the setters write the whole struct, so read the current values first, change the fields you need, and write the struct back;
@@ -161,7 +161,7 @@ adv.set_depth_control(cur);
 
 `get_all_controls()` (C: `rs2_get_all_advanced_controls`) fills an `STAdvancedModeControls` with every group in all three modes in one operation. Each member is an array of `RS2_ADVANCED_MODE_MODES` (3) entries: `[0]` value, `[1]` minimum, `[2]` maximum. Groups for which the firmware does not report a minimum or maximum get the current value in all three entries.
 
-Device-specific behaviour from [`advanced_mode.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/advanced_mode/advanced_mode.cpp):
+Device-specific behaviour from [`advanced_mode.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/advanced_mode/advanced_mode.cpp):
 
 - `set_ae_control` throws "set_ae_control(...) failed! AE Setpoint is not supported on D500-family devices" on D500 devices. The Viewer also hides the AE setpoint for devices whose name contains "D457".
 - On devices without the amplitude-factor feature, `get_amp_factor` returns `0` and `set_amp_factor` does nothing.
@@ -170,7 +170,7 @@ Set advanced-mode controls while the device is not streaming when possible.
 
 ### Python
 
-In `pyrealsense2`, `rs400_advanced_mode` has the same `get_*` / `set_*` methods as the C++ class, plus `get_all_controls()`. Two Python-only extras are bound in [`pyrs_advanced_mode.cpp`](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/pyrs_advanced_mode.cpp):
+In `pyrealsense2`, `rs400_advanced_mode` has the same `get_*` / `set_*` methods as the C++ class, plus `get_all_controls()`. Two Python-only extras are bound in [`pyrs_advanced_mode.cpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/pyrs_advanced_mode.cpp):
 
 - each group struct can be used like a mapping: `keys()`, `group["field"]`, and `group["field"] = value` (an integer field rounds a float value);
 - the advanced-mode object itself is indexed by group name: `adv["depth_control"]` reads the current values, `adv["depth_control", 1]` the minimums, `adv["depth_control", 2]` the maximums, and `adv["depth_control"] = group` writes them. `adv.keys()` lists the group names.
@@ -185,7 +185,7 @@ In Python, the `STAFactor` field is named `a_factor` (C/C++: `amplitude`). Some 
 
 ## Control group reference
 
-One row per struct in [`rs_advanced_mode_command.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_advanced_mode_command.h), in header order. C functions are declared in [`rs_advanced_mode.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rs_advanced_mode.h), C++ methods of `rs400::advanced_mode` in [`rs_advanced_mode.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rs_advanced_mode.hpp). Python uses the C++ method names.
+One row per struct in [`rs_advanced_mode_command.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_advanced_mode_command.h), in header order. C functions are declared in [`rs_advanced_mode.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rs_advanced_mode.h), C++ methods of `rs400::advanced_mode` in [`rs_advanced_mode.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rs_advanced_mode.hpp). Python uses the C++ method names.
 
 <!-- wikigen:table-advanced-mode-groups -->
 | Struct | Fields | C get / set | C++ get / set |
@@ -210,11 +210,11 @@ Other functions in `rs_advanced_mode.h`: `rs2_toggle_advanced_mode` and `rs2_is_
 
 ## Source and examples
 
-- Public API: [`rs_advanced_mode.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rs_advanced_mode.h), [`rs_advanced_mode.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rs_advanced_mode.hpp), [`h/rs_advanced_mode_command.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_advanced_mode_command.h), [`hpp/rs_serializable_device.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_serializable_device.hpp)
-- Implementation: [`src/ds/advanced_mode/`](https://github.com/realsenseai/librealsense/tree/development/src/ds/advanced_mode), [`src/core/advanced_mode.h`](https://github.com/realsenseai/librealsense/blob/development/src/core/advanced_mode.h)
-- Older C and C++ snippets: [`doc/rs400/rs400_advanced_mode.md`](https://github.com/realsenseai/librealsense/blob/development/doc/rs400/rs400_advanced_mode.md)
-- Python: [`python-rs400-advanced-mode-example.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/python-rs400-advanced-mode-example.py)
-- Viewer integration: [`common/device-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/device-model.cpp), [`common/realsense-ui-advanced-mode.h`](https://github.com/realsenseai/librealsense/blob/development/common/realsense-ui-advanced-mode.h)
+- Public API: [`rs_advanced_mode.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rs_advanced_mode.h), [`rs_advanced_mode.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rs_advanced_mode.hpp), [`h/rs_advanced_mode_command.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_advanced_mode_command.h), [`hpp/rs_serializable_device.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_serializable_device.hpp)
+- Implementation: [`src/ds/advanced_mode/`](https://github.com/realsenseai/librealsense/tree/master/src/ds/advanced_mode), [`src/core/advanced_mode.h`](https://github.com/realsenseai/librealsense/blob/master/src/core/advanced_mode.h)
+- Older C and C++ snippets: [`doc/rs400/rs400_advanced_mode.md`](https://github.com/realsenseai/librealsense/blob/master/doc/rs400/rs400_advanced_mode.md)
+- Python: [`python-rs400-advanced-mode-example.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/python-rs400-advanced-mode-example.py)
+- Viewer integration: [`common/device-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/device-model.cpp), [`common/realsense-ui-advanced-mode.h`](https://github.com/realsenseai/librealsense/blob/master/common/realsense-ui-advanced-mode.h)
 
 Related pages: [[D400 Series Visual Presets]], [[Realsense Viewer Manual]], [[Depth Quality Tool]], [[Python Wrapper]], [[API How To]].
 

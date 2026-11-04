@@ -43,7 +43,7 @@ print(rs.rum.get_report_path())
 
 ### With the `RS2_RUM_CLOUD_ENABLED` environment variable
 
-`rs2_rum_is_cloud_enabled` checks the environment variable before it reads the config file ([`src/rum/rum-config.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/rum/rum-config.cpp)):
+`rs2_rum_is_cloud_enabled` checks the environment variable before it reads the config file ([`src/rum/rum-config.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/rum/rum-config.cpp)):
 
 | `RS2_RUM_CLOUD_ENABLED` | Saved `rum_cloud_enabled` | Upload allowed? |
 |---|---|---|
@@ -57,7 +57,7 @@ The variable controls only whether upload is allowed. It does not change what is
 
 ## Turn collection off (build time)
 
-Collection is controlled by the CMake option `ENABLE_STATS` in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake):
+Collection is controlled by the CMake option `ENABLE_STATS` in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake):
 
 ```
 option(ENABLE_STATS "Enable RUM (Real User Monitoring) usage-statistics collection" ON)
@@ -69,10 +69,10 @@ cmake .. -DENABLE_STATS=OFF
 
 What the option controls:
 
-- When it is ON, [`CMake/global_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/global_config.cmake) adds the `ENABLE_STATS` compile definition. ON is also one of the options that pull in libcurl (`BUILD_WITH_LIBCURL`), along with `CHECK_FOR_UPDATES` and `ENABLE_AI_ASSISTANT`.
-- When it is OFF, every hook in [`src/rum/rum-hooks.h`](https://github.com/realsenseai/librealsense/blob/development/src/rum/rum-hooks.h) becomes an inline no-op. That includes the save that runs when a context closes, so the library records nothing and writes no report. In the Viewer, the uploader becomes a set of empty functions and the RUM settings section is not drawn.
+- When it is ON, [`CMake/global_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/global_config.cmake) adds the `ENABLE_STATS` compile definition. ON is also one of the options that pull in libcurl (`BUILD_WITH_LIBCURL`), along with `CHECK_FOR_UPDATES` and `ENABLE_AI_ASSISTANT`.
+- When it is OFF, every hook in [`src/rum/rum-hooks.h`](https://github.com/realsenseai/librealsense/blob/master/src/rum/rum-hooks.h) becomes an inline no-op. That includes the save that runs when a context closes, so the library records nothing and writes no report. In the Viewer, the uploader becomes a set of empty functions and the RUM settings section is not drawn.
 - The `rs2_rum_*` functions are built either way. The path query and the consent get/set keep working.
-- Android builds always set `ENABLE_STATS` to OFF ([`CMake/android_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/android_config.cmake)).
+- Android builds always set `ENABLE_STATS` to OFF ([`CMake/android_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/android_config.cmake)).
 
 For the other build options, see [[Build Configuration]].
 
@@ -82,13 +82,13 @@ The SDK collects data through a small set of hooks. The table lists every place 
 
 | Data | Recorded when | Call site |
 |---|---|---|
-| Device | `rs2_create_device` creates a device | [`src/rs.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/rs.cpp) |
-| Stream configuration (count) | A sensor is opened with a set of profiles | [`src/sensor.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/sensor.cpp), [`src/software-sensor.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/software-sensor.cpp) |
+| Device | `rs2_create_device` creates a device | [`src/rs.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/rs.cpp) |
+| Stream configuration (count) | A sensor is opened with a set of profiles | [`src/sensor.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/sensor.cpp), [`src/software-sensor.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/software-sensor.cpp) |
 | Stream duration | A sensor stops, closes or is destroyed while streaming (time from start to stop) | same files |
-| Option change | `rs2_set_option` on a device sensor sets a value different from the option's default | [`src/rs.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/rs.cpp) |
-| Filter use | A processing block processes its first frame | [`src/proc/synthetic-stream.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/proc/synthetic-stream.cpp) |
-| Notification | The SDK raises a notification | [`src/rs.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/rs.cpp) |
-| Save to disk | A context is destroyed | [`src/context.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/context.cpp) |
+| Option change | `rs2_set_option` on a device sensor sets a value different from the option's default | [`src/rs.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/rs.cpp) |
+| Filter use | A processing block processes its first frame | [`src/proc/synthetic-stream.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/proc/synthetic-stream.cpp) |
+| Notification | The SDK raises a notification | [`src/rs.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/rs.cpp) |
+| Save to disk | A context is destroyed | [`src/context.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/context.cpp) |
 
 Details:
 
@@ -105,7 +105,7 @@ The SDK does **not** record serial numbers, frame content (images, depth, point 
 
 ### Report format
 
-The report is a JSON object built in [`src/rum/rum-collector.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/rum/rum-collector.cpp):
+The report is a JSON object built in [`src/rum/rum-collector.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/rum/rum-collector.cpp):
 
 | Field | Content |
 |---|---|
@@ -145,7 +145,7 @@ Each save replaces the whole file in one step (atomic write).
 
 ## When and how data is sent
 
-Only the RealSense Viewer sends data ([`common/rum-uploader/rum-uploader.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/rum-uploader/rum-uploader.cpp)). Every upload first checks `rs2::rum::is_cloud_enabled()` and is refused, with a log warning, if that returns false. The report is sent over HTTPS as compact JSON *(changed in the next release; v2.59.1 sent the file contents exactly as stored)*.
+Only the RealSense Viewer sends data ([`common/rum-uploader/rum-uploader.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/rum-uploader/rum-uploader.cpp)). Every upload first checks `rs2::rum::is_cloud_enabled()` and is refused, with a log warning, if that returns false. The report is sent over HTTPS as compact JSON *(changed in the next release; v2.59.1 sent the file contents exactly as stored)*.
 
 - **Startup upload.** When the Viewer starts and consent is saved, a background thread uploads the saved `rum.json` if both of these are true:
   - the report contains device or notification data;
@@ -154,13 +154,13 @@ Only the RealSense Viewer sends data ([`common/rum-uploader/rum-uploader.cpp`](h
   After a successful upload, `rum.json` is reset to `{ "source_id": … }` and `rum_last_upload` (Unix seconds) is saved.
 - **First run.** Nothing is uploaded until the consent dialog is accepted. Accepting it starts the same upload.
 - **Upload now.** **Settings → Online Services → Upload now** sends the saved report immediately in the background and shows the notification `RUM report uploaded` or `RUM upload failed`. If the saved report has no usage data, it shows `No RUM report saved yet` instead. If an upload is already running, the click does nothing. The button is enabled only when consent is saved. This upload does not reset `rum.json` and does not update `rum_last_upload`.
-- **Export RUM data...** saves a copy of the current `rum.json` to a JSON file you choose. If the saved report has no usage data, the Viewer shows the notification `No RUM report saved yet` instead. These messages come from [`common/viewer.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/viewer.cpp).
+- **Export RUM data...** saves a copy of the current `rum.json` to a JSON file you choose. If the saved report has no usage data, the Viewer shows the notification `No RUM report saved yet` instead. These messages come from [`common/viewer.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/viewer.cpp).
 
 The current session is saved to disk only when its context closes. As a result, the startup upload, **Upload now** and **Export** all handle sessions that have already ended.
 
 ### Config keys
 
-These keys live in `realsense-config.json` (defined in [`common/device-model.h`](https://github.com/realsenseai/librealsense/blob/development/common/device-model.h)):
+These keys live in `realsense-config.json` (defined in [`common/device-model.h`](https://github.com/realsenseai/librealsense/blob/master/common/device-model.h)):
 
 | Key | Meaning | Default |
 |---|---|---|
@@ -170,7 +170,7 @@ These keys live in `realsense-config.json` (defined in [`common/device-model.h`]
 
 ## Public API
 
-The C API is in [`include/librealsense2/h/rs_rum.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_rum.h). The C++ wrappers are in [`include/librealsense2/hpp/rs_rum.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_rum.hpp). Both are included by `rs.h` and `rs.hpp`. The Python bindings are in [`wrappers/python/pyrs_rum.cpp`](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/pyrs_rum.cpp).
+The C API is in [`include/librealsense2/h/rs_rum.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_rum.h). The C++ wrappers are in [`include/librealsense2/hpp/rs_rum.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_rum.hpp). Both are included by `rs.h` and `rs.hpp`. The Python bindings are in [`wrappers/python/pyrs_rum.cpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/pyrs_rum.cpp).
 
 <!-- wikigen:table-api -->
 | C | C++ (`rs2::rum`) | Python (`pyrealsense2.rum`) | Description |
@@ -180,11 +180,11 @@ The C API is in [`include/librealsense2/h/rs_rum.h`](https://github.com/realsens
 | `int rs2_rum_is_cloud_enabled(rs2_error** error)` | `bool is_cloud_enabled()` | `is_cloud_enabled()` | Resolved consent: the saved `rum_cloud_enabled` value, unless `RS2_RUM_CLOUD_ENABLED` is set. Any non-empty value other than `1` disables; `1` enables unless the config file saved an opt-out |
 <!-- /wikigen:table-api -->
 
-No API call returns the report contents. To inspect the report, read the file at the returned path. Tests for the API and the report are in [`unit-tests/rum`](https://github.com/realsenseai/librealsense/tree/development/unit-tests/rum).
+No API call returns the report contents. To inspect the report, read the file at the returned path. Tests for the API and the report are in [`unit-tests/rum`](https://github.com/realsenseai/librealsense/tree/master/unit-tests/rum).
 
 ## RUM dev server (`tools/rum-uploader`)
 
-[`tools/rum-uploader/dev-server/rum_dev_server.py`](https://github.com/realsenseai/librealsense/blob/development/tools/rum-uploader/dev-server/rum_dev_server.py) is a small local receiver for development. It is not a command-line uploader. It listens on `127.0.0.1`, accepts `POST /v1/rum`, saves each body as `rum-<timestamp>-<n>.json` in the output folder, prints a summary and replies `200`. A POST to any other path gets `404`.
+[`tools/rum-uploader/dev-server/rum_dev_server.py`](https://github.com/realsenseai/librealsense/blob/master/tools/rum-uploader/dev-server/rum_dev_server.py) is a small local receiver for development. It is not a command-line uploader. It listens on `127.0.0.1`, accepts `POST /v1/rum`, saves each body as `rum-<timestamp>-<n>.json` in the output folder, prints a summary and replies `200`. A POST to any other path gets `404`.
 
 ```sh
 python rum_dev_server.py --port 8080 --dir received
@@ -206,9 +206,9 @@ The script has no `--version` flag and does not use `common/cli.h`.
 
 ## Source
 
-- [`src/rum/`](https://github.com/realsenseai/librealsense/tree/development/src/rum): collector, consent config and hooks
-- [`common/rum-uploader/`](https://github.com/realsenseai/librealsense/tree/development/common/rum-uploader): the Viewer's uploader and consent dialog
-- [`doc/rum.md`](https://github.com/realsenseai/librealsense/blob/development/doc/rum.md): the repository's overview
+- [`src/rum/`](https://github.com/realsenseai/librealsense/tree/master/src/rum): collector, consent config and hooks
+- [`common/rum-uploader/`](https://github.com/realsenseai/librealsense/tree/master/common/rum-uploader): the Viewer's uploader and consent dialog
+- [`doc/rum.md`](https://github.com/realsenseai/librealsense/blob/master/doc/rum.md): the repository's overview
 
 <!-- wikigen:footer -->
 _Maintained from librealsense `development`; last checked at commit [`46cf1a6`](https://github.com/realsenseai/librealsense/commit/46cf1a67cc441ad9f55ce339a0de30f2a1c6fed0)._

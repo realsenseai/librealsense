@@ -2,16 +2,16 @@ This page explains how to install the RealSense SDK 2.0 (librealsense) on NVIDIA
 
 ## Overview
 
-A Jetson runs Linux on ARM64, so librealsense uses the same two Linux backends as on a PC. CMake selects one in [`CMake/unix_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/unix_config.cmake):
+A Jetson runs Linux on ARM64, so librealsense uses the same two Linux backends as on a PC. CMake selects one in [`CMake/unix_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/unix_config.cmake):
 
 | Backend | Selected when | Kernel patches |
 |---|---|---|
-| V4L2 (`RS2_USE_V4L2_BACKEND`) | default (`FORCE_RSUSB_BACKEND=OFF`) | Uses the L4T kernel's `uvcvideo` and HID drivers. For full support (depth formats, per-frame metadata, HID motion sensors), patch the kernel modules with [`scripts/patch-realsense-ubuntu-L4T.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/patch-realsense-ubuntu-L4T.sh). |
+| V4L2 (`RS2_USE_V4L2_BACKEND`) | default (`FORCE_RSUSB_BACKEND=OFF`) | Uses the L4T kernel's `uvcvideo` and HID drivers. For full support (depth formats, per-frame metadata, HID motion sensors), patch the kernel modules with [`scripts/patch-realsense-ubuntu-L4T.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/patch-realsense-ubuntu-L4T.sh). |
 | RSUSB (`RS2_USE_LIBUVC_BACKEND`) | `-DFORCE_RSUSB_BACKEND=ON` | Not needed. UVC and HID are implemented in user space over libusb. |
 
 The backend is fixed when you configure the build; one build cannot use both.
 
-The Jetson guide [`doc/installation_jetson.md`](https://github.com/realsenseai/librealsense/blob/development/doc/installation_jetson.md) recommends the native kernel drivers (V4L2 backend), especially in production. It describes RSUSB as a way to get a working SDK without touching the kernel, with some performance and functional limitations (for example with multiple cameras). The L4T kernel is configured and flashed differently from a desktop Ubuntu kernel, which is why the patch script rebuilds only the affected modules instead of the whole kernel image.
+The Jetson guide [`doc/installation_jetson.md`](https://github.com/realsenseai/librealsense/blob/master/doc/installation_jetson.md) recommends the native kernel drivers (V4L2 backend), especially in production. It describes RSUSB as a way to get a working SDK without touching the kernel, with some performance and functional limitations (for example with multiple cameras). The L4T kernel is configured and flashed differently from a desktop Ubuntu kernel, which is why the patch script rebuilds only the affected modules instead of the whole kernel image.
 
 You can install librealsense on a Jetson in these ways:
 
@@ -27,8 +27,8 @@ Before you start, set up the board with NVIDIA's tools (JetPack, usually install
 
 The packages are built and published outside this repository, so the source code cannot confirm which JetPack releases they support. The repository guides describe the current policy:
 
-- [`doc/installation_jetson.md`](https://github.com/realsenseai/librealsense/blob/development/doc/installation_jetson.md) says the prebuilt Debian packages need at least JetPack 5.0.2 (L4T 35.1, CUDA 11.4), and that a lower version may not work because of CUDA version incompatibilities.
-- [`doc/distribution_linux.md`](https://github.com/realsenseai/librealsense/blob/development/doc/distribution_linux.md) has the steps to register the server's public key and add the apt repository. They are the same as on a PC; see [[Installation Linux]].
+- [`doc/installation_jetson.md`](https://github.com/realsenseai/librealsense/blob/master/doc/installation_jetson.md) says the prebuilt Debian packages need at least JetPack 5.0.2 (L4T 35.1, CUDA 11.4), and that a lower version may not work because of CUDA version incompatibilities.
+- [`doc/distribution_linux.md`](https://github.com/realsenseai/librealsense/blob/master/doc/distribution_linux.md) has the steps to register the server's public key and add the apt repository. They are the same as on a PC; see [[Installation Linux]].
 
 After adding the repository, the Jetson guide installs:
 
@@ -41,7 +41,7 @@ Then reconnect the camera and run `realsense-viewer`. The guide also notes that 
 
 ### Python wheels
 
-The `pyrealsense2` package on PyPI also has `aarch64` wheels. The Python wrapper guide [`wrappers/python/README.rst`](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/README.rst) says these wheels are CUDA builds, one per JetPack line, and that the wheel's Python version selects the JetPack it was built for:
+The `pyrealsense2` package on PyPI also has `aarch64` wheels. The Python wrapper guide [`wrappers/python/README.rst`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/README.rst) says these wheels are CUDA builds, one per JetPack line, and that the wheel's Python version selects the JetPack it was built for:
 
 | Runs on | Built on | CUDA | Wheel Python version |
 |---|---|---|---|
@@ -83,12 +83,12 @@ cd librealsense
 ./scripts/setup_udev_rules.sh
 ```
 
-[`scripts/setup_udev_rules.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/setup_udev_rules.sh) works the same way as on a PC (see [[Installation Linux]]). It stops if `v4l2-ctl` is missing, asks you to remove the cameras if any `/dev/video*` node exists, and copies [`config/99-realsense-libusb.rules`](https://github.com/realsenseai/librealsense/blob/development/config/99-realsense-libusb.rules) to `/etc/udev/rules.d/`.
+[`scripts/setup_udev_rules.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/setup_udev_rules.sh) works the same way as on a PC (see [[Installation Linux]]). It stops if `v4l2-ctl` is missing, asks you to remove the cameras if any `/dev/video*` node exists, and copies [`config/99-realsense-libusb.rules`](https://github.com/realsenseai/librealsense/blob/master/config/99-realsense-libusb.rules) to `/etc/udev/rules.d/`.
 
 On Jetson one more step can apply: if `v4l2-ctl --list-devices` reports a `tegra` device, the script also installs the MIPI camera files:
 
-- [`config/99-realsense-d4xx-mipi-dfu.rules`](https://github.com/realsenseai/librealsense/blob/development/config/99-realsense-d4xx-mipi-dfu.rules) into `/etc/udev/rules.d/`
-- [`scripts/rs-enum.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/rs-enum.sh) and [`scripts/rs_ipu6_d457_bind.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/rs_ipu6_d457_bind.sh) into `/usr/local/bin/`
+- [`config/99-realsense-d4xx-mipi-dfu.rules`](https://github.com/realsenseai/librealsense/blob/master/config/99-realsense-d4xx-mipi-dfu.rules) into `/etc/udev/rules.d/`
+- [`scripts/rs-enum.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/rs-enum.sh) and [`scripts/rs_ipu6_d457_bind.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/rs_ipu6_d457_bind.sh) into `/usr/local/bin/`
 
 To remove the rules, run `./scripts/setup_udev_rules.sh --uninstall`.
 
@@ -107,9 +107,9 @@ make -j$(($(nproc)-1))
 sudo make install
 ```
 
-CMake prints `using RS2_USE_LIBUVC_BACKEND` for this backend. The deprecated `FORCE_LIBUVC` option still works: it prints a deprecation message and turns on `FORCE_RSUSB_BACKEND` ([`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/CMakeLists.txt)).
+CMake prints `using RS2_USE_LIBUVC_BACKEND` for this backend. The deprecated `FORCE_LIBUVC` option still works: it prints a deprecation message and turns on `FORCE_RSUSB_BACKEND` ([`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/CMakeLists.txt)).
 
-The Jetson guide also points to the all-in-one script [`scripts/libuvc_installation.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/libuvc_installation.sh), described on [[Installation Linux]]. Note that it:
+The Jetson guide also points to the all-in-one script [`scripts/libuvc_installation.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/libuvc_installation.sh), described on [[Installation Linux]]. Note that it:
 
 - downloads and builds the **`master`** branch archive into `~/librealsense_build`, not your local checkout;
 - creates a 2 GB `/swapfile` if no swap is active;
@@ -133,14 +133,14 @@ From the repository root (note the `L4T` suffix):
 ./scripts/patch-realsense-ubuntu-L4T.sh
 ```
 
-[`scripts/patch-realsense-ubuntu-L4T.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/patch-realsense-ubuntu-L4T.sh) runs with `set -e`, so it stops at the first failing command. It does the following:
+[`scripts/patch-realsense-ubuntu-L4T.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/patch-realsense-ubuntu-L4T.sh) runs with `set -e`, so it stops at the first failing command. It does the following:
 
 1. If any `/dev/video*` node exists, it prints `Remove all RealSense cameras attached. Hit any key when ready` and waits for Enter.
-2. It loads the helper functions from [`scripts/patch-utils-hwe.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/patch-utils-hwe.sh). If `/sys/devices/pwm-fan/target_pwm` exists, it sets the fan to `200` to limit heat during the build.
+2. It loads the helper functions from [`scripts/patch-utils-hwe.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/patch-utils-hwe.sh). If `/sys/devices/pwm-fan/target_pwm` exists, it sets the fan to `200` to limit heat during the build.
 3. It reads the board name from `/proc/device-tree/model` and the L4T version from `/etc/nv_tegra_release`. If that file is missing, it prints `/etc/nv_tegra_release not present, aborting script` and stops.
 4. It picks the patch set for the L4T version (see the table below). Any other version ends with `Unsupported JetPack revision <version> aborting script`.
 5. It installs `build-essential git libssl-dev curl`.
-6. It creates a `Tegra` folder in the current directory and copies [`scripts/Tegra/sync.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/Tegra/sync.sh) and the matching `.repos` file into it.
+6. It creates a `Tegra` folder in the current directory and copies [`scripts/Tegra/sync.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/Tegra/sync.sh) and the matching `.repos` file into it.
 7. It downloads NVIDIA's license text for the kernel sources and shows it. You must press a key within 30 seconds to accept; otherwise the `read -t 30` times out and the script stops. If the license cannot be downloaded, it prints `License link not found` and exits.
 8. It runs `sync.sh -k jetson_<L4T version>` (for 39.2, `jetson_39.2.0`) to fetch the kernel source for your L4T tag. `sync.sh` first checks which NVIDIA git server is reachable (`gitlab.com/nvidia/nv-tegra` or `nv-tegra.nvidia.com`).
 9. It configures the kernel tree, applies the RealSense patches and builds the `uvcvideo`, `v4l2-core` and (for JetPack 6 and 7) the HID and IIO motion-sensor modules.
@@ -158,8 +158,8 @@ L4T versions the script accepts, and what happens next:
 
 What the script installs, by patch set:
 
-- **`5.0` (L4T 35.x)**: applies `01-realsense-camera-formats-L4T-5.0.patch`, `02-realsense-metadata-L4T-5.0.patch` and `05-realsense-powerlinefrequency-control-fix.patch` from [`scripts/Tegra/LRS_Patches/`](https://github.com/realsenseai/librealsense/tree/development/scripts/Tegra/LRS_Patches). The built modules are copied to your home folder as `jetson_<L4T>-uvcvideo.ko` (and the `videobuf` modules), then `uvcvideo` is replaced with the helper `try_module_insert`. That helper backs up the original module, and restores it if the patched one fails to load. The script then tries to install `hid_sensor_gyro_3d` and `hid_sensor_accel_3d` from `~/jetson_<L4T>-hid-sensor-*.ko` files that only the `4.4` patch set creates, so on this path it stops at that step after `uvcvideo` has been replaced.
-- **`6.0` and `7.0` (L4T 36.x, 38.x, 39.2)**: adds the HID sensor options (`CONFIG_HID_SENSOR_HUB`, `CONFIG_HID_SENSOR_ACCEL_3D`, `CONFIG_HID_SENSOR_GYRO_3D` and others) to the kernel config. It applies the Ubuntu `jammy` or `noble` patches from [`scripts/`](https://github.com/realsenseai/librealsense/tree/development/scripts) (`realsense-camera-formats-<codename>-master.patch`, `realsense-metadata-<codename>-master.patch`, plus `realsense-powerlinefrequency-control-fix-jammy.patch` or `makefile-noble-7.0.patch` when present). It also changes the `uvcvideo` version string from `1.1.1` to `1.1.1-realsense`. The modules (`uvcvideo`, `videodev`, `kfifo_buf`, `industrialio-triggered-buffer`, `hid-sensor-iio-common`, `hid-sensor-hub`, `hid-sensor-accel-3d`, `hid-sensor-gyro-3d`, `hid-sensor-trigger`) are copied to `/lib/modules/$(uname -r)/extra/`. `/etc/depmod.d/ubuntu.conf` is edited so that `extra` is searched before `updates`. Then the old modules are unloaded with `modprobe -r` and the new ones loaded with `modprobe`.
+- **`5.0` (L4T 35.x)**: applies `01-realsense-camera-formats-L4T-5.0.patch`, `02-realsense-metadata-L4T-5.0.patch` and `05-realsense-powerlinefrequency-control-fix.patch` from [`scripts/Tegra/LRS_Patches/`](https://github.com/realsenseai/librealsense/tree/master/scripts/Tegra/LRS_Patches). The built modules are copied to your home folder as `jetson_<L4T>-uvcvideo.ko` (and the `videobuf` modules), then `uvcvideo` is replaced with the helper `try_module_insert`. That helper backs up the original module, and restores it if the patched one fails to load. The script then tries to install `hid_sensor_gyro_3d` and `hid_sensor_accel_3d` from `~/jetson_<L4T>-hid-sensor-*.ko` files that only the `4.4` patch set creates, so on this path it stops at that step after `uvcvideo` has been replaced.
+- **`6.0` and `7.0` (L4T 36.x, 38.x, 39.2)**: adds the HID sensor options (`CONFIG_HID_SENSOR_HUB`, `CONFIG_HID_SENSOR_ACCEL_3D`, `CONFIG_HID_SENSOR_GYRO_3D` and others) to the kernel config. It applies the Ubuntu `jammy` or `noble` patches from [`scripts/`](https://github.com/realsenseai/librealsense/tree/master/scripts) (`realsense-camera-formats-<codename>-master.patch`, `realsense-metadata-<codename>-master.patch`, plus `realsense-powerlinefrequency-control-fix-jammy.patch` or `makefile-noble-7.0.patch` when present). It also changes the `uvcvideo` version string from `1.1.1` to `1.1.1-realsense`. The modules (`uvcvideo`, `videodev`, `kfifo_buf`, `industrialio-triggered-buffer`, `hid-sensor-iio-common`, `hid-sensor-hub`, `hid-sensor-accel-3d`, `hid-sensor-gyro-3d`, `hid-sensor-trigger`) are copied to `/lib/modules/$(uname -r)/extra/`. `/etc/depmod.d/ubuntu.conf` is edited so that `extra` is searched before `updates`. Then the old modules are unloaded with `modprobe -r` and the new ones loaded with `modprobe`.
 
 The Jetson guide says the method was verified on Jetson AGX Xavier with JetPack 5.0.2, Jetson AGX Orin with JetPack 6.0, and Jetson AGX Thor with JetPack 7.0 (beta level). For Jetson Nano it points to external instructions.
 
@@ -174,13 +174,13 @@ make -j$(($(nproc)-1))
 sudo make install
 ```
 
-`FORCE_RSUSB_BACKEND` is already `OFF` by default, and an unset `CMAKE_BUILD_TYPE` becomes `Release` on Linux ([`CMake/unix_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/unix_config.cmake)), so both flags only make the choice explicit. CMake prints `using RS2_USE_V4L2_BACKEND`. Leave out `-DBUILD_WITH_CUDA=ON` if the CUDA toolkit is not installed (see [Building with CUDA](#building-with-cuda)). Outputs and install locations are the same as on a PC; see [[Installation Linux]].
+`FORCE_RSUSB_BACKEND` is already `OFF` by default, and an unset `CMAKE_BUILD_TYPE` becomes `Release` on Linux ([`CMake/unix_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/unix_config.cmake)), so both flags only make the choice explicit. CMake prints `using RS2_USE_V4L2_BACKEND`. Leave out `-DBUILD_WITH_CUDA=ON` if the CUDA toolkit is not installed (see [Building with CUDA](#building-with-cuda)). Outputs and install locations are the same as on a PC; see [[Installation Linux]].
 
 Then connect the camera and run `rs-enumerate-devices` or `realsense-viewer`.
 
 ## Building with CUDA
 
-`BUILD_WITH_CUDA` is `OFF` by default ([`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake)). When you turn it on, [`CMake/global_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/global_config.cmake) defines `RS2_USE_CUDA` and includes [`CMake/cuda_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/cuda_config.cmake), which:
+`BUILD_WITH_CUDA` is `OFF` by default ([`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake)). When you turn it on, [`CMake/global_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/global_config.cmake) defines `RS2_USE_CUDA` and includes [`CMake/cuda_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/cuda_config.cmake), which:
 
 - prints `Building with CUDA..`, calls `enable_language( CUDA )` and `find_package(CUDA REQUIRED)`, so configuration fails if CMake cannot find the CUDA toolkit and the `nvcc` compiler. JetPack installs CUDA under `/usr/local/cuda`; if CMake does not find `nvcc`, put `/usr/local/cuda/bin` on your `PATH`.
 - links the CUDA runtime, cuSPARSE and cuBLAS libraries.
@@ -199,7 +199,7 @@ Related options:
 | Option | Default | Effect |
 |---|---|---|
 | `BUILD_WITH_CUDA` | `OFF` | Enable CUDA. |
-| `BUILD_WITH_CUDA_ZEROCOPY` | same as `BUILD_WITH_CUDA` | Zero-copy GPU memory path for integrated GPUs such as Jetson. CMake stops with `BUILD_WITH_CUDA_ZEROCOPY requires BUILD_WITH_CUDA=ON` if it is on without CUDA. At run time it is used only when the GPU is integrated ([`src/cuda/cuda-frame-memory.cu`](https://github.com/realsenseai/librealsense/blob/development/src/cuda/cuda-frame-memory.cu)). |
+| `BUILD_WITH_CUDA_ZEROCOPY` | same as `BUILD_WITH_CUDA` | Zero-copy GPU memory path for integrated GPUs such as Jetson. CMake stops with `BUILD_WITH_CUDA_ZEROCOPY requires BUILD_WITH_CUDA=ON` if it is on without CUDA. At run time it is used only when the GPU is integrated ([`src/cuda/cuda-frame-memory.cu`](https://github.com/realsenseai/librealsense/blob/master/src/cuda/cuda-frame-memory.cu)). |
 | `BUILD_WITH_NEON` | `ON` (ARM64 only) | ARM64 NEON optimizations. Defined only when `CMAKE_SYSTEM_PROCESSOR` is ARM64/AArch64. |
 | `BUILD_WITH_CLOSE_RANGE_DEPTH` | `OFF` (ARM64 only) | Improved Close Range Depth ("Jetson only, requires enhanced-depth library"). See [[Improved Close Range Depth]]. |
 
@@ -211,7 +211,7 @@ Messages you may see, and where they come from:
 
 | Message | Printed by | What to do |
 |---|---|---|
-| `Running on NVIDIA Jetson without the CUDA runtime installed.` | `realsense-viewer` and `rs-depth-quality` ([`common/viewer.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/viewer.cpp)), when `/etc/nv_tegra_release` exists, the build has no CUDA, and `/usr/local/cuda` does not exist | Install CUDA through NVIDIA JetPack, then rebuild with `-DBUILD_WITH_CUDA=ON`. |
+| `Running on NVIDIA Jetson without the CUDA runtime installed.` | `realsense-viewer` and `rs-depth-quality` ([`common/viewer.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/viewer.cpp)), when `/etc/nv_tegra_release` exists, the build has no CUDA, and `/usr/local/cuda` does not exist | Install CUDA through NVIDIA JetPack, then rebuild with `-DBUILD_WITH_CUDA=ON`. |
 | `Running on NVIDIA Jetson with the CUDA runtime installed,` ... `rebuild librealsense with -DBUILD_WITH_CUDA=ON.` | `realsense-viewer` and `rs-depth-quality`, when `/etc/nv_tegra_release` exists, the build has no CUDA, and `/usr/local/cuda` exists | Rebuild with `-DBUILD_WITH_CUDA=ON`. |
 | `Running on NVIDIA Jetson and realsense-viewer was built with CUDA,` ... `the CUDA runtime failed to initialize` | `realsense-viewer` and `rs-depth-quality`, when `/etc/nv_tegra_release` exists, the build has CUDA, but no GPU device is reported | Check the CUDA driver and library stack on the board. The SDK log has the `cudaGetDeviceCount` error. |
 | `/etc/nv_tegra_release not present, aborting script` | `scripts/patch-realsense-ubuntu-L4T.sh` | The script runs only on an L4T image. |

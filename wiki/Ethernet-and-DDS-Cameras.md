@@ -2,7 +2,7 @@ librealsense can reach RealSense cameras over Ethernet. Network cameras publish 
 
 ## Build librealsense with DDS
 
-DDS support is off by default. It is controlled by the CMake option `BUILD_WITH_DDS` in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake):
+DDS support is off by default. It is controlled by the CMake option `BUILD_WITH_DDS` in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake):
 
 ```
 option(BUILD_WITH_DDS "Access camera devices through DDS topics (requires CMake 3.16.3)" OFF)
@@ -14,13 +14,13 @@ Turn it on when you configure the build:
 cmake .. -DBUILD_WITH_DDS=ON
 ```
 
-With `BUILD_WITH_DDS=ON`, the top-level [`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/CMakeLists.txt) pulls in [`CMake/external_fastdds.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/external_fastdds.cmake). That file needs CMake 3.16.3 or newer, fetches eProsima Fast DDS (tag `v2.10.4-realsense`) and defines `BUILD_WITH_DDS` for the compiler. The library is then linked with the `realdds` library. The DDS tools in [`tools/dds`](https://github.com/realsenseai/librealsense/tree/development/tools/dds) are built only when both `BUILD_TOOLS` and `BUILD_WITH_DDS` are on (see [`tools/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/tools/CMakeLists.txt)).
+With `BUILD_WITH_DDS=ON`, the top-level [`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/CMakeLists.txt) pulls in [`CMake/external_fastdds.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/external_fastdds.cmake). That file needs CMake 3.16.3 or newer, fetches eProsima Fast DDS (tag `v2.10.4-realsense`) and defines `BUILD_WITH_DDS` for the compiler. The library is then linked with the `realdds` library. The DDS tools in [`tools/dds`](https://github.com/realsenseai/librealsense/tree/master/tools/dds) are built only when both `BUILD_TOOLS` and `BUILD_WITH_DDS` are on (see [`tools/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/tools/CMakeLists.txt)).
 
 Other build options are described in [[Build Configuration]].
 
 ## Enable DDS discovery in the context
 
-A DDS-enabled build still does not look for network cameras until DDS is enabled in the context settings. When `BUILD_WITH_DDS` is defined, [`src/context.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/context.cpp) adds a DDS device factory ([`src/dds/rsdds-device-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/dds/rsdds-device-factory.cpp)) to every context. The factory reads the `dds` object of the context settings:
+A DDS-enabled build still does not look for network cameras until DDS is enabled in the context settings. When `BUILD_WITH_DDS` is defined, [`src/context.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/context.cpp) adds a DDS device factory ([`src/dds/rsdds-device-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/dds/rsdds-device-factory.cpp)) to every context. The factory reads the `dds` object of the context settings:
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -50,7 +50,7 @@ Setting `"device-mask"` to include `RS2_PRODUCT_LINE_SW_ONLY` stops the context 
 
 ### From the configuration file
 
-Every context first loads the `context` section of the configuration file `realsense-config.json` (`RS2_CONFIG_FILENAME` in [`rs.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rs.h)) and then applies the settings passed in code on top. The file lives in the user's application-data folder: `%APPDATA%\realsense-config.json` on Windows and `~/.realsense-config.json` on Linux and macOS. To turn on DDS for all applications:
+Every context first loads the `context` section of the configuration file `realsense-config.json` (`RS2_CONFIG_FILENAME` in [`rs.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rs.h)) and then applies the settings passed in code on top. The file lives in the user's application-data folder: `%APPDATA%\realsense-config.json` on Windows and `~/.realsense-config.json` on Linux and macOS. To turn on DDS for all applications:
 
 ```json
 {
@@ -67,7 +67,7 @@ Passing `"inherit": false` in the context settings makes that context ignore the
 
 ### From the command line of tools and examples
 
-Tools and examples that use the shared `rs2::cli` parser in [`common/cli.h`](https://github.com/realsenseai/librealsense/blob/development/common/cli.h) accept these flags. Examples are `realsense-viewer` and `rs-eth-config`. Without a DDS build the flags are accepted but do nothing.
+Tools and examples that use the shared `rs2::cli` parser in [`common/cli.h`](https://github.com/realsenseai/librealsense/blob/master/common/cli.h) accept these flags. Examples are `realsense-viewer` and `rs-eth-config`. Without a DDS build the flags are accepted but do nothing.
 
 | Flag | Effect on the context settings |
 |---|---|
@@ -80,11 +80,11 @@ Tools and examples that use the shared `rs2::cli` parser in [`common/cli.h`](htt
 
 ## DDS tools
 
-The three tools in [`tools/dds`](https://github.com/realsenseai/librealsense/tree/development/tools/dds) are built with `BUILD_WITH_DDS=ON`. All of them also accept `-h`/`--help` and `--version`. The `--debug` flag of `rs-dds-config` and `rs-dds-adapter` exists when `BUILD_EASYLOGGINGPP` is on (the default). See [[Command Line Tools]] for the other console tools.
+The three tools in [`tools/dds`](https://github.com/realsenseai/librealsense/tree/master/tools/dds) are built with `BUILD_WITH_DDS=ON`. All of them also accept `-h`/`--help` and `--version`. The `--debug` flag of `rs-dds-config` and `rs-dds-adapter` exists when `BUILD_EASYLOGGINGPP` is on (the default). See [[Command Line Tools]] for the other console tools.
 
 ### rs-dds-config
 
-[`rs-dds-config`](https://github.com/realsenseai/librealsense/blob/development/tools/dds/dds-config/rs-dds-config.cpp) reads and changes the Ethernet configuration of a camera, and sets the SDK's default DDS settings in the configuration file. It uses the parser without the `--eth`/`--domain-id` context flags. Each run:
+[`rs-dds-config`](https://github.com/realsenseai/librealsense/blob/master/tools/dds/dds-config/rs-dds-config.cpp) reads and changes the Ethernet configuration of a camera, and sets the SDK's default DDS settings in the configuration file. It uses the parser without the `--eth`/`--domain-id` context flags. Each run:
 
 1. Writes `context.dds.enabled = true` into the configuration file if it is not set yet. Skipped with `--transient-sdk-domain-id`.
 2. Finds the one connected camera that supports Ethernet configuration. If more than one camera is found, it stops and asks for `--serial-number`. Recovery-mode devices are refused.
@@ -123,7 +123,7 @@ Rules enforced by the tool:
 - `--usb-first`, `--eth-first` and `--dynamic-priority` are mutually exclusive.
 - `--sdk-domain-id` and `--transient-sdk-domain-id` are mutually exclusive.
 - With `--transient-sdk-domain-id`, the configuration file is not changed to enable DDS. Use it to reach a camera on a domain other than the saved one without saving that domain. With `--disable` as well, DDS is still disabled in the file, but the run goes on and works on the camera.
-- The values above are checked on the host before the new configuration is sent. If the camera reports configuration table v3, only MTU 9000 and a transmission delay of 0 are allowed; with table v3 or v4, the UDP TTL must be 0. The tool then reports "Camera FW supports only MTU 9000.", "Camera FW does not support transmission delay." or "Camera FW does not support changing UDP TTL value." (messages from [`third-party/rsutils/src/eth-config.cpp`](https://github.com/realsenseai/librealsense/blob/development/third-party/rsutils/src/eth-config.cpp)).
+- The values above are checked on the host before the new configuration is sent. If the camera reports configuration table v3, only MTU 9000 and a transmission delay of 0 are allowed; with table v3 or v4, the UDP TTL must be 0. The tool then reports "Camera FW supports only MTU 9000.", "Camera FW does not support transmission delay." or "Camera FW does not support changing UDP TTL value." (messages from [`third-party/rsutils/src/eth-config.cpp`](https://github.com/realsenseai/librealsense/blob/master/third-party/rsutils/src/eth-config.cpp)).
 
 Examples:
 
@@ -137,7 +137,7 @@ rs-dds-config --golden                          # compare current with factory v
 
 ### rs-dds-sniffer
 
-[`rs-dds-sniffer`](https://github.com/realsenseai/librealsense/blob/development/tools/dds/dds-sniffer/rs-dds-sniffer.cpp) watches a DDS domain. It prints every participant and data reader/writer it discovers, with the topic name and type. Without `--snapshot` (also implied by `--participants` and `--topics`) it runs until stopped, first printing `rs-dds-sniffer listening on domain <N> (press Ctrl+C to stop)` (unless `--machine-readable` is given).
+[`rs-dds-sniffer`](https://github.com/realsenseai/librealsense/blob/master/tools/dds/dds-sniffer/rs-dds-sniffer.cpp) watches a DDS domain. It prints every participant and data reader/writer it discovers, with the topic name and type. Without `--snapshot` (also implied by `--participants` and `--topics`) it runs until stopped, first printing `rs-dds-sniffer listening on domain <N> (press Ctrl+C to stop)` (unless `--machine-readable` is given).
 
 | Flag | Description |
 |---|---|
@@ -152,7 +152,7 @@ rs-dds-config --golden                          # compare current with factory v
 
 ### rs-dds-adapter
 
-[`rs-dds-adapter`](https://github.com/realsenseai/librealsense/blob/development/tools/dds/dds-adapter/rs-dds-adapter.cpp) does the opposite job. It runs on the machine the cameras are plugged into (USB) and publishes each one on DDS, so librealsense on another machine can find them as network devices. It opens its own context with DDS turned off, so it serves local devices only. For its own DDS participant (named `rs-dds-adapter`) it uses the `dds` section of the configuration file, ignoring `enabled` there. It also publishes the ROS 2 discovery information, so each camera appears as a ROS 2 node.
+[`rs-dds-adapter`](https://github.com/realsenseai/librealsense/blob/master/tools/dds/dds-adapter/rs-dds-adapter.cpp) does the opposite job. It runs on the machine the cameras are plugged into (USB) and publishes each one on DDS, so librealsense on another machine can find them as network devices. It opens its own context with DDS turned off, so it serves local devices only. For its own DDS participant (named `rs-dds-adapter`) it uses the `dds` section of the configuration file, ignoring `enabled` there. It also publishes the ROS 2 discovery information, so each camera appears as a ROS 2 node.
 
 | Flag | Description |
 |---|---|
@@ -163,7 +163,7 @@ On start it prints `Starting RS DDS Adapter on domain <N> ...` (`<N>` is -1 when
 
 ## Configure the camera's Ethernet settings
 
-In the code at this commit, the `RS2_EXTENSION_ETH_CONFIG` extension is exposed by a D555 connected directly over USB or GMSL/MIPI (`rs555_device` in [`src/ds/d500/d500-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-factory.cpp)) and by every DDS device ([`src/dds/rs-dds-device-proxy.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/dds/rs-dds-device-proxy.cpp)). A DDS device reports support only if its name contains `D555`. Even then, `rs2_supports_eth_config` returns true only if the configuration can be read from the camera. See [[Supported Devices]] for the device list.
+In the code at this commit, the `RS2_EXTENSION_ETH_CONFIG` extension is exposed by a D555 connected directly over USB or GMSL/MIPI (`rs555_device` in [`src/ds/d500/d500-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-factory.cpp)) and by every DDS device ([`src/dds/rs-dds-device-proxy.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/dds/rs-dds-device-proxy.cpp)). A DDS device reports support only if its name contains `D555`. Even then, `rs2_supports_eth_config` returns true only if the configuration can be read from the camera. See [[Supported Devices]] for the device list.
 
 You have three ways to change the settings:
 
@@ -173,7 +173,7 @@ You have three ways to change the settings:
 
 ### The eth-config example
 
-[`examples/eth-config`](https://github.com/realsenseai/librealsense/tree/development/examples/eth-config) (`rs-eth-config`, built with the other examples) uses the C++ wrapper `rs2::eth_config_device` from [`rs_eth_config.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_eth_config.hpp). It finds the first device that supports Ethernet configuration and prints its link speed, priority, timeout, IP, netmask, gateway, DHCP, MTU and transmission delay. It then changes the link priority and DHCP timeout, and finally restores them. It does not change IP settings, which could disconnect a network device. Because it uses `rs2::cli`, run it with `--eth` to find cameras over the network.
+[`examples/eth-config`](https://github.com/realsenseai/librealsense/tree/master/examples/eth-config) (`rs-eth-config`, built with the other examples) uses the C++ wrapper `rs2::eth_config_device` from [`rs_eth_config.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_eth_config.hpp). It finds the first device that supports Ethernet configuration and prints its link speed, priority, timeout, IP, netmask, gateway, DHCP, MTU and transmission delay. It then changes the link priority and DHCP timeout, and finally restores them. It does not change IP settings, which could disconnect a network device. Because it uses `rs2::cli`, run it with `--eth` to find cameras over the network.
 
 A minimal read-out, adapted from the example:
 
@@ -198,7 +198,7 @@ Each setter sends the full configuration to the camera, and the library checks t
 
 ### C API reference
 
-The C functions in [`rs_eth_config.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_eth_config.h), in header order. Every function except `rs2_eth_link_priority_to_string` also takes a final `rs2_error ** error` argument. `rs2_ip_address` is `uint8_t[4]`. The C++ class `rs2::eth_config_device` has a method of the same name without the `rs2_` prefix for each (for example `get_mtu()`). The exceptions are `rs2_restore_default_eth_config`, which is `restore_defaults()`, and `rs2_eth_link_priority_to_string`, which is used through `operator<<`.
+The C functions in [`rs_eth_config.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_eth_config.h), in header order. Every function except `rs2_eth_link_priority_to_string` also takes a final `rs2_error ** error` argument. `rs2_ip_address` is `uint8_t[4]`. The C++ class `rs2::eth_config_device` has a method of the same name without the `rs2_` prefix for each (for example `get_mtu()`). The exceptions are `rs2_restore_default_eth_config`, which is `restore_defaults()`, and `rs2_eth_link_priority_to_string`, which is used through `operator<<`.
 
 <!-- wikigen:table-eth-config-api -->
 | Function | Parameters | Returns / description |
@@ -233,12 +233,12 @@ The C functions in [`rs_eth_config.h`](https://github.com/realsenseai/librealsen
 
 ## Set the MTU on the host
 
-The camera's MTU (`--mtu` in `rs-dds-config`, `rs2_set_mtu` in the API) sets the size of the Ethernet packets it sends. The repository guide [`doc/stepbystep/setting_mtu_on_host.md`](https://github.com/realsenseai/librealsense/blob/development/doc/stepbystep/setting_mtu_on_host.md) recommends setting the host network adapter to the same packet size. Large ("jumbo") packets can lower transmission time. In multi-camera setups, though, they can overload switches and cause dropped frames. The guide recommends 9000-byte packets, the D555 factory setting.
+The camera's MTU (`--mtu` in `rs-dds-config`, `rs2_set_mtu` in the API) sets the size of the Ethernet packets it sends. The repository guide [`doc/stepbystep/setting_mtu_on_host.md`](https://github.com/realsenseai/librealsense/blob/master/doc/stepbystep/setting_mtu_on_host.md) recommends setting the host network adapter to the same packet size. Large ("jumbo") packets can lower transmission time. In multi-camera setups, though, they can overload switches and cause dropped frames. The guide recommends 9000-byte packets, the D555 factory setting.
 
 - **Windows:** Start menu → **View network connections** → double-click the adapter connected to the camera → **Properties** → **Configure** → **Advanced** tab → set **Jumbo Packet**.
 - **Linux:** find the adapter with `ifconfig`, then set its MTU, for example `sudo ifconfig eno1 mtu 9000` (replace `eno1` with your adapter and `9000` with your packet size).
 
-![Linux adapter MTU](https://raw.githubusercontent.com/realsenseai/librealsense/development/doc/stepbystep/resources/linux_adapter.png)
+![Linux adapter MTU](https://raw.githubusercontent.com/realsenseai/librealsense/master/doc/stepbystep/resources/linux_adapter.png)
 
 ## Related pages
 

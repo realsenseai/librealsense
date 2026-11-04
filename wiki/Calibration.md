@@ -1,14 +1,14 @@
 librealsense gives you an API to check and improve the calibration of a depth camera in the field, and to save or reset the calibration table stored in the camera. This page covers on-chip self-calibration, tare calibration, target-based focal-length calibration, depth-to-color (UV-map) calibration, how to manage calibration tables, and the Python tool for IMU calibration. Read it if your depth quality has degraded, if you need absolute distance accuracy against a known target, or if you want to build calibration into your own application.
 
-All functions on this page belong to the `rs2::auto_calibrated_device` class in [include/librealsense2/hpp/rs_device.hpp](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_device.hpp), which wraps the C functions in [include/librealsense2/h/rs_device.h](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_device.h). The [[Realsense Viewer Manual]] runs the same calibrations from its UI ([common/on-chip-calib.cpp](https://github.com/realsenseai/librealsense/blob/development/common/on-chip-calib.cpp), [common/d500-on-chip-calib.cpp](https://github.com/realsenseai/librealsense/blob/development/common/d500-on-chip-calib.cpp)).
+All functions on this page belong to the `rs2::auto_calibrated_device` class in [include/librealsense2/hpp/rs_device.hpp](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_device.hpp), which wraps the C functions in [include/librealsense2/h/rs_device.h](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_device.h). The [[Realsense Viewer Manual]] runs the same calibrations from its UI ([common/on-chip-calib.cpp](https://github.com/realsenseai/librealsense/blob/master/common/on-chip-calib.cpp), [common/d500-on-chip-calib.cpp](https://github.com/realsenseai/librealsense/blob/master/common/d500-on-chip-calib.cpp)).
 
 ## Which devices support it
 
 A device supports this API when it can be extended to `RS2_EXTENSION_AUTO_CALIBRATED_DEVICE`. In the code, that applies to:
 
-- **D400 devices**: `d400_device` inherits `auto_calibrated` ([src/ds/d400/d400-auto-calibration.cpp](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-auto-calibration.cpp)).
-- **D500 devices over USB or MIPI**: `d500_device` inherits `d500_auto_calibrated` ([src/ds/d500/d500-auto-calibration.cpp](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-auto-calibration.cpp)).
-- **DDS (Ethernet) devices whose product line is `D500`**: the DDS device proxy installs a `d500_auto_calibrated` object through `auto_calibrated_proxy` ([src/dds/rs-dds-device-proxy.cpp](https://github.com/realsenseai/librealsense/blob/development/src/dds/rs-dds-device-proxy.cpp), [src/auto-calibrated-proxy.cpp](https://github.com/realsenseai/librealsense/blob/development/src/auto-calibrated-proxy.cpp)). If it did not install one, every call throws `Auto Calibration capability has not been initiated`. See [[Ethernet and DDS Cameras]].
+- **D400 devices**: `d400_device` inherits `auto_calibrated` ([src/ds/d400/d400-auto-calibration.cpp](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-auto-calibration.cpp)).
+- **D500 devices over USB or MIPI**: `d500_device` inherits `d500_auto_calibrated` ([src/ds/d500/d500-auto-calibration.cpp](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-auto-calibration.cpp)).
+- **DDS (Ethernet) devices whose product line is `D500`**: the DDS device proxy installs a `d500_auto_calibrated` object through `auto_calibrated_proxy` ([src/dds/rs-dds-device-proxy.cpp](https://github.com/realsenseai/librealsense/blob/master/src/dds/rs-dds-device-proxy.cpp), [src/auto-calibrated-proxy.cpp](https://github.com/realsenseai/librealsense/blob/master/src/auto-calibrated-proxy.cpp)). If it did not install one, every call throws `Auto Calibration capability has not been initiated`. See [[Ethernet and DDS Cameras]].
 
 Not every function is implemented on both families:
 
@@ -36,7 +36,7 @@ if( dev.is< rs2::auto_calibrated_device >() )
 
 ## Run on-chip self-calibration
 
-On-chip calibration (OCC) recalibrates the depth camera without a dedicated target. The [rs-on-chip-calib](https://github.com/realsenseai/librealsense/blob/development/examples/on-chip-calib/rs-on-chip-calib.cpp) example shows the full flow:
+On-chip calibration (OCC) recalibrates the depth camera without a dedicated target. The [rs-on-chip-calib](https://github.com/realsenseai/librealsense/blob/master/examples/on-chip-calib/rs-on-chip-calib.cpp) example shows the full flow:
 
 1. Start depth streaming. The example uses `cfg.enable_stream( RS2_STREAM_DEPTH, 256, 144, RS2_FORMAT_Z16, 90 )`.
 2. Build a JSON string with the calibration parameters (see below).
@@ -60,7 +60,7 @@ calibration_table run_on_chip_calibration(std::string json_content, float* healt
 calibration_table run_on_chip_calibration(std::string json_content, float* health, int timeout_ms = 5000) const;
 ```
 
-OCC on D400 and D555, and tare calibration on D400 and D500, turn thermal compensation off while they run (`thermal_compensation_guard` in [src/ds/ds-calib-common.cpp](https://github.com/realsenseai/librealsense/blob/development/src/ds/ds-calib-common.cpp)).
+OCC on D400 and D555, and tare calibration on D400 and D500, turn thermal compensation off while they run (`thermal_compensation_guard` in [src/ds/ds-calib-common.cpp](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-calib-common.cpp)).
 
 ### On-chip calibration JSON keys (D400)
 
@@ -102,10 +102,10 @@ Example JSON, as built by rs-on-chip-calib:
 `d500_auto_calibrated::run_on_chip_calibration` takes one of three paths, depending on the device:
 
 - **Name contains `D555`**: the OCC path (`run_occ`). It reads only `speed` (default slow), `scan parameter` (default Py scan) and `data sampling` (default interrupt), with the same ranges as on D400.
-- **Product IDs in the D5x5 family, and D585S** (`uses_interactive_triggered_calibration` in [src/ds/d500/d500-private.h](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-private.h)): interactive triggered calibration.
+- **Product IDs in the D5x5 family, and D585S** (`uses_interactive_triggered_calibration` in [src/ds/d500/d500-private.h](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-private.h)): interactive triggered calibration.
 - **Other D500 devices**: triggered calibration.
 
-The two triggered paths do not parse JSON keys. They search the string for one of these commands, checked in this order: `calib dry run`, `calib commit`, `calib cancel`, `calib try new`, `calib try old`, `calib run`, `calib abort` (an alias of cancel). Any other content throws `run_on_chip_calibration called with wrong content in json file`. For example, `d500_triggered_calibration.py` calls `run_on_chip_calibration("calib run", progress_cb, 100000)`. For the full flows, see the Python examples [d500_triggered_calibration.py](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/d500_triggered_calibration.py) and [d5x5_interactive_triggered_calibration.py](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/d5x5_interactive_triggered_calibration.py).
+The two triggered paths do not parse JSON keys. They search the string for one of these commands, checked in this order: `calib dry run`, `calib commit`, `calib cancel`, `calib try new`, `calib try old`, `calib run`, `calib abort` (an alias of cancel). Any other content throws `run_on_chip_calibration called with wrong content in json file`. For example, `d500_triggered_calibration.py` calls `run_on_chip_calibration("calib run", progress_cb, 100000)`. For the full flows, see the Python examples [d500_triggered_calibration.py](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/d500_triggered_calibration.py) and [d5x5_interactive_triggered_calibration.py](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/d5x5_interactive_triggered_calibration.py).
 
 ## Run tare calibration
 
@@ -138,7 +138,7 @@ When `apply preset` is 1, the code switches the visual preset to High Accuracy f
 
 ### Host-assisted calibration (D400)
 
-When `host assistance` is not 0, the D400 code collects depth frames on the host. Each depth frame is passed to `process_calibration_frame( frame, health, timeout_ms )`, which returns an empty table until calibration finishes and the new table when it is done. [depth_ucal_example.py](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/depth_ucal_example.py) runs this flow for OCC and tare.
+When `host assistance` is not 0, the D400 code collects depth frames on the host. Each depth frame is passed to `process_calibration_frame( frame, health, timeout_ms )`, which returns an empty table until calibration finishes and the new table when it is done. [depth_ucal_example.py](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/depth_ucal_example.py) runs this flow for OCC and tare.
 
 ## Target-based calibrations
 
@@ -206,16 +206,16 @@ cal_dev.set_calibration_table( backup );     // back to the previous table
 
 ## Python
 
-pyrealsense2 exposes the same methods on `rs.auto_calibrated_device` ([wrappers/python/pyrs_device.cpp](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/pyrs_device.cpp)). `run_on_chip_calibration`, `run_tare_calibration` and `process_calibration_frame` return the new table together with the health values instead of writing to an output argument. Examples:
+pyrealsense2 exposes the same methods on `rs.auto_calibrated_device` ([wrappers/python/pyrs_device.cpp](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/pyrs_device.cpp)). `run_on_chip_calibration`, `run_tare_calibration` and `process_calibration_frame` return the new table together with the health values instead of writing to an output argument. Examples:
 
-- [depth_auto_calibration_example.py](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/depth_auto_calibration_example.py)
-- [depth_ucal_example.py](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/depth_ucal_example.py): OCC and tare, including host-assisted flows
-- [d500_triggered_calibration.py](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/d500_triggered_calibration.py)
-- [d5x5_interactive_triggered_calibration.py](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/d5x5_interactive_triggered_calibration.py)
+- [depth_auto_calibration_example.py](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/depth_auto_calibration_example.py)
+- [depth_ucal_example.py](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/depth_ucal_example.py): OCC and tare, including host-assisted flows
+- [d500_triggered_calibration.py](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/d500_triggered_calibration.py)
+- [d5x5_interactive_triggered_calibration.py](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/d5x5_interactive_triggered_calibration.py)
 
 ## The rs-on-chip-calib example
 
-Source: [examples/on-chip-calib](https://github.com/realsenseai/librealsense/blob/development/examples/on-chip-calib/rs-on-chip-calib.cpp). It is built with the other examples (see [[Build Configuration]]).
+Source: [examples/on-chip-calib](https://github.com/realsenseai/librealsense/blob/master/examples/on-chip-calib/rs-on-chip-calib.cpp). It is built with the other examples (see [[Build Configuration]]).
 
 The example:
 
@@ -224,7 +224,7 @@ The example:
 3. Runs OCC with `"calib type": 0`, `"speed": 2`, `"scan parameter": 0` and a 9000 ms timeout, printing `progress = …%`.
 4. Prints `Completed successfully` and asks `Keep results? Yes/No`. If you answer `y` or `yes`, it calls `set_calibration_table` and `write_calibration` and prints `Results saved to flash`. Otherwise it prints `Results not saved`.
 
-Command-line options (from [common/cli.h](https://github.com/realsenseai/librealsense/blob/development/common/cli.h)):
+Command-line options (from [common/cli.h](https://github.com/realsenseai/librealsense/blob/master/common/cli.h)):
 
 | Flag | Description |
 |---|---|
@@ -240,7 +240,7 @@ The DDS flags are ignored when the build has no DDS support. `--eth`, `--eth-onl
 
 ## IMU calibration tool
 
-[tools/rs-imu-calibration/rs-imu-calibration.py](https://github.com/realsenseai/librealsense/blob/development/tools/rs-imu-calibration/rs-imu-calibration.py) is a Python script that calibrates the accelerometer of a camera with an IMU and computes the gyroscope bias. It needs `pyrealsense2` and `numpy`.
+[tools/rs-imu-calibration/rs-imu-calibration.py](https://github.com/realsenseai/librealsense/blob/master/tools/rs-imu-calibration/rs-imu-calibration.py) is a Python script that calibrates the accelerometer of a camera with an IMU and computes the gyroscope bias. It needs `pyrealsense2` and `numpy`.
 
 ### Usage
 
@@ -279,16 +279,16 @@ The script always waits up to about 5 seconds for a device (`wait_for_rs_device`
 
 The script does not check the device model. It uses any device that has accel and gyro streams (interactive mode) and accepts a debug-protocol command. The table and command it writes follow the D400 IMU table layout; the comments in the script refer to "all D400 cameras with IMU". The script reads the product line but does not use it to pick a table format.
 
-When librealsense opens the motion sensor, it reads the IMU calibration table from the camera ([src/ds/ds-calib-parsers.cpp](https://github.com/realsenseai/librealsense/blob/development/src/ds/ds-calib-parsers.cpp)). If the table is invalid or does not mark its intrinsics as valid, default intrinsic values are used.
+When librealsense opens the motion sensor, it reads the IMU calibration table from the camera ([src/ds/ds-calib-parsers.cpp](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-calib-parsers.cpp)). If the table is invalid or does not mark its intrinsics as valid, default intrinsic values are used.
 
 ## Source files
 
-- [include/librealsense2/hpp/rs_device.hpp](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_device.hpp): `rs2::calibrated_device`, `rs2::auto_calibrated_device`
-- [include/librealsense2/h/rs_device.h](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_device.h): C API (`rs2_run_on_chip_calibration`, `rs2_run_tare_calibration`, `rs2_get_calibration_table`, …)
-- [src/auto-calibrated-device.h](https://github.com/realsenseai/librealsense/blob/development/src/auto-calibrated-device.h): internal `auto_calibrated_interface`
-- [src/auto-calibrated-proxy.cpp](https://github.com/realsenseai/librealsense/blob/development/src/auto-calibrated-proxy.cpp): forwarding for DDS devices
-- [src/ds/ds-calib-common.cpp](https://github.com/realsenseai/librealsense/blob/development/src/ds/ds-calib-common.cpp): parameter checks and shared helpers
-- [src/ds/d400/d400-auto-calibration.cpp](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-auto-calibration.cpp), [src/ds/d500/d500-auto-calibration.cpp](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-auto-calibration.cpp): device implementations
+- [include/librealsense2/hpp/rs_device.hpp](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_device.hpp): `rs2::calibrated_device`, `rs2::auto_calibrated_device`
+- [include/librealsense2/h/rs_device.h](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_device.h): C API (`rs2_run_on_chip_calibration`, `rs2_run_tare_calibration`, `rs2_get_calibration_table`, …)
+- [src/auto-calibrated-device.h](https://github.com/realsenseai/librealsense/blob/master/src/auto-calibrated-device.h): internal `auto_calibrated_interface`
+- [src/auto-calibrated-proxy.cpp](https://github.com/realsenseai/librealsense/blob/master/src/auto-calibrated-proxy.cpp): forwarding for DDS devices
+- [src/ds/ds-calib-common.cpp](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-calib-common.cpp): parameter checks and shared helpers
+- [src/ds/d400/d400-auto-calibration.cpp](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-auto-calibration.cpp), [src/ds/d500/d500-auto-calibration.cpp](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-auto-calibration.cpp): device implementations
 
 See also [[Supported Devices]], [[D400 Series Visual Presets]] and [[Depth Quality Tool]].
 

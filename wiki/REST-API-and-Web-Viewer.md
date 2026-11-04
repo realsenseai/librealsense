@@ -1,13 +1,13 @@
-The RealSense REST API is a Python server, built with [FastAPI](https://fastapi.tiangolo.com/) on top of the `pyrealsense2` module, that exposes RealSense devices over HTTP: REST endpoints for device, sensor, option and stream control, WebRTC for live video, and Socket.IO for frame metadata, point clouds and device events. The React web viewer is a browser front end for that server. Both live in [`wrappers/rest-api`](https://github.com/realsenseai/librealsense/tree/development/wrappers/rest-api). This page is for anyone who wants to control a camera remotely, from a browser, or from a language without native librealsense bindings.
+The RealSense REST API is a Python server, built with [FastAPI](https://fastapi.tiangolo.com/) on top of the `pyrealsense2` module, that exposes RealSense devices over HTTP: REST endpoints for device, sensor, option and stream control, WebRTC for live video, and Socket.IO for frame metadata, point clouds and device events. The React web viewer is a browser front end for that server. Both live in [`wrappers/rest-api`](https://github.com/realsenseai/librealsense/tree/master/wrappers/rest-api). This page is for anyone who wants to control a camera remotely, from a browser, or from a language without native librealsense bindings.
 
 ## Overview
 
 | Part | Location | What it is |
 |---|---|---|
-| REST API server | [`wrappers/rest-api`](https://github.com/realsenseai/librealsense/tree/development/wrappers/rest-api) | FastAPI app ([`main.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/main.py)) combined with a Socket.IO server into one ASGI app, served by Uvicorn. |
-| Route definitions | [`app/api/router.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/app/api/router.py), [`app/api/endpoints`](https://github.com/realsenseai/librealsense/tree/development/wrappers/rest-api/app/api/endpoints) | All REST routes, mounted under `/api/v1`. |
-| Device logic | [`app/services/rs_manager.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/app/services/rs_manager.py) | Wraps `pyrealsense2` (device enumeration, streaming, options, firmware). |
-| React viewer | [`wrappers/rest-api/tools/react-viewer`](https://github.com/realsenseai/librealsense/tree/development/wrappers/rest-api/tools/react-viewer) | Vite + React + TypeScript web UI (package `realsense-react-viewer`), optionally packaged as a Tauri desktop app. |
+| REST API server | [`wrappers/rest-api`](https://github.com/realsenseai/librealsense/tree/master/wrappers/rest-api) | FastAPI app ([`main.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/main.py)) combined with a Socket.IO server into one ASGI app, served by Uvicorn. |
+| Route definitions | [`app/api/router.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/app/api/router.py), [`app/api/endpoints`](https://github.com/realsenseai/librealsense/tree/master/wrappers/rest-api/app/api/endpoints) | All REST routes, mounted under `/api/v1`. |
+| Device logic | [`app/services/rs_manager.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/app/services/rs_manager.py) | Wraps `pyrealsense2` (device enumeration, streaming, options, firmware). |
+| React viewer | [`wrappers/rest-api/tools/react-viewer`](https://github.com/realsenseai/librealsense/tree/master/wrappers/rest-api/tools/react-viewer) | Vite + React + TypeScript web UI (package `realsense-react-viewer`), optionally packaged as a Tauri desktop app. |
 
 The server talks to cameras through `pyrealsense2`, so the device support is that of the SDK build it loads; see [[Python Wrapper]] and [[Supported Devices]].
 
@@ -22,12 +22,12 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 python3 install.py
 ```
 
-[`install.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/install.py) does two things:
+[`install.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/install.py) does two things:
 
 1. If `import pyrealsense2` fails, it runs `pip install pyrealsense2` (from PyPI). If `pyrealsense2` is already importable (built from source, system package or an earlier pip install), it prints `pyrealsense2 already available - skipping PyPI install` and leaves it alone.
 2. It runs `pip install -r requirements.txt`.
 
-[`requirements.txt`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/requirements.txt) pins:
+[`requirements.txt`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/requirements.txt) pins:
 
 | Package | Version |
 |---|---|
@@ -45,7 +45,7 @@ Every requirement carries the marker `platform_machine != "aarch64"`, so on aarc
 
 ### Using a locally built pyrealsense2
 
-At start-up, [`main.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/main.py) looks for a `build/` directory at the repository root. If it finds `pyrealsense2*.pyd`, `pyrealsense2*.so` or `pyrealsense2/__init__.py` under it, it puts the directories holding them at the front of `sys.path` (newest first), so a module built from your checkout is preferred over a PyPI wheel. This lets the server see devices that the published wheel does not know yet. It prints `[pyrealsense2] preferring local build: <dir>`. If the chosen module is under a `Debug` directory, it logs a warning instead, because a Debug SDK makes streaming slow; the same condition is reported in the `warnings` list returned by `/api/v1/health`.
+At start-up, [`main.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/main.py) looks for a `build/` directory at the repository root. If it finds `pyrealsense2*.pyd`, `pyrealsense2*.so` or `pyrealsense2/__init__.py` under it, it puts the directories holding them at the front of `sys.path` (newest first), so a module built from your checkout is preferred over a PyPI wheel. This lets the server see devices that the published wheel does not know yet. It prints `[pyrealsense2] preferring local build: <dir>`. If the chosen module is under a `Debug` directory, it logs a warning instead, because a Debug SDK makes streaming slow; the same condition is reported in the `warnings` list returned by `/api/v1/health`.
 
 To build `pyrealsense2` from source, see [[Python Wrapper]] (CMake option `BUILD_PYTHON_BINDINGS`).
 
@@ -65,7 +65,7 @@ python main.py --host 0.0.0.0 --port 8080  # listen on all interfaces, other por
 | Launcher | Host | Port | Notes |
 |---|---|---|---|
 | `python main.py` | `--host`, default `127.0.0.1` | `--port`, default `8000` (1-65535) | Runs `uvicorn.run("main:combined_app", ..., reload=True, log_level="debug")`. When frozen with PyInstaller, reload is off and the log level is `info`. |
-| [`start_server.sh`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/start_server.sh) | `0.0.0.0` | `8000` | Runs `uvicorn main:combined_app --host 0.0.0.0 --port 8000`. |
+| [`start_server.sh`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/start_server.sh) | `0.0.0.0` | `8000` | Runs `uvicorn main:combined_app --host 0.0.0.0 --port 8000`. |
 
 The `--host` and `--port` arguments are *(new in the next release)*. In v2.59.1, `python main.py` always listened on `127.0.0.1:8000`.
 
@@ -79,7 +79,7 @@ Once it is running:
 
 ### Server settings
 
-Settings are class attributes in [`config.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/config.py). They are not read from environment variables; change them by editing the file.
+Settings are class attributes in [`config.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/config.py). They are not read from environment variables; change them by editing the file.
 
 | Setting | Default | Used for |
 |---|---|---|
@@ -92,7 +92,7 @@ Settings are class attributes in [`config.py`](https://github.com/realsenseai/li
 
 ## Running the web viewer
 
-The viewer needs Node.js and npm. It takes the backend origin from [`src/api/backend.ts`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/tools/react-viewer/src/api/backend.ts): the page origin in a browser, `http://localhost:8000` in the desktop app. It calls REST routes under `/api/v1` on that origin and connects Socket.IO on the path `/socket`.
+The viewer needs Node.js and npm. It takes the backend origin from [`src/api/backend.ts`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/src/api/backend.ts): the page origin in a browser, `http://localhost:8000` in the desktop app. It calls REST routes under `/api/v1` on that origin and connects Socket.IO on the path `/socket`.
 
 ### Development server
 
@@ -104,7 +104,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. The Vite dev server ([`vite.config.ts`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/tools/react-viewer/vite.config.ts)) runs on port 3000 and proxies `/api` and `/socket` (with WebSocket support) to `http://localhost:8000`, so the API server must be on port 8000 on the same machine.
+Open `http://localhost:3000`. The Vite dev server ([`vite.config.ts`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/vite.config.ts)) runs on port 3000 and proxies `/api` and `/socket` (with WebSocket support) to `http://localhost:8000`, so the API server must be on port 8000 on the same machine.
 
 ### Production build
 
@@ -122,13 +122,13 @@ npm run build
 npm run bundle     # copies dist/ to wrappers/rest-api/static/
 ```
 
-[`scripts/bundle-for-prod.js`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/tools/react-viewer/scripts/bundle-for-prod.js) replaces `wrappers/rest-api/static/` with the build output. When `static/index.html` exists, `main.py` serves that directory at the root, so the viewer and the API share one port: open `http://localhost:8000/`. Serving `static/` from `main.py` is *(new in the next release)*; in v2.59.1 the bundle script only printed instructions for mounting it yourself.
+[`scripts/bundle-for-prod.js`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/scripts/bundle-for-prod.js) replaces `wrappers/rest-api/static/` with the build output. When `static/index.html` exists, `main.py` serves that directory at the root, so the viewer and the API share one port: open `http://localhost:8000/`. Serving `static/` from `main.py` is *(new in the next release)*; in v2.59.1 the bundle script only printed instructions for mounting it yourself.
 
 ### Viewer features
 
-The main screen ([`src/App.tsx`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/tools/react-viewer/src/App.tsx)) has a device panel for selecting devices, streams and options, a stream view (video over WebRTC) and a 3D point cloud view. It also shows motion (gyro/accel) streams as charts and an orientation view *(changed in the next release)*, firmware update progress, server warnings from `/api/v1/health`, and an AI assistant panel. In v2.59.1, motion streams were shown as X/Y/Z values with bars.
+The main screen ([`src/App.tsx`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/src/App.tsx)) has a device panel for selecting devices, streams and options, a stream view (video over WebRTC) and a 3D point cloud view. It also shows motion (gyro/accel) streams as charts and an orientation view *(changed in the next release)*, firmware update progress, server warnings from `/api/v1/health`, and an AI assistant panel. In v2.59.1, motion streams were shown as X/Y/Z values with bars.
 
-The assistant panel calls external services directly from the browser. Its default mode, "RealSense AI Assistant", uses a hosted RealSense AI service and needs no key. A second mode, "Device Config Chatbot", calls an LLM provider. It is enabled by Vite environment variables in a `.env` file (see [`.env.example`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/tools/react-viewer/.env.example)), read in [`src/api/chat.ts`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/tools/react-viewer/src/api/chat.ts) in this order:
+The assistant panel calls external services directly from the browser. Its default mode, "RealSense AI Assistant", uses a hosted RealSense AI service and needs no key. A second mode, "Device Config Chatbot", calls an LLM provider. It is enabled by Vite environment variables in a `.env` file (see [`.env.example`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/.env.example)), read in [`src/api/chat.ts`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/src/api/chat.ts) in this order:
 
 | Variable | Provider |
 |---|---|
@@ -140,7 +140,7 @@ Without any of these, or if the viewer's check request to the provider fails or 
 
 ### Desktop app
 
-[`build-all.sh`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/tools/react-viewer/build-all.sh) (Linux/macOS) and [`build-all.ps1`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/tools/react-viewer/build-all.ps1) (Windows) build a standalone "RealSense Viewer" desktop app: the API server as a PyInstaller executable (`realsense_api`), the React build, and a Tauri bundle that starts the bundled server on `127.0.0.1:8000`. Run `./build-all.sh --help` for requirements and output locations, and see [`DESKTOP_BUILD.md`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/tools/react-viewer/DESKTOP_BUILD.md).
+[`build-all.sh`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/build-all.sh) (Linux/macOS) and [`build-all.ps1`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/build-all.ps1) (Windows) build a standalone "RealSense Viewer" desktop app: the API server as a PyInstaller executable (`realsense_api`), the React build, and a Tauri bundle that starts the bundled server on `127.0.0.1:8000`. Run `./build-all.sh --help` for requirements and output locations, and see [`DESKTOP_BUILD.md`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/DESKTOP_BUILD.md).
 
 ## Typical REST workflow
 
@@ -163,13 +163,13 @@ curl -X POST http://localhost:8000/api/v1/devices/<serial>/stream/start \
 curl -X POST http://localhost:8000/api/v1/devices/<serial>/stream/stop
 ```
 
-Take `sensor_id`, `stream_type`, `format`, resolution and framerate values from the `GET .../sensors/` response for your device. The request body model is `StreamStart` in [`app/models/stream.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/app/models/stream.py) (`configs`, optional `align_to`, `apply_filters`).
+Take `sensor_id`, `stream_type`, `format`, resolution and framerate values from the `GET .../sensors/` response for your device. The request body model is `StreamStart` in [`app/models/stream.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/app/models/stream.py) (`configs`, optional `align_to`, `apply_filters`).
 
 There are two ways to stream, and they cannot be used at the same time: the pipeline routes (`.../stream/start`) and the per-sensor routes (`.../sensors/{sensor_id}/start`). Stop all streams before switching between them.
 
 ## REST routes
 
-All routes below are prefixed with `/api/v1`. They are listed in the order the routers are registered in [`app/api/router.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/app/api/router.py), and within each router in source order. Trailing slashes are as written in the code. Request and response models are in [`app/models`](https://github.com/realsenseai/librealsense/tree/development/wrappers/rest-api/app/models); the Swagger UI at `/docs` shows the full schemas.
+All routes below are prefixed with `/api/v1`. They are listed in the order the routers are registered in [`app/api/router.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/app/api/router.py), and within each router in source order. Trailing slashes are as written in the code. Request and response models are in [`app/models`](https://github.com/realsenseai/librealsense/tree/master/wrappers/rest-api/app/models); the Swagger UI at `/docs` shows the full schemas.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -225,7 +225,7 @@ For firmware updates in general, see [[Firmware Update]]; for the filters, see [
 
 ## Socket.IO events
 
-The Socket.IO server ([`app/services/socketio.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/app/services/socketio.py)) is mounted on the same port as the REST API, at path `/socket`, and allows any origin. The server emits:
+The Socket.IO server ([`app/services/socketio.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/app/services/socketio.py)) is mounted on the same port as the REST API, at path `/socket`, and allows any origin. The server emits:
 
 | Event | When | Payload |
 |---|---|---|
@@ -236,11 +236,11 @@ The Socket.IO server ([`app/services/socketio.py`](https://github.com/realsensea
 | `firmware_update_success_<device_id>` | Firmware update finished | `device_id`, `firmware_version` |
 | `firmware_update_failed_<device_id>` | Firmware update failed | `device_id`, `error` |
 
-Point cloud data rides on `metadata_update` in the depth entry, in every third broadcast ([`metadata_socket_server.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/app/services/metadata_socket_server.py)). `point_cloud.vertices` (and `colors`, if present) are Base64-encoded raw NumPy array bytes. Motion samples are in `motion_data`.
+Point cloud data rides on `metadata_update` in the depth entry, in every third broadcast ([`metadata_socket_server.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/app/services/metadata_socket_server.py)). `point_cloud.vertices` (and `colors`, if present) are Base64-encoded raw NumPy array bytes. Motion samples are in `motion_data`.
 
 ## WebRTC streaming
 
-Video is delivered over WebRTC by [`app/services/webrtc_manager.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/app/services/webrtc_manager.py) (using `aiortc`). The server creates the offer:
+Video is delivered over WebRTC by [`app/services/webrtc_manager.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/app/services/webrtc_manager.py) (using `aiortc`). The server creates the offer:
 
 1. Start streaming on the device (`POST .../stream/start`).
 2. `POST /api/v1/webrtc/offer` with `{"device_id": "<serial>", "stream_types": ["color", "depth"]}`. The device must be streaming and every requested type must be in `active_streams` of `.../stream/status`, otherwise the server returns 400.
@@ -248,11 +248,11 @@ Video is delivered over WebRTC by [`app/services/webrtc_manager.py`](https://git
 4. Exchange ICE candidates through `POST /api/v1/webrtc/ice-candidates` and `GET /api/v1/webrtc/sessions/{session_id}/ice-candidates`.
 5. `DELETE /api/v1/webrtc/sessions/{session_id}` when done.
 
-To use WebRTC across networks, set `STUN_SERVER` or `TURN_SERVER` in `config.py`. The React viewer's client code in [`src/api/webrtc.ts`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/tools/react-viewer/src/api/webrtc.ts) is a working example.
+To use WebRTC across networks, set `STUN_SERVER` or `TURN_SERVER` in `config.py`. The React viewer's client code in [`src/api/webrtc.ts`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/tools/react-viewer/src/api/webrtc.ts) is a working example.
 
 ## Running tests
 
-[`run_tests.py`](https://github.com/realsenseai/librealsense/blob/development/wrappers/rest-api/run_tests.py) runs the backend pytest suite in [`tests/`](https://github.com/realsenseai/librealsense/tree/development/wrappers/rest-api/tests) and the viewer's Vitest suite:
+[`run_tests.py`](https://github.com/realsenseai/librealsense/blob/master/wrappers/rest-api/run_tests.py) runs the backend pytest suite in [`tests/`](https://github.com/realsenseai/librealsense/tree/master/wrappers/rest-api/tests) and the viewer's Vitest suite:
 
 ```bash
 cd wrappers/rest-api

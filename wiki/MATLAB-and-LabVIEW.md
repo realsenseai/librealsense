@@ -1,8 +1,8 @@
-The MATLAB wrapper lets you control RealSense cameras from MATLAB through a `realsense` package of MATLAB classes backed by a single MEX file, `librealsense_mex`. Its sources live in [`wrappers/matlab`](https://github.com/realsenseai/librealsense/tree/development/wrappers/matlab). The LabVIEW folder, [`wrappers/labview`](https://github.com/realsenseai/librealsense/tree/development/wrappers/labview), holds only a readme that points to a separately distributed VI library. This page covers building and setting up the MATLAB package, a first program, the bundled examples, the class reference and a summary of the LabVIEW readme.
+The MATLAB wrapper lets you control RealSense cameras from MATLAB through a `realsense` package of MATLAB classes backed by a single MEX file, `librealsense_mex`. Its sources live in [`wrappers/matlab`](https://github.com/realsenseai/librealsense/tree/master/wrappers/matlab). The LabVIEW folder, [`wrappers/labview`](https://github.com/realsenseai/librealsense/tree/master/wrappers/labview), holds only a readme that points to a separately distributed VI library. This page covers building and setting up the MATLAB package, a first program, the bundled examples, the class reference and a summary of the LabVIEW readme.
 
 ## MATLAB: how the wrapper is put together
 
-- [`librealsense_mex.cpp`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/librealsense_mex.cpp) (with `Factory.cpp`, `Factory.h`, `MatlabParamParser.h`, `rs2_type_traits.h` and `types.h`) builds one MEX function. MATLAB code calls it as `realsense.librealsense_mex('<C++ class>', '<method>', handle, args...)`, for example `realsense.librealsense_mex('rs2::pipeline', 'start', ...)`. The MEX file has a table of librealsense C++ classes (`rs2::pipeline`, `rs2::config`, `rs2::frame`, `rs400::advanced_mode` and others) and calls the C++ method you ask for.
+- [`librealsense_mex.cpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/librealsense_mex.cpp) (with `Factory.cpp`, `Factory.h`, `MatlabParamParser.h`, `rs2_type_traits.h` and `types.h`) builds one MEX function. MATLAB code calls it as `realsense.librealsense_mex('<C++ class>', '<method>', handle, args...)`, for example `realsense.librealsense_mex('rs2::pipeline', 'start', ...)`. The MEX file has a table of librealsense C++ classes (`rs2::pipeline`, `rs2::config`, `rs2::frame`, `rs400::advanced_mode` and others) and calls the C++ method you ask for.
 - Each class file that wraps librealsense (for example `pipeline.m` or `colorizer.m`) wraps one C++ class and keeps the native object handle in `objectHandle`. The enumeration files (for example `stream.m`) are plain `int64` enumerations.
 - Because the wrapper class files call the MEX file and each other with the `realsense.` prefix, and the examples call the classes the same way, the `.m` files and the compiled MEX file must all be in a MATLAB package folder called `+realsense`. MATLAB must be able to find the parent folder of `+realsense` (it can be your current folder or a folder on the MATLAB path).
 
@@ -10,9 +10,9 @@ If the MEX function gets a bad request, it raises errors from `librealsense_mex.
 
 ## Building the MATLAB wrapper with CMake
 
-The wrapper is part of the main librealsense CMake build. Turn it on with `BUILD_MATLAB_BINDINGS`, which defaults to `OFF` (defined in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake)). When the option is on, [`wrappers/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/wrappers/CMakeLists.txt) adds `wrappers/matlab`. For the other build options, see [[Build Configuration]].
+The wrapper is part of the main librealsense CMake build. Turn it on with `BUILD_MATLAB_BINDINGS`, which defaults to `OFF` (defined in [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake)). When the option is on, [`wrappers/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/wrappers/CMakeLists.txt) adds `wrappers/matlab`. For the other build options, see [[Build Configuration]].
 
-| Item | Value (from [`wrappers/matlab/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/CMakeLists.txt)) |
+| Item | Value (from [`wrappers/matlab/CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/CMakeLists.txt)) |
 |---|---|
 | Option | `BUILD_MATLAB_BINDINGS` (default `OFF`) |
 | MATLAB lookup | `find_package(Matlab COMPONENTS MX_LIBRARY MAT_LIBRARY REQUIRED)`, so configuration fails if CMake cannot find a MATLAB installation |
@@ -20,7 +20,7 @@ The wrapper is part of the main librealsense CMake build. Turn it on with `BUILD
 | Links to | `realsense2` and the MATLAB MAT library |
 | Linker flag | Always adds `/NODEFAULTLIB:realsense2`. This is a workaround for Debug builds with MSVC. |
 
-The wrapper's [readme](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/readme.md) only describes using it on Windows. Example configure and build on Windows:
+The wrapper's [readme](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/readme.md) only describes using it on Windows. Example configure and build on Windows:
 
 ```
 git clone https://github.com/realsenseai/librealsense.git
@@ -31,7 +31,7 @@ cmake .. -DBUILD_MATLAB_BINDINGS:BOOL=ON
 cmake --build . --config Release --target librealsense_mex
 ```
 
-On Windows, [`CMake/windows_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/windows_config.cmake) sends build outputs to the build directory. With the Visual Studio generator they land in `build/<Configuration>` (for example `build/Release`), next to `realsense2.dll`.
+On Windows, [`CMake/windows_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/windows_config.cmake) sends build outputs to the build directory. With the Visual Studio generator they land in `build/<Configuration>` (for example `build/Release`), next to `realsense2.dll`.
 
 ### Setting up the `+realsense` package after a CMake build
 
@@ -45,7 +45,7 @@ The CMake build only compiles the MEX file. It does **not** copy the `.m` files 
 
 ## Building with the Visual Studio project
 
-`wrappers/matlab` also has a standalone Visual Studio solution, [`librealsense_mex.sln`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/librealsense_mex.sln), with the project [`librealsense_mex.vcxproj`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/librealsense_mex.vcxproj). The project file shows the following:
+`wrappers/matlab` also has a standalone Visual Studio solution, [`librealsense_mex.sln`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/librealsense_mex.sln), with the project [`librealsense_mex.vcxproj`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/librealsense_mex.vcxproj). The project file shows the following:
 
 - It has `Debug` and `Release` configurations for `Win32` and `x64`. The platform toolset is `v140`.
 - It builds a `.mexw64` file into `$(SolutionDir)$(Platform)\$(Configuration)\+realsense\`. In the x64 configurations a pre-build step (`xcopy /y $(ProjectDir)*.m $(OutDir)`, "Copy Matlab files to output dir") copies the `.m` files there, so the output folder is a ready-to-use `+realsense` package.
@@ -56,7 +56,7 @@ The current tree has no `third-party/libtm` folder, so the `fw.lib` and `tm.lib`
 
 ## First program
 
-[`depth_example.m`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/depth_example.m) streams from the first available camera with default settings, takes a depth frame, colorizes it and shows it. Run it from the MATLAB prompt:
+[`depth_example.m`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/depth_example.m) streams from the first available camera with default settings, takes a depth frame, colorizes it and shows it. Run it from the MATLAB prompt:
 
 ```matlab
 realsense.depth_example
@@ -116,16 +116,16 @@ pipe.stop();
 
 ## Example scripts
 
-All examples are in [`wrappers/matlab`](https://github.com/realsenseai/librealsense/tree/development/wrappers/matlab). Run them as `realsense.<name>` once the package is set up.
+All examples are in [`wrappers/matlab`](https://github.com/realsenseai/librealsense/tree/master/wrappers/matlab). Run them as `realsense.<name>` once the package is set up.
 
 | Example | What it does |
 |---|---|
-| [`depth_example.m`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/depth_example.m) | Function. Streams with default settings, colorizes one depth frame and shows it with `imshow`. |
-| [`rosbag_example.m`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/rosbag_example.m) | Function `rosbag_example(filename)`. Plays a recorded file through `config.enable_device_from_file` and shows a colorized depth frame. See [[Record and Playback]]. |
-| [`pointcloud_example.m`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/pointcloud_example.m) | Function. Runs `realsense.pointcloud.calculate` on live depth frames and draws the vertices with `plot3` in a loop. |
-| [`depth_view_example.m`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/depth_view_example.m) | `matlab.apps.AppBase` app. Shows live colorized depth and color side by side, with Start/Stop buttons and a timer. It puts the serial number of the first device from `realsense.context().query_devices()` into a `realsense.config`, but starts the pipeline without that config. |
-| [`capture_example.m`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/capture_example.m) | `matlab.apps.AppBase` app. Shows depth, color, accelerometer and gyro data for whichever of these streams the device's default profile has. Streams it doesn't have are marked "not supported". |
-| [`advanced_mode_example.m`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/advanced_mode_example.m) | Function. Checks `dev.is('advanced_mode')`, turns advanced mode on if needed, reads the settings with `serialize_json`, changes `controls-color-gain` and uploads them with `load_json`. See [[D400 Advanced Mode]]. |
+| [`depth_example.m`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/depth_example.m) | Function. Streams with default settings, colorizes one depth frame and shows it with `imshow`. |
+| [`rosbag_example.m`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/rosbag_example.m) | Function `rosbag_example(filename)`. Plays a recorded file through `config.enable_device_from_file` and shows a colorized depth frame. See [[Record and Playback]]. |
+| [`pointcloud_example.m`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/pointcloud_example.m) | Function. Runs `realsense.pointcloud.calculate` on live depth frames and draws the vertices with `plot3` in a loop. |
+| [`depth_view_example.m`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/depth_view_example.m) | `matlab.apps.AppBase` app. Shows live colorized depth and color side by side, with Start/Stop buttons and a timer. It puts the serial number of the first device from `realsense.context().query_devices()` into a `realsense.config`, but starts the pipeline without that config. |
+| [`capture_example.m`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/capture_example.m) | `matlab.apps.AppBase` app. Shows depth, color, accelerometer and gyro data for whichever of these streams the device's default profile has. Streams it doesn't have are marked "not supported". |
+| [`advanced_mode_example.m`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/advanced_mode_example.m) | Function. Checks `dev.is('advanced_mode')`, turns advanced mode on if needed, reads the settings with `serialize_json`, changes `controls-color-gain` and uploads them with `load_json`. See [[D400 Advanced Mode]]. |
 
 If no camera is connected, `depth_view_example` and `capture_example` stop with the error `Not found RealSense device`. Both apps print this message.
 
@@ -204,11 +204,11 @@ All of these derive from `realsense.filter`, which derives from `realsense.optio
 | `realsense.timestamp_domain` | `rs2_timestamp_domain` |
 | `realsense.playback_status` | `rs2_playback_status` |
 
-The enumeration values are written out in the `.m` files, so check the file (for example [`option.m`](https://github.com/realsenseai/librealsense/blob/development/wrappers/matlab/option.m)) for the values that are available.
+The enumeration values are written out in the `.m` files, so check the file (for example [`option.m`](https://github.com/realsenseai/librealsense/blob/master/wrappers/matlab/option.m)) for the values that are available.
 
 ## LabVIEW
 
-[`wrappers/labview`](https://github.com/realsenseai/librealsense/tree/development/wrappers/labview) has only a [`readme.md`](https://github.com/realsenseai/librealsense/blob/development/wrappers/labview/readme.md). The repository has no LabVIEW code, VIs or build steps, so nothing in this section can be checked against code. The repository guide says the following:
+[`wrappers/labview`](https://github.com/realsenseai/librealsense/tree/master/wrappers/labview) has only a [`readme.md`](https://github.com/realsenseai/librealsense/blob/master/wrappers/labview/readme.md). The repository has no LabVIEW code, VIs or build steps, so nothing in this section can be checked against code. The repository guide says the following:
 
 - A separately downloaded VI library wraps most of the core functions of `realsense2.dll`. The readme links to several versions, the newest labelled "RealSense SDK2 for LabVIEW 1.0, 2.33.0, Feb 2020".
 - The package targets LabVIEW 2016 on 64-bit Windows 10. It ships a 64-bit `realsense2.dll`. To use a different build, compile `realsense2.dll` yourself (see [[Installation Windows]]) and replace the file the LabVIEW demos load.

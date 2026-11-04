@@ -6,7 +6,7 @@ There are two main methods for frame buffering management:
  - **Asynchronous method** - The librealsense library will pass each frame that is ready to be handled to a user pre-defined callback.
  - **Synchronous method** - This method (described below), instead of handling the frames immediately in a callback, the received frames are queued in a frame queue and can be polled by the application.
 
-[For more information on the librealsense SDK architecture](https://github.com/realsenseai/librealsense/blob/development/doc/api_arch.md). For frame ownership, threading and the frame syncer see [Frame Management](https://github.com/realsenseai/librealsense/blob/development/doc/frame_lifetime.md).
+[For more information on the librealsense SDK architecture](https://github.com/realsenseai/librealsense/blob/master/doc/api_arch.md). For frame ownership, threading and the frame syncer see [Frame Management](https://github.com/realsenseai/librealsense/blob/master/doc/frame_lifetime.md).
 
 ## Table of Contents
 * [Latency vs. Performance](#latency-vs.-performance)

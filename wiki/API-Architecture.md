@@ -4,13 +4,13 @@ For task-oriented snippets see [[API How To]]; for runnable programs see [[Code 
 
 ## Headers
 
-The public headers live in [`include/librealsense2`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2):
+The public headers live in [`include/librealsense2`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2):
 
 | Header | Language | Contents |
 |---|---|---|
-| [`rs.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rs.h) | C | Includes the C headers under `h/` (types, context, device, frame, option, processing, record/playback, sensor and others) |
-| [`rs.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rs.hpp) | C++ | Includes `rs.h` and the C++ wrappers under `hpp/` (types, context, device, frame, processing, record/playback, sensor, pipeline and others) |
-| [`hpp/rs_internal.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_internal.hpp) / [`h/rs_internal.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_internal.h) | C++ / C | Software device API. Not included by `rs.hpp`; include it separately |
+| [`rs.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rs.h) | C | Includes the C headers under `h/` (types, context, device, frame, option, processing, record/playback, sensor and others) |
+| [`rs.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rs.hpp) | C++ | Includes `rs.h` and the C++ wrappers under `hpp/` (types, context, device, frame, processing, record/playback, sensor, pipeline and others) |
+| [`hpp/rs_internal.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_internal.hpp) / [`h/rs_internal.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_internal.h) | C++ / C | Software device API. Not included by `rs.hpp`; include it separately |
 
 The C++ classes in `hpp/` are header-only wrappers: their methods call the matching `rs2_…` C functions (some return cached values or combine other calls) and turn any error into an exception.
 
@@ -28,14 +28,14 @@ rs2::context                          enumerates devices, reports connect / disc
 
 | Layer | C++ class | C handle | Defined in |
 |---|---|---|---|
-| Context | `rs2::context` | `rs2_context*` | [`rs_context.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_context.hpp), [`rs_context.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_context.h) |
-| Device list | `rs2::device_list` | `rs2_device_list*` | [`rs_device.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_device.hpp), [`rs_device.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_device.h) |
+| Context | `rs2::context` | `rs2_context*` | [`rs_context.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_context.hpp), [`rs_context.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_context.h) |
+| Device list | `rs2::device_list` | `rs2_device_list*` | [`rs_device.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_device.hpp), [`rs_device.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_device.h) |
 | Device | `rs2::device` | `rs2_device*` | same as above |
-| Sensor | `rs2::sensor` and subclasses (`depth_sensor`, `color_sensor`, `motion_sensor`, …) | `rs2_sensor*` | [`rs_sensor.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_sensor.hpp), [`rs_sensor.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_sensor.h) |
-| Stream profile | `rs2::stream_profile`, `rs2::video_stream_profile`, … | `rs2_stream_profile*` | [`rs_frame.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_frame.hpp) |
-| Frame | `rs2::frame`, `rs2::depth_frame`, `rs2::frameset`, … | `rs2_frame*` | [`rs_frame.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_frame.hpp), [`rs_frame.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_frame.h) |
-| Pipeline | `rs2::pipeline`, `rs2::pipeline_profile` | `rs2_pipeline*` | [`rs_pipeline.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_pipeline.hpp), [`rs_pipeline.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_pipeline.h) |
-| Config | `rs2::config` | `rs2_config*` | same as pipeline, plus [`rs_config.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_config.h) |
+| Sensor | `rs2::sensor` and subclasses (`depth_sensor`, `color_sensor`, `motion_sensor`, …) | `rs2_sensor*` | [`rs_sensor.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_sensor.hpp), [`rs_sensor.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_sensor.h) |
+| Stream profile | `rs2::stream_profile`, `rs2::video_stream_profile`, … | `rs2_stream_profile*` | [`rs_frame.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_frame.hpp) |
+| Frame | `rs2::frame`, `rs2::depth_frame`, `rs2::frameset`, … | `rs2_frame*` | [`rs_frame.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_frame.hpp), [`rs_frame.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_frame.h) |
+| Pipeline | `rs2::pipeline`, `rs2::pipeline_profile` | `rs2_pipeline*` | [`rs_pipeline.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_pipeline.hpp), [`rs_pipeline.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_pipeline.h) |
+| Config | `rs2::config` | `rs2_config*` | same as pipeline, plus [`rs_config.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_config.h) |
 
 Sensors, devices, profiles and frames are extensible: use `is<T>()` / `as<T>()` to check for and get a more specific type (for example `frame.as<rs2::depth_frame>()`). `device.first<T>()` returns the first sensor of type `T` and throws `rs2::error` if there is none.
 
@@ -68,9 +68,9 @@ Useful pieces of the pipeline API:
 
 The pipeline is constructed from a context (`rs2::pipeline(context ctx = context())`), so the low-level device remains reachable through `profile.get_device()` for setting options.
 
-When the pipeline is started with a callback, `wait_for_frames()` and `poll_for_frames()` throw (documented on `rs2_pipeline_start_with_callback_cpp` in `rs_pipeline.h`). See the [callback example](https://github.com/realsenseai/librealsense/blob/development/examples/callback/rs-callback.cpp).
+When the pipeline is started with a callback, `wait_for_frames()` and `poll_for_frames()` throw (documented on `rs2_pipeline_start_with_callback_cpp` in `rs_pipeline.h`). See the [callback example](https://github.com/realsenseai/librealsense/blob/master/examples/callback/rs-callback.cpp).
 
-Examples: [hello-realsense](https://github.com/realsenseai/librealsense/tree/development/examples/hello-realsense), [callback](https://github.com/realsenseai/librealsense/tree/development/examples/callback), [C distance](https://github.com/realsenseai/librealsense/blob/development/examples/C/distance/rs-distance.c).
+Examples: [hello-realsense](https://github.com/realsenseai/librealsense/tree/master/examples/hello-realsense), [callback](https://github.com/realsenseai/librealsense/tree/master/examples/callback), [C distance](https://github.com/realsenseai/librealsense/blob/master/examples/C/distance/rs-distance.c).
 
 ## Control sensors with the low-level API
 
@@ -98,7 +98,7 @@ depth_sensor.close();
 
 Sensor calls follow the order `open` (one profile or a vector of profiles) → `start` → `stop` → `close`. `sensor::start` takes any callable that accepts an `rs2::frame`; a `rs2::frame_queue` or `rs2::syncer` can be passed instead of a lambda (the software-device example passes a `syncer`). `get_active_streams()` lists the profiles currently opened. For buffering, queues and frame lifetimes see [[Frame Buffering Management in RealSense SDK 2.0]].
 
-Examples: [sensor-control](https://github.com/realsenseai/librealsense/tree/development/examples/sensor-control), [multicam](https://github.com/realsenseai/librealsense/tree/development/examples/multicam).
+Examples: [sensor-control](https://github.com/realsenseai/librealsense/tree/master/examples/sensor-control), [multicam](https://github.com/realsenseai/librealsense/tree/master/examples/multicam).
 
 ## Enumerate devices and handle hot-plug
 
@@ -150,13 +150,13 @@ rs2_delete_device_list(list);
 rs2_delete_context(ctx);
 ```
 
-Error accessors (in [`rs_types.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_types.h)): `rs2_get_error_message`, `rs2_get_failed_function`, `rs2_get_failed_args`, `rs2_get_librealsense_exception_type`, `rs2_free_error`.
+Error accessors (in [`rs_types.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_types.h)): `rs2_get_error_message`, `rs2_get_failed_function`, `rs2_get_failed_args`, `rs2_get_librealsense_exception_type`, `rs2_free_error`.
 
-Objects returned by the C API must be released by the caller with the matching function (`rs2_delete_context`, `rs2_delete_device_list`, `rs2_delete_device`, `rs2_release_frame`, …). `rs2_create_context` takes `RS2_API_VERSION` so the library can check that the application was built against a compatible version. The [C examples](https://github.com/realsenseai/librealsense/tree/development/examples/C) use a `check_error()` helper from [`example.h`](https://github.com/realsenseai/librealsense/blob/development/examples/C/example.h).
+Objects returned by the C API must be released by the caller with the matching function (`rs2_delete_context`, `rs2_delete_device_list`, `rs2_delete_device`, `rs2_release_frame`, …). `rs2_create_context` takes `RS2_API_VERSION` so the library can check that the application was built against a compatible version. The [C examples](https://github.com/realsenseai/librealsense/tree/master/examples/C) use a `check_error()` helper from [`example.h`](https://github.com/realsenseai/librealsense/blob/master/examples/C/example.h).
 
 ### C++ exceptions
 
-The C++ wrapper owns C handles through `std::shared_ptr` and calls `rs2::error::handle(e)` after each C call. That function throws an exception chosen by the error's `rs2_exception_type` ([`rs_types.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_types.hpp)):
+The C++ wrapper owns C handles through `std::shared_ptr` and calls `rs2::error::handle(e)` after each C call. That function throws an exception chosen by the error's `rs2_exception_type` ([`rs_types.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_types.hpp)):
 
 ```
 std::runtime_error
@@ -197,9 +197,9 @@ catch (const rs2::error& e)
 
 ## Software device
 
-A software device is an `rs2::device` with no hardware behind it. You define its sensors and stream profiles and push your own frame data into it; the frames then work with the rest of the SDK (for example `syncer`, `pointcloud`, `align`, recording). It is declared in [`rs_internal.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_internal.hpp) (C: [`rs_internal.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_internal.h)).
+A software device is an `rs2::device` with no hardware behind it. You define its sensors and stream profiles and push your own frame data into it; the frames then work with the rest of the SDK (for example `syncer`, `pointcloud`, `align`, recording). It is declared in [`rs_internal.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_internal.hpp) (C: [`rs_internal.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_internal.h)).
 
-Adapted from the [software-device example](https://github.com/realsenseai/librealsense/blob/development/examples/software-device/rs-software-device.cpp):
+Adapted from the [software-device example](https://github.com/realsenseai/librealsense/blob/master/examples/software-device/rs-software-device.cpp):
 
 ```cpp
 #include <librealsense2/rs.hpp>
@@ -241,11 +241,11 @@ Main calls:
 | | `set_metadata(value, type)` | Set metadata attached to the next frames |
 | | `add_read_only_option`, `set_read_only_option`, `add_option` | Expose options |
 
-The `rs2_software_video_frame` fields are `pixels`, `deleter`, `stride`, `bpp`, `timestamp`, `domain`, `frame_number`, `profile` and `depth_units`. The example notes that the `syncer` expects timestamps to advance by about 1000/FPS milliseconds between frames. See the [example readme](https://github.com/realsenseai/librealsense/blob/development/examples/software-device/readme.md) for the full walk-through.
+The `rs2_software_video_frame` fields are `pixels`, `deleter`, `stride`, `bpp`, `timestamp`, `domain`, `frame_number`, `profile` and `depth_units`. The example notes that the `syncer` expects timestamps to advance by about 1000/FPS milliseconds between frames. See the [example readme](https://github.com/realsenseai/librealsense/blob/master/examples/software-device/readme.md) for the full walk-through.
 
 ## Callbacks and threads
 
-- Frame callbacks passed to `sensor::start` or `pipeline::start` are called by the library as frames arrive, not on the thread that started streaming. The [callback example](https://github.com/realsenseai/librealsense/blob/development/examples/callback/rs-callback.cpp) therefore guards data shared with the main loop with a `std::mutex`.
+- Frame callbacks passed to `sensor::start` or `pipeline::start` are called by the library as frames arrive, not on the thread that started streaming. The [callback example](https://github.com/realsenseai/librealsense/blob/master/examples/callback/rs-callback.cpp) therefore guards data shared with the main loop with a `std::mutex`.
 - In the C++ wrapper, ownership of the callback object passes to the library (`rs2_start_cpp`, `rs2_set_devices_changed_callback_cpp`, `rs2_pipeline_start_with_callback_cpp`).
 - To consume frames on your own thread, start the sensor with an `rs2::frame_queue` (`rs2_start_queue` in C) and read from the queue. See [[Frame Buffering Management in RealSense SDK 2.0]].
 
@@ -254,7 +254,7 @@ The `rs2_software_video_frame` fields are `pixels`, `deleter`, `stride`, `bpp`, 
 - [[API How To]]: short recipes for common tasks
 - [[Code Samples]]: list of examples
 - [[Frame Buffering Management in RealSense SDK 2.0]]: frame queues and frame lifetime
-- Source documents: [`doc/api_arch.md`](https://github.com/realsenseai/librealsense/blob/development/doc/api_arch.md), [`doc/error_handling.md`](https://github.com/realsenseai/librealsense/blob/development/doc/error_handling.md), [`include/readme.md`](https://github.com/realsenseai/librealsense/blob/development/include/readme.md)
+- Source documents: [`doc/api_arch.md`](https://github.com/realsenseai/librealsense/blob/master/doc/api_arch.md), [`doc/error_handling.md`](https://github.com/realsenseai/librealsense/blob/master/doc/error_handling.md), [`include/readme.md`](https://github.com/realsenseai/librealsense/blob/master/include/readme.md)
 
 <!-- wikigen:footer -->
 _Maintained from librealsense `development`; last checked at commit [`46cf1a6`](https://github.com/realsenseai/librealsense/commit/46cf1a67cc441ad9f55ce339a0de30f2a1c6fed0)._

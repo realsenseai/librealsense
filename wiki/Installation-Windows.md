@@ -2,16 +2,16 @@ This page explains how to get the RealSense SDK 2.0 (librealsense) running on Wi
 
 ## Overview
 
-On Windows, librealsense talks to the camera through one of two backends, chosen at CMake time in [`CMake/windows_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/windows_config.cmake):
+On Windows, librealsense talks to the camera through one of two backends, chosen at CMake time in [`CMake/windows_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/windows_config.cmake):
 
 | Backend | Selected when | Sources |
 |---|---|---|
-| Windows Media Foundation (`RS2_USE_WMF_BACKEND`) | Default | [`src/mf/`](https://github.com/realsenseai/librealsense/tree/development/src/mf) |
-| RS USB backend over WinUSB (`RS2_USE_WINUSB_UVC_BACKEND`) | `FORCE_RSUSB_BACKEND=ON`, or the target system is Windows 7 (`CMAKE_SYSTEM_VERSION` 6.1) | [`src/win7/`](https://github.com/realsenseai/librealsense/tree/development/src/win7), [`src/rsusb-backend/`](https://github.com/realsenseai/librealsense/tree/development/src/rsusb-backend) |
+| Windows Media Foundation (`RS2_USE_WMF_BACKEND`) | Default | [`src/mf/`](https://github.com/realsenseai/librealsense/tree/master/src/mf) |
+| RS USB backend over WinUSB (`RS2_USE_WINUSB_UVC_BACKEND`) | `FORCE_RSUSB_BACKEND=ON`, or the target system is Windows 7 (`CMAKE_SYSTEM_VERSION` 6.1) | [`src/win7/`](https://github.com/realsenseai/librealsense/tree/master/src/win7), [`src/rsusb-backend/`](https://github.com/realsenseai/librealsense/tree/master/src/rsusb-backend) |
 
 The Media Foundation backend uses the camera through the Windows inbox drivers. Most users need nothing beyond the default.
 
-The repository guide ([`doc/installation_windows.md`](https://github.com/realsenseai/librealsense/blob/development/doc/installation_windows.md)) covers Windows 10 and Windows 11. It also says the librealsense team does not recommend or support installing in a virtual machine, because of the USB 3.0 translation layer between the hardware and the VM.
+The repository guide ([`doc/installation_windows.md`](https://github.com/realsenseai/librealsense/blob/master/doc/installation_windows.md)) covers Windows 10 and Windows 11. It also says the librealsense team does not recommend or support installing in a virtual machine, because of the USB 3.0 translation layer between the hardware and the VM.
 
 ## Install the prebuilt SDK
 
@@ -23,8 +23,8 @@ After you connect the camera to a USB 3 port, it shows up in the Windows Device 
 
 ### Requirements
 
-- **CMake 3.10 or newer.** The top-level [`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/development/CMakeLists.txt) and `CMake/windows_config.cmake` both call `cmake_minimum_required(VERSION 3.10)`. Some optional features need a newer CMake. For example, `BUILD_WITH_DDS` requires CMake 3.16.3 (see [[Build Configuration]]).
-- **Visual Studio with C++14 support.** The library is compiled with `cxx_std_14` ([`CMake/lrs_macros.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_macros.cmake)). The repository guide asks for Visual Studio 2019 or newer.
+- **CMake 3.10 or newer.** The top-level [`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blob/master/CMakeLists.txt) and `CMake/windows_config.cmake` both call `cmake_minimum_required(VERSION 3.10)`. Some optional features need a newer CMake. For example, `BUILD_WITH_DDS` requires CMake 3.16.3 (see [[Build Configuration]]).
+- **Visual Studio with C++14 support.** The library is compiled with `cxx_std_14` ([`CMake/lrs_macros.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_macros.cmake)). The repository guide asks for Visual Studio 2019 or newer.
 - **A Windows 10 SDK.** You need one for frame metadata (see [Compiling with metadata support](#compiling-with-metadata-support)).
 - **Git**, to clone the repository.
 - **Network access during configuration and build.** nlohmann/json is cloned at configure time (`CMake/external_json.cmake`, unless `USE_EXTERNAL_NLOHMANN_JSON=ON`). Other components are cloned during the build. For example, libcurl (`CMake/external_libcurl.cmake`) is pulled in because `CHECK_FOR_UPDATES`, `ENABLE_AI_ASSISTANT` and `ENABLE_STATS` are `ON` by default on Windows.
@@ -54,11 +54,11 @@ After you connect the camera to a USB 3 port, it shows up in the Windows Device 
    cmake --build . --config Release -- -m
    ```
 
-   This is the command the project's Windows CI uses ([`.github/actions/windows-build/action.yml`](https://github.com/realsenseai/librealsense/blob/development/.github/actions/windows-build/action.yml)). `-- -m` tells MSBuild to build projects in parallel. The library itself is also compiled with `/MP`.
+   This is the command the project's Windows CI uses ([`.github/actions/windows-build/action.yml`](https://github.com/realsenseai/librealsense/blob/master/.github/actions/windows-build/action.yml)). `-- -m` tells MSBuild to build projects in parallel. The library itself is also compiled with `/MP`.
 
-4. Optionally, install headers, libraries, the CMake and pkg-config package files, and the built tools and examples by building the `INSTALL` target, or (with CMake 3.15 or newer) with `cmake --install . --config Release`. The destination comes from `CMAKE_INSTALL_PREFIX` (see [`CMake/install_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/install_config.cmake)).
+4. Optionally, install headers, libraries, the CMake and pkg-config package files, and the built tools and examples by building the `INSTALL` target, or (with CMake 3.15 or newer) with `cmake --install . --config Release`. The destination comes from `CMAKE_INSTALL_PREFIX` (see [`CMake/install_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/install_config.cmake)).
 
-![Windows CMake](https://raw.githubusercontent.com/realsenseai/librealsense/development/doc/img/windows_cmake.png)
+![Windows CMake](https://raw.githubusercontent.com/realsenseai/librealsense/master/doc/img/windows_cmake.png)
 
 ### Build type and where outputs land
 
@@ -68,7 +68,7 @@ After you connect the camera to a USB 3 port, it shows up in the Windows Device 
 
 ### What gets built by default
 
-These defaults come from [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/lrs_options.cmake):
+These defaults come from [`CMake/lrs_options.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/lrs_options.cmake):
 
 | Option | Default | Effect |
 |---|---|---|
@@ -96,13 +96,13 @@ There are two ways to add the registry values: let the RealSense Viewer do it, o
 
 ### From the RealSense Viewer
 
-The Windows build of the RealSense Viewer checks the registry for every connected camera whose product line is `D400` or `D500` ([`common/metadata-helper.h`](https://github.com/realsenseai/librealsense/blob/development/common/metadata-helper.h), [`common/subdevice-model.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/subdevice-model.cpp)). If the values are missing, the Viewer shows a **Frame Metadata Disabled** notification with an **Enable** button ([`common/notifications.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/notifications.cpp)).
+The Windows build of the RealSense Viewer checks the registry for every connected camera whose product line is `D400` or `D500` ([`common/metadata-helper.h`](https://github.com/realsenseai/librealsense/blob/master/common/metadata-helper.h), [`common/subdevice-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/subdevice-model.cpp)). If the values are missing, the Viewer shows a **Frame Metadata Disabled** notification with an **Enable** button ([`common/notifications.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/notifications.cpp)).
 
-When you press **Enable** and the Viewer is not running as administrator, it starts a second copy of itself, elevated, with the `--enable_metadata` argument ([`common/windows-app-bootstrap.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/windows-app-bootstrap.cpp)). That copy writes the values for all connected D400/D500 devices and exits. Windows shows a UAC prompt for the elevation. For each interface, the Viewer writes `MetadataBufferSizeInKB0` up to `MetadataBufferSizeInKB<n-1>`, each as a `DWORD` with value `5`, where `n` is the number of media pins the code assigns to that interface ([`common/metadata-helper.cpp`](https://github.com/realsenseai/librealsense/blob/development/common/metadata-helper.cpp)).
+When you press **Enable** and the Viewer is not running as administrator, it starts a second copy of itself, elevated, with the `--enable_metadata` argument ([`common/windows-app-bootstrap.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/windows-app-bootstrap.cpp)). That copy writes the values for all connected D400/D500 devices and exits. Windows shows a UAC prompt for the elevation. For each interface, the Viewer writes `MetadataBufferSizeInKB0` up to `MetadataBufferSizeInKB<n-1>`, each as a `DWORD` with value `5`, where `n` is the number of media pins the code assigns to that interface ([`common/metadata-helper.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/metadata-helper.cpp)).
 
 ### With the PowerShell script
 
-The script is [`scripts/realsense_metadata_win10.ps1`](https://github.com/realsenseai/librealsense/blob/development/scripts/realsense_metadata_win10.ps1). Open PowerShell, go to the `scripts` folder and run:
+The script is [`scripts/realsense_metadata_win10.ps1`](https://github.com/realsenseai/librealsense/blob/master/scripts/realsense_metadata_win10.ps1). Open PowerShell, go to the `scripts` folder and run:
 
 ```
 .\realsense_metadata_win10.ps1 -op install
@@ -146,11 +146,11 @@ If neither the Viewer nor the script can be used, you can create the same values
 3. Add a `DWORD (32-bit)` value `MetadataBufferSizeInKB0` with value `5`. For the `MI_00` (depth) interface of multi-pin devices, and for every interface of a `VID_38E5` camera, also add `MetadataBufferSizeInKB1`, `MetadataBufferSizeInKB2` and `MetadataBufferSizeInKB3` with value `5`, as the script does.
 4. Repeat for every RealSense interface (depth, color, and so on).
 
-![Registry value](https://raw.githubusercontent.com/realsenseai/librealsense/development/doc/img/win_md_reg_key.png)
+![Registry value](https://raw.githubusercontent.com/realsenseai/librealsense/master/doc/img/win_md_reg_key.png)
 
 ### Compiling with metadata support
 
-Metadata support in the Media Foundation backend depends on the Windows SDK used for the build ([`src/mf/mf-uvc.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/mf/mf-uvc.cpp)):
+Metadata support in the Media Foundation backend depends on the Windows SDK used for the build ([`src/mf/mf-uvc.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/mf/mf-uvc.cpp)):
 
 - With a Windows SDK newer than 8.1, metadata support is compiled in.
 - With Windows SDK 8.1 or older and `ENFORCE_METADATA=OFF` (the default), the compiler prints this message and the library is built without metadata:
@@ -178,11 +178,11 @@ The older option `FORCE_WINUSB_UVC` is deprecated. Setting it prints a CMake dep
 
 With this backend:
 
-- The library is built with `RS2_USE_WINUSB_UVC_BACKEND`, from [`src/win7/`](https://github.com/realsenseai/librealsense/tree/development/src/win7) plus the shared RS USB, UVC and HID sources. It links against libusb. A system libusb is used if CMake finds one; otherwise the bundled external libusb is built ([`CMake/libusb_config.cmake`](https://github.com/realsenseai/librealsense/blob/development/CMake/libusb_config.cmake)).
-- In an out-of-source build, the files in [`src/win7/drivers/`](https://github.com/realsenseai/librealsense/tree/development/src/win7/drivers) are copied to `<build>\drivers\`, through a `realsense-driver` target that the library depends on. The repository contains only the driver `.inf` file (`IntelRealSense_D400_series_win7.inf`). The catalog file it references is not in the repository.
+- The library is built with `RS2_USE_WINUSB_UVC_BACKEND`, from [`src/win7/`](https://github.com/realsenseai/librealsense/tree/master/src/win7) plus the shared RS USB, UVC and HID sources. It links against libusb. A system libusb is used if CMake finds one; otherwise the bundled external libusb is built ([`CMake/libusb_config.cmake`](https://github.com/realsenseai/librealsense/blob/master/CMake/libusb_config.cmake)).
+- In an out-of-source build, the files in [`src/win7/drivers/`](https://github.com/realsenseai/librealsense/tree/master/src/win7/drivers) are copied to `<build>\drivers\`, through a `realsense-driver` target that the library depends on. The repository contains only the driver `.inf` file (`IntelRealSense_D400_series_win7.inf`). The catalog file it references is not in the repository.
 - The Media Foundation metadata registry setup described above does not apply, because this backend does not use Media Foundation.
 
-The repository guide ([`doc/installation_win7.md`](https://github.com/realsenseai/librealsense/blob/development/doc/installation_win7.md)) states that Windows 7 is no longer maintained and that not all product features are enabled there. Official validation covers Windows 10/11 and Linux.
+The repository guide ([`doc/installation_win7.md`](https://github.com/realsenseai/librealsense/blob/master/doc/installation_win7.md)) states that Windows 7 is no longer maintained and that not all product features are enabled there. Official validation covers Windows 10/11 and Linux.
 
 ## Build options
 

@@ -1,14 +1,14 @@
 Frame metadata is the set of read-only, per-frame attributes that librealsense attaches to each frame: counters, device and host timestamps, exposure, gain, laser power, and (on devices that report them) safety and diagnostic values. You need it when you have to know the exact capture conditions of a frame, for example to synchronize streams, detect dropped frames, log exposure settings, or read device-computed values.
 
-The attributes are defined by the `rs2_frame_metadata_value` enum in [`include/librealsense2/h/rs_frame.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_frame.h). Whether a given frame carries a given attribute depends on the device, its firmware, the stream, and whether the host platform delivers the metadata payload (see [How metadata reaches the host](#how-metadata-reaches-the-host)).
+The attributes are defined by the `rs2_frame_metadata_value` enum in [`include/librealsense2/h/rs_frame.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_frame.h). Whether a given frame carries a given attribute depends on the device, its firmware, the stream, and whether the host platform delivers the metadata payload (see [How metadata reaches the host](#how-metadata-reaches-the-host)).
 
 ## Reading metadata
 
-The query model is check-then-query: first ask whether the frame supports an attribute, then read it. Values are returned as `rs2_metadata_type`, a 64-bit signed integer (`long long`, defined in [`rs_types.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_types.h)).
+The query model is check-then-query: first ask whether the frame supports an attribute, then read it. Values are returned as `rs2_metadata_type`, a 64-bit signed integer (`long long`, defined in [`rs_types.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_types.h)).
 
 ### C++
 
-`rs2::frame` in [`include/librealsense2/hpp/rs_frame.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_frame.hpp) provides:
+`rs2::frame` in [`include/librealsense2/hpp/rs_frame.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_frame.hpp) provides:
 
 - `bool supports_frame_metadata(rs2_frame_metadata_value frame_metadata) const`
 - `rs2_metadata_type get_frame_metadata(rs2_frame_metadata_value frame_metadata) const`
@@ -30,13 +30,13 @@ int main()
 }
 ```
 
-Calling `get_frame_metadata` for an attribute the frame does not carry throws an error. The library builds the message as `<stream> frame does not support metadata "<attribute>"` (in `rs2_get_frame_metadata`, [`src/rs.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/rs.cpp)), so always check with `supports_frame_metadata` first.
+Calling `get_frame_metadata` for an attribute the frame does not carry throws an error. The library builds the message as `<stream> frame does not support metadata "<attribute>"` (in `rs2_get_frame_metadata`, [`src/rs.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/rs.cpp)), so always check with `supports_frame_metadata` first.
 
-To dump every attribute a frame carries, loop over the enum up to `RS2_FRAME_METADATA_COUNT` and use `rs2_frame_metadata_to_string` for the name. The [save-to-disk example](https://github.com/realsenseai/librealsense/blob/development/examples/save-to-disk/rs-save-to-disk.cpp) does exactly this and writes the result to a CSV file per stream.
+To dump every attribute a frame carries, loop over the enum up to `RS2_FRAME_METADATA_COUNT` and use `rs2_frame_metadata_to_string` for the name. The [save-to-disk example](https://github.com/realsenseai/librealsense/blob/master/examples/save-to-disk/rs-save-to-disk.cpp) does exactly this and writes the result to a CSV file per stream.
 
 ### C
 
-The C API in [`rs_frame.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_frame.h) has the same pair:
+The C API in [`rs_frame.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_frame.h) has the same pair:
 
 ```c
 int rs2_supports_frame_metadata(const rs2_frame* frame, rs2_frame_metadata_value frame_metadata, rs2_error** error);
@@ -47,7 +47,7 @@ rs2_metadata_type rs2_get_frame_metadata(const rs2_frame* frame, rs2_frame_metad
 
 ### Python
 
-The [[Python Wrapper]] binds the same methods on `pyrealsense2.frame` (see [`wrappers/python/pyrs_frame.cpp`](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/pyrs_frame.cpp)): `supports_frame_metadata(frame_metadata)` and `get_frame_metadata(frame_metadata)`. The enum is exposed as `rs.frame_metadata_value`. Python value names are the library's string names in lower case with spaces replaced by underscores (for example `RS2_FRAME_METADATA_FRAME_COUNTER` becomes `rs.frame_metadata_value.frame_counter`).
+The [[Python Wrapper]] binds the same methods on `pyrealsense2.frame` (see [`wrappers/python/pyrs_frame.cpp`](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/pyrs_frame.cpp)): `supports_frame_metadata(frame_metadata)` and `get_frame_metadata(frame_metadata)`. The enum is exposed as `rs.frame_metadata_value`. Python value names are the library's string names in lower case with spaces replaced by underscores (for example `RS2_FRAME_METADATA_FRAME_COUNTER` becomes `rs.frame_metadata_value.frame_counter`).
 
 ```python
 import pyrealsense2 as rs
@@ -66,7 +66,7 @@ if depth.supports_frame_metadata(md):
 
 Every frame also has a timestamp, read with `rs2::frame::get_timestamp()` (milliseconds), and a timestamp domain that tells which clock the timestamp refers to, read with `get_frame_timestamp_domain()`. In Python these are `get_timestamp()` / the `timestamp` property and `get_frame_timestamp_domain()` / the `frame_timestamp_domain` property.
 
-According to the documentation of `get_timestamp()` in [`rs_frame.hpp`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/hpp/rs_frame.hpp), the timestamps related to a frame are, in order:
+According to the documentation of `get_timestamp()` in [`rs_frame.hpp`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/hpp/rs_frame.hpp), the timestamps related to a frame are, in order:
 
 - `RS2_FRAME_METADATA_SENSOR_TIMESTAMP`: device clock; for video sensors, the middle of exposure. Needs metadata support.
 - `RS2_FRAME_METADATA_FRAME_TIMESTAMP`: device clock, stamped when frame readout and transfer start. Needs metadata support.
@@ -91,18 +91,18 @@ On USB cameras, video frames carry device-generated attributes in the UVC payloa
 
 ### Linux (V4L2 backend)
 
-The V4L2 backend reads metadata from a separate V4L2 metadata capture node that belongs to the video device (a node that reports `V4L2_CAP_META_CAPTURE`). It configures the node with the `V4L2_META_FMT_D4XX` format and falls back to `V4L2_META_FMT_UVC` (see [`src/linux/v4l-uvc-meta-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/linux/v4l-uvc-meta-device.cpp)). The kernel `uvcvideo` driver creates this node only for devices it recognizes as metadata-capable.
+The V4L2 backend reads metadata from a separate V4L2 metadata capture node that belongs to the video device (a node that reports `V4L2_CAP_META_CAPTURE`). It configures the node with the `V4L2_META_FMT_D4XX` format and falls back to `V4L2_META_FMT_UVC` (see [`src/linux/v4l-uvc-meta-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/linux/v4l-uvc-meta-device.cpp)). The kernel `uvcvideo` driver creates this node only for devices it recognizes as metadata-capable.
 
-For kernels whose `uvcvideo` driver does not yet know a camera, the repository ships kernel patches in [`scripts/`](https://github.com/realsenseai/librealsense/blob/development/scripts). The `realsense-metadata-<distribution>-<kernel>.patch` files add RealSense device IDs to `drivers/media/usb/uvc/uvc_driver.c` and mark them with `UVC_INFO_META(V4L2_META_FMT_D4XX)`. The patch scripts, for example [`scripts/patch-realsense-ubuntu-lts-hwe.sh`](https://github.com/realsenseai/librealsense/blob/development/scripts/patch-realsense-ubuntu-lts-hwe.sh), apply the metadata patch for the running kernel along with the other RealSense patches, then build the patched kernel modules and load them in place of the stock ones. See the installation pages for the full procedure.
+For kernels whose `uvcvideo` driver does not yet know a camera, the repository ships kernel patches in [`scripts/`](https://github.com/realsenseai/librealsense/blob/master/scripts). The `realsense-metadata-<distribution>-<kernel>.patch` files add RealSense device IDs to `drivers/media/usb/uvc/uvc_driver.c` and mark them with `UVC_INFO_META(V4L2_META_FMT_D4XX)`. The patch scripts, for example [`scripts/patch-realsense-ubuntu-lts-hwe.sh`](https://github.com/realsenseai/librealsense/blob/master/scripts/patch-realsense-ubuntu-lts-hwe.sh), apply the metadata patch for the running kernel along with the other RealSense patches, then build the patched kernel modules and load them in place of the stock ones. See the installation pages for the full procedure.
 
 ### Windows (Media Foundation backend)
 
-The Windows backend reads the UVC header from the Media Foundation sample attributes (see [`src/mf/mf-uvc.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/mf/mf-uvc.cpp)). Two conditions apply:
+The Windows backend reads the UVC header from the Media Foundation sample attributes (see [`src/mf/mf-uvc.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/mf/mf-uvc.cpp)). Two conditions apply:
 
 - **Build:** metadata support is compiled in unless the build uses WinSDK 8.1 or older. With such an SDK, the compiler prints a notification that UVC metadata requires WinSDK 10.0.10586.0 and "The library will be compiled without the metadata support!", and the build continues. Set the CMake option `ENFORCE_METADATA` (default `OFF`) to make such a build fail instead (see [[Build Configuration]]).
 - **Registry:** Windows passes metadata only for video devices that have the `MetadataBufferSizeInKB<n>` registry values set.
 
-[`scripts/realsense_metadata_win10.ps1`](https://github.com/realsenseai/librealsense/blob/development/scripts/realsense_metadata_win10.ps1) sets those values. When it runs, it:
+[`scripts/realsense_metadata_win10.ps1`](https://github.com/realsenseai/librealsense/blob/master/scripts/realsense_metadata_win10.ps1) sets those values. When it runs, it:
 
 1. Relaunches itself with administrator rights if needed.
 2. Finds RealSense devices (vendor IDs `8086` and `38E5`) under the `usbvideo` service and in two device-class branches under `HKLM:\SYSTEM\CurrentControlSet\Control\DeviceClasses`.
@@ -123,19 +123,19 @@ PS> .\realsense_metadata_win10.ps1 -op install_all
 
 ### RSUSB backend
 
-When librealsense is built with `FORCE_RSUSB_BACKEND` (see [[Build Configuration]]; CMake turns it on automatically on macOS and Windows 7), it talks to the camera through its own user-space UVC implementation. That implementation passes each frame's payload header to the library directly (see [`src/uvc/uvc-streamer.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/uvc/uvc-streamer.cpp)), so kernel patches and registry keys do not apply.
+When librealsense is built with `FORCE_RSUSB_BACKEND` (see [[Build Configuration]]; CMake turns it on automatically on macOS and Windows 7), it talks to the camera through its own user-space UVC implementation. That implementation passes each frame's payload header to the library directly (see [`src/uvc/uvc-streamer.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/uvc/uvc-streamer.cpp)), so kernel patches and registry keys do not apply.
 
 ## Which attributes a frame carries
 
 Each device registers a parser for each attribute it supports. Asking for an attribute without a parser, or one that is not in the current frame's payload, makes `supports_frame_metadata` return false. Firmware can also send different sets of attributes on different frames, so a registered attribute may still be missing from some frames. Always check per frame.
 
-Parser classes are in [`src/metadata-parser.h`](https://github.com/realsenseai/librealsense/blob/development/src/metadata-parser.h), and the device payload layouts are in [`src/metadata.h`](https://github.com/realsenseai/librealsense/blob/development/src/metadata.h). For background on the design, see [`doc/frame_metadata.md`](https://github.com/realsenseai/librealsense/blob/development/doc/frame_metadata.md).
+Parser classes are in [`src/metadata-parser.h`](https://github.com/realsenseai/librealsense/blob/master/src/metadata-parser.h), and the device payload layouts are in [`src/metadata.h`](https://github.com/realsenseai/librealsense/blob/master/src/metadata.h). For background on the design, see [`doc/frame_metadata.md`](https://github.com/realsenseai/librealsense/blob/master/doc/frame_metadata.md).
 
 Recordings also store frame metadata (see [[Record and Playback]]).
 
 ## Metadata attribute reference
 
-All `rs2_frame_metadata_value` values in code order, with the description from the header comment in [`rs_frame.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_frame.h). `RS2_FRAME_METADATA_COUNT` is the number of values and is not a valid attribute. A dash means the header has no comment for that value.
+All `rs2_frame_metadata_value` values in code order, with the description from the header comment in [`rs_frame.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_frame.h). `RS2_FRAME_METADATA_COUNT` is the number of values and is not a valid attribute. A dash means the header has no comment for that value.
 
 <!-- wikigen:table-metadata -->
 | Value | Description |

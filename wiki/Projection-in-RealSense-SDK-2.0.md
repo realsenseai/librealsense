@@ -23,7 +23,7 @@ Each stream of images provided by this SDK is also associated with a separate 3D
 
 ## Intrinsic Camera Parameters
 
-The relationship between a stream's 2D and 3D coordinate systems is described by its intrinsic camera parameters, contained in the [`rs2_intrinsics`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_types.h) struct. Each model of RealSense device is somewhat different, and the `rs2_intrinsics` struct must be capable of describing the images produced by all of them. The basic set of assumptions is described below:
+The relationship between a stream's 2D and 3D coordinate systems is described by its intrinsic camera parameters, contained in the [`rs2_intrinsics`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_types.h) struct. Each model of RealSense device is somewhat different, and the `rs2_intrinsics` struct must be capable of describing the images produced by all of them. The basic set of assumptions is described below:
 
 1. Images may be of arbitrary size
   * The `width` and `height` fields describe the number of columns and rows in the image, respectively
@@ -39,15 +39,15 @@ The relationship between a stream's 2D and 3D coordinate systems is described by
 Knowing the intrinsic camera parameters of an images allows you to carry out two fundamental mapping operations.
 
 1. Projection
-  * Projection takes a point from a stream's 3D coordinate space, and maps it to a 2D pixel location on that stream's images. It is provided by the function [`rs2_project_point_to_pixel(...)`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rsutil.h).
+  * Projection takes a point from a stream's 3D coordinate space, and maps it to a 2D pixel location on that stream's images. It is provided by the function [`rs2_project_point_to_pixel(...)`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rsutil.h).
 2. Deprojection
-  * Deprojection takes a 2D pixel location on a stream's images, as well as a depth, specified in meters, and maps it to a 3D point location within the stream's associated 3D coordinate space. It is provided by the function [`rs2_deproject_pixel_to_point(...)`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rsutil.h).
+  * Deprojection takes a 2D pixel location on a stream's images, as well as a depth, specified in meters, and maps it to a 3D point location within the stream's associated 3D coordinate space. It is provided by the function [`rs2_deproject_pixel_to_point(...)`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rsutil.h).
 
-Intrinsic parameters can be retrieved from any `rs2::video_stream_profile` object via a call to `get_intrinsics()`. (See [example here](https://github.com/realsenseai/librealsense/blob/development/examples/sensor-control/api_how_to.h))
+Intrinsic parameters can be retrieved from any `rs2::video_stream_profile` object via a call to `get_intrinsics()`. (See [example here](https://github.com/realsenseai/librealsense/blob/master/examples/sensor-control/api_how_to.h))
 
 #### Distortion Models
 
-Based on the design of each model of RealSense device, the different streams may be exposed via different distortion models. The full list is the `rs2_distortion` enum in [rs_types.h](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_types.h).
+Based on the design of each model of RealSense device, the different streams may be exposed via different distortion models. The full list is the `rs2_distortion` enum in [rs_types.h](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_types.h).
 
 1. **None** (`RS2_DISTORTION_NONE`)
   * An image has no distortion, as though produced by an idealized pinhole camera. This is typically the result of some hardware or software algorithm undistorting an image produced by a physical imager, but may simply indicate that the image was derived from some other image or images which were already undistorted. Images with no distortion have closed-form formulas for both projection and deprojection, and can be used with both `rs2_project_point_to_pixel(...)` and `rs2_deproject_pixel_to_point(...)`.
@@ -66,7 +66,7 @@ RealSense devices always support deprojection from depth images, and always supp
 
 ## Extrinsic Camera Parameters
 
-The 3D coordinate systems of each stream may in general be distinct. For instance, it is common for depth to be generated from one or more infrared imagers, while the color stream is provided by a separate color imager. The relationship between the separate 3D coordinate systems of separate streams is described by their extrinsic parameters, contained in the [`rs2_extrinsics`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_sensor.h) struct. The basic set of assumptions is described below:
+The 3D coordinate systems of each stream may in general be distinct. For instance, it is common for depth to be generated from one or more infrared imagers, while the color stream is provided by a separate color imager. The relationship between the separate 3D coordinate systems of separate streams is described by their extrinsic parameters, contained in the [`rs2_extrinsics`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_sensor.h) struct. The basic set of assumptions is described below:
 
 1. Imagers may be in separate locations, but are rigidly mounted on the same physical device
   * The `translation` field contains the 3D translation between the imager's physical positions, specified in meters
@@ -77,16 +77,16 @@ The 3D coordinate systems of each stream may in general be distinct. For instanc
 4. All coordinate systems are right handed and have an orthogonal basis
   * There is no need for any sort of mirroring/skewing in the transformation between two coordinate systems
 
-Knowing the extrinsic parameters between two streams allows you to transform points from one coordinate space to another, which can be done by calling [`rs2_transform_point_to_point(...)`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/rsutil.h). This operation is defined as a standard affine transformation using a 3x3 rotation matrix and a 3-component translation vector.
+Knowing the extrinsic parameters between two streams allows you to transform points from one coordinate space to another, which can be done by calling [`rs2_transform_point_to_point(...)`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/rsutil.h). This operation is defined as a standard affine transformation using a 3x3 rotation matrix and a 3-component translation vector.
 
-Extrinsic parameters can be retrieved via a call to [`rs2_get_extrinsics(...)`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_sensor.h) between any two streams which are supported by the device, or using a `rs2::stream_profile` object via `get_extrinsics_to(...)` (see [example here](https://github.com/realsenseai/librealsense/blob/development/examples/sensor-control/api_how_to.h)). One does not need to enable any streams beforehand, the device extrinsics are assumed to be independent of the content of the streams' images and constant for a given device for the lifetime of the program.
+Extrinsic parameters can be retrieved via a call to [`rs2_get_extrinsics(...)`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_sensor.h) between any two streams which are supported by the device, or using a `rs2::stream_profile` object via `get_extrinsics_to(...)` (see [example here](https://github.com/realsenseai/librealsense/blob/master/examples/sensor-control/api_how_to.h)). One does not need to enable any streams beforehand, the device extrinsics are assumed to be independent of the content of the streams' images and constant for a given device for the lifetime of the program.
 
 ## Depth Image Formats
 
 As mentioned above, mapping from 2D pixel coordinates to 3D point coordinates via the `rs2_intrinsics` structure and the `rs2_deproject_pixel_to_point(...)` function requires knowledge of the depth of that pixel in meters. Certain pixel formats, exposed by this SDK, contain per-pixel depth information, and can be immediately used with this function. Other images do not contain per-pixel depth information, and thus would typically be projected into instead of deprojected from.
 
-1. `RS2_FORMAT_Z16` (Under [`rs2_format`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_sensor.h))
-  * Depth is stored as one unsigned 16-bit integer per pixel, mapped linearly to depth in camera-specific units. The distance, in meters, corresponding to one integer increment in depth values can be queried via [`rs2_get_depth_scale(...)`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_sensor.h) or using a `rs2::depth_sensor` via `get_depth_scale()` (see [example here](https://github.com/realsenseai/librealsense/blob/development/examples/sensor-control/api_how_to.h)).
+1. `RS2_FORMAT_Z16` (Under [`rs2_format`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_sensor.h))
+  * Depth is stored as one unsigned 16-bit integer per pixel, mapped linearly to depth in camera-specific units. The distance, in meters, corresponding to one integer increment in depth values can be queried via [`rs2_get_depth_scale(...)`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_sensor.h) or using a `rs2::depth_sensor` via `get_depth_scale()` (see [example here](https://github.com/realsenseai/librealsense/blob/master/examples/sensor-control/api_how_to.h)).
 
     The following shows how to retrieve the depth of a pixel in meters:
 
@@ -153,9 +153,9 @@ points = pc.calculate(depth_frame)
 pc.map_to(color_frame)
 ```
 
-For additional examples, see [examples/pointcloud](https://github.com/realsenseai/librealsense/blob/development/examples/pointcloud).
+For additional examples, see [examples/pointcloud](https://github.com/realsenseai/librealsense/blob/master/examples/pointcloud).
 
-In addition, an example for integrating with PCL (Point Cloud Library) is available [here](https://github.com/realsenseai/librealsense/tree/development/wrappers/pcl).
+In addition, an example for integrating with PCL (Point Cloud Library) is available [here](https://github.com/realsenseai/librealsense/tree/master/wrappers/pcl).
 
 
 ### Frame Alignment
@@ -195,7 +195,7 @@ color_frame = aligned_frames.first(rs.stream.color)
 aligned_depth_frame = aligned_frames.get_depth_frame()
 ```
 
-  For additional examples, see [examples/align](https://github.com/realsenseai/librealsense/tree/development/examples/align) and [align-depth2color.py](https://github.com/realsenseai/librealsense/blob/development/wrappers/python/examples/align-depth2color.py).
+  For additional examples, see [examples/align](https://github.com/realsenseai/librealsense/tree/master/examples/align) and [align-depth2color.py](https://github.com/realsenseai/librealsense/blob/master/wrappers/python/examples/align-depth2color.py).
 
 ## Appendix: Model Specific Details
 

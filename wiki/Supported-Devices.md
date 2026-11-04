@@ -4,13 +4,13 @@ This page lists the RealSense cameras that librealsense recognizes, as the SDK c
 
 ### With rs-enumerate-devices
 
-[`rs-enumerate-devices`](https://github.com/realsenseai/librealsense/tree/development/tools/enumerate-devices) prints every connected device with its camera info fields (name, serial number, firmware version, product ID, product line and so on), followed by the sensors and stream profiles:
+[`rs-enumerate-devices`](https://github.com/realsenseai/librealsense/tree/master/tools/enumerate-devices) prints every connected device with its camera info fields (name, serial number, firmware version, product ID, product line and so on), followed by the sensors and stream profiles:
 
 ```
 rs-enumerate-devices
 ```
 
-Its flags (from [`rs-enumerate-devices.cpp`](https://github.com/realsenseai/librealsense/blob/development/tools/enumerate-devices/rs-enumerate-devices.cpp) and the shared [`common/cli.h`](https://github.com/realsenseai/librealsense/blob/development/common/cli.h)):
+Its flags (from [`rs-enumerate-devices.cpp`](https://github.com/realsenseai/librealsense/blob/master/tools/enumerate-devices/rs-enumerate-devices.cpp) and the shared [`common/cli.h`](https://github.com/realsenseai/librealsense/blob/master/common/cli.h)):
 
 | Flag | What it does |
 |---|---|
@@ -35,7 +35,7 @@ See [[Command Line Tools]] for the other tools.
 
 ### From code
 
-Every device exposes its identity through `rs2::device::get_info()` with an `rs2_camera_info` value (declared in [`include/librealsense2/h/rs_sensor.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_sensor.h)):
+Every device exposes its identity through `rs2::device::get_info()` with an `rs2_camera_info` value (declared in [`include/librealsense2/h/rs_sensor.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_sensor.h)):
 
 ```cpp
 #include <librealsense2/rs.hpp>
@@ -55,7 +55,7 @@ int main()
 }
 ```
 
-What the D400 and D500 device code registers ([`src/ds/d400/d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-device.cpp), [`src/ds/d500/d500-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-device.cpp)):
+What the D400 and D500 device code registers ([`src/ds/d400/d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-device.cpp), [`src/ds/d500/d500-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-device.cpp)):
 
 | Info field | Value |
 |---|---|
@@ -65,21 +65,21 @@ What the D400 and D500 device code registers ([`src/ds/d400/d400-device.cpp`](ht
 | `RS2_CAMERA_INFO_CONNECTION_TYPE` | `USB`, or `GMSL` for MIPI/GMSL cameras |
 | `RS2_CAMERA_INFO_IMU_TYPE` | IMU chip name (see [IMU notes](#imu-notes-for-the-d435i-and-other-d400-cameras)) |
 
-A camera in recovery (DFU) mode shows up as a firmware-update device. Its name also comes from the same maps, or `unknown` if the PID is not in them ([`src/ds/d400/d400-fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-fw-update-device.cpp), [`src/ds/d500/d500-fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-fw-update-device.cpp)). See [[Firmware Update]].
+A camera in recovery (DFU) mode shows up as a firmware-update device. Its name also comes from the same maps, or `unknown` if the PID is not in them ([`src/ds/d400/d400-fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-fw-update-device.cpp), [`src/ds/d500/d500-fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-fw-update-device.cpp)). See [[Firmware Update]].
 
 ### Limit enumeration to a product line
 
-`rs2::context::query_devices()` takes a product-line mask from [`include/librealsense2/h/rs_context.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_context.h), for example `RS2_PRODUCT_LINE_D400`, `RS2_PRODUCT_LINE_D500` or `RS2_PRODUCT_LINE_ANY`. [`src/backend-device-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/backend-device-factory.cpp) only picks D400 devices when the mask includes `RS2_PRODUCT_LINE_D400`, and D500 devices when it includes `RS2_PRODUCT_LINE_D500`. USB recovery devices are matched to the D400 or D500 line by their PID. MIPI recovery devices are not filtered by the product line.
+`rs2::context::query_devices()` takes a product-line mask from [`include/librealsense2/h/rs_context.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_context.h), for example `RS2_PRODUCT_LINE_D400`, `RS2_PRODUCT_LINE_D500` or `RS2_PRODUCT_LINE_ANY`. [`src/backend-device-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/backend-device-factory.cpp) only picks D400 devices when the mask includes `RS2_PRODUCT_LINE_D400`, and D500 devices when it includes `RS2_PRODUCT_LINE_D500`. USB recovery devices are matched to the D400 or D500 line by their PID. MIPI recovery devices are not filtered by the product line.
 
 ## How the SDK decides which cameras it supports
 
-For USB and MIPI cameras, enumeration happens in [`src/backend-device-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/backend-device-factory.cpp):
+For USB and MIPI cameras, enumeration happens in [`src/backend-device-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/backend-device-factory.cpp):
 
-1. **D400:** `d400_info::pick_d400_devices()` in [`src/ds/d400/d400-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-factory.cpp) keeps only video devices whose PID is in `rs400_sku_pid` ([`src/ds/d400/d400-private.h`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-private.h)). `d400_info::create_device()` then builds a device class for the PID.
-2. **D500:** `d500_info::pick_d500_devices()` in [`src/ds/d500/d500-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-factory.cpp) does the same with `rs500_sku_pid` ([`src/ds/d500/d500-private.h`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-private.h)).
-3. **Recovery (DFU):** `fw_update_info::pick_recovery_devices()` in [`src/fw-update/fw-update-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/fw-update/fw-update-factory.cpp) picks USB devices with a recovery PID, and MIPI devices in recovery.
+1. **D400:** `d400_info::pick_d400_devices()` in [`src/ds/d400/d400-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-factory.cpp) keeps only video devices whose PID is in `rs400_sku_pid` ([`src/ds/d400/d400-private.h`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-private.h)). `d400_info::create_device()` then builds a device class for the PID.
+2. **D500:** `d500_info::pick_d500_devices()` in [`src/ds/d500/d500-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-factory.cpp) does the same with `rs500_sku_pid` ([`src/ds/d500/d500-private.h`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-private.h)).
+3. **Recovery (DFU):** `fw_update_info::pick_recovery_devices()` in [`src/fw-update/fw-update-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/fw-update/fw-update-factory.cpp) picks USB devices with a recovery PID, and MIPI devices in recovery.
 
-If a PID is in the supported set but `create_device()` has no class for it, or creating the device fails, the factory falls back to a generic device with partial capabilities. It does this only when the `partial-device-allowed` context setting is true, which is the default ([`src/ds/ds-private.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/ds-private.cpp)). Otherwise it logs `Failed to create device for PID 0x…` and the error is thrown.
+If a PID is in the supported set but `create_device()` has no class for it, or creating the device fails, the factory falls back to a generic device with partial capabilities. It does this only when the `partial-device-allowed` context setting is true, which is the default ([`src/ds/ds-private.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-private.cpp)). Otherwise it logs `Failed to create device for PID 0x…` and the error is thrown.
 
 Network cameras are enumerated separately; see [[Ethernet and DDS Cameras]].
 
@@ -87,8 +87,8 @@ Network cameras are enumerated separately; see [[Ethernet and DDS Cameras]].
 
 The table below has one row per entry of the PID-to-name maps, in code order:
 
-- D400 rows: `rs400_sku_names` in [`src/ds/d400/d400-private.h`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-private.h). The PID constants are defined at the top of the same file.
-- D500 rows: `rs500_sku_names` in [`src/ds/d500/d500-private.h`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-private.h).
+- D400 rows: `rs400_sku_names` in [`src/ds/d400/d400-private.h`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-private.h). The PID constants are defined at the top of the same file.
+- D500 rows: `rs500_sku_names` in [`src/ds/d500/d500-private.h`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-private.h).
 
 How the columns are filled:
 
@@ -98,7 +98,7 @@ How the columns are filled:
   - **Tracking module** means the PID is in `d400_fisheye_pid` and the class includes `d400_motion`.
   - **Yes** for D500 means the device class includes `d500_motion`.
   - Recovery PIDs have no streams.
-- **Notes** names the class that `create_device()` builds ([`d400-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-factory.cpp), [`d500-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d500/d500-factory.cpp)) or, for recovery PIDs, the update device ([`fw-update-factory.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/fw-update/fw-update-factory.cpp)). MIPI/GMSL PIDs are the ones in `d400_mipi_device_pid`.
+- **Notes** names the class that `create_device()` builds ([`d400-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-factory.cpp), [`d500-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d500/d500-factory.cpp)) or, for recovery PIDs, the update device ([`fw-update-factory.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/fw-update/fw-update-factory.cpp)). MIPI/GMSL PIDs are the ones in `d400_mipi_device_pid`.
 
 All PIDs, names and factory cases below are the same at v2.59.1.
 
@@ -157,12 +157,12 @@ Some things to know when you read this table:
 
 - Several names repeat for different PIDs. For example, `RealSense D430` is both 0x0AD4 (USB) and 0xABCE (GMSL), and `RealSense D585` is both 0x0B6A and 0x0C05. Use `RS2_CAMERA_INFO_PRODUCT_ID` and `RS2_CAMERA_INFO_CONNECTION_TYPE` to tell them apart.
 - The D400 recovery PIDs and 0xBBCD are not in `rs400_sku_pid`. The D500 recovery PIDs are not in `rs500_sku_pid`. They are only picked up by the firmware-update path.
-- The MIPI recovery PIDs are not read from a USB descriptor. On Linux, [`src/linux/v4l-enumerator-mipi.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/linux/v4l-enumerator-mipi.cpp) assigns 0xBBDD (D5xx) or 0xBBCD (D4xx) to a MIPI DFU device that reports `recovery`.
+- The MIPI recovery PIDs are not read from a USB descriptor. On Linux, [`src/linux/v4l-enumerator-mipi.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/linux/v4l-enumerator-mipi.cpp) assigns 0xBBDD (D5xx) or 0xBBCD (D4xx) to a MIPI DFU device that reports `recovery`.
 - The D400 code also keeps a minimum firmware version per PID (`d400_device_to_fw_min_version` in `d400-private.h`). The D500 equivalent is still commented out.
 
 ### D535/D585 dual RGB and dedicated color modes
 
-The D535 and D585 PIDs come in pairs: a dual-RGB PID (built as `rs5x5_device`) and a dedicated-color-sensor PID (built as `rs5x5_dedicated_color_device`). `RS2_OPTION_SENSORS_CONFIG_MODE` on the depth sensor switches between them: `0` = Dedicated Color Sensor, `1` = Dual RGB. The option cannot be set while streaming. After you change it, call a hardware reset, and the device then enumerates under the other PID ([`include/librealsense2/h/rs_option.h`](https://github.com/realsenseai/librealsense/blob/development/include/librealsense2/h/rs_option.h)).
+The D535 and D585 PIDs come in pairs: a dual-RGB PID (built as `rs5x5_device`) and a dedicated-color-sensor PID (built as `rs5x5_dedicated_color_device`). `RS2_OPTION_SENSORS_CONFIG_MODE` on the depth sensor switches between them: `0` = Dedicated Color Sensor, `1` = Dual RGB. The option cannot be set while streaming. After you change it, call a hardware reset, and the device then enumerates under the other PID ([`include/librealsense2/h/rs_option.h`](https://github.com/realsenseai/librealsense/blob/master/include/librealsense2/h/rs_option.h)).
 
 The option is registered for firmware `7.58.40897.13078` or newer, and only for the PIDs in `d5x5_dual_rgb_mode_pids` (0x0C01, 0x0C02, 0x0C04, 0x0C05, 0x0C07, 0x0C08) *(changed in the next release)*. At v2.59.1 it was registered for the whole D5x5 family, including D535F (0x0C03) and D585F (0x0C06).
 
@@ -170,20 +170,20 @@ See [[D500 Perception Features]] for the D500 features.
 
 ## IMU notes for the D435i and other D400 cameras
 
-These notes are based on [`doc/d435i.md`](https://github.com/realsenseai/librealsense/blob/development/doc/d435i.md), limited to what the code confirms.
+These notes are based on [`doc/d435i.md`](https://github.com/realsenseai/librealsense/blob/master/doc/d435i.md), limited to what the code confirms.
 
 ### IMU chip
 
-The IMU chip is read from the device and reported in `RS2_CAMERA_INFO_IMU_TYPE` as `BMI055`, `BMI085`, `BMI088` or `IMU_Unknown` ([`src/ds/d400/d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/d400/d400-device.cpp)). If the device data does not identify the chip, the code falls back to the PID: D435I, D436, D430I and D455 (`d400_hid_bmi_055_pid`) are taken as BMI055.
+The IMU chip is read from the device and reported in `RS2_CAMERA_INFO_IMU_TYPE` as `BMI055`, `BMI085`, `BMI088` or `IMU_Unknown` ([`src/ds/d400/d400-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/d400/d400-device.cpp)). If the device data does not identify the chip, the code falls back to the PID: D435I, D436, D430I and D455 (`d400_hid_bmi_055_pid`) are taken as BMI055.
 
 ### Coordinate system
 
-On USB and MIPI connections, IMU samples are rotated into the depth sensor's coordinate system before the SDK delivers them. Each accel and gyro frame goes through `motion_transform`, which multiplies it by `imu_to_depth_alignment()` from the calibration handler ([`src/proc/motion-transform.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/proc/motion-transform.cpp)). Over Ethernet (DDS), the combined motion stream is passed on unchanged. The depth-to-IMU extrinsics are registered for the accel and gyro streams, and both share the same extrinsics ([`src/ds/ds-motion-common.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/ds-motion-common.cpp)). See [[Projection in RealSense SDK 2.0]] for the axis convention.
+On USB and MIPI connections, IMU samples are rotated into the depth sensor's coordinate system before the SDK delivers them. Each accel and gyro frame goes through `motion_transform`, which multiplies it by `imu_to_depth_alignment()` from the calibration handler ([`src/proc/motion-transform.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/proc/motion-transform.cpp)). Over Ethernet (DDS), the combined motion stream is passed on unchanged. The depth-to-IMU extrinsics are registered for the accel and gyro streams, and both share the same extrinsics ([`src/ds/ds-motion-common.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-motion-common.cpp)). See [[Projection in RealSense SDK 2.0]] for the axis convention.
 
-![D400 depth sensor coordinate system](https://raw.githubusercontent.com/realsenseai/librealsense/development/doc/img/LRS_CS_axis_base.png)
+![D400 depth sensor coordinate system](https://raw.githubusercontent.com/realsenseai/librealsense/master/doc/img/LRS_CS_axis_base.png)
 ### IMU calibration
 
-When the motion module starts, the SDK reads the IMU calibration table from the device ([`src/ds/ds-calib-parsers.cpp`](https://github.com/realsenseai/librealsense/blob/development/src/ds/ds-calib-parsers.cpp)):
+When the motion module starts, the SDK reads the IMU calibration table from the device ([`src/ds/ds-calib-parsers.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-calib-parsers.cpp)):
 
 - If the table cannot be read, the library logs `IMU Calibration is not available, default intrinsic and extrinsic will be used.` and uses default values.
 - If the table has no valid intrinsics, default intrinsics are used.
@@ -191,28 +191,28 @@ When the motion module starts, the SDK reads the IMU calibration table from the 
 
 On USB and MIPI connections, the motion sensor exposes `RS2_OPTION_ENABLE_MOTION_CORRECTION` (on by default), which applies the intrinsics (sensitivity and bias) to the samples: the stored ones, or the defaults (scale 1, bias 0) when the table has none.
 
-To calibrate the IMU and write the result to the camera, use [`tools/rs-imu-calibration/rs-imu-calibration.py`](https://github.com/realsenseai/librealsense/blob/development/tools/rs-imu-calibration/rs-imu-calibration.py). See [[Calibration]].
+To calibrate the IMU and write the result to the camera, use [`tools/rs-imu-calibration/rs-imu-calibration.py`](https://github.com/realsenseai/librealsense/blob/master/tools/rs-imu-calibration/rs-imu-calibration.py). See [[Calibration]].
 
 ### Reading IMU data
 
 Accel and gyro are ordinary streams (`RS2_STREAM_ACCEL`, `RS2_STREAM_GYRO`); Ethernet (DDS) devices instead give one `RS2_STREAM_MOTION` stream in `RS2_FORMAT_COMBINED_MOTION`. Enable them on an `rs2::config` and read `rs2::motion_frame::get_motion_data()` for accel and gyro, or `rs2::motion_frame::get_combined_motion_data()` for the combined motion stream. These programs work with IMU streams:
 
-- [`examples/motion`](https://github.com/realsenseai/librealsense/tree/development/examples/motion) (`rs-motion`) is a complete example.
-- [`rs-enumerate-devices`](https://github.com/realsenseai/librealsense/tree/development/tools/enumerate-devices) lists the motion stream profiles.
-- [`rs-data-collect`](https://github.com/realsenseai/librealsense/tree/development/tools/data-collect) saves samples to a file.
+- [`examples/motion`](https://github.com/realsenseai/librealsense/tree/master/examples/motion) (`rs-motion`) is a complete example.
+- [`rs-enumerate-devices`](https://github.com/realsenseai/librealsense/tree/master/tools/enumerate-devices) lists the motion stream profiles.
+- [`rs-data-collect`](https://github.com/realsenseai/librealsense/tree/master/tools/data-collect) saves samples to a file.
 - [[Realsense Viewer Manual]] covers viewing them in the RealSense Viewer.
 - [[Record and Playback]] covers recording them.
 
 ## Platform and validation status
 
-Which operating systems and hosts a camera works on is mostly a matter of validation, not code. The repository guide ([`doc/support-matrix.md`](https://github.com/realsenseai/librealsense/blob/development/doc/support-matrix.md)) says:
+Which operating systems and hosts a camera works on is mostly a matter of validation, not code. The repository guide ([`doc/support-matrix.md`](https://github.com/realsenseai/librealsense/blob/master/doc/support-matrix.md)) says:
 
 - Each firmware and librealsense release goes through unit tests and basic functional testing before it is published on the [releases page](https://github.com/realsenseai/librealsense/releases) as a pre-release.
 - A release is promoted to latest after the full validation report is reviewed.
 - Validation is done on x86 NUC machines running Windows 10 and Ubuntu 16.04 LTS.
 - Other platforms are tested and supported on demand, driven by community requests.
 
-One limit does come from the code: MIPI recovery-device detection lives in the Linux V4L2 backend ([`src/linux/`](https://github.com/realsenseai/librealsense/tree/development/src/linux)).
+One limit does come from the code: MIPI recovery-device detection lives in the Linux V4L2 backend ([`src/linux/`](https://github.com/realsenseai/librealsense/tree/master/src/linux)).
 
 For per-platform setup, see [[Installation Linux]], [[Installation Windows]], [[Installation macOS]], [[Installation Jetson]], [[Installation Raspberry Pi]] and [[Android]].
 
