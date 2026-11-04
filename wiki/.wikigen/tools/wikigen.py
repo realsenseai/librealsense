@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Helper for the librealsense Wiki Writer workflow.
 
-Commands (WIKI is the wiki/ folder of a gh-pages checkout, SRC a development checkout):
+Commands (WIKI is the wiki/ folder of a gh-pages checkout, SRC a master checkout):
   validate --wiki WIKI                         check .wikigen/manifest.json and state files
   plan --src SRC --wiki WIKI --base REF        JSON: pending subjects, subjects to update,
                                                waiting_new, uncovered repo items
-  state --wiki WIKI --file F --commit SHA [--tag T]   record that subject F is accurate at SHA
+  state --wiki WIKI --file F --commit SHA      record that subject F is accurate at SHA
   nav --wiki WIKI                              regenerate _Sidebar.md and Home.md's subject list
   block get|set|ensure --file F --name N [--top]      read, replace (stdin) or add a marked block
-  freeze --file F --heading H                  turn the upcoming-release draft into a released section
   links --src SRC --wiki WIKI [--external] [--block N] FILE...   JSON report of broken links
                                                (--block: only lines inside that marked block)
+  relink --wiki WIKI                           point github.com and raw repo links at master instead of development
+  media --wiki WIKI --base URL                 load res/ and d400_presets/ files from URL; delete the local copies
   cmake-options --src SRC                      Markdown table of CMake/lrs_options.cmake
 
 Exit codes: 0 ok, 1 validation problems, 2 usage or input error.
@@ -21,6 +22,7 @@ import concurrent.futures
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -28,7 +30,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-KINDS = ("nav", "guide", "reference", "release")
+KINDS = ("nav", "guide", "reference")
 REQUIRED_KEYS = ("version", "write_first", "sections", "out_of_scope", "exclusions", "sidebar_links", "subjects")
 USER_AGENT = "Mozilla/5.0 (compatible; librealsense-wiki-writer)"
 REPO_URL = re.compile(
@@ -42,6 +44,16 @@ WIKI_LINK = re.compile(r"\[\[([^\]]+)\]\]")
 MD_LINK = re.compile(r"!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")
 HTML_LINK = re.compile(r"(?:href|src)\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
 HEADER = re.compile(r"^include/librealsense2/(h/|hpp/)?[^/]+\.(h|hpp)$")
+MEDIA_REF = re.compile(
+    r"(?:https?://raw\.githubusercontent\.com/wiki/(?:intelrealsense|realsenseai)/librealsense/|(?<![\w/.\-`]))"
+    r"(?:\./)?((?:res|d400_presets)/[^\s)\]\[\"'<>#?`]+)",
+    re.IGNORECASE,
+)
+DEV_LINK = re.compile(
+    r"(https?://(?:github\.com/(?:intelrealsense|realsenseai)/librealsense/(?:blob|tree|raw)"
+    r"|raw\.githubusercontent\.com/(?:intelrealsense|realsenseai)/librealsense)/)development/",
+    re.IGNORECASE,
+)
 
 
 class InputError(Exception):
@@ -140,6 +152,17 @@ def validate(manifest, wiki):
                 problems.append(name + ": section not in sections list: " + str(subject.get("section")))
             if not subject.get("sources"):
                 problems.append(name + ": no sources")
+            doc = subject.get("doc_source")
+            if doc is not None and (not str(doc).endswith(".md") or doc not in subject["sources"]):
+                problems.append(name + ": doc_source must be a .md file listed in sources: " + str(doc))
+    subject_titles = set(norm_page(title_of(name)) for name in seen)
+    for group in manifest.get("linked_pages", []):
+        if not group.get("section") or not group.get("titles"):
+            problems.append("linked_pages entry needs a section and titles: " + json.dumps(group))
+            continue
+        for title in group["titles"]:
+            if norm_page(title) in subject_titles:
+                problems.append("linked page " + title + " is also a subject")
     for name in manifest["write_first"]:
         if name not in seen:
             problems.append("write_first names " + name + ", which is not a subject")
@@ -157,7 +180,7 @@ def coverage(manifest, src):
     files = [f for f in git(src, "ls-files").splitlines() if f]
     patterns = []
     for subject in manifest["subjects"]:
-        if subject["kind"] != "nav" and not subject.get("catch_all"):
+        if subject["kind"] != "nav":
             patterns.extend(subject["sources"])
     excluded = [e["path"] for e in manifest["exclusions"]]
     prefixes = tuple(manifest["out_of_scope"]["prefixes"])
@@ -194,11 +217,6 @@ def write_order(manifest):
 
 def plan(manifest, src, wiki, base):
     end = git(src, "rev-parse", "HEAD").strip()
-    tag_proc = subprocess.run(
-        ["git", "-C", src, "describe", "--tags", "--abbrev=0", "--match", "v*", "HEAD"],
-        capture_output=True, text=True,
-    )
-    last_tag = tag_proc.stdout.strip() if tag_proc.returncode == 0 else ""
     sources = dict((s["file"], s) for s in manifest["subjects"])
     pending, written, to_update = [], [], []
     for name in write_order(manifest):
@@ -212,13 +230,10 @@ def plan(manifest, src, wiki, base):
         if not missing:
             diff = git(src, "diff", "--name-only", "--no-renames", commit, "HEAD").splitlines()
             changed = sorted(p for p in diff if p and matches_any(p, sources[name]["sources"]))
-        entry = dict(file=name, commit=commit, tag=state.get("tag", ""), changed=changed, commit_missing=missing)
-        if sources[name]["kind"] == "release":
-            entry["new_tag"] = bool(last_tag) and state.get("tag", "") != last_tag
-        written.append(entry)
+        written.append(dict(file=name, commit=commit, changed=changed, commit_missing=missing))
     for name in subject_files(manifest):
         entry = [w for w in written if w["file"] == name]
-        if entry and (entry[0]["changed"] or entry[0]["commit_missing"] or entry[0].get("new_tag")):
+        if entry and (entry[0]["changed"] or entry[0]["commit_missing"]):
             to_update.append(name)
     prefix = git(wiki, "rev-parse", "--show-prefix").strip()
     state_prefix = prefix + ".wikigen/state/"
@@ -230,20 +245,20 @@ def plan(manifest, src, wiki, base):
             if entry_name.endswith(".json") and state_prefix + entry_name not in merged:
                 waiting += 1
     return dict(
-        end=end, end7=end[:7], last_tag=last_tag, pending=pending, written=written,
+        end=end, end7=end[:7], pending=pending, written=written,
         to_update=to_update, waiting_new=waiting, uncovered=coverage(manifest, src),
     )
 
 
 # ---------- state ----------
 
-def write_state(manifest, wiki, file_name, commit, tag):
+def write_state(manifest, wiki, file_name, commit):
     if file_name not in subject_files(manifest):
         raise InputError(file_name + " is not a (non-nav) subject in the manifest")
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise InputError("commit must be a full 40-character SHA")
     os.makedirs(state_dir(wiki), exist_ok=True)
-    text = json.dumps(dict(commit=commit, file=file_name, tag=tag), indent=1, sort_keys=True) + "\n"
+    text = json.dumps(dict(commit=commit, file=file_name), indent=1, sort_keys=True) + "\n"
     write_text(os.path.join(state_dir(wiki), file_name[:-3] + ".json"), text)
 
 
@@ -301,23 +316,6 @@ def block_ensure(path, name, top):
     write_text(path, text)
 
 
-def freeze(path, heading):
-    content = block_get(path, "upcoming")
-    lines = content.strip("\n").split("\n")
-    if lines and lines[0].startswith("## "):
-        lines = lines[1:]
-    body = "\n".join(lines).strip("\n")
-    if not body.strip():
-        raise InputError("the upcoming block in " + path + " is empty")
-    text = read_text(path)
-    span = find_block(text, "upcoming")
-    close_m = markers("upcoming")[1]
-    after_close = text.index(close_m, span[1]) + len(close_m) + 1
-    section = heading + "\n\n_Draft, not yet reviewed._\n\n" + body + "\n"
-    text = text[:span[0]] + text[span[1]:after_close] + "\n" + section + text[after_close:]
-    write_text(path, text)
-
-
 # ---------- nav ----------
 
 def subject_list(manifest):
@@ -328,6 +326,10 @@ def subject_list(manifest):
             lines.append("### " + section)
             lines.extend("- [[" + title_of(n) + "]]" for n in names)
             lines.append("")
+    for group in manifest.get("linked_pages", []):
+        lines.append("### " + group["section"])
+        lines.extend("- [[" + title + "]]" for title in group["titles"])
+        lines.append("")
     return lines
 
 
@@ -389,6 +391,8 @@ def known_pages(manifest, wiki):
     for entry in os.listdir(wiki):
         if entry.endswith(".md"):
             pages.add(norm_page(title_of(entry)))
+    for group in manifest.get("linked_pages", []):
+        pages.update(norm_page(title) for title in group["titles"])
     return pages
 
 
@@ -436,18 +440,22 @@ def check_links(manifest, src, wiki, files, external, block=None):
                 if lower.startswith(("mailto:", "tel:", "#")):
                     skipped += 1
                 elif repo:
-                    if repo.group(1) != "development":
+                    if repo.group(1) == "development":
+                        broken.append(dict(file=rel, line=number, link=url, reason="links must use master"))
+                    elif repo.group(1) != "master":
                         skipped += 1
                     elif os.path.exists(os.path.join(src, urllib.parse.unquote(repo.group(2)).rstrip("/"))):
                         ok += 1
                     else:
-                        broken.append(dict(file=rel, line=number, link=url, reason="not found on development"))
+                        broken.append(dict(file=rel, line=number, link=url, reason="not found on master"))
                 elif wiki_url:
                     page = wiki_url.group(1) or "Home"
                     if norm_page(page) in pages:
                         ok += 1
                     else:
                         broken.append(dict(file=rel, line=number, link=url, reason="no such wiki page"))
+                elif DEV_LINK.match(url):
+                    broken.append(dict(file=rel, line=number, link=url, reason="links must use master"))
                 elif lower.startswith(("http://", "https://", "//")):
                     outside.append(dict(file=rel, line=number, link=("https:" + url) if url.startswith("//") else url))
                 else:
@@ -466,6 +474,47 @@ def check_links(manifest, src, wiki, files, external, block=None):
     else:
         unknown = [dict(item, reason="not checked (run with --external)") for item in outside]
     return dict(broken=broken, unknown=unknown, ok=ok, skipped=skipped)
+
+
+# ---------- relink + media ----------
+
+def relink(wiki):
+    pages, links = [], 0
+    for name in sorted(os.listdir(wiki)):
+        if not name.endswith(".md"):
+            continue
+        path = os.path.join(wiki, name)
+        text = read_text(path)
+        new, count = DEV_LINK.subn(lambda m: m.group(1) + "master/", text)
+        if count:
+            write_text(path, new)
+            pages.append(name)
+            links += count
+    return dict(pages=pages, links=links)
+
+
+def media(wiki, base, fetch=None):
+    fetch = fetch or default_fetch
+    base = base.rstrip("/")
+    names = [n for n in sorted(os.listdir(wiki)) if n.endswith(".md")]
+    texts = dict((n, read_text(os.path.join(wiki, n))) for n in names)
+    refs = sorted(set(m.group(1) for text in texts.values() for m in MEDIA_REF.finditer(text)))
+    missing = []
+    for ref in refs:
+        status, error = fetch(base + "/" + ref)
+        if status != 200:
+            missing.append(ref + " (" + (error or "HTTP " + str(status)) + ")")
+    if missing:
+        raise InputError("not on the media host: " + ", ".join(missing))
+    pages = []
+    for name in names:
+        new = MEDIA_REF.sub(lambda m: base + "/" + m.group(1), texts[name])
+        if new != texts[name]:
+            write_text(os.path.join(wiki, name), new)
+            pages.append(name)
+    for folder in ("res", "d400_presets"):
+        shutil.rmtree(os.path.join(wiki, folder), ignore_errors=True)
+    return dict(pages=pages, files=len(refs))
 
 
 # ---------- cmake-options ----------
@@ -557,7 +606,6 @@ def main(argv):
     p.add_argument("--wiki", required=True)
     p.add_argument("--file", required=True)
     p.add_argument("--commit", required=True)
-    p.add_argument("--tag", default="")
     p = sub.add_parser("nav")
     p.add_argument("--wiki", required=True)
     p = sub.add_parser("block")
@@ -565,15 +613,17 @@ def main(argv):
     p.add_argument("--file", required=True)
     p.add_argument("--name", required=True)
     p.add_argument("--top", action="store_true")
-    p = sub.add_parser("freeze")
-    p.add_argument("--file", required=True)
-    p.add_argument("--heading", required=True)
     p = sub.add_parser("links")
     p.add_argument("--src", required=True)
     p.add_argument("--wiki", required=True)
     p.add_argument("--external", action="store_true")
     p.add_argument("--block", default=None)
     p.add_argument("files", nargs="+")
+    p = sub.add_parser("relink")
+    p.add_argument("--wiki", required=True)
+    p = sub.add_parser("media")
+    p.add_argument("--wiki", required=True)
+    p.add_argument("--base", required=True)
     p = sub.add_parser("cmake-options")
     p.add_argument("--src", required=True)
     args = parser.parse_args(argv)
@@ -585,7 +635,7 @@ def main(argv):
         if args.command == "plan":
             print(json.dumps(plan(load_manifest(args.wiki), args.src, args.wiki, args.base), indent=1))
         elif args.command == "state":
-            write_state(load_manifest(args.wiki), args.wiki, args.file, args.commit, args.tag)
+            write_state(load_manifest(args.wiki), args.wiki, args.file, args.commit)
         elif args.command == "nav":
             nav(load_manifest(args.wiki), args.wiki)
         elif args.command == "block":
@@ -595,11 +645,13 @@ def main(argv):
                 block_set(args.file, args.name, sys.stdin.read())
             else:
                 block_ensure(args.file, args.name, args.top)
-        elif args.command == "freeze":
-            freeze(args.file, args.heading)
         elif args.command == "links":
             report = check_links(load_manifest(args.wiki), args.src, args.wiki, args.files, args.external, args.block)
             print(json.dumps(report, indent=1))
+        elif args.command == "relink":
+            print(json.dumps(relink(args.wiki)))
+        elif args.command == "media":
+            print(json.dumps(media(args.wiki, args.base)))
         elif args.command == "cmake-options":
             sys.stdout.write(cmake_options(args.src))
     except InputError as err:
