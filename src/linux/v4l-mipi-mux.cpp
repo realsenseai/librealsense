@@ -10,7 +10,9 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <map>
 #include <mutex>
+#include <set>
 
 namespace librealsense
 {
@@ -21,18 +23,6 @@ namespace librealsense
             namespace
             {
                 constexpr uint32_t RSVL_FOURCC = 0x5253564C;  // the carrier format the muxed streams share
-
-                // HWMC opcode 0xC0 controls one muxed stream: { version, action, stream id, enable }
-                constexpr uint32_t MUX_CONTROL_OPCODE = 0xC0;
-                constexpr uint32_t MUX_CONTROL_VERSION = 1;
-                constexpr uint32_t MUX_SET_ENABLE = 1;
-                constexpr uint32_t MUX_GET_STATE = 2;
-
-                // HWMC rides the depth XU (subdevice 0, unit 3) selector 1, in fixed size buffers
-                const extension_unit HWMC_XU = { 0, 3, 2, {} };
-                constexpr uint8_t HWMC_SELECTOR = 1;
-                constexpr size_t HWMC_BUFFER_SIZE = 1024;
-                constexpr size_t HWMC_DATA_SIZE_OFFSET = 1020;
 
                 constexpr uint32_t CAPTURE_TIMING_ID = 0x80000001;
                 constexpr uint32_t CAPTURE_TIMING_MUX_VERSION = 2;
@@ -61,32 +51,17 @@ namespace librealsense
 
                 constexpr size_t MUX_MD_SIZE = uvc_header_size + sizeof( capture_timing );
 
-                struct mux_state
-                {
-                    uint32_t requested;
-                    uint32_t applied;
-                    uint32_t capture_active;
-                };
-
                 // Bytes one RSVL record holds
                 size_t capacity( const stream_profile & p ) { return size_t( p.width ) * p.height; }
 
-                // The rates of the smallest RSVL record holding `payload` bytes, highest rate first; empty when none does
-                std::vector< stream_profile > fitting_record( const std::vector< stream_profile > & profiles, size_t payload )
+                // The RSVL record of a `payload`-byte stream, every rate highest first: the camera rounds a stream up to
+                // whole rows, so its record holds the payload with less than one row to spare. Empty when none does.
+                std::vector< stream_profile > exact_record( const std::vector< stream_profile > & profiles, size_t payload )
                 {
                     std::vector< stream_profile > record;
                     for( auto const & p : profiles )
-                    {
-                        if( p.format != RSVL_FOURCC || capacity( p ) < payload )
-                            continue;
-                        if( ! record.empty() && capacity( p ) != capacity( record.front() ) )
-                        {
-                            if( capacity( p ) > capacity( record.front() ) )
-                                continue;
-                            record.clear();
-                        }
-                        record.push_back( p );
-                    }
+                        if( p.format == RSVL_FOURCC && capacity( p ) >= payload && capacity( p ) - payload < p.width )
+                            record.push_back( p );
                     std::sort( record.begin(), record.end(),
                                []( const stream_profile & a, const stream_profile & b ) { return a.fps > b.fps; } );
                     return record;
@@ -104,25 +79,16 @@ namespace librealsense
                     }
                 }
 
-                // The MUX control is an HWMC of the depth node of the carrier's camera
-                uvc_device_info control_info_of( const uvc_device_info & carrier_info )
-                {
-                    auto info = carrier_info;
-                    int const camera_index = v4l_mipi_logic::parse_video_index( carrier_info.device_path );
-                    info.id = info.device_path = "/dev/" + v4l_mipi_logic::rs_enum_video_node_name( "depth", camera_index, false );
-                    info.has_metadata_node = false;
-                    info.metadata_node_id.clear();
-                    return info;
-                }
-
                 // Owns the multiplexing node. Its own (IR) user and the muxed streams are mutually exclusive; the muxed
                 // streams share one capture, started with the first and stopped with the last.
                 class mux
                 {
                 public:
+                    // One device object's registration of a muxed stream
                     struct slot
                     {
                         muxed_stream desc;
+                        muxed_stream_enable enable;  // the registering device's channel to the camera's MUX control
                         frame_callback callback;
                         stream_profile profile;  // as committed; what the callback reports
                         bool started = false;
@@ -131,22 +97,38 @@ namespace librealsense
                     };
 
                     explicit mux( const uvc_device_info & carrier_info )
-                        : _control( std::make_shared< retry_controls_work_around >(
-                            std::make_shared< v4l_mipi_device >( control_info_of( carrier_info ) ) ) )
-                        , _carrier( std::make_shared< v4l_mipi_device >( carrier_info ) )
+                        : _carrier( std::make_shared< v4l_mipi_device >( carrier_info ) )
                     {
                     }
 
                     uvc_device & carrier() const { return *_carrier; }
-                    uvc_device & control() const { return *_control; }
 
-                    slot & add_stream( const muxed_stream & desc )
+                    slot & add_stream( const muxed_stream & desc, muxed_stream_enable enable )
                     {
                         std::lock_guard< std::mutex > lock( _mtx );
                         std::lock_guard< std::recursive_mutex > route( _route_mtx );
+                        for( auto const & s : _slots )
+                        {
+                            // Another device object may register the same stream again, never a different one under its ids
+                            bool same_stream = s->desc.stream_id == desc.stream_id;
+                            if( same_stream != ( s->desc.metadata.type_id == desc.metadata.type_id )
+                                || ( same_stream && s->desc.frame.payload_size != desc.frame.payload_size ) )
+                                throw invalid_value_exception( desc.name + " conflicts with " + s->desc.name + " on the GMSL MUX" );
+                        }
                         _slots.push_back( std::make_unique< slot >() );
                         _slots.back()->desc = desc;
+                        _slots.back()->enable = std::move( enable );
                         return *_slots.back();
+                    }
+
+                    void remove_stream( slot * s )
+                    {
+                        if( s->committed )
+                            close( s, s->profile );  // the stream's user went away without closing
+                        std::lock_guard< std::mutex > lock( _mtx );
+                        std::lock_guard< std::recursive_mutex > route( _route_mtx );
+                        _slots.erase( std::find_if( _slots.begin(), _slots.end(),
+                                                    [s]( const std::unique_ptr< slot > & p ) { return p.get() == s; } ) );
                     }
 
                     // The IR user sees the node without the carrier format
@@ -159,13 +141,13 @@ namespace librealsense
                         return profiles;
                     }
 
-                    // A muxed stream runs at the rate of its RSVL record, or not at all when the camera offers none
+                    // A muxed stream runs at the rates of its RSVL record, or not at all when the camera offers none
                     std::vector< stream_profile > get_profiles( const slot & s ) const
                     {
-                        auto record = fitting_record( _carrier->get_profiles(), s.desc.payload_size );
-                        if( record.empty() )
-                            return {};
-                        return { { s.desc.width, s.desc.height, record.front().fps, s.desc.format } };
+                        std::vector< stream_profile > profiles;
+                        for( auto const & p : exact_record( _carrier->get_profiles(), s.desc.frame.payload_size ) )
+                            profiles.push_back( { s.desc.frame.width, s.desc.frame.height, p.fps, s.desc.frame.format } );
+                        return profiles;
                     }
 
                     void set_power( bool on )
@@ -173,18 +155,11 @@ namespace librealsense
                         std::lock_guard< std::mutex > lock( _power_mtx );
                         if( on )
                         {
-                            if( _power_users == 0 )
-                            {
+                            if( _power_users++ == 0 )
                                 _carrier->set_power_state( D0 );
-                                _control->set_power_state( D0 );
-                            }
-                            ++_power_users;
                         }
                         else if( _power_users > 0 && --_power_users == 0 )
-                        {
-                            _control->set_power_state( D3 );
                             _carrier->set_power_state( D3 );
-                        }
                     }
 
                     void commit( slot * s, const stream_profile & profile, frame_callback callback, int buffers )
@@ -201,7 +176,7 @@ namespace librealsense
                             }
                             if( _carrier_committed )
                                 throw wrong_api_call_sequence_exception( s->desc.name + " is unavailable while the GMSL IR channel streams" );
-                            if( s->committed )
+                            if( is_committed( s->desc.stream_id ) )
                                 throw wrong_api_call_sequence_exception( "Device already streaming!" );
                             // Claiming the queue first keeps a process that cannot capture from touching camera state
                             if( ! _streams_committed )
@@ -228,7 +203,7 @@ namespace librealsense
                             return;
                         if( ! _streaming )
                         {
-                            clear_stale_requests();
+                            clear_stale_requests( *s );
                             set_enable( *s, true );
                             // Firmware owns the backing graph, including inputs it starts on its own
                             try
@@ -297,6 +272,12 @@ namespace librealsense
                     }
 
                 private:
+                    bool is_committed( uint32_t stream_id ) const
+                    {
+                        return std::any_of( _slots.begin(), _slots.end(), [&]( const std::unique_ptr< slot > & s )
+                                            { return s->committed && s->desc.stream_id == stream_id; } );
+                    }
+
                     // Comma-separated names of the committed streams, for messages
                     std::string committed_names() const
                     {
@@ -307,15 +288,14 @@ namespace librealsense
                         return names;
                     }
 
-                    // The smallest RSVL record holding every registered stream, at its highest rate; a late joiner must
-                    // not resize the queue
+                    // The record holding every registered stream, at its highest rate; a late joiner must not resize the queue
                     stream_profile carrier_profile()
                     {
                         const auto profiles = _carrier->get_profiles();
                         std::vector< stream_profile > best;
                         for( auto const & s : _slots )
                         {
-                            auto record = fitting_record( profiles, s->desc.payload_size );
+                            auto record = exact_record( profiles, s->desc.frame.payload_size );
                             if( ! record.empty() && ( best.empty() || capacity( record.front() ) > capacity( best.front() ) ) )
                                 best = std::move( record );
                         }
@@ -324,68 +304,28 @@ namespace librealsense
                         return _carrier_profile = best.front();
                     }
 
-                    // False, with the camera's error code, when the camera rejects the request
-                    bool command( uint32_t action, uint32_t stream_id, uint32_t enable, mux_state & state, int32_t & error ) const
-                    {
-                        std::vector< uint8_t > buf( HWMC_BUFFER_SIZE, 0 );
-                        const uint16_t header[] = { 20, 0xCDAB };
-                        const uint32_t request[] = { MUX_CONTROL_OPCODE, MUX_CONTROL_VERSION, action, stream_id, enable };
-                        std::memcpy( buf.data(), header, sizeof( header ) );
-                        std::memcpy( buf.data() + sizeof( header ), request, sizeof( request ) );
-                        {
-                            // The HWMC mailbox is shared with every other HWMC user of the depth node
-                            std::lock_guard< uvc_device > lock( *_control );
-                            if( ! _control->set_xu( HWMC_XU, HWMC_SELECTOR, buf.data(), static_cast< int >( buf.size() ) )
-                                || ! _control->get_xu( HWMC_XU, HWMC_SELECTOR, buf.data(), static_cast< int >( buf.size() ) ) )
-                                throw linux_backend_exception( "MUX control transfer failed" );
-                        }
-                        uint32_t opcode, size;
-                        std::memcpy( &opcode, buf.data(), sizeof( opcode ) );
-                        std::memcpy( &size, buf.data() + HWMC_DATA_SIZE_OFFSET, sizeof( size ) );
-                        if( opcode != MUX_CONTROL_OPCODE )
-                        {
-                            error = static_cast< int32_t >( opcode );
-                            return false;
-                        }
-                        // Allow appended fields, but keep the response before the size trailer.
-                        if( size < sizeof( state )
-                            || size > HWMC_DATA_SIZE_OFFSET - sizeof( opcode ) )
-                        {
-                            throw backend_exception( "MUX control response size does not match the FW contract" );
-                        }
-                        std::memcpy( &state, buf.data() + sizeof( opcode ), sizeof( state ) );
-                        return true;
-                    }
-
                     void set_enable( slot & s, bool on )
                     {
-                        mux_state state;
-                        int32_t error;
-                        if( ! command( MUX_SET_ENABLE, s.desc.stream_id, on, state, error ) )
-                            throw backend_exception( rsutils::string::from() << s.desc.name << " (MUX stream " << s.desc.stream_id
-                                                                             << ") enable(" << on << ") rejected, error " << error );
-                        // The camera applies the request asynchronously; routing by metadata makes waiting for it unnecessary
-                        s.enabled = ( state.requested != 0 );
-                        if( state.requested != uint32_t( on ) )
-                            throw backend_exception( rsutils::string::from() << s.desc.name << " (MUX stream " << s.desc.stream_id
-                                                                             << ") enable(" << on << ") returned requested "
-                                                                             << state.requested );
+                        s.enable( s.desc.stream_id, on, s.profile );
+                        s.enabled = on;
                     }
 
-                    // Queue ownership precedes this first enable: even this stream's armed profile may be stale.
-                    // A stream the camera does not support rejects the query and is skipped.
-                    void clear_stale_requests()
+                    // Queue ownership precedes this first enable: a request another client left behind, even for this
+                    // stream, is cleared through the starting device's channel. One that stays only costs dropped frames.
+                    void clear_stale_requests( const slot & by )
                     {
-                        mux_state state;
-                        int32_t error;
+                        std::set< uint32_t > ids;
                         for( auto const & s : _slots )
                         {
-                            if( ! s->enabled && command( MUX_GET_STATE, s->desc.stream_id, 0, state, error ) && state.requested )
+                            if( ! ids.insert( s->desc.stream_id ).second )
+                                continue;
+                            try
                             {
-                                LOG_INFO( "Clearing a stale request of " << s->desc.name );
-                                if( ! command( MUX_SET_ENABLE, s->desc.stream_id, 0, state, error ) )
-                                    LOG_WARNING( s->desc.name << " (MUX stream " << s->desc.stream_id
-                                                 << ") stale request not cleared, error " << error << "; its frames are dropped" );
+                                by.enable( s->desc.stream_id, false, {} );
+                            }
+                            catch( const std::exception & e )
+                            {
+                                LOG_WARNING( s->desc.name << " stale request not cleared: " << e.what() );
                             }
                         }
                     }
@@ -420,26 +360,29 @@ namespace librealsense
                         if( timing.reserved[0] || timing.reserved[1] || timing.reserved[2] )
                             return reject( "capture timing reserved field", timing.reserved[0] | timing.reserved[1] | timing.reserved[2] );
 
-                        auto it = std::find_if( _slots.begin(), _slots.end(), [&]( const std::unique_ptr< slot > & s )
-                                                { return s->desc.metadata_type_id == timing.metadata_type_id; } );
-                        if( it == _slots.end() )
+                        // The stream may be registered by several device objects; at most one of them has it started
+                        slot * target = nullptr;
+                        for( auto const & s : _slots )
+                            if( s->desc.metadata.type_id == timing.metadata_type_id && ( ! target || s->started ) )
+                                target = s.get();
+                        if( ! target )
                             return reject( "metadata type", timing.metadata_type_id );
-                        const muxed_stream & desc = ( *it )->desc;
+                        const muxed_stream & desc = target->desc;
 
                         const uint8_t native_size = header.length - MUX_MD_SIZE;
-                        if( native_size || desc.native_required )
+                        if( native_size || desc.metadata.native_required )
                         {
                             native_header native;
                             if( native_size < sizeof( native ) )
                                 return reject( "native metadata size", native_size );
                             std::memcpy( &native, raw + MUX_MD_SIZE, sizeof( native ) );
-                            if( native.id != desc.native_id )
+                            if( native.id != desc.metadata.native_id )
                                 return reject( "native metadata id", native.id );
-                            if( native.size != native_size || native.size < desc.native_min_size )
+                            if( native.size != native_size || native.size < desc.metadata.native_min_size )
                                 return reject( "native metadata size", native.size );
                         }
 
-                        if( f.frame_size < desc.payload_size )
+                        if( f.frame_size < desc.frame.payload_size )
                             return reject( "frame size", static_cast< uint32_t >( f.frame_size ) );
 
                         header.length = uvc_header_size + native_size;
@@ -447,8 +390,8 @@ namespace librealsense
                         std::memcpy( md.data() + uvc_header_size, raw + MUX_MD_SIZE, native_size );
                         f.metadata = md.data();
                         f.metadata_size = header.length;
-                        f.frame_size = desc.payload_size;
-                        return it->get();
+                        f.frame_size = desc.frame.payload_size;
+                        return target;
                     }
 
                     // Capture thread
@@ -463,9 +406,8 @@ namespace librealsense
                         s->callback( s->profile, f, std::move( release ) );
                     }
 
-                    std::shared_ptr< uvc_device > _control;  // the depth node, holding the camera controls
-                    std::mutex _mtx;                         // capture lifecycle and stream enables
-                    std::recursive_mutex _route_mtx;         // the streams' callbacks, held while delivering
+                    std::mutex _mtx;                  // capture lifecycle and stream enables
+                    std::recursive_mutex _route_mtx;  // the streams' callbacks, held while delivering
                     std::mutex _power_mtx;
                     std::vector< std::unique_ptr< slot > > _slots;
                     stream_profile _carrier_profile{};
@@ -477,6 +419,19 @@ namespace librealsense
                     std::shared_ptr< uvc_device > _carrier;  // last, so its capture thread stops before the rest goes
                 };
 
+                // One MUX per node, shared by every device object of the camera, so all of them see one enable table
+                std::shared_ptr< mux > get_mux( const uvc_device_info & info )
+                {
+                    static std::mutex registry_mtx;
+                    static std::map< std::string, std::weak_ptr< mux > > registry;
+                    std::lock_guard< std::mutex > lock( registry_mtx );
+                    auto & entry = registry[info.device_path];
+                    auto shared = entry.lock();
+                    if( ! shared )
+                        entry = shared = std::make_shared< mux >( info );
+                    return shared;
+                }
+
                 // The node's own device (no slot), or the device of one of its muxed streams
                 class mux_device : public uvc_device
                 {
@@ -487,11 +442,18 @@ namespace librealsense
                     {
                     }
 
-                    std::shared_ptr< uvc_device > create_muxed_stream_device( const muxed_stream & desc ) override
+                    ~mux_device() override
+                    {
+                        if( _slot )
+                            _mux->remove_stream( _slot );
+                    }
+
+                    std::shared_ptr< uvc_device > create_muxed_stream_device( const muxed_stream & desc,
+                                                                              muxed_stream_enable enable ) override
                     {
                         if( _slot )
                             return nullptr;  // a muxed stream carries none of its own
-                        return std::make_shared< mux_device >( _mux, &_mux->add_stream( desc ) );
+                        return std::make_shared< mux_device >( _mux, &_mux->add_stream( desc, std::move( enable ) ) );
                     }
 
                     void probe_and_commit( stream_profile profile, frame_callback callback, int buffers ) override
@@ -515,7 +477,12 @@ namespace librealsense
                     }
                     power_state get_power_state() const override { return _state; }
 
-                    void init_xu( const extension_unit & xu ) override { controls().init_xu( xu ); }
+                    // A muxed stream has no node of its own, so nothing to initialize
+                    void init_xu( const extension_unit & xu ) override
+                    {
+                        if( ! _slot )
+                            _mux->carrier().init_xu( xu );
+                    }
                     bool set_xu( const extension_unit & xu, uint8_t ctrl, const uint8_t * data, int len ) override
                     {
                         return controls().set_xu( xu, ctrl, data, len );
@@ -545,8 +512,13 @@ namespace librealsense
                     bool is_platform_jetson() const override { return _mux->carrier().is_platform_jetson(); }
 
                 private:
-                    // Muxed streams have no node of their own; their controls live on the depth node
-                    uvc_device & controls() const { return _slot ? _mux->control() : _mux->carrier(); }
+                    // The node's controls belong to its own user; a muxed stream's live on the camera's control node
+                    uvc_device & controls() const
+                    {
+                        if( _slot )
+                            throw not_implemented_exception( _slot->desc.name + " has no controls of its own" );
+                        return _mux->carrier();
+                    }
 
                     std::shared_ptr< mux > _mux;
                     mux::slot * _slot;
@@ -558,7 +530,7 @@ namespace librealsense
             {
                 if( ! is_carrier( info ) )
                     return nullptr;
-                return std::make_shared< mux_device >( std::make_shared< mux >( info ), nullptr );
+                return std::make_shared< mux_device >( get_mux( info ), nullptr );
             }
         }  // namespace v4l_mipi_mux
     }  // namespace platform

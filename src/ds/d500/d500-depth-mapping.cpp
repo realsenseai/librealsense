@@ -204,11 +204,11 @@ namespace librealsense
 
     // Occupancy as the GMSL IR node multiplexes it: MUX stream id, metadata id (routing, and its own required
     // block of 136+ bytes) and the 320x256 grid
-    const platform::muxed_stream occupancy_muxed_stream = { "Occupancy", 7,
-                                                            uint32_t( md_type::META_DATA_INTEL_OCCUPANCY_ID ),
-                                                            uint32_t( md_type::META_DATA_INTEL_OCCUPANCY_ID ),
-                                                            136, true, 320 * 256,
-                                                            320, 256, rs_fourcc( 'G', 'R', 'E', 'Y' ) };
+    const platform::muxed_stream occupancy_muxed_stream
+        = { "Occupancy",
+            7,
+            { uint32_t( md_type::META_DATA_INTEL_OCCUPANCY_ID ), uint32_t( md_type::META_DATA_INTEL_OCCUPANCY_ID ), 136, true },
+            { 320, 256, rs_fourcc( 'G', 'R', 'E', 'Y' ), 320 * 256 } };
 
     d500_depth_mapping::d500_depth_mapping( std::shared_ptr< const d500_info > const & dev_info)
         : device( dev_info ), d500_device( dev_info ),
@@ -225,10 +225,16 @@ namespace librealsense
 
         // Over GMSL occupancy is multiplexed on the depth sensor's IR node; over USB the Mapping function has its
         // own interface
-        auto mapping_dev = get_raw_depth_sensor()->get_uvc_device()->create_muxed_stream_device( occupancy_muxed_stream );
+        auto mapping_dev = get_raw_depth_sensor()->get_uvc_device()->create_muxed_stream_device(
+            occupancy_muxed_stream,
+            [this]( uint32_t stream_id, bool on, const platform::stream_profile & p )
+            { enable_muxed_stream( stream_id, on, p.width, p.height, p.fps ); } );
         std::string physical_port;
         if( mapping_dev )
+        {
             physical_port = mapping_dev->get_device_location();
+            LOG_DEBUG( "Occupancy is multiplexed on " << physical_port );
+        }
         else
         {
             const uint32_t mapping_stream_mi = _is_safety_layout ? 13 : 11;

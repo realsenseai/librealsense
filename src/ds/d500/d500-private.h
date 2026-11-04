@@ -188,6 +188,22 @@ namespace librealsense
             GET_FW_LOGS              = 0xB4, // Get FW logs extended format
             SET_CALIB_MODE           = 0xB8, // Set Calibration Mode
             GET_CALIB_STATUS         = 0xB9, // Get Calibration Status
+            MUX_CONTROL              = 0xC0, // GMSL MUX: have the camera produce or stop a stream multiplexed on the IR node
+        };
+
+        // MUX_CONTROL params { version, action, stream id, enable }, ENABLE_WITH_PROFILE adding the profile as data
+        const uint32_t MUX_CONTROL_VERSION = 1;
+        enum d500_mux_action : uint32_t
+        {
+            MUX_SET_ENABLE = 1,
+            MUX_GET_STATE = 2,
+            MUX_ENABLE_WITH_PROFILE = 6,  // 8-byte profile ( width << 32 ) | ( height << 16 ) | fps, echoed in the reply
+        };
+        struct d500_mux_state
+        {
+            uint32_t requested;
+            uint32_t applied;
+            uint32_t capture_active;
         };
 
         inline std::string d500_fw_cmd2str(const d500_fw_cmd state)

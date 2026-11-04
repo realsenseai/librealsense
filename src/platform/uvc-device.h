@@ -130,15 +130,25 @@ private:
 // format descriptor; this is what the carrier cannot know about the stream.
 struct muxed_stream
 {
-    std::string name;                // for messages and logs
-    uint32_t stream_id;              // the camera's id of the stream in its MUX control
-    uint32_t metadata_type_id;       // Capture Timing value that routes a carrier frame to this stream
-    uint32_t native_id;              // id of the stream's own metadata block that follows; not always the same
-    uint32_t native_min_size;
-    bool native_required;            // frames without the native block are dropped
-    size_t payload_size;             // bytes of one frame on the wire
-    uint32_t width, height, format;  // frame geometry as the sensor sees it
+    std::string name;    // for messages and logs
+    uint32_t stream_id;  // the camera's id of the stream in its MUX control
+    struct
+    {
+        uint32_t type_id;          // Capture Timing value that routes a carrier frame to this stream
+        uint32_t native_id;        // id of the stream's own block that follows; not always the same
+        uint32_t native_min_size;
+        bool native_required;      // frames without the native block are dropped
+    } metadata;
+    struct
+    {
+        uint32_t width, height, format;  // as the sensor sees it
+        size_t payload_size;             // bytes of one frame on the wire
+    } frame;
 };
+
+// A device's channel to the camera's MUX control: have it produce a muxed stream at the committed profile, or
+// stop it. Off also serves streams the camera may not know, which are left alone.
+using muxed_stream_enable = std::function< void( uint32_t stream_id, bool on, const stream_profile & ) >;
 
 
 class uvc_device
@@ -192,7 +202,10 @@ public:
     virtual bool is_platform_jetson() const = 0;
 
     // The device of a stream multiplexed on this node's capture, or nullptr when it carries none
-    virtual std::shared_ptr< uvc_device > create_muxed_stream_device( const muxed_stream & ) { return nullptr; }
+    virtual std::shared_ptr< uvc_device > create_muxed_stream_device( const muxed_stream &, muxed_stream_enable )
+    {
+        return nullptr;
+    }
 
     virtual ~uvc_device() = default;
 
@@ -327,9 +340,10 @@ public:
 
     bool is_platform_jetson() const override { return _dev->is_platform_jetson(); }
 
-    std::shared_ptr< uvc_device > create_muxed_stream_device( const muxed_stream & stream ) override
+    std::shared_ptr< uvc_device > create_muxed_stream_device( const muxed_stream & stream,
+                                                              muxed_stream_enable enable ) override
     {
-        return _dev->create_muxed_stream_device( stream );
+        return _dev->create_muxed_stream_device( stream, std::move( enable ) );
     }
 
 private:
@@ -461,10 +475,11 @@ public:
 
     usb_spec get_usb_specification() const override { return _dev.front()->get_usb_specification(); }
 
-    std::shared_ptr< uvc_device > create_muxed_stream_device( const muxed_stream & stream ) override
+    std::shared_ptr< uvc_device > create_muxed_stream_device( const muxed_stream & stream,
+                                                              muxed_stream_enable enable ) override
     {
         for( auto & elem : _dev )
-            if( auto dev = elem->create_muxed_stream_device( stream ) )
+            if( auto dev = elem->create_muxed_stream_device( stream, enable ) )
                 return dev;
         return nullptr;
     }

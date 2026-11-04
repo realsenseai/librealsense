@@ -33,22 +33,31 @@ namespace librealsense
 
     // The stream as the GMSL IR node multiplexes it: MUX stream id, metadata id (routing, and its own optional
     // block of 83+ bytes) and the ODET blob padded to 2347 bytes
-    const platform::muxed_stream od_muxed_stream = { "Object Detection", 6,
-                                                     uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ),
-                                                     uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ),
-                                                     83, false, 2347,
-                                                     2347, 1, rs_fourcc( 'G', 'R', 'E', 'Y' ) };
+    const platform::muxed_stream od_muxed_stream
+        = { "Object Detection",
+            6,
+            { uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ), uint32_t( md_type::META_DATA_INTEL_OBJECT_DETECTION_ID ), 83, false },
+            { 2347, 1, rs_fourcc( 'G', 'R', 'E', 'Y' ), 2347 } };
 
     d500_object_detection::d500_object_detection( std::shared_ptr< const d500_info > const & dev_info )
         : device( dev_info )
         , d500_device( dev_info )
         , _object_detection_stream( new stream( RS2_STREAM_OBJECT_DETECTION ) )
     {
-        // Over GMSL the stream is multiplexed on the depth sensor's IR node; over USB it has its own interface
-        auto od_dev = get_raw_depth_sensor()->get_uvc_device()->create_muxed_stream_device( od_muxed_stream );
+        // Over GMSL the stream is multiplexed on the depth sensor's IR node, and the camera takes it by rate alone;
+        // over USB it has its own interface
+        auto od_dev = get_raw_depth_sensor()->get_uvc_device()->create_muxed_stream_device(
+            od_muxed_stream,
+            [this]( uint32_t stream_id, bool on, const platform::stream_profile & p )
+            { enable_muxed_stream( stream_id, on, 0, 0, p.fps ); } );
+        // A muxed stream has no controls of its own; its XU is the depth node's
+        std::shared_ptr< uvc_sensor > xu_host = od_dev ? get_raw_depth_sensor() : nullptr;
         std::string physical_port;
         if( od_dev )
+        {
             physical_port = od_dev->get_device_location();
+            LOG_DEBUG( "Object Detection is multiplexed on " << physical_port );
+        }
         else
         {
             // OD VideoControl is MI 9 on all currently supported layouts (D555/D555e,
@@ -72,14 +81,15 @@ namespace librealsense
             physical_port = od_devs_info.front().device_path;
         }
 
-        auto od_ep = create_object_detection_device( dev_info->get_context(), od_dev, physical_port );
+        auto od_ep = create_object_detection_device( dev_info->get_context(), od_dev, physical_port, xu_host );
         _object_detection_device_idx = add_sensor( od_ep );
     }
 
     std::shared_ptr< synthetic_sensor >
     d500_object_detection::create_object_detection_device( std::shared_ptr< context > ctx,
                                                            std::shared_ptr< platform::uvc_device > od_device,
-                                                           const std::string & physical_port )
+                                                           const std::string & physical_port,
+                                                           std::shared_ptr< uvc_sensor > xu_host )
     {
         auto enable_global_time_option = std::shared_ptr< global_time_option >( new global_time_option() );
 
@@ -95,7 +105,9 @@ namespace librealsense
                                                                                     enable_global_time_option ) ),
             this );
 
-        raw_od_ep->register_xu( ds::inference_xu ); // ensure the XU is initialized every time we power the camera
+        if( ! xu_host )
+            xu_host = raw_od_ep;
+        xu_host->register_xu( ds::inference_xu ); // ensure the XU is initialized every time we power the camera
 
         auto od_ep = std::make_shared< d500_object_detection_sensor >( this,
                                                                        raw_od_ep,
@@ -106,7 +118,7 @@ namespace librealsense
 
         if( _fw_version >= firmware_version( "7.58.40802.12738" ) )
         {
-            auto detection_distance = std::make_shared< uvc_xu_option< uint8_t > >(raw_od_ep,
+            auto detection_distance = std::make_shared< uvc_xu_option< uint8_t > >(xu_host,
                                                                                    ds::inference_xu,
                                                                                    ds::d500_xu_id::DETECTION_DISTANCE,
                                                                                    "Enable firmware distance calculation for detections" );
