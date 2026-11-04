@@ -178,5 +178,5 @@ These are the sequence metadata fields ([`include/librealsense2/h/rs_frame.h`](h
 - [`src/proc/hdr-merge.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/proc/hdr-merge.cpp), [`src/proc/sequence-id-filter.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/proc/sequence-id-filter.cpp): the processing blocks.
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`bc496cd`](https://github.com/realsenseai/librealsense/commit/bc496cdb16beca36c41d2b96170e309fceb38d6e)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
