@@ -202,5 +202,5 @@ The build tools, sources and intermediate files stay in the builder stage.
 The repository guide mentions a prebuilt image, `docker pull librealsense/librealsense`, on Docker Hub, available only for x86. No script or workflow in the repository builds or publishes it, so its tags and contents cannot be checked against the code. To be sure what you run, build the image yourself as described above.
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`de7fa8c`](https://github.com/realsenseai/librealsense/commit/de7fa8cf3e05bac6f3ce6b5eeec2eb766c57259e)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
