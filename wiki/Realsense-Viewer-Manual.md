@@ -176,7 +176,7 @@ If the device supports [Advanced Mode](#advanced-mode), an **Advanced Controls**
 
 ### Streaming toggle
 
-Each sensor section has an on/off toggle button that starts or stops streaming from that sensor. It is disabled (with an explanatory tooltip) when a dependent stream needs to be started first (an object detection stream needs both Color and Depth streaming), or while a decimation/temporal embedded filter is enabled, which cannot run together with object detection.
+Each sensor section has an on/off toggle button that starts or stops streaming from that sensor. For a sensor with an object detection stream selected, the start button is disabled (with an explanatory tooltip) until both Color and Depth are streaming, and while a decimation/temporal embedded filter is enabled, since the two cannot run together.
 
 ## Sensor Options Reference
 
