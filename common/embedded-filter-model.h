@@ -6,7 +6,7 @@
 #include <librealsense2/rs.hpp>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_hdrd_control.h>
+#include <librealsense2/h/rs_icr_control.h>
 #include "composite-control-editor.h"
 #include <functional>
 #include <string>
@@ -46,7 +46,7 @@ namespace rs2
         // special-casing app code is expected to do.
         void draw_decimation_filter_dpp_control_editor( std::string & error_message );
         void draw_temporal_filter_dpp_control_editor( std::string & error_message );
-        void draw_hdrd_control_editor( std::string & error_message );
+        void draw_icr_control_editor( std::string & error_message );
 
         std::shared_ptr<rs2::embedded_filter> get_filter() { return _embedded_filter; }
 
@@ -94,9 +94,9 @@ namespace rs2
         // with any field this frame, which the editor's debounce countdown needs.
         bool draw_decimation_filter_dpp_fields( std::string & error_message );
         bool draw_temporal_filter_dpp_fields( std::string & error_message );
-        // Each HDRD field is wrapped in BeginDisabled()/EndDisabled() when the current
+        // Each ICR field is wrapped in BeginDisabled()/EndDisabled() when the current
         // filter_type/shift_mode selection makes it irrelevant.
-        bool draw_hdrd_fields( std::string & error_message );
+        bool draw_icr_fields( std::string & error_message );
 
         // The three concerns populate_options() used to inline directly, split out so each is
         // readable on its own: scalar rs2_option models, composite-option editor priming, and
@@ -136,8 +136,8 @@ namespace rs2
         field_edit_state _temporal_filter_dpp_smooth_alpha_edit;
         field_edit_state _temporal_filter_dpp_smooth_delta_edit;
 
-        composite_control_editor< rs2_hdrd_control > _hdrd_editor;
-        field_edit_state _hdrd_shift_edit;
-        field_edit_state _hdrd_threshold_edit;
+        composite_control_editor< rs2_icr_control > _icr_editor;
+        field_edit_state _icr_shift_edit;
+        field_edit_state _icr_threshold_edit;
     };
 }

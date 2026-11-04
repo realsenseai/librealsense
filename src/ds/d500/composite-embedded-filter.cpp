@@ -2,7 +2,7 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 #include "composite-embedded-filter.h"
-#include "hdrd-embedded-filter.h"
+#include "icr-embedded-filter.h"
 #include <src/proc/temporal-embedded-filter.h>
 #include <src/proc/decimation-embedded-filter.h>
 #include <src/ds/composite-xu-option.h>

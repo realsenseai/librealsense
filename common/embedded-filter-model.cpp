@@ -54,7 +54,7 @@ namespace rs2
                        << v.reserved[2] << "," << v.reserved[3] << "]" );
         }
 
-        // No enum-valued fields to clamp here (unlike sanitize_hdrd_control() below) - every field
+        // No enum-valued fields to clamp here (unlike sanitize_icr_control() below) - every field
         // is just range-bounded. Still zeroes the reserved slots - same "MUST be zero on SET" rule.
         void sanitize_temporal_filter_dpp_config( rs2_temporal_filter_dpp_config & v )
         {
@@ -63,8 +63,8 @@ namespace rs2
         }
 
         // Same scheme as print_decimation_filter_dpp_config() above, for
-        // RS2_COMPOSITE_OPTION_HDRD_CONTROL.
-        void print_hdrd_control( const rs2_hdrd_control & v )
+        // RS2_COMPOSITE_OPTION_ICR_CONTROL.
+        void print_icr_control( const rs2_icr_control & v )
         {
             LOG_DEBUG( "[Improved Close Range GET] version=" << (int)v.header.version
                        << " flags=" << (int)v.header.flags
@@ -84,7 +84,7 @@ namespace rs2
         // A real device's firmware may still speak the pre-design-review wire layout, so a field
         // can land outside its enum's legal range. Called after every raw device read, before any
         // branching/display code uses it, so the stored value and what's shown stay consistent.
-        void sanitize_hdrd_control( rs2_hdrd_control & v )
+        void sanitize_icr_control( rs2_icr_control & v )
         {
             v.filter_type = std::min( std::max( v.filter_type, 0 ), 1 );
             v.downscale_ratio = std::min( std::max( v.downscale_ratio, 1 ), 2 );
@@ -144,7 +144,7 @@ namespace rs2
     void embedded_filter_model::draw_composite_options( std::string & error_message )
     {
         // Composite options have no generic per-field editing UI - Decimation, Temporal Filter DPP
-        // and HDRD each get a hardcoded editor below; everything else shows read-only metadata.
+        // and ICR each get a hardcoded editor below; everything else shows read-only metadata.
         for( auto id : _composite_option_ids )
         {
             try
@@ -159,9 +159,9 @@ namespace rs2
                     draw_temporal_filter_dpp_control_editor( error_message );
                     continue;
                 }
-                if( id == RS2_COMPOSITE_OPTION_HDRD_CONTROL )
+                if( id == RS2_COMPOSITE_OPTION_ICR_CONTROL )
                 {
-                    draw_hdrd_control_editor( error_message );
+                    draw_icr_control_editor( error_message );
                     continue;
                 }
 
@@ -332,80 +332,80 @@ namespace rs2
 
     // Irrelevant fields stay visible but BeginDisabled()-greyed, not hidden. |= (not ||): each
     // call draws real widgets and must run every frame.
-    bool embedded_filter_model::draw_hdrd_fields( std::string & error_message )
+    bool embedded_filter_model::draw_icr_fields( std::string & error_message )
     {
         static const char * const filter_type_labels[] = { "Downscale", "Lookup Shift" };
         static const char * const downscale_ratio_labels[] = { "x2", "x4" };
         static const char * const shift_mode_labels[] = { "Shift 126px", "Shift 64px", "Manual" };
         static const char * const threshold_mode_labels[] = { "Zero range", "MinZ (computed)", "Manual" };
 
-        auto & v = _hdrd_editor.value;
-        bool any_field_active = _hdrd_editor.draw_enum_field( "Filter Type",
+        auto & v = _icr_editor.value;
+        bool any_field_active = _icr_editor.draw_enum_field( "Filter Type",
             "Downscale: reduce resolution by a fixed ratio. Lookup Shift: shift the disparity lookup by a pixel count.\n"
             "Not all Depth resolutions and frame rates are supported.",
-            "hdrd_filter_type", filter_type_labels, v.filter_type );
+            "icr_filter_type", filter_type_labels, v.filter_type );
 
         const bool downscale_relevant = ( v.filter_type == 0 );
         if( ! downscale_relevant )
             ImGui::BeginDisabled();
         // Wire values are 1 (x2) and 2 (x4), not 0-based like the other enum fields - value_offset
         // converts to and from a 0-based index rather than changing the documented wire values.
-        any_field_active |= _hdrd_editor.draw_enum_field( "Downscale Ratio", "Resolution reduction applied by the Downscale filter type.",
-            "hdrd_downscale_ratio", downscale_ratio_labels, v.downscale_ratio, 1 );
+        any_field_active |= _icr_editor.draw_enum_field( "Downscale Ratio", "Resolution reduction applied by the Downscale filter type.",
+            "icr_downscale_ratio", downscale_ratio_labels, v.downscale_ratio, 1 );
         if( ! downscale_relevant )
             ImGui::EndDisabled();
 
         const bool shift_relevant = ( v.filter_type == 1 );
         if( ! shift_relevant )
             ImGui::BeginDisabled();
-        any_field_active |= _hdrd_editor.draw_enum_field( "Shift Mode", "Fixed shift preset, or Manual to use the Shift Pixels value below.",
-            "hdrd_shift_mode", shift_mode_labels, v.shift_mode );
+        any_field_active |= _icr_editor.draw_enum_field( "Shift Mode", "Fixed shift preset, or Manual to use the Shift Pixels value below.",
+            "icr_shift_mode", shift_mode_labels, v.shift_mode );
         if( ! shift_relevant )
             ImGui::EndDisabled();
 
         const bool shift_pixels_relevant = shift_relevant && ( v.shift_mode == 2 );
         if( ! shift_pixels_relevant )
             ImGui::BeginDisabled();
-        any_field_active |= _hdrd_editor.draw_scalar_field( "Shift Pixels", "Disparity lookup shift, in pixels, used when Shift Mode is Manual.",
-            "hdrd_shift", v.shift_pixels, 0, 256, 1, 1.f, _hdrd_shift_edit, error_message );
+        any_field_active |= _icr_editor.draw_scalar_field( "Shift Pixels", "Disparity lookup shift, in pixels, used when Shift Mode is Manual.",
+            "icr_shift", v.shift_pixels, 0, 256, 1, 1.f, _icr_shift_edit, error_message );
         if( ! shift_pixels_relevant )
             ImGui::EndDisabled();
 
-        any_field_active |= _hdrd_editor.draw_enum_field( "Threshold Mode",
+        any_field_active |= _icr_editor.draw_enum_field( "Threshold Mode",
             "Zero range: fill only originally-empty depth pixels.\n"
             "MinZ (computed): firmware picks the threshold for the active resolution.\n"
             "Manual: use the threshold value below.",
-            "hdrd_threshold_mode", threshold_mode_labels, v.threshold_mode );
+            "icr_threshold_mode", threshold_mode_labels, v.threshold_mode );
 
         const bool threshold_relevant = ( v.threshold_mode == 2 );
         if( ! threshold_relevant )
             ImGui::BeginDisabled();
-        any_field_active |= _hdrd_editor.draw_scalar_field( "Threshold (mm)", "Depth threshold, in mm, used when Threshold Mode is Manual.",
-            "hdrd_threshold", v.threshold_mm, 0, 65535, 1, 1.f, _hdrd_threshold_edit, error_message );
+        any_field_active |= _icr_editor.draw_scalar_field( "Threshold (mm)", "Depth threshold, in mm, used when Threshold Mode is Manual.",
+            "icr_threshold", v.threshold_mm, 0, 65535, 1, 1.f, _icr_threshold_edit, error_message );
         if( ! threshold_relevant )
             ImGui::EndDisabled();
 
         return any_field_active;
     }
 
-    void embedded_filter_model::draw_hdrd_control_editor( std::string & error_message )
+    void embedded_filter_model::draw_icr_control_editor( std::string & error_message )
     {
-        const auto id = RS2_COMPOSITE_OPTION_HDRD_CONTROL;
+        const auto id = RS2_COMPOSITE_OPTION_ICR_CONTROL;
         // A rejected enable (e.g. unsupported Depth profile) leads to a re-read here - keep the toggle in sync with it
-        auto on_read = [this]( const rs2_hdrd_control & v )
+        auto on_read = [this]( const rs2_icr_control & v )
         {
-            print_hdrd_control( v );
+            print_icr_control( v );
             _enabled = v.enable != 0;
         };
-        if( ! _hdrd_editor.ensure_initialized( _embedded_filter, id, error_message, on_read ) )
+        if( ! _icr_editor.ensure_initialized( _embedded_filter, id, error_message, on_read ) )
             return;
-        sanitize_hdrd_control( _hdrd_editor.value );
+        sanitize_icr_control( _icr_editor.value );
 
-        draw_composite_editor< rs2_hdrd_control, rs2_hdrd_control_range >(
-            _hdrd_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
-            [&]() { return draw_hdrd_fields( error_message ); },
-            sanitize_hdrd_control,
-            [this]( rs2_hdrd_control & v )
+        draw_composite_editor< rs2_icr_control, rs2_icr_control_range >(
+            _icr_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
+            [&]() { return draw_icr_fields( error_message ); },
+            sanitize_icr_control,
+            [this]( rs2_icr_control & v )
             {
                 v.enable = 1;
                 _enabled = true;
@@ -479,21 +479,21 @@ namespace rs2
             return;
         }
 
-        // Same scheme as Decimation above, for RS2_COMPOSITE_OPTION_HDRD_CONTROL.
-        if( _embedded_filter->supports_composite_option( RS2_COMPOSITE_OPTION_HDRD_CONTROL ) )
+        // Same scheme as Decimation above, for RS2_COMPOSITE_OPTION_ICR_CONTROL.
+        if( _embedded_filter->supports_composite_option( RS2_COMPOSITE_OPTION_ICR_CONTROL ) )
         {
             try
             {
-                if( ! _hdrd_editor.initialized )
+                if( ! _icr_editor.initialized )
                 {
-                    _hdrd_editor.value = _embedded_filter->get_composite_option_as< rs2_hdrd_control >(
-                        RS2_COMPOSITE_OPTION_HDRD_CONTROL );
-                    sanitize_hdrd_control( _hdrd_editor.value );
-                    print_hdrd_control( _hdrd_editor.value );
-                    _hdrd_editor.initialized = true;
+                    _icr_editor.value = _embedded_filter->get_composite_option_as< rs2_icr_control >(
+                        RS2_COMPOSITE_OPTION_ICR_CONTROL );
+                    sanitize_icr_control( _icr_editor.value );
+                    print_icr_control( _icr_editor.value );
+                    _icr_editor.initialized = true;
                 }
-                _hdrd_editor.value.enable = actual ? 1 : 0;
-                _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_HDRD_CONTROL, _hdrd_editor.value );
+                _icr_editor.value.enable = actual ? 1 : 0;
+                _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_ICR_CONTROL, _icr_editor.value );
                 _enabled = actual;
             }
             catch( const std::exception & e )
@@ -573,16 +573,16 @@ namespace rs2
                         _enabled = _temporal_filter_dpp_editor.value.enabled != 0;
                 }
             }
-            else if( id == RS2_COMPOSITE_OPTION_HDRD_CONTROL )
+            else if( id == RS2_COMPOSITE_OPTION_ICR_CONTROL )
             {
-                if( _hdrd_editor.ensure_initialized( _embedded_filter, id, error_message, print_hdrd_control ) )
+                if( _icr_editor.ensure_initialized( _embedded_filter, id, error_message, print_icr_control ) )
                 {
-                    sanitize_hdrd_control( _hdrd_editor.value );
+                    sanitize_icr_control( _icr_editor.value );
                     // Composite state is the FALLBACK source of _enabled, not an override - a DDS
                     // filter that already set it from the scalar option in populate_scalar_options()
                     // keeps that value.
                     if( ! _embedded_filter->supports( RS2_OPTION_EMBEDDED_FILTER_ENABLED ) )
-                        _enabled = _hdrd_editor.value.enable != 0;
+                        _enabled = _icr_editor.value.enable != 0;
                 }
             }
         }

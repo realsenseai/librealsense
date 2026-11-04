@@ -28,7 +28,7 @@
 #include <src/ds/d500/d500-auto-calibration.h>
 #include <src/ds/features/decimation-filter-feature.h>
 #include <src/ds/features/temporal-filter-feature.h>
-#include <src/ds/features/hdrd-filter-feature.h>
+#include <src/ds/features/icr-filter-feature.h>
 
 #include <src/platform/platform-utils.h>
 
@@ -472,7 +472,7 @@ namespace librealsense
             // above. Formerly the scalar "Improved Close Range Depth" (now retired).
             if( d500_device::_fw_version >= firmware_version( "7.58.45911.14188" ) )
             {
-                register_feature( std::make_shared< hdrd_filter_feature >(
+                register_feature( std::make_shared< icr_filter_feature >(
                     *this, dynamic_cast< d500_depth_sensor & >( depth_sensor ), _is_mipi_device ) );
             }
         }

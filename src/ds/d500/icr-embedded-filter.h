@@ -17,7 +17,7 @@ namespace librealsense {
 // "Improved Close Range Depth", a scalar enable-only option (since removed) - consolidated onto
 // this composite option's all 7 fields. RS2_OPTION_EMBEDDED_FILTER_ENABLED is no longer
 // registered for this filter, so a caller assuming every filter has it will throw - accepted.
-using hdrd_embedded_filter
+using icr_embedded_filter
     = composite_embedded_filter< close_range_embedded_filter, RS2_EMBEDDED_FILTER_TYPE_CLOSE_RANGE >;
 
 }  // namespace librealsense

@@ -8,7 +8,7 @@ tell the two apart - RS2_FRAME_METADATA_EMBEDDED_FILTERS is the only way to conf
 frame came from the DPP decimation block rather than the native path.
 
 Known FW gap (RSDEV-14424): the metadata field itself is reliable - Temporal Filter DPP and
-HDRD/Improved Close Range Control both set their bits correctly (see
+Improved Close Range Control both set their bits correctly (see
 pytest-embedded-filters-metadata.py), and it reads 0x00 with all three DPP filters disabled.
 Only Decimation's bit (1u<<0) never sets, at both 1280x720 and 640x360. Not a metadata-plumbing
 bug - the decimation DPP block itself isn't being applied by FW on this build.

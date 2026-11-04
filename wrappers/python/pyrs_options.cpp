@@ -5,7 +5,7 @@
 #include <librealsense2/hpp/rs_options.hpp>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_hdrd_control.h>
+#include <librealsense2/h/rs_icr_control.h>
 
 using rsutils::json;
 
@@ -72,38 +72,38 @@ void init_options(py::module &m) {
         .def_readwrite( "step", &rs2_temporal_filter_dpp_range::step )
         .def_readwrite( "default", &rs2_temporal_filter_dpp_range::def );
 
-    py::class_< rs2_hdrd_control >(
-        m, "hdrd_control", "Improved Close Range Control composite option payload - see rs_hdrd_control.h." )
+    py::class_< rs2_icr_control >(
+        m, "icr_control", "Improved Close Range Control composite option payload - see rs_icr_control.h." )
         .def( py::init<>() )
-        .def_readwrite( "header", &rs2_hdrd_control::header )
-        .def_readwrite( "enable", &rs2_hdrd_control::enable )
-        .def_readwrite( "filter_type", &rs2_hdrd_control::filter_type )
-        .def_readwrite( "downscale_ratio", &rs2_hdrd_control::downscale_ratio )
-        .def_readwrite( "shift_mode", &rs2_hdrd_control::shift_mode )
-        .def_readwrite( "shift_pixels", &rs2_hdrd_control::shift_pixels )
-        .def_readwrite( "threshold_mode", &rs2_hdrd_control::threshold_mode )
-        .def_readwrite( "threshold_mm", &rs2_hdrd_control::threshold_mm )
+        .def_readwrite( "header", &rs2_icr_control::header )
+        .def_readwrite( "enable", &rs2_icr_control::enable )
+        .def_readwrite( "filter_type", &rs2_icr_control::filter_type )
+        .def_readwrite( "downscale_ratio", &rs2_icr_control::downscale_ratio )
+        .def_readwrite( "shift_mode", &rs2_icr_control::shift_mode )
+        .def_readwrite( "shift_pixels", &rs2_icr_control::shift_pixels )
+        .def_readwrite( "threshold_mode", &rs2_icr_control::threshold_mode )
+        .def_readwrite( "threshold_mm", &rs2_icr_control::threshold_mm )
         .def( "__repr__",
-              []( rs2_hdrd_control const & v )
+              []( rs2_icr_control const & v )
               {
                   std::ostringstream ss;
-                  ss << "<hdrd_control enable=" << v.enable << " filter_type=" << v.filter_type
+                  ss << "<icr_control enable=" << v.enable << " filter_type=" << v.filter_type
                      << " downscale_ratio=" << v.downscale_ratio << " shift_mode=" << v.shift_mode
                      << " shift_pixels=" << v.shift_pixels << " threshold_mode=" << v.threshold_mode
                      << " threshold_mm=" << v.threshold_mm << ">";
                   return ss.str();
               } );
 
-    py::class_< rs2_hdrd_control_range >(
-        m, "hdrd_control_range", "Supported {min,max,step,default} bounds for hdrd_control - see rs_hdrd_control.h." )
+    py::class_< rs2_icr_control_range >(
+        m, "icr_control_range", "Supported {min,max,step,default} bounds for icr_control - see rs_icr_control.h." )
         .def( py::init<>() )
-        .def_readwrite( "min", &rs2_hdrd_control_range::min )
-        .def_readwrite( "max", &rs2_hdrd_control_range::max )
-        .def_readwrite( "step", &rs2_hdrd_control_range::step )
+        .def_readwrite( "min", &rs2_icr_control_range::min )
+        .def_readwrite( "max", &rs2_icr_control_range::max )
+        .def_readwrite( "step", &rs2_icr_control_range::step )
         // 'def' is a Python keyword and cannot be used as an attribute name (obj.def is a syntax
         // error) - exposed as "default" instead, the one place this binding's naming has to
         // diverge from the C++ field it mirrors.
-        .def_readwrite( "default", &rs2_hdrd_control_range::def );
+        .def_readwrite( "default", &rs2_icr_control_range::def );
 
     // Expose option values as a custom struct rather than 'rs2_option_value*'
     struct option_value
@@ -340,18 +340,18 @@ void init_options(py::module &m) {
             "Typed counterpart to get_composite_option_range() for Temporal Filter DPP.",
             "option"_a )
         .def(
-            "get_hdrd_control",
-            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_hdrd_control
+            "get_icr_control",
+            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_icr_control
             {
                 py::gil_scoped_release release;
-                return self.get_composite_option_as< rs2_hdrd_control >( id );
+                return self.get_composite_option_as< rs2_icr_control >( id );
             },
             "Typed counterpart to get_composite_option() for Improved Close Range Control - returns a "
-            "hdrd_control object (bound directly against the real C struct) instead of raw bytes.",
+            "icr_control object (bound directly against the real C struct) instead of raw bytes.",
             "option"_a )
         .def(
-            "set_hdrd_control",
-            []( rs2::options const & self, rs2_composite_option_id id, rs2_hdrd_control const & value )
+            "set_icr_control",
+            []( rs2::options const & self, rs2_composite_option_id id, rs2_icr_control const & value )
             {
                 py::gil_scoped_release release;
                 self.set_composite_option_from( id, value );
@@ -360,11 +360,11 @@ void init_options(py::module &m) {
             "option"_a,
             "value"_a )
         .def(
-            "get_hdrd_control_range",
-            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_hdrd_control_range
+            "get_icr_control_range",
+            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_icr_control_range
             {
                 py::gil_scoped_release release;
-                return self.get_composite_option_range_as< rs2_hdrd_control_range >( id );
+                return self.get_composite_option_range_as< rs2_icr_control_range >( id );
             },
             "Typed counterpart to get_composite_option_range() for Improved Close Range Control.",
             "option"_a );

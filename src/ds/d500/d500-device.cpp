@@ -21,7 +21,7 @@
 #include <src/ds/features/auto-exposure-roi-feature.h>
 #include <src/ds/features/decimation-filter-feature.h>
 #include <src/ds/features/temporal-filter-feature.h>
-#include <src/ds/features/hdrd-filter-feature.h>
+#include <src/ds/features/icr-filter-feature.h>
 
 #include "proc/depth-formats-converter.h"
 #include "proc/y8i-to-y8y8.h"
@@ -688,7 +688,7 @@ namespace librealsense
         // filters that can set a bit here requires (make_always_enabled_param_parser has no
         // flags-bit check, so an older FW without this field would otherwise report it as
         // supported and hand back garbage bytes). On D555, Decimation/Temporal register at
-        // 7.58.39807.10573 but HDRD needs 7.58.45911.14188 (see d500-factory.cpp's rs555_device) -
+        // 7.58.39807.10573 but ICR needs 7.58.45911.14188 (see d500-factory.cpp's rs555_device) -
         // the higher of the two applies here too, so this PID currently needs no special case.
         bool registers_dpp_filters = d5x5_family_pids.count( _pid )
             || _pid == ds::D585_LEGACY_PID
@@ -893,7 +893,7 @@ namespace librealsense
         auto & depth_sensor = dynamic_cast< d500_depth_sensor & >( get_depth_sensor() );
         register_feature( std::make_shared< decimation_filter_feature >( depth_sensor, _is_mipi_device ) );
         register_feature( std::make_shared< temporal_filter_feature >( depth_sensor, _is_mipi_device ) );
-        register_feature( std::make_shared< hdrd_filter_feature >( *this, depth_sensor, _is_mipi_device ) );
+        register_feature( std::make_shared< icr_filter_feature >( *this, depth_sensor, _is_mipi_device ) );
     }
 
     void d500_device::register_converters( synthetic_sensor & depth_sensor )

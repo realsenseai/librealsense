@@ -12,12 +12,12 @@ pytestmark = [
 ]
 
 
-def _find_hdrd_filter(sensor):
+def _find_icr_filter(sensor):
     """Return the embedded filter exposing Improved Close Range Control on this sensor, or None - the
     composite option lives on one of the sensor's embedded filters, its own independent options
     registry, not on the sensor itself (see rs2::embedded_filter)."""
     for embedded_filter in sensor.query_embedded_filters():
-        if rs.composite_option_id.hdrd_control in embedded_filter.get_supported_composite_options():
+        if rs.composite_option_id.icr_control in embedded_filter.get_supported_composite_options():
             return embedded_filter
     return None
 
@@ -36,23 +36,23 @@ def _bounce_field_pair(embedded_filter, option_id, original, range, filter_type,
 
     # Each set starts from a freshly-read struct - the header/other fields must be carried over
     # exactly as the device just reported them, not zero-initialized.
-    cfg = embedded_filter.get_hdrd_control(option_id)
+    cfg = embedded_filter.get_icr_control(option_id)
     cfg.filter_type = filter_type
     if field == 'shift_pixels':
         cfg.shift_mode = 2  # Manual - the only mode that makes shift_pixels meaningful
     setattr(cfg, field, new_value)
-    embedded_filter.set_hdrd_control(option_id, cfg)
+    embedded_filter.set_icr_control(option_id, cfg)
 
-    readback = embedded_filter.get_hdrd_control(option_id)
+    readback = embedded_filter.get_icr_control(option_id)
     assert readback.filter_type == filter_type, f"filter_type: expected {filter_type}, got {readback.filter_type}"
     assert getattr(readback, field) == new_value, f"{field}: expected {new_value}, got {getattr(readback, field)}"
 
-    cfg = embedded_filter.get_hdrd_control(option_id)
+    cfg = embedded_filter.get_icr_control(option_id)
     cfg.filter_type = original.filter_type
     if field == 'shift_pixels':
         cfg.shift_mode = original.shift_mode
     setattr(cfg, field, current)
-    embedded_filter.set_hdrd_control(option_id, cfg)
+    embedded_filter.set_icr_control(option_id, cfg)
     return True
 
 
@@ -65,19 +65,19 @@ def _bounce_threshold(embedded_filter, option_id, original, range):
         log.info(f"threshold_mm: no room to change, range is [{lo}, {hi}]")
         return False
 
-    cfg = embedded_filter.get_hdrd_control(option_id)
+    cfg = embedded_filter.get_icr_control(option_id)
     cfg.threshold_mode = 2
     cfg.threshold_mm = lo if original.threshold_mm != lo else hi
-    embedded_filter.set_hdrd_control(option_id, cfg)
+    embedded_filter.set_icr_control(option_id, cfg)
 
-    readback = embedded_filter.get_hdrd_control(option_id)
+    readback = embedded_filter.get_icr_control(option_id)
     assert readback.threshold_mode == 2, f"threshold_mode: expected 2, got {readback.threshold_mode}"
     assert readback.threshold_mm == cfg.threshold_mm, f"threshold_mm: expected {cfg.threshold_mm}, got {readback.threshold_mm}"
 
-    cfg = embedded_filter.get_hdrd_control(option_id)
+    cfg = embedded_filter.get_icr_control(option_id)
     cfg.threshold_mode = original.threshold_mode
     cfg.threshold_mm = original.threshold_mm
-    embedded_filter.set_hdrd_control(option_id, cfg)
+    embedded_filter.set_icr_control(option_id, cfg)
     return True
 
 
@@ -94,16 +94,16 @@ def _restore_original_raw(embedded_filter, option_id, original_raw):
     assert bytes(readback_raw) == expected_raw, "failed to restore original Improved Close Range Control value"
 
 
-def test_hdrd_control_basic_parameter_changes(test_device):
+def test_icr_control_basic_parameter_changes(test_device):
     """Check whether Improved Close Range Control is supported; if so, bounce its writable fields to new
     in-range values (verifying each readback) and restore the original value at the end."""
     dev, ctx = test_device
     depth_sensor = dev.first_depth_sensor()
-    embedded_filter = _find_hdrd_filter(depth_sensor)
+    embedded_filter = _find_icr_filter(depth_sensor)
     if embedded_filter is None:
         pytest.skip("Improved Close Range Control composite option not supported on this device")
 
-    option_id = rs.composite_option_id.hdrd_control
+    option_id = rs.composite_option_id.icr_control
     try:
         original_raw = embedded_filter.get_composite_option(option_id)
     except RuntimeError as e:
@@ -115,8 +115,8 @@ def test_hdrd_control_basic_parameter_changes(test_device):
     # Typed get/set (see pyrs_options.cpp) - the SDK's own bound struct, no hand-rolled
     # struct.pack/unpack format string to keep in sync. Only the final restore-and-verify below
     # uses the raw bytes, for the strongest possible guarantee.
-    original = embedded_filter.get_hdrd_control(option_id)
-    range = embedded_filter.get_hdrd_control_range(option_id)
+    original = embedded_filter.get_icr_control(option_id)
+    range = embedded_filter.get_icr_control_range(option_id)
 
     try:
         changed_any = False

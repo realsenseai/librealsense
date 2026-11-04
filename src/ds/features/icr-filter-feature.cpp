@@ -2,9 +2,9 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 
-#include <src/ds/features/hdrd-filter-feature.h>
+#include <src/ds/features/icr-filter-feature.h>
 #include <src/ds/d500/d500-device.h>
-#include <src/ds/d500/hdrd-embedded-filter.h>
+#include <src/ds/d500/icr-embedded-filter.h>
 #include <src/ds/ds-private.h>
 #include <src/ds/composite-xu-option.h>
 #include <src/uvc-sensor.h>
@@ -13,7 +13,7 @@
 #include <rsutils/string/from.h>
 
 #include <librealsense2/h/rs_composite_option.h>
-#include <librealsense2/h/rs_hdrd_control.h>
+#include <librealsense2/h/rs_icr_control.h>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 
 #include <algorithm>
@@ -24,20 +24,20 @@ namespace librealsense {
 
 
 // D500_CAMERA_CID_MINZ range descriptor; step is 1 per slot (all-integer params). Defaults
-// track LibRS's rs2_hdrd_control field docs.
+// track LibRS's rs2_icr_control field docs.
 // GMSL cannot query ranges (V4L2 array controls report one scalar bound and the FW
 // registers hold only the current value), so these tables are the only source of the MIPI
 // range. USB reads it from FW and ignores this desc.
-static constexpr int32_t minz_min[]  = { 0, 0, 1, 0,   0, 0, 0 };
-static constexpr int32_t minz_max[]  = { 1, 1, 2, 2, 256, 2, 65535 };
-static constexpr int32_t minz_step[] = { 1, 1, 1, 1,   1, 1, 1 };
-static constexpr int32_t minz_def[]  = { 0, 0, 1, 0, 126, 1, 0 };
+static constexpr int32_t icr_min[]  = { 0, 0, 1, 0,   0, 0, 0 };
+static constexpr int32_t icr_max[]  = { 1, 1, 2, 2, 256, 2, 65535 };
+static constexpr int32_t icr_step[] = { 1, 1, 1, 1,   1, 1, 1 };
+static constexpr int32_t icr_def[]  = { 0, 0, 1, 0, 126, 1, 0 };
 
-static constexpr dpp_control_desc minz_desc = {
+static constexpr dpp_control_desc icr_desc = {
     0x0008,  // ctl_id (D500_DPP_XU_MINZ_CONTROL_ID = BIT(3))
     7,       // param_count
     0x00,    // param_type (all-integer)
-    minz_min, minz_max, minz_step, minz_def
+    icr_min, icr_max, icr_step, icr_def
 };
 
 
@@ -77,15 +77,15 @@ static bool embedded_decimation_enabled( const sensor_interface & depth_sensor )
     return false;
 }
 
-// FW rejects unsupported MinZ profiles only once streaming starts, with an obscure error (Depth+IR on Windows even
-// needs a replug) - so the SDK checks the MinZ profile limits first.
-static void minz_allowed_or_throw( const void * hdrd_control, size_t size, const video_stream_profile_interface & depth,
+// FW rejects unsupported ICR profiles only once streaming starts, with an obscure error (Depth+IR on Windows even
+// needs a replug) - so the SDK checks the ICR profile limits first.
+static void icr_allowed_or_throw( const void * icr_control, size_t size, const video_stream_profile_interface & depth,
                                    const sensor_interface & depth_sensor )
 {
-    if( ! hdrd_control || size != sizeof( rs2_hdrd_control ) )
+    if( ! icr_control || size != sizeof( rs2_icr_control ) )
         return;
-    rs2_hdrd_control cfg;
-    std::memcpy( &cfg, hdrd_control, sizeof( cfg ) );
+    rs2_icr_control cfg;
+    std::memcpy( &cfg, icr_control, sizeof( cfg ) );
     if( ! cfg.enable )
         return;
 
@@ -126,40 +126,69 @@ static void minz_allowed_or_throw( const void * hdrd_control, size_t size, const
             << " at up to " << max_fps << " FPS, but Depth is " << w << "x" << h << " @ " << fps << " FPS" );
 }
 
-// Rejects enabling MinZ while a Depth profile it cannot process is open. `control` is the transport (XU or DDS).
-class minz_option : public composite_option_interface
+// Rejects enabling ICR while a Depth profile it cannot process is open. `control` is the transport (XU or DDS).
+class icr_option : public composite_option_interface
 {
 public:
-    minz_option( std::shared_ptr< composite_option_interface > control, const sensor_interface & depth_sensor )
+    icr_option( std::shared_ptr< composite_option_interface > control, const sensor_interface & depth_sensor )
         : _control( std::move( control ) )
         , _depth_sensor( depth_sensor )
     {
     }
 
-    std::vector< uint8_t > get_raw() const override { return _control->get_raw(); }
+    std::vector< uint8_t > get_raw() const override
+    {
+        auto raw = _control->get_raw();
+        check_envelope_or_throw( raw.data(), raw.size() );
+        return raw;
+    }
     void set_raw( const void * data, size_t size ) override
     {
         auto active = _depth_sensor.get_active_streams();
         geometry_unchanged_or_throw( data, size, active );
         if( auto depth = find_depth_profile( active ) )
-            minz_allowed_or_throw( data, size, *depth, _depth_sensor );
+            icr_allowed_or_throw( data, size, *depth, _depth_sensor );
         _control->set_raw( data, size );
     }
-    std::vector< uint8_t > get_raw_range() const override { return _control->get_raw_range(); }
+    // {min, max, step, def}, each a complete payload with its own envelope
+    std::vector< uint8_t > get_raw_range() const override
+    {
+        auto raw = _control->get_raw_range();
+        if( raw.size() != 4 * sizeof( rs2_icr_control ) )
+            throw invalid_value_exception( "Improved Close Range control returned an unexpected range payload size" );
+        for( size_t i = 0; i < 4; ++i )
+            check_envelope_or_throw( raw.data() + i * sizeof( rs2_icr_control ), sizeof( rs2_icr_control ) );
+        return raw;
+    }
     bool is_read_only() const override { return _control->is_read_only(); }
     bool is_enabled() const override { return _control->is_enabled(); }
     const char * get_description() const override { return _control->get_description(); }
 
 private:
+    // The payload size, header version, control ID, param count and param type must be the ICR schema
+    static void check_envelope_or_throw( const uint8_t * data, size_t size )
+    {
+        if( size != sizeof( rs2_icr_control ) )
+            throw invalid_value_exception( "Improved Close Range control returned an unexpected payload size" );
+        dpp_header hdr = {};
+        std::memcpy( &hdr, data, sizeof( hdr ) );
+        if( hdr.version != DPP_HEADER_CURRENT_VERSION || hdr.ctl_id != icr_desc.ctl_id
+            || hdr.param_count != icr_desc.param_count || hdr.param_type != icr_desc.param_type )
+            throw invalid_value_exception( rsutils::string::from()
+                << "Improved Close Range control returned an unsupported schema (version=" << (int)hdr.version
+                << " ctl_id=" << (int)hdr.ctl_id << " param_count=" << (int)hdr.param_count
+                << " param_type=" << (int)hdr.param_type << ")" );
+    }
+
     // FW rejects changing Filter Type or Downscale Ratio while Depth or IR stream, with an obscure error
     void geometry_unchanged_or_throw( const void * data, size_t size, const stream_profiles & active ) const
     {
         bool const streaming = std::any_of( active.begin(), active.end(), []( const std::shared_ptr< stream_profile_interface > & p )
                                             { return p->get_stream_type() == RS2_STREAM_DEPTH || p->get_stream_type() == RS2_STREAM_INFRARED; } );
-        if( ! streaming || ! data || size != sizeof( rs2_hdrd_control ) )
+        if( ! streaming || ! data || size != sizeof( rs2_icr_control ) )
             return;
-        rs2_hdrd_control next;
-        rs2_hdrd_control current;
+        rs2_icr_control next;
+        rs2_icr_control current;
         std::memcpy( &next, data, sizeof( next ) );
         auto raw = _control->get_raw();
         if( raw.size() != sizeof( current ) )
@@ -175,30 +204,30 @@ private:
 };
 
 
-/* static */ const feature_id hdrd_filter_feature::ID = "Improved Close Range filter feature";
+/* static */ const feature_id icr_filter_feature::ID = "Improved Close Range filter feature";
 
-hdrd_filter_feature::hdrd_filter_feature( d500_device & owner, d500_depth_sensor & depth_sensor, bool is_mipi )
-    : hdrd_filter_feature( owner,
+icr_filter_feature::icr_filter_feature( d500_device & owner, d500_depth_sensor & depth_sensor, bool is_mipi )
+    : icr_filter_feature( owner,
                            depth_sensor,
                            composite_xu_option::create(
                                is_mipi,
                                std::dynamic_pointer_cast< uvc_sensor >( depth_sensor.get_raw_sensor() ),
                                ds::depth_xu,
-                               ds::DS5_HKR_HDRD_CONTROL,
-                               static_cast< uint32_t >( sizeof( rs2_hdrd_control ) ),
-                               "Improved Close Range Control (prototype) - use rs2_set/get_composite_option, see rs_hdrd_control.h",
-                               minz_desc ) )
+                               ds::DS5_HKR_ICR_CONTROL,
+                               static_cast< uint32_t >( sizeof( rs2_icr_control ) ),
+                               "Improved Close Range Control (prototype) - use rs2_set/get_composite_option, see rs_icr_control.h",
+                               icr_desc ) )
 {
     depth_sensor.add_embedded_filter( _filter );
 }
 
-hdrd_filter_feature::hdrd_filter_feature( device & owner, const sensor_interface & depth_sensor,
+icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface & depth_sensor,
                                           std::shared_ptr< composite_option_interface > control )
 {
-    auto option = std::make_shared< minz_option >( std::move( control ), depth_sensor );
-    _filter = std::make_shared< hdrd_embedded_filter >( option, RS2_COMPOSITE_OPTION_HDRD_CONTROL );
+    auto option = std::make_shared< icr_option >( std::move( control ), depth_sensor );
+    _filter = std::make_shared< icr_embedded_filter >( option, RS2_COMPOSITE_OPTION_ICR_CONTROL );
 
-    // MinZ may have been enabled while the sensor was closed - check it against the Depth profile being opened
+    // ICR may have been enabled while the sensor was closed - check it against the Depth profile being opened
     owner.add_stream_combination_validator(
         [option, &depth_sensor]( const stream_profiles & requests )
         {
@@ -215,11 +244,11 @@ hdrd_filter_feature::hdrd_filter_feature( device & owner, const sensor_interface
                 LOG_WARNING( "Improved Close Range Depth state unavailable, skipping profile check: " << e.what() );
                 return;
             }
-            minz_allowed_or_throw( raw.data(), raw.size(), *depth, depth_sensor );
+            icr_allowed_or_throw( raw.data(), raw.size(), *depth, depth_sensor );
         } );
 }
 
-feature_id hdrd_filter_feature::get_id() const
+feature_id icr_filter_feature::get_id() const
 {
     return ID;
 }

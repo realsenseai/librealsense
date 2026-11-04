@@ -41,7 +41,7 @@ temporal_filter_feature::temporal_filter_feature( d500_depth_sensor & depth_sens
 {
     // Registers the ONE composite option this filter exposes. No dedicated alias type:
     // temporal_embedded_filter is the RS2_EXTENSION_* identity, and this is the only place that
-    // ever constructs it (compare hdrd-embedded-filter.h, which needs a named alias).
+    // ever constructs it (compare icr-embedded-filter.h, which needs a named alias).
     auto raw_depth_ep = std::dynamic_pointer_cast< uvc_sensor >( depth_sensor.get_raw_sensor() );
     auto option = composite_xu_option::create(
         is_mipi,

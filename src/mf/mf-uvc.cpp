@@ -356,7 +356,7 @@ namespace librealsense
 
             // Each KS reply entry is exactly `length` bytes wide - the old 4-byte cap was correct
             // for scalar PU/CT controls (length <=4 there) but silently truncated multi-field
-            // composite XU controls (e.g. rs2_hdrd_control's 38 bytes) to their first 4 bytes.
+            // composite XU controls (e.g. rs2_icr_control's 38 bytes) to their first 4 bytes.
             auto option_range_size = std::max(sizeof(uint32_t), (size_t)length);
             switch (pHeader->MembersFlags)
             {

@@ -8,7 +8,7 @@
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <rsutils/string/from.h>
 #include <rsutils/json.h>
-#include <librealsense2/h/rs_hdrd_control.h>
+#include <librealsense2/h/rs_icr_control.h>
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
@@ -20,16 +20,16 @@ using rsutils::json;
 
 namespace librealsense {
 
-    // FW-advertised DDS option names of the rs2_hdrd_control fields, in wire order
+    // FW-advertised DDS option names of the rs2_icr_control fields, in wire order
     static const char * const field_names[] = { "Enable", "Filter Type", "Secondary frame downscale ratio", "Shift Mode",
                                                 "Shift Pixels", "MinZ Threshold Mode", "Threshold" };
     static constexpr size_t field_count = std::extent< decltype( field_names ) >::value;
     static constexpr size_t downscale_ratio_field = 2;
-    static constexpr size_t fields_offset = offsetof( rs2_hdrd_control, enable );
-    static_assert( offsetof( rs2_hdrd_control, reserved ) - fields_offset == field_count * sizeof( int32_t ),
-                   "field_names must match the contiguous int32_t fields of rs2_hdrd_control" );
+    static constexpr size_t fields_offset = offsetof( rs2_icr_control, enable );
+    static_assert( offsetof( rs2_icr_control, reserved ) - fields_offset == field_count * sizeof( int32_t ),
+                   "field_names must match the contiguous int32_t fields of rs2_icr_control" );
 
-    // The downscale ratio is a DDS enum of "2"/"4"; rs2_hdrd_control holds 1 = x2, 2 = x4
+    // The downscale ratio is a DDS enum of "2"/"4"; rs2_icr_control holds 1 = x2, 2 = x4
     static int32_t to_field( size_t field_index, json const & dds_value )
     {
         if( dds_value.is_null() )
@@ -59,11 +59,11 @@ namespace librealsense {
         }
     }
 
-    // Packs rs2_hdrd_control; get( field index, its DDS option ) returns the field's value
+    // Packs rs2_icr_control; get( field index, its DDS option ) returns the field's value
     template< class Get >
     std::vector< uint8_t > rs_dds_close_range_control::pack( Get && get ) const
     {
-        rs2_hdrd_control cfg{};
+        rs2_icr_control cfg{};
         cfg.header.version = DPP_HEADER_CURRENT_VERSION;
         cfg.header.ctl_id = 0x0008;
         cfg.header.param_count = static_cast< uint8_t >( field_count );
@@ -83,9 +83,9 @@ namespace librealsense {
 
     void rs_dds_close_range_control::set_raw( const void * data, size_t size )
     {
-        if( ! data || size != sizeof( rs2_hdrd_control ) )
+        if( ! data || size != sizeof( rs2_icr_control ) )
             throw invalid_value_exception( rsutils::string::from() << "Improved Close Range Control expects "
-                                                                   << sizeof( rs2_hdrd_control ) << " bytes, got " << size );
+                                                                   << sizeof( rs2_icr_control ) << " bytes, got " << size );
         int32_t fields[field_count];
         std::memcpy( fields, static_cast< const uint8_t * >( data ) + fields_offset, sizeof( fields ) );
 
@@ -130,7 +130,7 @@ namespace librealsense {
 
     const char * rs_dds_close_range_control::get_description() const
     {
-        return "Improved Close Range Control - use rs2_set/get_composite_option, see rs_hdrd_control.h";
+        return "Improved Close Range Control - use rs2_set/get_composite_option, see rs_icr_control.h";
     }
 
 }  // namespace librealsense
