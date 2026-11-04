@@ -75,6 +75,7 @@ namespace rs2
         void collapse_deadline_on_focus_loss( bool any_field_active_this_frame );
 
         bool commit_due() const { return _dirty && ImGui::GetTime() >= _commit_deadline; }
+        bool is_dirty() const { return _dirty; }
         void clear_dirty();
 
     private:
@@ -95,6 +96,8 @@ namespace rs2
     public:
         T value{};
         bool initialized = false;
+        static constexpr double refresh_period = 1.0;   // seconds between idle re-reads
+        double _last_read = 0.;
 
         // Seeds `value` from a GET the first time this is called; a no-op afterward. Returns whether
         // `value` is safe to use. `on_read`, if set, runs on the freshly-read value.
@@ -103,18 +106,23 @@ namespace rs2
                                  std::string & error_message,
                                  const std::function< void( const T & ) > & on_read = nullptr )
         {
-            if( initialized )
+            // While idle, re-read periodically to pick up changes made by other clients (e.g. ROS2 over DDS)
+            bool const refresh = initialized && ! is_dirty() && ImGui::GetTime() - _last_read >= refresh_period;
+            if( initialized && ! refresh )
                 return true;
             try
             {
                 value = filter->get_composite_option_as< T >( id );
                 initialized = true;
+                _last_read = ImGui::GetTime();
                 if( on_read )
                     on_read( value );
             }
             catch( const std::exception & e )
             {
-                error_message = e.what();
+                _last_read = ImGui::GetTime();
+                if( ! refresh )
+                    error_message = e.what();
             }
             return initialized;
         }
