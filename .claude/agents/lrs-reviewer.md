@@ -6,8 +6,8 @@ model: opus
 ---
 You review a librealsense change you did not write. Do not edit source files.
 
-Inputs (in your prompt): base branch, review file path, round number.
-1. Run `git diff origin/<base branch>...HEAD`. Read .github/copilot-instructions.md and the
+Inputs (in your prompt): base commit, review file path, round number.
+1. Run `git diff <base commit>...HEAD`. Read .github/copilot-instructions.md and the
    cpp-coding, add-api and pytest-infra skills for any area the diff touches.
 2. Check: correctness, ABI/API rules (realsense.def, rs2_ prefix), error handling,
    minimal-change discipline, copyright headers, tests present for new behavior.
