@@ -134,7 +134,6 @@ Each connected device's panel header shows a row of icon buttons:
 | Icon | Label | Behavior |
 |---|---|---|
 | Circle / stop | **Record** / **Stop** | Starts or stops recording this device to a `.bag`/`.db3` file. See [Recording & Playback](#recording--playback). |
-| Refresh | **Sync** | Tooltip "Enable streams synchronization"; the button currently has no effect (its state is not stored). |
 | Info circle | **Info** | Shows/hides the device details panel (name, serial number, firmware version, USB type, etc.). |
 | Bars | **More** | Opens the [device "More" menu](#device-more-menu). |
 | ✕ | *(remove)* | Removes the device from the current view (it can be re-added via [Add Source](#add-source)). |
@@ -161,7 +160,7 @@ At the top of each sensor's section:
 * **Frame Rate (FPS)** combo — sets the streaming frame rate.
 * Per-stream / per-format checkboxes — pick which streams (and pixel formats) to enable for that sensor.
 
-On a D500 **Stereo Module**, the Viewer can show a separate **Resolution** combo for depth and for infrared, each with its own stream checkboxes, under one shared frame rate; other streams are listed with infrared. It does this on the D585S, on other D500 cameras while the embedded decimation filter is enabled, and on dual-RGB cameras, where color gets a combo of its own that both color streams share *(changed in the next release)*. On a dual-RGB camera with decimation off, infrared uses the depth resolution and is listed with depth, along with the other streams. In v2.59.1 the split view appeared only on the D585S or with embedded decimation enabled, and it covered depth and infrared only ([`common/subdevice-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/subdevice-model.cpp)).
+On a D500 **Stereo Module**, the Viewer can show a separate **Resolution** combo for depth and for infrared, each with its own stream checkboxes, under one shared frame rate. It does this on the D585S, and on other D500 cameras while the embedded decimation filter is enabled ([`common/subdevice-model.cpp`](https://github.com/realsenseai/librealsense/blob/master/common/subdevice-model.cpp)).
 
 These controls are locked while the sensor is streaming; hovering a locked control shows the tooltip **"Can't modify while streaming"**.
 
@@ -177,7 +176,7 @@ If the device supports [Advanced Mode](#advanced-mode), an **Advanced Controls**
 
 ### Streaming toggle
 
-Each sensor section has an on/off toggle button that starts or stops streaming from that sensor. It is disabled (with an explanatory tooltip) when a dependent stream needs to be started first (object detection needs a Color stream), or, on GMSL devices, while the Infrared streams that share the perception channel are running *(changed in the next release)*. In v2.59.1 an object detection stream instead needed both Color and Depth streaming, and could not start while a decimation/temporal embedded filter was enabled.
+Each sensor section has an on/off toggle button that starts or stops streaming from that sensor. It is disabled (with an explanatory tooltip) when a dependent stream needs to be started first (an object detection stream needs both Color and Depth streaming), or while a decimation/temporal embedded filter is enabled, which cannot run together with object detection.
 
 ## Sensor Options Reference
 
@@ -219,9 +218,6 @@ The options below are the raw sensor/firmware controls surfaced through `rs2_opt
 | Auto Exposure Mode (depth) | Depth-sensor auto-exposure algorithm: Regular or Accelerated; on colored-IR devices, the AE policy: Auto, Depth Priority, Color Priority, or Hybrid. |
 | Receiver Gain | Exposure time of the Avalanche Photo Diode in the receiver (L500). |
 | Auto RX sensitivity | Enables receiver sensitivity to auto-adjust with ambient light, bounded by the Receiver Gain control. |
-| Dual RGB enable auto exposure *(new in the next release)* | D585 dual-RGB (2C): enable / disable auto-exposure of the RGB cameras, independent of the depth auto-exposure. |
-| Dual RGB exposure *(new in the next release)* | D585 dual-RGB (2C): RGB exposure time in 100-microsecond units. Setting any value disables RGB auto-exposure. |
-| Dual RGB gain *(new in the next release)* | D585 dual-RGB (2C): RGB gain. Setting any value disables RGB auto-exposure. |
 | Receiver sensitivity | Manual receiver sensitivity to incoming light — both projected and ambient (same as APD on L515). |
 
 ### Laser, emitter & illumination controls
@@ -263,9 +259,6 @@ These map directly to the algorithms described in [[Post Processing Filters]]; t
 | Downscale ratio | Embedded filter: secondary-frame downscale ratio (pre-stream only). |
 | Readout shaping | IR/depth sensor readout shaping (0–100%); higher values slow the sensor readout to avoid dropped frames. |
 | Enable IR Reflectivity | Enables data collection for calculating IR pixel reflectivity. |
-| Passive depth mode *(new in the next release)* | D585 dual-RGB (2C): which exposure classes produce depth (pre-stream only). |
-| Occupancy grid segmentation *(new in the next release)* | Off = depth-only labeling; On = the occupancy grid uses the segmentation mode and classes (pre-stream only). |
-| LPCL Segmentation *(new in the next release)* | Off = depth-only labeling; On = the labeled point cloud uses the segmentation mode and classes (pre-stream only). |
 | Stream filter | Selects which stream a multi-stream-aware filter should process. |
 | Stream format filter | Selects which stream format a multi-stream-aware filter should process. |
 | Stream index filter | Selects which stream index a multi-stream-aware filter should process. |
@@ -287,7 +280,7 @@ These map directly to the algorithms described in [[Post Processing Filters]]; t
 | Enable aligned depth | Device-side depth-to-color alignment: the depth stream returns Z16 aligned to the color viewport. |
 | Alternate IR | When enabled, the IR image holds the amplitude of the depth correlation instead of the standard IR image. |
 | Thermal compensation | Depth thermal compensation, for selected D400 SKUs. |
-| Detection distance | Enables firmware calculation of per-detection distance (meters) on the object-detection stream. On the object-detection sensor the Viewer shows it as a combo that picks the distance drawn on each detection box: **Off** (no distance), **Application** (estimated by the Viewer from the depth stream) or **Camera** (calculated by the camera; the only choice that turns the camera's control on) *(changed in the next release)*. In v2.59.1 the Viewer drew the camera's distance and estimated one from the depth stream only for detections where the camera reported 0. |
+| Detection distance | Enables firmware calculation of per-detection distance (meters) on the object-detection stream. The Viewer draws the camera's distance on each detection box, and estimates one from the depth stream for detections where the camera reports 0. |
 | Gyro sensitivity | Gyro sensitivity level (61.0 / 30.5 / 15.3 / 7.6 / 3.8 milli-deg/sec). |
 
 ### Visual presets & hardware configuration
@@ -327,7 +320,6 @@ These back the [HDR Configuration](#hdr-configuration) dialog described below.
 | Enable pose jumping | Enable position jumping. |
 | Enable dynamic calibration | Enable dynamic calibration. |
 | Enable map preservation | Preserve the previous map when starting. |
-| Accel sensitivity *(new in the next release)* | Accelerometer sensitivity (dynamic range) level; selects the saturation point only, the reported unit scale is unchanged. |
 | Freefall detection enabled | Enable / disable automatic sensor shutdown when a free-fall is detected (on by default). |
 
 ### Safety camera controls
@@ -507,11 +499,11 @@ Distances and areas are shown as floating labels and connecting rulers; distance
 | **F8** | Toggle fullscreen. |
 | **W / A / S / D** | Dolly the 3D camera forward / left / back / right. |
 | **R** | Reset the 3D camera to its default pose. |
-| **Space** | Pause/resume all streaming (unless Space activates a focused widget) *(changed in the next release)*. In v2.59.1, Space always pauses/resumes, even when a widget has focus. |
+| **Space** | Pause/resume all streaming. |
 | **Ctrl + left-drag** (mouse) | Pan the 3D view (alternate to middle/right-drag). |
 | **Shift** (held while clicking, in the Measurement Tool) | Chain more than 2 points to measure an area instead of a distance. |
 | **Z** (in the Measurement Tool) | Undo the last measurement change. |
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`e12faf3`](https://github.com/realsenseai/librealsense/commit/e12faf3cf8e19688f1ad2c832037c8a06f319429)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
