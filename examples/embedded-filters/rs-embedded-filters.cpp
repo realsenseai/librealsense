@@ -249,15 +249,14 @@ try
 
                 std::cout << "Streaming with Improved Close Range Depth OFF..." << std::endl;
                 auto cfg = original;
-                cfg.enable = 0;
+                cfg.mode = RS2_ICR_MODE_OFF;
                 close_range_filter.set_composite_option_from(id, cfg);
                 auto min_depth_off = capture_min_valid_depth(5, 10);
                 std::cout << "  Minimum valid depth (filter off): " << min_depth_off << " (depth units)" << std::endl;
 
                 std::cout << "Streaming with Improved Close Range Depth ON (Downscale x2)..." << std::endl;
                 cfg = original;
-                cfg.enable = 1;
-                cfg.filter_type = 0;      // Downscale
+                cfg.mode = RS2_ICR_MODE_DOWNSCALE_HDR;
                 cfg.downscale_ratio = 1;  // x2
                 close_range_filter.set_composite_option_from(id, cfg);
                 auto min_depth_on = capture_min_valid_depth(5, 10);

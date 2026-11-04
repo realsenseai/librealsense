@@ -15,7 +15,7 @@ namespace librealsense {
 //
 // Addresses the SAME physical XU control (unit 3, selector 0x14) that used to be exposed as
 // "Improved Close Range Depth", a scalar enable-only option (since removed) - consolidated onto
-// this composite option's all 7 fields. RS2_OPTION_EMBEDDED_FILTER_ENABLED is no longer
+// this composite option's all 8 fields. RS2_OPTION_EMBEDDED_FILTER_ENABLED is no longer
 // registered for this filter, so a caller assuming every filter has it will throw - accepted.
 using icr_embedded_filter
     = composite_embedded_filter< close_range_embedded_filter, RS2_EMBEDDED_FILTER_TYPE_CLOSE_RANGE >;

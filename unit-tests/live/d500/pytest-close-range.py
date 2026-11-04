@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Improved Close Range Depth over DDS. Older FW publishes Enable, Downscale Ratio, Disparity Shift and
-# Threshold, exposed as scalar options; newer FW publishes the 7 icr_control fields, exposed as the
+# Threshold, exposed as scalar options; newer FW publishes the 8 icr_control fields, exposed as the
 # icr_control composite option same as over USB (field round trips in live/options/pytest-icr-control.py).
 
 import time
@@ -79,7 +79,7 @@ def _set_fields( embedded_filter, **fields ):
 
 def _set_enable( embedded_filter, value ):
     if _is_composite( embedded_filter ):
-        _set_fields( embedded_filter, enable=value )
+        _set_fields( embedded_filter, mode=value )
     else:
         embedded_filter.set_option( rs.option.embedded_filter_enabled, value )
 
@@ -161,19 +161,19 @@ def test_icr_control_present( test_device ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
     cfg = embedded_filter.get_icr_control( ICR )
     assert cfg.header.version == 1
-    assert cfg.header.param_count == 7
+    assert cfg.header.param_count == 8
 
 
 def test_icr_control_enable_round_trip( test_device ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
-    original = embedded_filter.get_icr_control( ICR ).enable
+    original = embedded_filter.get_icr_control( ICR ).mode
     for value in ( 1, 0 ):
-        _set_fields( embedded_filter, enable=value )
-        check.equal( embedded_filter.get_icr_control( ICR ).enable, value )
-    _set_fields( embedded_filter, enable=original )
+        _set_fields( embedded_filter, mode=value )
+        check.equal( embedded_filter.get_icr_control( ICR ).mode, value )
+    _set_fields( embedded_filter, mode=original )
 
 
-@pytest.mark.parametrize( "field, value", [( "enable", 2 ), ( "enable", -1 ), ( "downscale_ratio", 3 ), ( "shift_pixels", 257 )] )
+@pytest.mark.parametrize( "field, value", [( "mode", 3 ), ( "mode", -1 ), ( "downscale_ratio", 3 ), ( "high_res_offset", 257 )] )
 def test_icr_control_invalid_value_rejected( test_device, field, value ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
     before = embedded_filter.get_icr_control( ICR )

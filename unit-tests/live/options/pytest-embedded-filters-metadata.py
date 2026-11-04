@@ -120,7 +120,7 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
 
     try:
         cfg = embedded_filter.get_icr_control(option_id)
-        cfg.enable = 1
+        cfg.mode = 1  # Downscale HDR
         embedded_filter.set_icr_control(option_id, cfg)
         frame = _stream_one_depth_frame(dev, ctx, ICR_WIDTH, ICR_HEIGHT)
         assert frame is not None, "No depth frame received with ICR control enabled"
@@ -130,7 +130,7 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
             f"with ICR control enabled")
 
         cfg = embedded_filter.get_icr_control(option_id)
-        cfg.enable = 0
+        cfg.mode = 0  # Off
         embedded_filter.set_icr_control(option_id, cfg)
         frame = _stream_one_depth_frame(dev, ctx, ICR_WIDTH, ICR_HEIGHT)
         assert frame is not None, "No depth frame received with ICR control disabled"
@@ -140,5 +140,5 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
             f"with ICR control disabled")
     finally:
         cfg = embedded_filter.get_icr_control(option_id)
-        cfg.enable = 0
+        cfg.mode = 0  # Off
         embedded_filter.set_icr_control(option_id, cfg)

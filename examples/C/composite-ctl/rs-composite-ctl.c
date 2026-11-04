@@ -128,13 +128,14 @@ static void print_icr_struct( const rs2_icr_control * v )
     printf( "        %-16s = 0x%x\n", "ctl_id", (unsigned int)v->header.ctl_id );
     printf( "        %-16s = %d\n", "param_count", (int)v->header.param_count );
     printf( "        %-16s = %d\n", "param_type", (int)v->header.param_type );
-    printf( "        %-16s = %d\n", "enable", v->enable );
-    printf( "        %-16s = %d\n", "filter_type", v->filter_type );
-    printf( "        %-16s = %d\n", "downscale_ratio", v->downscale_ratio );
-    printf( "        %-16s = %d\n", "shift_mode", v->shift_mode );
-    printf( "        %-16s = %d\n", "shift_pixels", v->shift_pixels );
-    printf( "        %-16s = %d\n", "threshold_mode", v->threshold_mode );
-    printf( "        %-16s = %d\n", "threshold_mm", v->threshold_mm );
+    printf( "        %-20s = %d\n", "mode", v->mode );
+    printf( "        %-20s = %d\n", "downscale_ratio", v->downscale_ratio );
+    printf( "        %-20s = %d\n", "high_res_mode", v->high_res_mode );
+    printf( "        %-20s = %d\n", "high_res_offset", v->high_res_offset );
+    printf( "        %-20s = %d\n", "smoothing_offset_mm", v->smoothing_offset_mm );
+    printf( "        %-20s = %d\n", "completion_offset_mm", v->completion_offset_mm );
+    printf( "        %-20s = %d\n", "min_z_mm", v->min_z_mm );
+    printf( "        %-20s = %d\n", "improved_min_z_mm", v->improved_min_z_mm );
 }
 
 /* C99 equivalent of the C++ sample's generic print_range(icr_fields(), ...): one header
@@ -150,13 +151,14 @@ static void print_icr_range( const rs2_icr_control_range * r )
     ICR_ROW( "ctl_id", header.ctl_id );
     ICR_ROW( "param_count", header.param_count );
     ICR_ROW( "param_type", header.param_type );
-    ICR_ROW( "enable", enable );
-    ICR_ROW( "filter_type", filter_type );
+    ICR_ROW( "mode", mode );
     ICR_ROW( "downscale_ratio", downscale_ratio );
-    ICR_ROW( "shift_mode", shift_mode );
-    ICR_ROW( "shift_pixels", shift_pixels );
-    ICR_ROW( "threshold_mode", threshold_mode );
-    ICR_ROW( "threshold_mm", threshold_mm );
+    ICR_ROW( "high_res_mode", high_res_mode );
+    ICR_ROW( "high_res_offset", high_res_offset );
+    ICR_ROW( "smoothing_offset_mm", smoothing_offset_mm );
+    ICR_ROW( "completion_offset_mm", completion_offset_mm );
+    ICR_ROW( "min_z_mm", min_z_mm );
+    ICR_ROW( "improved_min_z_mm", improved_min_z_mm );
 #undef ICR_ROW
 }
 
@@ -522,43 +524,40 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
     /* 2) Set + Get, wire header and every other field carried over untouched from `current`, not
        zero-initialized, on every step below. */
     cfg = current;
-    cfg.enable = 1;
 
-    /* Lookup Shift + Manual shift pixels - exercises filter_type together with the
-       (shift_mode, shift_pixels) pair it selects. */
-    cfg.filter_type = 1;
-    cfg.shift_mode = 2;
-    cfg.shift_pixels = 100;
+    /* High-Res mode + Manual offset - exercises mode together with the
+       (high_res_mode, high_res_offset) pair it selects. */
+    cfg.mode = RS2_ICR_MODE_HIGH_RES;
+    cfg.high_res_mode = 2;
+    cfg.high_res_offset = 100;
     if( ! icr_set_and_readback( opts, id, &cfg, &after ) )
         return 0;  /* helper already printed and freed its own error */
-    printf( "      Set (filter_type=Lookup Shift, shift_mode=Manual, shift_pixels=100): %s\n",
-            ( after.filter_type == cfg.filter_type && after.shift_mode == cfg.shift_mode
-              && after.shift_pixels == cfg.shift_pixels )
+    printf( "      Set (mode=High-Res, high_res_mode=Manual, high_res_offset=100): %s\n",
+            ( after.mode == cfg.mode && after.high_res_mode == cfg.high_res_mode
+              && after.high_res_offset == cfg.high_res_offset )
                 ? "matches what was sent" : "differs - FW may quantize/clamp on write" );
     print_icr_struct( &after );
 
-    /* Downscale + x4 ratio - exercises the OTHER branch filter_type selects between. */
-    cfg.filter_type = 0;
+    /* Downscale HDR + x4 ratio + Close Range Smoothing - the OTHER branch mode selects between. */
+    cfg.mode = RS2_ICR_MODE_DOWNSCALE_HDR;
     cfg.downscale_ratio = 2;
+    cfg.smoothing_offset_mm = 300;
     if( ! icr_set_and_readback( opts, id, &cfg, &after ) )
         return 0;  /* helper already printed and freed its own error */
-    printf( "      Set (filter_type=Downscale, downscale_ratio=x4): %s\n",
-            ( after.filter_type == cfg.filter_type && after.downscale_ratio == cfg.downscale_ratio )
+    printf( "      Set (mode=Downscale HDR, downscale_ratio=x4, smoothing_offset_mm=300): %s\n",
+            ( after.mode == cfg.mode && after.downscale_ratio == cfg.downscale_ratio
+              && after.smoothing_offset_mm == cfg.smoothing_offset_mm )
                 ? "matches what was sent" : "differs - FW may quantize/clamp on write" );
     print_icr_struct( &after );
 
-    /* Cycle threshold_mode through all three rungs - threshold_mm only matters for Manual. */
-    for( mode = 0; mode <= 2; ++mode )
-    {
-        cfg.threshold_mode = mode;
-        cfg.threshold_mm = ( mode == 2 ) ? 300 : 0;
-        if( ! icr_set_and_readback( opts, id, &cfg, &after ) )
-            return 0;  /* helper already printed and freed its own error */
-        printf( "      Set (threshold_mode=%d): %s\n", mode,
-                ( after.threshold_mode == cfg.threshold_mode )
-                    ? "matches what was sent" : "differs - FW may quantize/clamp on write" );
-        print_icr_struct( &after );
-    }
+    /* Close Range Completion applies in every mode but Off. */
+    cfg.completion_offset_mm = 200;
+    if( ! icr_set_and_readback( opts, id, &cfg, &after ) )
+        return 0;  /* helper already printed and freed its own error */
+    printf( "      Set (completion_offset_mm=200): %s\n",
+            ( after.completion_offset_mm == cfg.completion_offset_mm )
+                ? "matches what was sent" : "differs - FW may quantize/clamp on write" );
+    print_icr_struct( &after );
 
     /* Restore the original value read in step 1 - this sample exercises real, consequential
        state changes (unlike a single-field toggle), so leaving no lasting effect on the device
@@ -566,9 +565,10 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
     if( ! icr_set_and_readback( opts, id, &current, &after ) )
         return 0;  /* helper already printed and freed its own error */
     printf( "      Restore original value: %s\n",
-            ( after.filter_type == current.filter_type && after.downscale_ratio == current.downscale_ratio
-              && after.shift_mode == current.shift_mode && after.shift_pixels == current.shift_pixels
-              && after.threshold_mode == current.threshold_mode && after.threshold_mm == current.threshold_mm )
+            ( after.mode == current.mode && after.downscale_ratio == current.downscale_ratio
+              && after.high_res_mode == current.high_res_mode && after.high_res_offset == current.high_res_offset
+              && after.smoothing_offset_mm == current.smoothing_offset_mm
+              && after.completion_offset_mm == current.completion_offset_mm )
                 ? "ok" : "FAILED to restore - device may be left in the sample's last test state" );
 
     /* 3) Get range - raw bytes, then the manual cast to rs2_icr_control_range
