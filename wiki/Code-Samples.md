@@ -92,5 +92,5 @@ Python samples live in [`wrappers/python/examples`](https://github.com/realsense
 The graphical C++ samples include [`examples/example.hpp`](https://github.com/realsenseai/librealsense/blob/master/examples/example.hpp) (window and texture helpers on top of GLFW/OpenGL); the align, align-advanced, align-gl and hdr samples include it through [`examples/example-imgui.hpp`](https://github.com/realsenseai/librealsense/blob/master/examples/example-imgui.hpp). The C samples share [`examples/C/example.h`](https://github.com/realsenseai/librealsense/blob/master/examples/C/example.h).
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`46cf1a6`](https://github.com/realsenseai/librealsense/commit/46cf1a67cc441ad9f55ce339a0de30f2a1c6fed0)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
