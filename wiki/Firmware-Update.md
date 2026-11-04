@@ -136,7 +136,7 @@ sudo rmmod d4xx && sudo modprobe d4xx
 or reboot the system
 ```
 
-For GMSL devices the library writes the whole image to the device's DFU character device and reports progress estimated from the image size, held below 100% until the write finishes *(changed in the next release)*. In v2.59.1 the image was written in 1 KB blocks with progress reported per block.
+For GMSL recovery devices the library writes the image to the device's DFU character device in 1 KB blocks and reports progress per block ([`src/fw-update/fw-update-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/fw-update/fw-update-device.cpp)). For GMSL devices in normal mode it writes the whole image at once and reports progress estimated from the elapsed time, held below 100% until the write finishes ([`src/ds/ds-mipi-device.cpp`](https://github.com/realsenseai/librealsense/blob/master/src/ds/ds-mipi-device.cpp)).
 
 In the Viewer, a recovery device shows the same **Update Firmware** menu item; the Viewer writes the image to it directly and then waits for the camera to reconnect, except for GMSL recovery devices, where it logs the driver-reload message shown above instead.
 
@@ -277,5 +277,5 @@ The repository's diagram of this flow:
 For other camera problems see [[Troubleshooting Q&A]].
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`0d4fcab`](https://github.com/realsenseai/librealsense/commit/0d4fcabf634650b821200ad38eedaa13aa4cb704)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
