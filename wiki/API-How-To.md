@@ -214,5 +214,5 @@ while (true)
 See [Projection in RealSense SDK 2.0](https://github.com/realsenseai/librealsense/wiki/Projection-in-RealSense-SDK-2.0#frame-alignment) and [examples/align](https://github.com/realsenseai/librealsense/tree/master/examples/align).
 
 <!-- wikigen:footer -->
-_Maintained from librealsense `development`; last checked at commit [`46cf1a6`](https://github.com/realsenseai/librealsense/commit/46cf1a67cc441ad9f55ce339a0de30f2a1c6fed0)._
+_Maintained from librealsense `master`; last checked at commit [`c84fe64`](https://github.com/realsenseai/librealsense/commit/c84fe6438bd14a4cc69f46deae92c993268232c6)._
 <!-- /wikigen:footer -->
