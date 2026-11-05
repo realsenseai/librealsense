@@ -54,13 +54,15 @@ static std::vector< uint8_t > legacy_to_icr( const uint8_t * data, bool is_step 
 // `legacy` is the current 7-parameter payload: the slots ICR does not map are carried back as they are
 static std::vector< uint8_t > icr_to_legacy( const rs2_icr_control & cfg, std::vector< uint8_t > legacy )
 {
-    int32_t * l = reinterpret_cast< int32_t * >( legacy.data() + icr_params_offset );
+    int32_t l[legacy_param_count];
+    std::memcpy( l, legacy.data() + icr_params_offset, sizeof( l ) );
     l[0] = cfg.mode != RS2_ICR_MODE_OFF;
     if( cfg.mode != RS2_ICR_MODE_OFF )  // Off leaves the filter type as is
         l[1] = cfg.mode == RS2_ICR_MODE_HIGH_RES;
     l[2] = cfg.downscale_ratio;
     l[3] = cfg.high_res_mode;
     l[4] = cfg.high_res_offset;
+    std::memcpy( legacy.data() + icr_params_offset, l, sizeof( l ) );
     return legacy;
 }
 

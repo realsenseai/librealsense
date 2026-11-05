@@ -100,8 +100,8 @@ namespace librealsense {
     std::vector< uint8_t > rs_dds_close_range_control::get_raw() const
     {
         int32_t mode = RS2_ICR_MODE_OFF;
-        if( _legacy && _enable && _filter_type && to_field( 0, _enable->get_value() ) )
-            mode = to_field( 0, _filter_type->get_value() ) ? RS2_ICR_MODE_HIGH_RES : RS2_ICR_MODE_DOWNSCALE_HDR;
+        if( _legacy && _enable && to_field( 0, _enable->get_value() ) )
+            mode = _filter_type && to_field( 0, _filter_type->get_value() ) ? RS2_ICR_MODE_HIGH_RES : RS2_ICR_MODE_DOWNSCALE_HDR;
         return pack( mode, [this]( size_t i, realdds::dds_option const & o ) { return to_field( i, o.get_value() ); } );
     }
 
