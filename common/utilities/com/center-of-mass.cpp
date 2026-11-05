@@ -37,6 +37,11 @@ static constexpr float    COM_UPPER_FRACTION   = 0.65f;
 static constexpr float    COM_CENTROID_FRACTION = 0.40f;
 static constexpr int      NUM_DEPTH_SAMPLES    = 5;
 
+// is_minz_violation() — NOT FW-mirrored, see center-of-mass.h.
+static constexpr float    MIN_CENTER_FILL_RATE   = 0.25f;
+static constexpr int      CENTER_REGION_DIV      = 6;     // center region half-extent = roi/DIV
+static constexpr float    MAX_PLAUSIBLE_WIDTH_MM = 2000.f;
+
 // depth_8u value for MAX_DEPTH: ceil((MAX_DEPTH-400)/SCALE_DEPTH) — fits in uint8 with SCALE_DEPTH=30
 static const int MaxDepth8U =
     (int)std::ceil(((int)MAX_DEPTH - (int)SUBTRACT_FROM_DEPTH) / SCALE_DEPTH);
@@ -450,6 +455,36 @@ bool center_of_mass_calculator::calculate(
     }
 
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// is_minz_violation  (post-processing check on calculate()'s result)
+// ---------------------------------------------------------------------------
+
+bool center_of_mass_calculator::is_minz_violation(
+    const depth_image_16& raw_depth, const rect& roi,
+    const camera_intrinsics& intrinsics, float estimated_depth_mm)
+{
+    if (estimated_depth_mm <= 0.f) return false;  // already invalid; nothing to flag
+
+    // A genuine hole: almost no raw depth at the ROI's own center.
+    int const center_half_w = std::max(1, roi.width  / CENTER_REGION_DIV);
+    int const center_half_h = std::max(1, roi.height / CENTER_REGION_DIV);
+    int const center_x = roi.x + roi.width  / 2;
+    int const center_y = roi.y + roi.height / 2;
+    int valid = 0, total = 0;
+    for (int y = center_y - center_half_h; y < center_y + center_half_h; ++y)
+        for (int x = center_x - center_half_w; x < center_x + center_half_w; ++x)
+        {
+            if (x < 0 || x >= raw_depth.width || y < 0 || y >= raw_depth.height) continue;
+            ++total;
+            if (raw_depth.data[y * raw_depth.width + x] > 0) ++valid;
+        }
+    if (total > 0 && float(valid) / total < MIN_CENTER_FILL_RATE) return true;
+
+    // A confidently-measured background: implies an impossibly large real-world width.
+    float const implied_width_mm = estimated_depth_mm * roi.width / intrinsics.fx;
+    return implied_width_mm > MAX_PLAUSIBLE_WIDTH_MM;
 }
 
 } // namespace com
