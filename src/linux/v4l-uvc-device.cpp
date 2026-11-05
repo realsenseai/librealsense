@@ -3,6 +3,7 @@
 
 #include "v4l-uvc-device.h"
 
+#include "v4l-mipi-logic.h"
 #include "v4l-product-ids.h"
 #include <src/platform/hid-data.h>
 #include <src/core/time-service.h>
@@ -36,42 +37,6 @@ namespace librealsense
 {
     namespace platform
     {
-        std::vector<uint8_t*> get_imu_reports(uint8_t* buffer, size_t buffer_size)
-        {
-            size_t const report_size = sizeof(hid_mipi_data_32);
-            uint8_t const accel = 1, gyro = 2, state_valid = 2;  // typeID 0 means no second report; skip1 is the state
-
-            // Frame too small for two IMU values, assuming only one is present
-            if (buffer_size < 2 * report_size)
-                return { buffer };
-
-            auto const * first = reinterpret_cast<const hid_mipi_data_32*>(buffer);
-            auto const * second = first + 1;
-            auto is_valid = [&](const hid_mipi_data_32* report)
-            {
-                return (report->typeID == accel || report->typeID == gyro) && report->skip1 == state_valid;
-            };
-            auto is_zero_from = [&](size_t offset)
-            {
-                return std::all_of(buffer + offset, buffer + buffer_size, [](uint8_t b) { return b == 0; });
-            };
-
-            // Frame big enough for two reports but only one exists, return it
-            if (second->typeID == 0)
-            {
-                if (is_valid(first) && is_zero_from(report_size))
-                    return { buffer };
-                return {};
-            }
-
-            // Expecting two IMU values
-            if (! is_valid(first) || ! is_valid(second) || first->typeID == second->typeID || ! is_zero_from(2 * report_size))
-                return {};
-            if (second->hwTs < first->hwTs)
-                return { buffer + report_size, buffer };
-            return { buffer, buffer + report_size };
-        }
-
         v4l_uvc_device::v4l_uvc_device(const uvc_device_info& info, bool use_memory_map)
             : _name(info.id), 
               _device_path(info.device_path),
@@ -562,7 +527,7 @@ namespace librealsense
                                                 auto frame_start = buffer->get_frame_start();
                                                 if (md_size == 0 && _info.mi == 4)
                                                 {
-                                                    auto const reports = get_imu_reports(frame_start, frame_sz);
+                                                    auto const reports = v4l_mipi_logic::get_imu_reports(frame_start, frame_sz);
                                                     if (reports.empty())
                                                     {
                                                         LOG_DEBUG("Malformed IMU buffer of " << frame_sz << " bytes dropped");
