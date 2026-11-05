@@ -54,7 +54,7 @@ namespace rs2
                        << v.reserved[2] << "," << v.reserved[3] << "]" );
         }
 
-        // No enum-valued fields to clamp here (unlike sanitize_icr_control() below) - every field
+        // No enum-valued fields to clamp here (unlike sanitize_icr() below) - every field
         // is just range-bounded. Still zeroes the reserved slots - same "MUST be zero on SET" rule.
         void sanitize_temporal_filter_dpp_config( rs2_temporal_filter_dpp_config & v )
         {
@@ -71,30 +71,49 @@ namespace rs2
                        << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
                        << " param_count=" << (int)v.header.param_count
                        << " param_type=" << (int)v.header.param_type
-                       << " enable=" << v.enable
-                       << " filter_type=" << v.filter_type
+                       << " mode=" << v.mode
                        << " downscale_ratio=" << v.downscale_ratio
-                       << " shift_mode=" << v.shift_mode
-                       << " shift_pixels=" << v.shift_pixels
-                       << " threshold_mode=" << v.threshold_mode
-                       << " threshold_mm=" << v.threshold_mm
-                       << " reserved=[" << v.reserved[0] << "]" );
+                       << " high_res_mode=" << v.high_res_mode
+                       << " high_res_offset=" << v.high_res_offset
+                       << " smoothing_offset_mm=" << v.smoothing_offset_mm
+                       << " completion_offset_mm=" << v.completion_offset_mm
+                       << " min_z_mm=" << v.min_z_mm
+                       << " improved_min_z_mm=" << v.improved_min_z_mm );
         }
 
-        // A real device's firmware may still speak the pre-design-review wire layout, so a field
-        // can land outside its enum's legal range. Called after every raw device read, before any
-        // branching/display code uses it, so the stored value and what's shown stay consistent.
-        void sanitize_icr_control( rs2_icr_control & v )
+    }
+
+    // A device may hand back a value outside its field's legal range (e.g. firmware still speaking another
+    // wire layout). Called after every raw device read, before any branching/display code uses it, so the
+    // stored value and what's shown stay consistent. The bounds are the FW-reported range (fetched once);
+    // MinZ/Improved MinZ are read-only and never edited.
+    void embedded_filter_model::sanitize_icr( rs2_icr_control & v )
+    {
+        if( ! _icr_range_initialized )
         {
-            v.filter_type = std::min( std::max( v.filter_type, 0 ), 1 );
-            v.downscale_ratio = std::min( std::max( v.downscale_ratio, 1 ), 2 );
-            v.shift_mode = std::min( std::max( v.shift_mode, 0 ), 2 );
-            v.threshold_mode = std::min( std::max( v.threshold_mode, 0 ), 2 );
-            // Header doc: "MUST be zero on SET". A real device may hand back a non-zero byte here
-            // on GET (pre-design-review firmware, or simply unused memory) - without this, every
-            // later auto-commit/enable-toggle would echo that non-zero value straight back on SET.
-            v.reserved[0] = 0;
+            try
+            {
+                _icr_range = _embedded_filter->get_composite_option_range_as< rs2_icr_control_range >( RS2_COMPOSITE_OPTION_ICR_CONTROL );
+                _icr_range_initialized = true;
+            }
+            catch( const std::exception & )
+            {
+                // Best-effort - not marked initialized, so a later frame can retry
+            }
         }
+        if( _icr_range_initialized )
+        {
+            auto clamp = [&]( int32_t & value, int32_t rs2_icr_control::*field )
+            { value = std::min( std::max( value, _icr_range.min.*field ), _icr_range.max.*field ); };
+            clamp( v.mode, &rs2_icr_control::mode );
+            clamp( v.downscale_ratio, &rs2_icr_control::downscale_ratio );
+            clamp( v.high_res_mode, &rs2_icr_control::high_res_mode );
+            clamp( v.high_res_offset, &rs2_icr_control::high_res_offset );
+            clamp( v.smoothing_offset_mm, &rs2_icr_control::smoothing_offset_mm );
+            clamp( v.completion_offset_mm, &rs2_icr_control::completion_offset_mm );
+        }
+        if( v.mode != RS2_ICR_MODE_OFF )
+            _icr_last_active_mode = v.mode;
     }
 
     embedded_filter_model::embedded_filter_model(
@@ -330,61 +349,76 @@ namespace rs2
             } );
     }
 
-    // Irrelevant fields stay visible but BeginDisabled()-greyed, not hidden. |= (not ||): each
-    // call draws real widgets and must run every frame.
+    // Unlike the other editors, every ICR field stays enabled whatever the mode (a product decision): a gated-off
+    // field remains in the wire payload and only takes effect once its mode applies. |= (not ||): each call draws
+    // real widgets and must run every frame.
     bool embedded_filter_model::draw_icr_fields( std::string & error_message )
     {
-        static const char * const filter_type_labels[] = { "Downscale", "Lookup Shift" };
+        static const char * const mode_labels[] = { "Off", "Downscale HDR", "High-Res" };
         static const char * const downscale_ratio_labels[] = { "x2", "x4" };
-        static const char * const shift_mode_labels[] = { "Shift 126px", "Shift 64px", "Manual" };
-        static const char * const threshold_mode_labels[] = { "Zero range", "MinZ (computed)", "Manual" };
+        static const char * const high_res_mode_labels[] = { "Shift 126px", "Shift 64px", "Manual" };
 
         auto & v = _icr_editor.value;
-        bool any_field_active = _icr_editor.draw_enum_field( "Filter Type",
-            "Downscale: reduce resolution by a fixed ratio. Lookup Shift: shift the disparity lookup by a pixel count.\n"
-            "Not all Depth resolutions and frame rates are supported.",
-            "icr_filter_type", filter_type_labels, v.filter_type );
+        // FW-reported bounds of a scalar field; a degenerate [current,current] slider while the range is unavailable
+        auto bound = [&]( int32_t rs2_icr_control::*field, bool upper )
+        { return _icr_range_initialized ? ( upper ? _icr_range.max.*field : _icr_range.min.*field ) : v.*field; };
 
-        const bool downscale_relevant = ( v.filter_type == 0 );
-        if( ! downscale_relevant )
-            ImGui::BeginDisabled();
+        bool any_field_active = _icr_editor.draw_enum_field( "ICR Mode",
+            "Off: Improved Close Range disabled.\n"
+            "Downscale HDR: merge a downscaled near-range pass with the nominal depth.\n"
+            "High-Res: merge a disparity-shifted near-range pass with the nominal depth.\n"
+            "Not all Depth resolutions and frame rates are supported.",
+            "icr_mode", mode_labels, v.mode );
+
         // Wire values are 1 (x2) and 2 (x4), not 0-based like the other enum fields - value_offset
         // converts to and from a 0-based index rather than changing the documented wire values.
-        any_field_active |= _icr_editor.draw_enum_field( "Downscale Ratio", "Resolution reduction applied by the Downscale filter type.",
+        any_field_active |= _icr_editor.draw_enum_field( "Downscale Ratio", "Resolution reduction applied by Downscale HDR mode.",
             "icr_downscale_ratio", downscale_ratio_labels, v.downscale_ratio, 1 );
-        if( ! downscale_relevant )
-            ImGui::EndDisabled();
+        any_field_active |= _icr_editor.draw_scalar_field( "Close Range Smoothing (mm)",
+            "Depth range above MinZ where near-range data overrides the nominal depth. 0 disables it.",
+            "icr_smoothing", v.smoothing_offset_mm, bound( &rs2_icr_control::smoothing_offset_mm, false ),
+            bound( &rs2_icr_control::smoothing_offset_mm, true ), 1, 1.f, _icr_smoothing_edit, error_message );
+        any_field_active |= _icr_editor.draw_enum_field( "High-Res Mode", "Fixed shift preset, or Manual to use the High-Res Offset value below.",
+            "icr_high_res_mode", high_res_mode_labels, v.high_res_mode );
+        any_field_active |= _icr_editor.draw_scalar_field( "High-Res Offset", "Disparity shift, in pixels, used when High-Res Mode is Manual.",
+            "icr_high_res_offset", v.high_res_offset, bound( &rs2_icr_control::high_res_offset, false ),
+            bound( &rs2_icr_control::high_res_offset, true ), 1, 1.f, _icr_high_res_offset_edit, error_message );
+        any_field_active |= _icr_editor.draw_scalar_field( "Close Range Completion (mm)",
+            "Depth range above MinZ where holes are filled from the near-range pass. 0 disables it.",
+            "icr_completion", v.completion_offset_mm, bound( &rs2_icr_control::completion_offset_mm, false ),
+            bound( &rs2_icr_control::completion_offset_mm, true ), 1, 1.f, _icr_completion_edit, error_message );
 
-        const bool shift_relevant = ( v.filter_type == 1 );
-        if( ! shift_relevant )
-            ImGui::BeginDisabled();
-        any_field_active |= _icr_editor.draw_enum_field( "Shift Mode", "Fixed shift preset, or Manual to use the Shift Pixels value below.",
-            "icr_shift_mode", shift_mode_labels, v.shift_mode );
-        if( ! shift_relevant )
-            ImGui::EndDisabled();
-
-        const bool shift_pixels_relevant = shift_relevant && ( v.shift_mode == 2 );
-        if( ! shift_pixels_relevant )
-            ImGui::BeginDisabled();
-        any_field_active |= _icr_editor.draw_scalar_field( "Shift Pixels", "Disparity lookup shift, in pixels, used when Shift Mode is Manual.",
-            "icr_shift", v.shift_pixels, 0, 256, 1, 1.f, _icr_shift_edit, error_message );
-        if( ! shift_pixels_relevant )
-            ImGui::EndDisabled();
-
-        any_field_active |= _icr_editor.draw_enum_field( "Threshold Mode",
-            "Zero range: fill only originally-empty depth pixels.\n"
-            "MinZ (computed): firmware picks the threshold for the active resolution.\n"
-            "Manual: use the threshold value below.",
-            "icr_threshold_mode", threshold_mode_labels, v.threshold_mode );
-
-        const bool threshold_relevant = ( v.threshold_mode == 2 );
-        if( ! threshold_relevant )
-            ImGui::BeginDisabled();
-        any_field_active |= _icr_editor.draw_scalar_field( "Threshold (mm)", "Depth threshold, in mm, used when Threshold Mode is Manual.",
-            "icr_threshold", v.threshold_mm, 0, 65535, 1, 1.f, _icr_threshold_edit, error_message );
-        if( ! threshold_relevant )
-            ImGui::EndDisabled();
-
+        // Read-only FW telemetry in any mode (Improved MinZ equals MinZ while Off). The FW recalculates it when a
+        // stream starts and keeps it after the stream stops, so it is polled at a low rate while streaming, apart
+        // from the editor's own commit path so a refresh never marks an edit as pending, and kept once read
+        if( _owner && _owner->streaming )
+        {
+            auto const now = std::chrono::steady_clock::now();
+            if( now - _icr_telemetry_time > std::chrono::seconds( 1 ) )
+            {
+                _icr_telemetry_time = now;
+                try
+                {
+                    auto const current = _embedded_filter->get_composite_option_as< rs2_icr_control >( RS2_COMPOSITE_OPTION_ICR_CONTROL );
+                    v.min_z_mm = current.min_z_mm;
+                    v.improved_min_z_mm = current.improved_min_z_mm;
+                    _icr_telemetry_valid = true;
+                }
+                catch( const std::exception & )
+                {
+                }
+            }
+        }
+        if( _icr_telemetry_valid )
+        {
+            ImGui::Text( "MinZ: %d mm", v.min_z_mm );
+            ImGui::Text( "Improved MinZ: %d mm", v.improved_min_z_mm );
+        }
+        else
+        {
+            ImGui::TextDisabled( "MinZ: available after the first stream" );
+            ImGui::TextDisabled( "Improved MinZ: available after the first stream" );
+        }
         return any_field_active;
     }
 
@@ -395,19 +429,20 @@ namespace rs2
         auto on_read = [this]( const rs2_icr_control & v )
         {
             print_icr_control( v );
-            _enabled = v.enable != 0;
+            _enabled = v.mode != RS2_ICR_MODE_OFF;
         };
         if( ! _icr_editor.ensure_initialized( _embedded_filter, id, error_message, on_read ) )
             return;
-        sanitize_icr_control( _icr_editor.value );
+        sanitize_icr( _icr_editor.value );
 
         draw_composite_editor< rs2_icr_control, rs2_icr_control_range >(
             _icr_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
             [&]() { return draw_icr_fields( error_message ); },
-            sanitize_icr_control,
+            [this]( rs2_icr_control & v ) { sanitize_icr( v ); },
             [this]( rs2_icr_control & v )
             {
-                v.enable = 1;
+                if( v.mode == RS2_ICR_MODE_OFF )
+                    v.mode = _icr_last_active_mode;
                 _enabled = true;
             } );
     }
@@ -488,11 +523,14 @@ namespace rs2
                 {
                     _icr_editor.value = _embedded_filter->get_composite_option_as< rs2_icr_control >(
                         RS2_COMPOSITE_OPTION_ICR_CONTROL );
-                    sanitize_icr_control( _icr_editor.value );
+                    sanitize_icr( _icr_editor.value );
                     print_icr_control( _icr_editor.value );
                     _icr_editor.initialized = true;
                 }
-                _icr_editor.value.enable = actual ? 1 : 0;
+                if( ! actual )
+                    _icr_editor.value.mode = RS2_ICR_MODE_OFF;
+                else if( _icr_editor.value.mode == RS2_ICR_MODE_OFF )
+                    _icr_editor.value.mode = _icr_last_active_mode;
                 _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_ICR_CONTROL, _icr_editor.value );
                 _enabled = actual;
             }
@@ -577,12 +615,12 @@ namespace rs2
             {
                 if( _icr_editor.ensure_initialized( _embedded_filter, id, error_message, print_icr_control ) )
                 {
-                    sanitize_icr_control( _icr_editor.value );
+                    sanitize_icr( _icr_editor.value );
                     // Composite state is the FALLBACK source of _enabled, not an override - a DDS
                     // filter that already set it from the scalar option in populate_scalar_options()
                     // keeps that value.
                     if( ! _embedded_filter->supports( RS2_OPTION_EMBEDDED_FILTER_ENABLED ) )
-                        _enabled = _icr_editor.value.enable != 0;
+                        _enabled = _icr_editor.value.mode != RS2_ICR_MODE_OFF;
                 }
             }
         }

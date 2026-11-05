@@ -436,13 +436,14 @@ public:
             case RS2_COMPOSITE_OPTION_ICR_CONTROL:
             {
                 rs2_icr_control v = filter.get_composite_option_as<rs2_icr_control>(id);
-                std::cout << "  enable          : " << v.enable << std::endl;
-                std::cout << "  filter_type     : " << v.filter_type << std::endl;
-                std::cout << "  downscale_ratio : " << v.downscale_ratio << std::endl;
-                std::cout << "  shift_mode      : " << v.shift_mode << std::endl;
-                std::cout << "  shift_pixels    : " << v.shift_pixels << std::endl;
-                std::cout << "  threshold_mode  : " << v.threshold_mode << std::endl;
-                std::cout << "  threshold_mm    : " << v.threshold_mm << std::endl;
+                std::cout << "  mode                 : " << v.mode << std::endl;
+                std::cout << "  downscale_ratio      : " << v.downscale_ratio << std::endl;
+                std::cout << "  high_res_mode        : " << v.high_res_mode << std::endl;
+                std::cout << "  high_res_offset      : " << v.high_res_offset << std::endl;
+                std::cout << "  smoothing_offset_mm  : " << v.smoothing_offset_mm << std::endl;
+                std::cout << "  completion_offset_mm : " << v.completion_offset_mm << std::endl;
+                std::cout << "  min_z_mm (read-only)          : " << v.min_z_mm << std::endl;
+                std::cout << "  improved_min_z_mm (read-only) : " << v.improved_min_z_mm << std::endl;
                 break;
             }
             default:
@@ -611,17 +612,16 @@ public:
                 return;
             }
             std::cout << "Supported range:" << std::endl;
-            std::cout << "  enable          : [" << range.min.enable << ", " << range.max.enable << "]" << std::endl;
-            std::cout << "  filter_type     : [" << range.min.filter_type << ", " << range.max.filter_type << "]" << std::endl;
-            std::cout << "  downscale_ratio : [" << range.min.downscale_ratio << ", " << range.max.downscale_ratio << "]" << std::endl;
-            std::cout << "  shift_mode      : [" << range.min.shift_mode << ", " << range.max.shift_mode << "]" << std::endl;
-            std::cout << "  shift_pixels    : [" << range.min.shift_pixels << ", " << range.max.shift_pixels << "]" << std::endl;
-            std::cout << "  threshold_mode  : [" << range.min.threshold_mode << ", " << range.max.threshold_mode << "]" << std::endl;
-            std::cout << "  threshold_mm    : [" << range.min.threshold_mm << ", " << range.max.threshold_mm << "]" << std::endl;
+            std::cout << "  mode                 : [" << range.min.mode << ", " << range.max.mode << "]" << std::endl;
+            std::cout << "  downscale_ratio      : [" << range.min.downscale_ratio << ", " << range.max.downscale_ratio << "]" << std::endl;
+            std::cout << "  high_res_mode        : [" << range.min.high_res_mode << ", " << range.max.high_res_mode << "]" << std::endl;
+            std::cout << "  high_res_offset      : [" << range.min.high_res_offset << ", " << range.max.high_res_offset << "]" << std::endl;
+            std::cout << "  smoothing_offset_mm  : [" << range.min.smoothing_offset_mm << ", " << range.max.smoothing_offset_mm << "]" << std::endl;
+            std::cout << "  completion_offset_mm : [" << range.min.completion_offset_mm << ", " << range.max.completion_offset_mm << "]" << std::endl;
 
-            std::cout << "\nWhich field would you like to change?\n" << std::endl;
-            std::cout << "  0 : enable\n  1 : filter_type\n  2 : downscale_ratio\n  3 : shift_mode\n"
-                          "  4 : shift_pixels\n  5 : threshold_mode\n  6 : threshold_mm" << std::endl;
+            std::cout << "\nWhich field would you like to change? (MinZ/Improved MinZ are read-only)\n" << std::endl;
+            std::cout << "  0 : mode\n  1 : downscale_ratio\n  2 : high_res_mode\n  3 : high_res_offset\n"
+                          "  4 : smoothing_offset_mm\n  5 : completion_offset_mm" << std::endl;
             uint32_t field_index = get_user_selection("Select a field by index: ");
 
             std::cout << "Enter the new value for this field: ";
@@ -631,13 +631,12 @@ public:
 
             switch (field_index)
             {
-            case 0: cfg.enable = requested_value; break;
-            case 1: cfg.filter_type = requested_value; break;
-            case 2: cfg.downscale_ratio = requested_value; break;
-            case 3: cfg.shift_mode = requested_value; break;
-            case 4: cfg.shift_pixels = requested_value; break;
-            case 5: cfg.threshold_mode = requested_value; break;
-            case 6: cfg.threshold_mm = requested_value; break;
+            case 0: cfg.mode = requested_value; break;
+            case 1: cfg.downscale_ratio = requested_value; break;
+            case 2: cfg.high_res_mode = requested_value; break;
+            case 3: cfg.high_res_offset = requested_value; break;
+            case 4: cfg.smoothing_offset_mm = requested_value; break;
+            case 5: cfg.completion_offset_mm = requested_value; break;
             default:
                 std::cerr << "Selected field is out of range" << std::endl;
                 return;

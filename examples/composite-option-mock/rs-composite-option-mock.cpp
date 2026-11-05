@@ -249,8 +249,7 @@ bool test_temporal_filter_dpp()
 bool test_icr_control()
 {
     rs2_icr_control initial{};
-    initial.enable = 1;
-    initial.filter_type = 0;
+    initial.mode = RS2_ICR_MODE_DOWNSCALE_HDR;
     initial.downscale_ratio = 1;
     rs2_icr_control modified = initial;
     modified.downscale_ratio = 2;  // change one field to prove this second round trip is independent
@@ -259,13 +258,12 @@ bool test_icr_control()
         RS2_COMPOSITE_OPTION_ICR_CONTROL, "Improved Close Range Control (fake, for testing)", initial, modified,
         []( const rs2_icr_control & a, const rs2_icr_control & b )
         {
-            return a.enable == b.enable && a.filter_type == b.filter_type
-                && a.downscale_ratio == b.downscale_ratio && a.shift_mode == b.shift_mode
-                && a.shift_pixels == b.shift_pixels && a.threshold_mode == b.threshold_mode
-                && a.threshold_mm == b.threshold_mm;
+            return a.mode == b.mode && a.downscale_ratio == b.downscale_ratio && a.high_res_mode == b.high_res_mode
+                && a.high_res_offset == b.high_res_offset && a.smoothing_offset_mm == b.smoothing_offset_mm
+                && a.completion_offset_mm == b.completion_offset_mm;
         },
         []( std::ostream & os, const rs2_icr_control & v )
-        { os << "enable=" << v.enable << " filter_type=" << v.filter_type << " downscale_ratio=" << v.downscale_ratio; } );
+        { os << "mode=" << v.mode << " downscale_ratio=" << v.downscale_ratio; } );
 }
 
 }  // namespace
