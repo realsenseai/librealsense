@@ -45,7 +45,8 @@ namespace librealsense
         , _object_detection_stream( new stream( RS2_STREAM_OBJECT_DETECTION ) )
     {
         // Over GMSL the stream is multiplexed on the depth sensor's IR node, and the camera takes it by rate alone;
-        // over USB it has its own interface. Sensors outlive the device's HW monitor, so a close at teardown skips it.
+        // over USB it has its own interface. Sensors outlive the device's HW monitor, so a close at teardown skips
+        // the camera command: the camera drops the request itself once the capture closes.
         auto od_dev = get_raw_depth_sensor()->get_uvc_device()->create_muxed_stream_device(
             od_muxed_stream,
             [this, alive = _is_alive]( uint32_t stream_id, bool on, const platform::stream_profile & p )

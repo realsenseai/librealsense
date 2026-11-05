@@ -890,11 +890,18 @@ namespace librealsense
     {
         using namespace ds;
         hwmon_response_type response = d500_hwmon_response::SUCCESS;
+        // A Mapping switch may still be draining on the camera worker, so a not-ready camera is given some time
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 1500 );
         auto send = [&]( uint32_t action, uint32_t enable, std::vector< uint8_t > profile = {} )
         {
             command cmd( MUX_CONTROL, MUX_CONTROL_VERSION, action, stream_id, enable );
             cmd.data = std::move( profile );
             auto reply = _hw_monitor->send( cmd, &response );
+            while( response == d500_hwmon_response::SW_NOT_READY && std::chrono::steady_clock::now() < deadline )
+            {
+                std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+                reply = _hw_monitor->send( cmd, &response );
+            }
             d500_mux_state state{};
             // The profile, when sent, is echoed before the state
             if( reply.size() >= cmd.data.size() + sizeof( state ) )
@@ -905,7 +912,14 @@ namespace librealsense
         d500_mux_state state;
         if( ! on )
         {
-            if( ! send( MUX_GET_STATE, 0 ).requested )
+            state = send( MUX_GET_STATE, 0 );
+            // The camera rejects the query for a stream it does not know; any other failure is reported
+            if( response != d500_hwmon_response::SUCCESS && response != d500_hwmon_response::INVALID_PARAM )
+                throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
+                                                                       << " state query rejected, error " << response );
+            if( response != d500_hwmon_response::SUCCESS )
+                LOG_DEBUG( "MUX stream " << stream_id << " is unknown to the camera; nothing to disable" );
+            if( ! state.requested )
                 return;
             state = send( MUX_SET_ENABLE, 0 );
             if( state.requested || response != d500_hwmon_response::SUCCESS )
@@ -917,20 +931,12 @@ namespace librealsense
             const uint64_t packed = ( uint64_t( width ) << 32 ) | ( uint64_t( height ) << 16 ) | fps;
             std::vector< uint8_t > profile( sizeof( packed ) );
             std::memcpy( profile.data(), &packed, sizeof( packed ) );
-            // A Mapping switch may still be draining on the camera worker, so a not-ready camera is given some time
-            const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 1500 );
-            while( true )
+            state = send( MUX_ENABLE_WITH_PROFILE, 1, profile );
+            // Camera firmware without the profile action does not know it, and picks the rate itself
+            if( response == d500_hwmon_response::COMMAND_NOT_SUPPORTED )
             {
-                state = send( MUX_ENABLE_WITH_PROFILE, 1, profile );
-                if( response != d500_hwmon_response::SW_NOT_READY || std::chrono::steady_clock::now() >= deadline )
-                    break;
-                std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-            }
-            // Camera firmware without the profile action picks the rate itself; a real error fails the plain enable too
-            if( response != d500_hwmon_response::SUCCESS && response != d500_hwmon_response::SW_NOT_READY )
-            {
-                LOG_WARNING( "MUX stream " << stream_id << " profile action rejected (" << response
-                                           << "); enabling without a rate, the requested " << fps << " fps may not be served" );
+                LOG_WARNING( "MUX stream " << stream_id << " profile action not supported by the camera; enabling without a rate, "
+                                           << "the requested " << fps << " fps may not be served" );
                 state = send( MUX_SET_ENABLE, 1 );
             }
             if( response != d500_hwmon_response::SUCCESS )
