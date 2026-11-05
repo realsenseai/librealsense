@@ -5140,6 +5140,7 @@ namespace rs2
                     || it->second.as< video_stream_profile >().width() != w
                     || it->second.as< video_stream_profile >().height() != h )
                 {
+                    // Already-computed XYZ needs only buffer dimensions; projection uses the texture profile.
                     rs2_intrinsics intr = {};
                     intr.width = w;
                     intr.height = h;
@@ -5341,9 +5342,15 @@ namespace rs2
             LOG_ERROR("Failed to read labeled point cloud data: " << e.what());
             return;
         }
-        if (w <= 0 || h <= 0 || count != size_t(w) * h)
+        if (w <= 0 || h <= 0)
         {
-            LOG_ERROR("Labeled point cloud: " << count << " vertices, expected " << w << "x" << h);
+            LOG_ERROR("Labeled point cloud: invalid dimensions " << w << "x" << h);
+            return;
+        }
+        if (count != size_t(w) * h)
+        {
+            LOG_WARNING("Labeled point cloud: " << count << " vertices, expected " << w << "x" << h
+                                               << "; skipping frame");
             return;
         }
 
