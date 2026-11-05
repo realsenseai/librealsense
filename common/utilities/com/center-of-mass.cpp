@@ -466,6 +466,7 @@ bool center_of_mass_calculator::is_minz_violation(
     const camera_intrinsics& intrinsics, float estimated_depth_mm)
 {
     if (estimated_depth_mm <= 0.f) return false;  // already invalid; nothing to flag
+    if (!raw_depth.data || intrinsics.fx <= 0.f) return false;  // can't evaluate without valid input
 
     // A genuine hole: almost no raw depth at the ROI's own center.
     int const center_half_w = std::max(1, roi.width  / CENTER_REGION_DIV);
