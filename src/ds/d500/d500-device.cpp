@@ -926,10 +926,11 @@ namespace librealsense
                     break;
                 std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
             }
-            // Camera firmware without the profile action picks the rate itself
+            // Camera firmware without the profile action picks the rate itself; a real error fails the plain enable too
             if( response != d500_hwmon_response::SUCCESS && response != d500_hwmon_response::SW_NOT_READY )
             {
-                LOG_DEBUG( "MUX stream " << stream_id << " profile action rejected (" << response << "); enabling without a rate" );
+                LOG_WARNING( "MUX stream " << stream_id << " profile action rejected (" << response
+                                           << "); enabling without a rate, the requested " << fps << " fps may not be served" );
                 state = send( MUX_SET_ENABLE, 1 );
             }
             if( response != d500_hwmon_response::SUCCESS )
