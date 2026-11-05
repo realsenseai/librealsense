@@ -73,7 +73,8 @@ def test_align_unchanged_after_decimation_toggle():
 
     before = aligned_depth(frames)
     assert before.any(), "aligned depth is empty"
-    aligned_depth(rs.composite_frame(decimation.process(frames)))  # decimated depth feeds the same align block
+    # filter.process returns a plain frame; wrap it as a composite so align.process accepts it
+    aligned_depth(rs.composite_frame(decimation.process(frames)))
     after = aligned_depth(frames)
 
     assert np.array_equal(before, after), "aligned depth changed after decimation was toggled back off"
