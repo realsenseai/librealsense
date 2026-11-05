@@ -19,6 +19,7 @@ Argument: Jira ticket ID.
    `<base>`, the design file, `.review/<ticket>/test-report.md` and the round number.
    It reports whether existing tests cover the change (run them), need a small extension,
    or a new test is needed, and runs the result.
+   After any EXTEND/NEW verdict, commit the `unit-tests/` changes so the review sees them.
    On `RESULT: FAIL`, fix the product code (never weaken the test without a reason you
    can state), commit, and respawn it. `NOT RUN` (no device available) is not a pass:
    report it to the user, who may claim a lab machine via `/lab-machine`.
