@@ -46,6 +46,10 @@ namespace librealsense
             // rs-enum link naming conventions
             std::string rs_enum_video_node_name( const std::string & sensor, int cam_idx, bool metadata );
             std::string rs_enum_dfu_node_path( int cam_idx );
+
+            // Split an IMU node buffer into its reports (hid_mipi_data_32), oldest first (accel on ties). D585 GMSL bundles accel and gyro
+            // in one buffer; D457 sends one report. Empty if the buffer is malformed.
+            std::vector< uint8_t * > get_imu_reports( uint8_t * buffer, size_t buffer_size );
         }  // namespace v4l_mipi_logic
     }  // namespace platform
 }  // namespace librealsense

@@ -7,6 +7,7 @@
 #include <src/librealsense-exception.h>  // linux_backend_exception
 
 #include <src/platform/uvc-device.h>  // extension_unit
+#include <src/platform/hid-data.h>    // hid_mipi_data_32
 #include <rsutils/string/from.h>
 
 #include <linux/media.h>  // media_device_info, MEDIA_IOC_DEVICE_INFO
@@ -15,6 +16,7 @@
 #include <sys/ioctl.h>  // ioctl()
 #include <unistd.h>     // close()
 
+#include <algorithm>
 #include <cstring>
 #include <regex>
 #include <thread>
@@ -401,6 +403,42 @@ namespace librealsense
                 if( xu.unit != RS_DEPTH_XU_UNIT )
                     throw not_implemented_exception( rsutils::string::from() << "no v4l2 mipi cid for XU unit " << std::dec << int( xu.unit ) << " control " << int( control ) );
                 return depth_xu_to_cid( control, is_d5xx );
+            }
+
+            std::vector< uint8_t * > get_imu_reports( uint8_t * buffer, size_t buffer_size )
+            {
+                size_t const report_size = sizeof( hid_mipi_data_32 );
+                uint8_t const state_valid = 2;  // typeID 0 means no second report; skip1 is the state
+
+                // Frame too small for two IMU values, assuming only one is present
+                if( buffer_size < 2 * report_size )
+                    return { buffer };
+
+                auto const * first = reinterpret_cast< const hid_mipi_data_32 * >( buffer );
+                auto const * second = first + 1;
+                auto is_valid = [&]( const hid_mipi_data_32 * report )
+                {
+                    return ( report->typeID == hid_mipi_accel || report->typeID == hid_mipi_gyro ) && report->skip1 == state_valid;
+                };
+                auto is_zero_from = [&]( size_t offset )
+                {
+                    return std::all_of( buffer + offset, buffer + buffer_size, []( uint8_t b ) { return b == 0; } );
+                };
+
+                // Frame big enough for two reports but only one exists, return it
+                if( second->typeID == 0 )
+                {
+                    if( is_valid( first ) && is_zero_from( report_size ) )
+                        return { buffer };
+                    return {};
+                }
+
+                // Expecting two IMU values
+                if( ! is_valid( first ) || ! is_valid( second ) || first->typeID == second->typeID || ! is_zero_from( 2 * report_size ) )
+                    return {};
+                if( second->hwTs < first->hwTs || ( second->hwTs == first->hwTs && second->typeID == hid_mipi_accel ) )
+                    return { buffer + report_size, buffer };
+                return { buffer, buffer + report_size };
             }
         }  // namespace v4l_mipi_logic
     }  // namespace platform
