@@ -161,6 +161,8 @@ namespace librealsense
                                      uint8_t control, int size, rs2_option id );
         static bool is_pu_published( const std::shared_ptr< uvc_sensor > & ep, const platform::processing_unit & pu,
                                      rs2_option id );
+        // GMSL MUX control: have the camera produce a stream multiplexed on the IR node at this profile, or stop it
+        void enable_muxed_stream( uint32_t stream_id, bool on, uint32_t width, uint32_t height, uint32_t fps );
         friend class d500_depth_sensor;
 
         std::shared_ptr<hw_monitor_extended_buffers> _hw_monitor;
