@@ -6,6 +6,7 @@
 #include <librealsense2/rs.hpp>
 #include <imgui.h>
 
+#include <cstring>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -98,7 +99,6 @@ namespace rs2
         bool initialized = false;
         bool auto_refresh = false;   // re-read while idle to follow other clients; off where nobody else can change the value
         static constexpr double refresh_period = 1.0;   // seconds between idle re-reads
-        double _last_read = 0.;
 
         // Seeds `value` from a GET the first time this is called; a no-op afterward. Returns whether
         // `value` is safe to use. `on_read`, if set, runs on the freshly-read value.
@@ -113,10 +113,12 @@ namespace rs2
                 return true;
             try
             {
-                value = filter->get_composite_option_as< T >( id );
+                T const read = filter->get_composite_option_as< T >( id );
+                bool const changed = ! initialized || std::memcmp( &read, &value, sizeof( T ) ) != 0;
+                value = read;
                 initialized = true;
                 _last_read = ImGui::GetTime();
-                if( on_read )
+                if( changed && on_read )
                     on_read( value );
             }
             catch( const std::exception & e )
@@ -187,5 +189,8 @@ namespace rs2
             }
             clear_dirty();
         }
+
+    private:
+        double _last_read = 0.;
     };
 }
