@@ -620,6 +620,19 @@ namespace rs2
         */
         h264_decoder() : filter(init(), 1) { }
 
+        /**
+        * Tells whether this platform can decode H.264 at all. Where it cannot, a decoder still passes
+        * H.264 through but never produces an RGB8 frame.
+        */
+        static bool is_supported()
+        {
+            rs2_error* e = nullptr;
+            auto supported = rs2_is_h264_decoder_supported(&e);
+            error::handle(e);
+
+            return supported != 0;
+        }
+
     protected:
         h264_decoder(std::shared_ptr<rs2_processing_block> block) : filter(block, 1) {}
 
