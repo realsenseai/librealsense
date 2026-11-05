@@ -132,6 +132,15 @@ public:
                           person_center_of_mass&      result,
                           vec2f                       depth_shift = {0.f, 0.f});
 
+    // Post-processing check on calculate()'s result for minZ (it can lock onto a background
+    // object instead of the subject). Not FW-mirrored — kept here as a reference for FW.
+    //   roi                — same ROI passed to calculate() as color_bbox
+    //   estimated_depth_mm — calculate()'s result.mean_body_depth
+    static bool is_minz_violation(const depth_image_16&   raw_depth,
+                                  const rect&              roi,
+                                  const camera_intrinsics& intrinsics,
+                                  float                    estimated_depth_mm);
+
 private:
     static int  get_depth_at_color_pixel(const depth_image_16& depth, vec2f color_pt);
 
