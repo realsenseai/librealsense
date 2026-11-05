@@ -919,9 +919,13 @@ namespace librealsense
             std::memcpy( profile.data(), &packed, sizeof( packed ) );
             // A Mapping switch may still be draining on the camera worker, so a not-ready camera is given some time
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 1500 );
-            while( ( state = send( MUX_ENABLE_WITH_PROFILE, 1, profile ) ).requested == 0
-                   && response == d500_hwmon_response::SW_NOT_READY && std::chrono::steady_clock::now() < deadline )
+            while( true )
+            {
+                state = send( MUX_ENABLE_WITH_PROFILE, 1, profile );
+                if( response != d500_hwmon_response::SW_NOT_READY || std::chrono::steady_clock::now() >= deadline )
+                    break;
                 std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+            }
             // Camera firmware without the profile action picks the rate itself
             if( response != d500_hwmon_response::SUCCESS && response != d500_hwmon_response::SW_NOT_READY )
             {

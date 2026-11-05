@@ -123,8 +123,7 @@ namespace librealsense
 
                     void remove_stream( slot * s )
                     {
-                        if( s->committed )
-                            close( s, s->profile );  // the stream's user went away without closing
+                        close( s, {} );  // a no-op unless the stream's user went away without closing
                         std::lock_guard< std::mutex > lock( _mtx );
                         std::lock_guard< std::recursive_mutex > route( _route_mtx );
                         _slots.erase( std::find_if( _slots.begin(), _slots.end(),
