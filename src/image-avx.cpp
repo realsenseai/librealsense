@@ -1,21 +1,20 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2015 RealSense, Inc. All Rights Reserved.
 
-#define _USE_MATH_DEFINES
-#include <cmath>
 #include "image-avx.h"
 
-#ifndef ANDROID
-    #if defined(__SSSE3__) && defined(__AVX2__)
-    #include <tmmintrin.h> // For SSE3 intrinsic used in unpack_yuy2_sse
+#ifdef AVX2_SUPPORT
+    // Keep this file free of C++ library code: it must not emit AVX2 instructions outside the functions below
+    #include <librealsense2/h/rs_sensor.h>
+    #include <cassert>
     #include <immintrin.h>
 
     #pragma pack(push, 1) // All structs in this file are assumed to be byte-packed
     namespace librealsense
     {
-        template<rs2_format FORMAT> void unpack_yuy2( uint8_t * const d[], const uint8_t * s, int n)
+        template<rs2_format FORMAT> AVX2_TARGET void unpack_yuy2( uint8_t * const d[], const uint8_t * s, int n)
         {
-            assert(n % 16 == 0); // All currently supported color resolutions are multiples of 16 pixels. Could easily extend support to other resolutions by copying final n<16 pixels into a zero-padded buffer and recursively calling self for final iteration.
+            assert(n % 32 == 0); // the caller uses AVX2 only when n % 32 == 0
 
             auto src = reinterpret_cast<const __m256i *>(s);
             auto dst = reinterpret_cast<__m256i *>(d[0]);
@@ -37,17 +36,6 @@
                 __m256i s0 = _mm256_loadu_si256(&src[i * 2]);
                 __m256i s1 = _mm256_loadu_si256(&src[i * 2 + 1]);
 
-                if (FORMAT == RS2_FORMAT_Y8)
-                {
-                    // Align all Y components and output 32 pixels (32 bytes) at once
-                    __m256i y0 = _mm256_shuffle_epi8(s0, _mm256_setr_epi8(1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 14,
-                        1, 3, 5, 7, 9, 11, 13, 15, 0, 2, 4, 6, 8, 10, 12, 14));
-                    __m256i y1 = _mm256_shuffle_epi8(s1, _mm256_setr_epi8(0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15,
-                        0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15));
-                    _mm256_storeu_si256(&dst[i], _mm256_alignr_epi8(y0, y1, 8));
-                    continue;
-                }
-
                 // Shuffle all Y components to the low order bytes of the register, and all U/V components to the high order bytes
                 const __m256i evens_odd1s_odd3s = _mm256_setr_epi8(0, 2, 4, 6, 8, 10, 12, 14, 1, 5, 9, 13, 3, 7, 11, 15,
                     0, 2, 4, 6, 8, 10, 12, 14, 1, 5, 9, 13, 3, 7, 11, 15); // to get yyyyyyyyuuuuvvvvyyyyyyyyuuuuvvvv
@@ -57,13 +45,6 @@
                 // Retrieve all 32 Y components as 32-bit values (16 components per register))
                 __m256i y16__0_7 = _mm256_unpacklo_epi8(yyyyyyyyuuuuvvvv0, zero);         // convert to 16 bit
                 __m256i y16__8_F = _mm256_unpacklo_epi8(yyyyyyyyuuuuvvvv8, zero);         // convert to 16 bit
-
-                if (FORMAT == RS2_FORMAT_Y16)
-                {
-                    _mm256_storeu_si256(&dst[i * 2], _mm256_slli_epi16(y16__0_7, 8));
-                    _mm256_storeu_si256(&dst[i * 2 + 1], _mm256_slli_epi16(y16__8_F, 8));
-                    continue;
-                }
 
                 // Retrieve all 16 U and V components as 32-bit values (16 components per register)
                 __m256i uv = _mm256_unpackhi_epi32(yyyyyyyyuuuuvvvv0, yyyyyyyyuuuuvvvv8); // uuuuuuuuvvvvvvvvuuuuuuuuvvvvvvvv
@@ -216,11 +197,11 @@
                         // Shuffle rgb triples to the start and end of each register
                         __m128i bgr0 = _mm_shuffle_epi8(rgba0, _mm_setr_epi8(3, 7, 11, 15, 0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14));
                         __m128i bgr1 = _mm_shuffle_epi8(rgba1, _mm_setr_epi8(0, 1, 2, 4, 3, 7, 11, 15, 5, 6, 8, 9, 10, 12, 13, 14));
-                        __m128i bgr2 = _mm_shuffle_epi8(rgba2, _mm_setr_epi8(0, 1, 2, 4, 5, 6, 8, 9, 3, 7, 11, 15, 10, 12, 13, 1));
+                        __m128i bgr2 = _mm_shuffle_epi8(rgba2, _mm_setr_epi8(0, 1, 2, 4, 5, 6, 8, 9, 3, 7, 11, 15, 10, 12, 13, 14));
                         __m128i bgr3 = _mm_shuffle_epi8(rgba3, _mm_setr_epi8(0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 3, 7, 11, 15));
                         __m128i bgr4 = _mm_shuffle_epi8(rgba4, _mm_setr_epi8(3, 7, 11, 15, 0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14));
                         __m128i bgr5 = _mm_shuffle_epi8(rgba5, _mm_setr_epi8(0, 1, 2, 4, 3, 7, 11, 15, 5, 6, 8, 9, 10, 12, 13, 14));
-                        __m128i bgr6 = _mm_shuffle_epi8(rgba6, _mm_setr_epi8(0, 1, 2, 4, 5, 6, 8, 9, 3, 7, 11, 15, 10, 12, 13, 1));
+                        __m128i bgr6 = _mm_shuffle_epi8(rgba6, _mm_setr_epi8(0, 1, 2, 4, 5, 6, 8, 9, 3, 7, 11, 15, 10, 12, 13, 14));
                         __m128i bgr7 = _mm_shuffle_epi8(rgba7, _mm_setr_epi8(0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 3, 7, 11, 15));
 
                         __m128i a1 = _mm_alignr_epi8(bgr1, bgr0, 4);
@@ -248,32 +229,23 @@
             }
         }
 
-        void unpack_yuy2_avx_y8( uint8_t * const d[], const uint8_t * s, int n)
-        {
-            unpack_yuy2<RS2_FORMAT_Y8>(d, s, n);
-        }
-        void unpack_yuy2_avx_y16( uint8_t * const d[], const uint8_t * s, int n)
-        {
-            unpack_yuy2<RS2_FORMAT_Y16>(d, s, n);
-        }
-        void unpack_yuy2_avx_rgb8( uint8_t * const d[], const uint8_t * s, int n)
+        AVX2_TARGET void unpack_yuy2_avx_rgb8( uint8_t * const d[], const uint8_t * s, int n)
         {
             unpack_yuy2<RS2_FORMAT_RGB8>(d, s, n);
         }
-        void unpack_yuy2_avx_rgba8( uint8_t * const d[], const uint8_t * s, int n)
+        AVX2_TARGET void unpack_yuy2_avx_rgba8( uint8_t * const d[], const uint8_t * s, int n)
         {
             unpack_yuy2<RS2_FORMAT_RGBA8>(d, s, n);
         }
-        void unpack_yuy2_avx_bgr8( uint8_t * const d[], const uint8_t * s, int n)
+        AVX2_TARGET void unpack_yuy2_avx_bgr8( uint8_t * const d[], const uint8_t * s, int n)
         {
             unpack_yuy2<RS2_FORMAT_BGR8>(d, s, n);
         }
-        void unpack_yuy2_avx_bgra8( uint8_t * const d[], const uint8_t * s, int n)
+        AVX2_TARGET void unpack_yuy2_avx_bgra8( uint8_t * const d[], const uint8_t * s, int n)
         {
             unpack_yuy2<RS2_FORMAT_BGRA8>(d, s, n);
         }
     }
 
     #pragma pack(pop)
-    #endif
 #endif

@@ -13,7 +13,7 @@ namespace rsutils {
 
   bool rs2_is_cuda_available();   // true iff the NVIDIA CUDA driver reports >= 1 visible device
   bool rs2_is_hip_available();    // true iff the AMD HIP runtime reports >= 1 visible device
-  bool rs2_is_gpu_available();    // true iff rs2_is_cuda_available() || rs2_is_hip_available()
+  bool rs2_is_gpu_available();    // the probe of the vendor this build targets: HIP if RS2_USE_HIP, else CUDA
 
     // Returns true if the (first) CUDA device is an integrated GPU sharing physical
     // memory with the CPU (Jetson / Tegra). On such parts, mapped/zero-copy memory is a

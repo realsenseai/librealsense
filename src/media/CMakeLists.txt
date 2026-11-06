@@ -69,23 +69,37 @@ if(BUILD_ROSBAG2)
 
     # libdeflate: portable PNG (zlib) compression for CompressedImage topics —
     # byte-identical output on every architecture
-    include(${PROJECT_SOURCE_DIR}/CMake/external_libdeflate.cmake)
-    set(LIBDEFLATE_DIR "${LIBDEFLATE_SOURCE_DIR}")
-    set(LIBDEFLATE_SOURCES
-        "${LIBDEFLATE_DIR}/lib/adler32.c"
-        "${LIBDEFLATE_DIR}/lib/crc32.c"
-        "${LIBDEFLATE_DIR}/lib/deflate_compress.c"
-        "${LIBDEFLATE_DIR}/lib/utils.c"
-        "${LIBDEFLATE_DIR}/lib/zlib_compress.c"
-        "${LIBDEFLATE_DIR}/lib/arm/cpu_features.c"
-        "${LIBDEFLATE_DIR}/lib/x86/cpu_features.c"
-        # "${LIBDEFLATE_DIR}/lib/x86/decompress_impl.h" # decode uses stb_image instead
-    )
-    target_include_directories(${LRS_TARGET} PRIVATE "${LIBDEFLATE_DIR}")
-    target_sources(${LRS_TARGET} PRIVATE ${LIBDEFLATE_SOURCES})
-    if(BUILD_SHARED_LIBS AND UNIX AND NOT APPLE)
-        # C sources: -fvisibility-inlines-hidden from hide_sources_symbols is C++-only
-        set_source_files_properties(${LIBDEFLATE_SOURCES} PROPERTIES COMPILE_FLAGS "-fvisibility=hidden")
+    if(USE_EXTERNAL_LIBDEFLATE)
+        find_package(libdeflate CONFIG REQUIRED)
+        if(TARGET libdeflate::libdeflate_shared AND BUILD_SHARED_LIBS)
+            target_link_libraries(${LRS_TARGET} PRIVATE libdeflate::libdeflate_shared)
+        elseif(TARGET libdeflate::libdeflate_static AND NOT BUILD_SHARED_LIBS)
+            target_link_libraries(${LRS_TARGET} PRIVATE libdeflate::libdeflate_static)
+        else()
+            message(FATAL_ERROR "can't link external libdeflate with BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}")
+        endif()
+        set(REALSENSE2_LIBDEFLATE_DEPENDENCIES
+            "include(CMakeFindDependencyMacro)\nfind_dependency(libdeflate CONFIG REQUIRED)\n" )
+    else()
+        include(${PROJECT_SOURCE_DIR}/CMake/external_libdeflate.cmake)
+        set(LIBDEFLATE_DIR "${LIBDEFLATE_SOURCE_DIR}")
+        set(LIBDEFLATE_SOURCES
+            "${LIBDEFLATE_DIR}/lib/adler32.c"
+            "${LIBDEFLATE_DIR}/lib/crc32.c"
+            "${LIBDEFLATE_DIR}/lib/deflate_compress.c"
+            "${LIBDEFLATE_DIR}/lib/utils.c"
+            "${LIBDEFLATE_DIR}/lib/zlib_compress.c"
+            "${LIBDEFLATE_DIR}/lib/arm/cpu_features.c"
+            "${LIBDEFLATE_DIR}/lib/x86/cpu_features.c"
+            # "${LIBDEFLATE_DIR}/lib/x86/decompress_impl.h" # decode uses stb_image instead
+        )
+        target_include_directories(${LRS_TARGET} PRIVATE "${LIBDEFLATE_DIR}")
+        target_sources(${LRS_TARGET} PRIVATE ${LIBDEFLATE_SOURCES})
+        if(BUILD_SHARED_LIBS AND UNIX AND NOT APPLE)
+            # C sources: -fvisibility-inlines-hidden from hide_sources_symbols is C++-only
+            set_source_files_properties(${LIBDEFLATE_SOURCES} PROPERTIES COMPILE_FLAGS "-fvisibility=hidden")
+        endif()
+        set(REALSENSE2_LIBDEFLATE_DEPENDENCIES "")
     endif()
 
     target_sources(${LRS_TARGET} PRIVATE ${ROS2_SOURCE_FILES})

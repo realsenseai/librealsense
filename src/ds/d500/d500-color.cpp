@@ -200,6 +200,7 @@ namespace librealsense
         }
         color_ep.register_processing_block(  // Color Raw (Bayer 10-bit embedded in 16-bit) for calibration
             processing_block_factory::create_id_pbf( RS2_FORMAT_RAW16, RS2_STREAM_COLOR ) );
+        color_ep.register_processing_block( processing_block_factory::create_id_pbf( RS2_FORMAT_MJPEG, RS2_STREAM_COLOR ) );
     }
 
     void d500_color::register_options()

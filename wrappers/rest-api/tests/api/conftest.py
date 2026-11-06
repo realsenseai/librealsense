@@ -40,7 +40,7 @@ def setup_mock_managers(patch_dependencies):
     rs_manager = patch_dependencies["rs_manager"]
     webrtc_manager = patch_dependencies["webrtc_manager"]
 
-    def mock_start_stream(device_id, configs, align_to=None, reuse_cache=True):
+    def mock_start_stream(device_id, configs, align_to=None):
         rs_manager.active_streams[device_id] = {c.stream_type for c in configs}
         rs_manager.frame_queues[device_id] = {
             c.stream_type: [
@@ -58,14 +58,10 @@ def setup_mock_managers(patch_dependencies):
         }
         rs_manager.pipelines[device_id] = MagicMock()
 
-        # Shape must match the real start_stream() so the endpoint can subscript result['timings'].
         return {
             "device_id": device_id,
             "is_streaming": True,
             "active_streams": list(rs_manager.active_streams[device_id]),
-            "timings": {},
-            "config_reused": False,
-            "config_signature": "mock-signature",
         }
 
     def mock_refresh_devices():

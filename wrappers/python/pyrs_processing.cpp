@@ -92,6 +92,16 @@ void init_processing(py::module &m) {
                                                           "get better performance. Othere implementations (GLSL, OpenCL, Neon, NCS) should follow.");
     yuy_decoder.def(py::init<>());
 
+    py::class_<rs2::mjpeg_decoder, rs2::filter> mjpeg_decoder(m, "mjpeg_decoder", "Decodes compressed MJPEG frames to RGB8.");
+    mjpeg_decoder.def(py::init<>());
+
+    py::class_<rs2::h264_decoder, rs2::filter> h264_decoder(m, "h264_decoder", "Decodes H.264 access units to RGB8. "
+                                                            "Stateful: feed one decoder a single stream in order.");
+    h264_decoder.def(py::init<>());
+    h264_decoder.def_static("is_supported", &rs2::h264_decoder::is_supported,
+                            "True when this platform can decode H.264. Where it cannot, the decoder still "
+                            "passes H.264 through but never produces an RGB8 frame.");
+
     // Parameterized converters: same internal classes the SDK uses for live cameras,
     // exposed here as factories so tests can pick the output format.
 #define BIND_CONVERTER(name) \
@@ -169,7 +179,7 @@ void init_processing(py::module &m) {
              "6 - Warm\n"
              "7 - Quantized\n"
              "8 - Pattern", "color_scheme"_a)
-        .def("colorize", &rs2::colorizer::colorize, "Start to generate color image base on depth frame", "depth"_a)
+        .def("colorize", &rs2::colorizer::colorize, "Start to generate color image base on depth frame", "depth"_a, py::call_guard<py::gil_scoped_release>())
         /*.def("__call__", &rs2::colorizer::operator())*/;
 
     py::class_<rs2::decimation_filter, rs2::filter> decimation_filter(m, "decimation_filter", "Performs downsampling by using the median with specific kernel size.");
@@ -222,6 +232,7 @@ void init_processing(py::module &m) {
     py::class_<rs2::embedded_filter, rs2::options> embedded_filter(m, "embedded_filter", "Define the embedded filter workflow.");
     embedded_filter.def( BIND_DOWNCAST( embedded_filter, embedded_decimation_filter ) )
         .def( BIND_DOWNCAST( embedded_filter, embedded_temporal_filter ) )
+        .def( BIND_DOWNCAST( embedded_filter, embedded_close_range_filter ) )
         .def( "__bool__", &rs2::embedded_filter::operator bool )  // Called to implement truth value testing in Python 3
         .def( "get_type", &rs2::embedded_filter::get_type, "Get the embedded filter type" );
 
@@ -230,6 +241,9 @@ void init_processing(py::module &m) {
 
     py::class_<rs2::embedded_temporal_filter, rs2::embedded_filter> embedded_temporal_filter(m, "embedded_temporal_filter",
         "Define the embedded temporal filter workflow.");
+
+    py::class_<rs2::embedded_close_range_filter, rs2::embedded_filter> embedded_close_range_filter(m, "embedded_close_range_filter",
+        "Define the embedded Improved Close Range Depth filter workflow.");
 
     /** end rs_processing.hpp **/
 }

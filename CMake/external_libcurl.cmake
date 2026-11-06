@@ -5,23 +5,48 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
     include(ExternalProject)
     message(STATUS "Building libcurl enabled")
     
-    set(CURL_FLAGS -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DUSE_WIN32_LDAP=OFF -DHTTP_ONLY=ON -DCURL_ZLIB=OFF -DCURL_DISABLE_CRYPTO_AUTH=ON -DCURL_USE_LIBSSH2=OFF -DBUILD_TESTING=OFF -DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF -DCURL_USE_LIBPSL=OFF )
+    # HTTP(S) only, and no optional dependencies that curl would otherwise pick up on its own (e.g. Homebrew's nghttp2/brotli/zstd)
+    set(CURL_FLAGS -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DUSE_WIN32_LDAP=OFF -DHTTP_ONLY=ON -DCURL_ZLIB=OFF -DCURL_DISABLE_DIGEST_AUTH=ON
+        -DCURL_USE_LIBSSH2=OFF -DBUILD_TESTING=OFF -DBUILD_LIBCURL_DOCS=OFF -DBUILD_MISC_DOCS=OFF -DENABLE_CURL_MANUAL=OFF -DCURL_USE_LIBPSL=OFF
+        -DUSE_LIBIDN2=OFF -DUSE_NGHTTP2=OFF -DCURL_BROTLI=OFF -DCURL_ZSTD=OFF )
     if (WIN32)
         set(CURL_FLAGS ${CURL_FLAGS} -DCURL_STATIC_CRT=ON )
     endif()
     
     # Add SSL library flag
+    # 8.19.0: supports OpenSSL 4 (opaque ASN1 types), last that builds with CMake < 3.18
+    set(CURL_GIT_TAG "curl-8_19_0")
     if (WIN32)
         set(CURL_FLAGS ${CURL_FLAGS} -DCURL_USE_SCHANNEL=ON )
     else()
+        find_package(OpenSSL REQUIRED)
+        # curl dropped OpenSSL 1.1.x in 8.18.0 (e.g. Ubuntu 20.04 / JetPack 5); no single curl supports both 1.1 and 4
+        if(OPENSSL_VERSION VERSION_LESS 3)
+            set(CURL_GIT_TAG "curl-8_8_0")
+        endif()
         set(CURL_FLAGS ${CURL_FLAGS} -DCURL_USE_OPENSSL=ON )
+        # Build curl against the same OpenSSL we link below (e.g. with both openssl@3 and openssl@4 installed)
+        if(OPENSSL_ROOT_DIR)
+            set(CURL_FLAGS ${CURL_FLAGS} -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR} )
+        endif()
     endif()
     
+    set(CURL_DEBUG_TARGET_NAME "libcurl-d")
+    set(CURL_RELEASE_TARGET_NAME "libcurl")
+    set(CURL_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/libcurl/libcurl_install)
+
+    # Only the library matching the build type is ever produced; declaring both
+    # as byproducts would leave one permanently missing, re-running libcurl on every build
+    set(CURL_BYPRODUCT_NAME ${CURL_RELEASE_TARGET_NAME})
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(CURL_BYPRODUCT_NAME ${CURL_DEBUG_TARGET_NAME})
+    endif()
+
     ExternalProject_Add(
         libcurl
         PREFIX libcurl
         GIT_REPOSITORY "https://github.com/curl/curl.git"
-        GIT_TAG "curl-8_8_0"
+        GIT_TAG ${CURL_GIT_TAG}
         SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/third-party/libcurl
         CMAKE_ARGS  --no-warn-unused-cli
                     -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
@@ -32,7 +57,7 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
                     -DCMAKE_C_FLAGS_RELEASE=${CMAKE_C_FLAGS_RELEASE}
                     -DCMAKE_C_FLAGS_RELWITHDEBINFO=${CMAKE_C_FLAGS_RELWITHDEBINFO}
                     -DCMAKE_CXX_STANDARD_LIBRARIES=${CMAKE_CXX_STANDARD_LIBRARIES}
-                    -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/libcurl/libcurl_install
+                    -DCMAKE_INSTALL_PREFIX=${CURL_INSTALL_DIR}
                     -DCMAKE_INSTALL_LIBDIR=lib
                     -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                     -DANDROID_ABI=${ANDROID_ABI}
@@ -40,24 +65,23 @@ if(CHECK_FOR_UPDATES OR ENABLE_AI_ASSISTANT OR ENABLE_STATS)
         UPDATE_COMMAND ""
         PATCH_COMMAND ""
         TEST_COMMAND ""
+        # Ninja needs to know these are generated; we link them by path, below
+        BUILD_BYPRODUCTS ${CURL_INSTALL_DIR}/lib/${CURL_BYPRODUCT_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}
     )
 
-    set(CURL_DEBUG_TARGET_NAME "libcurl-d")
-    set(CURL_RELEASE_TARGET_NAME "libcurl")
     add_library(curl INTERFACE)
     add_definitions(-DCURL_STATICLIB) # Mandatory for building libcurl as static lib
 
-    target_include_directories(curl INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/libcurl/libcurl_install/include>)
+    target_include_directories(curl INTERFACE $<BUILD_INTERFACE:${CURL_INSTALL_DIR}/include>)
         
-    target_link_libraries(curl INTERFACE debug ${CMAKE_CURRENT_BINARY_DIR}/libcurl/libcurl_install/lib/${CURL_DEBUG_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX})
-    target_link_libraries(curl INTERFACE optimized ${CMAKE_CURRENT_BINARY_DIR}/libcurl/libcurl_install/lib/${CURL_RELEASE_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX})
+    target_link_libraries(curl INTERFACE debug ${CURL_INSTALL_DIR}/lib/${CURL_DEBUG_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX})
+    target_link_libraries(curl INTERFACE optimized ${CURL_INSTALL_DIR}/lib/${CURL_RELEASE_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX})
     
    # libcurl required libs per OS 
    # (Linux require that the link dependency will be added after the libcurl link target that use it)
     if (WIN32)
-        target_link_libraries(curl INTERFACE ws2_32.lib crypt32.lib)
+        target_link_libraries(curl INTERFACE ws2_32.lib crypt32.lib secur32.lib iphlpapi.lib)
     else()
-        find_package(OpenSSL REQUIRED)
         target_link_libraries(curl INTERFACE OpenSSL::SSL OpenSSL::Crypto)
         if (APPLE)
             target_link_libraries(curl INTERFACE "-framework CoreFoundation -framework SystemConfiguration")

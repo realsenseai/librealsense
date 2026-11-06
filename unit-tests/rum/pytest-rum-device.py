@@ -62,26 +62,13 @@ def test_created_device_appears_in_report( test_device, rum_report ):
     assert entry.get( "count", 0 ) >= 1
 
 
-def test_opened_stream_appears_in_report( test_device, rum_report ):
-    dev, _ = test_device
-    sensor = dev.first_depth_sensor()
-    profile = streamable_depth_profile( sensor )
-    sensor.open( profile )                            # triggers the stream hook
-    try:
-        stream = recorded_stream( device_entry( rum_report(), dev ), profile )
-        assert stream is not None                     # the profile we opened is in the report
-        assert stream.get( "count", 0 ) >= 1
-    finally:
-        sensor.close()
-
-
 def test_applied_filter_and_stream_duration( test_device, rum_report ):
     dev, _ = test_device
     sensor = dev.first_depth_sensor()
     queue = rs.frame_queue( 8 )
     spatial = rs.spatial_filter()
     profile = streamable_depth_profile( sensor )
-    sensor.open( profile )
+    sensor.open( profile )                            # triggers the stream hook
     sensor.start( queue )
     try:
         for _ in range( 10 ):
@@ -95,7 +82,8 @@ def test_applied_filter_and_stream_duration( test_device, rum_report ):
     assert entry.get( "filters", {} ).get( "Spatial Filter", 0 ) >= 1
     # The depth stream above (start -> stop) accumulates duration on the profile we streamed.
     depth = recorded_stream( entry, profile )
-    assert depth is not None
+    assert depth is not None                          # the profile we opened is in the report
+    assert depth.get( "count", 0 ) >= 1
     assert depth.get( "duration_seconds", 0 ) > 0
 
 

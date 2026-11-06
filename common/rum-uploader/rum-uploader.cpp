@@ -124,10 +124,12 @@ bool rum_uploader::upload( std::string const & json_report )
         return false;
     }
 
+    // The file is stored readable; the indentation is a third of it and carries nothing.
+    auto body = rsutils::json::parse( json_report ).dump();
+
     // The server answers 403 unless this header carries the body's SHA-256.
     http::http_uploader uploader;
-    return uploader.upload( RUM_ENDPOINT, json_report,
-                            "x-amz-content-sha256: " + sha256_hex( json_report ) );
+    return uploader.upload( RUM_ENDPOINT, body, "x-amz-content-sha256: " + sha256_hex( body ) );
 }
 
 

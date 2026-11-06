@@ -20,6 +20,7 @@ namespace librealsense
 
         bool is_imu_high_accuracy() const override;
         double get_gyro_default_scale() const override;
+        double get_accel_default_scale() const override;
 
         std::shared_ptr<synthetic_sensor> create_hid_device( std::shared_ptr<context> ctx,
                                                              const std::vector<platform::hid_device_info>& all_hid_infos );
@@ -43,6 +44,8 @@ namespace librealsense
         ds_motion_sensor & get_motion_sensor();
         std::shared_ptr< hid_sensor > get_raw_motion_sensor();
         bool supports_physical_units() const;
+        bool supports_accel_range() const;
+        bool supports_physical_gyro() const;
         void register_gyro_sensitivity();
 
     private:

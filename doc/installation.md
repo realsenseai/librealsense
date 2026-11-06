@@ -142,6 +142,40 @@ if not the SDK will use a timer polling approach which is less sensitive for dev
     Try closing memory consuming applications, and if you are running inside a VM, increase available RAM to at least 2 GB. \
     **Note:** You can find more information about the available configuration options on [this wiki page](https://github.com/realsenseai/librealsense/wiki/Build-Configuration).
 
+
+### H264 GPU decoding
+
+Decoding an H.264 stream to `RGB8` on Linux uses [oneVPL](https://github.com/intel/libvpl) on an Intel GPU, and is off by
+default. Without it the stream is still delivered as passthrough, for the application to decode itself.
+
+  * Install the build-time packages, then configure with the flag:
+    ```sh
+    sudo apt install libvpl-dev libva-dev
+    cmake ../ -DBUILD_WITH_VPL=ON
+    ```
+    **Note:** These must already be present. Unlike Fast-DDS or libusb nothing is downloaded during the build, so configuring
+    with `-DBUILD_WITH_VPL=ON` fails immediately if `pkg-config` cannot find them.
+  * Install the runtime driver. Gen9 and older Intel GPUs also need the legacy runtime:
+    ```sh
+    sudo apt install intel-media-va-driver libmfx1
+    ```
+  * Give the user access to the GPU, then log out and back in for it to take effect:
+    ```sh
+    sudo usermod -aG render $USER
+    ```
+    **Note:** Without the `render` group the process cannot open the GPU's render node, so the `RGB8` option never appears
+    and the SDK log carries `no oneVPL H.264 decoder: ... is this user in the 'render' group?` at warning level.
+  * Confirm the GPU advertises the profile, `VAProfileH264High` with `VAEntrypointVLD`. The Intel node is usually
+    `/dev/dri/renderD128`, but with more than one GPU it can be any of them, so check them all:
+    ```sh
+    for node in /dev/dri/renderD*; do echo $node; vainfo --display drm --device $node 2>/dev/null | grep VAProfileH264; done
+    ```
+
+A camera can publish H.264 and JPEG as profiles of one compressed colour stream, at the same resolutions. Where a
+decoder is available the SDK decodes `RGB8` from H.264, which costs far less bandwidth than JPEG at the same
+geometry; where it is not, `RGB8` comes from JPEG. An application that wants the JPEG path regardless should
+request `MJPEG` and decode it itself, for example with `rs2::mjpeg_decoder`.
+
   
 ## Troubleshooting Installation and Patch-related Issues
 

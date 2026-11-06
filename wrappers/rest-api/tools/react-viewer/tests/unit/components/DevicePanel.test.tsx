@@ -46,24 +46,12 @@ describe('DevicePanel', () => {
       expect(screen.getByText('Connect a RealSense device')).toBeInTheDocument()
     })
 
-    it('shows loading message when loading with no devices', async () => {
-      const fetchDevices = vi.fn().mockImplementation(() => {
-        // Simulate loading - set isLoadingDevices to true and devices to empty
-        useAppStore.setState({ isLoadingDevices: true, devices: [] })
-        return new Promise(() => {}) // Never resolves to keep loading
+    it('shows loading message when loading with no devices', () => {
+      render(<DevicePanel />, {
+        initialStoreState: { isLoadingDevices: true, devices: [] },
       })
-      
-      useAppStore.setState({ 
-        isLoadingDevices: true, 
-        devices: [],
-        fetchDevices,
-      })
-      render(<DevicePanel />)
-      
-      // When loading with no devices, should show "Searching for devices..."
-      await waitFor(() => {
-        expect(screen.getByText('Searching for devices...')).toBeInTheDocument()
-      })
+
+      expect(screen.getByText('Searching for devices...')).toBeInTheDocument()
     })
   })
 
@@ -96,26 +84,14 @@ describe('DevicePanel', () => {
       expect(screen.getByText('D455')).toBeInTheDocument()
     })
 
-    it('displays device serial number', async () => {
+    it('displays device serial number', () => {
       const mockDevice = createMockDevice({ serial_number: 'TEST-SERIAL-123' })
-      
-      // Make sure fetchDevices keeps the devices we set
-      const fetchDevices = vi.fn().mockImplementation(() => {
-        useAppStore.setState({ devices: [mockDevice], isLoadingDevices: false })
-        return Promise.resolve()
+
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [mockDevice], deviceStates: {} },
       })
-      
-      useAppStore.setState({
-        devices: [mockDevice],
-        deviceStates: {},
-        fetchDevices,
-        isLoadingDevices: false,
-      })
-      render(<DevicePanel />)
-      
-      await waitFor(() => {
-        expect(screen.getByText(/TEST-SERIAL-123/)).toBeInTheDocument()
-      })
+
+      expect(screen.getByText(/TEST-SERIAL-123/)).toBeInTheDocument()
     })
 
     it('displays firmware version', () => {
@@ -191,8 +167,6 @@ describe('DevicePanel', () => {
       const refreshButton = screen.getByLabelText('Refresh devices')
       await userEvent.click(refreshButton)
 
-      // The polling effect also calls fetchDevices() with no args on mount.
-      // The manual-click call must explicitly pass true.
       expect(fetchDevices).toHaveBeenCalledWith(true)
     })
 
@@ -392,6 +366,44 @@ describe('DevicePanel', () => {
       await openMenu()
       await userEvent.click(screen.getByRole('button', { name: 'Disable Advanced Mode' }))
       expect(toggleAdvancedMode).toHaveBeenCalledWith(device.device_id, false)
+    })
+  })
+
+  describe('Resolution and FPS', () => {
+    const row = (width: number, height: number, fps: number) =>
+      ({ stream_type: 'depth', stream_index: 0, format: 'z16', width, height, fps, default: false })
+
+    async function renderSensor(framerate: number, updateSensorConfig = vi.fn()) {
+      const device = createMockDevice()
+      const sensor = createMockSensor({
+        sensor_id: 'sensor-a',
+        supported_stream_profiles: [row(848, 480, 90), row(848, 480, 30), row(1280, 720, 15), row(1280, 720, 30)],
+      })
+      const deviceState = createMockDeviceState(device, {
+        isActive: true,
+        sensors: [sensor],
+        sensorConfigs: { 'sensor-a': { resolution: { width: 848, height: 480 }, framerate } },
+        streamConfigs: [{ sensor_id: 'sensor-a', stream_type: 'depth', format: 'z16',
+          resolution: { width: 848, height: 480 }, framerate, enable: true }],
+      })
+      render(<DevicePanel />, {
+        initialStoreState: { devices: [device], deviceStates: { [device.device_id]: deviceState }, updateSensorConfig },
+      })
+      await userEvent.click(screen.getByText('Stereo Module'))
+      return updateSensorConfig
+    }
+
+    it('offers every fps the sensor has, like the C++ viewer', async () => {
+      await renderSensor(30)
+      const fps = screen.getByTestId('sensor-fps') as HTMLSelectElement
+      expect([...fps.options].map(o => o.value)).toEqual(['15', '30', '90'])
+    })
+
+    it('keeps the picked resolution and moves fps onto one it has', async () => {
+      const updateSensorConfig = await renderSensor(90)
+      await userEvent.selectOptions(screen.getByTestId('sensor-resolution'), '1280x720')
+      expect(updateSensorConfig).toHaveBeenLastCalledWith(expect.anything(), 'sensor-a',
+        { resolution: { width: 1280, height: 720 }, framerate: 15 })
     })
   })
 

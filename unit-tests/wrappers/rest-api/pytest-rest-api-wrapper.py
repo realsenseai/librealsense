@@ -33,7 +33,6 @@ _REQUIRED_MODULES = {
     "multipart": "python-multipart",  # FastAPI File/UploadFile route registration
     "aiortc": "aiortc",
     "socketio": "python-socketio",
-    "cv2": "opencv-python",
     "numpy": "numpy",
     "httpx": "httpx",  # FastAPI TestClient
 }

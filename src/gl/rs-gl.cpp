@@ -297,7 +297,7 @@ rs2_processing_block* rs2_gl_create_pointcloud_renderer(int api_version, rs2_err
 HANDLE_EXCEPTIONS_AND_RETURN(nullptr, api_version)
 
 #ifdef BUILD_EASYLOGGINGPP
-#ifdef SHARED_LIBS
+#if defined( SHARED_LIBS ) && ! defined( __linux__ )  // on Linux, realsense2 exports the storage and we share it
 INITIALIZE_EASYLOGGINGPP
 #endif
 char log_gl_name[] = LIBREALSENSE_ELPP_ID;

@@ -110,6 +110,8 @@ stream_profiles formats_converter::get_all_possible_profiles( const stream_profi
                 if( source.format == raw_profile->get_format() &&
                    ( source.stream == raw_profile->get_stream_type() || source.stream == RS2_STREAM_ANY ) )
                 {
+                    int const raw_index = raw_profile->get_stream_index();
+
                     // targets are saved with format, type and sometimes index. Updating fps and resolution before using as key
                     for( const auto & target : pbf->get_target_info() )
                     {
@@ -117,18 +119,16 @@ stream_profiles formats_converter::get_all_possible_profiles( const stream_profi
                         // infrared split into IR1/IR2, dual-color routed to distinct streams, depth next to device-aligned depth),
                         // match each raw profile to the target whose index equals the raw stream index.
                         if( ( source.stream == RS2_STREAM_INFRARED || source.stream == RS2_STREAM_COLOR || source.stream == RS2_STREAM_DEPTH )
-                            && raw_profile->get_stream_index() != target.index )
+                            && raw_index != target.index )
                             continue;
 
                         auto cloned_profile = clone_profile( raw_profile, target.stream );
                         cloned_profile->set_format( target.format );
                         cloned_profile->set_stream_index( target.index );
                         cloned_profile->set_stream_type( target.stream );
-                        // UVC raw profile name is not set, default name can be created based on type and index, but raw UVC index is always 0.
-                        // Use temporary variable to generate name without changing original raw_profile object.
-                        auto && tmp_raw_profile = std::dynamic_pointer_cast< stream_profile_base >( raw_profile ).get();
-                        tmp_raw_profile->set_stream_index( target.index );
-                        cloned_profile->set_name( tmp_raw_profile->get_name() );
+                        // A stored name (perception, software sensors) carries over; UVC raw profiles have none and
+                        // the default type + index name is derived from the target at query time.
+                        cloned_profile->set_name( raw_profile->get_name() );
 
                         auto cloned_vsp = As< video_stream_profile, stream_profile_interface >( cloned_profile );
                         if( cloned_vsp )
@@ -274,6 +274,10 @@ void formats_converter::prepare_to_convert( stream_profiles from_profiles )
         // Retrieve source profile from cached map and generate the relevant processing block.
         std::unordered_set< std::shared_ptr< stream_profile_interface > > current_resolved_reqs;
         auto best_pb = factory_of_best_match->generate();
+        // A single-source converter gets an instance per raw profile (stream) it converts: its state, e.g. the cached
+        // output profile, belongs to one stream, and streams on separate pins would call it from separate threads.
+        bool const pb_per_raw_profile = factory_of_best_match->get_source_info().size() == 1;
+        std::map< std::shared_ptr< stream_profile_interface >, std::shared_ptr< processing_block > > pb_of_raw_profile;
         for( const auto & from_profile : from_profiles_of_best_match )
         {
             auto & mapped_raw_profiles = _target_profiles_to_raw_profiles[to_profile( from_profile.get() )];
@@ -284,8 +288,17 @@ void formats_converter::prepare_to_convert( stream_profiles from_profiles )
                 {
                     current_resolved_reqs.insert( raw_profile );
 
+                    auto pb = best_pb;
+                    if( pb_per_raw_profile )
+                    {
+                        auto & own = pb_of_raw_profile[raw_profile];
+                        if( ! own )
+                            own = pb_of_raw_profile.size() == 1 ? best_pb : factory_of_best_match->generate();
+                        pb = own;
+                    }
+
                     // Caching converters to invoke appropriate converters for received frames
-                    _raw_profile_to_converters[raw_profile].insert( best_pb );
+                    _raw_profile_to_converters[raw_profile].insert( pb );
                 }
             }
         }
@@ -413,12 +426,23 @@ formats_converter::find_pbf_matching_most_profiles( const stream_profiles & from
     return { best_match_processing_block_factory, best_match_profiles };
 }
 
+rs2_frame_callback_sptr formats_converter::get_frames_callback() const
+{
+    std::lock_guard< std::mutex > lock( _callback_mutex );
+    return _converted_frames_callback;
+}
+
 void formats_converter::set_frames_callback( rs2_frame_callback_sptr callback )
 {
-    _converted_frames_callback = callback;
+    {
+        std::lock_guard< std::mutex > lock( _callback_mutex );
+        _converted_frames_callback = callback;
+    }
 
     // After processing callback
     auto output_cb = make_frame_callback( [&]( frame_holder f ) {
+        // Our own reference keeps the user callback alive for this call even if it is swapped meanwhile
+        auto converted_frames_callback = get_frames_callback();
         std::vector< frame_interface * > frames_to_be_processed;
         frames_to_be_processed.push_back( f.frame );
 
@@ -439,7 +463,10 @@ void formats_converter::set_frames_callback( rs2_frame_callback_sptr callback )
                 // We find a from profile with the same format+index+type as the frame profile and save it back
                 // to the frame. Reason - viewer uses syncher and matcher that uses rs2::stream_profile.clone()
                 // that generates a new ID for the clone and than the match can fail.
-                auto cached_from_profile = find_cached_profile_for_frame( fr );
+                auto const & profile = fr->get_stream();
+                auto cached_from_profile = find_cached_profile_for_frame( profile->get_format(),
+                                                                          profile->get_stream_type(),
+                                                                          profile->get_stream_index() );
 
                 if( cached_from_profile )
                 {
@@ -449,8 +476,8 @@ void formats_converter::set_frames_callback( rs2_frame_callback_sptr callback )
                     continue;
 
                 fr->acquire();
-                if( _converted_frames_callback )
-                    _converted_frames_callback->on_frame( (rs2_frame *)fr );
+                if( converted_frames_callback )
+                    converted_frames_callback->on_frame( (rs2_frame *)fr );
             }
         }
     } );
@@ -480,18 +507,17 @@ void formats_converter::convert_frame( frame_holder & f )
     }
 }
 
-std::shared_ptr< stream_profile_interface > formats_converter::find_cached_profile_for_frame( const frame_interface * f )
+std::shared_ptr< stream_profile_interface > formats_converter::find_cached_profile_for_frame( rs2_format format, rs2_stream stream, int index )
 {
-    const auto & iter = _format_mapping_to_from_profiles.find( f->get_stream()->get_format() );
+    const auto & iter = _format_mapping_to_from_profiles.find( format );
     if( iter == _format_mapping_to_from_profiles.end() )
         return nullptr;
 
     auto & from_profiles = iter->second;
     auto from_profile = std::find_if( begin( from_profiles ),
                                       end( from_profiles ),
-                                      [&f]( const std::shared_ptr< stream_profile_interface > & prof ) {
-                                          return ( prof->get_stream_index() == f->get_stream()->get_stream_index() &&
-                                                   prof->get_stream_type() == f->get_stream()->get_stream_type() );
+                                      [stream, index]( const std::shared_ptr< stream_profile_interface > & prof ) {
+                                          return prof->get_stream_index() == index && prof->get_stream_type() == stream;
                                       } );
 
     return from_profile != end( from_profiles ) ? *from_profile : nullptr;

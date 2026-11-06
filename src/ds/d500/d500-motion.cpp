@@ -35,7 +35,20 @@ namespace librealsense
 {
     namespace
     {
+        // Raw counts per dps on the HID path (set_gyro_scale_factor), and its reciprocal as the default scale.
         constexpr double RAW_TO_DPS_SCALE = 10000.0;
+
+        // First FW that sends the true int32 IMU record on GMSL, with accel at 10 ug per count on USB and GMSL.
+        const firmware_version MIN_FW_INT32_IMU( "7.59.46582.16434" );
+
+        // First FW that sends the GMSL gyro in 0.0001 dps per count, independent of the range option.
+        const firmware_version MIN_FW_PHYSICAL_GYRO_GMSL( "7.59.46653.0" );
+
+        // First Safety (D585S) FW that sends int32 physical-unit gyro in a 38-byte HID report.
+        const firmware_version MIN_FW_PHYSICAL_UNITS_D585S( "8.58.40658.12556" );
+
+        // First FW that sends physical-unit IMU samples over USB on D500 devices other than D585S.
+        const firmware_version MIN_FW_PHYSICAL_UNITS_USB( "7.58.40672.12546" );
     }
 
     const std::map<fourcc::value_type, rs2_format> d500_motion_fourcc_to_rs2_format = {
@@ -54,9 +67,21 @@ namespace librealsense
 
     bool d500_motion::supports_physical_units() const
     {
-        static const firmware_version min_fw_supporting_physical_units( "7.58.40672.12546" );
-        return get_pid() != ds::D585S_PID && ! _is_mipi_device
-            && _fw_version >= min_fw_supporting_physical_units;
+        if( get_pid() == ds::D585S_PID )
+            return _fw_version >= MIN_FW_PHYSICAL_UNITS_D585S;
+        return _fw_version >= ( _is_mipi_device ? MIN_FW_INT32_IMU
+                                                : MIN_FW_PHYSICAL_UNITS_USB );
+    }
+
+    bool d500_motion::supports_accel_range() const
+    {
+        // The FW acts on the accel level from the same release that reports accel at 10 ug per count. Not on D585S.
+        return get_pid() != ds::D585S_PID && supports_physical_units() && _fw_version >= MIN_FW_INT32_IMU;
+    }
+
+    bool d500_motion::supports_physical_gyro() const
+    {
+        return supports_physical_units() && ( ! _is_mipi_device || _fw_version >= MIN_FW_PHYSICAL_GYRO_GMSL );
     }
 
     bool d500_motion::is_imu_high_accuracy() const
@@ -66,11 +91,19 @@ namespace librealsense
 
     double d500_motion::get_gyro_default_scale() const
     {
-        if( supports_physical_units() )
+        // Older GMSL FW sends the gyro as the raw BMI08x register value, so only HID and newer GMSL FW have a fixed scale.
+        if( supports_physical_gyro() )
             return 1. / RAW_TO_DPS_SCALE;
 
         // Legacy D500 reports signed 16-bit raw samples at a fixed 125 dps assumption.
         return 125. / 32768.;
+    }
+
+    double d500_motion::get_accel_default_scale() const
+    {
+        // FW changed the accel unit from 1 mg to 10 ug per count (USB and GMSL) in the same release that sends the
+        // true int32 record on GMSL. The range option never changes this scale.
+        return supports_accel_range() ? 0.00001 : 0.001;
     }
 
     std::shared_ptr<synthetic_sensor> d500_motion::create_hid_device( std::shared_ptr<context> ctx,
@@ -93,7 +126,6 @@ namespace librealsense
 
             using namespace ds;
 
-#if !defined(__APPLE__) // Motion sensors not supported on macOS
             std::shared_ptr<synthetic_sensor> sensor_ep;
             if( _is_mipi_device )
             {
@@ -119,11 +151,15 @@ namespace librealsense
             {
                 _motion_module_device_idx = static_cast<uint8_t>(add_sensor(sensor_ep));
                 sensor_ep->get_raw_sensor()->register_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP, make_hid_header_parser(&hid_header::timestamp));
-                register_gyro_sensitivity();
-                if( supports_physical_units() )
+                if( ! _is_mipi_device )
+                    register_gyro_sensitivity();
+                if( supports_physical_units() && ! _is_mipi_device )  // HID only, MIPI scales in the processing block
                     get_raw_motion_sensor()->set_gyro_scale_factor( RAW_TO_DPS_SCALE );
+                // Windows MF rebuilds FW counts from g; derive the factor from the scale the transform uses (1000 or 100000).
+                // Unconditional on purpose: the legacy value, 1000, equals the backend default.
+                if( ! _is_mipi_device )
+                    get_raw_motion_sensor()->set_accel_scale_factor( 1.0 / get_accel_default_scale() );
             }
-#endif
         }
         catch (const std::exception& e)
         {
@@ -168,24 +204,30 @@ namespace librealsense
 
         motion_ep->register_option(RS2_OPTION_GLOBAL_TIME_ENABLED, enable_global_time_option);
 
-        std::shared_ptr< option > gyro_sensitivity_option;
-        try
+        // Register a sensitivity control only when the driver reports exactly [0, max_level] with step 1.
+        auto register_mipi_sensitivity = [&]( rs2_option id, float max_level ) -> std::shared_ptr< option >
         {
-            auto candidate = std::make_shared< d500_mipi_gyro_sensitivity_option >( raw_motion_ep );
-            const auto range = candidate->get_range();
-            if( range.min == 0.f && range.max == 4.f && range.step == 1.f )
+            try
             {
-                gyro_sensitivity_option = candidate;
-                motion_ep->register_option( RS2_OPTION_GYRO_SENSITIVITY, candidate );
-            }
-            else
-                LOG_WARNING( "MIPI gyro sensitivity control has unexpected range ["
+                auto candidate = std::make_shared< d500_mipi_imu_sensitivity_option >( raw_motion_ep, id );
+                const auto range = candidate->get_range();
+                if( range.min == 0.f && range.max == max_level && range.step == 1.f )
+                {
+                    motion_ep->register_option( id, candidate );
+                    return candidate;
+                }
+                LOG_WARNING( "MIPI " << rs2_option_to_string( id ) << " control has unexpected range ["
                              << range.min << ", " << range.max << ", " << range.step << "]" );
-        }
-        catch( const std::exception & e )
-        {
-            LOG_WARNING( "MIPI gyro sensitivity control is unavailable: " << e.what() );
-        }
+            }
+            catch( const std::exception & e )
+            {
+                LOG_WARNING( "MIPI " << rs2_option_to_string( id ) << " control is unavailable: " << e.what() );
+            }
+            return nullptr;
+        };
+        auto gyro_sensitivity_option = register_mipi_sensitivity( RS2_OPTION_GYRO_SENSITIVITY, RS2_GYRO_SENSITIVITY_COUNT - 1.f );
+        if( supports_accel_range() )
+            register_mipi_sensitivity( RS2_OPTION_ACCEL_SENSITIVITY, RS2_ACCEL_SENSITIVITY_COUNT - 1.f );
 
         // register pre-processing
         std::shared_ptr<enable_motion_correction> mm_correct_opt = nullptr;
@@ -206,13 +248,15 @@ namespace librealsense
         double gyro_scale_factor = get_gyro_default_scale();
         double accel_scale_factor = get_accel_default_scale();
         bool high_accuracy = is_imu_high_accuracy();
+        bool raw_gyro = ! supports_physical_gyro();
         motion_ep->register_processing_block(
             { {RS2_FORMAT_MOTION_XYZ32F} },
             { {RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_ACCEL}, {RS2_FORMAT_MOTION_XYZ32F, RS2_STREAM_GYRO} },
-            [mm_calib, high_accuracy, mm_correct_opt, gyro_scale_factor, accel_scale_factor, gyro_sensitivity_option]()
+            [mm_calib, high_accuracy, mm_correct_opt, gyro_scale_factor, accel_scale_factor, gyro_sensitivity_option, raw_gyro]()
             {
                 double scale = gyro_scale_factor;
-                if( gyro_sensitivity_option )
+                // Older MIPI FW gyro is a raw register value, its scale follows the selected range.
+                if( raw_gyro && gyro_sensitivity_option )
                 {
                     try
                     {
@@ -231,32 +275,27 @@ namespace librealsense
 
     ds_motion_sensor & d500_motion::get_motion_sensor()
     {
-#if defined(__APPLE__)
-        throw std::runtime_error( "Motion sensors are not supported on macOS" );
-#else
         return dynamic_cast< ds_motion_sensor & >( get_sensor( _motion_module_device_idx.value() ) );
-#endif
     }
 
     std::shared_ptr< hid_sensor > d500_motion::get_raw_motion_sensor()
     {
-#if defined(__APPLE__)
-        return nullptr;
-#else
         auto raw_sensor = get_motion_sensor().get_raw_sensor();
         return std::dynamic_pointer_cast< hid_sensor >( raw_sensor );
-#endif
     }
 
     void d500_motion::register_gyro_sensitivity()
     {
-        if( supports_physical_units() && ! _has_motion_module_failed )
+        if( supports_physical_units() && ! _is_mipi_device && ! _has_motion_module_failed )
         {
             auto raw_motion_sensor = get_raw_motion_sensor();
             raw_motion_sensor->enable_gyro_sensitivity_range_index();
             register_feature(
                 std::make_shared< gyro_sensitivity_feature >(
                     raw_motion_sensor, get_motion_sensor(), 4.f ) );
+            if( supports_accel_range() )
+                get_motion_sensor().register_option( RS2_OPTION_ACCEL_SENSITIVITY,
+                                                     std::make_shared< d500_hid_accel_sensitivity_option >( raw_motion_sensor ) );
         }
     }
 

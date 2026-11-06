@@ -2,6 +2,7 @@
 // Copyright(c) 2019-2024 RealSense, Inc. All Rights Reserved.
 
 #include "fw-update-device.h"
+#include "dfu-write.h"
 #include "../types.h"
 #include "../context.h"
 #include "../device-info.h"
@@ -317,49 +318,19 @@ namespace librealsense
     {
         // checking fw compatibility (covering the case of recovery device with wrong product line fw )
         std::vector<uint8_t> buffer((uint8_t*)fw_image, (uint8_t*)fw_image + fw_image_size);
-        const size_t transfer_size = 1024;
-
-        size_t remaining_bytes = fw_image_size;
-        uint16_t blocks_count = uint16_t( fw_image_size / transfer_size );
-        uint16_t block_number = 0;
-
-        size_t offset = 0;
-        uint32_t transferred = 0;
-
         if (!check_fw_compatibility(buffer))
             throw librealsense::invalid_value_exception("Device: " + get_serial_number() + " failed to update firmware\nImage is unsupported for this device or corrupted");
-        // Write signed firmware to appropriate file descriptor
 
-        std::ofstream fw_path_in_device(_physical_port.c_str(), std::ios::binary);
-        if (!fw_path_in_device)
-        {
-            throw io_exception("Firmware Update failed - wrong path or permissions missing");
-            return;
-        }
-        while (remaining_bytes > 0)
-        {
-            size_t chunk_size = std::min(transfer_size, remaining_bytes);
+        perform_dfu_chardev_write( _physical_port, fw_image,
+                                   static_cast< std::size_t >( fw_image_size ),
+                                   update_progress_callback,
+                                   estimate_dfu_seconds( static_cast< std::size_t >( fw_image_size ) ) );
 
-            auto curr_block = ((uint8_t*)fw_image + offset);
-
-            fw_path_in_device.write(reinterpret_cast<const char*>(curr_block), chunk_size);
-            if (!fw_path_in_device)
-                throw io_exception("Firmware Update failed - DFU chardev write error at offset "
-                                   + std::to_string(offset));
-
-            block_number++;
-            remaining_bytes -= chunk_size;
-            offset += chunk_size;
-
-            float progress = (float)block_number / (float)blocks_count;
-            LOG_DEBUG("fw update progress: " << progress);
-            if (update_progress_callback)
-                update_progress_callback->on_update_progress(progress);
-        }
-        fw_path_in_device.close();
-        if (!fw_path_in_device)
-            throw io_exception("Firmware Update failed - DFU chardev flush/close error");
-        LOG_INFO("Firmware Update for MIPI device done.");
+        // Recovery mode has no post-write HW reset window the operational path
+        // uses to defer the terminal callback — fire it here so the DFU dialog
+        // still reports 100% when the chardev write completes.
+        if( update_progress_callback )
+            update_progress_callback->on_update_progress( 1.f );
     }
 
     void update_device::update(const void* fw_image, int fw_image_size, rs2_update_progress_callback_sptr update_progress_callback) const

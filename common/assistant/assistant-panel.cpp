@@ -9,6 +9,8 @@
 #include "device-model.h"
 #include "ux-window.h"
 #include "assistant-ui-utils.h"
+#include "rs-config.h"
+#include "assistant-markdown.h"
 
 namespace rs2
 {
@@ -120,16 +122,78 @@ namespace rs2
         const float input_row_h = 44.f;
         const float input_row_gap = 14.f; // breathing room between the message list and the input box
         float avail_h = ImGui::GetContentRegionAvail().y - input_row_h - input_row_gap;
+        auto body_pos = ImGui::GetCursorScreenPos();
+        ImVec2 body_size = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
+        bool accepted = config_file::instance().get_or_default(configurations::viewer::assistant_disclaimer_accepted, false);
+        ImGui::BeginDisabled(!accepted);
         if (_messages.empty())
             draw_greeting(win, avail_h);
         else
             draw_messages(win, avail_h);
         ImGui::Dummy({ 0.f, input_row_gap });
         draw_input_row(win, ImGui::GetContentRegionAvail().x);
+        ImGui::EndDisabled();
+        if (!accepted)
+            draw_disclaimer(win, body_pos, body_size);
 
         ImGui::End();
         ImGui::PopStyleVar(4);
         ImGui::PopStyleColor(2);
+    }
+
+    void assistant_model::draw_disclaimer(ux_window& win, ImVec2 pos, ImVec2 size)
+    {
+        // A child window (not a draw-list rect) so the dim layer stacks above the greeting/messages child.
+        ImGui::SetCursorScreenPos(pos);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.f, 0.f, 0.f, 0.6f));
+        ImGui::BeginChild("##assistant_disclaimer_dim", size, ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
+
+        const float margin = 8.f, pad = 16.f;
+        ImGui::SetCursorPos({ margin, std::max(margin, (size.y - _disclaimer_card_h) * 0.5f) });
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, sensor_bg);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(pad, pad));
+        ImGui::BeginChild("##assistant_disclaimer_card", { size.x - 2.f * margin, 0.f },
+            ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
+
+        ImGui::PushFont(win.get_large_font());
+        ImGui::PushStyleColor(ImGuiCol_Text, white);
+        ImGui::TextUnformatted("Disclaimer");
+        ImGui::PopStyleColor();
+        ImGui::PopFont();
+        ImGui::Spacing();
+
+        static const std::string text =
+            "RealSense does not guarantee the accuracy, completeness, or up-to-date nature of the information "
+            "provided by the AI Assistant. Users of the AI Assistant bear sole responsibility for their "
+            "interactions and reliance on the information provided. By using the AI Assistant, you acknowledge "
+            "and accept these terms. For any critical, sensitive, or complex inquiries, please "
+            "[contact the RealSense team](https://github.com/realsenseai/librealsense/issues/new) "
+            "directly for confirmation and further assistance.";
+        // No images in this text, so the image-fetch invoke is never used.
+        assistant_detail::draw_markdown_body(win, text, ImGui::GetContentRegionAvail().x, *_image_cache, {});
+
+        ImGui::Spacing();
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Button, regular_blue);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, light_blue);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, light_blue);
+        if (ImGui::Button("Accept & Continue", { ImGui::GetContentRegionAvail().x, 32.f }))
+        {
+            config_file::instance().set_and_save(configurations::viewer::assistant_disclaimer_accepted, true);
+            _focus_input_next_frame = true;
+        }
+        if (ImGui::IsItemHovered())
+            win.link_hovered();
+        ImGui::PopStyleColor(3);
+
+        ImGui::EndChild();
+        _disclaimer_card_h = ImGui::GetItemRectSize().y;
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor();
+
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
     }
 
     void assistant_model::draw_input_row(ux_window& win, float avail_w)

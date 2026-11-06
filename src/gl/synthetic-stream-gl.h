@@ -16,6 +16,7 @@
 
 #include <functional>
 #include <thread>
+#include <mutex>
 #include <deque>
 #include <unordered_set>
 
@@ -229,6 +230,13 @@ namespace librealsense
             std::shared_ptr<context> _ctx;
         };
 
+        // Serializes GL calls of both lanes: the driver can deadlock on its shared-context locks otherwise
+        inline std::recursive_mutex& shared_gl_mutex()
+        {
+            static std::recursive_mutex m;
+            return m;
+        }
+
         class gpu_object
         {
         private:
@@ -285,6 +293,7 @@ namespace librealsense
             template<class T>
             void perform_gl_action(T action)
             {
+                std::lock_guard<std::recursive_mutex> gl_lock(shared_gl_mutex());
                 if (rendering_lane::instance().is_active())
                     action();
             }
@@ -319,6 +328,7 @@ namespace librealsense
             template<class T, class S>
             void perform_gl_action(T action, S fallback)
             {
+                std::lock_guard<std::recursive_mutex> gl_lock(shared_gl_mutex());
                 auto ctx = _ctx.lock();
                 if (ctx)
                 {

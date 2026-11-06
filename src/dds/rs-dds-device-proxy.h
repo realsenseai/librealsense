@@ -84,6 +84,10 @@ public:
 
     bool is_in_recovery_mode() const override;
 
+    // open() only sets the requested profiles and start() streams; a second sensor's open-streams control would
+    // revert the first sensor's streams to defaults unless the first is already streaming.
+    bool start_sensors_when_opened() const override { return true; }
+
     // calibration_change_device
 public:
     void register_calibration_change_callback( rs2_calibration_change_callback_sptr callback ) override

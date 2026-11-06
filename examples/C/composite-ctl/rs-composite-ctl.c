@@ -8,7 +8,7 @@
 #include <librealsense2/rs.h>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_hdrd_control.h>
+#include <librealsense2/h/rs_icr_control.h>
 #include "example.h"   /* shared check_error()/print_device_info() used by every Examples/C sample */
 
 #include <stdio.h>
@@ -21,7 +21,7 @@ static const char * composite_option_name( rs2_composite_option_id id )
     {
     case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  return "DECIMATION_FILTER_DPP";
     case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    return "TEMPORAL_FILTER_DPP";
-    case RS2_COMPOSITE_OPTION_HDRD_CONTROL:           return "HDRD_CONTROL";
+    case RS2_COMPOSITE_OPTION_ICR_CONTROL:           return "ICR_CONTROL";
     default:                                           return "UNKNOWN";
     }
 }
@@ -118,10 +118,10 @@ static void print_temporal_filter_dpp_range( const rs2_temporal_filter_dpp_range
 #undef TEMPORAL_FILTER_DPP_ROW
 }
 
-/* C99 equivalent of the C++ sample's generic print_struct(hdrd_fields(), ...) - no
+/* C99 equivalent of the C++ sample's generic print_struct(icr_fields(), ...) - no
    pointer-to-member table to drive it in C, so every field is spelled out here once, in wire
-   order, matching rs_hdrd_control.h. */
-static void print_hdrd_struct( const rs2_hdrd_control * v )
+   order, matching rs_icr_control.h. */
+static void print_icr_struct( const rs2_icr_control * v )
 {
     printf( "        %-16s = %d\n", "version", (int)v->header.version );
     printf( "        %-16s = %d\n", "flags", (int)v->header.flags );
@@ -137,27 +137,27 @@ static void print_hdrd_struct( const rs2_hdrd_control * v )
     printf( "        %-16s = %d\n", "threshold_mm", v->threshold_mm );
 }
 
-/* C99 equivalent of the C++ sample's generic print_range(hdrd_fields(), ...): one header
+/* C99 equivalent of the C++ sample's generic print_range(icr_fields(), ...): one header
    line naming the columns, then one row per field, name = [ min, max, default, step ]. */
-static void print_hdrd_range( const rs2_hdrd_control_range * r )
+static void print_icr_range( const rs2_icr_control_range * r )
 {
     printf( "        %-16s   [ min, max, default, step ]\n", "" );
-#define HDRD_ROW( label, field ) \
+#define ICR_ROW( label, field ) \
     printf( "        %-16s = [ %d, %d, %d, %d ]\n", label, \
             (int)r->min.field, (int)r->max.field, (int)r->def.field, (int)r->step.field )
-    HDRD_ROW( "version", header.version );
-    HDRD_ROW( "flags", header.flags );
-    HDRD_ROW( "ctl_id", header.ctl_id );
-    HDRD_ROW( "param_count", header.param_count );
-    HDRD_ROW( "param_type", header.param_type );
-    HDRD_ROW( "enable", enable );
-    HDRD_ROW( "filter_type", filter_type );
-    HDRD_ROW( "downscale_ratio", downscale_ratio );
-    HDRD_ROW( "shift_mode", shift_mode );
-    HDRD_ROW( "shift_pixels", shift_pixels );
-    HDRD_ROW( "threshold_mode", threshold_mode );
-    HDRD_ROW( "threshold_mm", threshold_mm );
-#undef HDRD_ROW
+    ICR_ROW( "version", header.version );
+    ICR_ROW( "flags", header.flags );
+    ICR_ROW( "ctl_id", header.ctl_id );
+    ICR_ROW( "param_count", header.param_count );
+    ICR_ROW( "param_type", header.param_type );
+    ICR_ROW( "enable", enable );
+    ICR_ROW( "filter_type", filter_type );
+    ICR_ROW( "downscale_ratio", downscale_ratio );
+    ICR_ROW( "shift_mode", shift_mode );
+    ICR_ROW( "shift_pixels", shift_pixels );
+    ICR_ROW( "threshold_mode", threshold_mode );
+    ICR_ROW( "threshold_mm", threshold_mm );
+#undef ICR_ROW
 }
 
 /* Sets *cfg and reads it back into *after - the C99 equivalent for rs2_decimation_filter_dpp_config.
@@ -373,7 +373,7 @@ static int exercise_temporal_filter_dpp( const rs2_options * opts, rs2_composite
     print_temporal_filter_dpp_struct( &current );
 
     /* 2) Set + Get read-modify-write - wire fields carried over untouched from `current` on
-       every step below, same discipline as exercise_hdrd_control() below. */
+       every step below, same discipline as exercise_icr_control() below. */
     cfg = current;
     cfg.enabled = 1;
     cfg.smooth_alpha = 550;  /* normalized [0,1] scaled into [0,1000] - i.e. 0.55 */
@@ -446,9 +446,9 @@ skipped:
 
 /* Sets *cfg and reads it back into *after. Returns 1 on success, 0 (SKIPPED message printed) on
    failure. */
-static int hdrd_set_and_readback( const rs2_options * opts, rs2_composite_option_id id,
-                                                    const rs2_hdrd_control * cfg,
-                                                    rs2_hdrd_control * after )
+static int icr_set_and_readback( const rs2_options * opts, rs2_composite_option_id id,
+                                                    const rs2_icr_control * cfg,
+                                                    rs2_icr_control * after )
 {
     rs2_error * e = NULL;
     const rs2_raw_data_buffer * raw;
@@ -478,16 +478,16 @@ failed:
 }
 
 /* Full read-modify-write + range + metadata sequence - the C99 equivalent of
-   exercise_hdrd_control() in rs-composite-option.cpp. Exercises both conditional axes then
+   exercise_icr_control() in rs-composite-option.cpp. Exercises both conditional axes then
    restores the original value; a non-functional control is reported via `goto skipped`. */
-static int exercise_hdrd_control( const rs2_options * opts, rs2_composite_option_id id )
+static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_id id )
 {
     rs2_error * e = NULL;
     const rs2_raw_data_buffer * raw;
     const unsigned char * bytes;
     int size;
-    rs2_hdrd_control current, cfg, after;
-    rs2_hdrd_control_range range;
+    rs2_icr_control current, cfg, after;
+    rs2_icr_control_range range;
     int mode;
 
     /* 1) Get (before) - both forms of the read, same as the C++ sample: the raw untyped
@@ -517,7 +517,7 @@ static int exercise_hdrd_control( const rs2_options * opts, rs2_composite_option
     memcpy( &current, bytes, sizeof( current ) );
     rs2_delete_raw_data( raw );
     printf( "      Get Structured Data:\n" );
-    print_hdrd_struct( &current );
+    print_icr_struct( &current );
 
     /* 2) Set + Get, wire header and every other field carried over untouched from `current`, not
        zero-initialized, on every step below. */
@@ -529,41 +529,41 @@ static int exercise_hdrd_control( const rs2_options * opts, rs2_composite_option
     cfg.filter_type = 1;
     cfg.shift_mode = 2;
     cfg.shift_pixels = 100;
-    if( ! hdrd_set_and_readback( opts, id, &cfg, &after ) )
+    if( ! icr_set_and_readback( opts, id, &cfg, &after ) )
         return 0;  /* helper already printed and freed its own error */
     printf( "      Set (filter_type=Lookup Shift, shift_mode=Manual, shift_pixels=100): %s\n",
             ( after.filter_type == cfg.filter_type && after.shift_mode == cfg.shift_mode
               && after.shift_pixels == cfg.shift_pixels )
                 ? "matches what was sent" : "differs - FW may quantize/clamp on write" );
-    print_hdrd_struct( &after );
+    print_icr_struct( &after );
 
     /* Downscale + x4 ratio - exercises the OTHER branch filter_type selects between. */
     cfg.filter_type = 0;
     cfg.downscale_ratio = 2;
-    if( ! hdrd_set_and_readback( opts, id, &cfg, &after ) )
+    if( ! icr_set_and_readback( opts, id, &cfg, &after ) )
         return 0;  /* helper already printed and freed its own error */
     printf( "      Set (filter_type=Downscale, downscale_ratio=x4): %s\n",
             ( after.filter_type == cfg.filter_type && after.downscale_ratio == cfg.downscale_ratio )
                 ? "matches what was sent" : "differs - FW may quantize/clamp on write" );
-    print_hdrd_struct( &after );
+    print_icr_struct( &after );
 
     /* Cycle threshold_mode through all three rungs - threshold_mm only matters for Manual. */
     for( mode = 0; mode <= 2; ++mode )
     {
         cfg.threshold_mode = mode;
         cfg.threshold_mm = ( mode == 2 ) ? 300 : 0;
-        if( ! hdrd_set_and_readback( opts, id, &cfg, &after ) )
+        if( ! icr_set_and_readback( opts, id, &cfg, &after ) )
             return 0;  /* helper already printed and freed its own error */
         printf( "      Set (threshold_mode=%d): %s\n", mode,
                 ( after.threshold_mode == cfg.threshold_mode )
                     ? "matches what was sent" : "differs - FW may quantize/clamp on write" );
-        print_hdrd_struct( &after );
+        print_icr_struct( &after );
     }
 
     /* Restore the original value read in step 1 - this sample exercises real, consequential
        state changes (unlike a single-field toggle), so leaving no lasting effect on the device
        matters more here. */
-    if( ! hdrd_set_and_readback( opts, id, &current, &after ) )
+    if( ! icr_set_and_readback( opts, id, &current, &after ) )
         return 0;  /* helper already printed and freed its own error */
     printf( "      Restore original value: %s\n",
             ( after.filter_type == current.filter_type && after.downscale_ratio == current.downscale_ratio
@@ -571,7 +571,7 @@ static int exercise_hdrd_control( const rs2_options * opts, rs2_composite_option
               && after.threshold_mode == current.threshold_mode && after.threshold_mm == current.threshold_mm )
                 ? "ok" : "FAILED to restore - device may be left in the sample's last test state" );
 
-    /* 3) Get range - raw bytes, then the manual cast to rs2_hdrd_control_range
+    /* 3) Get range - raw bytes, then the manual cast to rs2_icr_control_range
        (4 full copies of the struct - min/max/step/def, header fields included). */
     raw = rs2_get_composite_option_range( opts, id, &e );
     if( e )
@@ -598,7 +598,7 @@ static int exercise_hdrd_control( const rs2_options * opts, rs2_composite_option
     memcpy( &range, bytes, sizeof( range ) );
     rs2_delete_raw_data( raw );
     printf( "      Range:\n" );
-    print_hdrd_range( &range );
+    print_icr_range( &range );
 
     /* 4) Query info. */
     printf( "      Read-only: %s\n", rs2_is_composite_option_read_only( opts, id, &e ) ? "true" : "false" );
@@ -630,8 +630,8 @@ static int exercise_composite_option( const rs2_options * opts, rs2_composite_op
         return exercise_decimation_filter_dpp( opts, id );
     case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:
         return exercise_temporal_filter_dpp( opts, id );
-    case RS2_COMPOSITE_OPTION_HDRD_CONTROL:
-        return exercise_hdrd_control( opts, id );
+    case RS2_COMPOSITE_OPTION_ICR_CONTROL:
+        return exercise_icr_control( opts, id );
     default:
         printf( "      (no typed handler registered for this composite option id)\n" );
         return -1;

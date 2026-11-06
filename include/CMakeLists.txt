@@ -19,11 +19,12 @@ target_sources( ${PROJECT_NAME}
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_config.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_advanced_mode_command.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_eth_config.h"
+        "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_nn.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_rum.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_composite_option.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_dpp_header.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_temporal_filter_dpp.h"
-        "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_hdrd_control.h"
+        "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_icr_control.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_decimation_filter_dpp.h"
 
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/hpp/rs_types.hpp"
@@ -40,6 +41,7 @@ target_sources( ${PROJECT_NAME}
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/hpp/rs_internal.hpp"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/hpp/rs_pipeline.hpp"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/hpp/rs_eth_config.hpp"
+        "${CMAKE_CURRENT_LIST_DIR}/librealsense2/hpp/rs_nn.hpp"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/hpp/rs_rum.hpp"
 
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/rsutil.h"

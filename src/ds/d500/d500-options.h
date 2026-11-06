@@ -12,6 +12,7 @@
 #include <rsutils/lazy.h>
 
 #include <atomic>
+#include <mutex>
 
 
 namespace librealsense
@@ -185,6 +186,68 @@ namespace librealsense
         std::vector< std::function< void( bool ) > > _observers;
     };
 
+    // Which exposure classes produce depth. The firmware applies the mode at stream start, and in Full Passive
+    // it takes the laser and the AE policy over - the policy is moved to Color Priority along with the mode,
+    // since the firmware keeps reporting whatever was selected before.
+    class passive_depth_mode_option : public uvc_xu_option< uint8_t >
+    {
+    public:
+        passive_depth_mode_option( const std::weak_ptr< uvc_sensor > & raw_ep,
+                                   const std::map< float, std::string > & description_per_value );
+
+        void set( float value ) override;
+        bool is_read_only() const override;
+
+        // Cached state, free of a firmware round-trip: the gated controls consult it on every UI refresh,
+        // and it only changes under set() below.
+        bool is_full_passive() const { return _full_passive; }
+
+        // Wired once while the device is built, before it is reachable by any other thread - the same
+        // contract as d500_enable_aligned_depth_option::add_observer.
+        void set_ae_policy_option( const std::weak_ptr< option > & ae_policy ) { _ae_policy = ae_policy; }
+
+    private:
+        std::weak_ptr< option > _ae_policy;
+        std::atomic< bool > _full_passive;
+        // Pairs the write with its read-back, so concurrent sets cannot leave the cache on the losing value.
+        std::mutex _set_mutex;
+    };
+
+    // A control that Full Passive Depth takes over: the firmware forces the laser off there, so the host
+    // refuses changes and reports the control locked instead of letting a write silently do nothing.
+    // raw_ep is passed for a control the firmware also fixes for the duration of a stream.
+    class passive_depth_locked_option : public proxy_option
+    {
+    public:
+        passive_depth_locked_option( std::shared_ptr< option > proxy,
+                                     const std::weak_ptr< passive_depth_mode_option > & passive_depth_mode,
+                                     const std::weak_ptr< uvc_sensor > & raw_ep = {} );
+
+        void set( float value ) override;
+        bool is_read_only() const override;
+
+    private:
+        std::weak_ptr< passive_depth_mode_option > _passive_depth_mode;
+        std::weak_ptr< uvc_sensor > _raw_ep;
+    };
+
+    // Auto-exposure policy of a dual-RGB depth sensor. Full Passive Depth locks the policy to Color Priority in
+    // firmware, so Hybrid drops out of the reported range and is refused while that mode is active.
+    class colored_ir_ae_policy_option : public uvc_xu_option< uint8_t >
+    {
+    public:
+        colored_ir_ae_policy_option( const std::weak_ptr< uvc_sensor > & raw_ep,
+                                     const std::map< float, std::string > & description_per_value,
+                                     const std::weak_ptr< passive_depth_mode_option > & passive_depth_mode );
+
+        void set( float value ) override;
+        option_range get_range() const override;
+        bool is_read_only() const override;
+
+    private:
+        std::weak_ptr< passive_depth_mode_option > _passive_depth_mode;
+    };
+
     class power_line_freq_option : public uvc_pu_option
     {
     public:
@@ -201,15 +264,38 @@ namespace librealsense
         }
     };
 
-    class d500_mipi_gyro_sensitivity_option : public uvc_pu_option
+    class d500_mipi_imu_sensitivity_option : public uvc_pu_option
     {
     public:
-        explicit d500_mipi_gyro_sensitivity_option( const std::weak_ptr< uvc_sensor > & ep );
+        d500_mipi_imu_sensitivity_option( const std::weak_ptr< uvc_sensor > & ep, rs2_option id );
 
         void set( float value ) override;
         bool is_read_only() const override;
         const char * get_description() const override;
         const char * get_value_description( float value ) const override;
+
+    private:
+        bool _is_accel;
+    };
+
+    class hid_sensor;
+    class d500_hid_accel_sensitivity_option : public option_base
+    {
+    public:
+        explicit d500_hid_accel_sensitivity_option( const std::weak_ptr< hid_sensor > & sensor );
+
+        void set( float value ) override;
+        float query() const override { return _value; }
+        bool is_enabled() const override { return true; }
+        bool is_read_only() const override;
+        const char * get_description() const override;
+        const char * get_value_description( float value ) const override;
+        void enable_recording( std::function< void( const option & ) > record_action ) override { _record_action = record_action; }
+
+    private:
+        float _value;
+        std::weak_ptr< hid_sensor > _sensor;
+        std::function< void( const option & ) > _record_action = []( const option & ) {};
     };
 
 } // namespace librealsense

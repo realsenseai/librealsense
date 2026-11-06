@@ -89,18 +89,20 @@ def find_matching_devices(device_markers, each=True, cli_includes=None, cli_excl
         if marker.name not in ['device', 'device_each'] or not marker.args:
             continue
 
-        pattern = marker.args[0]
-        log.debug(f"Looking for devices matching pattern: {pattern}")
+        # device_each("D555", "D585") matches any of its patterns
+        patterns = marker.args if marker.name == 'device_each' else marker.args[:1]
+        for pattern in patterns:
+            log.debug(f"Looking for devices matching pattern: {pattern}")
 
-        for sn in devices.by_spec(pattern, []):
-            had_candidates = True
-            if not passes(sn):
-                continue
-            if sn not in matching_sns:
-                matching_sns.append(sn)
-                log.debug(f"  Found matching device: {devices.get(sn).name} ({sn})")
-            if not each:
-                return matching_sns, had_candidates
+            for sn in devices.by_spec(pattern, []):
+                had_candidates = True
+                if not passes(sn):
+                    continue
+                if sn not in matching_sns:
+                    matching_sns.append(sn)
+                    log.debug(f"  Found matching device: {devices.get(sn).name} ({sn})")
+                if not each:
+                    return matching_sns, had_candidates
 
     return matching_sns, had_candidates
 
@@ -138,6 +140,31 @@ def _passes_connection_type(sn, required_types, excluded_types):
     return True
 
 
+def _pattern_excluded(pattern, cli_excludes):
+    """True when a device() pattern is covered by an --exclude-device spec textually
+    (no enumerated device to compare against): same name, or a wildcard spec whose
+    prefix the pattern starts with or product line it names (D43* and D400* both cover D435)."""
+    pattern = pattern.strip().upper()
+    for spec in split_cli_patterns(cli_excludes):
+        spec = spec.upper()
+        if spec.endswith('*'):
+            prefix = spec[:-1]
+            if pattern.startswith(prefix) or _product_line_of(pattern) == prefix:
+                return True
+        elif spec == pattern:
+            return True
+    return False
+
+
+def _product_line_of(product):
+    """D455 -> D400; D555/D585S -> D500 (same rule as rspy.device_map)"""
+    if product.startswith('D4'):
+        return 'D400'
+    if product.startswith('D5'):
+        return 'D500'
+    return None
+
+
 def resolve_device_each_serials(metafunc):
     """Expand @device_each and @device markers into parametrized test instances.
 
@@ -146,7 +173,7 @@ def resolve_device_each_serials(metafunc):
     at *module* scope, so module-scoped fixtures (``module_device_setup``, ``test_context``,
     ``test_device``) are reused across all test functions sharing the same device.
 
-    - ``device_each(pattern)``: one instance per matching device.  When no device
+    - ``device_each(pattern, ...)``: one instance per device matching any pattern.  When no device
       matches (and there is no coexisting single-spec ``device()``), a single
       ``__SKIP__:patterns`` sentinel instance is parametrized so the test is
       collected and skipped by ``module_device_setup``.
@@ -201,12 +228,10 @@ def resolve_device_each_serials(metafunc):
     passes = _build_sn_filter(all_markers, cli_includes, cli_excludes)
 
     for marker in device_each_markers:
-        if not marker.args:
-            continue
-        pattern = marker.args[0]
-        for sn in devices.by_spec(pattern, []):
-            if passes(sn) and sn not in all_serials:
-                all_serials.append(sn)
+        for pattern in marker.args:
+            for sn in devices.by_spec(pattern, []):
+                if passes(sn) and sn not in all_serials:
+                    all_serials.append(sn)
 
     # Each single-spec ``device()`` marker independently contributes one parametrized
     # instance (the first matching device, or a sentinel if none).  Multiple stacked
@@ -229,7 +254,9 @@ def resolve_device_each_serials(metafunc):
         if found_sn is not None:
             if found_sn not in all_serials:
                 all_serials.append(found_sn)
-        elif had_raw_match:
+        elif had_raw_match or _pattern_excluded(pattern, cli_excludes):
+            # Excluded on the CLI (e.g. the map-check reported it missing): a skip,
+            # not an unattributed failure, even though nothing of that pattern enumerated
             sentinel = f"{_SKIP_SENTINEL_PREFIX}{pattern}"
             if sentinel not in all_serials:
                 all_serials.append(sentinel)
@@ -245,7 +272,7 @@ def resolve_device_each_serials(metafunc):
     # own. The sentinel ensures consistent skip behavior whether the marker is at
     # module level or function level.
     if device_each_markers and not single_device_markers and not all_serials:
-        patterns = ','.join(m.args[0] for m in device_each_markers if m.args)
+        patterns = ','.join(p for m in device_each_markers for p in m.args)
         all_serials.append(f"{_SKIP_SENTINEL_PREFIX}{patterns}")
 
     if all_serials:

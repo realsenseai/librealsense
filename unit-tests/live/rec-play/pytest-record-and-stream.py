@@ -42,6 +42,8 @@ def record(file_name, default_profile):
     depth_sensor.start(frame_queue)
 
     recorder = rs.recorder(file_name, dev)
+    # Change the option only after frames are flowing (up to 5s for the first one), as the test intends
+    frame_queue.wait_for_frame(5000)
     time.sleep(1)
     if depth_sensor.supports(rs.option.emitter_enabled):
         try:

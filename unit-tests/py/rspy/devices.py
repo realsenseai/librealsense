@@ -33,7 +33,10 @@ except ModuleNotFoundError:
 # And where to look for pyrealsense2
 from rspy import repo
 pyrs_dir = repo.find_pyrs_dir()
-sys.path.insert( 1, pyrs_dir )
+if not pyrs_dir:
+    log.d( 'pyrealsense2 build dir not found; not adding it to sys.path' )
+elif pyrs_dir not in sys.path:
+    sys.path.insert( 1, pyrs_dir )
 
 MAX_ENUMERATION_TIME = 20  # [sec]
 

@@ -33,7 +33,10 @@ NUM_FRAMES = 15  # frames averaged per measurement, to average out sensor read n
 SETTLE_FRAMES_TO_DISCARD = 5  # frames dropped after toggling the emitter, to let the new state take effect
 MIN_DOT_AREA_PX = 1  # smallest connected component counted as a dot
 MAX_DOT_AREA_PX = 50  # above this, treat it as a brightness blob, not a laser dot
-MIN_DOT_COUNT = 30  # need at least this many dot-sized blobs in the diff image
+BACKGROUND_KERNEL_PX = 15  # box-blur size for the local background; much wider than a dot
+DOT_MIN_NOISE_STDS = 4  # a dot pixel must exceed the local background by at least this many noise standard deviations
+MIN_NOISE_STD = 0.5  # floor on the noise estimate, so a near-zero diff doesn't threshold at ~0
+MIN_DOT_COUNT = 1000  # need at least this many dot-sized blobs in the diff image
 GRID_SIZE = 4  # frame divided into GRID_SIZE x GRID_SIZE cells to check spread
 MIN_GRID_CELLS_COVERED = 6  # dots must be spread across at least this many cells (of GRID_SIZE**2)
 MIN_QUADRANTS_COVERED = 3  # covered cells must span at least this many of the 4 image quadrants,
@@ -59,12 +62,19 @@ def capture_avg_ir(pipeline):
 
 def find_dot_blobs(diff_image):
     """
-    Threshold the ON-minus-OFF difference image (Otsu, like a human picking out
-    "the bright bits") and return the dot-sized connected components plus the
+    Subtract the local background from the ON-minus-OFF difference image and keep pixels
+    well above the noise level, so a bright near object (e.g. a cable lit by the laser)
+    can't swamp a global threshold. Returns the dot-sized connected components plus the
     binary mask used, for debugging.
     """
-    diff_u8 = cv2.normalize(np.clip(diff_image, 0, None), None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-    _, mask = cv2.threshold(diff_u8, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    MAD_SCALE_FACTOR = 1.4826  # converts median absolute deviation to standard deviation, for Gaussian noise
+    diff = np.clip(diff_image, 0, None)  # negatives are noise (OFF > ON); they'd drag the local background down
+    # subtract each pixel's neighbourhood average: wide bright areas flatten to ~0, small sharp dots stay above it
+    above_background = diff - cv2.blur(diff, (BACKGROUND_KERNEL_PX, BACKGROUND_KERNEL_PX))
+    # median-based noise estimate, so the bright dots themselves don't inflate it
+    noise_mad = np.median(np.abs(above_background - np.median(above_background)))
+    noise_std = max(MAD_SCALE_FACTOR * noise_mad, MIN_NOISE_STD)
+    mask = (above_background > DOT_MIN_NOISE_STDS * noise_std).astype(np.uint8) * 255
     _, _, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
 
     dots = [(centroids[i], stats[i, cv2.CC_STAT_AREA]) for i in range(1, len(stats))  # skip background label 0

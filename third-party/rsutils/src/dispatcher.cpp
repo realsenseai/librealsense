@@ -71,6 +71,7 @@ void dispatcher::start()
     {
         std::lock_guard< std::mutex > lock(_was_stopped_mutex);
         was_stopped = _was_stopped.exchange( false );
+        _stopping = false;
     }
     _queue.start();
     // Wake up all threads that wait for the dispatcher to start
@@ -96,15 +97,23 @@ void dispatcher::stop()
     // pending
     _queue.stop();
 
+    // Wake any sleeping dispatched item now, so we don't wait out its sleep below
+    {
+        std::lock_guard< std::mutex > lock( _was_stopped_mutex );
+        _stopping = true;
+    }
+    _was_stopped_cv.notify_all();
+
     // Wait until any dispatched is done...
     {
         std::lock_guard< std::mutex > lock(_dispatch_mutex);
         assert(_queue.empty());
     }
-    // Signal we've stopped so any sleeping dispatched will wake up immediately
+    // Signal we've stopped (flush() waits on this, so only after the in-flight item finished)
     {
         std::lock_guard< std::mutex > lock( _was_stopped_mutex );
         _was_stopped = true;
+        _stopping = false;
     }
     _was_stopped_cv.notify_all();
 

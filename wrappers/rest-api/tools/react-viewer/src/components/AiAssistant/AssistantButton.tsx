@@ -50,7 +50,7 @@ export function AssistantButton() {
       `}
     >
       {isAssistantOpen ? (
-        <X className="w-5 h-5 text-rs-light" />
+        <X className="w-5 h-5 text-rs-text" />
       ) : (
         <>
           <span className="relative flex items-center justify-center w-8 h-8 rounded-full bg-white overflow-hidden shrink-0">
@@ -59,7 +59,7 @@ export function AssistantButton() {
                 into this small circle (which made the icon nearly invisible). */}
             <img src="/realsense-logo.png" alt="" className="w-full h-full object-cover object-left" />
           </span>
-          <span className="flex items-center gap-2 text-sm font-medium whitespace-nowrap text-rs-light">
+          <span className="flex items-center gap-2 text-sm font-medium whitespace-nowrap text-rs-text">
             Ask RealSenseAI
             <span className="relative flex w-2 h-2">
               {isAssistantOnline && (

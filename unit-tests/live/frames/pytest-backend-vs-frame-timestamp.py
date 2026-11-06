@@ -9,6 +9,7 @@ Verifies for both depth and color sensors.
 import pytest
 import pyrealsense2 as rs
 import time
+import threading
 import logging
 from rspy.snippets import is_dds_dev
 log = logging.getLogger(__name__)
@@ -25,11 +26,10 @@ FPS = 30
 def _run_timestamp_check(sensor, profile, stream_name):
     """Stream frames and verify backend_ts > frame_ts for each."""
     failures = []
-    has_frame = False
+    has_frame = threading.Event()
 
     def check_backend_ts(frame):
-        nonlocal has_frame, failures
-        has_frame = True
+        has_frame.set()
         assert frame.supports_frame_metadata(rs.frame_metadata_value.backend_timestamp), \
             f"{stream_name}: backend_timestamp metadata not supported"
         frame_ts = frame.get_frame_timestamp()
@@ -48,11 +48,13 @@ def _run_timestamp_check(sensor, profile, stream_name):
 
         sensor.open(profile)
         sensor.start(check_backend_ts)
-        time.sleep(1)
+        # Wait up to 5s for the first frame (startup latency is t2ff's job), then check 1s of frames
+        if has_frame.wait(5):
+            time.sleep(1)
         sensor.stop()
         sensor.close()
 
-        assert has_frame, f"{stream_name}: no frames arrived"
+        assert has_frame.is_set(), f"{stream_name}: no frames arrived"
         assert not failures, f"{stream_name}: backend_ts <= frame_ts:\n" + "\n".join(failures)
     finally:
         # Restore original setting

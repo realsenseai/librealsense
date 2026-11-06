@@ -76,6 +76,30 @@ rs2_processing_block* rs2_create_m420_decoder(rs2_error** error);
 rs2_processing_block* rs2_create_nv12_decoder(rs2_error** error);
 
 /**
+* Creates MJPEG decoder processing block.
+* This block accepts compressed MJPEG frames and outputs RGB8 frames.
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+rs2_processing_block* rs2_create_mjpeg_decoder(rs2_error** error);
+
+/**
+* Creates H264 decoder processing block.
+* This block accepts H.264 access units and outputs RGB8 frames. Decoding is stateful - frames
+* reference earlier ones - so feed one block a single stream in order, and expect no output until
+* the first keyframe and its parameter sets have arrived. Platforms without a decoder produce none.
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+rs2_processing_block* rs2_create_h264_decoder(rs2_error** error);
+
+/**
+* Tells whether this platform can decode H.264 at all. An H264 decoder block built where it cannot
+* decode is still valid, and still passes H.264 through, but produces no RGB8 frame.
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return            non-zero when a decoder is available
+*/
+int rs2_is_h264_decoder_supported(rs2_error** error);
+
+/**
 * Creates y411 decoder processing block. This block accepts raw y411 frames and outputs frames in RGB8.
 *     https://www.fourcc.org/pixel-format/yuv-y411/
 * Y411 is disguised as NV12 to allow Linux compatibility. Both are 12bpp encodings that allow high-resolution

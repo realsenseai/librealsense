@@ -4,39 +4,81 @@
 
 #include "d500-options.h"
 #include "d500-private.h"
+#include <src/hid-sensor.h>
 
 namespace librealsense
 {
-    d500_mipi_gyro_sensitivity_option::d500_mipi_gyro_sensitivity_option(
-        const std::weak_ptr< uvc_sensor > & ep )
-        : uvc_pu_option( ep, RS2_OPTION_GYRO_SENSITIVITY )
+    d500_mipi_imu_sensitivity_option::d500_mipi_imu_sensitivity_option( const std::weak_ptr< uvc_sensor > & ep,
+                                                                        rs2_option id )
+        : uvc_pu_option( ep, id )
+        , _is_accel( id == RS2_OPTION_ACCEL_SENSITIVITY )
     {
     }
 
-    void d500_mipi_gyro_sensitivity_option::set( float value )
+    void d500_mipi_imu_sensitivity_option::set( float value )
     {
         auto sensor = _ep.lock();
         if( ! sensor )
             throw invalid_value_exception( "MIPI IMU sensor is not alive for setting" );
-        (void)gyro_sensitivity_to_scale( value );
+        (void)get_value_description( value );
         sensor->invoke_if_closed( [this, value]() { uvc_pu_option::set( value ); } );
     }
 
-    bool d500_mipi_gyro_sensitivity_option::is_read_only() const
+    bool d500_mipi_imu_sensitivity_option::is_read_only() const
     {
         if( auto sensor = _ep.lock() )
             return sensor->is_opened();
         return false;
     }
 
-    const char * d500_mipi_gyro_sensitivity_option::get_description() const
+    const char * d500_mipi_imu_sensitivity_option::get_description() const
     {
-        return "gyro sensitivity resolutions, lowers the dynamic range for a more accurate readings";
+        return _is_accel ? "accel sensitivity (dynamic range), selects the saturation point without changing the unit scale"
+                         : "gyro sensitivity resolutions, lowers the dynamic range for a more accurate readings";
     }
 
-    const char * d500_mipi_gyro_sensitivity_option::get_value_description( float value ) const
+    const char * d500_mipi_imu_sensitivity_option::get_value_description( float value ) const
     {
-        return get_gyro_sensitivity_value_description( value );
+        return _is_accel ? get_accel_sensitivity_value_description( value ) : get_gyro_sensitivity_value_description( value );
+    }
+
+    d500_hid_accel_sensitivity_option::d500_hid_accel_sensitivity_option( const std::weak_ptr< hid_sensor > & sensor )
+        : option_base( { 0.f, RS2_ACCEL_SENSITIVITY_COUNT - 1.f, 1.f, 0.f } )
+        , _value( 0.f )
+        , _sensor( sensor )
+    {
+    }
+
+    void d500_hid_accel_sensitivity_option::set( float value )
+    {
+        auto sensor = _sensor.lock();
+        if( ! sensor )
+            throw invalid_value_exception( "Hid sensor is not alive for setting" );
+        if( sensor->is_opened() )
+            throw invalid_value_exception( "setting this option while the sensor is open is not allowed!" );
+        if( ! is_valid( value ) )
+            throw invalid_value_exception( "set(accel_sensitivity) failed! Invalid accel sensitivity request " + std::to_string( value ) );
+
+        sensor->set_imu_sensitivity( RS2_STREAM_ACCEL, value );
+        _value = value;
+        _record_action( *this );
+    }
+
+    bool d500_hid_accel_sensitivity_option::is_read_only() const
+    {
+        if( auto sensor = _sensor.lock() )
+            return sensor->is_opened();
+        return false;
+    }
+
+    const char * d500_hid_accel_sensitivity_option::get_description() const
+    {
+        return "accel sensitivity (dynamic range), selects the saturation point without changing the unit scale";
+    }
+
+    const char * d500_hid_accel_sensitivity_option::get_value_description( float value ) const
+    {
+        return get_accel_sensitivity_value_description( value );
     }
 
     rgb_tnr_option::rgb_tnr_option(std::shared_ptr<hw_monitor> hwm, const std::weak_ptr< sensor_base > & ep)
@@ -240,6 +282,143 @@ namespace librealsense
             return;
         for( auto & observer : _observers )
             observer( aligned );
+    }
+
+    // Full Passive Depth hands the laser and the AE policy to the firmware; an expired or unregistered mode
+    // option means the device has no such mode and nothing is gated.
+    static bool in_full_passive_depth( const std::weak_ptr< passive_depth_mode_option > & mode )
+    {
+        auto strong = mode.lock();
+        return strong && strong->is_full_passive();
+    }
+
+    // Firmware applies these at stream start, so there is nothing for the user to change while streaming.
+    static bool sensor_is_streaming( const std::weak_ptr< uvc_sensor > & ep )
+    {
+        auto sensor = ep.lock();
+        return sensor && sensor->is_streaming();
+    }
+
+    passive_depth_locked_option::passive_depth_locked_option( std::shared_ptr< option > proxy,
+                                                              const std::weak_ptr< passive_depth_mode_option > & passive_depth_mode,
+                                                              const std::weak_ptr< uvc_sensor > & raw_ep )
+        : proxy_option( proxy )
+        , _passive_depth_mode( passive_depth_mode )
+        , _raw_ep( raw_ep )
+    {
+    }
+
+    void passive_depth_locked_option::set( float value )
+    {
+        if( in_full_passive_depth( _passive_depth_mode ) )
+            throw invalid_value_exception( "Laser controls cannot be changed in Passive Depth mode 'Full'!" );
+        if( sensor_is_streaming( _raw_ep ) )
+            throw invalid_value_exception( "This control cannot be changed while streaming!" );
+
+        proxy_option::set( value );
+    }
+
+    bool passive_depth_locked_option::is_read_only() const
+    {
+        return in_full_passive_depth( _passive_depth_mode ) || sensor_is_streaming( _raw_ep ) || proxy_option::is_read_only();
+    }
+
+    colored_ir_ae_policy_option::colored_ir_ae_policy_option( const std::weak_ptr< uvc_sensor > & raw_ep,
+                                                              const std::map< float, std::string > & description_per_value,
+                                                              const std::weak_ptr< passive_depth_mode_option > & passive_depth_mode )
+        : uvc_xu_option< uint8_t >( raw_ep,
+                                    ds::depth_xu,
+                                    ds::d500_xu_id::COLORED_IR_AE_POLICY,
+                                    "Auto exposure policy for sensor with both color and depth streams",
+                                    description_per_value,
+                                    false ) // Not settable while streaming
+        , _passive_depth_mode( passive_depth_mode )
+    {
+    }
+
+    void colored_ir_ae_policy_option::set( float value )
+    {
+        if( value == RS2_COLORED_IR_AUTO_EXPOSURE_HYBRID && in_full_passive_depth( _passive_depth_mode ) )
+            throw invalid_value_exception( "Hybrid auto exposure is not available in Full Passive Depth!" );
+
+        uvc_xu_option< uint8_t >::set( value );
+    }
+
+    option_range colored_ir_ae_policy_option::get_range() const
+    {
+        auto range = uvc_xu_option< uint8_t >::get_range();
+        if( in_full_passive_depth( _passive_depth_mode ) )
+            range.max = RS2_COLORED_IR_AUTO_EXPOSURE_COLOR_PRIORITY;
+        return range;
+    }
+
+    bool colored_ir_ae_policy_option::is_read_only() const
+    {
+        return sensor_is_streaming( _ep );
+    }
+
+    passive_depth_mode_option::passive_depth_mode_option( const std::weak_ptr< uvc_sensor > & raw_ep,
+                                                          const std::map< float, std::string > & description_per_value )
+        : uvc_xu_option< uint8_t >( raw_ep,
+                                    ds::depth_xu,
+                                    ds::d500_xu_id::PASSIVE_DEPTH,
+                                    "Which exposure classes produce depth: active only, alternating active and passive, or passive only",
+                                    description_per_value,
+                                    false ) // Not settable while streaming
+        , _full_passive( false )
+    {
+        // Seeded here so the cache is valid from the start. The caller only builds this on firmware that
+        // carries the control, so the guard is for a firmware that reports the version but not the XU.
+        try
+        {
+            _full_passive = ( uvc_xu_option< uint8_t >::query() == RS2_PASSIVE_DEPTH_MODE_FULL );
+        }
+        catch( const std::exception & )
+        {
+        }
+    }
+
+    void passive_depth_mode_option::set( float value )
+    {
+        {
+            std::lock_guard< std::mutex > lock( _set_mutex );
+            uvc_xu_option< uint8_t >::set( value );
+
+            // Read back rather than cache what we asked for, so the gated controls follow what the firmware
+            // took. A read-back that fails must not leave the previous mode cached, so fall back to the
+            // value we just wrote - the write itself succeeded, so it is the better of the two guesses.
+            try
+            {
+                _full_passive = ( uvc_xu_option< uint8_t >::query() == RS2_PASSIVE_DEPTH_MODE_FULL );
+            }
+            catch( const std::exception & e )
+            {
+                _full_passive = ( value == RS2_PASSIVE_DEPTH_MODE_FULL );
+                LOG_WARNING( "Passive Depth mode set but could not be read back: " << e.what() );
+            }
+        }
+
+        if( value != RS2_PASSIVE_DEPTH_MODE_FULL )
+            return;
+
+        // Firmware runs Full Passive on Color Priority but leaves the reported policy alone, so move it here -
+        // otherwise the control keeps showing a policy the device is not using.
+        if( auto ae_policy = _ae_policy.lock() )
+        {
+            try
+            {
+                ae_policy->set( RS2_COLORED_IR_AUTO_EXPOSURE_COLOR_PRIORITY );
+            }
+            catch( const std::exception & e )
+            {
+                LOG_WARNING( "Could not move the AE policy to Color Priority for Full Passive Depth: " << e.what() );
+            }
+        }
+    }
+
+    bool passive_depth_mode_option::is_read_only() const
+    {
+        return sensor_is_streaming( _ep );
     }
 
     power_line_freq_option::power_line_freq_option(const std::weak_ptr< uvc_sensor >& ep, rs2_option id,

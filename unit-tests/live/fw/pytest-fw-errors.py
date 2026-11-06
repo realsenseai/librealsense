@@ -3,6 +3,7 @@
 
 import logging
 import threading
+import time
 
 import pytest
 import pyrealsense2 as rs
@@ -16,12 +17,16 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
-    pytest.mark.device_exclude("D585 Proto"),
     pytest.mark.context("nightly"),
 ]
 
 STREAMING_DURATION_SECONDS = 10  # Duration to stream and monitor for FW errors
 ERROR_TOLERANCE = 0  # No firmware errors should be tolerated
+
+OPCODE_TRIGGER_ERROR = 0x4D  # HWM opcode that injects a firmware error
+ERROR_ID_REC_ERROR = 25      # one-time error class: latched once, never re-raised
+NOTIFICATION_TIMEOUT_S = 5   # the handler polls every 1 s
+SETTLE_AFTER_FIRST_S = 3     # an uncleared error would be re-reported on each poll
 
 def get_known_errors_for_firmware(current_fw_version):
     """Get list of known errors based on firmware version"""
@@ -33,6 +38,19 @@ def get_known_errors_for_firmware(current_fw_version):
         # Add other version-specific known errors here as needed
 
     return known_errors
+
+def error_polling_expected(device):
+    """D400 GMSL serves FW errors only from FW 5.17.6 with d4xx driver 1.0.7.6"""
+    connection = device.get_info(rs.camera_info.connection_type)
+    if connection == "DDS":
+        return False
+    if connection == "GMSL" and device.get_info(rs.camera_info.product_line) == "D400":
+        if not device.supports(rs.camera_info.mipi_driver_version):
+            return False
+        fw = rsutils.version(device.get_info(rs.camera_info.firmware_version))
+        driver = rsutils.version(device.get_info(rs.camera_info.mipi_driver_version))
+        return fw >= rsutils.version(5, 17, 6, 0) and driver >= rsutils.version(1, 0, 7, 6)
+    return True
 
 class FirmwareErrorMonitor:
     def __init__(self, known_errors=None):
@@ -144,6 +162,10 @@ def test_firmware_error_monitoring(test_device):
 
     log.info("Monitoring firmware errors on %d sensors: %s", len(registered_sensors), ', '.join(registered_sensors))
 
+    # Without error polling the callbacks register fine but FW errors are never reported
+    if error_polling_expected(device):
+        assert any(s.supports(rs.option.error_polling_enabled) for s in sensors), "no sensor supports FW error polling"
+
     # Start streaming
     pipe = rs.pipeline(ctx)
     # On hubless multi-device rigs (e.g. Jetson with D457 + D436) the context sees every
@@ -216,3 +238,36 @@ def test_firmware_error_monitoring(test_device):
     assert total_errors == ERROR_TOLERANCE
 
     log.info("Firmware error monitoring test completed successfully")
+
+
+@pytest.mark.device_exclude("D500*")  # 0x4D is a D400 FW command
+def test_injected_error_reported_once(test_device):
+    device, _ = test_device
+    if not error_polling_expected(device):
+        pytest.skip("GMSL FW error polling needs FW 5.17.6 and d4xx driver 1.0.7.6")
+    if device.get_info(rs.camera_info.camera_locked) == "YES":
+        pytest.skip("FW rejects error injection on locked cameras")
+
+    depth_sensor = device.first_depth_sensor()
+    assert depth_sensor.supports(rs.option.error_polling_enabled)
+
+    notifications = []
+    received = threading.Event()
+
+    def on_notification(n):
+        log.debug("notification: %s (%s)", n.get_description(), n.get_category())
+        notifications.append(n.get_description())
+        received.set()
+
+    depth_sensor.set_notifications_callback(on_notification)
+    assert depth_sensor.get_option(rs.option.error_polling_enabled) == 1
+
+    proto = rs.debug_protocol(device)
+    reply = list(proto.send_and_receive_raw_data(proto.build_command(OPCODE_TRIGGER_ERROR, ERROR_ID_REC_ERROR)))
+    assert reply[:4] == [OPCODE_TRIGGER_ERROR, 0, 0, 0], f"HWM error injection rejected: {reply[:8]}"
+
+    assert received.wait(NOTIFICATION_TIMEOUT_S),         f"no FW error notification within {NOTIFICATION_TIMEOUT_S} [sec] of injecting error {ERROR_ID_REC_ERROR}"
+    time.sleep(SETTLE_AFTER_FIRST_S)
+
+    log.info("notifications: %s", notifications)
+    assert notifications == ["REC error"]

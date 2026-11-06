@@ -45,7 +45,7 @@ namespace librealsense
     class d400_motion : public d400_motion_base
     {
     public:
-        d400_motion( std::shared_ptr< const d400_info > const & dev_info );
+        d400_motion( std::shared_ptr< const d400_info > const & dev_info, bool supports_gyro_sensitivity = false );
 
         std::shared_ptr<synthetic_sensor> create_hid_device( std::shared_ptr<context> ctx,
                                                              const std::vector<platform::hid_device_info>& all_hid_infos );
@@ -58,9 +58,8 @@ namespace librealsense
         friend class ds_fisheye_sensor;
         friend class ds_motion_sensor;
 
-        void register_gyro_sensitivity();
-
     private:
+        void register_gyro_sensitivity();
         void register_fisheye_options();
         void register_fisheye_metadata();
 

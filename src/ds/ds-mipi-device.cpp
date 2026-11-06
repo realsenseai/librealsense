@@ -4,14 +4,9 @@
 #include "ds-mipi-device.h"
 #include "ds-device-common.h"
 #include "error-handling.h"
-#include "librealsense-exception.h"
-#include "types.h"
+#include "fw-update/dfu-write.h"
 
-#include <algorithm>
-#include <atomic>
 #include <chrono>
-#include <fstream>
-#include <string>
 #include <thread>
 
 
@@ -52,50 +47,8 @@ namespace librealsense
                          _error_poller && _error_poller->is_active() };
         if( _error_poller ) _error_poller->stop();
 
-        std::ofstream fw_path_in_device( dfu_path.c_str(), std::ios::binary );
-        if( ! fw_path_in_device )
-            throw io_exception( "Firmware Update failed - wrong path or permissions missing: " + dfu_path );
-
-        // Progress + heartbeat thread; RAII joiner covers the throw path too.
-        std::atomic< bool > done{ false };
-        std::thread heartbeat( [&]() {
-            auto start = std::chrono::steady_clock::now();
-            auto last_log = start;
-            while( ! done.load() )
-            {
-                std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
-                auto now = std::chrono::steady_clock::now();
-                int elapsed = int( std::chrono::duration_cast< std::chrono::seconds >( now - start ).count() );
-                if( progress_callback )
-                    progress_callback->on_update_progress(
-                        std::min( float( elapsed ) / float( estimated_seconds ), 0.99f ) );
-                if( now - last_log >= std::chrono::seconds( 30 ) )
-                {
-                    LOG_INFO( "MIPI DFU in progress: elapsed " << elapsed << " s" );
-                    last_log = now;
-                }
-            }
-        } );
-        struct joiner { std::atomic< bool > & d; std::thread & t; ~joiner() { d = true; if( t.joinable() ) t.join(); } };
-        joiner _j{ done, heartbeat };
-
-        fw_path_in_device.write( reinterpret_cast< const char * >( fw_image ), fw_image_size );
-        if( ! fw_path_in_device )
-            throw io_exception( "Firmware Update failed - DFU chardev write error: " + dfu_path );
-
-        fw_path_in_device.close();
-        if( ! fw_path_in_device )
-            throw io_exception( "Firmware Update failed - DFU chardev flush/close error: " + dfu_path );
-
-        // Stop the heartbeat here. The terminal on_update_progress(1.0f) is the
-        // caller's responsibility — it must fire only after the caller's own
-        // post-write recovery (HW reset, GMSL relink) has completed, so the
-        // viewer's DFU dialog reports 100% at the moment the device is truly
-        // back, not the moment the DFU chardev closes.
-        done = true;
-        if( heartbeat.joinable() )
-            heartbeat.join();
-        LOG_INFO( "MIPI DFU write complete for " << dfu_path );
+        perform_dfu_chardev_write( dfu_path, fw_image, fw_image_size,
+                                   progress_callback, estimated_seconds );
 
         // Keep both options watchers and the error poller paused over the reset
         // window. The D585 disappears from I2C while HKR and GMSL restart.

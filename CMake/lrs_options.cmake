@@ -7,19 +7,18 @@
 option(ENABLE_CCACHE "Build with ccache." ON)
 option(BUILD_WITH_CUDA "Enable CUDA" OFF)
 
+# oneVPL (MIT) decodes H.264 on an Intel GPU, giving Linux what Media Foundation gives Windows. Without it H264 streams are
+# still received, just not decoded. Needs libvpl-dev and libva-dev, and the user must be in the 'render' group at runtime.
+option(BUILD_WITH_VPL "Enable H.264 GPU decoding through oneVPL (Linux, Intel GPU)" OFF)
+
 # Zero-copy GPU memory path (Jetson / integrated-GPU only). Requires BUILD_WITH_CUDA.
 # Eliminates the per-frame CPU->frame copy (capture) and the GPU host<->device round-trips.
-# Activates at runtime only on integrated GPUs; discrete GPUs keep the copy path. Default OFF
-# so a plain CUDA build is byte-for-byte identical to today.
+# Activates at runtime only on integrated GPUs; discrete GPUs keep the copy path.
 option(BUILD_WITH_CUDA_ZEROCOPY "Enable zero-copy GPU memory path (Jetson/integrated GPU only, requires BUILD_WITH_CUDA)" ${BUILD_WITH_CUDA})
+# Zero-copy needs no flag of its own on the HIP side: global_config.cmake always defines
+# RS2_USE_CUDA_ZEROCOPY for a HIP build, and rs_frame_zc_enabled() then enables the mapped
+# path per-device at runtime via rs2_is_hip_integrated(), so discrete GPUs keep the copy path.
 option(BUILD_WITH_HIP "Enable HIP/ROCm for AMD GPUs" OFF)
-# Zero-copy GPU memory path for HIP (unified-memory AMD APUs, e.g. Ryzen AI / MI300A,
-# only -- not applicable to discrete RDNA3/CDNA3 GPUs). Requires BUILD_WITH_HIP. Mirrors
-# BUILD_WITH_CUDA_ZEROCOPY: shares the same RS2_USE_CUDA_ZEROCOPY macro and the vendor-
-# neutral try_device_ptr() fast path in rscuda_utils.cuh/cuda-pointcloud.cu, which fall
-# back to the persistent-buffer copy path whenever a buffer is not pinned/mapped -- so
-# enabling this on discrete GPUs is safe (falls back every time) but pointless.
-option(BUILD_WITH_HIP_ZEROCOPY "Enable zero-copy GPU memory path (unified-memory AMD APUs only, requires BUILD_WITH_HIP)" OFF)
 
 
 
@@ -82,6 +81,7 @@ option(BUILD_PC_STITCHING "Build pointcloud-stitching example" OFF)
 option(BUILD_WITH_DDS "Access camera devices through DDS topics (requires CMake 3.16.3)" OFF)
 option(BUILD_RS2_ALL "Build realsense2-all static bundle containing all realsense libraries (with BUILD_SHARED_LIBS=OFF)" ON)
 option(ENABLE_SECURITY_FLAGS "Enable additional compiler security flags to enhance the build's security" OFF)
+option(USE_EXTERNAL_LIBDEFLATE "Use externally build libdeflate library instead of building and using the in this repo provided version" OFF)
 option(USE_EXTERNAL_LZ4 "Use externally build LZ4 library instead of building and using the in this repo provided version" OFF)
 option(USE_EXTERNAL_NLOHMANN_JSON "Use an externally built nlohmann-json development package instead of downloading it as part of this build" OFF)
 option(BUILD_ASAN "Enable AddressSanitizer" OFF)

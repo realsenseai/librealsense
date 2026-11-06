@@ -4,6 +4,8 @@ import { server } from '../../mocks/server'
 import { useAppStore } from '@/store'
 import { firmwareStatus } from '@/api/types'
 import { resetStore, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
+import { mockDevice } from '../../mocks/fixtures/devices'
+import { mockDepthSensorProfiles, mockSensors } from '../../mocks/fixtures/sensors'
 
 describe('AppStore', () => {
   beforeEach(() => {
@@ -50,7 +52,7 @@ describe('AppStore', () => {
     it('starts with default values', () => {
       const state = useAppStore.getState()
       
-      expect(state.isConnected).toBe(false)
+      expect(state.connection).toBe('starting')
       expect(state.devices).toEqual([])
       expect(state.deviceStates).toEqual({})
       expect(state.isLoadingDevices).toBe(false)
@@ -70,24 +72,17 @@ describe('AppStore', () => {
       expect(state.isChatAvailable).toBe(false)
       expect(state.chatMessages).toEqual([])
     })
-
-    it('starts with empty IMU history', () => {
-      const state = useAppStore.getState()
-      
-      expect(state.imuHistory.accel).toEqual([])
-      expect(state.imuHistory.gyro).toEqual([])
-    })
   })
 
   describe('Connection State', () => {
     it('sets connection state', () => {
       useAppStore.getState().setConnected(true)
       
-      expect(useAppStore.getState().isConnected).toBe(true)
+      expect(useAppStore.getState().connection).toBe('connected')
       
       useAppStore.getState().setConnected(false)
       
-      expect(useAppStore.getState().isConnected).toBe(false)
+      expect(useAppStore.getState().connection).toBe('reconnecting')
     })
   })
 
@@ -143,51 +138,6 @@ describe('AppStore', () => {
       useAppStore.getState().clearChat()
       
       expect(useAppStore.getState().chatMessages).toEqual([])
-    })
-  })
-
-  describe('IMU History', () => {
-    it('adds accelerometer data', () => {
-      const accelData = { timestamp: 1234567890, x: 0.1, y: 0.2, z: 9.8 }
-      
-      useAppStore.getState().addIMUData('accel', accelData)
-      
-      const state = useAppStore.getState()
-      expect(state.imuHistory.accel).toHaveLength(1)
-      expect(state.imuHistory.accel[0]).toEqual(accelData)
-    })
-
-    it('adds gyroscope data', () => {
-      const gyroData = { timestamp: 1234567890, x: 0.01, y: 0.02, z: 0.03 }
-      
-      useAppStore.getState().addIMUData('gyro', gyroData)
-      
-      const state = useAppStore.getState()
-      expect(state.imuHistory.gyro).toHaveLength(1)
-      expect(state.imuHistory.gyro[0]).toEqual(gyroData)
-    })
-
-    it('clears IMU history', () => {
-      useAppStore.getState().addIMUData('accel', { timestamp: 1, x: 0, y: 0, z: 0 })
-      useAppStore.getState().addIMUData('gyro', { timestamp: 1, x: 0, y: 0, z: 0 })
-      
-      useAppStore.getState().clearIMUHistory()
-      
-      const state = useAppStore.getState()
-      expect(state.imuHistory.accel).toEqual([])
-      expect(state.imuHistory.gyro).toEqual([])
-    })
-
-    it('limits IMU history length', () => {
-      const maxLength = useAppStore.getState().maxIMUHistoryLength
-      
-      // Add more than max entries
-      for (let i = 0; i < maxLength + 10; i++) {
-        useAppStore.getState().addIMUData('accel', { timestamp: i, x: i, y: i, z: i })
-      }
-      
-      const state = useAppStore.getState()
-      expect(state.imuHistory.accel.length).toBeLessThanOrEqual(maxLength)
     })
   })
 
@@ -324,6 +274,73 @@ describe('AppStore', () => {
       const state = useAppStore.getState()
       const configs = state.deviceStates[device.device_id].streamConfigs
       expect(configs).toContainEqual(config)
+    })
+  })
+
+  describe('Stream profiles', () => {
+    const depthId = `${mockDevice.device_id}-sensor-0`
+
+    async function loadSensors() {
+      useAppStore.setState({ deviceStates: { [mockDevice.device_id]: createMockDeviceState(mockDevice) } })
+      await useAppStore.getState().fetchSensors(mockDevice.device_id)
+      return useAppStore.getState().deviceStates[mockDevice.device_id]
+    }
+
+    function captureStart() {
+      const bodies: unknown[] = []
+      server.use(http.post('/api/v1/devices/:deviceId/sensors/:sensorId/start', async ({ request }) => {
+        bodies.push(await request.json())
+        return HttpResponse.json(null)
+      }))
+      return bodies
+    }
+
+    const rowOf = (stream: string, format: string, width: number, fps: number) =>
+      mockDepthSensorProfiles.find(p => p.stream_type === stream && p.format === format && p.width === width && p.fps === fps)!
+
+    it('starts every stream on the SDK default, and infrared at the default depth resolution/fps', async () => {
+      const state = await loadSensors()
+      const pick = (s: string) => state.streamConfigs.find(c => c.stream_type === s)!
+      expect(state.sensorConfigs[depthId]).toMatchObject({ resolution: { width: 848, height: 480 }, framerate: 30 })
+      expect(pick('infrared-1')).toMatchObject({ format: 'y8', resolution: { width: 848, height: 480 }, framerate: 30 })
+      expect(pick('color')).toMatchObject({ format: 'rgb8', resolution: { width: 1280, height: 720 }, framerate: 30 })
+      expect([pick('accel').framerate, pick('gyro').framerate]).toEqual([100, 200])
+    })
+
+    it('hides infrared index 0', async () => {
+      const ir0 = { ...rowOf('infrared', 'y8', 848, 30), stream_index: 0 }
+      server.use(http.get('/api/v1/devices/:deviceId/sensors/', () =>
+        HttpResponse.json([{ ...mockSensors[0], supported_stream_profiles: [...mockDepthSensorProfiles, ir0] }])))
+
+      const state = await loadSensors()
+
+      expect(state.streamConfigs.map(c => c.stream_type)).not.toContain('infrared-0')
+      expect(state.sensors[0].supported_stream_profiles).not.toContainEqual(ir0)
+    })
+
+    it('starts the sensor with the listed profile of each enabled stream', async () => {
+      const state = await loadSensors()
+      const ir = state.streamConfigs.find(c => c.stream_type === 'infrared-1')!
+      useAppStore.getState().updateStreamConfig(mockDevice.device_id, { ...ir, enable: true })
+      const bodies = captureStart()
+
+      await useAppStore.getState().startSensorStreaming(mockDevice.device_id, depthId)
+
+      expect(bodies).toEqual([{ profiles: [rowOf('depth', 'z16', 848, 30), rowOf('infrared', 'y8', 848, 30)] }])
+      expect(useAppStore.getState().deviceStates[mockDevice.device_id].sensorStreamingStatus[depthId])
+        .toMatchObject({ is_streaming: true, stream_types: ['depth', 'infrared-1'] })
+    })
+
+    it('does not start a format the selected resolution lacks', async () => {
+      const state = await loadSensors()
+      const ir = state.streamConfigs.find(c => c.stream_type === 'infrared-1')!
+      useAppStore.getState().updateStreamConfig(mockDevice.device_id, { ...ir, format: 'y16', enable: true })
+      const bodies = captureStart()
+
+      await useAppStore.getState().startSensorStreaming(mockDevice.device_id, depthId)
+
+      expect(bodies).toEqual([])
+      expect(useAppStore.getState().error).toBe('infrared-1 has no y16 profile at 848x480 30fps')
     })
   })
 

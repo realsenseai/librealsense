@@ -363,11 +363,15 @@ dds_device_proxy::dds_device_proxy( std::shared_ptr< const device_info > const &
             if( get_format_conversion() != format_conversion::raw )
             {
                 auto & source_profiles = sensor_proxy->_formats_converter.get_source_profiles_from_target( profile );
-                if( source_profiles.size() != 1 )
-                    LOG_ERROR( source_profiles.size() << " source profiles available for [" << profile
-                                                      << "]: " << source_profiles );
+                if( source_profiles.size() > 1 )
+                    // Expected: one stream can carry several codecs at the same geometry, e.g. H264 and MJPEG.
+                    LOG_DEBUG( source_profiles.size() << " source profiles available for [" << profile << "]: "
+                                                      << source_profiles
+                                                      << ". Actual converter according to registration order" );
                 if( ! source_profiles.empty() )
                     source_profile = source_profiles[0];
+                else
+                    LOG_ERROR( "no source profile available for [" << profile << "]" );
             }
 
             sid_index type_and_index( source_profile->get_stream_type(), source_profile->get_stream_index() );

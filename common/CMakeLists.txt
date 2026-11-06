@@ -44,6 +44,7 @@ set(COMMON_SRC
     "${CMAKE_CURRENT_LIST_DIR}/measurement.h"
     "${CMAKE_CURRENT_LIST_DIR}/measurement.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/objects-in-frame.h"
+    "${CMAKE_CURRENT_LIST_DIR}/detection-distance.h"
     "${CMAKE_CURRENT_LIST_DIR}/objects-in-frame.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/utilities/com/center-of-mass.h"
     "${CMAKE_CURRENT_LIST_DIR}/utilities/com/center-of-mass.cpp"
@@ -80,6 +81,7 @@ set(COMMON_SRC
     "${CMAKE_CURRENT_LIST_DIR}/hdr-model.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/embedded-filter-model.h"
     "${CMAKE_CURRENT_LIST_DIR}/composite-control-editor.h"
+    "${CMAKE_CURRENT_LIST_DIR}/composite-control-editor.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/embedded-filter-model.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/textual-icons.h"
     )

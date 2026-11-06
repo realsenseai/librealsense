@@ -20,6 +20,7 @@
 #include <src/depth-sensor.h>
 
 #include "ds/ds-device-common.h"
+#include <rsutils/time/timer.h>
 #include "backend-device.h"
 
 namespace librealsense
@@ -41,6 +42,7 @@ namespace librealsense
         void open( const stream_profiles & requests ) override;
         void close() override;
         rs2_intrinsics get_color_intrinsics( const stream_profile & profile ) const;
+        bool has_color1() const;   // D401 raw dual-RGB: a Color 1 profile is published
         stream_profiles init_stream_profiles() override;
         float get_depth_scale() const override;
         void set_depth_scale( float val );
@@ -55,6 +57,7 @@ namespace librealsense
     protected:
         const d400_device * _owner;
         mutable std::atomic< float > _depth_units;
+        rsutils::time::timer _min_open_timer{ std::chrono::seconds( 2 ) };
         float _stereo_baseline_mm;
         std::shared_ptr< hdr_config > _hdr_cfg;
     };
@@ -136,6 +139,7 @@ namespace librealsense
         void get_fw_details( const std::vector< uint8_t > & gvd_buff, std::string & optic_serial,
                              std::string & asic_serial, std::string & fwv ) const;
         bool is_d401_usb_device( uint8_t gvd_hw_type ) const;
+        bool is_d401_raw_dual_rgb() const;
 
         friend class d400_depth_sensor;
         friend class ds_advanced_mode_base;
@@ -148,7 +152,7 @@ namespace librealsense
         std::shared_ptr<stream_interface> _left_ir_stream;
         std::shared_ptr<stream_interface> _right_ir_stream;
         std::shared_ptr<stream_interface> _color_stream;
-        std::shared_ptr<stream_interface> _color_stream2;   // D401 GMSL dual-RGB: 2nd color (right imager)
+        std::shared_ptr<stream_interface> _color_stream2;   // D401 dual-RGB: 2nd color (right imager)
 
         uint8_t _depth_device_idx;
 

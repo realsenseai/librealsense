@@ -120,7 +120,8 @@ void hid_sensor::open( const stream_profiles & requests )
         configured_hid_profiles.push_back( platform::hid_profile{
             std::move( sensor_name ),
             fps_to_sampling_frequency(request->get_stream_type(), request->get_framerate()),
-            get_imu_sensitivity_values( request->get_stream_type() ) } );
+            get_imu_sensitivity_values( request->get_stream_type() ),
+            _imu_sensitivity_per_rs2_stream.count( RS2_STREAM_ACCEL ) > 0 } );
     }
     _hid_device->open( configured_hid_profiles );
     if( Is< librealsense::global_time_interface >( _owner ) )

@@ -138,13 +138,31 @@ cmake .. -G Ninja -DBUILD_WITH_HIP=ON
 cmake --build .
 ```
 
-By default, this targets multiple AMD architectures (gfx90a, gfx942, gfx1100, gfx1101 -- covering MI200, MI300, and RDNA3 GPUs). To build for a specific GPU:
+By default, this targets multiple AMD architectures (gfx90a, gfx942, gfx1100, gfx1101, gfx1151 -- covering MI200, MI300, RDNA3, and RDNA3.5 / Strix Halo GPUs). To build for a specific GPU:
 
 ```bash
 cmake .. -DBUILD_WITH_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx1100
 ```
 
 > **Note:** `BUILD_WITH_CUDA` and `BUILD_WITH_HIP` are mutually exclusive. See [doc/amd-hip-support.md](doc/amd-hip-support.md) for details.
+
+### H.264 Decoding
+
+Supporting cameras can expose an H.264 stream in two ways: as `H264`, handing your application the raw access units to decode
+itself, and as `RGB8`, decoded by the SDK. The `RGB8` option appears only where a decoder exists.
+
+**Windows** needs no build flag -- decoding uses Media Foundation, which is part of the OS and covers Intel, AMD and NVIDIA
+GPUs through DXVA.
+
+**Linux** decodes on Intel GPUs through [oneVPL](https://github.com/intel/libvpl) (MIT), off by default:
+
+```bash
+cmake .. -DBUILD_WITH_VPL=ON
+```
+
+This needs packages installed beforehand and a GPU the process is allowed to open; see
+[Linux installation](./doc/installation.md#h264-gpu-decoding) for the setup. Built without the flag, or run where no decoder
+exists, the H.264 stream is still fully available as passthrough -- only the SDK-decoded `RGB8` option is absent.
 
 ## Python Packages
 [![pyrealsense2](https://img.shields.io/pypi/v/pyrealsense2.svg?label=pyrealsense2&logo=pypi)](https://pypi.org/project/pyrealsense2/)

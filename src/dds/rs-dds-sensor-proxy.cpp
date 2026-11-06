@@ -27,6 +27,7 @@
 #include <src/image.h>
 
 #include <src/proc/color-formats-converter.h>
+#include <src/proc/h264-decoder.h>
 #include <src/proc/y16-10msb-to-y16.h>
 #include <src/proc/rotation-filter.h>
 
@@ -37,6 +38,8 @@
 #include <dds/rs-dds-embedded-decimation-filter.h>
 #include <dds/rs-dds-embedded-temporal-filter.h>
 #include <dds/rs-dds-embedded-close-range-filter.h>
+#include <dds/rs-dds-close-range-control.h>
+#include <src/ds/features/icr-filter-feature.h>
 
 #include <src/ds/ds-private.h>
 
@@ -53,6 +56,13 @@ using rsutils::json;
 namespace librealsense {
 
 
+// Mirrors realdds::dds_video_stream_profile::is_compressed_encoding()
+static bool is_compressed_format( rs2_format format )
+{
+    return format == RS2_FORMAT_MJPEG || format == RS2_FORMAT_H264;
+}
+
+
 dds_sensor_proxy::dds_sensor_proxy( std::string const & sensor_name,
                                     software_device * owner,
                                     std::shared_ptr< realdds::dds_device > const & dev )
@@ -60,6 +70,7 @@ dds_sensor_proxy::dds_sensor_proxy( std::string const & sensor_name,
     , _dev( dev )
     , _name( sensor_name )
     , _md_enabled( dev->supports_metadata() )
+    , _imu_xz_flipped( dev->device_info().name().find( "D555" ) != std::string::npos )
 {
     rsutils::json const & settings = owner->get_context()->get_settings();
     if( auto interval_j = settings.nested( std::string( "options-update-interval", 23 ) ) )
@@ -129,6 +140,7 @@ void dds_sensor_proxy::register_converters()
     std::set< int > y16_indexes;
     std::set< int > jpeg_indexes;
     std::set< int > z16_indexes;
+    std::set< int > h264_indexes;
     for( auto & stream : streams() )
     {
         for( auto & profile : stream.second->profiles() )
@@ -142,6 +154,8 @@ void dds_sensor_proxy::register_converters()
                     jpeg_indexes.insert( stream.first.index );
                 else if( vsp->encoding().to_rs2() == RS2_FORMAT_Z16 )
                     z16_indexes.insert( stream.first.index );
+                else if( vsp->encoding().to_rs2() == RS2_FORMAT_H264 )
+                    h264_indexes.insert( stream.first.index );
         }
     }
 
@@ -163,13 +177,40 @@ void dds_sensor_proxy::register_converters()
             { RS2_FORMAT_YUYV, RS2_FORMAT_RGB8, RS2_FORMAT_Y8, RS2_FORMAT_RGBA8, RS2_FORMAT_BGR8, RS2_FORMAT_BGRA8 },
             RS2_STREAM_COLOR ) );
 
+    // Before JPEG on purpose: the two share a stream and a geometry, and both can produce RGB8, so the one
+    // registered first wins the tie. H.264 costs far less bandwidth, so it is the better source where we can
+    // decode it; where we cannot, nothing here targets RGB8 and JPEG takes over.
+    if( h264_indexes.size() > 0 )
+    {
+        // Passthrough, so an application can take the access units and decode them itself. Offered
+        // on every platform - it needs no decoder.
+        for( int index : h264_indexes )
+            _formats_converter.register_converter(
+                processing_block_factory::create_id_pbf( RS2_FORMAT_H264, RS2_STREAM_COLOR, index ) );
+
+        // Decoding to RGB8 is only offered where the platform has a decoder
+        if( h264_decoder::is_supported() )
+        {
+            std::vector< stream_profile > target_profiles;
+            for( int index : h264_indexes )
+                target_profiles.push_back( { RS2_FORMAT_RGB8, RS2_STREAM_COLOR, index } );
+            _formats_converter.register_converter( { { RS2_FORMAT_H264, RS2_STREAM_COLOR } }, target_profiles,
+                                                   []() { return std::make_shared< h264_decoder >( RS2_FORMAT_RGB8 ); } );
+        }
+    }
+
     if( jpeg_indexes.size() > 0 )
     {
-        std::vector< stream_profile > target_profiles;
+        std::vector< stream_profile > target_profiles, passthrough_profiles;
         for( int index : jpeg_indexes )
+        {
             target_profiles.push_back( { RS2_FORMAT_RGB8, RS2_STREAM_COLOR, index } );
+            passthrough_profiles.push_back( { RS2_FORMAT_MJPEG, RS2_STREAM_COLOR, index } );
+        }
         _formats_converter.register_converter( { { RS2_FORMAT_MJPEG, RS2_STREAM_COLOR } }, target_profiles,
                                                []() { return std::make_shared< mjpeg_converter >( RS2_FORMAT_RGB8 ); } );
+        _formats_converter.register_converter( { { RS2_FORMAT_MJPEG, RS2_STREAM_COLOR } }, passthrough_profiles,
+                                               []() { return std::make_shared< identity_processing_block >(); } );
     }
 
     // Depth. A device can expose more than one, e.g. raw depth next to device-aligned depth, so the
@@ -330,14 +371,6 @@ realdds::dds_stream_profiles dds_sensor_proxy::find_dds_profiles( const libreals
 
 void dds_sensor_proxy::open( const stream_profiles & profiles )
 {
-    if( Is< perception_sensor >( this ) )
-    {
-        auto dev = dynamic_cast< device * >( &get_device() );
-        if( ! dev )
-            throw invalid_value_exception( "perception sensor's owner is not a device" );
-        dev->throw_if_perception_blocking_filter_enabled();
-    }
-
     _active_converted_profiles = profiles;
     auto source_profiles = profiles; // Start with user requested profiles
     if( get_format_conversion() != format_conversion::raw )
@@ -410,12 +443,19 @@ void dds_sensor_proxy::handle_video_data( std::vector< uint8_t > && buffer,
     if( ! vid_profile )
         throw invalid_value_exception( "non-video profile provided to on_video_frame" );
 
+    auto format = vid_profile->get_format();
     auto height = vid_profile->get_height();
     auto width = vid_profile->get_width();
     auto stride = static_cast< int >(height > 0 ? data.raw_size / height : data.raw_size );
-    auto expected_bpp = get_image_bpp(vid_profile->get_format()) / 8;
+    auto expected_bpp = get_image_bpp( format ) / 8;
     auto expected_size = height * width * expected_bpp;
-    if( data.raw_size != expected_size )
+    if( is_compressed_format( format ) )
+    {
+        // realdds already drops empty payloads; this guards in case that ever changes
+        if( ! data.raw_size )
+            throw invalid_value_exception( "Received an empty compressed frame" );
+    }
+    else if( data.raw_size != expected_size )
         throw invalid_value_exception( rsutils::string::from() << "Received frame with unexpected size " << data.raw_size << ", expected " << expected_size );
 
     auto new_frame_interface = allocate_new_video_frame( vid_profile, stride, expected_bpp, std::move( data ) );    
@@ -467,12 +507,14 @@ void dds_sensor_proxy::handle_motion_data( realdds::topics::imu_msg && imu,
     m->orientation.y = imu.imu_data().orientation().y();
     m->orientation.z = imu.imu_data().orientation().z();
     m->orientation.w = imu.imu_data().orientation().w();
-    m->angular_velocity.x = imu.gyro_data().x();  // should be in rad/sec
+    // Same IMU to depth alignment the USB path applies to D555 (diag(-1,1,-1))
+    double const xz_sign = _imu_xz_flipped ? -1. : 1.;
+    m->angular_velocity.x = xz_sign * imu.gyro_data().x();  // should be in rad/sec
     m->angular_velocity.y = imu.gyro_data().y();
-    m->angular_velocity.z = imu.gyro_data().z();
-    m->linear_acceleration.x = imu.accel_data().x();  // should be in m/s^2
+    m->angular_velocity.z = xz_sign * imu.gyro_data().z();
+    m->linear_acceleration.x = xz_sign * imu.accel_data().x();  // should be in m/s^2
     m->linear_acceleration.y = imu.accel_data().y();
-    m->linear_acceleration.z = imu.accel_data().z();
+    m->linear_acceleration.z = xz_sign * imu.accel_data().z();
 
     // No metadata for motion streams, therefore no syncer
     invoke_new_frame( new_frame,
@@ -1048,6 +1090,13 @@ rs2_frame_callback_sptr dds_sensor_proxy::get_frames_callback() const
 
 void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedded_filter > embedded_filter )
 {
+    if( ! _embedded_filter_names.insert( embedded_filter->get_name() ).second )
+    {
+        // Filter might already be added by another stream of this sensor, in that case, we just ignore it.
+        LOG_DEBUG( "embedded filter '" << embedded_filter->get_name() << "' already exists in sensor '" << get_name() << "'" );
+        return;
+    }
+
     std::shared_ptr< embedded_filter_interface > rs_embedded_filter = nullptr;
     if (auto decimation_filter = std::dynamic_pointer_cast< dds_decimation_filter >(embedded_filter) )
     {
@@ -1062,11 +1111,6 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
             {
                 return _dev->query_embedded_filter(embedded_filter);
             });
-        // Capture the owning device (which outlives this sensor, hence the filter) rather than 'this'.
-        auto owning_device = dynamic_cast< device * >( &get_device() );
-        if( ! owning_device )
-            throw invalid_value_exception( "embedded filter's owner is not a device" );
-        filter->set_activation_guard( [owning_device]() { owning_device->throw_if_perception_active(); } );
         rs_embedded_filter = filter;
     }
     else if (auto temporal_filter = std::dynamic_pointer_cast< dds_temporal_filter >(embedded_filter))
@@ -1082,14 +1126,11 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
             {
                 return _dev->query_embedded_filter(embedded_filter);
             });
-        // Capture the owning device (which outlives this sensor, hence the filter) rather than 'this'.
-        auto owning_device = dynamic_cast< device * >( &get_device() );
-        if( ! owning_device )
-            throw invalid_value_exception( "embedded filter's owner is not a device" );
-        filter->set_activation_guard( [owning_device]() { owning_device->throw_if_perception_active(); } );
         rs_embedded_filter = filter;
     }
-    else if (auto close_range_filter = std::dynamic_pointer_cast< dds_close_range_filter >(embedded_filter))
+    // Older FW publishes Enable/Downscale/Disparity Shift/Threshold only, exposed as scalar options
+    else if( std::dynamic_pointer_cast< dds_close_range_filter >( embedded_filter )
+             && ! find_dds_option_by_name( embedded_filter->get_options(), "Filter Type" ) )
     {
         rs_embedded_filter = std::make_shared< rs_dds_embedded_close_range_filter >(
             embedded_filter,
@@ -1102,6 +1143,21 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
             {
                 return _dev->query_embedded_filter(embedded_filter);
             });
+    }
+    else if (auto close_range_filter = std::dynamic_pointer_cast< dds_close_range_filter >(embedded_filter))
+    {
+        // All parameters as rs2_icr_control. Same feature as USB, only the transport of the payload differs
+        auto feature = std::make_shared< icr_filter_feature >(
+            *_owner,
+            *this,
+            std::make_shared< rs_dds_close_range_control >( embedded_filter,
+                                                            [=]( json options_value )
+                                                            {
+                                                                // The local values get cached as part of the reply
+                                                                _dev->set_embedded_filter( embedded_filter, std::move( options_value ) );
+                                                            } ) );
+        _owner->register_feature( feature );
+        rs_embedded_filter = feature->get_filter();
     }
     else
     {

@@ -25,6 +25,9 @@ The AMD HIP/ROCm GPU acceleration support and the related build and unit-test in
 | yaml-cpp (rosbag2) | https://github.com/jbeder/yaml-cpp | MIT License | Copyright (c) Jesse Beder |
 | imgui_md | https://github.com/mekhontsev/imgui_md | MIT License | Copyright (c) 2021 Dmitry Mekhontsev |
 | md4c | https://github.com/mity/md4c | MIT License | Copyright (c) 2016-2026 Martin Mitáš |
+| oneVPL (libvpl) | https://github.com/intel/libvpl | MIT License | Copyright (c) Intel Corporation |
+| libva | https://github.com/intel/libva | MIT License | Copyright (c) 2007 Intel Corporation |
+| libdrm | https://gitlab.freedesktop.org/mesa/drm | MIT License | Copyright (c) 2005 Adam Jackson, Copyright (c) Intel Corporation |
 
 ###### MIT License 
 The MIT License (MIT)
@@ -79,7 +82,6 @@ This notice may not be removed or altered from any source distribution.
 
 | Component | Home Page | License| Copyright |
 | ------- | ------- | ------- | ------- |
-| HIDAPI library | https://github.com/signal11/hidapi|  BSD-3-Clause license  |  Copyright (c) 2010, Alan Ott, Signal 11 Software |
 | ross_comm | https://github.com/ros/ros_comm | BSD-3-Clause  | Copyright (c) 2008, Willow Garage, Inc.  |
 | class_loader (rosbag2) | https://github.com/ros/class_loader | BSD-3-Clause | Copyright (c) Willow Garage, Inc. |
 | pluginlib (rosbag2) | https://github.com/ros/pluginlib | BSD-3-Clause | Copyright (c) Willow Garage, Inc. |

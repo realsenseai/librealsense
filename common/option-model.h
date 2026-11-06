@@ -32,7 +32,7 @@ namespace rs2
     class option_model
     {
     public:
-        bool draw( std::string& error_message, notifications_model& model, bool new_line = true, bool use_option_name = true );
+        bool draw( std::string& error_message, notifications_model& model, bool new_line = true );
         void update_supported( std::string& error_message );
         void update_read_only_status( std::string& error_message );
         void update_all_fields( std::string& error_message, notifications_model& model );
@@ -92,7 +92,7 @@ namespace rs2
         // Route a user-initiated write to the synchronous or async path per write_synchronously.
         void write_value( float new_value, std::string & error_message );
         bool draw_checkbox( notifications_model& model, std::string& error_message, const char* description );
-        bool draw_combobox( notifications_model& model, std::string& error_message, const char* description, bool new_line, bool use_option_name );
+        bool draw_combobox( notifications_model& model, std::string& error_message, const char* description, bool new_line );
         bool draw_slider( notifications_model& model, std::string& error_message, const char* description, bool use_cm_units );
         bool slider_selected( rs2_option opt,
             float value,
@@ -154,6 +154,15 @@ namespace rs2
         float _user_request_value = 0.f;
         rsutils::time::stopwatch _user_request_stopwatch;
 
+        // Arrow-key nudges on the slider are batched: the value is shown at once (through the
+        // user-request mask above) but written only after a short quiet period, so a held or
+        // repeatedly pressed key produces one FW write instead of one per step.
+        void queue_arrow_nudge( float value );
+        void flush_arrow_nudge( std::string & error_message );
+        bool _arrow_nudge_pending = false;
+        float _arrow_nudge_value = 0.f;
+        rsutils::time::stopwatch _arrow_nudge_stopwatch;
+
         // Cross-thread async-error state, see option_async_state for layout. Eagerly
         // allocated so option_model copies (e.g., map-insertion of create_option_model's
         // return value) keep the same state; the worker callback captures this
@@ -161,13 +170,6 @@ namespace rs2
         // still in mid-FW-call when option_model destructs.
         std::shared_ptr< option_async_state > _async_state = std::make_shared< option_async_state >();
     };
-
-    // Holes Filling is titled by its description rather than its name, to match the 3rd-party tools;
-    // null for every other option, which is titled by its name
-    inline char const * alternative_option_title( rs2_option opt )
-    {
-        return opt == RS2_OPTION_HOLES_FILL ? "Persistency mode" : nullptr;
-    }
 
     option_model create_option_model(option_value const & opt,
         const std::string& opt_base_label,

@@ -14,8 +14,8 @@
 // The label/id helpers below must produce strings identical to what the viewer renders.
 // SetRef("Control Panel") scopes subsequent item lookups to the viewer's left-side panel;
 // most helpers call it first so that ItemClick/ItemOpen resolve within the correct window.
-// Sleep() is skipped in --auto (fast) mode; use SleepNoSkip(seconds, framestep) to wait
-// real wall-clock time.
+// Under --auto (Fast + NoThrottle), imgui->Sleep and SleepNoSkip only advance the
+// simulated frame clock; use sleep() / wait_until() to wait real wall-clock time.
 // ---------------------------------------------------------------------------
 
 rs2::device_model & viewer_test::find_first_device_or_exit()
@@ -62,7 +62,7 @@ void viewer_test::expand_sensor_panel( rs2::device_model & model,
 {
     imgui->SetRef( "Control Panel" );
     imgui->ItemOpen( sensor_label( model, sub ).c_str() );
-    imgui->SleepNoSkip( 0.3f, 0.1f );
+    sleep( 0.3f );
 }
 
 void viewer_test::collapse_sensor_panel( rs2::device_model & model,
@@ -70,7 +70,7 @@ void viewer_test::collapse_sensor_panel( rs2::device_model & model,
 {
     imgui->SetRef( "Control Panel" );
     imgui->ItemClose( sensor_label( model, sub ).c_str() );
-    imgui->SleepNoSkip( 0.3f, 0.1f );
+    sleep( 0.3f );
 }
 
 void viewer_test::expand_controls( rs2::device_model & model,
@@ -83,7 +83,7 @@ void viewer_test::expand_controls( rs2::device_model & model,
     imgui->SetRef( "Control Panel" );
     std::string path = sensor_label( model, sub ) + "/" + controls_label( model, sub );
     imgui->ItemOpen( path.c_str() );
-    imgui->SleepNoSkip( 0.3f, 0.1f );
+    sleep( 0.3f );
 }
 
 void viewer_test::collapse_controls( rs2::device_model & model,
@@ -94,7 +94,7 @@ void viewer_test::collapse_controls( rs2::device_model & model,
     imgui->SetRef( "Control Panel" );
     std::string path = sensor_label( model, sub ) + "/" + controls_label( model, sub );
     imgui->ItemClose( path.c_str() );
-    imgui->SleepNoSkip( 0.3f, 0.1f );
+    sleep( 0.3f );
 }
 
 void viewer_test::click_stream_toggle_on( rs2::device_model & model,
@@ -130,7 +130,7 @@ void viewer_test::click_device_menu_item( rs2::device_model & model, const std::
 
     imgui->SetRef( "Control Panel" );
     imgui->ItemClick( bars_btn.c_str() );
-    imgui->SleepNoSkip( 0.5f, 0.1f );
+    sleep( 0.5f );
 
     IM_CHECK_SILENT( imgui->UiContext->NavWindow != nullptr );
     imgui->SetRef( imgui->UiContext->NavWindow );
@@ -234,7 +234,7 @@ void viewer_test::set_controls_filter( rs2::device_model & model,
     // the box sits at the sensor level, above the Controls section, so it covers every group
     imgui->ItemInput( ImHashStr( "##options_filter", 0, sensor_id_seed( model, sub ) ) );
     imgui->KeyCharsReplaceEnter( text.c_str() );
-    imgui->SleepNoSkip( 0.3f, 0.1f );
+    sleep( 0.3f );
 }
 
 void viewer_test::click_controls_filter_clear( rs2::device_model & model,
@@ -245,7 +245,7 @@ void viewer_test::click_controls_filter_clear( rs2::device_model & model,
         << rs2::textual_icons::times_circle << "##clear_options_filter,"
         << sub->s->get_info( RS2_CAMERA_INFO_NAME ) << "," << model.id;
     imgui->ItemClick( ImHashStr( label.c_str(), 0, sensor_id_seed( model, sub ) ) );
-    imgui->SleepNoSkip( 0.3f, 0.1f );
+    sleep( 0.3f );
 }
 
 std::string viewer_test::post_processing_label( rs2::device_model & model )
@@ -401,7 +401,7 @@ void viewer_test::expand_post_processing( rs2::device_model & model,
     std::string path = rsutils::string::from()
         << sensor_label( model, sub ) << "/Post-Processing##" << model.id;
     imgui->ItemOpen( path.c_str() );
-    imgui->SleepNoSkip( 0.3f, 0.1f );
+    sleep( 0.3f );
 }
 
 void viewer_test::enable_post_processing( rs2::device_model & model,
@@ -415,7 +415,7 @@ void viewer_test::enable_post_processing( rs2::device_model & model,
         << " " << rs2::textual_icons::toggle_off << "##" << model.id << ","
         << sub->s->get_info( RS2_CAMERA_INFO_NAME ) << ",post";
     imgui->ItemClick( label.c_str() );
-    imgui->SleepNoSkip( 0.3f, 0.1f );
+    sleep( 0.3f );
 }
 
 void viewer_test::enable_post_processing_filter( rs2::device_model & model,
@@ -435,7 +435,7 @@ void viewer_test::enable_post_processing_filter( rs2::device_model & model,
         << " " << rs2::textual_icons::toggle_off << "##" << model.id << ","
         << sub->s->get_info( RS2_CAMERA_INFO_NAME ) << "," << pb->get_name();
     imgui->ItemClick( label.c_str() );
-    imgui->SleepNoSkip( 0.3f, 0.1f );
+    sleep( 0.3f );
 }
 
 void viewer_test::expand_post_processing_filter( rs2::device_model & model,
@@ -447,7 +447,7 @@ void viewer_test::expand_post_processing_filter( rs2::device_model & model,
         << sensor_label( model, sub ) << "/Post-Processing##" << model.id
         << "/" << pb->get_name() << "##" << model.id;
     imgui->ItemOpen( path.c_str() );
-    imgui->SleepNoSkip( 0.3f, 0.1f );
+    sleep( 0.3f );
 }
 
 void viewer_test::set_post_processing_value( rs2::device_model & model,

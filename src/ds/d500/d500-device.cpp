@@ -19,6 +19,9 @@
 
 #include <src/ds/features/amplitude-factor-feature.h>
 #include <src/ds/features/auto-exposure-roi-feature.h>
+#include <src/ds/features/decimation-filter-feature.h>
+#include <src/ds/features/temporal-filter-feature.h>
+#include <src/ds/features/icr-filter-feature.h>
 
 #include "proc/depth-formats-converter.h"
 #include "proc/y8i-to-y8y8.h"
@@ -27,11 +30,16 @@
 #include <rsutils/type/fourcc.h>
 using rs_fourcc = rsutils::type::fourcc;
 
+#include <rsutils/string/from.h>
 #include <rsutils/string/hexdump.h>
 #include <rsutils/version.h>
 
 #include <vector>
 #include <string>
+#include <chrono>
+#include <cstring>
+#include <thread>
+#include <algorithm>
 
 #include <src/ds/d500/d500-debug-protocol-calibration-engine.h>
 
@@ -46,8 +54,6 @@ namespace librealsense
     std::map<uint32_t, rs2_format> d500_depth_fourcc_to_rs2_format = {
         {rs_fourcc('Y','U','Y','2'), RS2_FORMAT_YUYV},
         {rs_fourcc('Y','U','Y','V'), RS2_FORMAT_YUYV},
-        {rs_fourcc('U','Y','V','Y'), RS2_FORMAT_UYVY},
-        {rs_fourcc('G','R','E','Y'), RS2_FORMAT_Y8},
         {rs_fourcc('Y','8','I',' '), RS2_FORMAT_Y8I},
         {rs_fourcc('W','1','0',' '), RS2_FORMAT_W10},
         {rs_fourcc('Y','1','6',' '), RS2_FORMAT_Y16},
@@ -62,8 +68,6 @@ namespace librealsense
     std::map<uint32_t, rs2_stream> d500_depth_fourcc_to_rs2_stream = {
         {rs_fourcc('Y','U','Y','2'), RS2_STREAM_COLOR},
         {rs_fourcc('Y','U','Y','V'), RS2_STREAM_COLOR},
-        {rs_fourcc('U','Y','V','Y'), RS2_STREAM_INFRARED},
-        {rs_fourcc('G','R','E','Y'), RS2_STREAM_INFRARED},
         {rs_fourcc('Y','8','I',' '), RS2_STREAM_INFRARED},
         {rs_fourcc('W','1','0',' '), RS2_STREAM_INFRARED},
         {rs_fourcc('Y','1','6',' '), RS2_STREAM_INFRARED},
@@ -139,8 +143,9 @@ namespace librealsense
     {
         // Aligned depth is a depth-sized virtual rectified color viewport, so per FW it is interpreted with
         // rectified color intrinsics scaled and cropped to the depth dimensions - not with depth's own.
+        // In Dual RGB the aligned-to color is Color 1, the left imager, which shares depth's own intrinsics.
         if( profile.stream == RS2_STREAM_DEPTH && _owner->_aligned_depth_option
-            && _owner->_aligned_depth_option->is_aligned() )
+            && _owner->_aligned_depth_option->is_aligned() && ! ds::is_dual_rgb_pid( _owner->_pid ) )
             return get_color_intrinsics( profile );
 
         return get_d500_intrinsic_by_resolution(
@@ -519,19 +524,21 @@ namespace librealsense
 
             if ((_device_capabilities & ds_caps::CAP_INTERCAM_HW_SYNC) == ds_caps::CAP_INTERCAM_HW_SYNC)
             {
-                if( _fw_version >= firmware_version( "7.58.40929.13516" ) )
+                // The sync-mode XU ships on FW >= 7.58.40929.13516. D585S runs a separate 8.x FW line
+                // with no such XU, so it keeps the HW-monitor SET/GET_CAM_SYNC path regardless of FW
+                // version.
+                if( _pid != ds::D585S_PID && _fw_version >= firmware_version( "7.58.40929.13516" ) )
                 {
-                    // GMSL: d4xx kernel driver exposes the D457-style range 0..2 (0:Internal, 1:Master, 2:External);
+                    // GMSL: the d4xx driver exposes range 0..2 and skip-masks 1 (Master) for D5xx, so only 0:Internal, 2:External are labeled;
                     // USB: FW register 0x2C uses the D500-native 2:Internal, 3:External. Different range → different
                     // labels are needed for the viewer to render this as an enum combo rather than a slider.
                     std::map< float, std::string > description_per_value = _is_mipi_device
                         ? std::map< float, std::string >{ { 0.f, "Internal" },
-                                                          { 1.f, "Master" },
                                                           { 2.f, "External" } }
                         : std::map< float, std::string >{ { 2.f, "Internal" },
                                                           { 3.f, "External" } };
                     const char * desc = _is_mipi_device
-                        ? "Inter-camera synchronization mode: 0:Internal, 1:Master, 2:External"
+                        ? "Inter-camera synchronization mode: 0:Internal, 2:External"
                         : "Inter-camera synchronization mode: 2:Internal, 3:External";
                     depth_sensor.register_option( RS2_OPTION_INTER_CAM_SYNC_MODE,
                                                   std::make_shared< uvc_xu_option< uint16_t > >(
@@ -609,16 +616,18 @@ namespace librealsense
                 LOG_DEBUG( "Align Depth is not supported by this firmware: " << e.what() );
             }
 
-            if( d5x5_family_pids.count( _pid )
+            if( d5x5_dual_rgb_mode_pids.count( _pid )
                 && _fw_version >= firmware_version( "7.58.40897.13078" ) )
             {
+                // The camera rejects a reset sent right after the write, so wait for the new mode to read back
                 depth_sensor.register_option( RS2_OPTION_SENSORS_CONFIG_MODE,
-                    std::make_shared< uvc_xu_option< uint8_t > >(
+                    std::make_shared< ensure_set_xu_option< uint8_t > >(
                         raw_depth_sensor,
                         depth_xu,
                         d500_xu_id::DUAL_RGB_MODE,
                         "Dedicated color sensor (0) vs dual RGB (1). Requires a hardware reset to take effect.",
                         std::map< float, std::string >{ { 0.f, "Dedicated Color Sensor" }, { 1.f, "Dual RGB" } },
+                        std::chrono::milliseconds( 250 ),
                         false /* not settable while streaming */ ) );
             }
 
@@ -682,7 +691,7 @@ namespace librealsense
         // filters that can set a bit here requires (make_always_enabled_param_parser has no
         // flags-bit check, so an older FW without this field would otherwise report it as
         // supported and hand back garbage bytes). On D555, Decimation/Temporal register at
-        // 7.58.39807.10573 but HDRD needs 7.58.45911.14188 (see d500-factory.cpp's rs555_device) -
+        // 7.58.39807.10573 but ICR needs 7.58.45911.14188 (see d500-factory.cpp's rs555_device) -
         // the higher of the two applies here too, so this PID currently needs no special case.
         bool registers_dpp_filters = d5x5_family_pids.count( _pid )
             || _pid == ds::D585_LEGACY_PID
@@ -823,13 +832,142 @@ namespace librealsense
         register_feature( std::make_shared< auto_exposure_roi_feature >( get_depth_sensor(), _hw_monitor ) );
     }
 
+    static int32_t range_field( const std::vector< uint8_t > & raw )
+    {
+        int32_t value = 0;
+        if( ! raw.empty() )
+            std::memcpy( &value, raw.data(), std::min( raw.size(), sizeof( value ) ) );
+        return value;
+    }
+
+    // A control the firmware does not publish answers with an all-zero range (V4L2) or fails the query
+    // outright (WMF). Not every platform publishes the same set - e.g. no backlight compensation over GMSL.
+    static bool is_published( const platform::control_range & range )
+    {
+        return range_field( range.min ) || range_field( range.max )
+            || range_field( range.def ) || range_field( range.step );
+    }
+
+    // Both probes ask the hardware directly, so a control the firmware lacks never costs an option object
+    // that is built only to be dropped.
+    bool d500_device::is_xu_published( const std::shared_ptr< uvc_sensor > & ep, const platform::extension_unit & xu,
+                                       uint8_t control, int size, rs2_option id )
+    {
+        if( ! ep )
+            return false;
+        try
+        {
+            return is_published( ep->invoke_powered( [&]( platform::uvc_device & dev )
+                                                     { return dev.get_xu_range( xu, control, size ); } ) );
+        }
+        catch( const std::exception & e )
+        {
+            LOG_DEBUG( "Control " << id << " not published: " << e.what() );
+            return false;
+        }
+    }
+
+    bool d500_device::is_pu_published( const std::shared_ptr< uvc_sensor > & ep, const platform::processing_unit & pu,
+                                       rs2_option id )
+    {
+        if( ! ep )
+            return false;
+        try
+        {
+            return is_published( ep->invoke_powered( [&]( platform::uvc_device & dev )
+                                                     { return dev.get_pu_range( pu, id ); } ) );
+        }
+        catch( const std::exception & e )
+        {
+            LOG_DEBUG( "Control " << id << " not published: " << e.what() );
+            return false;
+        }
+    }
+
+    // Off is "ensure off": a stream the camera does not know, or has no request for, is left alone. The camera applies
+    // a request asynchronously; routing by metadata makes waiting for `applied` unnecessary.
+    void d500_device::enable_muxed_stream( uint32_t stream_id, bool on, uint32_t width, uint32_t height, uint32_t fps )
+    {
+        using namespace ds;
+        hwmon_response_type response = d500_hwmon_response::SUCCESS;
+        // A Mapping switch may still be draining on the camera worker, so a not-ready camera is given some time
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 1500 );
+        auto send = [&]( uint32_t action, uint32_t enable, std::vector< uint8_t > profile = {} )
+        {
+            command cmd( MUX_CONTROL, MUX_CONTROL_VERSION, action, stream_id, enable );
+            cmd.data = std::move( profile );
+            auto reply = _hw_monitor->send( cmd, &response );
+            while( response == d500_hwmon_response::SW_NOT_READY && std::chrono::steady_clock::now() < deadline )
+            {
+                std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+                reply = _hw_monitor->send( cmd, &response );
+            }
+            d500_mux_state state{};
+            // The profile, when sent, is echoed before the state
+            if( reply.size() >= cmd.data.size() + sizeof( state ) )
+                std::memcpy( &state, reply.data() + cmd.data.size(), sizeof( state ) );
+            return state;
+        };
+
+        d500_mux_state state;
+        if( ! on )
+        {
+            state = send( MUX_GET_STATE, 0 );
+            // The camera rejects the query for a stream it does not know; any other failure is reported
+            if( response != d500_hwmon_response::SUCCESS && response != d500_hwmon_response::INVALID_PARAM )
+                throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
+                                                                       << " state query rejected, error " << response );
+            if( response != d500_hwmon_response::SUCCESS )
+                LOG_DEBUG( "MUX stream " << stream_id << " is unknown to the camera; nothing to disable" );
+            if( ! state.requested )
+                return;
+            state = send( MUX_SET_ENABLE, 0 );
+            if( state.requested || response != d500_hwmon_response::SUCCESS )
+                throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
+                                                                       << " disable rejected, error " << response );
+        }
+        else
+        {
+            const uint64_t packed = ( uint64_t( width ) << 32 ) | ( uint64_t( height ) << 16 ) | fps;
+            std::vector< uint8_t > profile( sizeof( packed ) );
+            std::memcpy( profile.data(), &packed, sizeof( packed ) );
+            state = send( MUX_ENABLE_WITH_PROFILE, 1, profile );
+            // Camera firmware without the profile action does not know it, and picks the rate itself
+            if( response == d500_hwmon_response::COMMAND_NOT_SUPPORTED )
+            {
+                LOG_WARNING( "MUX stream " << stream_id << " profile action not supported by the camera; enabling without a rate, "
+                                           << "the requested " << fps << " fps may not be served" );
+                state = send( MUX_SET_ENABLE, 1 );
+            }
+            if( response != d500_hwmon_response::SUCCESS )
+                throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
+                                                                       << " enable rejected, error " << response );
+            if( ! state.requested )
+                throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
+                                                                       << " enable returned requested 0" );
+        }
+        LOG_DEBUG( "MUX stream " << stream_id << " enable(" << on << "): requested " << state.requested << ", applied "
+                                 << state.applied << ", capture active " << state.capture_active );
+    }
+
+    void d500_device::register_dpp_embedded_filters()
+    {
+        // MIPI publishes these CIDs later than USB. Older firmware on either transport ignores
+        // the composite protocol entirely, so we skip registration below the transport's gate.
+        const auto min_fw = _is_mipi_device
+            ? firmware_version( "7.58.46315.15221" )
+            : firmware_version( "7.58.45911.14188" );
+        if( _fw_version < min_fw )
+            return;
+        auto & depth_sensor = dynamic_cast< d500_depth_sensor & >( get_depth_sensor() );
+        register_feature( std::make_shared< decimation_filter_feature >( depth_sensor, _is_mipi_device ) );
+        register_feature( std::make_shared< temporal_filter_feature >( depth_sensor, _is_mipi_device ) );
+        register_feature( std::make_shared< icr_filter_feature >( *this, depth_sensor, _is_mipi_device ) );
+    }
+
     void d500_device::register_converters( synthetic_sensor & depth_sensor )
     {
         depth_sensor.register_processing_block( processing_block_factory::create_id_pbf(RS2_FORMAT_Z16, RS2_STREAM_DEPTH) );
-
-        // On MIPI/GMSL only Y8I is functional, Y8 for left IR only is not supported by FW.
-        if( ! _is_mipi_device )
-            depth_sensor.register_processing_block( processing_block_factory::create_id_pbf(RS2_FORMAT_Y8, RS2_STREAM_INFRARED, 1) );
 
         depth_sensor.register_processing_block( { {RS2_FORMAT_Y8I} },
                                                 { {RS2_FORMAT_Y8, RS2_STREAM_INFRARED, 1} , {RS2_FORMAT_Y8, RS2_STREAM_INFRARED, 2} },

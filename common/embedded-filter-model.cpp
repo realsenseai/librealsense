@@ -4,13 +4,10 @@
 #include <librealsense2/rs.hpp>
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <algorithm>
-#include <cstdlib>
-#include <cstring>
 #include <string>
 #include "subdevice-model.h"
 #include "embedded-filter-model.h"
 #include "control-section.h"
-#include "textual-icons.h"
 #include "viewer.h"
 
 
@@ -18,10 +15,6 @@ namespace rs2
 {
     namespace
     {
-        // Ties the manual-entry pencil icon and the number it opens together visually - the same
-        // color on both is what says "these two are one mode," not just proximity.
-        const ImVec4 manual_edit_color( 1.0f, 0.65f, 0.0f, 1.0f );
-
         // DEBUG: every field read back from FW for RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP -
         // called only after a real GET, never an every-frame no-op re-read. LOG_DEBUG so this only
         // emits at DEBUG+ verbosity, not the default INFO level.
@@ -61,7 +54,7 @@ namespace rs2
                        << v.reserved[2] << "," << v.reserved[3] << "]" );
         }
 
-        // No enum-valued fields to clamp here (unlike sanitize_hdrd_control() below) - every field
+        // No enum-valued fields to clamp here (unlike sanitize_icr_control() below) - every field
         // is just range-bounded. Still zeroes the reserved slots - same "MUST be zero on SET" rule.
         void sanitize_temporal_filter_dpp_config( rs2_temporal_filter_dpp_config & v )
         {
@@ -70,8 +63,8 @@ namespace rs2
         }
 
         // Same scheme as print_decimation_filter_dpp_config() above, for
-        // RS2_COMPOSITE_OPTION_HDRD_CONTROL.
-        void print_hdrd_control( const rs2_hdrd_control & v )
+        // RS2_COMPOSITE_OPTION_ICR_CONTROL.
+        void print_icr_control( const rs2_icr_control & v )
         {
             LOG_DEBUG( "[Improved Close Range GET] version=" << (int)v.header.version
                        << " flags=" << (int)v.header.flags
@@ -91,7 +84,7 @@ namespace rs2
         // A real device's firmware may still speak the pre-design-review wire layout, so a field
         // can land outside its enum's legal range. Called after every raw device read, before any
         // branching/display code uses it, so the stored value and what's shown stay consistent.
-        void sanitize_hdrd_control( rs2_hdrd_control & v )
+        void sanitize_icr_control( rs2_icr_control & v )
         {
             v.filter_type = std::min( std::max( v.filter_type, 0 ), 1 );
             v.downscale_ratio = std::min( std::max( v.downscale_ratio, 1 ), 2 );
@@ -110,7 +103,7 @@ namespace rs2
         std::shared_ptr<rs2::embedded_filter> filter,
         viewer_model& viewer,
         std::string& error_message)
-        : _embedded_filter(filter), _viewer(viewer), _destructing(false)
+        : _embedded_filter(filter), _viewer(viewer), _owner(owner), _destructing(false)
     {
         _name = rs2_embedded_filter_type_to_string(type);
 
@@ -151,7 +144,7 @@ namespace rs2
     void embedded_filter_model::draw_composite_options( std::string & error_message )
     {
         // Composite options have no generic per-field editing UI - Decimation, Temporal Filter DPP
-        // and HDRD each get a hardcoded editor below; everything else shows read-only metadata.
+        // and ICR each get a hardcoded editor below; everything else shows read-only metadata.
         for( auto id : _composite_option_ids )
         {
             try
@@ -166,12 +159,9 @@ namespace rs2
                     draw_temporal_filter_dpp_control_editor( error_message );
                     continue;
                 }
-                if( id == RS2_COMPOSITE_OPTION_HDRD_CONTROL )
+                if( id == RS2_COMPOSITE_OPTION_ICR_CONTROL )
                 {
-                    // No always-visible description line here - draw_hdrd_control_editor shows
-                    // it as a tooltip on hovering the framed control instead, to save vertical
-                    // space in this narrow side panel.
-                    draw_hdrd_control_editor( error_message );
+                    draw_icr_control_editor( error_message );
                     continue;
                 }
 
@@ -193,111 +183,63 @@ namespace rs2
         }
     }
 
-    // ==== RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP editor =====
-    // The InputText half of draw_decimation_filter_dpp_manual_editable_field()'s two editing
-    // modes: a narrow, centered box seeded with the current value; Enter parses, clamps, commits,
-    // then flips back to slider mode. touch() fires every frame this box has focus so a countdown
-    // can't fire mid-edit.
-    bool embedded_filter_model::draw_decimation_filter_dpp_manual_input( const char * id, int & value, int min_v, int max_v,
-                                                                          bool & edit_mode, std::string & edit_buf )
+    // ==== Composite editors =====
+    namespace
     {
-        char buf[32] = {};
-        strncpy( buf, edit_buf.c_str(), sizeof( buf ) - 1 );
-
-        float avail_width = ImGui::GetContentRegionAvail().x;
-        float input_width = ImGui::CalcTextSize( "000000" ).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-        ImGui::SetCursorPosX( ImGui::GetCursorPosX() + std::max( 0.0f, ( avail_width - input_width ) * 0.5f ) );
-        ImGui::PushItemWidth( input_width );
-        ImGui::PushStyleColor( ImGuiCol_Text, manual_edit_color );
-        std::string input_id = rsutils::string::from() << "##" << id << "_input";
-        bool submitted = ImGui::InputText( input_id.c_str(), buf, sizeof( buf ),
-                                            ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_EnterReturnsTrue );
-        ImGui::PopStyleColor();
-        ImGui::PopItemWidth();
-
-        if( submitted )
+        // Framing/dim/commit orchestration shared by the three editors: frame the fields plus a
+        // Reset-to-Default button, grey the box via global alpha (not BeginDisabled) while the
+        // filter is off so fields stay clickable - editing while off forces enable back on at
+        // commit time via before_commit.
+        template< typename T, typename RangeT >
+        void draw_composite_editor( composite_control_editor< T > & editor,
+                                    float extra_width,
+                                    const std::shared_ptr< rs2::embedded_filter > & filter,
+                                    rs2_composite_option_id id,
+                                    bool enabled,
+                                    bool hold_commit,
+                                    std::string & error_message,
+                                    const std::function< bool() > & draw_fields,
+                                    const std::function< void( T & ) > & sanitize,
+                                    const std::function< void( T & ) > & before_commit )
         {
-            char * end = nullptr;
-            long parsed = std::strtol( buf, &end, 10 );
-            if( end != buf )
-            {
-                value = (int)std::min( std::max( parsed, (long)min_v ), (long)max_v );
-                _decimation_filter_dpp_editor.touch();
-                _decimation_filter_dpp_editor.finalize( _decimation_filter_dpp_editor.numeric_commit_delay );
-            }
-            edit_mode = false;
-        }
-        else
-            edit_buf = buf;
+            editor.extra_width = extra_width;
+            ImGui::Dummy( ImVec2( 0, 4 ) );
+            ImVec2 frame_min = ImGui::GetCursorScreenPos();
+            frame_min.x -= 9.f;   // same gap to the sliders on the left as the right
+            frame_min.y -= 4.f;
+            float frame_width = ImGui::GetContentRegionAvail().x;
 
-        if( ImGui::IsItemActive() )
-            _decimation_filter_dpp_editor.touch();
-        return ImGui::IsItemActive();
-    }
+            if( ! enabled )
+                ImGui::PushStyleVar( ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.35f );
 
-    // The slider half of draw_decimation_filter_dpp_manual_editable_field()'s two editing modes.
-    // ImGui sliders don't nudge via arrow keys on their own, so it's implemented by hand: one
-    // focused arrow press is one complete, discrete edit (touch()+finalize() together).
-    bool embedded_filter_model::draw_decimation_filter_dpp_slider_with_arrows( const char * id, int & value, int min_v, int max_v )
-    {
-        std::string slider_id = rsutils::string::from() << "##" << id;
-        if( ImGui::SliderInt( slider_id.c_str(), &value, min_v, max_v ) )
-            _decimation_filter_dpp_editor.touch();
-        if( ImGui::IsItemActive() )
-            _decimation_filter_dpp_editor.touch();
-        if( ImGui::IsItemDeactivatedAfterEdit() )
-            _decimation_filter_dpp_editor.finalize( _decimation_filter_dpp_editor.numeric_commit_delay );
-        else if( ImGui::IsItemFocused() && ! ImGui::IsItemActive() )
-        {
-            if( ImGui::IsKeyPressed( ImGuiKey_RightArrow ) )
-            {
-                value = std::min( value + 1, max_v );
-                _decimation_filter_dpp_editor.touch();
-                _decimation_filter_dpp_editor.finalize( _decimation_filter_dpp_editor.fast_commit_delay );
-            }
-            else if( ImGui::IsKeyPressed( ImGuiKey_LeftArrow ) )
-            {
-                value = std::max( value - 1, min_v );
-                _decimation_filter_dpp_editor.touch();
-                _decimation_filter_dpp_editor.finalize( _decimation_filter_dpp_editor.fast_commit_delay );
-            }
-        }
-        return ImGui::IsItemActive();
-    }
+            bool any_field_active = draw_fields();
+            any_field_active |= editor.template draw_reset_to_default< RangeT >( filter, id, error_message, sanitize );
+            ImGui::Dummy( ImVec2( 0, 6 ) );   // bottom padding inside the pending-commit border
 
-    // One "label + pencil-toggle + (slider OR manual InputText)" field for the single magnitude
-    // field. The pencil toggles between draw_decimation_filter_dpp_manual_input()/
-    // draw_decimation_filter_dpp_slider_with_arrows() above.
-    bool embedded_filter_model::draw_decimation_filter_dpp_manual_editable_field( const char * label, const char * id, int & value,
-                                                                                   int min_v, int max_v, bool & edit_mode,
-                                                                                   std::string & edit_buf )
-    {
-        ImGui::Text( "%s", label );
-        ImGui::SameLine();
-        {
-            std::string edit_id = rsutils::string::from() << textual_icons::edit << "##" << id << "_edit";
-            const bool color_pushed = edit_mode;
-            if( color_pushed )
-                ImGui::PushStyleColor( ImGuiCol_Text, manual_edit_color );
-            if( ImGui::SmallButton( edit_id.c_str() ) )
-            {
-                if( ! edit_mode )
-                    edit_buf = std::to_string( value );
-                edit_mode = ! edit_mode;
-            }
-            if( color_pushed )
-                ImGui::PopStyleColor();
-            if( ImGui::IsItemHovered() )
-                ImGui::SetTooltip( edit_mode ? "Back to slider" : "Type an exact value" );
+            ImVec2 frame_max( frame_min.x + frame_width, ImGui::GetCursorScreenPos().y );
+            editor.end_frame_and_maybe_commit( filter, id, error_message, frame_min, frame_max, any_field_active, hold_commit,
+                                               before_commit );
+
+            if( ! enabled )
+                ImGui::PopStyleVar();
         }
 
-        return edit_mode ? draw_decimation_filter_dpp_manual_input( id, value, min_v, max_v, edit_mode, edit_buf )
-                          : draw_decimation_filter_dpp_slider_with_arrows( id, value, min_v, max_v );
+        // Same names/descriptions/value labels as the software temporal filter (src/proc/temporal-filter.cpp)
+        // and the DDS one, so the D500 panel reads the same as every other Temporal panel.
+        const char * const temporal_alpha_description
+            = "Alpha factor of Exp. moving average, 1=no filter, 0=infinite filter. Smooths against previous frames";
+        const char * const temporal_delta_description
+            = "Step-size boundary, the threshold used to preserve surfaces (edges). Higher = smooths over bigger depth differences";
+        const char * const temporal_persistency_description
+            = "Persistency mode. Rules for replacing a missing pixel with its last valid value";
+        const char * const temporal_persistency_labels[] = { "Disabled",          "Valid in 8/8",      "Valid in 2/last 3",
+                                                             "Valid in 2/last 4", "Valid in 2/8",      "Valid in 1/last 2",
+                                                             "Valid in 1/last 5", "Valid in 1/8",      "Always on" };
     }
 
-    // Draws the single magnitude field. Range is fetched once (see _decimation_filter_dpp_range)
-    // rather than on every draw call - this runs every frame the panel is open.
-    bool embedded_filter_model::draw_decimation_filter_dpp_fields()
+    // Magnitude range is fetched once (see _decimation_filter_dpp_range) rather than on every draw
+    // call - this runs every frame the panel is open.
+    bool embedded_filter_model::draw_decimation_filter_dpp_fields( std::string & error_message )
     {
         int magnitude_min = _decimation_filter_dpp_editor.value.magnitude;
         int magnitude_max = _decimation_filter_dpp_editor.value.magnitude;
@@ -322,720 +264,157 @@ namespace rs2
             magnitude_max = _decimation_filter_dpp_range.max.magnitude;
         }
 
-        bool any_field_active = draw_decimation_filter_dpp_manual_editable_field( "Magnitude:", "decimation_filter_dpp_magnitude",
-            _decimation_filter_dpp_editor.value.magnitude, magnitude_min, magnitude_max,
-            _decimation_filter_dpp_magnitude_edit_mode, _decimation_filter_dpp_magnitude_edit_buf );
-        if( ImGui::IsItemHovered() )
-            ImGui::SetTooltip( "Downscale factor - currently fixed by firmware." );
-
-        return any_field_active;
-    }
-
-    // Reset to Default corner overlay - see draw_hdrd_reset_to_default_overlay() below, which
-    // this mirrors exactly (same collapse/reveal/fade behavior), against this struct's own
-    // range/editor.
-    bool embedded_filter_model::draw_decimation_filter_dpp_reset_to_default_overlay( rs2_composite_option_id id,
-                                                                                      std::string & error_message,
-                                                                                      float frame_max_x,
-                                                                                      float frame_max_y )
-    {
-        bool any_active = false;
-        ImVec2 frame_max( frame_max_x, frame_max_y );
-        ImVec2 saved_cursor = ImGui::GetCursorScreenPos();
-
-        ImVec2 button_size = ImGui::CalcTextSize( "Reset to Default" );
-        button_size.x += ImGui::GetStyle().FramePadding.x * 2.0f;
-        button_size.y += ImGui::GetStyle().FramePadding.y * 2.0f;
-        ImVec2 button_pos( frame_max.x - button_size.x - 4.0f, frame_max.y - button_size.y - 4.0f );
-
-        constexpr float reveal_margin = 24.0f;
-        ImVec2 mouse = ImGui::GetIO().MousePos;
-        bool nearby = mouse.x >= button_pos.x - reveal_margin && mouse.x <= frame_max.x + reveal_margin
-                   && mouse.y >= button_pos.y - reveal_margin && mouse.y <= frame_max.y + reveal_margin;
-
-        if( nearby )
-        {
-            ImGui::SetCursorScreenPos( button_pos );
-            if( ImGui::Button( "Reset to Default##decimation_filter_dpp" ) )
-            {
-                try
-                {
-                    // Unlike the hardcoded fallback in embedded_filter_enable_disable(), this
-                    // button's whole point is to reflect what FW actually reports as default -
-                    // that can differ from this struct's own documented value (observed on real
-                    // HW), so a live read here is correct, not the read-modify-write anti-pattern.
-                    auto range = _embedded_filter->get_composite_option_range_as< rs2_decimation_filter_dpp_range >( id );
-                    _decimation_filter_dpp_editor.value = range.def;
-                    sanitize_decimation_filter_dpp_config( _decimation_filter_dpp_editor.value );
-                    _decimation_filter_dpp_editor.touch();
-                    _decimation_filter_dpp_editor.finalize();
-                }
-                catch( const std::exception & e )
-                {
-                    error_message = e.what();
-                }
-            }
-            any_active = ImGui::IsItemActive();
-            if( ImGui::IsItemHovered() )
-                ImGui::SetTooltip( "Restore all fields to the firmware-reported default values" );
-        }
-        else
-        {
-            ImVec2 marker_size = ImGui::CalcTextSize( "..." );
-            ImGui::SetCursorScreenPos( ImVec2( frame_max.x - marker_size.x - 8.0f, frame_max.y - marker_size.y - 6.0f ) );
-            ImGui::Text( "..." );
-        }
-
-        ImGui::SetCursorScreenPos( saved_cursor );
-        return any_active;
+        return _decimation_filter_dpp_editor.draw_scalar_field( "Magnitude", "Downscale factor - currently fixed by firmware.",
+            "decimation_filter_dpp_magnitude", _decimation_filter_dpp_editor.value.magnitude, magnitude_min, magnitude_max, 1, 1.f,
+            _decimation_filter_dpp_magnitude_edit, error_message );
     }
 
     void embedded_filter_model::draw_decimation_filter_dpp_control_editor( std::string & error_message )
     {
         const auto id = RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP;
-
         if( ! _decimation_filter_dpp_editor.ensure_initialized( _embedded_filter, id, error_message, print_decimation_filter_dpp_config ) )
             return;
         sanitize_decimation_filter_dpp_config( _decimation_filter_dpp_editor.value );
 
-        ImGui::Indent( -5.f );
-        ImGui::Dummy( ImVec2( 0, 2 ) );
-
-        float frame_left = ImGui::GetCursorScreenPos().x - 4.0f;
-        float frame_top = ImGui::GetCursorScreenPos().y - 4.0f;
-        float frame_width = ImGui::GetContentRegionAvail().x;
-
-        constexpr float slider_right_inset = 8.0f;
-        ImGui::PushItemWidth( frame_width - slider_right_inset );
-
-        // No separate Enable checkbox - the row header's own toggle drives
-        // rs2_decimation_filter_dpp_config::enabled directly, same as the others. Unlike them,
-        // the device itself also rejects a SET once Depth/IR is streaming (read-only while
-        // active) - end_frame_and_maybe_commit()'s own error_message surfaces that rejection.
-        const bool dim_while_disabled = ! _enabled;
-        if( dim_while_disabled )
-            ImGui::PushStyleVar( ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.35f );
-
-        bool any_field_active = draw_decimation_filter_dpp_fields();
-
-        ImGui::PopItemWidth();
-
-        ImGui::Dummy( ImVec2( 0, 2 ) );
-
-        ImVec2 reset_button_size = ImGui::CalcTextSize( "Reset to Default" );
-        reset_button_size.y += ImGui::GetStyle().FramePadding.y * 2.0f;
-        ImGui::Dummy( ImVec2( 0, ( reset_button_size.y + 6.0f ) * 0.5f ) );
-
-        float frame_bottom = ImGui::GetCursorScreenPos().y;
-        ImVec2 frame_min( frame_left, frame_top );
-        ImVec2 frame_max( frame_left + frame_width, frame_bottom );
-
-        any_field_active |= draw_decimation_filter_dpp_reset_to_default_overlay( id, error_message, frame_max.x, frame_max.y );
-
-        _decimation_filter_dpp_editor.end_frame_and_maybe_commit( _embedded_filter, id, error_message, frame_min, frame_max, any_field_active,
+        // No separate Enable checkbox - the row header's own toggle drives the struct's enabled field.
+        // The device also rejects a SET once Depth/IR is streaming (read-only while active) -
+        // end_frame_and_maybe_commit()'s own error_message surfaces that rejection.
+        draw_composite_editor< rs2_decimation_filter_dpp_config, rs2_decimation_filter_dpp_range >(
+            _decimation_filter_dpp_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
+            [&]() { return draw_decimation_filter_dpp_fields( error_message ); },
+            sanitize_decimation_filter_dpp_config,
             [this]( rs2_decimation_filter_dpp_config & v )
             {
                 v.enabled = 1;
                 _enabled = true;
             } );
-
-        if( dim_while_disabled )
-            ImGui::PopStyleVar();
-
-        ImGui::Unindent( -5.f );
     }
 
-    // ==== RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP editor - same scheme as Decimation above =====
-    // The InputText half - see draw_decimation_filter_dpp_manual_input() above, which this
-    // mirrors field for field.
-    bool embedded_filter_model::draw_temporal_filter_dpp_manual_input( const char * id, int & value, int min_v, int max_v,
-                                                                        bool & edit_mode, std::string & edit_buf )
+    // Ranges per rs_temporal_filter_dpp.h; smooth_alpha is a [0,1] value scaled into [0,1000] on
+    // the wire, shown back as 0.00-1.00 like the software/DDS filter's option.
+    bool embedded_filter_model::draw_temporal_filter_dpp_fields( std::string & error_message )
     {
-        char buf[32] = {};
-        strncpy( buf, edit_buf.c_str(), sizeof( buf ) - 1 );
+        auto & v = _temporal_filter_dpp_editor.value;
+        bool any_field_active = _temporal_filter_dpp_editor.draw_scalar_field(
+            rs2_option_to_string( RS2_OPTION_FILTER_SMOOTH_ALPHA ), temporal_alpha_description,
+            "temporal_filter_dpp_smooth_alpha", v.smooth_alpha, 0, 1000, 10, 1000.f,
+            _temporal_filter_dpp_smooth_alpha_edit, error_message );
 
-        float avail_width = ImGui::GetContentRegionAvail().x;
-        float input_width = ImGui::CalcTextSize( "000000" ).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-        ImGui::SetCursorPosX( ImGui::GetCursorPosX() + std::max( 0.0f, ( avail_width - input_width ) * 0.5f ) );
-        ImGui::PushItemWidth( input_width );
-        ImGui::PushStyleColor( ImGuiCol_Text, manual_edit_color );
-        std::string input_id = rsutils::string::from() << "##" << id << "_input";
-        bool submitted = ImGui::InputText( input_id.c_str(), buf, sizeof( buf ),
-                                            ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_EnterReturnsTrue );
-        ImGui::PopStyleColor();
-        ImGui::PopItemWidth();
+        any_field_active |= _temporal_filter_dpp_editor.draw_scalar_field(
+            rs2_option_to_string( RS2_OPTION_FILTER_SMOOTH_DELTA ), temporal_delta_description,
+            "temporal_filter_dpp_smooth_delta", v.smooth_delta, 1, 100, 1, 1.f,
+            _temporal_filter_dpp_smooth_delta_edit, error_message );
 
-        if( submitted )
-        {
-            char * end = nullptr;
-            long parsed = std::strtol( buf, &end, 10 );
-            if( end != buf )
-            {
-                value = (int)std::min( std::max( parsed, (long)min_v ), (long)max_v );
-                _temporal_filter_dpp_editor.touch();
-                _temporal_filter_dpp_editor.finalize( _temporal_filter_dpp_editor.numeric_commit_delay );
-            }
-            edit_mode = false;
-        }
-        else
-            edit_buf = buf;
-
-        if( ImGui::IsItemActive() )
-            _temporal_filter_dpp_editor.touch();
-        return ImGui::IsItemActive();
-    }
-
-    // The slider half - see draw_decimation_filter_dpp_slider_with_arrows() above, which this
-    // mirrors field for field.
-    bool embedded_filter_model::draw_temporal_filter_dpp_slider_with_arrows( const char * id, int & value, int min_v, int max_v )
-    {
-        std::string slider_id = rsutils::string::from() << "##" << id;
-        if( ImGui::SliderInt( slider_id.c_str(), &value, min_v, max_v ) )
-            _temporal_filter_dpp_editor.touch();
-        if( ImGui::IsItemActive() )
-            _temporal_filter_dpp_editor.touch();
-        if( ImGui::IsItemDeactivatedAfterEdit() )
-            _temporal_filter_dpp_editor.finalize( _temporal_filter_dpp_editor.numeric_commit_delay );
-        else if( ImGui::IsItemFocused() && ! ImGui::IsItemActive() )
-        {
-            if( ImGui::IsKeyPressed( ImGuiKey_RightArrow ) )
-            {
-                value = std::min( value + 1, max_v );
-                _temporal_filter_dpp_editor.touch();
-                _temporal_filter_dpp_editor.finalize( _temporal_filter_dpp_editor.fast_commit_delay );
-            }
-            else if( ImGui::IsKeyPressed( ImGuiKey_LeftArrow ) )
-            {
-                value = std::max( value - 1, min_v );
-                _temporal_filter_dpp_editor.touch();
-                _temporal_filter_dpp_editor.finalize( _temporal_filter_dpp_editor.fast_commit_delay );
-            }
-        }
-        return ImGui::IsItemActive();
-    }
-
-    // One "label + pencil-toggle + (slider OR manual InputText)" field - see
-    // draw_decimation_filter_dpp_manual_editable_field() above, which this mirrors exactly. Every
-    // field here uses this pattern since none of them are enum-valued.
-    bool embedded_filter_model::draw_temporal_filter_dpp_manual_editable_field( const char * label, const char * id, int & value,
-                                                                                 int min_v, int max_v, bool & edit_mode,
-                                                                                 std::string & edit_buf )
-    {
-        ImGui::Text( "%s", label );
-        ImGui::SameLine();
-        {
-            std::string edit_id = rsutils::string::from() << textual_icons::edit << "##" << id << "_edit";
-            const bool color_pushed = edit_mode;
-            if( color_pushed )
-                ImGui::PushStyleColor( ImGuiCol_Text, manual_edit_color );
-            if( ImGui::SmallButton( edit_id.c_str() ) )
-            {
-                if( ! edit_mode )
-                    edit_buf = std::to_string( value );
-                edit_mode = ! edit_mode;
-            }
-            if( color_pushed )
-                ImGui::PopStyleColor();
-            if( ImGui::IsItemHovered() )
-                ImGui::SetTooltip( edit_mode ? "Back to slider" : "Type an exact value" );
-        }
-
-        return edit_mode ? draw_temporal_filter_dpp_manual_input( id, value, min_v, max_v, edit_mode, edit_buf )
-                          : draw_temporal_filter_dpp_slider_with_arrows( id, value, min_v, max_v );
-    }
-
-    // Draws all 3 fields, in order. No BeginDisabled()-greyed conditional relevance here: every
-    // field is meaningful all the time.
-    bool embedded_filter_model::draw_temporal_filter_dpp_fields()
-    {
-        bool any_field_active = draw_temporal_filter_dpp_manual_editable_field( "Smooth Alpha:", "temporal_filter_dpp_smooth_alpha",
-            _temporal_filter_dpp_editor.value.smooth_alpha, 0, 1000,
-            _temporal_filter_dpp_smooth_alpha_edit_mode, _temporal_filter_dpp_smooth_alpha_edit_buf );
-        if( ImGui::IsItemHovered() )
-            ImGui::SetTooltip( "Normalized [0,1] scaled into [0,1000] - e.g. 400 = 0.4." );
-
-        any_field_active |= draw_temporal_filter_dpp_manual_editable_field( "Smooth Delta:", "temporal_filter_dpp_smooth_delta",
-            _temporal_filter_dpp_editor.value.smooth_delta, 1, 100,
-            _temporal_filter_dpp_smooth_delta_edit_mode, _temporal_filter_dpp_smooth_delta_edit_buf );
-
-        any_field_active |= draw_temporal_filter_dpp_manual_editable_field( "Persistency Index:", "temporal_filter_dpp_persistency_index",
-            _temporal_filter_dpp_editor.value.persistency_index, 0, 8,
-            _temporal_filter_dpp_persistency_index_edit_mode, _temporal_filter_dpp_persistency_index_edit_buf );
+        any_field_active |= _temporal_filter_dpp_editor.draw_enum_field(
+            "Persistency mode", temporal_persistency_description, "temporal_filter_dpp_persistency_index",
+            temporal_persistency_labels, v.persistency_index );
 
         return any_field_active;
-    }
-
-    // Reset to Default corner overlay - see draw_decimation_filter_dpp_reset_to_default_overlay()
-    // above, which this mirrors exactly (same collapse/reveal/fade behavior), against this
-    // struct's own range/editor.
-    bool embedded_filter_model::draw_temporal_filter_dpp_reset_to_default_overlay( rs2_composite_option_id id,
-                                                                                    std::string & error_message,
-                                                                                    float frame_max_x,
-                                                                                    float frame_max_y )
-    {
-        bool any_active = false;
-        ImVec2 frame_max( frame_max_x, frame_max_y );
-        ImVec2 saved_cursor = ImGui::GetCursorScreenPos();
-
-        ImVec2 button_size = ImGui::CalcTextSize( "Reset to Default" );
-        button_size.x += ImGui::GetStyle().FramePadding.x * 2.0f;
-        button_size.y += ImGui::GetStyle().FramePadding.y * 2.0f;
-        ImVec2 button_pos( frame_max.x - button_size.x - 4.0f, frame_max.y - button_size.y - 4.0f );
-
-        constexpr float reveal_margin = 24.0f;
-        ImVec2 mouse = ImGui::GetIO().MousePos;
-        bool nearby = mouse.x >= button_pos.x - reveal_margin && mouse.x <= frame_max.x + reveal_margin
-                   && mouse.y >= button_pos.y - reveal_margin && mouse.y <= frame_max.y + reveal_margin;
-
-        if( nearby )
-        {
-            ImGui::SetCursorScreenPos( button_pos );
-            if( ImGui::Button( "Reset to Default##temporal_filter_dpp" ) )
-            {
-                try
-                {
-                    // See the equivalent comment in draw_decimation_filter_dpp_reset_to_default_overlay()
-                    // above - this button needs FW's actual reported default, not a hardcoded guess.
-                    auto range = _embedded_filter->get_composite_option_range_as< rs2_temporal_filter_dpp_range >( id );
-                    _temporal_filter_dpp_editor.value = range.def;
-                    sanitize_temporal_filter_dpp_config( _temporal_filter_dpp_editor.value );
-                    _temporal_filter_dpp_editor.touch();
-                    _temporal_filter_dpp_editor.finalize();
-                }
-                catch( const std::exception & e )
-                {
-                    error_message = e.what();
-                }
-            }
-            any_active = ImGui::IsItemActive();
-            if( ImGui::IsItemHovered() )
-                ImGui::SetTooltip( "Restore all fields to the firmware-reported default values" );
-        }
-        else
-        {
-            ImVec2 marker_size = ImGui::CalcTextSize( "..." );
-            ImGui::SetCursorScreenPos( ImVec2( frame_max.x - marker_size.x - 8.0f, frame_max.y - marker_size.y - 6.0f ) );
-            ImGui::Text( "..." );
-        }
-
-        ImGui::SetCursorScreenPos( saved_cursor );
-        return any_active;
     }
 
     void embedded_filter_model::draw_temporal_filter_dpp_control_editor( std::string & error_message )
     {
         const auto id = RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP;
-
         if( ! _temporal_filter_dpp_editor.ensure_initialized( _embedded_filter, id, error_message, print_temporal_filter_dpp_config ) )
             return;
         sanitize_temporal_filter_dpp_config( _temporal_filter_dpp_editor.value );
 
-        ImGui::Indent( -5.f );
-        ImGui::Dummy( ImVec2( 0, 2 ) );
-
-        float frame_left = ImGui::GetCursorScreenPos().x - 4.0f;
-        float frame_top = ImGui::GetCursorScreenPos().y - 4.0f;
-        float frame_width = ImGui::GetContentRegionAvail().x;
-
-        constexpr float slider_right_inset = 8.0f;
-        ImGui::PushItemWidth( frame_width - slider_right_inset );
-
-        // No separate Enable checkbox - the row header's own toggle drives
-        // rs2_temporal_filter_dpp_config::enabled directly, same as the others.
-        const bool dim_while_disabled = ! _enabled;
-        if( dim_while_disabled )
-            ImGui::PushStyleVar( ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.35f );
-
-        bool any_field_active = draw_temporal_filter_dpp_fields();
-
-        ImGui::PopItemWidth();
-
-        ImGui::Dummy( ImVec2( 0, 2 ) );
-
-        ImVec2 reset_button_size = ImGui::CalcTextSize( "Reset to Default" );
-        reset_button_size.y += ImGui::GetStyle().FramePadding.y * 2.0f;
-        ImGui::Dummy( ImVec2( 0, ( reset_button_size.y + 6.0f ) * 0.5f ) );
-
-        float frame_bottom = ImGui::GetCursorScreenPos().y;
-        ImVec2 frame_min( frame_left, frame_top );
-        ImVec2 frame_max( frame_left + frame_width, frame_bottom );
-
-        any_field_active |= draw_temporal_filter_dpp_reset_to_default_overlay( id, error_message, frame_max.x, frame_max.y );
-
-        _temporal_filter_dpp_editor.end_frame_and_maybe_commit( _embedded_filter, id, error_message, frame_min, frame_max, any_field_active,
+        draw_composite_editor< rs2_temporal_filter_dpp_config, rs2_temporal_filter_dpp_range >(
+            _temporal_filter_dpp_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
+            [&]() { return draw_temporal_filter_dpp_fields( error_message ); },
+            sanitize_temporal_filter_dpp_config,
             [this]( rs2_temporal_filter_dpp_config & v )
             {
                 v.enabled = 1;
                 _enabled = true;
             } );
-
-        if( dim_while_disabled )
-            ImGui::PopStyleVar();
-
-        ImGui::Unindent( -5.f );
     }
 
-    // ==== RS2_COMPOSITE_OPTION_HDRD_CONTROL editor =====
-    // "Slider enum" widget - an ImGui::SliderInt showing the enum's own name instead of a number,
-    // the idiom from Dear ImGui's own Sliders demo. Not a dropdown: one drag/click, no popup, and
-    // it shares the drag/arrow-key interaction of every other slider (draw_hdrd_slider_with_arrows()).
-    bool embedded_filter_model::draw_hdrd_enum_field( const char * label,
-                                                                       const char * id,
-                                                                       const char * const labels[],
-                                                                       int count,
-                                                                       int & value,
-                                                                       int value_offset )
+    // Irrelevant fields stay visible but BeginDisabled()-greyed, not hidden. |= (not ||): each
+    // call draws real widgets and must run every frame.
+    bool embedded_filter_model::draw_icr_fields( std::string & error_message )
     {
-        // Width comes from the ambient PushItemWidth() the caller (draw_hdrd_control_editor())
-        // wraps the whole field block in - shared with every other slider in the box, not pushed here,
-        // so they all end at the exact same x regardless of field type.
-        ImGui::Text( "%s", label );
-        int selected = value - value_offset;
-        const char * current_label = ( selected >= 0 && selected < count ) ? labels[selected] : "?";
-        if( ImGui::SliderInt( id, &selected, 0, count - 1, current_label ) )
-        {
-            value = selected + value_offset;
-            _hdrd_editor.touch();
-        }
-        if( ImGui::IsItemActive() )
-            _hdrd_editor.touch();
-        // Same fast_commit_delay as the arrow-key nudge below - releasing this slider IS the
-        // discrete choice, so it gets near-immediate turnaround, not the longer numeric default.
-        if( ImGui::IsItemDeactivatedAfterEdit() )
-            _hdrd_editor.finalize( _hdrd_editor.fast_commit_delay );
-        else if( ImGui::IsItemFocused() && ! ImGui::IsItemActive() )
-        {
-            if( ImGui::IsKeyPressed( ImGuiKey_RightArrow ) && selected < count - 1 )
-            {
-                value = selected + 1 + value_offset;
-                _hdrd_editor.touch();
-                _hdrd_editor.finalize( _hdrd_editor.fast_commit_delay );   // arrow-key nudge - fast turnaround
-            }
-            else if( ImGui::IsKeyPressed( ImGuiKey_LeftArrow ) && selected > 0 )
-            {
-                value = selected - 1 + value_offset;
-                _hdrd_editor.touch();
-                _hdrd_editor.finalize( _hdrd_editor.fast_commit_delay );   // arrow-key nudge - fast turnaround
-            }
-        }
-        return ImGui::IsItemActive();
-    }
+        static const char * const filter_type_labels[] = { "Downscale", "Lookup Shift" };
+        static const char * const downscale_ratio_labels[] = { "x2", "x4" };
+        static const char * const shift_mode_labels[] = { "Shift 126px", "Shift 64px", "Manual" };
+        static const char * const threshold_mode_labels[] = { "Zero range", "MinZ (computed)", "Manual" };
 
-    bool embedded_filter_model::draw_hdrd_filter_type_field()
-    {
-        static const char * const labels[] = { "Downscale", "Lookup Shift" };
-        return draw_hdrd_enum_field( "Filter Type:", "##hdrd_filter_type",
-            labels, 2, _hdrd_editor.value.filter_type, 0 );
-    }
+        auto & v = _icr_editor.value;
+        bool any_field_active = _icr_editor.draw_enum_field( "Filter Type",
+            "Downscale: reduce resolution by a fixed ratio. Lookup Shift: shift the disparity lookup by a pixel count.\n"
+            "Not all Depth resolutions and frame rates are supported.",
+            "icr_filter_type", filter_type_labels, v.filter_type );
 
-    bool embedded_filter_model::draw_hdrd_downscale_ratio_field()
-    {
+        const bool downscale_relevant = ( v.filter_type == 0 );
+        if( ! downscale_relevant )
+            ImGui::BeginDisabled();
         // Wire values are 1 (x2) and 2 (x4), not 0-based like the other enum fields - value_offset
-        // converts to and from a 0-based slider index rather than changing the documented wire values.
-        static const char * const labels[] = { "x2", "x4" };
-        return draw_hdrd_enum_field( "Downscale Ratio:", "##hdrd_downscale_ratio",
-            labels, 2, _hdrd_editor.value.downscale_ratio, 1 );
-    }
-
-    bool embedded_filter_model::draw_hdrd_shift_mode_field()
-    {
-        // Lookup Shift: pick a fixed preset, or Manual - which draw_hdrd_control_editor()
-        // reveals via a separate draw_hdrd_manual_editable_field() call for Shift Pixels.
-        static const char * const labels[] = { "Shift 126px", "Shift 64px", "Manual" };
-        return draw_hdrd_enum_field( "Shift Mode:", "##hdrd_shift_mode",
-            labels, 3, _hdrd_editor.value.shift_mode, 0 );
-    }
-
-    // The InputText half of draw_hdrd_manual_editable_field()'s two editing modes: a narrow,
-    // centered box seeded with the current value; Enter parses, clamps, commits, then flips back
-    // to slider mode. touch() fires every frame this box has focus so a countdown can't fire mid-edit.
-    bool embedded_filter_model::draw_hdrd_manual_input( const char * id, int & value, int min_v, int max_v,
-                                                          bool & edit_mode, std::string & edit_buf )
-    {
-        char buf[32] = {};
-        strncpy( buf, edit_buf.c_str(), sizeof( buf ) - 1 );
-
-        // Narrow, centered input box (not full-width/left-aligned like the slider it replaces)
-        // plus the same highlight color as the pencil icon beside it, so the box visually reads
-        // as "a small typed value," distinct from the wide slider it stands in for while active.
-        float avail_width = ImGui::GetContentRegionAvail().x;
-        float input_width = ImGui::CalcTextSize( "000000" ).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-        ImGui::SetCursorPosX( ImGui::GetCursorPosX() + std::max( 0.0f, ( avail_width - input_width ) * 0.5f ) );
-        ImGui::PushItemWidth( input_width );
-        ImGui::PushStyleColor( ImGuiCol_Text, manual_edit_color );
-        std::string input_id = rsutils::string::from() << "##" << id << "_input";
-        bool submitted = ImGui::InputText( input_id.c_str(), buf, sizeof( buf ),
-                                            ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_EnterReturnsTrue );
-        ImGui::PopStyleColor();
-        ImGui::PopItemWidth();
-
-        if( submitted )
-        {
-            char * end = nullptr;
-            long parsed = std::strtol( buf, &end, 10 );
-            if( end != buf )
-            {
-                value = (int)std::min( std::max( parsed, (long)min_v ), (long)max_v );
-                _hdrd_editor.touch();
-                // Shorter than the enum fields' default commit_delay - a typed-and-submitted
-                // number, like a slider drag release, doesn't carry the same "did I mean to pick
-                // that?" risk a discrete choice does.
-                _hdrd_editor.finalize( _hdrd_editor.numeric_commit_delay );
-            }
-            edit_mode = false;
-        }
-        else
-            edit_buf = buf;
-
-        if( ImGui::IsItemActive() )
-            _hdrd_editor.touch();
-        return ImGui::IsItemActive();
-    }
-
-    // The slider half of draw_hdrd_manual_editable_field()'s two editing modes. ImGui sliders
-    // don't nudge via arrow keys on their own, so it's implemented by hand: one focused arrow
-    // press is one complete, discrete edit (touch()+finalize() together).
-    bool embedded_filter_model::draw_hdrd_slider_with_arrows( const char * id, int & value, int min_v, int max_v )
-    {
-        std::string slider_id = rsutils::string::from() << "##" << id;
-        if( ImGui::SliderInt( slider_id.c_str(), &value, min_v, max_v ) )
-            _hdrd_editor.touch();
-        if( ImGui::IsItemActive() )
-            _hdrd_editor.touch();
-        // Shorter than the enum fields' default commit_delay - dragging a plain value slider
-        // doesn't carry the same "did I mean to pick that?" risk a discrete choice does.
-        if( ImGui::IsItemDeactivatedAfterEdit() )
-            _hdrd_editor.finalize( _hdrd_editor.numeric_commit_delay );
-        else if( ImGui::IsItemFocused() && ! ImGui::IsItemActive() )
-        {
-            if( ImGui::IsKeyPressed( ImGuiKey_RightArrow ) )
-            {
-                value = std::min( value + 1, max_v );
-                _hdrd_editor.touch();
-                _hdrd_editor.finalize( _hdrd_editor.fast_commit_delay );   // arrow-key nudge - fast turnaround
-            }
-            else if( ImGui::IsKeyPressed( ImGuiKey_LeftArrow ) )
-            {
-                value = std::max( value - 1, min_v );
-                _hdrd_editor.touch();
-                _hdrd_editor.finalize( _hdrd_editor.fast_commit_delay );   // arrow-key nudge - fast turnaround
-            }
-        }
-        return ImGui::IsItemActive();
-    }
-
-    // One "label + pencil-toggle + (slider OR manual InputText)" field - shared by Disparity
-    // Shift and Threshold (mm), which otherwise repeated this pattern twice. The pencil toggles
-    // between draw_hdrd_manual_input()/draw_hdrd_slider_with_arrows() above.
-    bool embedded_filter_model::draw_hdrd_manual_editable_field( const char * label, const char * id, int & value,
-                                                                   int min_v, int max_v, bool & edit_mode,
-                                                                   std::string & edit_buf )
-    {
-        ImGui::Text( "%s", label );
-        ImGui::SameLine();
-        {
-            std::string edit_id = rsutils::string::from() << textual_icons::edit << "##" << id << "_edit";
-            // Captured once, before the button can flip edit_mode - push and pop must agree on
-            // the SAME decision, or a click toggling edit_mode this frame leaves them unbalanced
-            // (an unmatched push, or a pop with nothing pushed).
-            const bool color_pushed = edit_mode;
-            if( color_pushed )
-                ImGui::PushStyleColor( ImGuiCol_Text, manual_edit_color );
-            if( ImGui::SmallButton( edit_id.c_str() ) )
-            {
-                if( ! edit_mode )
-                    edit_buf = std::to_string( value );
-                edit_mode = ! edit_mode;
-            }
-            if( color_pushed )
-                ImGui::PopStyleColor();
-            if( ImGui::IsItemHovered() )
-                ImGui::SetTooltip( edit_mode ? "Back to slider" : "Type an exact value" );
-        }
-
-        return edit_mode ? draw_hdrd_manual_input( id, value, min_v, max_v, edit_mode, edit_buf )
-                          : draw_hdrd_slider_with_arrows( id, value, min_v, max_v );
-    }
-
-    bool embedded_filter_model::draw_hdrd_threshold_mode_field()
-    {
-        // Zero range / MinZ (firmware-computed) / Manual. Per the design review, the FW-computed
-        // MinZ value itself is NOT surfaced to the user at this stage - "MinZ (computed)" reveals
-        // no readback field at all, unlike "Manual" (see draw_hdrd_manual_editable_field()).
-        static const char * const labels[] = { "Zero range", "MinZ (computed)", "Manual" };
-        bool active = draw_hdrd_enum_field( "Threshold Mode:", "##hdrd_threshold_mode",
-            labels, 3, _hdrd_editor.value.threshold_mode, 0 );
-        if( ImGui::IsItemHovered() )
-            ImGui::SetTooltip( "Zero range: fill only originally-empty depth pixels.\n"
-                                "MinZ (computed): firmware picks the threshold for the active resolution.\n"
-                                "Manual: use the threshold value below." );
-        return active;
-    }
-
-    // Reset to Default starts hidden behind a small "..." marker in the box's bottom-right
-    // corner - a rarely-used action that shouldn't compete for attention. Hovering within
-    // reveal_margin swaps it for the real button, drawn as an absolute overlay.
-    bool embedded_filter_model::draw_hdrd_reset_to_default_overlay( rs2_composite_option_id id,
-                                                                      std::string & error_message,
-                                                                      float frame_max_x,
-                                                                      float frame_max_y )
-    {
-        bool any_active = false;
-        ImVec2 frame_max( frame_max_x, frame_max_y );
-        ImVec2 saved_cursor = ImGui::GetCursorScreenPos();
-
-        ImVec2 button_size = ImGui::CalcTextSize( "Reset to Default" );
-        button_size.x += ImGui::GetStyle().FramePadding.x * 2.0f;
-        button_size.y += ImGui::GetStyle().FramePadding.y * 2.0f;
-        ImVec2 button_pos( frame_max.x - button_size.x - 4.0f, frame_max.y - button_size.y - 4.0f );
-
-        constexpr float reveal_margin = 24.0f;
-        ImVec2 mouse = ImGui::GetIO().MousePos;
-        bool nearby = mouse.x >= button_pos.x - reveal_margin && mouse.x <= frame_max.x + reveal_margin
-                   && mouse.y >= button_pos.y - reveal_margin && mouse.y <= frame_max.y + reveal_margin;
-
-        if( nearby )
-        {
-            // Goes through the same touch()/finalize() pipeline as every other field edit, so it
-            // gets the fade animation and undo grace window for free. range.def is the FULL
-            // FW-reported default; before_commit still forces enable back on, same as any edit.
-            ImGui::SetCursorScreenPos( button_pos );
-            if( ImGui::Button( "Reset to Default##hdrd" ) )
-            {
-                try
-                {
-                    auto range = _embedded_filter->get_composite_option_range_as< rs2_hdrd_control_range >( id );
-                    _hdrd_editor.value = range.def;
-                    sanitize_hdrd_control( _hdrd_editor.value );
-                    _hdrd_editor.touch();
-                    _hdrd_editor.finalize();
-                }
-                catch( const std::exception & e )
-                {
-                    error_message = e.what();
-                }
-            }
-            any_active = ImGui::IsItemActive();
-            if( ImGui::IsItemHovered() )
-                ImGui::SetTooltip( "Restore all fields to the firmware-reported default values" );
-        }
-        else
-        {
-            ImVec2 marker_size = ImGui::CalcTextSize( "..." );
-            ImGui::SetCursorScreenPos( ImVec2( frame_max.x - marker_size.x - 8.0f, frame_max.y - marker_size.y - 6.0f ) );
-            // Full-brightness text, not TextDisabled's muted grey - the marker is easy to miss
-            // otherwise, and unlike the fields above it, it isn't meant to read as unavailable.
-            ImGui::Text( "..." );
-        }
-
-        ImGui::SetCursorScreenPos( saved_cursor );
-        return any_active;
-    }
-
-    // any_field_active distinguishes "nothing of ours is active" from "focus left the group" for
-    // the caller's debounce countdown. |= (not ||=): each call draws real widgets and must run
-    // every frame. Irrelevant fields stay visible but BeginDisabled()-greyed, not hidden.
-    bool embedded_filter_model::draw_hdrd_fields()
-    {
-        bool any_field_active = draw_hdrd_filter_type_field();
-
-        const bool downscale_relevant = ( _hdrd_editor.value.filter_type == 0 );
-        if( ! downscale_relevant )
-            ImGui::BeginDisabled();
-        any_field_active |= draw_hdrd_downscale_ratio_field();
+        // converts to and from a 0-based index rather than changing the documented wire values.
+        any_field_active |= _icr_editor.draw_enum_field( "Downscale Ratio", "Resolution reduction applied by the Downscale filter type.",
+            "icr_downscale_ratio", downscale_ratio_labels, v.downscale_ratio, 1 );
         if( ! downscale_relevant )
             ImGui::EndDisabled();
 
-        const bool shift_relevant = ( _hdrd_editor.value.filter_type == 1 );
+        const bool shift_relevant = ( v.filter_type == 1 );
         if( ! shift_relevant )
             ImGui::BeginDisabled();
-        any_field_active |= draw_hdrd_shift_mode_field();
+        any_field_active |= _icr_editor.draw_enum_field( "Shift Mode", "Fixed shift preset, or Manual to use the Shift Pixels value below.",
+            "icr_shift_mode", shift_mode_labels, v.shift_mode );
         if( ! shift_relevant )
             ImGui::EndDisabled();
 
-        const bool shift_pixels_relevant = shift_relevant && ( _hdrd_editor.value.shift_mode == 2 );
+        const bool shift_pixels_relevant = shift_relevant && ( v.shift_mode == 2 );
         if( ! shift_pixels_relevant )
             ImGui::BeginDisabled();
-        any_field_active |= draw_hdrd_manual_editable_field( "Shift Pixels:", "hdrd_shift",
-            _hdrd_editor.value.shift_pixels, 0, 256, _hdrd_shift_edit_mode, _hdrd_shift_edit_buf );
+        any_field_active |= _icr_editor.draw_scalar_field( "Shift Pixels", "Disparity lookup shift, in pixels, used when Shift Mode is Manual.",
+            "icr_shift", v.shift_pixels, 0, 256, 1, 1.f, _icr_shift_edit, error_message );
         if( ! shift_pixels_relevant )
             ImGui::EndDisabled();
 
-        any_field_active |= draw_hdrd_threshold_mode_field();
+        any_field_active |= _icr_editor.draw_enum_field( "Threshold Mode",
+            "Zero range: fill only originally-empty depth pixels.\n"
+            "MinZ (computed): firmware picks the threshold for the active resolution.\n"
+            "Manual: use the threshold value below.",
+            "icr_threshold_mode", threshold_mode_labels, v.threshold_mode );
 
-        const bool threshold_relevant = ( _hdrd_editor.value.threshold_mode == 2 );
+        const bool threshold_relevant = ( v.threshold_mode == 2 );
         if( ! threshold_relevant )
             ImGui::BeginDisabled();
-        any_field_active |= draw_hdrd_manual_editable_field( "Threshold (mm):", "hdrd_threshold",
-            _hdrd_editor.value.threshold_mm, 0, 65535, _hdrd_threshold_edit_mode, _hdrd_threshold_edit_buf );
+        any_field_active |= _icr_editor.draw_scalar_field( "Threshold (mm)", "Depth threshold, in mm, used when Threshold Mode is Manual.",
+            "icr_threshold", v.threshold_mm, 0, 65535, 1, 1.f, _icr_threshold_edit, error_message );
         if( ! threshold_relevant )
             ImGui::EndDisabled();
 
         return any_field_active;
     }
 
-    void embedded_filter_model::draw_hdrd_control_editor( std::string & error_message )
+    void embedded_filter_model::draw_icr_control_editor( std::string & error_message )
     {
-        const auto id = RS2_COMPOSITE_OPTION_HDRD_CONTROL;
-
-        if( ! _hdrd_editor.ensure_initialized( _embedded_filter, id, error_message, print_hdrd_control ) )
+        const auto id = RS2_COMPOSITE_OPTION_ICR_CONTROL;
+        // A rejected enable (e.g. unsupported Depth profile) leads to a re-read here - keep the toggle in sync with it
+        auto on_read = [this]( const rs2_icr_control & v )
+        {
+            print_icr_control( v );
+            _enabled = v.enable != 0;
+        };
+        if( ! _icr_editor.ensure_initialized( _embedded_filter, id, error_message, on_read ) )
             return;
-        sanitize_hdrd_control( _hdrd_editor.value );
+        sanitize_icr_control( _icr_editor.value );
 
-        // Minimal indent so widget text doesn't sit flush on the frame border. Indent(w) ADDS w
-        // (negative shifts left); the matching Unindent below MUST pass the same -5.f, since
-        // Unindent SUBTRACTS its argument (Unindent(-5.f) is what actually cancels Indent(-5.f)).
-        ImGui::Indent( -5.f );
-        ImGui::Dummy( ImVec2( 0, 2 ) );
-
-        float frame_left = ImGui::GetCursorScreenPos().x - 4.0f;
-        float frame_top = ImGui::GetCursorScreenPos().y - 4.0f;
-        float frame_width = ImGui::GetContentRegionAvail().x;
-
-        // Every slider in the box shares this one pushed width so they all end at the same x. A
-        // few pixels narrower than the frame so they finish just inside its right edge.
-        constexpr float slider_right_inset = 8.0f;
-        ImGui::PushItemWidth( frame_width - slider_right_inset );
-
-        // No separate Enable checkbox - the row header's own toggle drives rs2_hdrd_control::enable
-        // directly. Grey the box via global alpha (not BeginDisabled) so fields stay clickable -
-        // editing while off forces enable back on at commit time below.
-        const bool dim_while_disabled = ! _enabled;
-        if( dim_while_disabled )
-            ImGui::PushStyleVar( ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.35f );
-
-        bool any_field_active = draw_hdrd_fields();
-
-        ImGui::PopItemWidth();
-
-        ImGui::Dummy( ImVec2( 0, 2 ) );
-
-        // Reserve a blank row below the last field for the Reset-to-Default corner overlay - just
-        // enough for the collapsed "..." marker, not the taller expanded-button hover state.
-        ImVec2 reset_button_size = ImGui::CalcTextSize( "Reset to Default" );
-        reset_button_size.y += ImGui::GetStyle().FramePadding.y * 2.0f;
-        ImGui::Dummy( ImVec2( 0, ( reset_button_size.y + 6.0f ) * 0.5f ) );
-
-        float frame_bottom = ImGui::GetCursorScreenPos().y;
-        ImVec2 frame_min( frame_left, frame_top );
-        ImVec2 frame_max( frame_left + frame_width, frame_bottom );
-
-        any_field_active |= draw_hdrd_reset_to_default_overlay( id, error_message, frame_max.x, frame_max.y );
-
-        // Draws the dirty-state fade/border and sends the whole struct once the debounce timer
-        // lapses. before_commit forces enable back on: with no Enable checkbox here, editing
-        // e.g. Threshold alone would otherwise send with enable unchanged (often off).
-        _hdrd_editor.end_frame_and_maybe_commit( _embedded_filter, id, error_message, frame_min, frame_max, any_field_active,
-            [this]( rs2_hdrd_control & v )
+        draw_composite_editor< rs2_icr_control, rs2_icr_control_range >(
+            _icr_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
+            [&]() { return draw_icr_fields( error_message ); },
+            sanitize_icr_control,
+            [this]( rs2_icr_control & v )
             {
                 v.enable = 1;
                 _enabled = true;
             } );
+    }
 
-        if( dim_while_disabled )
-            ImGui::PopStyleVar();
-
-        ImGui::Unindent( -5.f );   // undo Indent(-5.f) above, exactly - see the comment there
+    bool embedded_filter_model::sensor_stopping() const
+    {
+        return _owner && _owner->is_stopping();
     }
 
     void embedded_filter_model::embedded_filter_enable_disable(bool actual, std::string * error_message)
@@ -1100,21 +479,21 @@ namespace rs2
             return;
         }
 
-        // Same scheme as Decimation above, for RS2_COMPOSITE_OPTION_HDRD_CONTROL.
-        if( _embedded_filter->supports_composite_option( RS2_COMPOSITE_OPTION_HDRD_CONTROL ) )
+        // Same scheme as Decimation above, for RS2_COMPOSITE_OPTION_ICR_CONTROL.
+        if( _embedded_filter->supports_composite_option( RS2_COMPOSITE_OPTION_ICR_CONTROL ) )
         {
             try
             {
-                if( ! _hdrd_editor.initialized )
+                if( ! _icr_editor.initialized )
                 {
-                    _hdrd_editor.value = _embedded_filter->get_composite_option_as< rs2_hdrd_control >(
-                        RS2_COMPOSITE_OPTION_HDRD_CONTROL );
-                    sanitize_hdrd_control( _hdrd_editor.value );
-                    print_hdrd_control( _hdrd_editor.value );
-                    _hdrd_editor.initialized = true;
+                    _icr_editor.value = _embedded_filter->get_composite_option_as< rs2_icr_control >(
+                        RS2_COMPOSITE_OPTION_ICR_CONTROL );
+                    sanitize_icr_control( _icr_editor.value );
+                    print_icr_control( _icr_editor.value );
+                    _icr_editor.initialized = true;
                 }
-                _hdrd_editor.value.enable = actual ? 1 : 0;
-                _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_HDRD_CONTROL, _hdrd_editor.value );
+                _icr_editor.value.enable = actual ? 1 : 0;
+                _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_ICR_CONTROL, _icr_editor.value );
                 _enabled = actual;
             }
             catch( const std::exception & e )
@@ -1194,16 +573,16 @@ namespace rs2
                         _enabled = _temporal_filter_dpp_editor.value.enabled != 0;
                 }
             }
-            else if( id == RS2_COMPOSITE_OPTION_HDRD_CONTROL )
+            else if( id == RS2_COMPOSITE_OPTION_ICR_CONTROL )
             {
-                if( _hdrd_editor.ensure_initialized( _embedded_filter, id, error_message, print_hdrd_control ) )
+                if( _icr_editor.ensure_initialized( _embedded_filter, id, error_message, print_icr_control ) )
                 {
-                    sanitize_hdrd_control( _hdrd_editor.value );
+                    sanitize_icr_control( _icr_editor.value );
                     // Composite state is the FALLBACK source of _enabled, not an override - a DDS
                     // filter that already set it from the scalar option in populate_scalar_options()
                     // keeps that value.
                     if( ! _embedded_filter->supports( RS2_OPTION_EMBEDDED_FILTER_ENABLED ) )
-                        _enabled = _hdrd_editor.value.enable != 0;
+                        _enabled = _icr_editor.value.enable != 0;
                 }
             }
         }

@@ -27,7 +27,7 @@
 #define cudaStreamSynchronize hipStreamSynchronize
 #define cudaMemset hipMemset
 // Zero-copy pointer-attribute probing (see try_device_ptr() below). Only referenced when
-// RS2_USE_CUDA_ZEROCOPY is also defined (BUILD_WITH_HIP_ZEROCOPY); harmless otherwise since
+// RS2_USE_CUDA_ZEROCOPY is also defined (always the case for HIP builds); harmless otherwise since
 // the whole try_device_ptr() body they appear in is itself compiled out.
 #define cudaPointerAttributes hipPointerAttribute_t
 #define cudaPointerGetAttributes hipPointerGetAttributes

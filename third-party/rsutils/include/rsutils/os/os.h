@@ -14,5 +14,8 @@ namespace rsutils
         // CPU architecture the binary was built for: "x86_64", "arm64", "x86", "arm", or "unknown".
         std::string cpu_arch();
 
+        // True when the CPU supports AVX2 and the OS saves the YMM registers; always false on non-x86 builds.
+        bool cpu_supports_avx2();
+
     }
 }

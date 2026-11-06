@@ -19,8 +19,11 @@ namespace librealsense
     public:
         d500_object_detection( std::shared_ptr< const d500_info > const & );
 
+        // `xu_host` is the sensor whose node publishes the inference XU, or null for the OD sensor itself
         std::shared_ptr< synthetic_sensor > create_object_detection_device( std::shared_ptr< context > ctx,
-                                                                            const std::vector< platform::uvc_device_info > & od_devices_info );
+                                                                            std::shared_ptr< platform::uvc_device > od_device,
+                                                                            const std::string & physical_port,
+                                                                            std::shared_ptr< uvc_sensor > xu_host );
 
     private:
         friend class d500_object_detection_sensor;

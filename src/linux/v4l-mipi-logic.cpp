@@ -2,12 +2,18 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 #include "v4l-mipi-logic.h"
-#include "backend-v4l2.h"  // xioctl(), linux_backend_exception
+#include "v4l-ioctl.h"  // xioctl()
+
+#include <src/librealsense-exception.h>  // linux_backend_exception
 
 #include <src/platform/uvc-device.h>  // extension_unit
 #include <rsutils/string/from.h>
 
 #include <linux/media.h>  // media_device_info, MEDIA_IOC_DEVICE_INFO
+
+#include <fcntl.h>      // open(), O_RDWR
+#include <sys/ioctl.h>  // ioctl()
+#include <unistd.h>     // close()
 
 #include <cstring>
 #include <regex>
@@ -57,8 +63,21 @@ namespace librealsense
             static constexpr uint32_t RS_CAMERA_CID_DEVICE_MODE             = ( RS_CAMERA_CID_BASE + 0x24 ); // Dual RGB (2C) vs dedicated color sensor (3C)
             static constexpr uint32_t RS_CAMERA_CID_2C_AE_POLICY            = ( RS_CAMERA_CID_BASE + 0x25 );
             static constexpr uint32_t RS_CAMERA_CID_GYRO_SENSITIVITY        = ( RS_CAMERA_CID_BASE + 0x26 );
+            static constexpr uint32_t RS_CAMERA_CID_ACCEL_SENSITIVITY       = ( RS_CAMERA_CID_BASE + 0x27 );
+            static constexpr uint32_t RS_CAMERA_CID_OD_DISTANCE             = ( RS_CAMERA_CID_BASE + 0x28 );
+            // D500 DPP composite XU CIDs, matching the MIPI driver's D500_CAMERA_CID_*
+            // allocations (see realsense_mipi_platform_driver#658).
+            static constexpr uint32_t RS_CAMERA_CID_MINZ                    = ( RS_CAMERA_CID_BASE + 44 );
+            static constexpr uint32_t RS_CAMERA_CID_DECIMATION_FILTER_DPP   = ( RS_CAMERA_CID_BASE + 49 );
+            static constexpr uint32_t RS_CAMERA_CID_TEMPORAL_FILTER_DPP     = ( RS_CAMERA_CID_BASE + 51 );
+
+            static constexpr uint32_t RS_CAMERA_CID_ALIGNED_DEPTH           = ( RS_CAMERA_CID_BASE + 55 );
+            static constexpr uint32_t RS_CAMERA_CID_PASSIVE_DEPTH           = ( RS_CAMERA_CID_BASE + 17 ); // D500 reuses D400's manual-exposure offset
 
             static constexpr uint8_t GVD_VALID_OPCODE = 0x10;
+
+            // MIPI depth XU unit (subdevice 0), matching ds::depth_xu.
+            static constexpr uint8_t RS_DEPTH_XU_UNIT = 0x03;
 
             // MIPI depth-XU selector identifiers (subdevice 0).
             static constexpr uint8_t RS_HWMONITOR                       = 0x01;
@@ -81,13 +100,18 @@ namespace librealsense
             static constexpr uint8_t RS_OHM_TEMPERATURE                 = 0x17;
             static constexpr uint8_t RS_COLORED_IR_AE_POLICY            = 0x19; // d500_xu_id::COLORED_IR_AE_POLICY
             static constexpr uint8_t RS_EXTERNAL_SYNC_D500              = 0x1A; // d500_xu_id::EXTERNAL_SYNC_MODE
+            static constexpr uint8_t RS_PASSIVE_DEPTH                   = 0x1B; // d500_xu_id::PASSIVE_DEPTH
 
             // D500-only selectors that collide with a different D400 control at the same number.
             static constexpr uint8_t RS_ALIGN_DEPTH           = 0x10; // vs RS_EMITTER_FREQUENCY
             static constexpr uint8_t RS_DECIMATION_FILTER_DPP = 0x11; // vs RS_DEPTH_AUTO_EXPOSURE_MODE
             static constexpr uint8_t RS_DUAL_RGB_MODE         = 0x12; // vs RS_EXTERNAL_SYNC
             static constexpr uint8_t RS_TEMPORAL_FILTER_DPP   = 0x13; // vs RS_READOUT_SHAPING
-            static constexpr uint8_t RS_HDRD_CONTROL          = 0x14; // D500 only, no D400 counterpart
+            static constexpr uint8_t RS_ICR_CONTROL          = 0x14; // D500 only, no D400 counterpart
+
+            // D500 inference XU, on subdevice 0 like the depth XU but with its own unit and selectors.
+            static constexpr uint8_t RS_INFERENCE_XU_UNIT     = 0x10;
+            static constexpr uint8_t RS_DETECTION_DISTANCE    = 0x01;
 
             bool is_auto_exposure_control( uint8_t control )
             {
@@ -302,6 +326,7 @@ namespace librealsense
                 case RS2_OPTION_POWER_LINE_FREQUENCY : return V4L2_CID_POWER_LINE_FREQUENCY;
                 case RS2_OPTION_AUTO_EXPOSURE_PRIORITY: return V4L2_CID_EXPOSURE_AUTO_PRIORITY;
                 case RS2_OPTION_GYRO_SENSITIVITY: return RS_CAMERA_CID_GYRO_SENSITIVITY;
+                case RS2_OPTION_ACCEL_SENSITIVITY: return RS_CAMERA_CID_ACCEL_SENSITIVITY;
                 default: throw linux_backend_exception( rsutils::string::from() << "no v4l2 mipi mapping cid for option " << option );
                 }
             }
@@ -309,56 +334,73 @@ namespace librealsense
             // MIPI controls map - temporal solution to bypass backend interface with actual codes.
             // The two families reuse selector numbers for different controls, so the ones they
             // disagree on are split on `is_d5xx` - see the D500 block below.
-            uint32_t xu_to_cid( const extension_unit & xu, uint8_t control, bool is_d5xx )
+            static uint32_t depth_xu_to_cid( uint8_t control, bool is_d5xx )
             {
-                if( 0 == xu.subdevice )
+                if( is_d5xx )
                 {
-                    if( is_d5xx )
-                    {
-                        switch( control )
-                        {
-                        case RS_DUAL_RGB_MODE: return RS_CAMERA_CID_DEVICE_MODE;
-                        case RS_COLORED_IR_AE_POLICY: return RS_CAMERA_CID_2C_AE_POLICY;
-                        // Selectors the D400 table below maps to something else entirely, and which have
-                        // no MIPI equivalent yet: ALIGN_DEPTH, and the decimation / temporal / close-range
-                        // DPP composites the driver splits into its own scalar CIDs.
-                        case RS_ALIGN_DEPTH:
-                        case RS_DECIMATION_FILTER_DPP:
-                        case RS_TEMPORAL_FILTER_DPP:
-                        case RS_HDRD_CONTROL:
-                            throw linux_backend_exception( rsutils::string::from() << "no v4l2 mipi cid for D500 XU depth control " << std::dec << int( control ) );
-                        default: break;  // the rest are common to both families
-                        }
-                    }
-
                     switch( control )
                     {
-                    case RS_HWMONITOR: return RS_CAMERA_CID_HWMC;
-                    case RS_DEPTH_EMITTER_ENABLED: return RS_CAMERA_CID_LASER_POWER;
-                    case RS_EXPOSURE: return V4L2_CID_EXPOSURE_ABSOLUTE;
-                    case RS_LASER_POWER: return RS_CAMERA_CID_MANUAL_LASER_POWER;
-                    case RS_ENABLE_AUTO_WHITE_BALANCE : return RS_CAMERA_CID_WHITE_BALANCE_MODE;
-                    case RS_ENABLE_AUTO_EXPOSURE: return V4L2_CID_EXPOSURE_AUTO;
-                    case RS_HARDWARE_PRESET : return RS_CAMERA_CID_PRESET;
-                    case RS_EMITTER_FREQUENCY : return RS_CAMERA_CID_EMITTER_FREQUENCY;
-                    case RS_DEPTH_AUTO_EXPOSURE_MODE : return RS_CAMERA_CID_AE_MODE;
-                    case RS_EXTERNAL_SYNC :
-                    case RS_EXTERNAL_SYNC_D500 : return RS_CAMERA_CID_SYNC_MODE;
-                    case RS_READOUT_SHAPING : return RS_CAMERA_CID_READOUT_SHAPING;
-                    case RS_PVT_TEMPERATURE : return RS_CAMERA_CID_SOC_PVT_TEMPERATURE;
-                    case RS_OHM_TEMPERATURE : return RS_CAMERA_CID_OHM_TEMPERATURE;
-                    case RS_PROJECTOR_TEMPERATURE : return RS_CAMERA_CID_PROJECTOR_TEMPERATURE;
-                    case RS_ERROR_REPORTING : return RS_CAMERA_CID_ERROR_CODE;
-                    // D457 Missing functionality
-                    //case RS_EXT_TRIGGER: TBD;
-                    //case RS_ASIC_AND_PROJECTOR_TEMPERATURES: TBD;
-                    //case RS_LED_PWR: TBD;
-
-                    default: throw linux_backend_exception( rsutils::string::from() << "no v4l2 mipi cid for XU depth control " << std::dec << int( control ) );
+                    case RS_DUAL_RGB_MODE: return RS_CAMERA_CID_DEVICE_MODE;
+                    case RS_COLORED_IR_AE_POLICY: return RS_CAMERA_CID_2C_AE_POLICY;
+                    // D500 composite DPP controls - LibRS-side ctrl ids from ds-private.h that
+                    // route to the driver's D500_CAMERA_CID_MINZ / _DECIMATION_FILTER_DPP /
+                    // _TEMPORAL_FILTER_DPP composite CIDs. MINZ is what LibRS calls ICR.
+                    case RS_DECIMATION_FILTER_DPP: return RS_CAMERA_CID_DECIMATION_FILTER_DPP;
+                    case RS_TEMPORAL_FILTER_DPP:   return RS_CAMERA_CID_TEMPORAL_FILTER_DPP;
+                    case RS_ICR_CONTROL:          return RS_CAMERA_CID_MINZ;
+                    case RS_ALIGN_DEPTH:           return RS_CAMERA_CID_ALIGNED_DEPTH;
+                    case RS_PASSIVE_DEPTH:         return RS_CAMERA_CID_PASSIVE_DEPTH;
+                    default: break;  // the rest are common to both families
                     }
                 }
-                else
+
+                switch( control )
+                {
+                case RS_HWMONITOR: return RS_CAMERA_CID_HWMC;
+                case RS_DEPTH_EMITTER_ENABLED: return RS_CAMERA_CID_LASER_POWER;
+                case RS_EXPOSURE: return V4L2_CID_EXPOSURE_ABSOLUTE;
+                case RS_LASER_POWER: return RS_CAMERA_CID_MANUAL_LASER_POWER;
+                case RS_ENABLE_AUTO_WHITE_BALANCE : return RS_CAMERA_CID_WHITE_BALANCE_MODE;
+                case RS_ENABLE_AUTO_EXPOSURE: return V4L2_CID_EXPOSURE_AUTO;
+                case RS_HARDWARE_PRESET : return RS_CAMERA_CID_PRESET;
+                case RS_EMITTER_FREQUENCY : return RS_CAMERA_CID_EMITTER_FREQUENCY;
+                case RS_DEPTH_AUTO_EXPOSURE_MODE : return RS_CAMERA_CID_AE_MODE;
+                case RS_EXTERNAL_SYNC :
+                case RS_EXTERNAL_SYNC_D500 : return RS_CAMERA_CID_SYNC_MODE;
+                case RS_READOUT_SHAPING : return RS_CAMERA_CID_READOUT_SHAPING;
+                case RS_PVT_TEMPERATURE : return RS_CAMERA_CID_SOC_PVT_TEMPERATURE;
+                case RS_OHM_TEMPERATURE : return RS_CAMERA_CID_OHM_TEMPERATURE;
+                case RS_PROJECTOR_TEMPERATURE : return RS_CAMERA_CID_PROJECTOR_TEMPERATURE;
+                case RS_ERROR_REPORTING : return RS_CAMERA_CID_ERROR_CODE;
+                // D457 Missing functionality
+                //case RS_EXT_TRIGGER: TBD;
+                //case RS_ASIC_AND_PROJECTOR_TEMPERATURES: TBD;
+                //case RS_LED_PWR: TBD;
+
+                default: throw linux_backend_exception( rsutils::string::from() << "no v4l2 mipi cid for XU depth control " << std::dec << int( control ) );
+                }
+            }
+
+            static uint32_t inference_xu_to_cid( uint8_t control )
+            {
+                switch( control )
+                {
+                case RS_DETECTION_DISTANCE: return RS_CAMERA_CID_OD_DISTANCE;
+                default: throw linux_backend_exception( rsutils::string::from() << "no v4l2 mipi cid for D500 inference XU control " << std::dec << int( control ) );
+                }
+            }
+
+            uint32_t xu_to_cid( const extension_unit & xu, uint8_t control, bool is_d5xx )
+            {
+                if( 0 != xu.subdevice )
                     throw linux_backend_exception( rsutils::string::from() << "MIPI Controls mapping is for Depth XU only, requested for subdevice " << xu.subdevice );
+
+                if( is_d5xx && xu.unit == RS_INFERENCE_XU_UNIT )
+                    return inference_xu_to_cid( control );
+                // Selectors repeat across XUs, so another unit must not be looked up in the depth table
+                if( xu.unit != RS_DEPTH_XU_UNIT )
+                    throw not_implemented_exception( rsutils::string::from() << "no v4l2 mipi cid for XU unit " << std::dec << int( xu.unit ) << " control " << int( control ) );
+                return depth_xu_to_cid( control, is_d5xx );
             }
         }  // namespace v4l_mipi_logic
     }  // namespace platform

@@ -5,6 +5,8 @@
 #include "backend.h"
 #include "types.h"
 
+#include <src/platform/hid-device.h>
+
 #include <limits.h>
 #include <list>
 #include <fstream>

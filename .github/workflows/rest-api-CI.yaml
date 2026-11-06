@@ -38,6 +38,11 @@ jobs:
     - name: Build
       run: npm run build
 
+    # Copies dist/ into wrappers/rest-api/static/, which the server serves -- so the tests
+    # drive the bundle that actually ships instead of a vite dev server.
+    - name: Bundle the viewer into the server
+      run: npm run bundle
+
     - name: Install rest-api server deps
       working-directory: wrappers/rest-api
       run: |
@@ -47,22 +52,10 @@ jobs:
     - name: Install Playwright browser
       run: npx playwright install --with-deps chromium
 
-    # Vite proxies /api and /socket to :8000, so the viewer talks to the real server.
-    # No camera here, so the device list is empty: this covers the API and socket
-    # contract, not streaming. real-device self-skips without REAL_DEVICE=true.
+    # No camera here: this covers that the bundle boots and reaches the backend. The camera
+    # tests are excluded by tag and run on LibCI instead.
     - name: Run Playwright against a live server
-      working-directory: wrappers/rest-api
-      run: |
-        python3 -m uvicorn main:combined_app --host 127.0.0.1 --port 8000 &
-        server_pid=$!
-        trap 'kill $server_pid' EXIT
-        for _ in $(seq 1 30); do
-          curl -sfL http://127.0.0.1:8000/api/v1/devices/ > /dev/null && break
-          sleep 1
-        done
-        curl -sfL http://127.0.0.1:8000/api/v1/devices/ > /dev/null
-        cd tools/react-viewer
-        npm run test:e2e -- --project=chromium
+      run: npm run test:e2e -- --grep-invert @real-device
 
 
   #--------------------------------------------------------------------------------

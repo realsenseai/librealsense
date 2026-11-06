@@ -131,7 +131,7 @@ typedef enum rs2_frame_metadata_value
     RS2_FRAME_METADATA_OCCUPANCY_GRID_ROWS                  , /**< Number of rows in the grid. Max value is 250 (corresponding to 5M width with 2cm tile) */
     RS2_FRAME_METADATA_OCCUPANCY_GRID_COLUMNS               , /**< Number of columns in the grid. Max value is 320 (corresponding to ~6.5M depth with 2cm tile) */
     RS2_FRAME_METADATA_OCCUPANCY_CELL_SIZE                  , /**< Edge size of each tile, measured in cm */
-    RS2_FRAME_METADATA_NUMBER_OF_3D_VERTICES                , /**< The max number of points is 640x360 */
+    RS2_FRAME_METADATA_NUMBER_OF_3D_VERTICES                , /**< W x H of the organized cloud */
     RS2_FRAME_METADATA_SAFETY_PRESET_ERROR_TYPE             , /**< Bitmask, enumerated */
     RS2_FRAME_METADATA_SAFETY_PRESET_ERROR_PARAM_1          , /**< Preset Error Param. Enumerated*/
     RS2_FRAME_METADATA_SAFETY_PRESET_ERROR_PARAM_2          , /**< Preset Error Param. Enumerated*/
@@ -160,6 +160,13 @@ typedef enum rs2_frame_metadata_value
     RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_X_CORD       , /**< Diagnostic Zone point #3, X coord in mm*/
     RS2_FRAME_METADATA_DIAGNOSTIC_ZONE_POINT_3_Y_CORD       , /**< Diagnostic Zone point #3, Y coord in mm*/
     RS2_FRAME_METADATA_EMBEDDED_FILTERS                     , /**< Bitmask, enumerated */
+    RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_X              , /**< Occupancy-grid origin on the forward axis, in millimeters */
+    RS2_FRAME_METADATA_OCCUPANCY_GRID_ORIGIN_Y              , /**< Occupancy-grid origin on the lateral axis, in millimeters */
+    RS2_FRAME_METADATA_COLOR_FRAME_COUNTER                  , /**< Point cloud: RGB frame matched to the cloud, or used by the segmentation (LPCL) */
+    RS2_FRAME_METADATA_COLOR_SYNC_DELTA                     , /**< Point cloud: signed Depth - RGB capture timestamp delta, in microseconds */
+    RS2_FRAME_METADATA_SEGMENTATION_MODE                    , /**< OG / LPCL: 0 - segmentation not applied, otherwise the mode applied */
+    RS2_FRAME_METADATA_SEGMENTATION_CLASSES                 , /**< OG / LPCL: bitmask of the segmentation classes applied */
+    RS2_FRAME_METADATA_PCL_OCCLUSION_REMOVAL                , /**< Point cloud: 0 - occlusion removal off, 1 - on */
     RS2_FRAME_METADATA_COUNT
 } rs2_frame_metadata_value;
 const char* rs2_frame_metadata_to_string(rs2_frame_metadata_value metadata);
@@ -355,7 +362,8 @@ void rs2_export_to_ply(const rs2_frame* frame, const char* fname, rs2_frame* tex
 * Each coordinate represent a (u,v) pair within [0,1] range, to be mapped to texture image
 * \param[in] frame       Points frame
 * \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
-* \return                Pointer to an array of texture coordinates, lifetime is managed by the frame
+* \return                Pointer to an array of texture coordinates, lifetime is managed by the frame;
+*                        nullptr for a device point cloud (RS2_STREAM_POINT_CLOUD), which carries vertices only
 */
 rs2_pixel* rs2_get_frame_texture_coordinates(const rs2_frame* frame, rs2_error** error);
 

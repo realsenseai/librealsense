@@ -228,6 +228,9 @@ EXPORTS
     rs2_create_yuy_decoder
     rs2_create_m420_decoder
     rs2_create_nv12_decoder
+    rs2_create_mjpeg_decoder
+    rs2_create_h264_decoder
+    rs2_is_h264_decoder_supported
     rs2_create_threshold
     rs2_create_units_transform
     rs2_create_decimation_filter_block
@@ -288,7 +291,9 @@ EXPORTS
     rs2_depth_auto_exposure_mode_to_string
     rs2_colored_ir_auto_exposure_mode_to_string
     rs2_emitter_mode_to_string
+    rs2_passive_depth_mode_to_string
     rs2_gyro_sensitivity_to_string
+    rs2_accel_sensitivity_to_string
 
     rs2_create_record_device
     rs2_create_record_device_ex
@@ -476,6 +481,8 @@ EXPORTS
     rs2_set_calibration_config
     rs2_get_application_config
     rs2_set_application_config
+    rs2_get_depth_mapping_params
+    rs2_set_depth_mapping_params
     rs2_get_composite_option
     rs2_set_composite_option
     rs2_get_composite_option_range
@@ -513,6 +520,11 @@ EXPORTS
     rs2_get_udp_ttl
     rs2_set_udp_ttl
     rs2_restore_default_eth_config
+
+    rs2_nn_target_to_string
+    rs2_nn_upload
+    rs2_nn_upload_cpp
+    rs2_nn_is_upload_supported
 
     rs2_query_embedded_filters
     rs2_delete_embedded_filter_list

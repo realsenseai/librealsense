@@ -8,9 +8,6 @@
 #include "media/record/record_device.h"
 #include <src/proc/syncer-processing-block.h>
 #include <src/core/frame-callback.h>
-#ifdef BUILD_WITH_DDS
-#include <src/dds/rs-dds-device-proxy.h>
-#endif
 
 #include <rsutils/string/from.h>
 
@@ -129,17 +126,9 @@ namespace librealsense
             }
 
             _dispatcher.start();
-#ifdef BUILD_WITH_DDS
-            if( Is< librealsense::dds_device_proxy >( dev ) )
-            {
-                // For DDS devices open() only sets requested profiles, start() actually starts streaming.
-                // Calling open() then start() sends open-streams control for all sensors before starting to stream,
-                // second open-streams control will resets the first (reverting first requested streams to defaults).
-                // open_and_start() starts streaming from the first sensor before the second open so it does not reset.
+            if( dev->start_sensors_when_opened() )
                 profile->_multistream.open_and_start( callbacks );
-            }
             else
-#endif
             {
                 profile->_multistream.open();
                 profile->_multistream.start( callbacks );

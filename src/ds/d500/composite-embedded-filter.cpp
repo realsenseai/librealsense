@@ -2,8 +2,7 @@
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 #include "composite-embedded-filter.h"
-#include "hdrd-embedded-filter.h"
-#include "ds/ds-private.h"
+#include "icr-embedded-filter.h"
 #include <src/proc/temporal-embedded-filter.h>
 #include <src/proc/decimation-embedded-filter.h>
 #include <src/ds/composite-xu-option.h>
@@ -12,14 +11,10 @@ namespace librealsense {
 
 template< class Base, rs2_embedded_filter_type Type >
 composite_embedded_filter< Base, Type >::composite_embedded_filter(
-    std::weak_ptr< uvc_sensor > raw_depth_ep,
-    uint8_t ctrl_id,
-    uint32_t wire_size,
-    rs2_composite_option_id option_id,
-    std::string description )
+    std::shared_ptr< composite_option_interface > option,
+    rs2_composite_option_id option_id )
 {
-    auto opt = std::make_shared< composite_xu_option >( raw_depth_ep, ds::depth_xu, ctrl_id, wire_size, std::move( description ) );
-    this->register_composite_option( option_id, opt );
+    this->register_composite_option( option_id, std::move( option ) );
 }
 
 // The only three composite-option embedded filters that exist today. Adding another one means

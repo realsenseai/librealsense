@@ -19,6 +19,7 @@
 #include "rum-uploader/rum-uploader.h"
 #endif
 #include <librealsense2/hpp/rs_export.hpp>
+#include <librealsense2/hpp/rs_internal.hpp>
 
 namespace rs2
 {
@@ -71,8 +72,19 @@ namespace rs2
 
         void update_configuration(config_file* new_cfg = nullptr);
 
-        const float panel_width = 340.f;
+        // The left control pane is resizable in the Viewer (see handle_panel_resize); the default is also the minimum
+        static constexpr float default_panel_width = 340.f;
+        // The pane window is this much wider than the pane, so its scrollbar lands under the top bar's divider
+        static constexpr float panel_scrollbar_overhang = 3.f;
+        float panel_width = default_panel_width;
         const float panel_y = 50.f;
+
+        // Widgets laid out for the default pane width add this to follow a wider pane
+        float panel_extra_width() const { return panel_width - default_panel_width; }
+
+        // Drag the pane's right edge to resize it, between the default width and half the window; the width is
+        // kept in the config. Call at the start of each frame, before anything uses panel_width or the mouse.
+        void handle_panel_resize( ux_window & window );
 
         float get_output_height() const { return (float)(not_model->output.get_output_height()); }
         float get_dashboard_width() const { return (float)(not_model->output.get_dashboard_width()); }
@@ -150,9 +162,15 @@ namespace rs2
 
         void disable_measurements();
 
+        // Held across texture uploads; capture callbacks must use the queue mutex instead.
         std::mutex streams_mutex;
         std::map<int, stream_model> streams;
         std::map<int, int> streams_origin;
+        // Alternating Passive Depth interleaves laser-on and laser-off frames on one profile, so each
+        // depth/IR stream gets a second tile for the passive class - mapped here from the stream's uid.
+        std::map<int, int> passive_streams;
+        // Keys the passive tile of a split stream; kept clear of the unique ids the SDK hands out.
+        static constexpr int PASSIVE_STREAM_KEY_OFFSET = 0x10000000;
         bool fullscreen = false;
         stream_model* selected_stream = nullptr;
         // When true, stream tiles can be re-arranged by dragging one onto another (toggled from the top bar)
@@ -242,7 +260,7 @@ namespace rs2
         bool _support_ir_reflectivity;
 
     private:
-        void get_frame_objects_container( rs2::frame & frame, std::shared_ptr< atomic_objects_in_frame > & objects );
+        std::shared_ptr< subdevice_model > get_frame_subdevice( rs2::frame const & frame ) const;
         rs2::rect project_color_bbox_to_depth( const rs2::rect &    color_bbox,
                                                const uint16_t *     depth_data,
                                                float                depth_scale,
@@ -252,6 +270,11 @@ namespace rs2
                                                const rs2_extrinsics & depth_to_color,
                                                const rs2::rect &    depth_frame_rect );
         void process_object_detection_frames( std::map< int, rs2::frame > & last_frames );
+        void update_device_detections( rs2::object_detection_frame const & odf,
+                                       rs2::video_frame const & cf,
+                                       rs2::depth_frame const & df,
+                                       std::shared_ptr< atomic_objects_in_frame > const & objects );
+        int od_color_stream_index( device_model const * dev_model ) const;
 
         void check_permissions();
         void hide_common_options();
@@ -282,12 +305,53 @@ namespace rs2
         // the ruler smoothing state that lives on s_model.
         ruler_bounds calculate_ruler_bounds(std::vector<float> distances,
                                             stream_model& s_model);
+        // Pairs sampled depth values with the colors the tile shows them in; false when there is nothing to show.
+        bool sample_ruler( int stream_key, stream_model & s_model,
+                           std::vector< rgb_per_distance > & colors, std::vector< float > & distances );
+        static void sample_ruler_pixels( const rs2::video_frame & depth, const rs2::video_frame & colorized,
+                                         std::vector< rgb_per_distance > & colors, std::vector< float > & distances );
+        struct ruler_samples
+        {
+            std::vector< rgb_per_distance > colors;
+            std::vector< float > distances;
+            unsigned long long frame_number = 0;  // depth frame the samples were taken from
+            std::chrono::steady_clock::time_point taken;
+        };
+        // Samples of GPU-colorized tiles, by stream key, taken off a CPU colorization and refreshed a few times a second.
+        std::map< int, ruler_samples > _gpu_ruler_samples;
+        std::shared_ptr< rs2::colorizer > _ruler_colorizer;
 
         void set_export_popup(ImFont* large_font, ImFont* font, rect stream_rect, std::string& error_message, config_file& temp_cfg);
         void init_depth_uid(int& selected_depth_source, std::vector<std::string>& depth_sources_str, std::vector<int>& depth_sources);
         void init_labeled_points_uid();
         void draw_3d_labeled_points(const rect& viewer_rect, rs2::labeled_points labeled_points);
+        // Label color legend of the labeled point cloud; (x, y) is the corner given by right / bottom
+        static void draw_label_legend(float x, float y, bool right, bool bottom);
+        // HKR clouds (device point cloud, labeled point cloud) are drawn by the host point-cloud renderer:
+        // converted to host-style points (vertices + texture coordinates) over a color texture.
+        rs2::points make_host_points(rs2::frame source);
+        void prepare_device_cloud();
+        texture_buffer * device_cloud_texture();
+        int selected_texture_stream( rs2::video_frame & frame );
+        bool project_to_texture( const rs2::stream_profile & from, const rs2::vertex * vertices,
+                                 const rs2::video_frame & tex );
+        rs2::points make_textured_host_points( rs2::frame cloud, const rs2::vertex * vertices,
+                                               const rs2::video_frame & tex, int & tex_uid );
+        texture_buffer * labeled_cloud_texture();
+        void prepare_labeled_cloud();
+        bool render_hkr_cloud(rs2::gl::pointcloud_renderer& renderer, rs2::points pts, texture_buffer& tex, float point_size,
+                              const rect& viewer_rect, ux_window& win, matrix4 camera, matrix4 projection, bool pick);
+        void on_point_picked(ux_window& win, const float3& p, const float3& normal);
+        void switch_to_3d_view(ux_window& win, const rect& viewer_rect);
+        void switch_to_2d_view();
+        bool is_streaming(rs2_stream type) const;
+        bool is_stream_streaming(int key) const;
+        bool _lpcl_active = false;  // labeled point cloud streaming: went to 3D when it started
+        bool _occupancy_active = false;  // occupancy grid streaming: went to 2D when it started
         bool should_texture_frame_be_updated(const rs2::frame& f) const;
+        bool is_passive_frame(const rs2::frame& f) const;
+        bool is_split_passive_frame( const rs2::frame & f );
+        int last_frames_key( const rs2::frame & f );
 
         streams_layout _layout;
         streams_layout _old_layout;
@@ -305,6 +369,12 @@ namespace rs2
         bool _prev_reorder_mouse_down = false;
         float2 _drag_origin{ 0.f, 0.f };
 
+        // Control pane resize state (see handle_panel_resize)
+        float _panel_width_pref = default_panel_width;  // the dragged/saved width, before clamping to the window
+        bool _panel_resizing = false;
+        bool _panel_prev_mouse_down = false;
+        float _panel_grab_offset = 0.f;
+
         // 3D-Viewer state
         float3 pos = { 0.0f, 0.0f, -0.5f };
         float3 target = { 0.0f, 0.0f, 0.0f };
@@ -319,12 +389,45 @@ namespace rs2
         
         rs2::labeled_points last_labeled_points;
 
+        // Device point cloud (RS2_STREAM_POINT_CLOUD): ready-made XYZ, drawn without texture.
+        rs2::points last_device_points;
+        rs2::points _device_pc_host_points;  // host-style copy for the point-cloud renderer
+        std::shared_ptr< texture_buffer > _device_pc_texture;
+        unsigned long long _device_pc_frame_number = 0;
+        double _device_pc_timestamp = 0.;
+        int _device_pc_tex_uid = -1;          // streams key of the Color / IR texture of the device cloud, -1 = depth colors
+        rs2::frame _device_pc_tex_frame;      // texture of the device cloud, for export
+        std::shared_ptr< rs2::filter > _device_pc_frameset_maker;  // device cloud + texture, for export
+        std::vector< rs2::texture_coordinate > _host_points_uv;  // optional input of _host_points_maker
+        rs2::points _lpcl_host_points;
+        std::shared_ptr< texture_buffer > _lpcl_texture;
+        std::vector< uint8_t > _lpcl_rgb;
+        unsigned long long _lpcl_frame_number = 0;
+        int _lpcl_tex_uid = -1;  // streams key of the Color / IR texture of the labeled cloud, -1 = label colors
+        double _lpcl_timestamp = 0.;
+        std::shared_ptr< rs2::filter > _host_points_maker;
+        std::map< int, rs2::stream_profile > _host_points_profiles;
+        std::vector< rs2::vertex > _host_points_xyz;  // input of _host_points_maker
+        // Colors come from the depth colorizer, as for the host cloud: the cloud's Z goes through a
+        // software depth sensor (to give the frame its depth units) and a CPU copy of the colorizer.
+        std::vector< uint16_t > _device_pc_z16;
+        std::shared_ptr< rs2::software_device > _device_pc_sw_device;
+        std::shared_ptr< rs2::software_sensor > _device_pc_sw_sensor;
+        rs2::stream_profile _device_pc_sw_profile;
+        std::shared_ptr< rs2::frame_queue > _device_pc_sw_queue;
+        std::shared_ptr< rs2::colorizer > _device_pc_colorizer;
+        rs2::frame _device_pc_colors;  // colorized W x H image of the latest device cloud (3D colors and 2D tile)
+        rs2::frame colorize_device_points( int width, int height );
+        void update_device_points( rs2::points pc );
+
         // Infinite pan / rotate feature:
         bool manipulating = false;
         float2 overflow = { 0.f, 0.f };
 
         rs2::gl::camera_renderer _cam_renderer;
         rs2::gl::pointcloud_renderer _pc_renderer;
+        rs2::gl::pointcloud_renderer _device_pc_renderer;
+        rs2::gl::pointcloud_renderer _lpcl_renderer;
 
 
         bool _pc_selected = false;
