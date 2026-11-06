@@ -1696,7 +1696,7 @@ namespace rs2
                 }
             }
         }
-        if (results.empty())
+        if (results.empty() && def_p.get())
             results.push_back(def_p);
         update_ui(results);
         return results;
@@ -2057,7 +2057,29 @@ namespace rs2
         }
 
         ui.is_multiple_resolutions = desired;
-        last_valid_ui = ui;
+        // The new geometry may not advertise the previously selected FPS. Keep
+        // the format and resolution pairing, and choose the nearest common FPS.
+        if( show_single_fps_list && !is_selected_combination_supported() )
+        {
+            const int original_id = ui.selected_shared_fps_id;
+            const int requested_fps = shared_fps_values.at( original_id );
+            int best_id = -1;
+            for( int i = 0; i < static_cast<int>( shared_fps_values.size() ); ++i )
+            {
+                ui.selected_shared_fps_id = i;
+                if( !is_selected_combination_supported() )
+                    continue;
+                const int distance = std::abs( shared_fps_values[i] - requested_fps );
+                if( best_id < 0
+                    || distance < std::abs( shared_fps_values[best_id] - requested_fps )
+                    || ( distance == std::abs( shared_fps_values[best_id] - requested_fps )
+                         && shared_fps_values[i] > shared_fps_values[best_id] ) )
+                    best_id = i;
+            }
+            ui.selected_shared_fps_id = best_id >= 0 ? best_id : original_id;
+        }
+        if( is_selected_combination_supported() )
+            last_valid_ui = ui;
     }
 
     void subdevice_model::apply_decimation_resolution_defaults()
@@ -2397,6 +2419,10 @@ namespace rs2
 
     void subdevice_model::play(const std::vector<stream_profile>& profiles, viewer_model& viewer, std::shared_ptr<rs2::asynchronous_syncer> syncer)
     {
+        if( profiles.empty()
+            || std::any_of( profiles.begin(), profiles.end(),
+                            []( const stream_profile & profile ) { return !profile.get(); } ) )
+            throw std::runtime_error( "Cannot start streaming: no valid stream profile selected." );
         wait_for_stop();
         avoid_streaming_on_embedded_filters_not_matching_configuration();
         set_extrinsics_from_depth_if_needed();
