@@ -762,6 +762,9 @@ namespace librealsense
         {
             for(auto&& s : _parser->get_formats())
             {
+                if (s.first != format.interfaceNumber)
+                    continue;
+
                 for(auto&& curr_format : s.second)
                 {
                     auto val = SWAP_UINT32(*(const uint32_t *) curr_format.guidFormat);
