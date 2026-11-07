@@ -1,8 +1,6 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
 
-# Not frequently changing, using FW return codes. Can be checked weekly.
-
 # This UT tests the HWM error reporting mechanism.
 # When we send HWM command and it is successful we expect the command opcode to be reflected in the first bytes of the reply.
 # In case of failure a negative value will be returned, indicating the failure reason.
@@ -13,7 +11,7 @@ import logging
 log = logging.getLogger(__name__)
 
 pytestmark = [
-    pytest.mark.context("weekly"),
+    pytest.mark.context("nightly"),
     pytest.mark.device_each("D400*"),
     pytest.mark.device_each("D500*"),
 ]
@@ -85,7 +83,7 @@ def test_wrong_parameter(test_device_wrapped):
     command_opcode_as_int = 0x2b  # SET_ADV
     failure_opcode_as_string = "fa ff ff ff"  # WRONG_PARAM = -6 = 0xfa
     if product_line == "D500":
-        command_opcode_as_int = 0x69  # SET_CAM_SYNC
+        command_opcode_as_int = 0x96  # APM_STROBE_SET, accepts only 0/1; D585 rejects SET_CAM_SYNC as unsupported
         failure_opcode_as_string = "fe ff ff ff"  # INVALID_PARAM = -2 = 0xfe
 
     raw_command = rs.debug_protocol(dev).build_command(command_opcode_as_int)
