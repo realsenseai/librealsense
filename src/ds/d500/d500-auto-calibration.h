@@ -41,7 +41,7 @@ namespace librealsense
         void set_depth_sensor( sensor_base * ds ) { _depth_sensor = ds; }
 
     protected:
-        // Throws if the device can't take a calibration write to flash now
+        // Throws if the device can't take a calibration write to flash now; d500_nn_loader refuses it during an install
         virtual void check_flash_write_allowed() const {}
 
     private:

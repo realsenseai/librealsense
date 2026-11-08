@@ -126,8 +126,9 @@ namespace librealsense
             if( unsupported_reason().empty() )
                 nn_transport_hwm( _hw_monitor ).read_status( status );
         }
-        catch( std::exception const & )
+        catch( std::exception const & e )
         {
+            LOG_DEBUG( "NN_STATUS read failed, not blocking the write: " << e.what() );
         }
         if( nn::is_busy( status.state ) )
             throw wrong_api_call_sequence_exception( nn::INSTALLING_MESSAGE );
