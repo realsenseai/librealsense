@@ -248,6 +248,7 @@ TEST_CASE( "og and lpcl metadata parsers: segmentation fields share one key" )
 {
     // Same chain as the sensor builds: OG registers first, the point cloud block (PCL and LPCL) second.
     // Both blocks use bits 21 / 22 for mode / classes, so only the frame's md_type tells them apart.
+    // They overlay one union (md_mapping_mode), so each frame holds one block; LPCL shares the PCL block.
     auto const og_offset = metadata_raw_mode_offset + offsetof( md_mapping_mode, intel_occupancy );
     auto const pcl_offset = metadata_raw_mode_offset + offsetof( md_mapping_mode, intel_point_cloud );
     md_layout_selecting_parser mode(
@@ -292,7 +293,7 @@ TEST_CASE( "og and lpcl metadata parsers: segmentation fields share one key" )
         CHECK( value == 0x0A );
     }
 
-    SECTION( "LPCL / PCL frame: reports the point cloud values" )
+    SECTION( "LPCL / PCL frame (same md_point_cloud block): reports the point cloud values" )
     {
         pcl.flags = flags_set;
         std::memcpy( f.additional_data.metadata_blob.data() + pcl_offset, &pcl, sizeof( pcl ) );
@@ -302,7 +303,7 @@ TEST_CASE( "og and lpcl metadata parsers: segmentation fields share one key" )
         CHECK( value == 0x05 );
     }
 
-    SECTION( "bits clear: not supported on either frame" )
+    SECTION( "bits clear: not supported, whichever block the frame holds" )
     {
         std::memcpy( f.additional_data.metadata_blob.data() + og_offset, &og, sizeof( og ) );
         CHECK_FALSE( mode.find( f, &value ) );
