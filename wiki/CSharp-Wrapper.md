@@ -34,7 +34,7 @@ The wrapper's [`CMakeLists.txt`](https://github.com/realsenseai/librealsense/blo
 
 ### Platform notes
 
-- CMake treats the C# bindings as Windows-only: on other systems, `wrappers/CMakeLists.txt` prints the warning `BUILD_CSHARP_BINDINGS is supported only for Windows OS` but still adds the folder. `DOTNET_VERSION_LIBRARY` and `DOTNET_VERSION_EXAMPLES` are only set by `CMake/windows_config.cmake`.
+- CMake treats the C# bindings as Windows-only: on other systems, `wrappers/CMakeLists.txt` prints the warning `BUILD_CSHARP_BINDINGS is supported only for Windows OS` but still adds the folder. `DOTNET_VERSION_EXAMPLES` is set only by `CMake/windows_config.cmake`. `DOTNET_VERSION_LIBRARY` is set there too, and `wrappers/CMakeLists.txt` also sets it to `3.5` when `BUILD_UNITY_BINDINGS` is on.
 - The tutorials other than `depth` and `pose` are WPF applications (they reference `PresentationCore`, `PresentationFramework`, `System.Xaml` and `WindowsBase`).
 - The library code itself chooses `memcpy` from `msvcrt.dll` on Windows and from `libc` on Unix and macOS at run time (`NativeMethods.MemCpy`).
 - [`.nuget/Intel.RealSense.targets`](https://github.com/realsenseai/librealsense/blob/master/wrappers/csharp/Intel.RealSense/.nuget/Intel.RealSense.targets) copies native DLLs from `runtimes\win-x64\native` (platform `x64`) or `runtimes\win-x86\native` (`x86` or `AnyCPU`) to the output folder of a project that imports it.
