@@ -13,22 +13,12 @@ using rsutils::json;
 void init_options(py::module &m) {
     /** rs_options.hpp **/
 
-    // Typed struct bindings for the two known composite-option wire layouts, bound directly
+    // Typed struct bindings for the known composite-option structs, bound directly
     // against the real C structs via pointer-to-member (same mechanism as rs2_intrinsics above)
     // so a shape change fails to compile instead of silently misinterpreting bytes.
-    py::class_< dpp_header >(
-        m, "dpp_header", "Wire header shared by the HKR DPP composite-option control family - see rs_dpp_header.h." )
-        .def( py::init<>() )
-        .def_readwrite( "version", &dpp_header::version )
-        .def_readwrite( "flags", &dpp_header::flags )
-        .def_readwrite( "ctl_id", &dpp_header::ctl_id )
-        .def_readwrite( "param_count", &dpp_header::param_count )
-        .def_readwrite( "param_type", &dpp_header::param_type );
-
     py::class_< rs2_decimation_filter_dpp_config >(
         m, "decimation_filter_dpp_config", "Decimation Filter DPP composite option payload - see rs_decimation_filter_dpp.h." )
         .def( py::init<>() )
-        .def_readwrite( "header", &rs2_decimation_filter_dpp_config::header )
         .def_readwrite( "enabled", &rs2_decimation_filter_dpp_config::enabled )
         .def_readwrite( "magnitude", &rs2_decimation_filter_dpp_config::magnitude )
         .def( "__repr__",
@@ -50,7 +40,6 @@ void init_options(py::module &m) {
     py::class_< rs2_temporal_filter_dpp_config >(
         m, "temporal_filter_dpp_config", "Temporal Filter DPP composite option payload - see rs_temporal_filter_dpp.h." )
         .def( py::init<>() )
-        .def_readwrite( "header", &rs2_temporal_filter_dpp_config::header )
         .def_readwrite( "enabled", &rs2_temporal_filter_dpp_config::enabled )
         .def_readwrite( "smooth_alpha", &rs2_temporal_filter_dpp_config::smooth_alpha )
         .def_readwrite( "smooth_delta", &rs2_temporal_filter_dpp_config::smooth_delta )

@@ -56,11 +56,6 @@ static void print_bytes( const char * label, const unsigned char * data, int siz
    table to drive it in C, so every field is spelled out here once, in wire order. */
 static void print_decimation_filter_dpp_struct( const rs2_decimation_filter_dpp_config * v )
 {
-    printf( "        %-16s = %d\n", "version", (int)v->header.version );
-    printf( "        %-16s = %d\n", "flags", (int)v->header.flags );
-    printf( "        %-16s = 0x%x\n", "ctl_id", (unsigned int)v->header.ctl_id );
-    printf( "        %-16s = %d\n", "param_count", (int)v->header.param_count );
-    printf( "        %-16s = %d\n", "param_type", (int)v->header.param_type );
     printf( "        %-16s = %d\n", "enabled", v->enabled );
     printf( "        %-16s = %d\n", "magnitude", v->magnitude );
 }
@@ -72,11 +67,6 @@ static void print_decimation_filter_dpp_range( const rs2_decimation_filter_dpp_r
 #define DECIMATION_FILTER_DPP_ROW( label, field ) \
     printf( "        %-16s = [ %d, %d, %d, %d ]\n", label, \
             (int)r->min.field, (int)r->max.field, (int)r->def.field, (int)r->step.field )
-    DECIMATION_FILTER_DPP_ROW( "version", header.version );
-    DECIMATION_FILTER_DPP_ROW( "flags", header.flags );
-    DECIMATION_FILTER_DPP_ROW( "ctl_id", header.ctl_id );
-    DECIMATION_FILTER_DPP_ROW( "param_count", header.param_count );
-    DECIMATION_FILTER_DPP_ROW( "param_type", header.param_type );
     DECIMATION_FILTER_DPP_ROW( "enabled", enabled );
     DECIMATION_FILTER_DPP_ROW( "magnitude", magnitude );
 #undef DECIMATION_FILTER_DPP_ROW
@@ -87,11 +77,6 @@ static void print_decimation_filter_dpp_range( const rs2_decimation_filter_dpp_r
    DPP param slot is an int32), so it prints as a plain %d like every other field, not a float. */
 static void print_temporal_filter_dpp_struct( const rs2_temporal_filter_dpp_config * v )
 {
-    printf( "        %-16s = %d\n", "version", (int)v->header.version );
-    printf( "        %-16s = %d\n", "flags", (int)v->header.flags );
-    printf( "        %-16s = 0x%x\n", "ctl_id", (unsigned int)v->header.ctl_id );
-    printf( "        %-16s = %d\n", "param_count", (int)v->header.param_count );
-    printf( "        %-16s = %d\n", "param_type", (int)v->header.param_type );
     printf( "        %-16s = %d\n", "enabled", v->enabled );
     printf( "        %-16s = %d\n", "smooth_alpha", v->smooth_alpha );
     printf( "        %-16s = %d\n", "smooth_delta", v->smooth_delta );
@@ -106,11 +91,6 @@ static void print_temporal_filter_dpp_range( const rs2_temporal_filter_dpp_range
 #define TEMPORAL_FILTER_DPP_ROW( label, field ) \
     printf( "        %-16s = [ %d, %d, %d, %d ]\n", label, \
             (int)r->min.field, (int)r->max.field, (int)r->def.field, (int)r->step.field )
-    TEMPORAL_FILTER_DPP_ROW( "version", header.version );
-    TEMPORAL_FILTER_DPP_ROW( "flags", header.flags );
-    TEMPORAL_FILTER_DPP_ROW( "ctl_id", header.ctl_id );
-    TEMPORAL_FILTER_DPP_ROW( "param_count", header.param_count );
-    TEMPORAL_FILTER_DPP_ROW( "param_type", header.param_type );
     TEMPORAL_FILTER_DPP_ROW( "enabled", enabled );
     TEMPORAL_FILTER_DPP_ROW( "smooth_alpha", smooth_alpha );
     TEMPORAL_FILTER_DPP_ROW( "smooth_delta", smooth_delta );

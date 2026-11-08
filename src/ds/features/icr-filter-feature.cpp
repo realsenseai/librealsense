@@ -3,7 +3,7 @@
 
 
 #include <src/ds/features/icr-filter-feature.h>
-#include <src/ds/features/icr-control-wire.h>
+#include <src/ds/dpp-public-option.h>
 #include <src/ds/d500/d500-device.h>
 #include <src/ds/d500/icr-embedded-filter.h>
 #include <src/ds/ds-private.h>
@@ -127,8 +127,8 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
             << " at up to " << max_fps << " FPS, but Depth is " << w << "x" << h << " @ " << fps << " FPS" );
 }
 
-// Rejects enabling ICR while a Depth profile it cannot process is open. `control` is the transport (XU or DDS), it
-// carries the icr_control_wire payload; this class is the boundary translating it to and from the public rs2_icr_control.
+// Rejects enabling ICR while a Depth profile it cannot process is open. `control` is the transport (XU or DDS) wrapped
+// in dpp_public_option, so it exchanges rs2_icr_control.
 class icr_option : public composite_option_interface
 {
 public:
@@ -138,98 +138,35 @@ public:
     {
     }
 
-    std::vector< uint8_t > get_raw() const override
-    {
-        return to_public( _control->get_raw() );
-    }
+    std::vector< uint8_t > get_raw() const override { return _control->get_raw(); }
     void set_raw( const void * data, size_t size ) override
     {
-        if( ! data || size != sizeof( rs2_icr_control ) )
-            throw invalid_value_exception( rsutils::string::from() << "Improved Close Range control expects "
-                                                                   << sizeof( rs2_icr_control ) << " bytes, got " << size );
-        rs2_icr_control next;
-        std::memcpy( &next, data, sizeof( next ) );
-
         auto active = _depth_sensor.get_active_streams();
-        geometry_unchanged_or_throw( next, active );
+        geometry_unchanged_or_throw( data, size, active );
         if( auto depth = find_depth_profile( active ) )
             icr_allowed_or_throw( data, size, *depth, _depth_sensor );
-
-        // Carry back the header FW reported, so FW-owned flags are kept
-        dpp_header header = icr_default_header();
-        try
-        {
-            auto raw = _control->get_raw();
-            check_envelope_or_throw( raw.data(), raw.size() );
-            std::memcpy( &header, raw.data(), sizeof( header ) );
-        }
-        catch( const std::exception & e )
-        {
-            LOG_DEBUG( "Improved Close Range header unavailable, sending the default one: " << e.what() );
-        }
-        auto wire = icr_to_wire( next, header );
-        _control->set_raw( &wire, sizeof( wire ) );
+        _control->set_raw( data, size );
     }
-    // {min, max, step, def}, each a complete payload
-    std::vector< uint8_t > get_raw_range() const override
-    {
-        auto raw = _control->get_raw_range();
-        if( raw.size() != 4 * sizeof( icr_control_wire ) )
-            throw invalid_value_exception( "Improved Close Range control returned an unexpected range payload size" );
-        std::vector< uint8_t > range;
-        for( size_t i = 0; i < 4; ++i )
-        {
-            auto bound = to_public( std::vector< uint8_t >( raw.begin() + i * sizeof( icr_control_wire ),
-                                                             raw.begin() + ( i + 1 ) * sizeof( icr_control_wire ) ) );
-            range.insert( range.end(), bound.begin(), bound.end() );
-        }
-        return range;
-    }
+    std::vector< uint8_t > get_raw_range() const override { return _control->get_raw_range(); }
     bool is_read_only() const override { return _control->is_read_only(); }
     bool is_enabled() const override { return _control->is_enabled(); }
     const char * get_description() const override { return _control->get_description(); }
 
 private:
-    // The payload size, header version, control ID, param count and param type must be the ICR schema
-    static void check_envelope_or_throw( const uint8_t * data, size_t size )
-    {
-        if( size != sizeof( icr_control_wire ) )
-            throw invalid_value_exception( "Improved Close Range control returned an unexpected payload size" );
-        dpp_header hdr = {};
-        std::memcpy( &hdr, data, sizeof( hdr ) );
-        if( hdr.version != DPP_HEADER_CURRENT_VERSION || hdr.ctl_id != icr_desc.ctl_id
-            || hdr.param_count != icr_desc.param_count || hdr.param_type != icr_desc.param_type )
-            throw invalid_value_exception( rsutils::string::from()
-                << "Improved Close Range control returned an unsupported schema (version=" << (int)hdr.version
-                << " ctl_id=" << (int)hdr.ctl_id << " param_count=" << (int)hdr.param_count
-                << " param_type=" << (int)hdr.param_type << ")" );
-    }
-
-    // Validates a wire payload and returns its settings as rs2_icr_control bytes
-    static std::vector< uint8_t > to_public( const std::vector< uint8_t > & raw )
-    {
-        check_envelope_or_throw( raw.data(), raw.size() );
-        icr_control_wire wire;
-        std::memcpy( &wire, raw.data(), sizeof( wire ) );
-        auto cfg = icr_from_wire( wire );
-        std::vector< uint8_t > out( sizeof( cfg ) );
-        std::memcpy( out.data(), &cfg, sizeof( cfg ) );
-        return out;
-    }
-
     // FW rejects changing Filter Type or Downscale Ratio while Depth or IR stream, with an obscure error
-    void geometry_unchanged_or_throw( const rs2_icr_control & next, const stream_profiles & active ) const
+    void geometry_unchanged_or_throw( const void * data, size_t size, const stream_profiles & active ) const
     {
         bool const streaming = std::any_of( active.begin(), active.end(), []( const std::shared_ptr< stream_profile_interface > & p )
                                             { return p->get_stream_type() == RS2_STREAM_DEPTH || p->get_stream_type() == RS2_STREAM_INFRARED; } );
-        if( ! streaming )
+        if( ! streaming || ! data || size != sizeof( rs2_icr_control ) )
             return;
+        rs2_icr_control next;
+        rs2_icr_control current;
+        std::memcpy( &next, data, sizeof( next ) );
         auto raw = _control->get_raw();
-        if( raw.size() != sizeof( icr_control_wire ) )
+        if( raw.size() != sizeof( current ) )
             return;
-        icr_control_wire wire;
-        std::memcpy( &wire, raw.data(), sizeof( wire ) );
-        auto current = icr_from_wire( wire );
+        std::memcpy( &current, raw.data(), sizeof( current ) );
         if( next.filter_type != current.filter_type || next.downscale_ratio != current.downscale_ratio )
             throw wrong_api_call_sequence_exception( "Improved Close Range Depth Filter Type and Downscale Ratio cannot be "
                                                      "changed while Depth or Infrared is streaming" );
@@ -250,7 +187,7 @@ icr_filter_feature::icr_filter_feature( d500_device & owner, d500_depth_sensor &
                                std::dynamic_pointer_cast< uvc_sensor >( depth_sensor.get_raw_sensor() ),
                                ds::depth_xu,
                                ds::DS5_HKR_ICR_CONTROL,
-                               static_cast< uint32_t >( sizeof( icr_control_wire ) ),
+                               static_cast< uint32_t >( sizeof( dpp_wire ) ),
                                "Improved Close Range Control (prototype) - use rs2_set/get_composite_option, see rs_icr_control.h",
                                icr_desc ) )
 {
@@ -260,7 +197,8 @@ icr_filter_feature::icr_filter_feature( d500_device & owner, d500_depth_sensor &
 icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface & depth_sensor,
                                           std::shared_ptr< composite_option_interface > control )
 {
-    auto option = std::make_shared< icr_option >( std::move( control ), depth_sensor );
+    auto option = std::make_shared< icr_option >(
+        std::make_shared< dpp_public_option< rs2_icr_control > >( std::move( control ), icr_desc ), depth_sensor );
     _filter = std::make_shared< icr_embedded_filter >( option, RS2_COMPOSITE_OPTION_ICR_CONTROL );
 
     // ICR may have been enabled while the sensor was closed - check it against the Depth profile being opened

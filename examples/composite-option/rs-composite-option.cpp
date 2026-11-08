@@ -67,11 +67,6 @@ namespace
     // NON-TEMPLATED base interface, so a list of these can be iterated without ever knowing S or
     // Attribute. print_struct() has zero field names hardcoded; only the per-type table does.
 
-    // uint8_t/int8_t stream as characters via the default operator<< - not useful for a byte-
-    // sized numeric field like dpp_header::version - so route those through an int cast.
-    // Every other type (int32_t, float, uint16_t, ...) uses the generic overload as-is.
-    inline void stream_value( std::ostream & os, uint8_t v ) { os << (unsigned int)v; }
-    inline void stream_value( std::ostream & os, int8_t v ) { os << (int)v; }
     template< class T >
     void stream_value( std::ostream & os, const T & v ) { os << v; }
 
@@ -88,9 +83,6 @@ namespace
         virtual ~field_printer_base() = default;
     };
 
-    // Stores a std::function accessor rather than a raw pointer-to-member so the same class
-    // covers both a direct field (S::*) and one nested a level down through a composed header
-    // (S::*header, Header::*field) - see the two make_field_printer() overloads below.
     template< class S, class Attribute >
     class field_printer : public field_printer_base
     {
@@ -124,15 +116,6 @@ namespace
     {
         return std::make_shared< field_printer< S, Attribute > >( name,
             [field]( const S & s ) -> const Attribute & { return s.*field; } );
-    }
-
-    // Overload for a field nested one level down through a composed sub-struct, e.g.
-    // rs2_icr_control::header (a dpp_header) then dpp_header::version.
-    template< class S, class H, class Attribute >
-    std::shared_ptr< field_printer_base > make_field_printer( const char * name, H S::* header_field, Attribute H::* field )
-    {
-        return std::make_shared< field_printer< S, Attribute > >( name,
-            [header_field, field]( const S & s ) -> const Attribute & { return ( s.*header_field ).*field; } );
     }
 
     // The one fully generic entry point - takes whichever field table matches S, no per-struct
@@ -178,11 +161,6 @@ namespace
     const std::vector< std::shared_ptr< field_printer_base > > & decimation_filter_dpp_fields()
     {
         static const std::vector< std::shared_ptr< field_printer_base > > fields = {
-            make_field_printer( "version", &rs2_decimation_filter_dpp_config::header, &dpp_header::version ),
-            make_field_printer( "flags", &rs2_decimation_filter_dpp_config::header, &dpp_header::flags ),
-            make_field_printer( "ctl_id", &rs2_decimation_filter_dpp_config::header, &dpp_header::ctl_id ),
-            make_field_printer( "param_count", &rs2_decimation_filter_dpp_config::header, &dpp_header::param_count ),
-            make_field_printer( "param_type", &rs2_decimation_filter_dpp_config::header, &dpp_header::param_type ),
             make_field_printer( "enabled", &rs2_decimation_filter_dpp_config::enabled ),
             make_field_printer( "magnitude", &rs2_decimation_filter_dpp_config::magnitude ),
         };
@@ -192,11 +170,6 @@ namespace
     const std::vector< std::shared_ptr< field_printer_base > > & temporal_filter_dpp_fields()
     {
         static const std::vector< std::shared_ptr< field_printer_base > > fields = {
-            make_field_printer( "version", &rs2_temporal_filter_dpp_config::header, &dpp_header::version ),
-            make_field_printer( "flags", &rs2_temporal_filter_dpp_config::header, &dpp_header::flags ),
-            make_field_printer( "ctl_id", &rs2_temporal_filter_dpp_config::header, &dpp_header::ctl_id ),
-            make_field_printer( "param_count", &rs2_temporal_filter_dpp_config::header, &dpp_header::param_count ),
-            make_field_printer( "param_type", &rs2_temporal_filter_dpp_config::header, &dpp_header::param_type ),
             make_field_printer( "enabled", &rs2_temporal_filter_dpp_config::enabled ),
             make_field_printer( "smooth_alpha", &rs2_temporal_filter_dpp_config::smooth_alpha ),
             make_field_printer( "smooth_delta", &rs2_temporal_filter_dpp_config::smooth_delta ),
@@ -381,7 +354,7 @@ namespace
                   << '\n';
 
         // range.min/max/step/def are each a FULL rs2_icr_control - the same struct
-        // as `original`/`cfg` above, header fields included - and those bytes ARE exactly what the
+        // as `original`/`cfg` above - and those bytes ARE exactly what the
         // device's real get_xu_range() call returned.
         print_bytes( "Get Range", opts.get_composite_option_range( id ) );
         auto range = opts.get_composite_option_range_as< rs2_icr_control_range >( id );

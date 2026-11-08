@@ -4,8 +4,8 @@
 /** \file rs_decimation_filter_dpp.h
 * \brief
 * Cast-target struct for RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP (see rs_composite_option.h).
-* Same shared HKR DPP wire layout (see rs_icr_control.h): dpp_header + 8 int32 param slots,
-* 2 used (38 bytes, little-endian, pack(1)); ctl_id = 0x0001.
+* Holds only the user-facing settings: the firmware wire layout (header, unused slots, packing) is
+* private to the SDK, so firmware changes do not change this struct.
 */
 
 #ifndef LIBREALSENSE_RS2_DECIMATION_FILTER_DPP_H
@@ -15,32 +15,20 @@
 extern "C" {
 #endif
 
-#include "rs_dpp_header.h"
 #include <stdint.h>
 
-#pragma pack(push, 1)
-
-/** The entire 38-byte Decimation Filter DPP payload, header included. */
+/** Embedded Decimation filter settings. Read with get_composite_option_as(), change the fields of
+* interest and write back with set_composite_option_from(). */
 typedef struct rs2_decimation_filter_dpp_config
 {
-    dpp_header header;
-
     int32_t enabled;    /**< 0 = Off, 1 = On. Default 0. Read/write only while Depth/IR is
                          * idle - the device rejects a SET once streaming starts. */
     int32_t magnitude;  /**< Downscale factor. Currently fixed at 2 (min=max=default=2) - the
                          * FW-defined range this build must not assume stays a single value. */
-
-    int32_t reserved[6];   /**< MUST be zero on SET */
 } rs2_decimation_filter_dpp_config;
 
-#pragma pack(pop)
-
-/* Fails to compile if padding/field changes push this off the documented 38-byte wire size. */
-typedef char rs2_decimation_filter_dpp_config_wire_size_check[ ( sizeof( rs2_decimation_filter_dpp_config ) == 38 ) ? 1 : -1 ];
-
 /** {min, max, step, def} bounds for rs2_decimation_filter_dpp_config, as returned by
-* rs2_get_composite_option_range(RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP). Read-only - each
-* bound already carries its own header.version, so this wrapper has no version field of its own. */
+* rs2_get_composite_option_range(RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP). Read-only. */
 typedef struct rs2_decimation_filter_dpp_range
 {
     rs2_decimation_filter_dpp_config min;

@@ -20,46 +20,29 @@ namespace rs2
         // emits at DEBUG+ verbosity, not the default INFO level.
         void print_decimation_filter_dpp_config( const rs2_decimation_filter_dpp_config & v )
         {
-            LOG_DEBUG( "[Decimation Filter DPP GET] version=" << (int)v.header.version
-                       << " flags=" << (int)v.header.flags
-                       << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
-                       << " param_count=" << (int)v.header.param_count
-                       << " param_type=" << (int)v.header.param_type
-                       << " enabled=" << v.enabled
+            LOG_DEBUG( "[Decimation Filter DPP GET] enabled=" << v.enabled
                        << " magnitude=" << v.magnitude );
         }
 
-        // No enum-valued fields to clamp here - every field is just range-bounded. Still zeroes
-        // the reserved slots - "MUST be zero on SET" rule.
-        void sanitize_decimation_filter_dpp_config( rs2_decimation_filter_dpp_config & v )
+        // No enum-valued fields to clamp here - every field is just range-bounded.
+        void sanitize_decimation_filter_dpp_config( rs2_decimation_filter_dpp_config & )
         {
-            for( auto & r : v.reserved )
-                r = 0;
         }
 
         // Same scheme as print_decimation_filter_dpp_config() above, for
         // RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP.
         void print_temporal_filter_dpp_config( const rs2_temporal_filter_dpp_config & v )
         {
-            LOG_DEBUG( "[Temporal Filter DPP GET] version=" << (int)v.header.version
-                       << " flags=" << (int)v.header.flags
-                       << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
-                       << " param_count=" << (int)v.header.param_count
-                       << " param_type=" << (int)v.header.param_type
-                       << " enabled=" << v.enabled
+            LOG_DEBUG( "[Temporal Filter DPP GET] enabled=" << v.enabled
                        << " smooth_alpha=" << v.smooth_alpha
                        << " smooth_delta=" << v.smooth_delta
-                       << " persistency_index=" << v.persistency_index
-                       << " reserved=[" << v.reserved[0] << "," << v.reserved[1] << ","
-                       << v.reserved[2] << "," << v.reserved[3] << "]" );
+                       << " persistency_index=" << v.persistency_index );
         }
 
         // No enum-valued fields to clamp here (unlike sanitize_icr_control() below) - every field
-        // is just range-bounded. Still zeroes the reserved slots - same "MUST be zero on SET" rule.
-        void sanitize_temporal_filter_dpp_config( rs2_temporal_filter_dpp_config & v )
+        // is just range-bounded.
+        void sanitize_temporal_filter_dpp_config( rs2_temporal_filter_dpp_config & )
         {
-            for( auto & r : v.reserved )
-                r = 0;
         }
 
         // Same scheme as print_decimation_filter_dpp_config() above, for

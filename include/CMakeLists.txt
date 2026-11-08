@@ -22,7 +22,6 @@ target_sources( ${PROJECT_NAME}
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_nn.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_rum.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_composite_option.h"
-        "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_dpp_header.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_temporal_filter_dpp.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_icr_control.h"
         "${CMAKE_CURRENT_LIST_DIR}/librealsense2/h/rs_decimation_filter_dpp.h"

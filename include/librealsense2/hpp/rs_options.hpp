@@ -7,7 +7,6 @@
 #include "rs_types.hpp"
 #include "../h/rs_types.h"
 #include "../h/rs_composite_option.h"
-#include "../h/rs_dpp_header.h"   // DPP_HEADER_CURRENT_VERSION - see check_version_supported() below
 
 #include <memory>
 #include <vector>
@@ -424,8 +423,7 @@ namespace rs2
 
         /**
         * typed counterpart to get_composite_option() - casts the raw payload directly into T.
-        * Validates sizeof(T) matches, and for structs with a composed dpp_header, that its
-        * version is DPP_HEADER_CURRENT_VERSION (see rs_dpp_header.h), unpopulated (0) included.
+        * Validates sizeof(T) matches.
         * \param[in] id   composite option id to read
         * \return         T, populated from the option's current raw payload
         */
@@ -439,8 +437,7 @@ namespace rs2
 
         /**
         * typed counterpart to get_composite_option_range() - casts the raw {min,max,step,def}
-        * payload into TRange. Validates sizeof(TRange); the wrapper itself has no version field,
-        * but each of its four bounds does, each checked the same way as check_version_supported().
+        * payload into TRange. Validates sizeof(TRange).
         * \param[in] id   composite option id to read
         * \return         TRange, populated from the option's raw range payload
         */
@@ -453,16 +450,13 @@ namespace rs2
         }
 
         /**
-        * typed counterpart to set_composite_option() - sends value itself. For structs carrying a
-        * `header.version` field, rejects a value whose version isn't current - most likely a
-        * get-modify-set that left the header zero-initialized.
+        * typed counterpart to set_composite_option() - sends value itself.
         * \param[in] id      composite option id to write
         * \param[in] value   the caller's struct matching the option's documented wire layout
         */
         template< typename T >
         void set_composite_option_from( rs2_composite_option_id id, const T & value ) const
         {
-            check_version_supported( value );
             set_composite_option( id, &value, sizeof( T ) );
         }
 
@@ -569,66 +563,6 @@ namespace rs2
         }
 
         // ---- typed composite-option cast helpers (get_composite_option_as() and friends) -----
-        // Detects whether T has a `.header.version` member via a composed dpp_header - value
-        // structs like rs2_icr_control.
-        template< typename U >
-        class has_header_version
-        {
-            template< typename V > static auto test( int ) -> decltype( std::declval< V >().header.version, std::true_type{} );
-            template< typename > static std::false_type test( ... );
-        public:
-            static const bool value = decltype( test< U >( 0 ) )::value;
-        };
-
-        // Detects whether T is a {min,max,step,def} range wrapper whose ELEMENTS each carry their
-        // own `.header.version` - e.g. rs2_icr_control_range. The wrapper itself has no version
-        // field of its own (see rs_icr_control.h) - each of its four bounds does.
-        template< typename U >
-        class has_min_header_version
-        {
-            template< typename V > static auto test( int ) -> decltype( std::declval< V >().min.header.version, std::true_type{} );
-            template< typename > static std::false_type test( ... );
-        public:
-            static const bool value = decltype( test< U >( 0 ) )::value;
-        };
-
-        // T has neither shape - no dpp_header anywhere in it - nothing to check. Every composite-
-        // option struct currently in the SDK has one or the other, but a future one might not
-        // (e.g. a control outside the HKR DPP family entirely).
-        template< typename T >
-        static typename std::enable_if< ! has_header_version< T >::value && ! has_min_header_version< T >::value >::type
-        check_version_supported( const T & )
-        {
-        }
-
-        // This is what makes the version field worth having: reject anything other than
-        // DPP_HEADER_CURRENT_VERSION up front - including 0, the "never populated" sentinel - rather
-        // than silently misreading a struct laid out by a wire version this build doesn't know.
-        template< typename T >
-        static typename std::enable_if< has_header_version< T >::value >::type
-        check_version_supported( const T & value )
-        {
-            if( value.header.version != DPP_HEADER_CURRENT_VERSION )
-                throw std::runtime_error( "composite option struct has unsupported wire version "
-                                           + std::to_string( (int)value.header.version ) + " (this SDK build supports version "
-                                           + std::to_string( (int)DPP_HEADER_CURRENT_VERSION )
-                                           + ") - wrong struct for this option id, a zero-initialized header about to "
-                                             "be sent, or a newer device/firmware speaking a wire version this build "
-                                             "doesn't know yet?" );
-        }
-
-        // Range wrapper (e.g. rs2_icr_control_range) - checks each of the four bounds' own
-        // header.version the same way, since the wrapper carries none of its own.
-        template< typename T >
-        static typename std::enable_if< has_min_header_version< T >::value >::type
-        check_version_supported( const T & value )
-        {
-            check_version_supported( value.min );
-            check_version_supported( value.max );
-            check_version_supported( value.step );
-            check_version_supported( value.def );
-        }
-
         template< typename T >
         static void cast_composite_payload( const std::vector< uint8_t > & raw, T & out )
         {
@@ -637,7 +571,6 @@ namespace rs2
                                            + ") does not match sizeof(T) (" + std::to_string( sizeof( T ) )
                                            + ") - wrong struct for this option id?" );
             std::memcpy( &out, raw.data(), sizeof( T ) );
-            check_version_supported( out );
         }
 
         rs2_options* _options;

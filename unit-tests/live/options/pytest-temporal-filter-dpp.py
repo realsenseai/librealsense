@@ -35,7 +35,7 @@ def _bounce_field(embedded_filter, option_id, original, range, field):
     current = getattr(original, field)
     new_value = lo if current != lo else hi
 
-    # Each set starts from a freshly-read struct - the header/other fields must be carried over
+    # Each set starts from a freshly-read struct - the other fields must be carried over
     # exactly as the device just reported them, not zero-initialized.
     cfg = embedded_filter.get_temporal_filter_dpp_config(option_id)
     setattr(cfg, field, new_value)
@@ -52,15 +52,10 @@ def _bounce_field(embedded_filter, option_id, original, range, field):
 
 def _restore_original_raw(embedded_filter, option_id, original_raw):
     """Always restore the very first raw payload read from the device, regardless of what
-    happened above. `reserved` MUST be zero on SET, but a real device can hand back non-zero on
-    GET - zero it in both the sent buffer and the readback comparison before restoring."""
-    expected_raw = bytearray(original_raw)
-    expected_raw[-16:] = b"\x00" * 16
-    expected_raw = bytes(expected_raw)
-    embedded_filter.set_composite_option(option_id, expected_raw)
-    readback_raw = bytearray(embedded_filter.get_composite_option(option_id))
-    readback_raw[-16:] = b"\x00" * 16
-    assert bytes(readback_raw) == expected_raw, "failed to restore original Temporal Filter DPP value"
+    happened above."""
+    embedded_filter.set_composite_option(option_id, bytes(original_raw))
+    readback_raw = embedded_filter.get_composite_option(option_id)
+    assert bytes(readback_raw) == bytes(original_raw), "failed to restore original Temporal Filter DPP value"
 
 
 def test_temporal_filter_dpp_basic_parameter_changes(test_device):
