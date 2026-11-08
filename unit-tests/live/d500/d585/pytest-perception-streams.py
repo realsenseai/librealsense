@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Perception streams on D585, over USB and GMSL, in 2C and 3C.
-# Object Detection (PD) and Occupancy run on their own, with no Depth or Color capture. The camera builds Occupancy
+# Object Detection (PD), Occupancy and the Labeled Point Cloud run on their own, with no Depth or Color capture. The camera builds Occupancy
 # from Depth at 640x360 or 1280x720 at the Occupancy rate; Occupancy started first fixes that source at 640x360.
 # The SDK rejects the depth sensor combinations the camera would refuse or starve before the camera is touched.
 
@@ -21,7 +21,7 @@ pytestmark = [
 ]
 
 MIN_FRAMES = { rs.stream.object_detection: 8,   # GMSL runs PD at ~15 fps
-               rs.stream.occupancy: 15, rs.stream.depth: 15, rs.stream.color: 15 }
+               rs.stream.occupancy: 15, rs.stream.labeled_point_cloud: 15, rs.stream.depth: 15, rs.stream.color: 15 }
 FRAME_TIMEOUT_S = 5       # first frames of a fresh stream
 QUIET_S = 0.3             # how long a stopped stream must stay silent
 SDK_REJECT_S = 1.0        # a camera refusal takes longer
@@ -86,9 +86,14 @@ class Collector:
         if stream_type == rs.stream.object_detection:
             head = bytes( f.get_data() )[:ODET_HEADER]
             info.update( magic=head[:4], payload=struct.unpack_from( '<I', head, 8 )[0], number=f.get_frame_number() )
-        elif stream_type == rs.stream.occupancy:
+        else:
             md = lambda m: f.get_frame_metadata( m ) if f.supports_frame_metadata( m ) else None
-            info.update( counter=md( MD.frame_counter ), grid=( md( MD.occupancy_grid_rows ), md( MD.occupancy_grid_columns ) ) )
+            info.update( counter=md( MD.frame_counter ) )
+            if stream_type == rs.stream.occupancy:
+                info.update( grid=( md( MD.occupancy_grid_rows ), md( MD.occupancy_grid_columns ) ) )
+            elif stream_type == rs.stream.labeled_point_cloud:
+                points = f.as_labeled_points()
+                info.update( points=( points.get_width(), points.get_height() ) )
         self.frames.append( info )
     def of(self, stream_type, since=0.):
         return [i for i in self.frames if i['type'] == stream_type and i['time'] >= since]
@@ -110,7 +115,10 @@ def check_content(dev, profile, frames):
         assert all( b['number'] > a['number'] for a, b in zip( frames, frames[1:] ) )
         return
     vp = profile.as_video_stream_profile()
-    assert all( i['grid'] == ( vp.height(), vp.width() ) for i in frames ), "grids need their occupancy metadata"
+    if profile.stream_type() == rs.stream.labeled_point_cloud:
+        assert all( i['points'] == ( vp.width(), vp.height() ) for i in frames )
+    else:
+        assert all( i['grid'] == ( vp.height(), vp.width() ) for i in frames ), "grids need their occupancy metadata"
     if is_gmsl( dev ):   # over USB the FW reports counter 0 on every grid until its fix lands
         assert all( i['counter'] is not None for i in frames )
         assert all( b['counter'] > a['counter'] for a, b in zip( frames, frames[1:] ) )
@@ -135,7 +143,7 @@ def rejected(sensor, profiles, frames):
     return time.monotonic() - begin < SDK_REJECT_S
 
 
-@pytest.mark.parametrize( 'stream', ['object_detection', 'occupancy'] )
+@pytest.mark.parametrize( 'stream', ['object_detection', 'occupancy', 'labeled_point_cloud'] )
 def test_standalone_lifecycle(device, stream):
     """Runs with no other capture, resumes after stop, and a second session starts after the first one closed."""
     stream_type = getattr( rs.stream, stream )

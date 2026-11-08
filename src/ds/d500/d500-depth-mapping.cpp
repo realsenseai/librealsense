@@ -210,6 +210,14 @@ namespace librealsense
             { uint32_t( md_type::META_DATA_INTEL_OCCUPANCY_ID ), uint32_t( md_type::META_DATA_INTEL_OCCUPANCY_ID ), 136, true },
             { 320, 256, rs_fourcc( 'G', 'R', 'E', 'Y' ), 320 * 256, true } };
 
+    // Labeled point cloud on the same node, routed by its own Capture Timing id and carrying the point cloud metadata
+    // block: 640x360 headerless XYZ + label points. PAL8 as the USB backends tag it. About 3 MB, so not reserved
+    const platform::muxed_stream labeled_point_cloud_muxed_stream
+        = { "Labeled Point Cloud",
+            8,
+            { 0x80000043, uint32_t( md_type::META_DATA_INTEL_POINT_CLOUD_ID ), sizeof( md_point_cloud ), true },
+            { 640, 360, rs_fourcc( 'P', 'A', 'L', '8' ), 640 * 360 * ( 3 * sizeof( float ) + 1 ), false } };
+
     d500_depth_mapping::d500_depth_mapping( std::shared_ptr< const d500_info > const & dev_info)
         : device( dev_info ), d500_device( dev_info ),
         _occupancy_stream(new stream(RS2_STREAM_OCCUPANCY)),
@@ -223,20 +231,26 @@ namespace librealsense
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
         _is_d585s = ( pid == D585S_PID );
 
-        // Over GMSL occupancy is multiplexed on the depth sensor's IR node; over USB the Mapping function has its
-        // own interface
-        auto mapping_dev = get_raw_depth_sensor()->get_uvc_device()->create_muxed_stream_device(
-            occupancy_muxed_stream,
-            [this, alive = _is_alive]( uint32_t stream_id, bool on, const platform::stream_profile & p )
-            {
-                if( *alive )  // sensors outlive the device's HW monitor
-                    enable_muxed_stream( stream_id, on, p.width, p.height, p.fps );
-            } );
-        std::string physical_port;
-        if( mapping_dev )
+        // Over GMSL the Mapping streams are multiplexed on the depth sensor's IR node, one device each; over USB the
+        // Mapping function has its own interface
+        auto const depth_uvc = get_raw_depth_sensor()->get_uvc_device();
+        platform::muxed_stream_enable const enable
+            = [this, alive = _is_alive]( uint32_t stream_id, bool on, const platform::stream_profile & p )
         {
+            if( *alive )  // sensors outlive the device's HW monitor
+                enable_muxed_stream( stream_id, on, p.width, p.height, p.fps );
+        };
+        std::vector< std::shared_ptr< platform::uvc_device > > muxed_devs;
+        for( auto const & desc : { occupancy_muxed_stream, labeled_point_cloud_muxed_stream } )
+            if( auto dev = depth_uvc->create_muxed_stream_device( desc, enable ) )
+                muxed_devs.push_back( dev );
+        std::shared_ptr< platform::uvc_device > mapping_dev;
+        std::string physical_port;
+        if( ! muxed_devs.empty() )
+        {
+            mapping_dev = std::make_shared< platform::multi_pins_uvc_device >( muxed_devs );
             physical_port = mapping_dev->get_device_location();
-            LOG_DEBUG( "Occupancy is multiplexed on " << physical_port );
+            LOG_DEBUG( "Mapping streams are multiplexed on " << physical_port );
         }
         else
         {
