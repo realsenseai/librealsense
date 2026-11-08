@@ -3,7 +3,7 @@
 
 
 #include <src/ds/features/icr-filter-feature.h>
-#include <src/ds/dpp-public-option.h>
+#include <src/ds/dpp-composite-option.h>
 #include <src/ds/d500/d500-device.h>
 #include <src/ds/d500/icr-embedded-filter.h>
 #include <src/ds/ds-private.h>
@@ -128,7 +128,7 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
 }
 
 // Rejects enabling ICR while a Depth profile it cannot process is open. `control` is the transport (XU or DDS) wrapped
-// in dpp_public_option, so it exchanges rs2_icr_control.
+// in dpp_composite_option, so it exchanges rs2_icr_control.
 class icr_option : public composite_option_interface
 {
 public:
@@ -187,7 +187,7 @@ icr_filter_feature::icr_filter_feature( d500_device & owner, d500_depth_sensor &
                                std::dynamic_pointer_cast< uvc_sensor >( depth_sensor.get_raw_sensor() ),
                                ds::depth_xu,
                                ds::DS5_HKR_ICR_CONTROL,
-                               static_cast< uint32_t >( sizeof( dpp_wire ) ),
+                               static_cast< uint32_t >( sizeof( dpp_control_payload ) ),
                                "Improved Close Range Control (prototype) - use rs2_set/get_composite_option, see rs_icr_control.h",
                                icr_desc ) )
 {
@@ -198,7 +198,7 @@ icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface &
                                           std::shared_ptr< composite_option_interface > control )
 {
     auto option = std::make_shared< icr_option >(
-        std::make_shared< dpp_public_option< rs2_icr_control > >( std::move( control ), icr_desc ), depth_sensor );
+        std::make_shared< dpp_composite_option< rs2_icr_control > >( std::move( control ), icr_desc ), depth_sensor );
     _filter = std::make_shared< icr_embedded_filter >( option, RS2_COMPOSITE_OPTION_ICR_CONTROL );
 
     // ICR may have been enabled while the sensor was closed - check it against the Depth profile being opened

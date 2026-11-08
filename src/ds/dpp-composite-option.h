@@ -1,9 +1,9 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-// Boundary between the public settings structs of the HKR DPP composite options (rs2_decimation_filter_dpp_config,
-// rs2_temporal_filter_dpp_config, ...) and the FW wire payload: dpp_header + 8 int32 param slots (38 bytes).
-// A public struct holds only the active params, as contiguous int32 fields in slot order. The header, the unused
+// Boundary between the settings structs of the HKR DPP composite options (rs2_decimation_filter_dpp_config,
+// rs2_temporal_filter_dpp_config, ...) and the FW payload: dpp_header + 8 int32 param slots (38 bytes).
+// A settings struct holds only the active params, as contiguous int32 fields in slot order. The header, the unused
 // slots and the packing never reach the user, so FW payload changes do not change the public API.
 
 #pragma once
@@ -25,7 +25,7 @@
 namespace librealsense {
 
 #pragma pack( push, 1 )
-struct dpp_wire
+struct dpp_control_payload
 {
     static constexpr size_t slot_count = 8;
 
@@ -34,20 +34,20 @@ struct dpp_wire
 };
 #pragma pack( pop )
 
-static_assert( sizeof( dpp_wire ) == 38, "DPP wire payload must be 38 bytes" );
+static_assert( sizeof( dpp_control_payload ) == 38, "DPP wire payload must be 38 bytes" );
 
 
-// Wraps the transport (XU or DDS) carrying the dpp_wire payload and exposes the public struct `Public` instead.
-template< class Public >
-class dpp_public_option : public composite_option_interface
+// Wraps the transport (XU or DDS) carrying the dpp_control_payload payload and exposes the public struct `Settings` instead.
+template< class Settings >
+class dpp_composite_option : public composite_option_interface
 {
-    static_assert( std::is_standard_layout< Public >::value && sizeof( Public ) % sizeof( int32_t ) == 0
-                       && sizeof( Public ) / sizeof( int32_t ) <= dpp_wire::slot_count,
+    static_assert( std::is_standard_layout< Settings >::value && sizeof( Settings ) % sizeof( int32_t ) == 0
+                       && sizeof( Settings ) / sizeof( int32_t ) <= dpp_control_payload::slot_count,
                    "A DPP public struct is made of contiguous int32 settings only" );
-    static constexpr uint8_t param_count = sizeof( Public ) / sizeof( int32_t );
+    static constexpr uint8_t param_count = sizeof( Settings ) / sizeof( int32_t );
 
 public:
-    dpp_public_option( std::shared_ptr< composite_option_interface > control, const dpp_control_desc & desc )
+    dpp_composite_option( std::shared_ptr< composite_option_interface > control, const dpp_control_desc & desc )
         : _control( std::move( control ) )
         , _desc( desc )
     {
@@ -59,8 +59,8 @@ public:
 
     void set_raw( const void * data, size_t size ) override
     {
-        if( ! data || size != sizeof( Public ) )
-            throw invalid_value_exception( rsutils::string::from() << _desc_name() << " expects " << sizeof( Public )
+        if( ! data || size != sizeof( Settings ) )
+            throw invalid_value_exception( rsutils::string::from() << _desc_name() << " expects " << sizeof( Settings )
                                                                    << " bytes, got " << size );
         // Carry back the header FW reported, so FW-owned flags are kept
         dpp_header header = default_header();
@@ -74,10 +74,10 @@ public:
         {
             LOG_DEBUG( "DPP header unavailable, sending the default one: " << e.what() );
         }
-        dpp_wire wire;
+        dpp_control_payload wire;
         std::memset( &wire, 0, sizeof( wire ) );
         wire.header = header;
-        std::memcpy( wire.params, data, sizeof( Public ) );
+        std::memcpy( wire.params, data, sizeof( Settings ) );
         _control->set_raw( &wire, sizeof( wire ) );
     }
 
@@ -85,13 +85,13 @@ public:
     std::vector< uint8_t > get_raw_range() const override
     {
         auto raw = _control->get_raw_range();
-        if( raw.size() != 4 * sizeof( dpp_wire ) )
+        if( raw.size() != 4 * sizeof( dpp_control_payload ) )
             throw invalid_value_exception( "DPP control returned an unexpected range payload size" );
         std::vector< uint8_t > range;
         for( size_t i = 0; i < 4; ++i )
         {
-            auto bound = to_public( std::vector< uint8_t >( raw.begin() + i * sizeof( dpp_wire ),
-                                                             raw.begin() + ( i + 1 ) * sizeof( dpp_wire ) ) );
+            auto bound = to_public( std::vector< uint8_t >( raw.begin() + i * sizeof( dpp_control_payload ),
+                                                             raw.begin() + ( i + 1 ) * sizeof( dpp_control_payload ) ) );
             range.insert( range.end(), bound.begin(), bound.end() );
         }
         return range;
@@ -118,7 +118,7 @@ private:
     // The payload size, header version, control ID and param count must be this control's schema
     void check_envelope_or_throw( const std::vector< uint8_t > & raw ) const
     {
-        if( raw.size() != sizeof( dpp_wire ) )
+        if( raw.size() != sizeof( dpp_control_payload ) )
             throw invalid_value_exception( rsutils::string::from() << _desc_name() << " returned an unexpected payload size "
                                                                    << raw.size() );
         dpp_header hdr;
@@ -132,8 +132,8 @@ private:
     std::vector< uint8_t > to_public( const std::vector< uint8_t > & raw ) const
     {
         check_envelope_or_throw( raw );
-        std::vector< uint8_t > out( sizeof( Public ) );
-        std::memcpy( out.data(), raw.data() + offsetof( dpp_wire, params ), sizeof( Public ) );
+        std::vector< uint8_t > out( sizeof( Settings ) );
+        std::memcpy( out.data(), raw.data() + offsetof( dpp_control_payload, params ), sizeof( Settings ) );
         return out;
     }
 

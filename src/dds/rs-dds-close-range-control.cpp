@@ -8,7 +8,7 @@
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <rsutils/string/from.h>
 #include <rsutils/json.h>
-#include <src/ds/dpp-public-option.h>
+#include <src/ds/dpp-composite-option.h>
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
@@ -59,11 +59,11 @@ namespace librealsense {
         }
     }
 
-    // Packs the dpp_wire payload; get( field index, its DDS option ) returns the field's value
+    // Packs the dpp_control_payload; get( field index, its DDS option ) returns the field's value
     template< class Get >
     std::vector< uint8_t > rs_dds_close_range_control::pack( Get && get ) const
     {
-        dpp_wire wire{};
+        dpp_control_payload wire{};
         wire.header.version = DPP_HEADER_CURRENT_VERSION;
         wire.header.ctl_id = icr_ctl_id;
         wire.header.param_count = static_cast< uint8_t >( field_count );
@@ -81,11 +81,11 @@ namespace librealsense {
 
     void rs_dds_close_range_control::set_raw( const void * data, size_t size )
     {
-        if( ! data || size != sizeof( dpp_wire ) )
+        if( ! data || size != sizeof( dpp_control_payload ) )
             throw invalid_value_exception( rsutils::string::from() << "Improved Close Range Control expects "
-                                                                   << sizeof( dpp_wire ) << " bytes, got " << size );
+                                                                   << sizeof( dpp_control_payload ) << " bytes, got " << size );
         int32_t fields[field_count];
-        std::memcpy( fields, static_cast< const dpp_wire * >( data )->params, sizeof( fields ) );
+        std::memcpy( fields, static_cast< const dpp_control_payload * >( data )->params, sizeof( fields ) );
 
         json options = json::object();
         for( size_t i = 0; i < field_count; ++i )

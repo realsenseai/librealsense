@@ -18,7 +18,7 @@ class dds_option;
 
 namespace librealsense {
 
-    // DDS transport for the Improved Close Range Control (dpp_wire payload, see dpp-public-option.h) composite option: maps the payload to the
+    // DDS transport for the Improved Close Range Control (dpp_control_payload, see dpp-composite-option.h) composite option: maps the payload to the
     // FW's per-field DDS options of a realdds::dds_close_range_filter. Validation of the values against the streaming
     // profiles is left to icr_filter_feature, same as over USB.
     class rs_dds_close_range_control : public composite_option_interface
