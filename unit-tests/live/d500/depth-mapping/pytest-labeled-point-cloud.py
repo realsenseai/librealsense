@@ -1,11 +1,11 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-# Labeled point cloud (RS2_STREAM_LABELED_POINT_CLOUD) on the Depth Mapping sensor of D585 and D585S: the stream
+# Labeled point cloud (RS2_STREAM_LABELED_POINT_CLOUD) of D585 and D585S: the stream
 # starts and every frame is a well-formed organized cloud.
 # The frame describes its own geometry; the stream profile may not. On D585S (SC1.1, USB) the profile is the
 # 2880x1040 transport carrier while the cloud inside is 640x360, so consumers must size the cloud from
-# labeled_points.get_width() / get_height(), never from the profile (RSDEV-16235: Viewer 3D drew nothing).
+# labeled_points.get_width() / get_height(), never from the profile.
 # The cloud content (which points / labels) depends on the scene and is not checked; only its shape.
 
 import pytest
@@ -21,7 +21,6 @@ pytestmark = [
     pytest.mark.device_each( "D585" ),   # name match: D585 and D585S
 ]
 
-MAPPING_SENSOR_NAME = "Depth Mapping Camera"
 FRAMES_TO_CHECK = 30
 TIMEOUT = 10                       # [sec]
 CLOUD_SIZES = { (320, 180), (640, 360) }
@@ -29,24 +28,19 @@ BYTES_PER_POINT = 3 * 4 + 1        # XYZ float32 + uint8 label
 INVALID_VALUE = 404.0              # see labeled_point_cloud_utilities::invalid_value
 
 
-def mapping_sensor( dev ):
-    return next( ( s for s in dev.query_sensors() if s.get_info( rs.camera_info.name ) == MAPPING_SENSOR_NAME ), None )
-
-
-def lpcl_profile( sensor ):
-    profiles = [p for p in sensor.profiles if p.stream_type() == rs.stream.labeled_point_cloud]
-    return next( ( p for p in profiles if p.is_default() ), profiles[0] if profiles else None )
+def lpcl_profile( dev ):
+    for sensor in dev.query_sensors():
+        profiles = [p for p in sensor.profiles if p.stream_type() == rs.stream.labeled_point_cloud]
+        if profiles:
+            return sensor, next( ( p for p in profiles if p.is_default() ), profiles[0] )
+    return None, None
 
 
 @pytest.fixture
 def lpcl( test_device ):
     dev, _ = test_device
-    sensor = mapping_sensor( dev )
-    if not sensor:
-        pytest.skip( "no Depth Mapping sensor" )
-    profile = lpcl_profile( sensor )
-    if not profile:
-        pytest.skip( "FW exposes no labeled point cloud profile" )
+    sensor, profile = lpcl_profile( dev )
+    assert profile, "no sensor exposes a labeled point cloud profile"
     return dev, sensor, profile
 
 
