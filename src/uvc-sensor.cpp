@@ -403,7 +403,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // verbatim view of the backend buffer (sizes match exactly, not motion, not
                     // realigned) and we have not already pinned too many ring buffers.
                     const bool do_zc = capture_zerocopy_enabled()
-                                       && ! msp
+                                       && ! msp  // split IMU reports share one buffer, requeued after the last copy (v4l-uvc-device.cpp)
                                        && ! align64
                                        && expected_size == sizeof( uint8_t ) * f.frame_size
                                        && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT;
