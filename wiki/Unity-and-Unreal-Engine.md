@@ -28,7 +28,7 @@ Open the generated `realsense2.sln` in Visual Studio and build the `Intel.RealSe
 |---|---|
 | Configure | Creates `<build>\wrappers` and, if `<build>\wrappers\unity` does not exist yet, runs `mklink /D` to create a directory link at that path. |
 | Post-build | `XCOPY` copies `Intel.RealSense.dll` and `realsense2.dll` from the build output directory into `<build>\wrappers\unity\Assets\RealSenseSDK2.0\Plugins\`. |
-| Post-build (only if Unity is found) | Runs `Unity.exe -quit -batchmode -projectPath <build>\wrappers\unity -exportPackage "Assets" <OutDir>realsense.unitypackage` and writes the log to `<OutDir>Unity.log`. Failures in this step are ignored (the command ends with `EXIT 0`). |
+| Post-build (only if Unity is found) | Runs `Unity.exe -quit -batchmode -logFile <OutDir>Unity.log -projectPath <build>\wrappers\unity -exportPackage "Assets" <OutDir>realsense.unitypackage`, which writes the log to `<OutDir>Unity.log`. Failures in this step are ignored (the command ends with `\|\| EXIT 0`). |
 
 CMake finds Unity with `find_program(UNITY_PATH Unity\\Editor\\Unity.exe)`. To use a specific editor, pass `-DUNITY_PATH=<path to>\Unity.exe`. If CMake does not find Unity, it prints the warning `Couldn't locate Unity.exe` and skips the package step. The DLLs are still copied.
 
@@ -95,6 +95,7 @@ Scripts in [`Assets/RealSenseSDK2.0/Scripts`](https://github.com/realsenseai/lib
 | `RsPoseStreamTransformer` | Applies `Pose`/`SixDOF` frames to the GameObject's transform. |
 | `RsDeviceInspector` | Lists the running device's sensors and options in the Inspector (custom editor `RsDeviceInspectorEditor`). It looks up `RsDevice` with `GetComponent`, so add it to the same GameObject as `RsDevice`. |
 | `RsConfiguration`, `RsVideoStreamRequest` | Serializable configuration used by `RsDevice`. |
+| `RsARBackgroundRestrictions` | In Unity 2020.1 and newer, deactivates the GameObject named `AR` in `Start()` (used in `StartHere.unity` to hide the AR sample entry). |
 
 ### Configuring RsDevice
 
