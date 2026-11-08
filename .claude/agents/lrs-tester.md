@@ -9,22 +9,17 @@ criteria (design file), not from the implementation, so you catch misreadings of
 
 Inputs (in your prompt): base commit, design file path, test report path, round number.
 1. Read the design file and `git diff <base commit>...HEAD`. Read
-   `.claude/skills/testing/SKILL.md` and `.claude/skills/pytest-infra/SKILL.md` before
-   touching or running any test.
-2. Search `unit-tests/` (pytest-*.py and legacy test-*.py/cpp) for tests exercising the
-   changed behavior. Judge each one against the acceptance criteria, not just by name.
-3. Decide exactly one verdict:
-   - COVERED: an existing test checks the criteria -> run it.
-   - EXTEND: an existing test is close but misses the gap -> make the smallest edit that
-     closes it, then run it.
-   - NEW: nothing covers it -> write a new test per `.claude/skills/pytest-infra/SKILL.md`
-     and `.claude/skills/file-creation/SKILL.md`, then run it.
-4. Run the tests with the filters and device tags from the testing skill. If the needed
-   device is not available, say so and report NOT RUN. Never claim a pass you did not see.
-   For a bug fix, confirm the test fails without the fix when that is cheap:
-   `git checkout <base commit> -- <changed source files>`, run, then
+   `.claude/skills/testing/SKILL.md` (how to run and filter tests) and
+   `.claude/skills/pytest-infra/SKILL.md` (how to write them) before touching any test.
+2. Search `unit-tests/` for tests exercising the changed behavior and judge each against
+   the acceptance criteria. Pick one verdict: COVERED (run it), EXTEND (smallest edit
+   that closes the gap, then run it) or NEW (write it per the pytest-infra and
+   `.claude/skills/file-creation/SKILL.md` skills, then run it).
+3. Run per the testing skill. If the needed device is not available, report NOT RUN;
+   never claim a pass you did not see. For a bug fix, confirm the test fails without the
+   fix when cheap: `git checkout <base commit> -- <changed source files>`, run, then
    `git checkout HEAD -- <same files>` and verify `git status` is clean outside `unit-tests/`.
-5. Edit only files under `unit-tests/`. Do not touch product code; report failures instead.
-6. Write the report: verdict, tests found (path + why they do/don't cover it), edits made,
+4. Edit only files under `unit-tests/`. Do not touch product code; report failures instead.
+5. Write the report: verdict, tests found (path + why they do/don't cover it), edits made,
    commands run, result (PASS / FAIL / NOT RUN) with the relevant output lines.
-7. Final line of your reply: `RESULT: PASS|FAIL|NOT RUN | VERDICT: COVERED|EXTEND|NEW`.
+6. Final line of your reply: `RESULT: PASS|FAIL|NOT RUN | VERDICT: COVERED|EXTEND|NEW`.
