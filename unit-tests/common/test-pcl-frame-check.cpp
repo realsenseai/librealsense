@@ -44,6 +44,11 @@ uint32_t bit( md_point_cloud_attributes a )
     return static_cast< uint32_t >( a );
 }
 
+uint32_t bit( md_occupancy_attributes a )
+{
+    return static_cast< uint32_t >( a );
+}
+
 // Metadata as current FW sends it (version 0x00020001, counters, timestamp, CRC), optionally
 // extended with the 0x00020002 fields.
 md_point_cloud make_md( std::vector< uint8_t > const & payload, bool extended )
@@ -236,5 +241,74 @@ TEST_CASE( "pcl metadata parsers: 0x00020002 fields" )
         std::memcpy( f.additional_data.metadata_blob.data() + offset, &m, sizeof( m ) );
         for( auto const & e : entries )
             CHECK_FALSE( e.parser->find( f, nullptr ) );
+    }
+}
+
+TEST_CASE( "og and lpcl metadata parsers: segmentation fields share one key" )
+{
+    // Same chain as the sensor builds: OG registers first, the point cloud block (PCL and LPCL) second.
+    // Both blocks use bits 21 / 22 for mode / classes, so only the frame's md_type tells them apart.
+    auto const og_offset = metadata_raw_mode_offset + offsetof( md_mapping_mode, intel_occupancy );
+    auto const pcl_offset = metadata_raw_mode_offset + offsetof( md_mapping_mode, intel_point_cloud );
+    md_layout_selecting_parser mode(
+        make_attribute_parser( &md_occupancy::segmentation_mode, md_occupancy_attributes::segmentation_mode_attribute, og_offset ),
+        make_attribute_parser( &md_point_cloud::segmentation_mode, md_point_cloud_attributes::segmentation_mode_attribute, pcl_offset ) );
+    md_layout_selecting_parser classes(
+        make_attribute_parser( &md_occupancy::segmentation_classes, md_occupancy_attributes::segmentation_classes_attribute, og_offset ),
+        make_attribute_parser( &md_point_cloud::segmentation_classes, md_point_cloud_attributes::segmentation_classes_attribute, pcl_offset ) );
+
+    md_occupancy og;
+    std::memset( &og, 0, sizeof( og ) );
+    og.header.md_type_id = md_type::META_DATA_INTEL_OCCUPANCY_ID;
+    og.header.md_size = sizeof( og );
+    og.version = 0x00020002;
+    og.segmentation_mode = 1;
+    og.segmentation_classes = 0x0A;
+
+    md_point_cloud pcl;
+    std::memset( &pcl, 0, sizeof( pcl ) );
+    pcl.header.md_type_id = md_type::META_DATA_INTEL_POINT_CLOUD_ID;
+    pcl.header.md_size = sizeof( pcl );
+    pcl.version = 0x00020002;
+    pcl.segmentation_mode = 2;
+    pcl.segmentation_classes = 0x05;
+
+    librealsense::frame f;
+    REQUIRE( f.additional_data.metadata_blob.size() >= og_offset + sizeof( og ) );
+    REQUIRE( f.additional_data.metadata_blob.size() >= pcl_offset + sizeof( pcl ) );
+    auto const flags_set = bit( md_occupancy_attributes::segmentation_mode_attribute )
+                         | bit( md_occupancy_attributes::segmentation_classes_attribute );
+    REQUIRE( flags_set == ( bit( md_point_cloud_attributes::segmentation_mode_attribute )
+                          | bit( md_point_cloud_attributes::segmentation_classes_attribute ) ) );
+    rs2_metadata_type value = 0;
+
+    SECTION( "OG frame: reports the OG values" )
+    {
+        og.flags = flags_set;
+        std::memcpy( f.additional_data.metadata_blob.data() + og_offset, &og, sizeof( og ) );
+        REQUIRE( mode.find( f, &value ) );
+        CHECK( value == 1 );
+        REQUIRE( classes.find( f, &value ) );
+        CHECK( value == 0x0A );
+    }
+
+    SECTION( "LPCL / PCL frame: reports the point cloud values" )
+    {
+        pcl.flags = flags_set;
+        std::memcpy( f.additional_data.metadata_blob.data() + pcl_offset, &pcl, sizeof( pcl ) );
+        REQUIRE( mode.find( f, &value ) );
+        CHECK( value == 2 );
+        REQUIRE( classes.find( f, &value ) );
+        CHECK( value == 0x05 );
+    }
+
+    SECTION( "bits clear: not supported on either frame" )
+    {
+        std::memcpy( f.additional_data.metadata_blob.data() + og_offset, &og, sizeof( og ) );
+        CHECK_FALSE( mode.find( f, &value ) );
+        CHECK_FALSE( classes.find( f, &value ) );
+        std::memcpy( f.additional_data.metadata_blob.data() + pcl_offset, &pcl, sizeof( pcl ) );
+        CHECK_FALSE( mode.find( f, &value ) );
+        CHECK_FALSE( classes.find( f, &value ) );
     }
 }
