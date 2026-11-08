@@ -136,9 +136,10 @@ class Collector:
             info['cells_ok'] = all( b <= 100 or b == 255 for b in bytes( f.get_data() ) )   # int8 [-1, 100]
             info['counter'] = f.get_frame_metadata( md.frame_counter ) if f.supports_frame_metadata( md.frame_counter ) else None
         if f.get_profile().stream_type() == rs.stream.labeled_point_cloud:
+            md = rs.frame_metadata_value
             points = f.as_labeled_points()
             info['points'] = ( points.get_width(), points.get_height() )
-            info['counter'] = f.get_frame_metadata( rs.frame_metadata_value.frame_counter )
+            info['counter'] = f.get_frame_metadata( md.frame_counter ) if f.supports_frame_metadata( md.frame_counter ) else None
         self.frames.setdefault( f.get_profile().stream_type(), [] ).append( info )
     def count(self, stream_type, since=0.):
         return sum( 1 for i in self.frames.get( stream_type, [] ) if i['time'] >= since )
@@ -212,6 +213,7 @@ def test_pd_joins_lpcl(device):
 
     lpcl = frames.frames[rs.stream.labeled_point_cloud]
     assert all( i['size'] == 640 * 360 * 13 and i['points'] == ( 640, 360 ) for i in lpcl )
+    assert all( i['counter'] is not None for i in lpcl ), "LPCL frames need their counter metadata"
     assert all( b['counter'] > a['counter'] for a, b in zip( lpcl, lpcl[1:] ) )
 
 
