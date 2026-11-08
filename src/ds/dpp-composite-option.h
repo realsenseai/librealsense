@@ -37,13 +37,13 @@ struct dpp_control_payload
 static_assert( sizeof( dpp_control_payload ) == 38, "DPP wire payload must be 38 bytes" );
 
 
-// Wraps the transport (XU or DDS) carrying the dpp_control_payload payload and exposes the public struct `Settings` instead.
+// Wraps the transport (XU or DDS) carrying the dpp_control_payload and exposes the `Settings` struct instead.
 template< class Settings >
 class dpp_composite_option : public composite_option_interface
 {
     static_assert( std::is_standard_layout< Settings >::value && sizeof( Settings ) % sizeof( int32_t ) == 0
                        && sizeof( Settings ) / sizeof( int32_t ) <= dpp_control_payload::slot_count,
-                   "A DPP public struct is made of contiguous int32 settings only" );
+                   "A DPP settings struct is made of contiguous int32 settings only" );
     static constexpr uint8_t param_count = sizeof( Settings ) / sizeof( int32_t );
 
 public:
@@ -52,10 +52,10 @@ public:
         , _desc( desc )
     {
         if( _desc.param_count != param_count )
-            throw invalid_value_exception( "DPP control description does not match its public struct" );
+            throw invalid_value_exception( "DPP control description does not match its settings struct" );
     }
 
-    std::vector< uint8_t > get_raw() const override { return to_public( _control->get_raw() ); }
+    std::vector< uint8_t > get_raw() const override { return to_settings( _control->get_raw() ); }
 
     void set_raw( const void * data, size_t size ) override
     {
@@ -81,7 +81,7 @@ public:
         _control->set_raw( &wire, sizeof( wire ) );
     }
 
-    // {min, max, step, def}, each a complete public struct
+    // {min, max, step, def}, each a complete settings struct
     std::vector< uint8_t > get_raw_range() const override
     {
         auto raw = _control->get_raw_range();
@@ -90,7 +90,7 @@ public:
         std::vector< uint8_t > range;
         for( size_t i = 0; i < 4; ++i )
         {
-            auto bound = to_public( std::vector< uint8_t >( raw.begin() + i * sizeof( dpp_control_payload ),
+            auto bound = to_settings( std::vector< uint8_t >( raw.begin() + i * sizeof( dpp_control_payload ),
                                                              raw.begin() + ( i + 1 ) * sizeof( dpp_control_payload ) ) );
             range.insert( range.end(), bound.begin(), bound.end() );
         }
@@ -129,7 +129,7 @@ private:
                                            << " ctl_id=" << (int)hdr.ctl_id << " param_count=" << (int)hdr.param_count << ")" );
     }
 
-    std::vector< uint8_t > to_public( const std::vector< uint8_t > & raw ) const
+    std::vector< uint8_t > to_settings( const std::vector< uint8_t > & raw ) const
     {
         check_envelope_or_throw( raw );
         std::vector< uint8_t > out( sizeof( Settings ) );
