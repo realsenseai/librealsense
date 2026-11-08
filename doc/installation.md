@@ -171,6 +171,11 @@ default. Without it the stream is still delivered as passthrough, for the applic
     for node in /dev/dri/renderD*; do echo $node; vainfo --display drm --device $node 2>/dev/null | grep VAProfileH264; done
     ```
 
+A camera can publish H.264 and JPEG as profiles of one compressed colour stream, at the same resolutions. Where a
+decoder is available the SDK decodes `RGB8` from H.264, which costs far less bandwidth than JPEG at the same
+geometry; where it is not, `RGB8` comes from JPEG. An application that wants the JPEG path regardless should
+request `MJPEG` and decode it itself, for example with `rs2::mjpeg_decoder`.
+
   
 ## Troubleshooting Installation and Patch-related Issues
 

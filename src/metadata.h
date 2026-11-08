@@ -58,6 +58,7 @@ namespace librealsense
         META_DATA_INTEL_SAFETY_ID               = 0x80000014,
         META_DATA_INTEL_OCCUPANCY_ID            = 0x80000016,
         META_DATA_INTEL_POINT_CLOUD_ID          = 0x80000017,
+        META_DATA_INTEL_OBJECT_DETECTION_ID     = 0x80000020,
         META_DATA_MIPI_INTEL_DEPTH_ID           = 0x80010000,
         META_DATA_MIPI_INTEL_RGB_ID             = 0x80010001,
     };
@@ -83,7 +84,8 @@ namespace librealsense
         { md_type::META_DATA_MIPI_INTEL_RGB_ID,             "Intel Mipi RGB Control"},
         { md_type::META_DATA_INTEL_SAFETY_ID,               "Intel Safety Info"},
         { md_type::META_DATA_INTEL_OCCUPANCY_ID,            "Intel Occupancy"},
-        { md_type::META_DATA_INTEL_POINT_CLOUD_ID,          "Intel Point Cloud"}
+        { md_type::META_DATA_INTEL_POINT_CLOUD_ID,          "Intel Point Cloud"},
+        { md_type::META_DATA_INTEL_OBJECT_DETECTION_ID,     "Intel Object Detection"}
     };
 
     /**\brief md_capture_timing_attributes - enumerate the bit offset to check

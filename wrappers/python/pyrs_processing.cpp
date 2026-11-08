@@ -98,6 +98,9 @@ void init_processing(py::module &m) {
     py::class_<rs2::h264_decoder, rs2::filter> h264_decoder(m, "h264_decoder", "Decodes H.264 access units to RGB8. "
                                                             "Stateful: feed one decoder a single stream in order.");
     h264_decoder.def(py::init<>());
+    h264_decoder.def_static("is_supported", &rs2::h264_decoder::is_supported,
+                            "True when this platform can decode H.264. Where it cannot, the decoder still "
+                            "passes H.264 through but never produces an RGB8 frame.");
 
     // Parameterized converters: same internal classes the SDK uses for live cameras,
     // exposed here as factories so tests can pick the output format.

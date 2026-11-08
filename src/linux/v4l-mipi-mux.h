@@ -7,23 +7,16 @@
 #include <src/platform/uvc-device-info.h>
 
 #include <memory>
-#include <string>
-#include <utility>
-#include <vector>
 
 namespace librealsense
 {
     namespace platform
     {
-        // GMSL Perception MUX: logical streams time-share the IR node in the RSVL format and are told apart by their
-        // metadata. Each logical stream is presented as its own node, the way the USB device exposes it.
+        // GMSL MUX: streams time-share one node's capture in the RSVL format and are told apart by their metadata.
+        // The node's device hands out a device per muxed stream through uvc_device::create_muxed_stream_device().
         namespace v4l_mipi_mux
         {
-            // Append a device per logical stream of every multiplexing node, numbered with the stream's USB interface
-            // so the device code finds it as it does on USB.
-            void add_mux_devices( std::vector< std::pair< uvc_device_info, std::string > > & nodes );
-
-            // A device sharing the multiplexing node's capture, or nullptr if `info` is not part of a MUX.
+            // The device of a multiplexing node, or nullptr if `info` does not offer the carrier format
             std::shared_ptr< uvc_device > create_device( const uvc_device_info & info );
         }  // namespace v4l_mipi_mux
     }  // namespace platform
