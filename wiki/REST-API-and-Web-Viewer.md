@@ -84,7 +84,7 @@ Settings are class attributes in [`config.py`](https://github.com/realsenseai/li
 | `CORS_ORIGINS` | `["*"]` | Allowed origins for the CORS middleware. |
 | `STUN_SERVER` | `None` | If set, added as an ICE server for WebRTC sessions. |
 | `TURN_SERVER`, `TURN_USERNAME`, `TURN_PASSWORD` | `None` | If `TURN_SERVER` is set, added as an ICE server with these credentials. |
-| `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` | `"your-secret-key-here"`, `"HS256"`, `30` | Token helpers in `app/core/security.py`; no route requires a token. |
+| `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` | `"your-secret-key-here"`, `"HS256"`, `30` | Only `ACCESS_TOKEN_EXPIRE_MINUTES` is read, by the token helper in `app/core/security.py`; `SECRET_KEY` and `ALGORITHM` are unused, and no route requires a token. |
 
 ## Running the web viewer
 
@@ -207,7 +207,7 @@ All routes below are prefixed with `/api/v1`. They are listed in the order the r
 | GET | `/devices/{device_id}/stream/status` | Streaming status (`is_streaming`, `active_streams`, ...). |
 | GET | `/devices/{device_id}/stream/depth-at-pixel` | Depth in meters at query `x`, `y`. |
 | GET | `/devices/{device_id}/stream/depth-range` | Depth range for the colour legend, computed from the current frame. |
-| POST | `/system/enable-metadata` | On Windows, enables UVC frame metadata through an elevated (UAC) call to `rs.enable_metadata()`; on other systems returns `{"status": "noop"}`. |
+| POST | `/system/enable-metadata` | On Windows, enables UVC frame metadata through an elevated (UAC) call to `rs.enable_metadata()`; on other systems returns `{"status": "noop", "note": "Metadata management is Windows-only."}`. |
 | POST | `/webrtc/offer` | Create a WebRTC session for `device_id` and `stream_types`; returns `session_id`, `sdp`, `type`. |
 | POST | `/webrtc/answer` | Send the client's SDP answer (`session_id`, `sdp`, `type`). |
 | POST | `/webrtc/ice-candidates` | Add a client ICE candidate (`session_id`, `candidate`, `sdpMid`, `sdpMLineIndex`). |
