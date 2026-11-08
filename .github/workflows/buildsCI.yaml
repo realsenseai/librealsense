@@ -288,6 +288,15 @@ jobs:
         python3 -m pip install -r unit-tests/requirements.txt
         python3 -m pytest unit-tests/ --color=no --debug -s --not-live --context "linux"
 
+    - name: Python type stubs check
+      if: matrix.os == 'ubuntu-22.04'
+      shell: bash
+      run: |
+        python3 -m pip install build pybind11-stubgen==2.5.5 pyright==1.1.414 typing_extensions
+        python3 wrappers/python/build_wheel.py --build-dir build
+        python3 -m pip install wrappers/python/dist/pyrealsense2-*.whl
+        cd /tmp && python3 $GITHUB_WORKSPACE/wrappers/python/stubs_check/check_stubs.py
+
   #--------------------------------------------------------------------------------
   U22_ST_Py_DDS_RSUSB_SEC:  # Ubuntu 2020, Static, Python, DDS, RSUSB, additional security checks
     runs-on: ubuntu-22.04
