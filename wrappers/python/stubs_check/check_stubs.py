@@ -36,7 +36,7 @@ def stubgen_errors():
 
 def known_errors():
     lines = (HERE / 'known_errors.txt').read_text().splitlines()
-    return {line.strip() for line in lines if line.strip() and not line.startswith('#')}
+    return {line.strip() for line in lines if line.strip()}
 
 
 def main():
