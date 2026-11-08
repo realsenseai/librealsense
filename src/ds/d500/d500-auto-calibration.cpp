@@ -782,6 +782,7 @@ namespace librealsense
 
     void d500_auto_calibrated::write_calibration() const
     {
+        check_flash_write_allowed();
         _calib_engine->write_calibration(_curr_calibration);
 
         for( auto & cb : _depth_write_callbacks )
@@ -819,6 +820,7 @@ namespace librealsense
 
     void d500_auto_calibrated::reset_to_factory_calibration() const
     {
+        check_flash_write_allowed();
         auto cmd = _debug_dev->build_command(ds::CAL_RESTORE_DFLT);
         auto res = _debug_dev->send_receive_raw_data(cmd);
 
@@ -927,6 +929,7 @@ namespace librealsense
 
     void d500_auto_calibrated::set_calibration_config(const std::string& calibration_config_json_str) const
     {
+        check_flash_write_allowed();
         _calib_engine->set_calibration_config(calibration_config_json_str);
     }
 

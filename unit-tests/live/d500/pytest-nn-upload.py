@@ -89,8 +89,18 @@ def frames_for( sensor, profile, seconds, action=None ):
 
 def test_reported_only_on_d585( test_device ):
     dev, _ = test_device
-    fw = rsutils.version( dev.get_info( rs.camera_info.firmware_version ) )
-    assert dev.is_nn_loader() == ( is_d585( dev ) and fw >= NN_UPLOAD_MIN_FW )
+    assert dev.is_nn_loader() == is_d585( dev )
+
+
+def test_old_firmware_refused( test_device ):
+    dev, _ = test_device
+    if not is_d585( dev ) or rsutils.version( dev.get_info( rs.camera_info.firmware_version ) ) >= NN_UPLOAD_MIN_FW:
+        pytest.skip( "Needs a D585 with FW older than the NN upload" )
+    loader = dev.as_nn_loader()
+    supported, reason = loader.is_upload_supported()
+    assert not supported and "not supported by this camera's firmware" in reason
+    with pytest.raises( RuntimeError, match="not supported by this camera's firmware" ):
+        loader.nn_upload( GARBAGE )
 
 
 def test_is_upload_supported( loader ):

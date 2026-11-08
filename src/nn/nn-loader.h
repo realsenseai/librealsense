@@ -17,7 +17,7 @@ class nn_loader_interface
 public:
     virtual ~nn_loader_interface() = default;
 
-    // False when the device firmware or link cannot take an upload at all
+    // False when the product or its link cannot take an upload; FW and lock state come from is_upload_supported
     virtual bool supports_nn_upload() const = 0;
 
     virtual void nn_upload( const uint8_t * file, size_t size, rs2_nn_target target, int slot, bool activate,
