@@ -40,8 +40,9 @@ def set_align_depth(sensor, value):
 
 def depth_profile(sensor):
     """The raw depth profile. A device may expose a device-aligned depth stream too, whose topic only
-    exists while the mode is on, so 'the first depth profile' is not good enough here."""
-    depth = [p for p in sensor.profiles if p.stream_type() == rs.stream.depth]
+    exists while the mode is on, so 'the first depth profile' is not good enough here.
+    Aligned depth streams at up to 30 fps, so faster profiles are left out."""
+    depth = [p for p in sensor.profiles if p.stream_type() == rs.stream.depth and p.fps() <= 30]
     return next((p for p in depth if p.stream_name() == "Depth"), depth[0]).as_video_stream_profile()
 
 
