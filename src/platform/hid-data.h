@@ -44,4 +44,12 @@ struct hid_mipi_data_32
 #pragma pack( pop )
 
 
+// hid_mipi_data(_32)::typeID values
+enum : uint8_t
+{
+    hid_mipi_accel = 1,
+    hid_mipi_gyro = 2,
+};
+
+
 }  // namespace librealsense
