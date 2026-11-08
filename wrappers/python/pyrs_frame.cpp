@@ -80,11 +80,6 @@ void init_frame(py::module &m) {
         .def("fps", &rs2::stream_profile::fps, "The streams framerate")
         .def("unique_id", &rs2::stream_profile::unique_id, "Unique index assigned whent the stream was created")
         .def("clone", &rs2::stream_profile::clone, "Clone the current profile and change the type, index and format to input parameters", "type"_a, "index"_a, "format"_a)
-        .def(BIND_DOWNCAST(stream_profile, stream_profile))
-        .def(BIND_DOWNCAST(stream_profile, video_stream_profile))
-        .def(BIND_DOWNCAST(stream_profile, motion_stream_profile))
-        .def(BIND_DOWNCAST(stream_profile, pose_stream_profile))
-        .def(BIND_DOWNCAST(stream_profile, perception_stream_profile))
         .def("stream_name", &rs2::stream_profile::stream_name, "The stream's human-readable name.")
         .def("is_default", &rs2::stream_profile::is_default, "Checks if the stream profile is marked/assigned as default, "
              "meaning that the profile will be selected when the user requests stream configuration using wildcards.")
@@ -138,13 +133,10 @@ void init_frame(py::module &m) {
     py::class_<rs2::perception_stream_profile, rs2::stream_profile> perception_stream_profile(m, "perception_stream_profile", "Stream profile for perception streams.");
     perception_stream_profile.def(py::init<const rs2::stream_profile&>(), "sp"_a);
 
-    py::class_<rs2::filter_interface> filter_interface(m, "filter_interface", "Interface for frame filtering functionality");
-    filter_interface.def("process", &rs2::filter_interface::process, "frame"_a); // No docstring in C++
-
     py::class_<rs2::frame> frame(m, "frame", "Base class for multiple frame extensions");
     frame.def(py::init<>())
         // .def(py::self = py::self) // can't overload assignment in python
-        .def(py::init<rs2::frame>())
+        .def(py::init<rs2::frame>(), "frame"_a)
         .def("swap", &rs2::frame::swap, "Swap the internal frame handle with the one in parameter", "other"_a)
         .def("__nonzero__", &rs2::frame::operator bool, "check if internal frame handle is valid") // Called to implement truth value testing in Python 2
         .def("__bool__", &rs2::frame::operator bool, "check if internal frame handle is valid") // Called to implement truth value testing in Python 3
@@ -162,17 +154,6 @@ void init_frame(py::module &m) {
         .def("get_profile", &rs2::frame::get_profile, "Retrieve stream profile from frame handle.")
         .def_property_readonly("profile", &rs2::frame::get_profile, "Stream profile from frame handle. Identical to calling get_profile.")
         .def("keep", &rs2::frame::keep, "Keep the frame, otherwise if no refernce to the frame, the frame will be released.")
-        .def(BIND_DOWNCAST(frame, frame))
-        .def(BIND_DOWNCAST(frame, points))
-        .def(BIND_DOWNCAST(frame, labeled_points))
-        .def(BIND_DOWNCAST(frame, frameset))
-        .def(BIND_DOWNCAST(frame, video_frame))
-        .def(BIND_DOWNCAST(frame, depth_frame))
-        .def(BIND_DOWNCAST(frame, motion_frame))
-        .def(BIND_DOWNCAST(frame, pose_frame))
-        .def(BIND_DOWNCAST(frame, perception_frame))
-        .def(BIND_DOWNCAST(frame, object_detection_frame))
-        .def(BIND_DOWNCAST(frame, gpu_frame))
         .def("get_gpu_data_or_upload", [](const rs2::frame& self) -> py::object {
             bool copied = false;
             const void* p = self.get_gpu_data_or_upload(&copied);
@@ -209,7 +190,7 @@ void init_frame(py::module &m) {
         });
 
     py::class_<rs2::video_frame, rs2::frame> video_frame(m, "video_frame", "Extends the frame class with additional video related attributes and functions.");
-    video_frame.def(py::init<rs2::frame>())
+    video_frame.def(py::init<rs2::frame>(), "frame"_a)
         .def("get_width", &rs2::video_frame::get_width, "Returns image width in pixels.")
         .def_property_readonly("width", &rs2::video_frame::get_width, "Image width in pixels. Identical to calling get_width.")
         .def("get_height", &rs2::video_frame::get_height, "Returns image height in pixels.")
@@ -239,14 +220,14 @@ void init_frame(py::module &m) {
                 self.extract_target_dimensions(RS2_CALIB_TARGET_POS_GAUSSIAN_DOT_VERTICES, target_dims.data(), 8);
             }
             return target_dims;
-        }, "This will calculate the four target dimenson size(s) in millimeter on the specific target.");
+        }, "This will calculate the four target dimenson size(s) in millimeter on the specific target.", "target_type"_a);
 
     py::class_<rs2::vertex> vertex(m, "vertex"); // No docstring in C++
     vertex.def_readwrite("x", &rs2::vertex::x)
         .def_readwrite("y", &rs2::vertex::y)
         .def_readwrite("z", &rs2::vertex::z)
         .def(py::init([]() { return rs2::vertex{}; }))
-        .def(py::init([](float x, float y, float z) { return rs2::vertex{ x,y,z }; }))
+        .def(py::init([](float x, float y, float z) { return rs2::vertex{ x,y,z }; }), "x"_a, "y"_a, "z"_a)
         .def("__repr__", [](const rs2::vertex& v) {
             std::ostringstream oss;
             oss << v.x << ", " << v.y << ", " << v.z;
@@ -257,7 +238,7 @@ void init_frame(py::module &m) {
     texture_coordinate.def_readwrite("u", &rs2::texture_coordinate::u)
         .def_readwrite("v", &rs2::texture_coordinate::v)
         .def(py::init([]() { return rs2::texture_coordinate{}; }))
-        .def(py::init([](float u, float v) { return rs2::texture_coordinate{ u, v }; }))
+        .def(py::init([](float u, float v) { return rs2::texture_coordinate{ u, v }; }), "u"_a, "v"_a)
         .def("__repr__", [](const rs2::texture_coordinate& t) {
             std::ostringstream oss;
             oss << t.u << ", " << t.v;
@@ -287,7 +268,7 @@ void init_frame(py::module &m) {
 
     py::class_<rs2::points, rs2::frame> points(m, "points", "Extends the frame class with additional point cloud related attributes and functions.");
     points.def(py::init<>())
-        .def(py::init<rs2::frame>())
+        .def(py::init<rs2::frame>(), "frame"_a)
         .def("get_vertices", [](rs2::points& self, int dims) {
             auto verts = const_cast<rs2::vertex*>(self.get_vertices());
             auto profile = self.get_profile().as<rs2::video_stream_profile>();
@@ -320,32 +301,32 @@ void init_frame(py::module &m) {
                 throw std::domain_error("dims arg only supports values of 1, 2 or 3");
             }
         }, "Retrieve the texture coordinates (uv map) for the point cloud", py::keep_alive<0, 1>(), "dims"_a=1)
-        .def("export_to_ply", &rs2::points::export_to_ply, "Export the point cloud to a PLY file")
+        .def("export_to_ply", &rs2::points::export_to_ply, "Export the point cloud to a PLY file", "fname"_a, "texture"_a)
         .def("size", &rs2::points::size); // No docstring in C++
 
     py::class_<rs2::depth_frame, rs2::video_frame> depth_frame(m, "depth_frame", "Extends the video_frame class with additional depth related attributes and functions.");
-    depth_frame.def(py::init<rs2::frame>())
+    depth_frame.def(py::init<rs2::frame>(), "frame"_a)
         .def("get_distance", &rs2::depth_frame::get_distance, "x"_a, "y"_a, "Provide the depth in meters at the given pixel")
         .def("get_units", &rs2::depth_frame::get_units, "Provide the scaling factor to use when converting from get_data() units to meters");
     
     // rs2::disparity_frame
     py::class_<rs2::disparity_frame, rs2::depth_frame> disparity_frame(m, "disparity_frame", "Extends the depth_frame class with additional disparity related attributes and functions.");
-    disparity_frame.def(py::init<rs2::frame>())
+    disparity_frame.def(py::init<rs2::frame>(), "frame"_a)
         .def("get_baseline", &rs2::disparity_frame::get_baseline, "Retrieve the distance between the two IR sensors.");
 
     py::class_<rs2::motion_frame, rs2::frame> motion_frame(m, "motion_frame", "Extends the frame class with additional motion related attributes and functions");
-    motion_frame.def(py::init<rs2::frame>())
+    motion_frame.def(py::init<rs2::frame>(), "frame"_a)
         .def("get_motion_data", &rs2::motion_frame::get_motion_data, "Retrieve motion data from a GYRO/ACCEL sensor")
         .def("get_combined_motion_data", &rs2::motion_frame::get_combined_motion_data, "Retrieve motion data from a MOTION sensor")
         .def_property_readonly("motion_data", &rs2::motion_frame::get_motion_data, "Motion data from IMU sensor. Identical to calling get_motion_data.");
 
     py::class_<rs2::pose_frame, rs2::frame> pose_frame(m, "pose_frame", "Extends the frame class with additional pose related attributes and functions.");
-    pose_frame.def(py::init<rs2::frame>())
+    pose_frame.def(py::init<rs2::frame>(), "frame"_a)
         .def("get_pose_data", &rs2::pose_frame::get_pose_data, "Retrieve the pose data from T2xx position tracking sensor.")
         .def_property_readonly("pose_data", &rs2::pose_frame::get_pose_data, "Pose data from T2xx position tracking sensor. Identical to calling get_pose_data.");
 
     py::class_<rs2::labeled_points, rs2::frame> labeled_points(m, "labeled_points", "Extends the frame class with additional labeled points related attributes and functions.");
-    labeled_points.def(py::init<rs2::frame>())
+    labeled_points.def(py::init<rs2::frame>(), "frame"_a)
         .def("get_vertices", [](rs2::labeled_points& self) {
         auto verts = const_cast<rs2::vertex*>(self.get_vertices());
         return BufData(verts, sizeof(rs2::vertex), "@fff", self.size());
@@ -361,16 +342,16 @@ void init_frame(py::module &m) {
                 .def( "get_bpp", &rs2::labeled_points::get_bits_per_pixel, "Returns labeled point cloud bpp (bits per pixel)." );
 
     py::class_<rs2::perception_frame, rs2::frame> perception_frame(m, "perception_frame", "Extends the frame class with attributes inferred from the frame content, such as object detection results.");
-    perception_frame.def(py::init<rs2::frame>());
+    perception_frame.def(py::init<rs2::frame>(), "frame"_a);
 
     py::class_<rs2::object_detection_frame, rs2::perception_frame> object_detection_frame(m, "object_detection_frame", "Extends perception_frame class with additional object detection related attributes and functions.");
-    object_detection_frame.def(py::init<rs2::frame>())
+    object_detection_frame.def(py::init<rs2::frame>(), "frame"_a)
         .def("get_detection_count", &rs2::object_detection_frame::get_detection_count, "Get the number of detected objects in this frame")
         .def("get_detection", &rs2::object_detection_frame::get_detection, "index"_a, "Get a specific detection by index");
 
     py::class_<rs2::gpu_frame, rs2::frame> gpu_frame(m, "gpu_frame", "Extends the frame class for a GPU-resident (zero-copy) frame on "
         "integrated-GPU CUDA builds. Reach it with frame.as(gpu_frame); the cast is null unless the frame is GPU-resident.");
-    gpu_frame.def(py::init<rs2::frame>())
+    gpu_frame.def(py::init<rs2::frame>(), "frame"_a)
         .def("get_gpu_data", [](const rs2::gpu_frame& self) -> py::object {
             const void* p = self.get_gpu_data();
             if (!p) return py::none();
@@ -381,17 +362,17 @@ void init_frame(py::module &m) {
 
     // TODO: Deprecate composite_frame, replace with frameset
     py::class_<rs2::frameset, rs2::frame> frameset(m, "composite_frame", "Extends the frame class with additional frameset related attributes and functions");
-    frameset.def(py::init<rs2::frame>())
+    frameset.def(py::init<rs2::frame>(), "frame"_a)
         .def("first_or_default", &rs2::frameset::first_or_default, "Retrieve the first frame of a specific stream and optionally with a specific format. "
-             "If no frame is found, return an empty frame instance.", "s"_a, "f"_a = RS2_FORMAT_ANY)
+             "If no frame is found, return an empty frame instance.", "s"_a, py::arg_v("f", RS2_FORMAT_ANY, "format.any"))
         .def("first", &rs2::frameset::first, "Retrieve the first frame of a specific stream type and optionally with a specific format. "
-             "If no frame is found, an error will be thrown.", "s"_a, "f"_a = RS2_FORMAT_ANY)
+             "If no frame is found, an error will be thrown.", "s"_a, py::arg_v("f", RS2_FORMAT_ANY, "format.any"))
         .def("size", &rs2::frameset::size, "Return the size of the frameset")
         .def("__len__", &rs2::frameset::size, "Return the size of the frameset")
         .def("foreach", [](const rs2::frameset& self, std::function<void(rs2::frame)> callable) {
             self.foreach_rs(callable);
         }, "Extract internal frame handles from the frameset and invoke the action function", "callable"_a)
-        .def("__getitem__", &rs2::frameset::operator[])
+        .def("__getitem__", &rs2::frameset::operator[], "index"_a)
         .def("get_depth_frame", &rs2::frameset::get_depth_frame, "Retrieve the first depth frame, if no frame is found, return an empty frame instance.")
         .def("get_color_frame", &rs2::frameset::get_color_frame, "Retrieve the first color frame, if no frame is found, search for the color frame from IR stream. "
              "If one still can't be found, return an empty frame instance.", "index"_a = 0)
@@ -414,6 +395,27 @@ void init_frame(py::module &m) {
                 start += step;
             }
             return flist;
-        });
+        }, "slice"_a);
+
+    stream_profile.def(BIND_DOWNCAST(stream_profile, stream_profile))
+        .def(BIND_DOWNCAST(stream_profile, video_stream_profile))
+        .def(BIND_DOWNCAST(stream_profile, motion_stream_profile))
+        .def(BIND_DOWNCAST(stream_profile, pose_stream_profile))
+        .def(BIND_DOWNCAST(stream_profile, perception_stream_profile));
+
+    frame.def(BIND_DOWNCAST(frame, frame))
+        .def(BIND_DOWNCAST(frame, points))
+        .def(BIND_DOWNCAST(frame, labeled_points))
+        .def(BIND_DOWNCAST(frame, frameset))
+        .def(BIND_DOWNCAST(frame, video_frame))
+        .def(BIND_DOWNCAST(frame, depth_frame))
+        .def(BIND_DOWNCAST(frame, motion_frame))
+        .def(BIND_DOWNCAST(frame, pose_frame))
+        .def(BIND_DOWNCAST(frame, perception_frame))
+        .def(BIND_DOWNCAST(frame, object_detection_frame))
+        .def(BIND_DOWNCAST(frame, gpu_frame));
+
+    py::class_<rs2::filter_interface> filter_interface(m, "filter_interface", "Interface for frame filtering functionality");
+    filter_interface.def("process", &rs2::filter_interface::process, "frame"_a); // No docstring in C++
     /** end rs_frame.hpp **/
 }
