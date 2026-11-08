@@ -119,15 +119,10 @@ static void print_temporal_filter_dpp_range( const rs2_temporal_filter_dpp_range
 }
 
 /* C99 equivalent of the C++ sample's generic print_struct(icr_fields(), ...) - no
-   pointer-to-member table to drive it in C, so every field is spelled out here once, in wire
-   order, matching rs_icr_control.h. */
+   pointer-to-member table to drive it in C, so every field is spelled out here once, in
+   declaration order, matching rs_icr_control.h. */
 static void print_icr_struct( const rs2_icr_control * v )
 {
-    printf( "        %-16s = %d\n", "version", (int)v->header.version );
-    printf( "        %-16s = %d\n", "flags", (int)v->header.flags );
-    printf( "        %-16s = 0x%x\n", "ctl_id", (unsigned int)v->header.ctl_id );
-    printf( "        %-16s = %d\n", "param_count", (int)v->header.param_count );
-    printf( "        %-16s = %d\n", "param_type", (int)v->header.param_type );
     printf( "        %-16s = %d\n", "enable", v->enable );
     printf( "        %-16s = %d\n", "filter_type", v->filter_type );
     printf( "        %-16s = %d\n", "downscale_ratio", v->downscale_ratio );
@@ -145,11 +140,6 @@ static void print_icr_range( const rs2_icr_control_range * r )
 #define ICR_ROW( label, field ) \
     printf( "        %-16s = [ %d, %d, %d, %d ]\n", label, \
             (int)r->min.field, (int)r->max.field, (int)r->def.field, (int)r->step.field )
-    ICR_ROW( "version", header.version );
-    ICR_ROW( "flags", header.flags );
-    ICR_ROW( "ctl_id", header.ctl_id );
-    ICR_ROW( "param_count", header.param_count );
-    ICR_ROW( "param_type", header.param_type );
     ICR_ROW( "enable", enable );
     ICR_ROW( "filter_type", filter_type );
     ICR_ROW( "downscale_ratio", downscale_ratio );
@@ -519,7 +509,7 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
     printf( "      Get Structured Data:\n" );
     print_icr_struct( &current );
 
-    /* 2) Set + Get, wire header and every other field carried over untouched from `current`, not
+    /* 2) Set + Get, every other field carried over untouched from `current`, not
        zero-initialized, on every step below. */
     cfg = current;
     cfg.enable = 1;
@@ -572,7 +562,7 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
                 ? "ok" : "FAILED to restore - device may be left in the sample's last test state" );
 
     /* 3) Get range - raw bytes, then the manual cast to rs2_icr_control_range
-       (4 full copies of the struct - min/max/step/def, header fields included). */
+       (4 full copies of the struct - min/max/step/def). */
     raw = rs2_get_composite_option_range( opts, id, &e );
     if( e )
         goto skipped;

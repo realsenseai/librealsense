@@ -160,8 +160,8 @@ def test_close_range_disparity_shift( test_device ):
 def test_icr_control_present( test_device ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
     cfg = embedded_filter.get_icr_control( ICR )
-    assert cfg.header.version == 1
-    assert cfg.header.param_count == 7
+    assert cfg.enable in ( 0, 1 )
+    assert cfg.filter_type in ( 0, 1 )
 
 
 def test_icr_control_enable_round_trip( test_device ):

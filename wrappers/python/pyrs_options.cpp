@@ -75,7 +75,6 @@ void init_options(py::module &m) {
     py::class_< rs2_icr_control >(
         m, "icr_control", "Improved Close Range Control composite option payload - see rs_icr_control.h." )
         .def( py::init<>() )
-        .def_readwrite( "header", &rs2_icr_control::header )
         .def_readwrite( "enable", &rs2_icr_control::enable )
         .def_readwrite( "filter_type", &rs2_icr_control::filter_type )
         .def_readwrite( "downscale_ratio", &rs2_icr_control::downscale_ratio )
@@ -347,7 +346,7 @@ void init_options(py::module &m) {
                 return self.get_composite_option_as< rs2_icr_control >( id );
             },
             "Typed counterpart to get_composite_option() for Improved Close Range Control - returns a "
-            "icr_control object (bound directly against the real C struct) instead of raw bytes.",
+            "icr_control object (bound directly against the public C struct) instead of raw bytes.",
             "option"_a )
         .def(
             "set_icr_control",

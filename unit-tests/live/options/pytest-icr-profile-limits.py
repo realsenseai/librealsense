@@ -109,15 +109,14 @@ def filters(test_device):
     decimation = next((f for f in sensor.query_embedded_filters() if f.get_type() == rs.embedded_filter_type.decimation), None)
     if icr is None or decimation is None:
         pytest.skip("Improved Close Range Depth / Decimation filters not supported on this device")
-    original_icr = bytearray(icr.get_composite_option(ICR))
-    original_icr[-4:] = bytes(4)  # reserved MUST be zero on SET
+    original_icr = icr.get_icr_control(ICR)
     original_decimation = _decimation_enabled(decimation)
     _set_decimation(decimation, 0)
     _set_icr(icr, "downscale_x2", 0)
     yield sensor, icr, decimation
     if sensor.get_active_streams():  # an unsupported profile that opened by mistake; never started
         sensor.close()
-    icr.set_composite_option(ICR, bytes(original_icr))
+    icr.set_icr_control(ICR, original_icr)
     _set_decimation(decimation, original_decimation)
 
 

@@ -18,7 +18,7 @@ class dds_option;
 
 namespace librealsense {
 
-    // DDS transport for the Improved Close Range Control (rs2_icr_control) composite option: maps the struct to the
+    // DDS transport for the Improved Close Range Control (ICR wire payload, see icr-control-wire.h) composite option: maps the payload to the
     // FW's per-field DDS options of a realdds::dds_close_range_filter. Validation of the values against the streaming
     // profiles is left to icr_filter_feature, same as over USB.
     class rs_dds_close_range_control : public composite_option_interface
@@ -43,7 +43,7 @@ namespace librealsense {
 
         std::shared_ptr< realdds::dds_embedded_filter > _dds_ef;
         set_embedded_filter_callback _set_ef_cb;
-        // DDS option backing each rs2_icr_control field, in wire order; null if the FW does not advertise it
+        // DDS option backing each icr_control_wire field, in wire order; null if the FW does not advertise it
         std::vector< std::shared_ptr< realdds::dds_option > > _fields;
     };
 

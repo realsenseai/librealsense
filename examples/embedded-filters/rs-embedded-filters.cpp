@@ -191,9 +191,11 @@ try
         // Typed get - the SDK's own bound struct (get_composite_option_as<T>()), not raw bytes;
         // the same struct set_composite_option_from() below takes to write it back atomically.
         rs2_icr_control original{};
+        bool have_original = false;
         try
         {
             original = close_range_filter.get_composite_option_as<rs2_icr_control>(id);
+            have_original = true;
         }
         catch (const rs2::error& e)
         {
@@ -201,10 +203,9 @@ try
             // outcome - supports_composite_option() only reflects static registration, never a
             // live capability check.
             std::cout << "Registered but not functional on this device/FW: " << e.what() << std::endl;
-            original.header.version = 0;
         }
 
-        if (original.header.version == 0)
+        if (!have_original)
         {
             // get_composite_option_as() failed above - nothing more to demo.
         }

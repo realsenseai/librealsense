@@ -208,11 +208,6 @@ namespace
     const std::vector< std::shared_ptr< field_printer_base > > & icr_fields()
     {
         static const std::vector< std::shared_ptr< field_printer_base > > fields = {
-            make_field_printer( "version", &rs2_icr_control::header, &dpp_header::version ),
-            make_field_printer( "flags", &rs2_icr_control::header, &dpp_header::flags ),
-            make_field_printer( "ctl_id", &rs2_icr_control::header, &dpp_header::ctl_id ),
-            make_field_printer( "param_count", &rs2_icr_control::header, &dpp_header::param_count ),
-            make_field_printer( "param_type", &rs2_icr_control::header, &dpp_header::param_type ),
             make_field_printer( "enable", &rs2_icr_control::enable ),
             make_field_printer( "filter_type", &rs2_icr_control::filter_type ),
             make_field_printer( "downscale_ratio", &rs2_icr_control::downscale_ratio ),
@@ -336,8 +331,8 @@ namespace
         std::cout << "Get Structured Data:\n";
         print_struct( std::cout, icr_fields(), original );
 
-        // Read-modify-write: wire header carried over untouched from what the device just
-        // reported, not zero-initialized, on every Set below.
+        // Read-modify-write: every field not changed below goes back as the device just reported
+        // it, not zero-initialized, on every Set below.
         rs2_icr_control cfg = original;
         cfg.enable = 1;
 

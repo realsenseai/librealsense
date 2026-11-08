@@ -3,9 +3,10 @@
 
 /** \file rs_icr_control.h
 * \brief
-* Cast-target struct for RS2_COMPOSITE_OPTION_ICR_CONTROL (see rs_composite_option.h). Wire
-* layout: dpp_header + 8 int32 param slots, 7 used (38 bytes, little-endian, pack(1)); ctl_id =
-* 0x0008. Only some Depth profiles are supported; others are rejected when enabling or opening the stream.
+* Cast-target struct for RS2_COMPOSITE_OPTION_ICR_CONTROL (see rs_composite_option.h). Holds only the
+* user-facing settings: the firmware wire layout (header, reserved slots, packing) is private to the
+* SDK, so firmware changes do not change this struct. Only some Depth profiles are supported; others
+* are rejected when enabling or opening the stream.
 */
 
 #ifndef LIBREALSENSE_RS2_ICR_CONTROL_H
@@ -15,16 +16,13 @@
 extern "C" {
 #endif
 
-#include "rs_dpp_header.h"
 #include <stdint.h>
 
-#pragma pack(push, 1)
-
-/** The entire 38-byte HKR Improved Close Range payload, header included. */
+/** Improved Close Range (ICR) settings. Read with get_composite_option_as< rs2_icr_control >(),
+* modify the fields of interest and write back with set_composite_option_from(), so untouched
+* fields keep their value. */
 typedef struct rs2_icr_control
 {
-    dpp_header header;
-
     int32_t  enable;                /**< 0 = Off, 1 = On. Default 0 */
     int32_t  filter_type;           /**< 0 = Downscale, 1 = Lookup shift - selects which of the
                                      * next two field-pairs is meaningful */
@@ -37,18 +35,10 @@ typedef struct rs2_icr_control
                                      * to the host), 2 = Manual (see threshold_mm). Default 1 */
     int32_t  threshold_mm;          /**< Used when threshold_mode == Manual. Range [0,65535].
                                      * Default 0 */
-
-    int32_t  reserved[1];           /**< MUST be zero on SET */
 } rs2_icr_control;
 
-#pragma pack(pop)
-
-/* Fails to compile if padding/field changes push this off the documented 38-byte wire size. */
-typedef char rs2_icr_control_wire_size_check[ ( sizeof( rs2_icr_control ) == 38 ) ? 1 : -1 ];
-
 /** {min, max, step, def} bounds for rs2_icr_control, as returned by
-* rs2_get_composite_option_range(RS2_COMPOSITE_OPTION_ICR_CONTROL). Read-only - each
-* bound already carries its own header.version, so this wrapper has no version field of its own. */
+* rs2_get_composite_option_range(RS2_COMPOSITE_OPTION_ICR_CONTROL). Read-only. */
 typedef struct rs2_icr_control_range
 {
     rs2_icr_control min;

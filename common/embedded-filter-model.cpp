@@ -66,19 +66,13 @@ namespace rs2
         // RS2_COMPOSITE_OPTION_ICR_CONTROL.
         void print_icr_control( const rs2_icr_control & v )
         {
-            LOG_DEBUG( "[Improved Close Range GET] version=" << (int)v.header.version
-                       << " flags=" << (int)v.header.flags
-                       << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
-                       << " param_count=" << (int)v.header.param_count
-                       << " param_type=" << (int)v.header.param_type
-                       << " enable=" << v.enable
+            LOG_DEBUG( "[Improved Close Range GET] enable=" << v.enable
                        << " filter_type=" << v.filter_type
                        << " downscale_ratio=" << v.downscale_ratio
                        << " shift_mode=" << v.shift_mode
                        << " shift_pixels=" << v.shift_pixels
                        << " threshold_mode=" << v.threshold_mode
-                       << " threshold_mm=" << v.threshold_mm
-                       << " reserved=[" << v.reserved[0] << "]" );
+                       << " threshold_mm=" << v.threshold_mm );
         }
 
         // A real device's firmware may still speak the pre-design-review wire layout, so a field
@@ -90,10 +84,6 @@ namespace rs2
             v.downscale_ratio = std::min( std::max( v.downscale_ratio, 1 ), 2 );
             v.shift_mode = std::min( std::max( v.shift_mode, 0 ), 2 );
             v.threshold_mode = std::min( std::max( v.threshold_mode, 0 ), 2 );
-            // Header doc: "MUST be zero on SET". A real device may hand back a non-zero byte here
-            // on GET (pre-design-review firmware, or simply unused memory) - without this, every
-            // later auto-commit/enable-toggle would echo that non-zero value straight back on SET.
-            v.reserved[0] = 0;
         }
     }
 

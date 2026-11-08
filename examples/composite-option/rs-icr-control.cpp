@@ -1,166 +1,93 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-// Composite-option device sweep against whatever RealSense devices are actually connected.
-// Walks device -> depth sensor -> embedded filter -> each supported id, printing its current
-// value, through the public C++ wrapper (rs2::options), a thin pass-through to the C API.
+// Improved Close Range (ICR) control: how to read and write the composite option with rs2_icr_control.
+// Finds the first connected depth sensor exposing an ICR embedded filter, then:
+//   1. reads the current settings and the supported ranges,
+//   2. writes new settings (read-modify-write, so fields left alone keep their value),
+//   3. reads them back and restores the original settings.
+// rs2_icr_control only holds user-facing settings; the firmware payload layout is private to the SDK.
 
 #include <librealsense2/rs.hpp>
-#include <librealsense2/h/rs_decimation_filter_dpp.h>
-#include <librealsense2/h/rs_temporal_filter_dpp.h>
 #include <librealsense2/h/rs_icr_control.h>
 
 #include <iostream>
-#include <string>
+#include <memory>
 
 namespace
 {
-    const char * composite_option_name( rs2_composite_option_id id )
+    const rs2_composite_option_id ICR = RS2_COMPOSITE_OPTION_ICR_CONTROL;
+
+    void print( const char * title, const rs2_icr_control & v )
     {
-        switch( id )
-        {
-        case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  return "DECIMATION_FILTER_DPP";
-        case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    return "TEMPORAL_FILTER_DPP";
-        case RS2_COMPOSITE_OPTION_ICR_CONTROL:           return "ICR_CONTROL";
-        default:                                           return "UNKNOWN";
-        }
+        std::cout << title << '\n'
+                  << "  enable          = " << v.enable << '\n'
+                  << "  filter_type     = " << v.filter_type << "  (0 = Downscale, 1 = Lookup shift)\n"
+                  << "  downscale_ratio = " << v.downscale_ratio << "  (1 = x2, 2 = x4)\n"
+                  << "  shift_mode      = " << v.shift_mode << "  (0 = 126px, 1 = 64px, 2 = manual)\n"
+                  << "  shift_pixels    = " << v.shift_pixels << '\n'
+                  << "  threshold_mode  = " << v.threshold_mode << "  (0 = zero range, 1 = MinZ, 2 = manual)\n"
+                  << "  threshold_mm    = " << v.threshold_mm << '\n';
     }
 
-    void print_decimation_filter_dpp( const rs2_decimation_filter_dpp_config & v )
+    // The first embedded filter of any connected depth sensor that supports the ICR control
+    std::shared_ptr< rs2::embedded_filter > find_icr_filter()
     {
-        std::cout << "        version=" << (int)v.header.version
-                   << " flags=" << (int)v.header.flags
-                   << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
-                   << " param_count=" << (int)v.header.param_count
-                   << " param_type=" << (int)v.header.param_type
-                   << " enabled=" << v.enabled
-                   << " magnitude=" << v.magnitude << '\n';
-    }
-
-    void print_temporal_filter_dpp( const rs2_temporal_filter_dpp_config & v )
-    {
-        std::cout << "        version=" << (int)v.header.version
-                   << " flags=" << (int)v.header.flags
-                   << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
-                   << " param_count=" << (int)v.header.param_count
-                   << " param_type=" << (int)v.header.param_type
-                   << " enabled=" << v.enabled
-                   << " smooth_alpha=" << v.smooth_alpha
-                   << " smooth_delta=" << v.smooth_delta
-                   << " persistency_index=" << v.persistency_index << '\n';
-    }
-
-    void print_icr_control( const rs2_icr_control & v )
-    {
-        std::cout << "        version=" << (int)v.header.version
-                   << " flags=" << (int)v.header.flags
-                   << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
-                   << " param_count=" << (int)v.header.param_count
-                   << " param_type=" << (int)v.header.param_type
-                   << " enable=" << v.enable
-                   << " filter_type=" << v.filter_type
-                   << " downscale_ratio=" << v.downscale_ratio
-                   << " shift_mode=" << v.shift_mode
-                   << " shift_pixels=" << v.shift_pixels
-                   << " threshold_mode=" << v.threshold_mode
-                   << " threshold_mm=" << v.threshold_mm << '\n';
-    }
-
-    // Prints every field of `id`'s current value, dispatching to the right typed cast - no
-    // generic "print any composite option" mechanism by design, so a new id needs a case here too.
-    void print_composite_option_value( const rs2::options & opts, rs2_composite_option_id id )
-    {
-        try
-        {
-            switch( id )
-            {
-            case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:
-                print_decimation_filter_dpp( opts.get_composite_option_as< rs2_decimation_filter_dpp_config >( id ) );
-                break;
-            case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:
-                print_temporal_filter_dpp( opts.get_composite_option_as< rs2_temporal_filter_dpp_config >( id ) );
-                break;
-            case RS2_COMPOSITE_OPTION_ICR_CONTROL:
-                print_icr_control( opts.get_composite_option_as< rs2_icr_control >( id ) );
-                break;
-            default:
-                std::cout << "        (no typed printer registered for this composite option id)\n";
-                break;
-            }
-        }
-        catch( const std::exception & e )
-        {
-            std::cout << "        FAILED to read from device: " << e.what() << '\n';
-        }
+        rs2::context ctx;
+        for( auto && dev : ctx.query_devices() )
+            for( auto && sensor : dev.query_sensors() )
+                if( sensor.is< rs2::depth_sensor >() )
+                    for( auto && filter : sensor.query_embedded_filters() )
+                        if( filter.supports_composite_option( ICR ) )
+                            return std::make_shared< rs2::embedded_filter >( filter );
+        return nullptr;
     }
 }
 
 int main()
 try
 {
-    rs2::context ctx;
-    auto devices = ctx.query_devices();
-    std::cout << "Found " << devices.size() << " device(s)\n";
-
-    for( auto && dev : devices )
+    auto found = find_icr_filter();
+    if( ! found )
     {
-        std::string dev_name = dev.supports( RS2_CAMERA_INFO_NAME )
-            ? dev.get_info( RS2_CAMERA_INFO_NAME ) : "Unknown device";
-        std::string dev_sn = dev.supports( RS2_CAMERA_INFO_SERIAL_NUMBER )
-            ? dev.get_info( RS2_CAMERA_INFO_SERIAL_NUMBER ) : "N/A";
-        std::cout << "\nDevice: " << dev_name << " (S/N " << dev_sn << ")\n";
-
-        bool found_depth_sensor = false;
-        for( auto && sensor : dev.query_sensors() )
-        {
-            if( ! sensor.is< rs2::depth_sensor >() )
-                continue;
-            found_depth_sensor = true;
-
-            std::string sensor_name = sensor.supports( RS2_CAMERA_INFO_NAME )
-                ? sensor.get_info( RS2_CAMERA_INFO_NAME ) : "Depth Sensor";
-            std::cout << "  Depth sensor: " << sensor_name << '\n';
-
-            auto embedded_filters = sensor.query_embedded_filters();
-            if( embedded_filters.empty() )
-            {
-                std::cout << "    No embedded filters on this sensor.\n";
-                continue;
-            }
-
-            for( auto && ef : embedded_filters )
-            {
-                std::cout << "    Embedded filter: " << rs2_embedded_filter_type_to_string( ef.get_type() ) << '\n';
-
-                auto composite_ids = ef.get_supported_composite_options();
-                if( composite_ids.empty() )
-                {
-                    std::cout << "      Supports composite options: no (scalar rs2_option only)\n";
-                    continue;
-                }
-
-                std::cout << "      Supports composite options: yes (" << composite_ids.size() << ")\n";
-                for( auto id : composite_ids )
-                {
-                    std::cout << "      - " << composite_option_name( id ) << ":\n";
-                    print_composite_option_value( ef, id );
-                }
-            }
-        }
-
-        if( ! found_depth_sensor )
-            std::cout << "  No depth sensor on this device.\n";
+        std::cout << "No connected device exposes the Improved Close Range control\n";
+        return 0;
     }
 
+    rs2::embedded_filter & icr = *found;
+
+    // 1. Get - the current settings, and the {min, max, step, default} bounds
+    const auto original = icr.get_composite_option_as< rs2_icr_control >( ICR );
+    print( "Current settings:", original );
+
+    const auto range = icr.get_composite_option_range_as< rs2_icr_control_range >( ICR );
+    std::cout << "Supported shift_pixels: [" << range.min.shift_pixels << ", " << range.max.shift_pixels
+              << "], default " << range.def.shift_pixels << '\n';
+
+    // 2. Set - start from what the device reports, change only what is needed, send it all at once.
+    //    The device rejects enabling ICR on Depth profiles it cannot process, and changing
+    //    filter_type / downscale_ratio while Depth or Infrared streams - an rs2::error is thrown.
+    auto cfg = original;
+    cfg.enable = 1;
+    cfg.filter_type = 0;      // Downscale
+    cfg.downscale_ratio = 1;  // x2
+    icr.set_composite_option_from( ICR, cfg );
+
+    // 3. Get again to see what the device applied (it may adjust values), then restore
+    print( "Settings after set:", icr.get_composite_option_as< rs2_icr_control >( ICR ) );
+
+    icr.set_composite_option_from( ICR, original );
+    std::cout << "Original settings restored\n";
     return 0;
 }
 catch( const rs2::error & e )
 {
-    std::cerr << "FAIL: librealsense error: " << e.what() << std::endl;
+    std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args()
+              << "):\n    " << e.what() << std::endl;
     return 1;
 }
 catch( const std::exception & e )
 {
-    std::cerr << "FAIL: " << e.what() << std::endl;
+    std::cerr << e.what() << std::endl;
     return 1;
 }
