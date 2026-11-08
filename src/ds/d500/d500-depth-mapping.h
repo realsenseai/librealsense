@@ -18,7 +18,7 @@ namespace librealsense
     {
     public:
         std::shared_ptr<synthetic_sensor> create_depth_mapping_device(std::shared_ptr<context> ctx,
-            const std::vector<platform::uvc_device_info>& mapping_devices_info);
+            std::shared_ptr<platform::uvc_device> mapping_device, const std::string& physical_port);
 
         d500_depth_mapping( std::shared_ptr< const d500_info > const & );
 

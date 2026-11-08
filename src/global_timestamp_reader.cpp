@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <thread>
 #include <vector>
 
 using namespace std::chrono;
@@ -437,14 +438,13 @@ namespace librealsense
         return false;
     }
 
-    void time_diff_keeper::polling(dispatcher::cancellable_timer cancellable_timer)
+    void time_diff_keeper::polling(dispatcher::cancellable_timer)
     {
         update_diff_time();
         unsigned int time_to_sleep = _poll_intervals_ms + _coefs.is_full() * (9 * _poll_intervals_ms);
-        if (!cancellable_timer.try_sleep( std::chrono::milliseconds( time_to_sleep )))
-        {
-            LOG_DEBUG("Notification: time_diff_keeper polling loop is being shut-down");
-        }
+        // Not cancellable: waking on stop lets a UVC sensor power down right after stream-off, which wedges
+        // the USB control endpoint on Jetson JP5 (Tegra xHCI) after a color stream stop
+        std::this_thread::sleep_for( std::chrono::milliseconds( time_to_sleep ) );
     }
 
     double time_diff_keeper::get_system_hw_time(double crnt_hw_time, bool& is_ready)

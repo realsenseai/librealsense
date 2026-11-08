@@ -202,6 +202,14 @@ namespace librealsense
         {rs_fourcc('P','A','L','8'), RS2_STREAM_LABELED_POINT_CLOUD}
     };
 
+    // Occupancy as the GMSL IR node multiplexes it: MUX stream id, metadata id (routing, and its own required
+    // block of 136+ bytes) and the 320x256 grid; 80 KB, so reserved on every capture
+    const platform::muxed_stream occupancy_muxed_stream
+        = { "Occupancy",
+            7,
+            { uint32_t( md_type::META_DATA_INTEL_OCCUPANCY_ID ), uint32_t( md_type::META_DATA_INTEL_OCCUPANCY_ID ), 136, true },
+            { 320, 256, rs_fourcc( 'G', 'R', 'E', 'Y' ), 320 * 256, true } };
+
     d500_depth_mapping::d500_depth_mapping( std::shared_ptr< const d500_info > const & dev_info)
         : device( dev_info ), d500_device( dev_info ),
         _occupancy_stream(new stream(RS2_STREAM_OCCUPANCY)),
@@ -215,20 +223,40 @@ namespace librealsense
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
         _is_d585s = ( pid == D585S_PID );
 
-        const uint32_t mapping_stream_mi = _is_safety_layout ? 13 : 11;
-        auto mapping_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, mapping_stream_mi);
-
-        // A missing interface most commonly means older FW that predates depth mapping.
-        // Degrade gracefully (no occupancy/point-cloud streams) instead of failing the
-        // whole device - some units in the field won't have this FW yet.
-        if (mapping_devs_info.size() != 1)
+        // Over GMSL occupancy is multiplexed on the depth sensor's IR node; over USB the Mapping function has its
+        // own interface
+        auto mapping_dev = get_raw_depth_sensor()->get_uvc_device()->create_muxed_stream_device(
+            occupancy_muxed_stream,
+            [this, alive = _is_alive]( uint32_t stream_id, bool on, const platform::stream_profile & p )
+            {
+                if( *alive )  // sensors outlive the device's HW monitor
+                    enable_muxed_stream( stream_id, on, p.width, p.height, p.fps );
+            } );
+        std::string physical_port;
+        if( mapping_dev )
         {
-            LOG_WARNING( "depth mapping device not found (expected 1, found " << mapping_devs_info.size()
-                << ") - occupancy/point-cloud streams will not be available" );
-            return;
+            physical_port = mapping_dev->get_device_location();
+            LOG_DEBUG( "Occupancy is multiplexed on " << physical_port );
+        }
+        else
+        {
+            const uint32_t mapping_stream_mi = _is_safety_layout ? 13 : 11;
+            auto mapping_devs_info = filter_by_mi( dev_info->get_group().uvc_devices, mapping_stream_mi);
+
+            // A missing interface most commonly means older FW that predates depth mapping.
+            // Degrade gracefully (no occupancy/point-cloud streams) instead of failing the
+            // whole device - some units in the field won't have this FW yet.
+            if (mapping_devs_info.size() != 1)
+            {
+                LOG_WARNING( "depth mapping device not found (expected 1, found " << mapping_devs_info.size()
+                    << ") - occupancy/point-cloud streams will not be available" );
+                return;
+            }
+            mapping_dev = get_backend()->create_uvc_device( mapping_devs_info.front() );
+            physical_port = mapping_devs_info.front().device_path;
         }
 
-        auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_devs_info );
+        auto mapping_ep = create_depth_mapping_device( dev_info->get_context(), mapping_dev, physical_port );
         _depth_mapping_idx = add_sensor(mapping_ep);
         _depth_mapping_active = true;
         if( ! _is_safety_layout )
@@ -289,7 +317,7 @@ namespace librealsense
     }
 
     std::shared_ptr<synthetic_sensor> d500_depth_mapping::create_depth_mapping_device(std::shared_ptr<context> ctx,
-        const std::vector<platform::uvc_device_info>& occupancy_devices_info)
+        std::shared_ptr<platform::uvc_device> mapping_device, const std::string& physical_port)
     {
         using namespace ds;
 
@@ -299,7 +327,7 @@ namespace librealsense
         auto enable_global_time_option = std::shared_ptr<global_time_option>(new global_time_option());
 
         auto raw_mapping_ep = std::make_shared<uvc_sensor>("Raw Depth Mapping Device",
-            get_backend()->create_uvc_device(occupancy_devices_info.front()),
+            mapping_device,
             std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(ds_timestamp_reader_metadata), _tf_keeper, enable_global_time_option)),
             this);
         // Depth mapping params share the Mapping XU with segmentation, so the same products get both;
@@ -328,7 +356,7 @@ namespace librealsense
 
         mapping_ep->register_option(RS2_OPTION_GLOBAL_TIME_ENABLED, enable_global_time_option);
 
-        mapping_ep->register_info(RS2_CAMERA_INFO_PHYSICAL_PORT, occupancy_devices_info.front().device_path);
+        mapping_ep->register_info(RS2_CAMERA_INFO_PHYSICAL_PORT, physical_port);
 
         // register_extrinsics
         register_extrinsics();

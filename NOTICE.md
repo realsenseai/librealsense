@@ -27,6 +27,7 @@ The AMD HIP/ROCm GPU acceleration support and the related build and unit-test in
 | md4c | https://github.com/mity/md4c | MIT License | Copyright (c) 2016-2026 Martin Mitáš |
 | oneVPL (libvpl) | https://github.com/intel/libvpl | MIT License | Copyright (c) Intel Corporation |
 | libva | https://github.com/intel/libva | MIT License | Copyright (c) 2007 Intel Corporation |
+| libdrm | https://gitlab.freedesktop.org/mesa/drm | MIT License | Copyright (c) 2005 Adam Jackson, Copyright (c) Intel Corporation |
 
 ###### MIT License 
 The MIT License (MIT)
