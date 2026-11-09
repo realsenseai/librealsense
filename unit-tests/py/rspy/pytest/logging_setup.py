@@ -3,6 +3,7 @@
 
 """Logging setup: build dir detection, per-test log dirs, and rspy.log bridging."""
 
+import contextlib
 import logging
 import os
 import re
@@ -91,6 +92,22 @@ def install_rs_log_bridge(rs):
         rs.log_to_callback(rs.log_severity.debug, _callback, asynchronous=True)
     except TypeError:  # older pyrealsense2 build without the flag
         rs.log_to_callback(rs.log_severity.debug, _callback)
+
+
+@contextlib.contextmanager
+def rs_log_bridge_scope(rs):
+    """RAII: bridge LibRS logs into the test log for the duration of the block, then reset the
+    (process-global) LibRS logger so later tests don't inherit it. No-op if already bridged (--rslog)."""
+    global _rs_log_callback
+    if _rs_log_callback is not None:
+        yield
+        return
+    install_rs_log_bridge(rs)
+    try:
+        yield
+    finally:
+        rs.reset_logger()
+        _rs_log_callback = None
 
 
 def bridge_rspy_log():

@@ -12,6 +12,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.dds,
+    pytest.mark.usefixtures( 'rs_debug_log' ),
     pytest.mark.flaky( reruns=2 ),
 ]
 
@@ -60,8 +61,6 @@ else:
     # The client is LibRS
     #
     from rspy import librs as rs
-    if log.isEnabledFor( logging.DEBUG ):
-        rs.log_to_console( rs.log_severity.debug )
 
     @pytest.fixture(scope='module')
     def remote_and_sensor():

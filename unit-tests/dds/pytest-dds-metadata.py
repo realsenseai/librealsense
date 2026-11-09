@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.dds,
+    pytest.mark.usefixtures( 'rs_debug_log' ),
     pytest.mark.flaky( reruns=2 ),
     pytest.mark.skipif( platform.system() == 'Linux', reason='see file header' ),
 ]
@@ -188,8 +189,6 @@ else:
         #############################################################################################
         # Initialize librs device
         from rspy import librs as rs
-        if log.isEnabledFor( logging.DEBUG ):
-            rs.log_to_console( rs.log_severity.debug )
         context = rs.context( { 'dds': { 'enabled': True, 'domain': config_file.get_domain_from_config_file_or_default() }} )
         device = rs.wait_for_devices( context, rs.only_sw_devices, n=1. )
         sensors = device.sensors

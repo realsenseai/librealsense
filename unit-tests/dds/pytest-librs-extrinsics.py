@@ -13,11 +13,10 @@ log.nested = 'C  '
 
 pytestmark = [
     pytest.mark.dds,
+    pytest.mark.usefixtures( 'rs_debug_log' ),
     pytest.mark.flaky( reruns=2 ),
 ]
 
-if log.isEnabledFor(logging.DEBUG):
-    rs.log_to_console( rs.log_severity.debug )
 
 @pytest.fixture(scope='module')
 def remote_and_context():
