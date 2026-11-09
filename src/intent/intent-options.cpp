@@ -8,6 +8,7 @@
 #include <src/core/device-interface.h>
 #include <src/ds/d500/d500-device.h>
 #include <src/ds/ds-private.h>
+#include <src/librealsense-exception.h>
 #include <src/uvc-sensor.h>
 namespace librealsense {
 namespace {
@@ -26,7 +27,7 @@ class intent_option : public composite_option_interface {
         if (!sensor)
             throw std::runtime_error("Intent: sensor disconnected");
         return sensor->invoke_powered([&](platform::uvc_device &dev) {
-            std::vector<uint8_t> wire(_status ? 32U : rsintent::wire_size);
+            std::vector<uint8_t> wire(_status ? rsintent::status_size : rsintent::wire_size);
             if (!dev.get_xu(ds::depth_xu,
                             _status ? rsintent::GLOBAL_INTENT_STATUS : rsintent::GLOBAL_INTENT,
                             wire.data(), static_cast<int>(wire.size())))
@@ -102,9 +103,10 @@ class intent_option : public composite_option_interface {
         auto sensor = _sensor.lock();
         if (!sensor)
             throw std::runtime_error("Intent: sensor disconnected");
-        uint8_t status[32] = {};
+        std::vector<uint8_t> status(rsintent::status_size);
         sensor->invoke_powered([&](platform::uvc_device &dev) {
-            if (!dev.get_xu(ds::depth_xu, rsintent::GLOBAL_INTENT_STATUS, status, 32))
+            if (!dev.get_xu(ds::depth_xu, rsintent::GLOBAL_INTENT_STATUS, status.data(),
+                            static_cast<int>(status.size())))
                 throw std::runtime_error("Intent: status read failed before start");
         });
         if (status[2] == 0U || get_raw() != _expected)
@@ -129,7 +131,7 @@ void register_intent_options(d500_depth_sensor &sensor) {
     uint16_t sku = 0;
     try {
         const auto wire = status->get_raw();
-        if (wire.size() != 32U || wire[0] != rsintent::major)
+        if (wire.size() != rsintent::status_size || wire[0] != rsintent::major)
             return;
         sku = rsintent::read16(wire.data() + 8);
         if (rsintent::defaultModel(sku).count == 0U)
@@ -153,6 +155,38 @@ void verify_intent_before_start(device_interface &device) {
             &sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT));
         if (option)
             option->verify();
+    }
+}
+std::string intent_rejection(device_interface &device) noexcept {
+    try {
+        for (size_t i = 0; i < device.get_sensors_count(); ++i) {
+            auto &sensor = device.get_sensor(i);
+            if (!sensor.supports_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT_STATUS))
+                continue;
+            const auto status =
+                sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT_STATUS).get_raw();
+            // INVALID/INCOMPLETE come only from SET, so they cannot explain a start failure.
+            if (status.size() != rsintent::status_size ||
+                (status[3] != rsintent::CONSTRAINT && status[3] != rsintent::STREAM_MISMATCH &&
+                 status[3] != rsintent::CONTROL_STATE))
+                return std::string();
+            // STATUS is device-wide and last-writer-wins (AR-4).
+            return " (Intent " + describe_intent_status(status) +
+                   "; diagnostic may be stale or from another client)";
+        }
+    } catch (...) {
+    }
+    return std::string();
+}
+void rethrow_with_intent_rejection(device_interface &device) {
+    const auto reasons = intent_rejection(device);
+    try {
+        throw;
+    } catch (const backend_exception &e) {
+        if (reasons.empty())
+            throw;
+        // Keep the backend exception type so callers see the same rs2 error class.
+        throw backend_exception(e.what() + reasons);
     }
 }
 } // namespace librealsense

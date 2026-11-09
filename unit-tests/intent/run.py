@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='intent-json-') as temp:
         fw_include = out / 'fw-generated'
         subprocess.run([sys.executable, str(fw / 'tools/generate.py'), '--output',
                         str(fw_include / 'IntentDictionary.h')], check=True)
-        fw_sources = [fw / 'IntentProtocol.cpp', fw / 'IntentRules.cpp']
+        fw_sources = [fw / 'IntentProtocol.cpp', fw / 'IntentRules.cpp', fw / 'IntentController.cpp']
         fw_includes = ['-I' + str(fw_include), '-I' + str(fw), '-DINTENT_FW_RULES']
     else:
         print('note: --fw-root not given; FW side uses the vendored codec and a rule stub')
@@ -67,7 +67,7 @@ with tempfile.TemporaryDirectory(prefix='intent-json-') as temp:
         (future / 'contract').mkdir(parents=True)
         for name in ('intent-json.cpp', 'intent-json.h', 'intent-tlv.h'):
             shutil.copyfile(root / 'src/intent' / name, future / name)
-        for name in ('IntentProtocol.cpp', 'IntentProtocol.h'):
+        for name in ('IntentProtocol.cpp', 'IntentProtocol.h', 'IntentStatus.h'):
             shutil.copyfile(contract / name, future / 'contract' / name)
         schema = json.loads((fw / 'schema/dictionary.json').read_text())
         schema['minor'] = 1

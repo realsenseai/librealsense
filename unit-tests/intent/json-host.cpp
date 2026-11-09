@@ -1,6 +1,7 @@
 // License: Apache 2.0. Copyright (C) 2026 RealSense, Inc.
 #include "src/intent/intent-json.h"
 #include "src/intent/contract/IntentProtocol.h"
+#include "src/intent/contract/IntentStatus.h"
 #include "src/intent/contract/IntentCapabilities.h"
 #include <algorithm>
 #include <cassert>
@@ -12,8 +13,10 @@ extern "C" int fw_accept(const unsigned char *, unsigned);
 extern "C" int fw_accept_on(const unsigned char *, unsigned, unsigned);
 extern "C" void fw_template(unsigned, unsigned char *);
 extern "C" int fw_has_rules();
+extern "C" int fw_admission(const unsigned char *, unsigned, const unsigned *, unsigned char *);
 extern "C" int fw_decode(const unsigned char *, unsigned, unsigned *, unsigned *);
 using librealsense::decode_intent_json;
+using librealsense::describe_intent_status;
 using librealsense::encode_intent_json;
 using rsutils::json;
 static void rejected(const json &value) {
@@ -161,6 +164,83 @@ static void nativeProfiles(const std::vector<uint8_t> &status) {
     }
     std::cout << "profiles: " << tested << " SDK-encoded native tuples accepted by FW\n";
 }
+static bool contains(const std::string &text, const char *part) {
+    return text.find(part) != std::string::npos;
+}
+// The FW controller writes STATUS; the SDK decodes and names its REJECT_REASON list.
+static void statusReasons() {
+    std::vector<uint8_t> status(rsintent::status_size);
+    status[0] = rsintent::major;
+    status[3] = rsintent::STREAM_MISMATCH;
+    status[rsintent::status_reason_count_offset] = 2U;
+    rsintent::writeReason(status.data() + rsintent::status_header_size,
+                          {rsintent::STREAM_MISMATCH, 1U, rsintent::no_record_index, 1U, 0U,
+                           rsintent::MISMATCH_WIDTH | rsintent::MISMATCH_FPS});
+    rsintent::writeReason(status.data() + rsintent::status_header_size + rsintent::reject_reason_size,
+                          {rsintent::CONTROL_STATE, 2U, 3U, 7U, 0x101U, 2U});
+    std::vector<uint8_t> wire(rsintent::wire_size);
+    fw_template(0xc07, wire.data());
+    auto reasons = json::parse(decode_intent_json(wire, status))["status"]["reasons"];
+    assert(reasons.size() == 2U);
+    assert((reasons[1] == json{{"kind", 7}, {"sensor", 2}, {"record_idx", 3}, {"branch", 7},
+                               {"id", 0x101}, {"detail", 2}}));
+    auto text = describe_intent_status(status);
+    assert(contains(text, "last_result=STREAM_MISMATCH: STREAM_MISMATCH sensor=STEREO branch=DEPTH "
+                          "mismatch=WIDTH|FPS; CONTROL_STATE sensor=COLOR branch=RGB record=3 id=257 "
+                          "detail=2"));
+    status[rsintent::status_reason_count_offset] = rsintent::max_reject_reasons + 1U;
+    bool caught = false;
+    try {
+        decode_intent_json(wire, status);
+    } catch (const std::invalid_argument &) {
+        caught = true;
+    }
+    assert(caught && contains(describe_intent_status(status), "malformed reason count 125"));
+    if (!fw_has_rules()) return;
+    const rsintent::ProfileDefinition *depth = nullptr;
+    for (const auto &p : rsintent::profiles)
+        if (!depth && p.sku == 0xc07 && p.branch == 1U && p.transport == rsintent::USB3) depth = &p;
+    assert(depth);
+    uint8_t bytes[4];
+    rsintent::write32(bytes, depth->format);
+    std::string format(reinterpret_cast<char *>(bytes), 4U);
+    while (!format.empty() && format.back() == ' ') format.pop_back();
+    status[rsintent::status_reason_count_offset] = 0U;
+    auto document = json::parse(decode_intent_json(wire, status));
+    json *declared = nullptr;
+    for (auto &sensor : document["sensors"])
+        for (auto &stream : sensor["streams"])
+            if (stream["branch"] == "DEPTH") {
+                stream = {{"branch", "DEPTH"}, {"format", format}, {"width", depth->width},
+                          {"height", depth->height}, {"fps", depth->fps}};
+                declared = &stream;
+            }
+    assert(declared);
+    wire = encode_intent_json(document.dump());
+    // A1: one reason with every differing attribute.
+    const unsigned changed[] = {1U, 1U, depth->format, depth->width + 2U, depth->height, depth->fps + 1U};
+    assert(fw_admission(wire.data(), 0xc07, changed, status.data()) == rsintent::STREAM_MISMATCH);
+    auto st = json::parse(decode_intent_json(wire, status))["status"];
+    assert(st["last_result"] == rsintent::STREAM_MISMATCH && st["error_branch"] == 1);
+    assert((st["reasons"] == json::array({json{{"kind", 6}, {"sensor", 1}, {"record_idx", 255},
+                                              {"branch", 1}, {"id", 0}, {"detail", 8 | 32}}})));
+    assert(contains(describe_intent_status(status), "branch=DEPTH mismatch=WIDTH|FPS"));
+    // RGB (branch 7) does not exist on 2C, so it is undeclared.
+    const unsigned rgb[] = {2U, 7U, depth->format, depth->width, depth->height, depth->fps};
+    assert(fw_admission(wire.data(), 0xc07, rgb, status.data()) == rsintent::STREAM_MISMATCH);
+    assert(contains(describe_intent_status(status), "sensor=COLOR branch=RGB mismatch=UNDECLARED"));
+    // Admitted COMMIT clears the reasons.
+    const unsigned same[] = {1U, 1U, depth->format, depth->width, depth->height, depth->fps};
+    assert(fw_admission(wire.data(), 0xc07, same, status.data()) == rsintent::OK);
+    assert(json::parse(decode_intent_json(wire, status))["status"]["reasons"].empty());
+    // SET V1-V3: first error only (design 4.4.5).
+    (*declared)["fps"] = 7;
+    const auto bad = encode_intent_json(document.dump());
+    assert(fw_admission(bad.data(), 0xc07, same, status.data()) == rsintent::CONSTRAINT);
+    assert(status[rsintent::status_reason_count_offset] == 1U);
+    assert(contains(describe_intent_status(status), "last_result=CONSTRAINT: CONSTRAINT"));
+    std::cout << "status: FW REJECT_REASON list decoded and named by SDK\n";
+}
 int main(int argc, char **argv) {
     compatibility();
     assert(argc == 2);
@@ -168,6 +248,7 @@ int main(int argc, char **argv) {
     status[0] = 1;
     goldenVectors(argv[1], status);
     nativeProfiles(status);
+    statusReasons();
     json depth = {
         {"branch", "DEPTH"}, {"format", "Z16"}, {"width", 1280}, {"height", 720}, {"fps", 30}};
     json document = {

@@ -2,10 +2,12 @@
 #include "intent-json.h"
 #include "intent-tlv.h"
 #include "contract/IntentProtocol.h"
+#include "contract/IntentStatus.h"
 #include "contract/rs_intent_tlv.h"
 #include <rsutils/json.h>
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 namespace librealsense {
 namespace {
@@ -295,7 +297,8 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
     rsintent::Request request = {};
     if (rsintent::decode(clean.data(), clean.size(), request).code != rsintent::OK ||
         status.size() != rsintent::status_size || status[0] != rsintent::major ||
-        status[3] > rsintent::READ_ONLY)
+        status[3] > rsintent::READ_ONLY ||
+        status[rsintent::status_reason_count_offset] > rsintent::max_reject_reasons)
         throw std::invalid_argument("Intent: invalid firmware response");
     json j = {{"version", std::to_string(wire[0]) + "." + std::to_string(wire[6]) + "." + std::to_string(wire[7])},
               {"op", request.op == rsintent::CLEAR ? "CLEAR" :
@@ -350,7 +353,74 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
                    {"source", status[5] ? "DEFAULT" : "CURRENT"},
                    {"active_mask", rsintent::read16(status.data() + 6)},
                    {"sku", rsintent::read16(status.data() + 8)},
-                   {"rule_revision", rsintent::read32(status.data() + 20)}};
+                   {"rule_revision", rsintent::read32(status.data() + 20)},
+                   {"reasons", json::array()}};
+    for (size_t i = 0; i < status[rsintent::status_reason_count_offset]; ++i) {
+        const auto r = rsintent::readReason(status.data() + rsintent::status_header_size +
+                                            i * rsintent::reject_reason_size);
+        j["status"]["reasons"].push_back({{"kind", r.kind},
+                                          {"sensor", r.sensor},
+                                          {"record_idx", r.record},
+                                          {"branch", r.branch},
+                                          {"id", r.id},
+                                          {"detail", r.detail}});
+    }
     return j.dump(2);
+}
+std::string describe_intent_status(const std::vector<uint8_t> &status) {
+    static const char *const results[] = {"OK",          "BUSY",            "INVALID",
+                                          "INCOMPLETE",  "CONSTRAINT",      "WRONG_STATE",
+                                          "STREAM_MISMATCH", "CONTROL_STATE", "READ_ONLY"};
+    static const char *const mismatches[] = {"UNDECLARED", "DISABLED", "FORMAT", "WIDTH",
+                                             "HEIGHT",     "FPS",      "STALE"};
+    const auto result = [&](uint8_t code) {
+        return code < sizeof(results) / sizeof(*results) ? std::string(results[code])
+                                                          : std::to_string(code);
+    };
+    if (status.size() != rsintent::status_size || status[0] != rsintent::major)
+        return "status unavailable";
+    const uint16_t sku = rsintent::read16(status.data() + 8);
+    std::ostringstream out;
+    out << "last_result=" << result(status[3]);
+    if (status[3] == rsintent::INVALID || status[3] == rsintent::INCOMPLETE)
+        out << " at byte " << rsintent::read16(status.data() + 12);
+    const unsigned count = status[rsintent::status_reason_count_offset];
+    if (count > rsintent::max_reject_reasons)
+        return out.str() + ", malformed reason count " + std::to_string(count);
+    for (unsigned i = 0; i < count; ++i) {
+        const auto r = rsintent::readReason(status.data() + rsintent::status_header_size +
+                                            i * rsintent::reject_reason_size);
+        out << (i ? "; " : ": ") << result(r.kind);
+        const char *sensor = nullptr;
+        for (const auto &s : rsintent::sensors)
+            if (s.id == r.sensor)
+                sensor = s.name;
+        const char *branch = nullptr;
+        for (const auto &b : rsintent::branches)
+            if (b.id == r.branch && (!branch || b.sku == sku))
+                branch = b.name;
+        if (r.sensor)
+            out << " sensor=" << (sensor ? sensor : std::to_string(r.sensor).c_str());
+        if (r.branch)
+            out << " branch=" << (branch ? branch : std::to_string(r.branch).c_str());
+        if (r.record != rsintent::no_record_index)
+            out << " record=" << unsigned(r.record);
+        if (r.id)
+            out << " id=" << r.id;
+        if (r.kind == rsintent::STREAM_MISMATCH && r.detail) {
+            const char *separator = " mismatch=";
+            for (unsigned bit = 0; bit < 16U; ++bit)
+                if (r.detail & (1U << bit)) {
+                    out << separator;
+                    if (bit < sizeof(mismatches) / sizeof(*mismatches))
+                        out << mismatches[bit];
+                    else
+                        out << "bit" << bit;
+                    separator = "|";
+                }
+        } else if (r.detail)
+            out << " detail=" << r.detail;
+    }
+    return out.str();
 }
 } // namespace librealsense

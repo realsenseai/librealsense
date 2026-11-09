@@ -30,6 +30,39 @@ extern "C" void fw_template(unsigned sku, unsigned char *bytes) {
     rsintent::encode(rsintent::defaultModel(static_cast<uint16_t>(sku)), rsintent::SET, bytes,
                      rsintent::wire_size);
 }
+#ifdef INTENT_FW_RULES
+#include "IntentController.h"
+namespace {
+struct IdleDevice : rsintent::Backend {
+    bool idle() const override { return true; }
+    rsintent::Error check(const rsintent::Model &, uint16_t) override { return rsintent::Error(); }
+    rsintent::Error prepare(const rsintent::Model &) override { return rsintent::Error(); }
+    rsintent::Error gate(uint8_t, bool, bool) override { return rsintent::Error(); }
+    rsintent::Error release() override { return rsintent::Error(); }
+};
+} // namespace
+#endif
+// FW controller: SET `intent`, then COMMIT one stream; the FW STATUS transfer goes to `status`.
+extern "C" int fw_admission(const unsigned char *intent, unsigned sku, const unsigned *stream,
+                            unsigned char *status) {
+#ifdef INTENT_FW_RULES
+    IdleDevice device;
+    rsintent::Controller controller(static_cast<uint16_t>(sku), device);
+    rsintent::Error error = controller.set(intent, rsintent::wire_size);
+    if (error.code == rsintent::OK) {
+        const rsintent::Stream s = {static_cast<uint8_t>(stream[0]), static_cast<uint8_t>(stream[1]), true,
+                                    stream[2], static_cast<uint16_t>(stream[3]),
+                                    static_cast<uint16_t>(stream[4]), static_cast<uint16_t>(stream[5])};
+        uint32_t generation = 0;
+        error = controller.commit(s, generation);
+    }
+    if (controller.status(status, rsintent::status_size).code != rsintent::OK) return -1;
+    return error.code;
+#else
+    (void)intent, (void)sku, (void)stream, (void)status;
+    return -1;
+#endif
+}
 extern "C" int fw_has_rules() {
 #ifdef INTENT_FW_RULES
     return 1;

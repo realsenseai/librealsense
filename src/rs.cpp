@@ -5395,9 +5395,8 @@ void rs2_set_intent(const rs2_device* device,const char* json,rs2_error** error)
         std::string message=original.what();
         try {
             auto status=sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT_STATUS).get_raw();
-            if(status.size()==32U)message += " (device last result="+std::to_string(status[3])+
-                ", sensor="+std::to_string(status[10])+", branch="+std::to_string(status[11])+
-                ", rule="+std::to_string((unsigned(status[14]) | (unsigned(status[15]) << 8)))+
+            // SET reports its first V1-V3 error as one REJECT_REASON (design 4.4.5, 9.6).
+            message += " (device "+librealsense::describe_intent_status(status)+
                 "; diagnostic may be from another client)";
         } catch(const std::exception&) {}
         throw librealsense::invalid_value_exception(message);

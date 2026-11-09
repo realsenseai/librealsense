@@ -428,7 +428,7 @@ void uvc_sensor::open( const stream_profiles & requests )
             {
                 _device->close( commited_profile );
             }
-            throw;
+            rethrow_with_intent_rejection( get_device() );
         }
         commited.push_back( req_profile_base->get_backend_profile() );
     }
@@ -461,7 +461,8 @@ void uvc_sensor::open( const stream_profiles & requests )
         _power.reset();
         _is_opened = false;
 
-        throw;
+        // Linux uvcvideo sends the UVC COMMIT at STREAMON, so admission rejects surface here.
+        rethrow_with_intent_rejection( get_device() );
     }
     catch( ... )
     {
@@ -479,7 +480,7 @@ void uvc_sensor::open( const stream_profiles & requests )
             {
             }
         }
-        error_msg << std::endl;
+        error_msg << intent_rejection( get_device() ) << std::endl;
         reset_streaming();
         _power.reset();
         _is_opened = false;

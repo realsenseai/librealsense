@@ -382,14 +382,23 @@ int main(int argc, char **argv) {
               "VALIDATE_ONLY changed declaration");
       auto wrong = groups(dev, 2, dual, false, false);
       bool failed = false;
+      std::string message;
       try {
         wrong[0].sensor.open(wrong[0].profiles);
         wrong[0].opened = true;
-      } catch (const rs2::error &) {
+      } catch (const rs2::error &e) {
         failed = true;
+        message = e.what();
       }
       stop(wrong);
       require(failed, "Undeclared IR COMMIT accepted");
+      // A1 lists the stream as UNDECLARED or DISABLED in the STATUS reasons.
+      const auto st = json::parse(intent.get_intent())["status"];
+      require(st["last_result"] == 6 && !st["reasons"].empty() &&
+                  st["reasons"][0]["kind"] == 6 &&
+                  (st["reasons"][0]["detail"].get<unsigned>() & 3U) != 0U &&
+                  message.find("STREAM_MISMATCH") != std::string::npos,
+              "Start reject did not report its REJECT_REASON");
       std::cout << json{{"case", "negative"}, {"pass", true}}.dump()
                 << std::endl;
     } else if (mode == "guard") {
