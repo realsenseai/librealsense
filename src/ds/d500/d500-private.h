@@ -120,15 +120,6 @@ namespace librealsense
             D585_3C_PROTO_PID
         };
 
-        // Products whose FW defaults the gyro to range index 1 (1000 dps); other D500 FW defaults to index 4 (125 dps)
-        static const std::set<std::uint16_t> gyro_1000_dps_default_pids = {
-            D585_2C_PID,
-            D585_3C_PID,
-            D585F_PID,
-            D585_2C_PROTO_PID,
-            D585_3C_PROTO_PID
-        };
-
         // The products the FW implements the NN upload for; others sharing the FW (D535 in the same device classes) never report it
         static const std::set<std::uint16_t> nn_upload_pids = {
             D585_2C_PID,
