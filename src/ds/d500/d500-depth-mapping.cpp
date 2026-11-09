@@ -264,14 +264,13 @@ namespace librealsense
                                               { depth_sensor_allowed_or_throw( requests ); } );
     }
 
-    // The camera builds occupancy from depth at these sizes only, at the occupancy rate
-    static bool is_occupancy_depth_source( const stream_profile_interface & p, uint32_t fps, bool fixed_source_only )
+    // A rebuilt Mapping branch normalizes the full negotiated Depth view at the Mapping rate
+    static bool is_mapping_depth_source( const stream_profile_interface & p, uint32_t fps )
     {
         auto vp = dynamic_cast< const video_stream_profile_interface * >( &p );
         if( p.get_stream_type() != RS2_STREAM_DEPTH || ! vp || p.get_framerate() != fps )
             return false;
-        bool const native = vp->get_width() == 640 && vp->get_height() == 360;
-        return native || ( ! fixed_source_only && vp->get_width() == 1280 && vp->get_height() == 720 );
+        return vp->get_width() > 0 && vp->get_height() > 0;
     }
 
     static std::shared_ptr< stream_profile_interface > find_stream( const stream_profiles & profiles, rs2_stream type )
@@ -291,9 +290,9 @@ namespace librealsense
         if( running.empty() )
             return;
         if( std::none_of( running.begin(), running.end(),
-                          [fps]( const std::shared_ptr< stream_profile_interface > & p ) { return p && is_occupancy_depth_source( *p, fps, false ); } ) )
+                          [fps]( const std::shared_ptr< stream_profile_interface > & p ) { return p && is_mapping_depth_source( *p, fps ); } ) )
             throw wrong_api_call_sequence_exception( rsutils::string::from()
-                << "Occupancy needs Depth at 640x360 or 1280x720, " << fps << " fps, while the depth sensor streams" );
+                << "Occupancy needs Depth at " << fps << " fps, while the depth sensor streams" );
         // Over USB the camera keeps the colors open but stops delivering them
         if( ! _is_mipi_device && find_stream( running, RS2_STREAM_COLOR ) )
             throw wrong_api_call_sequence_exception( "Occupancy cannot start while the depth sensor streams color" );
@@ -301,16 +300,26 @@ namespace librealsense
 
     void d500_depth_mapping::depth_sensor_allowed_or_throw( const stream_profiles & requests ) const
     {
-        auto const occupancy = find_stream( get_sensor( _depth_mapping_idx ).get_active_streams(), RS2_STREAM_OCCUPANCY );
+        auto const active = get_sensor( _depth_mapping_idx ).get_active_streams();
+        if( auto const lpcl = find_stream( active, RS2_STREAM_LABELED_POINT_CLOUD ) )
+        {
+            if( auto const depth = find_stream( requests, RS2_STREAM_DEPTH ) )
+                if( depth->get_framerate() != lpcl->get_framerate() )
+                    throw wrong_api_call_sequence_exception( rsutils::string::from()
+                        << "Depth must run at " << lpcl->get_framerate()
+                        << " fps while Labeled Point Cloud is active. Select that frame rate or stop Depth Mapping." );
+            return;
+        }
+        auto const occupancy = find_stream( active, RS2_STREAM_OCCUPANCY );
         if( ! occupancy )
             return;
         // Keep the existing Depth/Color join rules; the GMSL MUX backend enforces IR exclusion.
         uint32_t const fps = occupancy->get_framerate();
         if( find_stream( requests, RS2_STREAM_DEPTH ) )
         {
-            if( requests.size() != 1 || ! is_occupancy_depth_source( *requests.front(), fps, true ) )
+            if( requests.size() != 1 || ! is_mapping_depth_source( *requests.front(), fps ) )
                 throw wrong_api_call_sequence_exception( rsutils::string::from()
-                    << "While Occupancy streams, Depth can start only alone at 640x360, " << fps << " fps" );
+                    << "While Occupancy streams, Depth can start only alone at " << fps << " fps" );
         }
         else if( find_stream( requests, RS2_STREAM_COLOR ) )
             throw wrong_api_call_sequence_exception( "Color cannot start while Occupancy streams" );
