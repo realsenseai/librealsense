@@ -60,11 +60,7 @@
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -137,11 +133,7 @@
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -216,11 +208,7 @@
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -259,7 +247,7 @@
    "kind": "decode",
    "description": "SET equal to the SKU template (no stream may run)",
    "size": 1024,
-   "hex": "01005400000000001002300011010400010000002002100021010100010000002601010000000000200210002101010004000000260101000000000010021c001101040002000000200210002101010007000000260101",
+   "hex": "0100c800000000001002300011010400010000002002100021010100010000002601010000000000200210002101010004000000260101000000000010021c00110104000200000020021000210101000700000026010100000000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
    "expect": {
     "result": "OK",
     "op": "SET",
@@ -292,16 +280,48 @@
       "width": 0,
       "height": 0,
       "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
      }
     ],
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -325,6 +345,37 @@
         "state": "DISABLED"
        }
       ]
+     },
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "state": "DISABLED"
+       },
+       {
+        "branch": "ACCEL",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
+        "state": "DISABLED"
+       }
+      ]
      }
     ]
    }
@@ -334,7 +385,7 @@
    "kind": "decode",
    "description": "SET equal to the SKU template (no stream may run)",
    "size": 1024,
-   "hex": "01005c0000000000100258001101040001000000200210002101010001000000260101000000000020021000210101000400000026010100000000002002100021010100050000002601010000000000200210002101010006000000260101",
+   "hex": "0100d0000000000010025800110104000100000020021000210101000100000026010100000000002002100021010100040000002601010000000000200210002101010005000000260101000000000020021000210101000600000026010100000000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
    "expect": {
     "result": "OK",
     "op": "SET",
@@ -376,16 +427,48 @@
       "width": 0,
       "height": 0,
       "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
      }
     ],
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -408,6 +491,37 @@
         "state": "DISABLED"
        }
       ]
+     },
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "state": "DISABLED"
+       },
+       {
+        "branch": "ACCEL",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
+        "state": "DISABLED"
+       }
+      ]
      }
     ]
    }
@@ -417,7 +531,7 @@
    "kind": "decode",
    "description": "SET equal to the SKU template (no stream may run)",
    "size": 1024,
-   "hex": "01005400000000001002300011010400010000002002100021010100010000002601010000000000200210002101010004000000260101000000000010021c001101040002000000200210002101010007000000260101",
+   "hex": "0100c800000000001002300011010400010000002002100021010100010000002601010000000000200210002101010004000000260101000000000010021c00110104000200000020021000210101000700000026010100000000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
    "expect": {
     "result": "OK",
     "op": "SET",
@@ -450,16 +564,48 @@
       "width": 0,
       "height": 0,
       "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
      }
     ],
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -480,6 +626,37 @@
       "streams": [
        {
         "branch": "RGB",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "state": "DISABLED"
+       },
+       {
+        "branch": "ACCEL",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
         "state": "DISABLED"
        }
       ]
@@ -521,11 +698,7 @@
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "VALIDATE_ONLY",
     "sensors": [
      {
@@ -570,11 +743,7 @@
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "CLEAR"
    }
   },
@@ -593,13 +762,723 @@
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": []
+   }
+  },
+  {
+   "name": "set_motion_odr",
+   "kind": "decode",
+   "description": "Design 7.5/7.6: MOTION sensor 3, GYRO 8, ACCEL 9; FPS is ODR",
+   "size": 1024,
+   "hex": "0100640000000000100260001101040003000000200228002101010008000000220104004d58595a2301020000000000240102000000000025010200c8000000200228002101010009000000220104004d58595a230102000000000024010200000000002501020064",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": true,
+      "format": "MXYZ",
+      "width": 0,
+      "height": 0,
+      "fps": 200
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": true,
+      "format": "MXYZ",
+      "width": 0,
+      "height": 0,
+      "fps": 100
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "format": "MXYZ",
+        "width": 0,
+        "height": 0,
+        "fps": 200
+       },
+       {
+        "branch": "ACCEL",
+        "format": "MXYZ",
+        "width": 0,
+        "height": 0,
+        "fps": 100
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_motion_disabled",
+   "kind": "decode",
+   "description": "Explicit DISABLED IMU streams carry no geometry or ODR",
+   "size": 1024,
+   "hex": "01003400000000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "state": "DISABLED"
+       },
+       {
+        "branch": "ACCEL",
+        "state": "DISABLED"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_od_30",
+   "kind": "decode",
+   "description": "EP13 native Y8 transport, not the SDK GREY alias",
+   "size": 1024,
+   "hex": "010038000000000010023400110104000400000020022800210101000a0000002201040059382020230102002b0900002401020001000000250102001e",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": true,
+      "format": "Y8  ",
+      "width": 2347,
+      "height": 1,
+      "fps": 30
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "format": "Y8",
+        "width": 2347,
+        "height": 1,
+        "fps": 30
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_od_15",
+   "kind": "decode",
+   "description": "EP13 native Y8 transport, not the SDK GREY alias",
+   "size": 1024,
+   "hex": "010038000000000010023400110104000400000020022800210101000a0000002201040059382020230102002b0900002401020001000000250102000f",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": true,
+      "format": "Y8  ",
+      "width": 2347,
+      "height": 1,
+      "fps": 15
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "format": "Y8",
+        "width": 2347,
+        "height": 1,
+        "fps": 15
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_dmap_pointcloud_vga",
+   "kind": "decode",
+   "description": "One EP12 DMAP branch selects a native Y8 profile",
+   "size": 1024,
+   "hex": "010038000000000010023400110104000500000020022800210101000b0000002201040059382020230102008002000024010200e0010000250102001e",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": true,
+      "format": "Y8  ",
+      "width": 640,
+      "height": 480,
+      "fps": 30
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
+        "format": "Y8",
+        "width": 640,
+        "height": 480,
+        "fps": 30
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_dmap_pointcloud_hd",
+   "kind": "decode",
+   "description": "One EP12 DMAP branch selects a native Y8 profile",
+   "size": 1024,
+   "hex": "010038000000000010023400110104000500000020022800210101000b0000002201040059382020230102000005000024010200d0020000250102000f",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": true,
+      "format": "Y8  ",
+      "width": 1280,
+      "height": 720,
+      "fps": 15
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
+        "format": "Y8",
+        "width": 1280,
+        "height": 720,
+        "fps": 15
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_dmap_labeled_pointcloud",
+   "kind": "decode",
+   "description": "One EP12 DMAP branch selects a native Y8 profile",
+   "size": 1024,
+   "hex": "010038000000000010023400110104000500000020022800210101000b000000220104005938202023010200800200002401020068010000250102001e",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": true,
+      "format": "Y8  ",
+      "width": 640,
+      "height": 360,
+      "fps": 30
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
+        "format": "Y8",
+        "width": 640,
+        "height": 360,
+        "fps": 30
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_dmap_occupancy",
+   "kind": "decode",
+   "description": "One EP12 DMAP branch selects a native Y8 profile",
+   "size": 1024,
+   "hex": "010038000000000010023400110104000500000020022800210101000b000000220104005938202023010200400100002401020000010000250102001e",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": true,
+      "format": "Y8  ",
+      "width": 320,
+      "height": 256,
+      "fps": 30
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
+        "format": "Y8",
+        "width": 320,
+        "height": 256,
+        "fps": 30
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_depth_90",
+   "kind": "decode",
+   "description": "Native profile encoding; SKU/link validation is a separate gate",
+   "size": 1024,
+   "hex": "0100380000000000100234001101040001000000200228002101010001000000220104005a313620230102008002000024010200e0010000250102005a",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 1,
+      "branch": 1,
+      "enabled": true,
+      "format": "Z16 ",
+      "width": 640,
+      "height": 480,
+      "fps": 90
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "STEREO",
+      "streams": [
+       {
+        "branch": "DEPTH",
+        "format": "Z16",
+        "width": 640,
+        "height": 480,
+        "fps": 90
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_depth_2c_25",
+   "kind": "decode",
+   "description": "Native profile encoding; SKU/link validation is a separate gate",
+   "size": 1024,
+   "hex": "0100380000000000100234001101040001000000200228002101010001000000220104005a313620230102008002000024010200680100002501020019",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 1,
+      "branch": 1,
+      "enabled": true,
+      "format": "Z16 ",
+      "width": 640,
+      "height": 360,
+      "fps": 25
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "STEREO",
+      "streams": [
+       {
+        "branch": "DEPTH",
+        "format": "Z16",
+        "width": 640,
+        "height": 360,
+        "fps": 25
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_ir_calibration",
+   "kind": "decode",
+   "description": "Native profile encoding; SKU/link validation is a separate gate",
+   "size": 1024,
+   "hex": "01003800000000001002340011010400010000002002280021010100040000002201040059313649230102004006000024010200140500002501020019",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 1,
+      "branch": 4,
+      "enabled": true,
+      "format": "Y16I",
+      "width": 1600,
+      "height": 1300,
+      "fps": 25
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "STEREO",
+      "streams": [
+       {
+        "branch": "IR_LR",
+        "format": "Y16I",
+        "width": 1600,
+        "height": 1300,
+        "fps": 25
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_color_mjpeg",
+   "kind": "decode",
+   "description": "Native profile encoding; SKU/link validation is a separate gate",
+   "size": 1024,
+   "hex": "0100380000000000100234001101040002000000200228002101010007000000220104004d4a5047230102005003000024010200e0010000250102003c",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 2,
+      "branch": 7,
+      "enabled": true,
+      "format": "MJPG",
+      "width": 848,
+      "height": 480,
+      "fps": 60
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "COLOR",
+      "streams": [
+       {
+        "branch": "RGB",
+        "format": "MJPG",
+        "width": 848,
+        "height": 480,
+        "fps": 60
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_color_raw",
+   "kind": "decode",
+   "description": "Native profile encoding; SKU/link validation is a separate gate",
+   "size": 1024,
+   "hex": "0100380000000000100234001101040002000000200228002101010007000000220104005257313623010200400600002401020014050000250102000f",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 2,
+      "branch": 7,
+      "enabled": true,
+      "format": "RW16",
+      "width": 1600,
+      "height": 1300,
+      "fps": 15
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "COLOR",
+      "streams": [
+       {
+        "branch": "RGB",
+        "format": "RW16",
+        "width": 1600,
+        "height": 1300,
+        "fps": 15
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_color_gmsl_uyvy",
+   "kind": "decode",
+   "description": "Native profile encoding; SKU/link validation is a separate gate",
+   "size": 1024,
+   "hex": "01003800000000001002340011010400020000002002280021010100070000002201040055595659230102000005000024010200d0020000250102001e",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 2,
+      "branch": 7,
+      "enabled": true,
+      "format": "UYVY",
+      "width": 1280,
+      "height": 720,
+      "fps": 30
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "COLOR",
+      "streams": [
+       {
+        "branch": "RGB",
+        "format": "UYVY",
+        "width": 1280,
+        "height": 720,
+        "fps": 30
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_color_gmsl_raw",
+   "kind": "decode",
+   "description": "Native profile encoding; SKU/link validation is a separate gate",
+   "size": 1024,
+   "hex": "01003800000000001002340011010400020000002002280021010100070000002201040047523136230102004006000024010200140500002501020019",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 2,
+      "branch": 7,
+      "enabled": true,
+      "format": "GR16",
+      "width": 1600,
+      "height": 1300,
+      "fps": 25
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "COLOR",
+      "streams": [
+       {
+        "branch": "RGB",
+        "format": "GR16",
+        "width": 1600,
+        "height": 1300,
+        "fps": 25
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "set_color_2c_yuy2",
+   "kind": "decode",
+   "description": "Native profile encoding; SKU/link validation is a separate gate",
+   "size": 1024,
+   "hex": "01003800000000001002340011010400010000002002280021010100060000002201040059555932230102008002000024010200e0010000250102002d",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 1,
+      "branch": 6,
+      "enabled": true,
+      "format": "YUY2",
+      "width": 640,
+      "height": 480,
+      "fps": 45
+     }
+    ],
+    "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.0",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "STEREO",
+      "streams": [
+       {
+        "branch": "RGB_R",
+        "format": "YUY2",
+        "width": 640,
+        "height": 480,
+        "fps": 45
+       }
+      ]
+     }
+    ]
    }
   },
   {
@@ -636,11 +1515,7 @@
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -702,6 +1577,36 @@
      }
     ],
     "code": 0
+   },
+   "sdk_document": {
+    "version": "1.0.5",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "STEREO",
+      "streams": [
+       {
+        "branch": "DEPTH",
+        "format": "Z16",
+        "width": 1280,
+        "height": 720,
+        "fps": 30
+       }
+      ]
+     },
+     {
+      "sensor": "COLOR",
+      "streams": [
+       {
+        "branch": "RGB",
+        "format": "NV12",
+        "width": 1280,
+        "height": 720,
+        "fps": 30
+       }
+      ]
+     }
+    ]
    }
   },
   {
@@ -736,6 +1641,36 @@
      }
     ],
     "code": 0
+   },
+   "sdk_document": {
+    "version": "1.4.255",
+    "op": "SET",
+    "sensors": [
+     {
+      "sensor": "STEREO",
+      "streams": [
+       {
+        "branch": "DEPTH",
+        "format": "Z16",
+        "width": 1280,
+        "height": 720,
+        "fps": 30
+       }
+      ]
+     },
+     {
+      "sensor": "COLOR",
+      "streams": [
+       {
+        "branch": "RGB",
+        "format": "NV12",
+        "width": 1280,
+        "height": 720,
+        "fps": 30
+       }
+      ]
+     }
+    ]
    }
   },
   {
@@ -763,11 +1698,7 @@
     "code": 0
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -1741,8 +2672,8 @@
    "sku": 3078,
    "description": "GET_DEF, or GET_CUR while UNSET, on D585F_3C",
    "size": 1024,
-   "hex": "01005400000000001002300011010400010000002002100021010100010000002601010000000000200210002101010004000000260101000000000010021c001101040002000000200210002101010007000000260101",
-   "tlv_size": 84,
+   "hex": "0100c800000000001002300011010400010000002002100021010100010000002601010000000000200210002101010004000000260101000000000010021c00110104000200000020021000210101000700000026010100000000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
+   "tlv_size": 200,
    "expect": {
     "model": [
      {
@@ -1771,15 +2702,47 @@
       "width": 0,
       "height": 0,
       "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
      }
     ]
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -1800,6 +2763,37 @@
       "streams": [
        {
         "branch": "RGB",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "state": "DISABLED"
+       },
+       {
+        "branch": "ACCEL",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
         "state": "DISABLED"
        }
       ]
@@ -1813,8 +2807,8 @@
    "sku": 3079,
    "description": "GET_DEF, or GET_CUR while UNSET, on D585_2C_PROTO",
    "size": 1024,
-   "hex": "01005c0000000000100258001101040001000000200210002101010001000000260101000000000020021000210101000400000026010100000000002002100021010100050000002601010000000000200210002101010006000000260101",
-   "tlv_size": 92,
+   "hex": "0100d0000000000010025800110104000100000020021000210101000100000026010100000000002002100021010100040000002601010000000000200210002101010005000000260101000000000020021000210101000600000026010100000000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
+   "tlv_size": 208,
    "expect": {
     "model": [
      {
@@ -1852,15 +2846,47 @@
       "width": 0,
       "height": 0,
       "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
      }
     ]
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -1880,6 +2906,37 @@
        },
        {
         "branch": "RGB_R",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "state": "DISABLED"
+       },
+       {
+        "branch": "ACCEL",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
         "state": "DISABLED"
        }
       ]
@@ -1893,8 +2950,8 @@
    "sku": 3080,
    "description": "GET_DEF, or GET_CUR while UNSET, on D585_3C_PROTO",
    "size": 1024,
-   "hex": "01005400000000001002300011010400010000002002100021010100010000002601010000000000200210002101010004000000260101000000000010021c001101040002000000200210002101010007000000260101",
-   "tlv_size": 84,
+   "hex": "0100c800000000001002300011010400010000002002100021010100010000002601010000000000200210002101010004000000260101000000000010021c00110104000200000020021000210101000700000026010100000000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
+   "tlv_size": 200,
    "expect": {
     "model": [
      {
@@ -1923,15 +2980,47 @@
       "width": 0,
       "height": 0,
       "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
      }
     ]
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -1955,6 +3044,37 @@
         "state": "DISABLED"
        }
       ]
+     },
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "state": "DISABLED"
+       },
+       {
+        "branch": "ACCEL",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
+        "state": "DISABLED"
+       }
+      ]
      }
     ]
    }
@@ -1965,8 +3085,8 @@
    "sku": 3080,
    "description": "GET_CUR after SET: template order with explicit DISABLED branches",
    "size": 1024,
-   "set_hex": "0100840000000000100248001101040001000000200228002101010001000000220104005a313620230102000005000024010200d0020000250102001e0000002002100021010100040000002601010000000000100234001101040002000000200228002101010007000000220104004e563132230102000005000024010200d0020000250102001e",
-   "hex": "0100840000000000100248001101040001000000200228002101010001000000220104005a313620230102000005000024010200d0020000250102001e0000002002100021010100040000002601010000000000100234001101040002000000200228002101010007000000220104004e563132230102000005000024010200d0020000250102001e",
+   "set_hex": "0100f80000000000100248001101040001000000200228002101010001000000220104005a313620230102000005000024010200d0020000250102001e0000002002100021010100040000002601010000000000100234001101040002000000200228002101010007000000220104004e563132230102000005000024010200d0020000250102001e0000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
+   "hex": "0100f80000000000100248001101040001000000200228002101010001000000220104005a313620230102000005000024010200d0020000250102001e0000002002100021010100040000002601010000000000100234001101040002000000200228002101010007000000220104004e563132230102000005000024010200d0020000250102001e0000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
    "expect": {
     "model": [
      {
@@ -1995,15 +3115,47 @@
       "width": 1280,
       "height": 720,
       "fps": 30
+     },
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
      }
     ]
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -2033,6 +3185,37 @@
         "fps": 30
        }
       ]
+     },
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "state": "DISABLED"
+       },
+       {
+        "branch": "ACCEL",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
+        "state": "DISABLED"
+       }
+      ]
      }
     ]
    }
@@ -2043,8 +3226,8 @@
    "sku": 3079,
    "description": "GET_CUR after SET: template order with explicit DISABLED branches",
    "size": 1024,
-   "set_hex": "01008c0000000000100288001101040001000000200228002101010001000000220104005a313620230102000005000024010200d0020000250102001e00000020021000210101000400000026010100000000002002100021010100050000002601010000000000200228002101010006000000220104004e563132230102000005000024010200d0020000250102001e",
-   "hex": "01008c0000000000100288001101040001000000200228002101010001000000220104005a313620230102000005000024010200d0020000250102001e00000020021000210101000400000026010100000000002002100021010100050000002601010000000000200228002101010006000000220104004e563132230102000005000024010200d0020000250102001e",
+   "set_hex": "0100000100000000100288001101040001000000200228002101010001000000220104005a313620230102000005000024010200d0020000250102001e00000020021000210101000400000026010100000000002002100021010100050000002601010000000000200228002101010006000000220104004e563132230102000005000024010200d0020000250102001e0000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
+   "hex": "0100000100000000100288001101040001000000200228002101010001000000220104005a313620230102000005000024010200d0020000250102001e00000020021000210101000400000026010100000000002002100021010100050000002601010000000000200228002101010006000000220104004e563132230102000005000024010200d0020000250102001e0000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
    "expect": {
     "model": [
      {
@@ -2082,15 +3265,47 @@
       "width": 1280,
       "height": 720,
       "fps": 30
+     },
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
      }
     ]
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -2119,6 +3334,37 @@
         "fps": 30
        }
       ]
+     },
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "state": "DISABLED"
+       },
+       {
+        "branch": "ACCEL",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
+        "state": "DISABLED"
+       }
+      ]
      }
     ]
    }
@@ -2129,8 +3375,8 @@
    "sku": 3078,
    "description": "GET_CUR after SET: template order with explicit DISABLED branches",
    "size": 1024,
-   "set_hex": "01006c0000000000100230001101040001000000200210002101010001000000260101000000000020021000210101000400000026010100000000001002340011010400020000002002280021010100070000002201040059555932230102000005000024010200d0020000250102001e",
-   "hex": "01006c0000000000100230001101040001000000200210002101010001000000260101000000000020021000210101000400000026010100000000001002340011010400020000002002280021010100070000002201040059555932230102000005000024010200d0020000250102001e",
+   "set_hex": "0100e00000000000100230001101040001000000200210002101010001000000260101000000000020021000210101000400000026010100000000001002340011010400020000002002280021010100070000002201040059555932230102000005000024010200d0020000250102001e0000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
+   "hex": "0100e00000000000100230001101040001000000200210002101010001000000260101000000000020021000210101000400000026010100000000001002340011010400020000002002280021010100070000002201040059555932230102000005000024010200d0020000250102001e0000001002300011010400030000002002100021010100080000002601010000000000200210002101010009000000260101000000000010021c00110104000400000020021000210101000a000000260101000000000010021c00110104000500000020021000210101000b000000260101",
    "expect": {
     "model": [
      {
@@ -2159,15 +3405,47 @@
       "width": 1280,
       "height": 720,
       "fps": 30
+     },
+     {
+      "sensor": 3,
+      "branch": 8,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 3,
+      "branch": 9,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 4,
+      "branch": 10,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
+     },
+     {
+      "sensor": 5,
+      "branch": 11,
+      "enabled": false,
+      "format": "",
+      "width": 0,
+      "height": 0,
+      "fps": 0
      }
     ]
    },
    "sdk_document": {
-    "version": {
-     "major": 1,
-     "minor": 0,
-     "patch": 0
-    },
+    "version": "1.0.0",
     "op": "SET",
     "sensors": [
      {
@@ -2194,47 +3472,39 @@
         "fps": 30
        }
       ]
+     },
+     {
+      "sensor": "MOTION",
+      "streams": [
+       {
+        "branch": "GYRO",
+        "state": "DISABLED"
+       },
+       {
+        "branch": "ACCEL",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "OBJECT_DETECTION",
+      "streams": [
+       {
+        "branch": "OD",
+        "state": "DISABLED"
+       }
+      ]
+     },
+     {
+      "sensor": "DEPTH_MAPPING",
+      "streams": [
+       {
+        "branch": "DMAP",
+        "state": "DISABLED"
+       }
+      ]
      }
     ]
-   }
-  },
-  {
-   "name": "controller_missing_bound_stream",
-   "kind": "controller",
-   "sku": 3080,
-   "size": 1024,
-   "hex": "010040000000000010021c001101040001000000200210002101010001000000260101000000000010021c001101040002000000200210002101010007000000260101",
-   "expect": {
-    "code": 3,
-    "detail": 14,
-    "sensor": 1,
-    "branch": 4
-   }
-  },
-  {
-   "name": "controller_complete_disabled",
-   "kind": "controller",
-   "sku": 3080,
-   "size": 1024,
-   "hex": "01005400000000001002300011010400010000002002100021010100010000002601010000000000200210002101010004000000260101000000000010021c001101040002000000200210002101010007000000260101",
-   "expect": {
-    "code": 0,
-    "detail": 0,
-    "sensor": 0,
-    "branch": 0
-   }
-  },
-  {
-   "name": "controller_empty",
-   "kind": "controller",
-   "sku": 3080,
-   "size": 1024,
-   "hex": "01",
-   "expect": {
-    "code": 3,
-    "detail": 14,
-    "sensor": 1,
-    "branch": 1
    }
   }
  ]

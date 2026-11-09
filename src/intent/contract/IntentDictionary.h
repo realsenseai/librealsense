@@ -2,7 +2,7 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "4b45fe0949ce862cc58ed4193c08e33261a6fd2f8f2e6143b0bd6716c26c0279";
+static const char dictionary_sha256[] = "ac428dd4b5d9414522f39096909d2b4b66db9144c14a9610894cf397bd51cd10";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned patch = 0U;
@@ -17,7 +17,7 @@ static const unsigned max_tlv_size = 1016U;
 static const unsigned sensor_record_bytes = 12U;
 static const unsigned enabled_stream_bytes = 44U;
 static const unsigned disabled_stream_bytes = 20U;
-static const unsigned rule_revision = 3U;
+static const unsigned rule_revision = 4U;
 enum Selectors {
     GLOBAL_INTENT = 28,
     GLOBAL_INTENT_STATUS = 29,
@@ -64,10 +64,16 @@ inline uint8_t recordSince(uint8_t type) {
     default: return 0U;
     }
 }
+// Implemented grammar metadata; reserved CONTROL is not supported.
+static const uint8_t supported_records[] = {SENSOR, SENSOR_ID, STREAM, BRANCH_ID, FORMAT, WIDTH, HEIGHT, FPS, STATE};
+static const uint8_t stream_attributes[] = {BRANCH_ID, FORMAT, WIDTH, HEIGHT, FPS, STATE};
 struct SensorDefinition { uint8_t id; const char* name; uint8_t since; };
 static const SensorDefinition sensors[] = {
     {1U, "STEREO", 0U},
     {2U, "COLOR", 0U},
+    {3U, "MOTION", 0U},
+    {4U, "OBJECT_DETECTION", 0U},
+    {5U, "DEPTH_MAPPING", 0U},
 };
 struct SkuDefinition { uint16_t pid; const char* name; };
 static const SkuDefinition skus[] = {
@@ -88,19 +94,39 @@ static const BranchDefinition branches[] = {
     {6U, 1U, 3079U, 0x3231564eU, "RGB_R", 0U},
     {7U, 2U, 3078U, 0x32595559U, "RGB", 0U},
     {7U, 2U, 3080U, 0x32595559U, "RGB", 0U},
+    {8U, 3U, 3078U, 0x5a59584dU, "GYRO", 0U},
+    {8U, 3U, 3079U, 0x5a59584dU, "GYRO", 0U},
+    {8U, 3U, 3080U, 0x5a59584dU, "GYRO", 0U},
+    {9U, 3U, 3078U, 0x5a59584dU, "ACCEL", 0U},
+    {9U, 3U, 3079U, 0x5a59584dU, "ACCEL", 0U},
+    {9U, 3U, 3080U, 0x5a59584dU, "ACCEL", 0U},
+    {10U, 4U, 3078U, 0x20203859U, "OD", 0U},
+    {10U, 4U, 3079U, 0x20203859U, "OD", 0U},
+    {10U, 4U, 3080U, 0x20203859U, "OD", 0U},
+    {11U, 5U, 3078U, 0x20203859U, "DMAP", 0U},
+    {11U, 5U, 3079U, 0x20203859U, "DMAP", 0U},
+    {11U, 5U, 3080U, 0x20203859U, "DMAP", 0U},
 };
 struct FormatDefinition { uint8_t branch; uint32_t format; };
 static const FormatDefinition formats[] = {
     {1U, 0x2036315aU},
     {4U, 0x20493859U},
+    {4U, 0x49363159U},
     {5U, 0x3231564eU},
+    {5U, 0x32595559U},
+    {5U, 0x36315752U},
     {6U, 0x3231564eU},
+    {6U, 0x32595559U},
+    {6U, 0x36315752U},
     {7U, 0x32595559U},
     {7U, 0x3231564eU},
-};
-// C1-owned rule content; consumed by IntentRules.cpp, not by the codec.
-struct ProfileDefinition { uint16_t width, height, fps; };
-static const ProfileDefinition profiles[] = {
-    {1280U, 720U, 30U},
+    {7U, 0x47504a4dU},
+    {7U, 0x36315752U},
+    {7U, 0x59565955U},
+    {7U, 0x36315247U},
+    {8U, 0x5a59584dU},
+    {9U, 0x5a59584dU},
+    {10U, 0x20203859U},
+    {11U, 0x20203859U},
 };
 } // namespace rsintent

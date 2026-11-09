@@ -17,7 +17,7 @@ void compatibility() {
     status[0] = rsintent::major;
     status[1] = 2;
     status[18] = 9;
-    auto base = encode_intent_json(R"({"version":{"major":1,"minor":2,"patch":9},"sensors":[
+    auto base = encode_intent_json(R"({"version":"1.2.9","sensors":[
         {"sensor":"STEREO","streams":[{"branch":"DEPTH","format":"Z16","width":1280,"height":720,"fps":30},
         {"branch":"IR_LR","state":"DISABLED"}]},
         {"sensor":"COLOR","streams":[{"branch":"RGB","state":"DISABLED"}]}]})");
@@ -40,6 +40,7 @@ void compatibility() {
         records.push_back({rsintent::SENSOR, 2, tlv::pack({sensorId, {0xe5, flags, {0xaa}}})});
         auto future = tlv::transfer(base, records);
         const auto text = decode_intent_json(future, status);
+        assert(json::parse(text).at("version") == "1.2.9");
         assert(encode_intent_json(text) == future);
         assert(encode_intent_json(text, status) == future);
         auto document = json::parse(text);

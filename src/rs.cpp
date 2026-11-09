@@ -1,5 +1,3 @@
-#include "intent/intent-json.h"
-#include <librealsense2/h/rs_intent.h>
 // License: Apache 2.0 See LICENSE file in root directory.
 // Copyright(c) 2024 RealSense, Inc. All Rights Reserved.
 
@@ -5363,44 +5361,3 @@ void rs2_get_frame_object_detection(const rs2_frame* frame, unsigned int index, 
     detection->center_of_mass_valid = entry.com_valid ? 1 : 0;
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, frame, index, output_arg(detection))
-
-namespace {
-librealsense::sensor_interface& intent_sensor(const rs2_device* dev) {
-    for(size_t i=0;i<dev->device->get_sensors_count();++i) {
-        auto& sensor=dev->device->get_sensor(i);
-        if(sensor.supports_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT))return sensor;
-    }
-    throw librealsense::invalid_value_exception("Global Intent is not supported by this device/firmware");
-}
-}
-const rs2_raw_data_buffer* rs2_get_intent(const rs2_device* device,rs2_error** error) BEGIN_API_CALL
-{
-    VALIDATE_NOT_NULL(device);
-    auto& sensor=intent_sensor(device);
-    auto wire=sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT).get_raw();
-    auto status=sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT_STATUS).get_raw();
-    auto text=librealsense::decode_intent_json(wire,status);
-    return new rs2_raw_data_buffer{std::vector<uint8_t>(text.begin(),text.end())};
-}
-HANDLE_EXCEPTIONS_AND_RETURN(nullptr,device)
-void rs2_set_intent(const rs2_device* device,const char* json,rs2_error** error) BEGIN_API_CALL
-{
-    VALIDATE_NOT_NULL(device);VALIDATE_NOT_NULL(json);
-    auto& sensor=intent_sensor(device);
-    auto version=sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT_STATUS).get_raw();
-    auto wire=librealsense::encode_intent_json(json,version);
-    try {
-        sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT).set_raw(wire.data(),wire.size());
-    } catch(const std::exception& original) {
-        std::string message=original.what();
-        try {
-            auto status=sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT_STATUS).get_raw();
-            if(status.size()==32U)message += " (device last result="+std::to_string(status[3])+
-                ", sensor="+std::to_string(status[10])+", branch="+std::to_string(status[11])+
-                ", rule="+std::to_string((unsigned(status[14]) | (unsigned(status[15]) << 8)))+
-                "; diagnostic may be from another client)";
-        } catch(const std::exception&) {}
-        throw librealsense::invalid_value_exception(message);
-    }
-}
-HANDLE_EXCEPTIONS_AND_RETURN(,device,json)

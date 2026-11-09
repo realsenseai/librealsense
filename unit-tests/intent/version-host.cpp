@@ -11,7 +11,7 @@ int main() {
     WarningCapture warnings;
     std::vector<uint8_t> status(rsintent::status_size);
     status[0] = rsintent::major;
-    const std::string twoC = R"({"version":{"major":1,"minor":1},"sensors":[
+    const std::string twoC = R"({"version":"1.1.0","sensors":[
         {"sensor":"STEREO","streams":[{"branch":"DEPTH","state":"DISABLED"},
         {"branch":"IR_LR","state":"DISABLED"},{"branch":"RGB_L","state":"DISABLED"},
         {"branch":"RGB_R","state":"DISABLED"}]}]})";
@@ -26,7 +26,7 @@ int main() {
     auto current = encode_intent_json(twoC, status);
     assert(rsintent::decode(current.data(), current.size(), request).code == rsintent::OK);
     assert(request.model.count == 4 && rsintent::find(request.model, 6));
-    const std::string threeC = R"({"version":{"major":1,"minor":1},"sensors":[
+    const std::string threeC = R"({"version":"1.1.0","sensors":[
         {"sensor":"STEREO","streams":[{"branch":"DEPTH","state":"DISABLED"},
         {"branch":"IR_LR","state":"DISABLED"}]},
         {"sensor":"COLOR","streams":[{"branch":"RGB","state":"DISABLED"}]}]})";
@@ -43,5 +43,5 @@ int main() {
     try { (void)encode_intent_json(twoC, status); }
     catch (const std::invalid_argument &) { caught = true; }
     assert(caught);
-    std::cout << "PASS: SDK N/FW N-1 omissions, named warnings, local major rejection\n";
+    std::cout << "PASS: I1 SDK N/FW N-1 omissions, named warnings, local major rejection\n";
 }

@@ -1,4 +1,3 @@
-#include "intent/intent-json.h"
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2023-4 RealSense, Inc. All Rights Reserved.
 
@@ -144,7 +143,6 @@ void uvc_sensor::verify_supported_requests( const stream_profiles & requests ) c
 
 void uvc_sensor::open( const stream_profiles & requests )
 {
-    verify_intent_before_start(get_device());
     std::lock_guard< std::mutex > lock( _configure_lock );
     if( _is_streaming )
         throw wrong_api_call_sequence_exception( "open(...) failed. UVC device is streaming!" );
@@ -568,7 +566,6 @@ void uvc_sensor::register_xu( platform::extension_unit xu )
 
 void uvc_sensor::start( rs2_frame_callback_sptr callback )
 {
-    verify_intent_before_start(get_device());
     std::lock_guard< std::mutex > lock( _configure_lock );
     if( _is_streaming )
         throw wrong_api_call_sequence_exception( "start_streaming(...) failed. UVC device is already streaming!" );

@@ -14,7 +14,7 @@ enum Result : uint8_t {
     STREAM_MISMATCH,
     CONTROL_STATE,
     READ_ONLY,
-    INTERNAL
+    INTERNAL = 0xff // Local backend/transport failure only; never a PDF last_result.
 };
 // Error::detail for INVALID/INCOMPLETE decode results (Error::rule is 0).
 enum ParseDetail : uint16_t {
@@ -35,7 +35,6 @@ enum ParseDetail : uint16_t {
     PARSE_MISSING           // stream attribute set incomplete (Result INCOMPLETE)
 };
 enum Operation : uint8_t { SET, VALIDATE_ONLY, CLEAR };
-enum State : uint8_t { UNSET, VALIDATING, CONFIGURED, ACTIVATING, LOCKED, UNLOCKING };
 struct Error {
     Result code;
     uint8_t sensor, branch;
@@ -70,11 +69,6 @@ Error decode(const uint8_t *data, size_t size, Request &output);
 Error encode(const Model &model, Operation op, uint8_t *data, size_t size);
 // SKU template: every branch of the SKU, DISABLED, in branch-ID order.
 Model defaultModel(uint16_t sku);
-// C1 placeholder rules (IntentRules.cpp); first error in stable branch-ID order.
-Error completeness(const Model &model, uint16_t sku, uint8_t senderMinor,
-                   const BranchDefinition *definitions = branches,
-                   size_t count = sizeof(branches) / sizeof(branches[0]));
-Error validate(const Model &model, uint16_t sku);
 const Stream *find(const Model &model, uint8_t branch);
 bool same(const Stream &a, const Stream &b);
 uint16_t bit(uint8_t branch);

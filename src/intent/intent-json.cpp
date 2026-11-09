@@ -2,6 +2,7 @@
 #include "intent-json.h"
 #include "intent-tlv.h"
 #include "contract/IntentProtocol.h"
+#include "contract/rs_intent_tlv.h"
 #include <rsutils/json.h>
 #include <rsutils/easylogging/easyloggingpp.h>
 #include <set>
@@ -25,6 +26,31 @@ void keys(const json &j, std::initializer_list<const char *> allowed) {
         if (!known)
             throw std::invalid_argument("Intent: unknown key " + i.key());
     }
+}
+void version(const json &value, uint8_t &minor, uint8_t &patch) {
+    if (!value.is_string())
+        throw std::invalid_argument("Intent: version must be major.minor.patch");
+    const auto text = value.get<std::string>();
+    unsigned components[3] = {};
+    size_t pos = 0;
+    for (unsigned index = 0; index < 3U; ++index) {
+        unsigned &component = components[index];
+        const size_t start = pos;
+        while (pos < text.size() && text[pos] >= '0' && text[pos] <= '9') {
+            component = component * 10U + static_cast<unsigned>(text[pos++] - '0');
+            if (component > 255U)
+                throw std::invalid_argument("Intent: version component exceeds 255");
+        }
+        if (pos == start || (pos - start > 1U && text[start] == '0') ||
+            (index < 2U && (pos == text.size() || text[pos++] != '.')))
+            throw std::invalid_argument("Intent: version must be canonical major.minor.patch");
+    }
+    if (pos != text.size())
+        throw std::invalid_argument("Intent: version must be canonical major.minor.patch");
+    if (components[0] != rsintent::major)
+        throw std::invalid_argument("Intent: unsupported major version");
+    minor = static_cast<uint8_t>(components[1]);
+    patch = static_cast<uint8_t>(components[2]);
 }
 const rsintent::BranchDefinition &definition(const json &stream) {
     const auto name = stream.at("branch").get<std::string>();
@@ -166,7 +192,8 @@ void attachLayouts(json &j, const std::vector<intent_tlv::Record> &records, unsi
 } // namespace
 std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vector<uint8_t> &status) {
     const json j = json::parse(text);
-    if (!status.empty() && (status.size() != rsintent::status_size || status[0] != rsintent::major))
+    if (!status.empty() && (status.size() != rsintent::status_size || status[0] != rsintent::major ||
+                           status[3] > rsintent::READ_ONLY))
         throw std::invalid_argument("Intent: firmware major mismatch or invalid status");
     keys(j, {"version", "op", "sensors", "status", "layout"});
     const std::string operation = j.value("op", std::string("SET"));
@@ -177,17 +204,10 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
         op = rsintent::VALIDATE_ONLY;
     else if (operation != "SET")
         throw std::invalid_argument("Intent: unknown operation");
-    uint8_t minor = 0;
+    uint8_t minor = static_cast<uint8_t>(rsintent::minor);
     uint8_t patch = static_cast<uint8_t>(rsintent::patch);
     if (j.contains("version")) {
-        const auto &v = j.at("version");
-        keys(v, {"major", "minor", "patch"});
-        if (integer(v, "major", 255U) != rsintent::major)
-            throw std::invalid_argument("Intent: unsupported major version");
-        minor = static_cast<uint8_t>(integer(v, "minor", 255U));
-        // ver_patch (XU byte 7) is optional in JSON and never gates compatibility.
-        if (v.contains("patch"))
-            patch = static_cast<uint8_t>(integer(v, "patch", 255U));
+        version(j.at("version"), minor, patch);
     } else if (op != rsintent::CLEAR)
         throw std::invalid_argument("Intent: missing version");
     rsintent::Model model = {};
@@ -228,8 +248,9 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
                     s.width = static_cast<uint16_t>(integer(entry, "width", 65535U));
                     s.height = static_cast<uint16_t>(integer(entry, "height", 65535U));
                     s.fps = static_cast<uint16_t>(integer(entry, "fps", 65535U));
-                    if (!s.width || !s.height || !s.fps)
-                        throw std::invalid_argument("Intent: zero image profile field");
+                    const bool geometry = s.sensor == RS_INTENT_SENSOR_MOTION ? !s.width && !s.height : s.width && s.height;
+                    if (!geometry || !s.fps)
+                        throw std::invalid_argument("Intent: invalid geometry or frame/ODR rate");
                 }
                 model.streams[model.count++] = s;
             }
@@ -273,9 +294,10 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
     const auto clean = intent_tlv::transfer(wire, intent_tlv::filter(records));
     rsintent::Request request = {};
     if (rsintent::decode(clean.data(), clean.size(), request).code != rsintent::OK ||
-        status.size() != rsintent::status_size || status[0] != rsintent::major)
+        status.size() != rsintent::status_size || status[0] != rsintent::major ||
+        status[3] > rsintent::READ_ONLY)
         throw std::invalid_argument("Intent: invalid firmware response");
-    json j = {{"version", {{"major", wire[0]}, {"minor", wire[6]}, {"patch", wire[7]}}},
+    json j = {{"version", std::to_string(wire[0]) + "." + std::to_string(wire[6]) + "." + std::to_string(wire[7])},
               {"op", request.op == rsintent::CLEAR ? "CLEAR" :
                      (request.op == rsintent::VALIDATE_ONLY ? "VALIDATE_ONLY" : "SET")},
               {"sensors", json::array()}};
