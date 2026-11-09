@@ -162,6 +162,8 @@ void init_options(py::module &m) {
                   return option_value( self[i] );
               } )
         .def( "__len__", &rs2::options_list::size )
+        .def( "get_changed_composite_options", &rs2::options_list::get_changed_composite_options,
+              "Composite options whose value changed (options-changed callback only); read them with get_composite_option()." )
         .def( "__iter__",
               []( const rs2::options_list & self )
               {
