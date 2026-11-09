@@ -26,12 +26,14 @@ Argument: Jira ticket ID. The user is asked for input only at step 5.
    a. Spawn the `lrs-tester` subagent with base commit `<base>`, the design file,
       `.review/<ticket>/test-report.md` and the round number. It decides whether a test
       already exists, needs a small extension or must be written, then runs it.
-   b. `RESULT: FAIL`: fix the product code (never weaken the test without a reason you can
+   b. Whatever the result, first commit the tester's `unit-tests/` changes (EXTEND/NEW) on
+      their own, so product fixes never mix with them and the next tester sees them.
+   c. `RESULT: FAIL`: fix the product code (never weaken the test without a reason you can
       state), commit, go to (a). `NOT RUN` (no device available) is not a pass: stop and
       report it to the user, who may claim a lab machine via `/lab-machine`.
-   c. `RESULT: PASS`: commit any `unit-tests/` changes (EXTEND/NEW) so the review sees them.
-   d. Spawn a fresh `lrs-reviewer` on the whole diff (same inputs as 3a, round continues).
-      If `OPEN: 0`, go to step 5. Otherwise fix the findings as in 3c and go to (a).
+   d. `RESULT: PASS`: spawn a fresh `lrs-reviewer` on the whole diff (same inputs as 3a,
+      round continues). If `OPEN: 0`, go to step 5. Otherwise fix the findings as in 3c
+      and go to (a).
    If anything is still open at the round cap, stop and report it to the user.
 5. HAND-OFF: follow the pr-create skill. Show the title and description and ask the user
    whether to accept the PR. Only on an explicit yes push and run `gh pr create`.
