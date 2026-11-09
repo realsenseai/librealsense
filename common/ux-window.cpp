@@ -342,7 +342,7 @@ namespace rs2
         if (!_win)
             throw std::runtime_error("Could not open OpenGL window, please check your graphic drivers or use the textual SDK tools");
 
-        if (config_file::instance().get(configurations::window::saved_pos))
+        if (config_file::instance().get(configurations::window::saved_pos) && !is_wayland())
         {
             int x = config_file::instance().get(configurations::window::position_x);
             int y = config_file::instance().get(configurations::window::position_y);
@@ -415,7 +415,8 @@ namespace rs2
             self->_window_state_timer.start();
         });
 
-        setup_icon();
+        if (!is_wayland())
+            setup_icon();
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
