@@ -635,12 +635,22 @@ namespace rs2
                     if (!_destructing)
                         for (auto id : list.get_changed_composite_options())
                         {
+                            // The header toggle follows too while the editor is collapsed (not drawn, so not re-reading)
                             if (id == RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP)
+                            {
                                 _decimation_filter_dpp_editor.mark_stale();
+                                _enabled = _embedded_filter->get_composite_option_as< rs2_decimation_filter_dpp_config >( id ).enabled != 0;
+                            }
                             else if (id == RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP)
+                            {
                                 _temporal_filter_dpp_editor.mark_stale();
+                                _enabled = _embedded_filter->get_composite_option_as< rs2_temporal_filter_dpp_config >( id ).enabled != 0;
+                            }
                             else if (id == RS2_COMPOSITE_OPTION_ICR_CONTROL)
+                            {
                                 _icr_editor.mark_stale();
+                                _enabled = _embedded_filter->get_composite_option_as< rs2_icr_control >( id ).enable != 0;
+                            }
                         }
                     for (auto changed_option : list)
                     {
