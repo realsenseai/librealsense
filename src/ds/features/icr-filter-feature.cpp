@@ -112,7 +112,8 @@ static bool embedded_decimation_enabled( const sensor_interface & depth_sensor )
 
 // FW rejects unsupported ICR profiles only once streaming starts, with an obscure error (Depth+IR on Windows even
 // needs a replug) - so the SDK checks the ICR profile limits first: the explicit profile exclusions, FPS up to 30,
-// and integral Secondary dimensions for Downscale (480x270 x4 is out as 270 is not divisible by 4).
+// and integral Secondary dimensions of at least 128 pixels wide for Downscale (480x270 x4 is out as 270 is not
+// divisible by 4, 424x240 x4 as its Secondary is 106 wide).
 static void icr_allowed_or_throw( const void * icr_control, size_t size, const video_stream_profile_interface & depth,
                                   const sensor_interface & depth_sensor )
 {
@@ -143,6 +144,10 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
         throw invalid_value_exception( rsutils::string::from()
             << "Improved Close Range Depth Downscale x" << ratio << " requires Depth dimensions divisible by " << ratio
             << ", but Depth is " << w << "x" << h );
+    if( w / ratio < 128 )
+        throw invalid_value_exception( rsutils::string::from()
+            << "Improved Close Range Depth Downscale x" << ratio << " requires Depth at least " << 128 * ratio
+            << " pixels wide, but Depth is " << w << "x" << h );
 }
 
 // Rejects out-of-range values locally, never writes the read-only MinZ telemetry slots, and rejects enabling ICR

@@ -21,6 +21,7 @@ pytestmark = [
 ICR = rs.composite_option_id.icr_control
 DECIMATION = rs.composite_option_id.decimation_filter_dpp
 MAX_FPS = 30
+MIN_WIDTH = 128  # the Downscale Secondary must be at least this wide
 
 # mode -> (ICR mode, downscale_ratio, ratio both Depth dimensions must be divisible by)
 MODES = {
@@ -35,7 +36,7 @@ LIVE_ENABLE = {"downscale_x2"}
 
 def _supported(mode, w, h, fps):
     _, _, divisor = MODES[mode]
-    return (w, h) not in EXCLUDED and w % divisor == 0 and h % divisor == 0 and fps <= MAX_FPS
+    return (w, h) not in EXCLUDED and w % divisor == 0 and h % divisor == 0 and w // divisor >= MIN_WIDTH and fps <= MAX_FPS
 
 
 def _find_filter(sensor, option_id):
