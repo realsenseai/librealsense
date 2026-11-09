@@ -4639,9 +4639,12 @@ namespace rs2
 
                 float const hkr_depth_m = det.depth;
                 float viewer_depth_m = 0.f;
+                bool  minz_violation = false;  // true only if a check below actively fires
 
-                // The Detection Distance combo picks the source; the application estimate runs only when chosen
-                if( needs_application_detection_distance( distance_source ) && df )
+                // TODO: temporary — runs unconditionally (not just when the Detection Distance
+                // combo needs it) so the minZ checks below have host data to check; revert once
+                // HKR COM is reliable.
+                if( df )
                 {
                     if( !depth8u_ready )
                     {
@@ -4688,9 +4691,21 @@ namespace rs2
                                                                &com_intrin, com_result, { shift_x, shift_y } );
                     if( com_result.mean_body_depth > 0.f )
                         viewer_depth_m = com_result.mean_body_depth / 1000.f;
+
+                    // Below minZ, calculate() can lock onto a background object instead of the
+                    // subject; is_minz_violation() is not FW-mirrored — kept as a reference for FW.
+                    if( com::center_of_mass_calculator::is_minz_violation(
+                            com_raw, com_bbox, com_intrin, com_result.mean_body_depth ) )
+                    {
+                        viewer_depth_m = 0.f;
+                        minz_violation = true;
+                    }
                 }
 
-                float const mean_depth = pick_detection_distance( distance_source, hkr_depth_m, viewer_depth_m );
+                // TODO: temporary minZ workaround — overrides the picked distance here since FW
+                // reports a confidently-wrong depth instead of 0 below minZ. Remove once FW fixes minZ.
+                float const mean_depth
+                    = minz_violation ? 0.f : pick_detection_distance( distance_source, hkr_depth_m, viewer_depth_m );
 
                 std::string name = object_type_to_string( static_cast< object_type >( det.class_id ) );
                 new_objects.emplace_back( obj_id++, name, normalized_color_bbox, mean_depth,
