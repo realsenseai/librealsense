@@ -102,8 +102,8 @@ def rs_log_bridge_scope(rs):
     if _rs_log_callback is not None:
         yield
         return
-    install_rs_log_bridge(rs)
     try:
+        install_rs_log_bridge(rs)
         yield
     finally:
         rs.reset_logger()

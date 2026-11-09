@@ -52,6 +52,17 @@ def test_resets_when_block_raises():
     assert rs.resets == 1
 
 
+def test_failed_install_leaves_no_bridge_behind():
+    rs = FakeRs()
+    def fail(*args, **kwargs):
+        raise RuntimeError('log_to_callback failed')
+    rs.log_to_callback = fail
+    with pytest.raises(RuntimeError):
+        with logging_setup.rs_log_bridge_scope(rs):
+            pass
+    assert rs.resets == 1 and logging_setup._rs_log_callback is None
+
+
 def test_keeps_session_bridge(monkeypatch):
     """Under --rslog the session bridge is already installed: leave it, and never reset it."""
     monkeypatch.setattr(logging_setup, '_rs_log_callback', object())
