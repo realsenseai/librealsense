@@ -343,7 +343,7 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
     if hub and not d555_found:
         # All CI machines with a D555 connected have a hub. Detect camera even in case domain have reset to 0 so applicable tests will run.
         ctx = rs.context( { "dds" : { "enabled" : True, "domain" : 0 } } )
-        devices = ctx.query_devices(int(rs.product_line.sw_only) | int(rs.product_line.any))
+        devices = _create_devices( ctx.query_devices(int(rs.product_line.sw_only) | int(rs.product_line.any)) )
         for dev in devices:
             name = dev.get_info(rs.camera_info.name) if dev.supports(rs.camera_info.name) else ""
             if "D555" in name:
