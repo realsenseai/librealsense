@@ -50,12 +50,16 @@ std::vector<uint8_t> encode_intent_json(const std::string &text) {
     else if (operation != "SET")
         throw std::invalid_argument("Intent: unknown operation");
     uint8_t minor = 0;
+    uint8_t patch = static_cast<uint8_t>(rsintent::patch);
     if (j.contains("version")) {
         const auto &v = j.at("version");
-        keys(v, {"major", "minor"});
+        keys(v, {"major", "minor", "patch"});
         if (integer(v, "major", 255U) != rsintent::major)
             throw std::invalid_argument("Intent: unsupported major version");
         minor = static_cast<uint8_t>(integer(v, "minor", 255U));
+        // ver_patch (XU byte 7) is optional in JSON and never gates compatibility.
+        if (v.contains("patch"))
+            patch = static_cast<uint8_t>(integer(v, "patch", 255U));
     } else if (op != rsintent::CLEAR)
         throw std::invalid_argument("Intent: missing version");
     rsintent::Model model = {};
@@ -108,6 +112,7 @@ std::vector<uint8_t> encode_intent_json(const std::string &text) {
     if (rsintent::encode(model, op, wire.data(), wire.size()).code != rsintent::OK)
         throw std::invalid_argument("Intent: encoding failed");
     wire[6] = minor;
+    wire[7] = patch;
     return wire;
 }
 std::string decode_intent_json(const std::vector<uint8_t> &wire,
@@ -119,7 +124,7 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
     if (wire[6] > rsintent::minor)
         throw std::invalid_argument(
             "Intent: firmware minor requires a newer SDK for lossless editing");
-    json j = {{"version", {{"major", wire[0]}, {"minor", wire[6]}}},
+    json j = {{"version", {{"major", wire[0]}, {"minor", wire[6]}, {"patch", wire[7]}}},
               {"op", "SET"},
               {"sensors", json::array()}};
     size_t emitted = 0;

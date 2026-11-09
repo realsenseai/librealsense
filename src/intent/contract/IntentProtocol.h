@@ -57,6 +57,7 @@ struct Model {
 struct Request {
     Operation op;
     uint8_t minorVersion;
+    uint8_t patchVersion;
     Model model;
 };
 uint16_t read16(const uint8_t *p);

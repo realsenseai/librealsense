@@ -126,7 +126,17 @@ int main(int argc, char **argv) {
         {"sensors", json::array({{{"sensor", "STEREO"}, {"streams", json::array({depth})}}})}};
     auto bytes = encode_intent_json(document.dump());
     assert(fw_accept(bytes.data(), 0xc07) == 0 && fw_accept(bytes.data(), 0xc08) == 0);
+    // ver_patch (byte 7): optional in JSON, passes the FW version gate, round-trips on GET.
+    assert(bytes[7] == rsintent::patch);
+    auto patched = document;
+    patched["version"]["patch"] = 9;
+    auto patchedBytes = encode_intent_json(patched.dump());
+    assert(patchedBytes[7] == 9 && fw_accept(patchedBytes.data(), 0xc08) == 0);
+    assert(json::parse(decode_intent_json(patchedBytes, status)).at("version").at("patch") == 9);
     auto bad = document;
+    bad["version"]["patch"] = 256;
+    rejected(bad);
+    bad = document;
     bad["version"]["major"] = 2;
     rejected(bad);
     bad = document;

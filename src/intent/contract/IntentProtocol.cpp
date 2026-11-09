@@ -161,14 +161,13 @@ Error decode(const uint8_t *data, size_t size, Request &output) {
         return Error(INVALID, 0, 0, 1, 0, PARSE_OPERATION);
     if (read16(data + 4) != 0U)
         return Error(INVALID, 0, 0, 4, 0, PARSE_RESERVED);
-    if (data[7] != 0U)
-        return Error(INVALID, 0, 0, 7, 0, PARSE_RESERVED);
     const size_t length = read16(data + 2);
     if (length > max_tlv_size || (length & 3U) != 0U || (data[1] == CLEAR && length != 0U))
         return Error(INVALID, 0, 0, 2, 0, PARSE_TLV_SIZE);
     Request candidate = {};
     candidate.op = static_cast<Operation>(data[1]);
     candidate.minorVersion = data[6];
+    candidate.patchVersion = data[7];
     size_t pos = envelope_size;
     const size_t end = pos + length;
     unsigned sensorsSeen = 0U;
@@ -254,6 +253,7 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
     data[0] = static_cast<uint8_t>(major);
     data[1] = op;
     data[6] = static_cast<uint8_t>(minor);
+    data[7] = static_cast<uint8_t>(patch);
     if (op == CLEAR)
         return Error();
     size_t pos = envelope_size;

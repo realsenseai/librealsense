@@ -36,6 +36,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -61,7 +62,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -102,6 +104,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -136,7 +139,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -179,6 +183,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -213,7 +218,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -258,6 +264,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -292,7 +299,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -331,6 +339,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -374,7 +383,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -412,6 +422,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -446,7 +457,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -485,6 +497,7 @@
     "result": "OK",
     "op": "VALIDATE_ONLY",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -510,7 +523,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "VALIDATE_ONLY",
     "sensors": [
@@ -551,13 +565,15 @@
     "result": "OK",
     "op": "CLEAR",
     "minor": 0,
+    "patch": 0,
     "model": [],
     "code": 0
    },
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "CLEAR"
    }
@@ -572,13 +588,15 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [],
     "code": 0
    },
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": []
@@ -594,6 +612,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -619,7 +638,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -651,6 +671,115 @@
    }
   },
   {
+   "name": "set_newer_patch",
+   "kind": "decode",
+   "description": "Byte 7 is ver_patch; a different patch passes the version gate (7.11)",
+   "size": 1024,
+   "hex": "0100700000000005100334001101040001000000200328002101010001000000220104005a313620230102000005000024010200d0020000250102001e000000100334001101040002000000200328002101010007000000220104004e563132230102000005000024010200d0020000250102001e",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 5,
+    "model": [
+     {
+      "sensor": 1,
+      "branch": 1,
+      "enabled": true,
+      "format": "Z16 ",
+      "width": 1280,
+      "height": 720,
+      "fps": 30
+     },
+     {
+      "sensor": 2,
+      "branch": 7,
+      "enabled": true,
+      "format": "NV12",
+      "width": 1280,
+      "height": 720,
+      "fps": 30
+     }
+    ],
+    "code": 0
+   }
+  },
+  {
+   "name": "set_newer_minor_patch",
+   "kind": "decode",
+   "description": "Newer minor and patch from the same major are accepted (7.11)",
+   "size": 1024,
+   "hex": "01007000000004ff100334001101040001000000200328002101010001000000220104005a313620230102000005000024010200d0020000250102001e000000100334001101040002000000200328002101010007000000220104004e563132230102000005000024010200d0020000250102001e",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 4,
+    "patch": 255,
+    "model": [
+     {
+      "sensor": 1,
+      "branch": 1,
+      "enabled": true,
+      "format": "Z16 ",
+      "width": 1280,
+      "height": 720,
+      "fps": 30
+     },
+     {
+      "sensor": 2,
+      "branch": 7,
+      "enabled": true,
+      "format": "NV12",
+      "width": 1280,
+      "height": 720,
+      "fps": 30
+     }
+    ],
+    "code": 0
+   }
+  },
+  {
+   "name": "design_worked_example",
+   "kind": "decode",
+   "description": "Design 7.6 worked example without the Phase 2 CONTROL record",
+   "size": 1024,
+   "hex": "0100380000000000100234001101040001000000200228002101010001000000220104005a313620230102008002000024010200e0010000250102001e",
+   "expect": {
+    "result": "OK",
+    "op": "SET",
+    "minor": 0,
+    "patch": 0,
+    "model": [
+     {
+      "sensor": 1,
+      "branch": 1,
+      "enabled": true,
+      "format": "Z16 ",
+      "width": 640,
+      "height": 480,
+      "fps": 30
+     }
+    ],
+    "code": 0
+   }
+  },
+  {
+   "name": "design_worked_example_control",
+   "kind": "decode",
+   "description": "Design 7.6 worked example as published: the CONTROL record is Phase 2 and rejected",
+   "size": 1024,
+   "hex": "010040000000000010023c001101040001000000200228002101010001000000220104005a313620230102008002000024010200e0010000250102001e00000030010400010101",
+   "expect": {
+    "result": "INVALID",
+    "detail": 10,
+    "offset": 64,
+    "sensor": 1,
+    "branch": 0,
+    "detail_name": "UNSUPPORTED",
+    "code": 2
+   }
+  },
+  {
    "name": "newer_minor_unknown_optional",
    "kind": "decode",
    "description": "Newer minor; unknown non-critical records skipped at root, sensor and stream levels (an unknown container hides its critical child)",
@@ -660,6 +789,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 9,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -693,6 +823,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 2,
@@ -726,6 +857,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -750,6 +882,7 @@
     "result": "OK",
     "op": "SET",
     "minor": 0,
+    "patch": 0,
     "model": [
      {
       "sensor": 1,
@@ -925,22 +1058,6 @@
    }
   },
   {
-   "name": "reserved_byte7",
-   "kind": "decode",
-   "description": "Byte 7 is reserved, not a patch version",
-   "size": 1024,
-   "hex": "0100000000000001",
-   "expect": {
-    "result": "INVALID",
-    "detail": 4,
-    "offset": 7,
-    "sensor": 0,
-    "branch": 0,
-    "detail_name": "RESERVED",
-    "code": 2
-   }
-  },
-  {
    "name": "reserved_byte4",
    "kind": "decode",
    "description": "Bytes 4..5 are reserved",
@@ -1025,7 +1142,7 @@
    "kind": "decode",
    "description": "Several envelope errors: major is reported first",
    "size": 1024,
-   "hex": "0207030000000001",
+   "hex": "0207030001",
    "expect": {
     "result": "INVALID",
     "detail": 2,
@@ -1638,7 +1755,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -1718,7 +1836,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -1788,7 +1907,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -1859,7 +1979,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -1945,7 +2066,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [
@@ -2021,7 +2143,8 @@
    "sdk_document": {
     "version": {
      "major": 1,
-     "minor": 0
+     "minor": 0,
+     "patch": 0
     },
     "op": "SET",
     "sensors": [

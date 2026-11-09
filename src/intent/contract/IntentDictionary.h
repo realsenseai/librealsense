@@ -2,9 +2,10 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "e44ce3e34645de7b444b6defb405d9f8035dfe64499cb85974d6696c48b2cf77";
+static const char dictionary_sha256[] = "79831d9570cbc541c04f1a21ece50ade3df57cd1fb9502c6bb9e4e8440b85d80";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
+static const unsigned patch = 0U;
 static const unsigned wire_size = 1024U;
 static const unsigned status_size = 32U;
 static const unsigned max_branch_id = 15U;
