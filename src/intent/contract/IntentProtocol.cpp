@@ -146,11 +146,12 @@ void header(uint8_t *p, uint8_t type, uint8_t flags, uint16_t length) {
     write16(p + 2, length);
 }
 void attr(uint8_t *p, uint8_t type, uint16_t length, uint32_t value) {
-    header(p, type, 1U, length);
+    header(p, type, recordCritical(type), length);
     write32(p + 4, value);
 }
 } // namespace
 Error decode(const uint8_t *data, size_t size, Request &output) {
+    // V1 is first-error: 2026-10-28 handover, RSDEV-15834/RSDEV-15835 design baseline.
     // Exactly one XU transfer: shorter is truncated, longer is oversized.
     if (!data || size != wire_size)
         return Error(INVALID, 0, 0, 0, 0, PARSE_TRANSFER_SIZE);
@@ -264,7 +265,7 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
                 children += m.streams[i].enabled ? enabled_stream_bytes : disabled_stream_bytes;
         if (!children)
             continue;
-        header(data + pos, SENSOR, 3U, static_cast<uint16_t>(8U + children));
+        header(data + pos, SENSOR, 2U | recordCritical(SENSOR), static_cast<uint16_t>(8U + children));
         pos += 4U;
         attr(data + pos, SENSOR_ID, 4U, sensor);
         pos += 8U;
@@ -272,7 +273,7 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
             const Stream *s = find(m, static_cast<uint8_t>(branch));
             if (!s || s->sensor != sensor)
                 continue;
-            header(data + pos, STREAM, 3U, s->enabled ? 40U : 16U);
+            header(data + pos, STREAM, 2U | recordCritical(STREAM), s->enabled ? 40U : 16U);
             pos += 4U;
             attr(data + pos, BRANCH_ID, 1U, s->branch);
             pos += 8U;

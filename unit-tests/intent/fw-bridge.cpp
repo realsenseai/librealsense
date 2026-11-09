@@ -6,6 +6,11 @@ extern "C" int fw_accept(const unsigned char *bytes, unsigned sku) {
     auto error = rsintent::decode(bytes, rsintent::wire_size, request);
     if (error.code != rsintent::OK)
         return error.code;
+    if (request.op == rsintent::CLEAR) return 0;
+#ifdef INTENT_FW_RULES
+    error = rsintent::completeness(request.model, static_cast<uint16_t>(sku), request.minorVersion);
+    if (error.code != rsintent::OK) return error.code;
+#endif
     return rsintent::validate(request.model, static_cast<uint16_t>(sku)).code;
 }
 extern "C" int fw_decode(const unsigned char *bytes, unsigned size, unsigned *detail,

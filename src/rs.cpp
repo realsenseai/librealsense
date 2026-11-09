@@ -5387,7 +5387,8 @@ void rs2_set_intent(const rs2_device* device,const char* json,rs2_error** error)
 {
     VALIDATE_NOT_NULL(device);VALIDATE_NOT_NULL(json);
     auto& sensor=intent_sensor(device);
-    auto wire=librealsense::encode_intent_json(json);
+    auto version=sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT_STATUS).get_raw();
+    auto wire=librealsense::encode_intent_json(json,version);
     try {
         sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT).set_raw(wire.data(),wire.size());
     } catch(const std::exception& original) {

@@ -2,7 +2,7 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "79831d9570cbc541c04f1a21ece50ade3df57cd1fb9502c6bb9e4e8440b85d80";
+static const char dictionary_sha256[] = "4b45fe0949ce862cc58ed4193c08e33261a6fd2f8f2e6143b0bd6716c26c0279";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned patch = 0U;
@@ -34,10 +34,40 @@ enum Records {
     STATE = 38,
     CONTROL = 48,
 };
-struct SensorDefinition { uint8_t id; const char* name; };
+inline uint8_t recordCritical(uint8_t type) {
+    switch (type) {
+    case BRANCH_ID: return 1U;
+    case CONTROL: return 0U;
+    case FORMAT: return 1U;
+    case FPS: return 1U;
+    case HEIGHT: return 1U;
+    case SENSOR: return 0U;
+    case SENSOR_ID: return 1U;
+    case STATE: return 1U;
+    case STREAM: return 0U;
+    case WIDTH: return 1U;
+    default: return 0U;
+    }
+}
+inline uint8_t recordSince(uint8_t type) {
+    switch (type) {
+    case BRANCH_ID: return 0U;
+    case CONTROL: return 0U;
+    case FORMAT: return 0U;
+    case FPS: return 0U;
+    case HEIGHT: return 0U;
+    case SENSOR: return 0U;
+    case SENSOR_ID: return 0U;
+    case STATE: return 0U;
+    case STREAM: return 0U;
+    case WIDTH: return 0U;
+    default: return 0U;
+    }
+}
+struct SensorDefinition { uint8_t id; const char* name; uint8_t since; };
 static const SensorDefinition sensors[] = {
-    {1U, "STEREO"},
-    {2U, "COLOR"},
+    {1U, "STEREO", 0U},
+    {2U, "COLOR", 0U},
 };
 struct SkuDefinition { uint16_t pid; const char* name; };
 static const SkuDefinition skus[] = {
@@ -46,18 +76,18 @@ static const SkuDefinition skus[] = {
     {0x0c08U, "D585_3C_PROTO"},
 };
 // One row per (branch, SKU); format is the branch default FourCC.
-struct BranchDefinition { uint8_t id, sensor; uint16_t sku; uint32_t format; const char* name; };
+struct BranchDefinition { uint8_t id, sensor; uint16_t sku; uint32_t format; const char* name; uint8_t since; };
 static const BranchDefinition branches[] = {
-    {1U, 1U, 3078U, 0x2036315aU, "DEPTH"},
-    {1U, 1U, 3079U, 0x2036315aU, "DEPTH"},
-    {1U, 1U, 3080U, 0x2036315aU, "DEPTH"},
-    {4U, 1U, 3078U, 0x20493859U, "IR_LR"},
-    {4U, 1U, 3079U, 0x20493859U, "IR_LR"},
-    {4U, 1U, 3080U, 0x20493859U, "IR_LR"},
-    {5U, 1U, 3079U, 0x3231564eU, "RGB_L"},
-    {6U, 1U, 3079U, 0x3231564eU, "RGB_R"},
-    {7U, 2U, 3078U, 0x32595559U, "RGB"},
-    {7U, 2U, 3080U, 0x32595559U, "RGB"},
+    {1U, 1U, 3078U, 0x2036315aU, "DEPTH", 0U},
+    {1U, 1U, 3079U, 0x2036315aU, "DEPTH", 0U},
+    {1U, 1U, 3080U, 0x2036315aU, "DEPTH", 0U},
+    {4U, 1U, 3078U, 0x20493859U, "IR_LR", 0U},
+    {4U, 1U, 3079U, 0x20493859U, "IR_LR", 0U},
+    {4U, 1U, 3080U, 0x20493859U, "IR_LR", 0U},
+    {5U, 1U, 3079U, 0x3231564eU, "RGB_L", 0U},
+    {6U, 1U, 3079U, 0x3231564eU, "RGB_R", 0U},
+    {7U, 2U, 3078U, 0x32595559U, "RGB", 0U},
+    {7U, 2U, 3080U, 0x32595559U, "RGB", 0U},
 };
 struct FormatDefinition { uint8_t branch; uint32_t format; };
 static const FormatDefinition formats[] = {

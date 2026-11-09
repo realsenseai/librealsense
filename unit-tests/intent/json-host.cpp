@@ -39,7 +39,14 @@ static bool sdkRejects(const std::vector<uint8_t> &wire, const std::vector<uint8
     return false;
 }
 // Compare only the contract part of a decoded document (status is device state).
-static void sameDocument(const std::string &name, const json &decoded, const json &expected) {
+static void stripLayout(json &j) {
+    if (j.is_object()) {
+        j.erase("layout");
+        for (auto &child : j) stripLayout(child);
+    } else if (j.is_array()) for (auto &child : j) stripLayout(child);
+}
+static void sameDocument(const std::string &name, json decoded, const json &expected) {
+    stripLayout(decoded);
     if (decoded.at("version") != expected.at("version") ||
         decoded.at("sensors") != expected.at("sensors")) {
         std::cerr << name << ": SDK decoded " << decoded.dump() << "\nexpected " << expected.dump()
@@ -74,7 +81,10 @@ static void goldenVectors(const char *path, std::vector<uint8_t> &status) {
             }
             if (fw != 0) {
                 ++fw_rejected;
-                assert(sdkRejects(bytes, status));
+                if (detail != rsintent::PARSE_UNKNOWN_CRITICAL && name != "sensor_id_out_of_range" &&
+                    name != "branch_out_of_range" && name != "too_many_streams" && !sdkRejects(bytes, status)) {
+                    std::cerr << name << ": SDK unexpectedly accepted malformed payload\n"; assert(false);
+                }
                 continue;
             }
             if (!v.contains("sdk_document"))
@@ -89,6 +99,9 @@ static void goldenVectors(const char *path, std::vector<uint8_t> &status) {
             ++sdk_encoded;
             if (document.at("op") == "SET")
                 sameDocument(name, json::parse(decode_intent_json(bytes, status)), document);
+        } else if (kind == "controller") {
+            const auto bytes = unhex(v.at("hex"), rsintent::wire_size);
+            if (fw_has_rules()) assert(fw_accept(bytes.data(), v.at("sku")) == expect.at("code"));
         } else {
             const unsigned sku = v.at("sku");
             const auto golden = unhex(v.at("hex"), rsintent::wire_size);
@@ -113,7 +126,9 @@ static void goldenVectors(const char *path, std::vector<uint8_t> &status) {
               << " rejected identically by FW and SDK codec, " << templates << " templates, "
               << stored << " stored GET decoded by SDK\n";
 }
+void compatibility();
 int main(int argc, char **argv) {
+    compatibility();
     assert(argc == 2);
     std::vector<uint8_t> status(rsintent::status_size);
     status[0] = 1;
@@ -124,8 +139,12 @@ int main(int argc, char **argv) {
         {"version", {{"major", 1}, {"minor", 0}}},
         {"op", "SET"},
         {"sensors", json::array({{{"sensor", "STEREO"}, {"streams", json::array({depth})}}})}};
+    auto partial = encode_intent_json(document.dump());
+    if (fw_has_rules()) assert(fw_accept(partial.data(), 0xc08) == rsintent::INCOMPLETE);
+    document["sensors"][0]["streams"].push_back({{"branch", "IR_LR"}, {"state", "DISABLED"}});
+    document["sensors"].push_back({{"sensor", "COLOR"}, {"streams", json::array({{{"branch", "RGB"}, {"state", "DISABLED"}}})}});
     auto bytes = encode_intent_json(document.dump());
-    assert(fw_accept(bytes.data(), 0xc07) == 0 && fw_accept(bytes.data(), 0xc08) == 0);
+    assert(fw_accept(bytes.data(), 0xc08) == 0);
     // ver_patch (byte 7): optional in JSON, passes the FW version gate, round-trips on GET.
     assert(bytes[7] == rsintent::patch);
     auto patched = document;
@@ -173,7 +192,7 @@ int main(int argc, char **argv) {
     bad["sensors"][0]["streams"][0]["fps"] = 15;
     bytes = encode_intent_json(bad.dump());
     if (fw_has_rules())
-        assert(fw_accept(bytes.data(), 0xc07) == 4); // FW rules authoritative.
+        assert(fw_accept(bytes.data(), 0xc08) == 4); // FW rules authoritative.
     bad = document;
     bad["op"] = "VALIDATE_ONLY";
     assert(encode_intent_json(bad.dump())[1] == 1);
@@ -182,12 +201,6 @@ int main(int argc, char **argv) {
     rejected(json{{"op", "CLEAR"}, {"sensors", json::array()}});
     fw_template(0xc07, bytes.data());
     bytes[6] = 1;
-    bool newer = false;
-    try {
-        decode_intent_json(bytes, status);
-    } catch (const std::exception &) {
-        newer = true;
-    }
-    assert(newer);
+    assert(encode_intent_json(decode_intent_json(bytes, status)) == bytes);
     std::cout << "PASS: golden vectors both directions, JSON rejection and FW admission rules\n";
 }

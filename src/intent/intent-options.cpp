@@ -1,6 +1,7 @@
 // License: Apache 2.0. Copyright (C) 2026 RealSense, Inc.
 #include "contract/IntentProtocol.h"
 #include "intent-json.h"
+#include "intent-tlv.h"
 #include <librealsense2/h/rs_composite_option.h>
 #include <mutex>
 #include <src/composite-option-interface.h>
@@ -41,15 +42,35 @@ class intent_option : public composite_option_interface {
         auto sensor = _sensor.lock();
         if (!sensor)
             throw std::runtime_error("Intent: sensor disconnected");
+        std::vector<uint8_t> payload(static_cast<const uint8_t *>(data), static_cast<const uint8_t *>(data) + size);
+        std::vector<uint8_t> version(rsintent::status_size);
+        sensor->invoke_powered([&](platform::uvc_device &dev) {
+            if (!dev.get_xu(ds::depth_xu, rsintent::GLOBAL_INTENT_STATUS, version.data(), static_cast<int>(version.size())))
+                throw std::runtime_error("Intent: status read failed before SET");
+        });
+        // Raw composite-option callers follow the same version policy as the JSON API.
+        const auto document = decode_intent_json(payload, version);
+        payload = encode_intent_json(document, version);
+        const auto records = intent_tlv::body(payload);
+        const auto clean = intent_tlv::transfer(payload, intent_tlv::filter(records));
         rsintent::Request request = {};
-        if (rsintent::decode(static_cast<const uint8_t *>(data), size, request).code !=
-            rsintent::OK)
+        if (rsintent::decode(clean.data(), clean.size(), request).code != rsintent::OK)
             throw std::invalid_argument("Intent: malformed payload");
         // Allocate and normalize before SET so a successful device mutation is
         // followed only by a nonthrowing local state update.
         std::vector<uint8_t> next;
         if (request.op == rsintent::SET) {
             auto model = rsintent::defaultModel(_sku);
+            size_t retained = 0;
+            for (size_t i = 0; i < model.count; ++i) {
+                bool supported = true;
+                for (const auto &b : rsintent::branches)
+                    if (b.id == model.streams[i].branch && b.since > version[1]) supported = false;
+                for (const auto &s : rsintent::sensors)
+                    if (s.id == model.streams[i].sensor && s.since > version[1]) supported = false;
+                if (supported) model.streams[retained++] = model.streams[i];
+            }
+            model.count = retained;
             for (size_t i = 0; i < request.model.count; ++i)
                 for (size_t j = 0; j < model.count; ++j)
                     if (request.model.streams[i].branch == model.streams[j].branch)
@@ -58,11 +79,16 @@ class intent_option : public composite_option_interface {
             if (rsintent::encode(model, rsintent::SET, next.data(), next.size()).code !=
                 rsintent::OK)
                 throw std::invalid_argument("Intent: cannot normalize declaration");
+            if (intent_tlv::pack(records) != intent_tlv::pack(intent_tlv::filter(records)))
+                next = payload;
+            next[0] = version[0];
+            next[6] = version[1];
+            next[7] = version[18];
         }
         std::lock_guard<std::mutex> lock(_mutex);
         sensor->invoke_powered([&](platform::uvc_device &dev) {
             if (!dev.set_xu(ds::depth_xu, rsintent::GLOBAL_INTENT,
-                            static_cast<const uint8_t *>(data), static_cast<int>(size)))
+                            payload.data(), static_cast<int>(payload.size())))
                 throw std::runtime_error("Intent SET rejected");
         });
         if (request.op != rsintent::VALIDATE_ONLY)
