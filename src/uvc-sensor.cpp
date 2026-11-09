@@ -10,6 +10,7 @@
 #include "core/notification.h"
 #include "platform/uvc-option.h"
 #include "platform/stream-profile-impl.h"
+#include <src/platform/hid-data.h>
 #include <src/metadata-parser.h>
 #include <rsutils/string/from.h>
 #include <src/core/time-service.h>
@@ -315,7 +316,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                     auto && msp = As< motion_stream_profile, stream_profile_interface >( req_profile );
                     if( msp )
                     {
-                        expected_size = 64;
+                        expected_size = sizeof( hid_mipi_data_32 );  // one IMU report; the rest of the buffer is padding
                         if( f.frame_size < expected_size )
                         {
                             LOG_ERROR( "Motion frame is " << f.frame_size << " bytes, expected at least " << expected_size );
@@ -325,9 +326,9 @@ void uvc_sensor::open( const stream_profiles & requests )
                         //Motion stream on uvc is used only for mipi. Stream frame number counts gyro and accel together.
                         //We override it using 2 seperate counters.
                         auto stream_type = ((uint8_t *)f.pixels)[0];
-                        if( stream_type == 1 ) // 1 == Accel
+                        if( stream_type == hid_mipi_accel )
                             fr->additional_data.frame_number = ++_accel_counter;
-                        else if( stream_type == 2 ) // 2 == Gyro
+                        else if( stream_type == hid_mipi_gyro )
                             fr->additional_data.frame_number = ++_gyro_counter;
                         frame_counter = fr->additional_data.frame_number;
                     }
@@ -403,7 +404,7 @@ void uvc_sensor::open( const stream_profiles & requests )
                     // verbatim view of the backend buffer (sizes match exactly, not motion, not
                     // realigned) and we have not already pinned too many ring buffers.
                     const bool do_zc = capture_zerocopy_enabled()
-                                       && ! msp
+                                       && ! msp  // split IMU reports share one buffer, requeued after the last copy (v4l-uvc-device.cpp)
                                        && ! align64
                                        && expected_size == sizeof( uint8_t ) * f.frame_size
                                        && zc_inflight->load( std::memory_order_relaxed ) < ZC_MAX_INFLIGHT;

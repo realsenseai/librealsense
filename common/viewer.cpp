@@ -5146,11 +5146,25 @@ namespace rs2
             _host_points_maker = std::make_shared< rs2::filter >( [this]( rs2::frame f, rs2::frame_source & src )
             {
                 auto vsp = f.get_profile().as< rs2::video_stream_profile >();
+                auto lpc = f.as< rs2::labeled_points >();
+                // Safety-camera profiles describe the USB carrier, not the organized cloud.
+                const int w = lpc ? lpc.get_width() : vsp.width();
+                const int h = lpc ? lpc.get_height() : vsp.height();
                 auto it = _host_points_profiles.find( vsp.unique_id() );
-                if( it == _host_points_profiles.end() )
-                    it = _host_points_profiles.emplace( vsp.unique_id(), vsp.clone( RS2_STREAM_DEPTH, 0, RS2_FORMAT_XYZ32F ) ).first;
+                if( it == _host_points_profiles.end()
+                    || it->second.as< video_stream_profile >().width() != w
+                    || it->second.as< video_stream_profile >().height() != h )
+                {
+                    // Already-computed XYZ needs only buffer dimensions; projection uses the texture profile.
+                    rs2_intrinsics intr = {};
+                    intr.width = w;
+                    intr.height = h;
+                    auto profile = lpc ? vsp.clone( RS2_STREAM_DEPTH, 0, RS2_FORMAT_XYZ32F, w, h, intr )
+                                       : vsp.clone( RS2_STREAM_DEPTH, 0, RS2_FORMAT_XYZ32F );
+                    _host_points_profiles[vsp.unique_id()] = std::move( profile );
+                    it = _host_points_profiles.find( vsp.unique_id() );
+                }
                 auto out = src.allocate_points( it->second, f ).as< rs2::points >();
-                const int w = vsp.width(), h = vsp.height();
                 auto v = const_cast< rs2::vertex * >( out.get_vertices() );
                 auto t = const_cast< rs2::texture_coordinate * >( out.get_texture_coordinates() );
                 const size_t n = std::min( out.size(), _host_points_xyz.size() );
@@ -5323,15 +5337,17 @@ namespace rs2
         _lpcl_host_points = points();
 
         auto profile = last_labeled_points.get_profile().as<video_stream_profile>();
-        if (!profile || profile.width() <= 0)
+        if (!profile)
             return;
-        const int w = profile.width(), h = profile.height();
 
         const rs2::vertex* vertices = nullptr;
         const uint8_t* labels = nullptr;
         size_t count = 0;
+        int w = 0, h = 0;
         try
         {
+            w = last_labeled_points.get_width();
+            h = last_labeled_points.get_height();
             vertices = last_labeled_points.get_vertices();
             labels = last_labeled_points.get_labels();
             count = last_labeled_points.size();
@@ -5341,9 +5357,15 @@ namespace rs2
             LOG_ERROR("Failed to read labeled point cloud data: " << e.what());
             return;
         }
+        if (w <= 0 || h <= 0)
+        {
+            LOG_ERROR("Labeled point cloud: invalid dimensions " << w << "x" << h);
+            return;
+        }
         if (count != size_t(w) * h)
         {
-            LOG_DEBUG("Labeled point cloud: " << count << " vertices, expected " << w << "x" << h);
+            LOG_WARNING("Labeled point cloud: " << count << " vertices, expected " << w << "x" << h
+                                               << "; skipping frame");
             return;
         }
 

@@ -177,20 +177,9 @@ void dds_sensor_proxy::register_converters()
             { RS2_FORMAT_YUYV, RS2_FORMAT_RGB8, RS2_FORMAT_Y8, RS2_FORMAT_RGBA8, RS2_FORMAT_BGR8, RS2_FORMAT_BGRA8 },
             RS2_STREAM_COLOR ) );
 
-    if( jpeg_indexes.size() > 0 )
-    {
-        std::vector< stream_profile > target_profiles, passthrough_profiles;
-        for( int index : jpeg_indexes )
-        {
-            target_profiles.push_back( { RS2_FORMAT_RGB8, RS2_STREAM_COLOR, index } );
-            passthrough_profiles.push_back( { RS2_FORMAT_MJPEG, RS2_STREAM_COLOR, index } );
-        }
-        _formats_converter.register_converter( { { RS2_FORMAT_MJPEG, RS2_STREAM_COLOR } }, target_profiles,
-                                               []() { return std::make_shared< mjpeg_converter >( RS2_FORMAT_RGB8 ); } );
-        _formats_converter.register_converter( { { RS2_FORMAT_MJPEG, RS2_STREAM_COLOR } }, passthrough_profiles,
-                                               []() { return std::make_shared< identity_processing_block >(); } );
-    }
-
+    // Before JPEG on purpose: the two share a stream and a geometry, and both can produce RGB8, so the one
+    // registered first wins the tie. H.264 costs far less bandwidth, so it is the better source where we can
+    // decode it; where we cannot, nothing here targets RGB8 and JPEG takes over.
     if( h264_indexes.size() > 0 )
     {
         // Passthrough, so an application can take the access units and decode them itself. Offered
@@ -208,6 +197,20 @@ void dds_sensor_proxy::register_converters()
             _formats_converter.register_converter( { { RS2_FORMAT_H264, RS2_STREAM_COLOR } }, target_profiles,
                                                    []() { return std::make_shared< h264_decoder >( RS2_FORMAT_RGB8 ); } );
         }
+    }
+
+    if( jpeg_indexes.size() > 0 )
+    {
+        std::vector< stream_profile > target_profiles, passthrough_profiles;
+        for( int index : jpeg_indexes )
+        {
+            target_profiles.push_back( { RS2_FORMAT_RGB8, RS2_STREAM_COLOR, index } );
+            passthrough_profiles.push_back( { RS2_FORMAT_MJPEG, RS2_STREAM_COLOR, index } );
+        }
+        _formats_converter.register_converter( { { RS2_FORMAT_MJPEG, RS2_STREAM_COLOR } }, target_profiles,
+                                               []() { return std::make_shared< mjpeg_converter >( RS2_FORMAT_RGB8 ); } );
+        _formats_converter.register_converter( { { RS2_FORMAT_MJPEG, RS2_STREAM_COLOR } }, passthrough_profiles,
+                                               []() { return std::make_shared< identity_processing_block >(); } );
     }
 
     // Depth. A device can expose more than one, e.g. raw depth next to device-aligned depth, so the
