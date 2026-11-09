@@ -56,7 +56,7 @@ namespace librealsense {
         return dds_value.is_null() ? 0 : dds_value.get< int32_t >();
     }
 
-    // Packs rs2_icr_control; get( field, its DDS option ) returns the field's value
+    // Packs rs2_icr_control; get( DDS option ) returns the field's value
     template< class Get >
     std::vector< uint8_t > rs_dds_close_range_control::pack( Get && get ) const
     {
@@ -66,7 +66,7 @@ namespace librealsense {
         cfg.header.param_count = static_cast< uint8_t >( field_count );
         int32_t fields[field_count];
         for( size_t i = 0; i < field_count; ++i )
-            fields[i] = _fields[i] ? get( i, *_fields[i] ) : 0;
+            fields[i] = _fields[i] ? get( *_fields[i] ) : 0;
         std::vector< uint8_t > raw( sizeof( cfg ) );
         std::memcpy( raw.data(), &cfg, sizeof( cfg ) );
         std::memcpy( raw.data() + fields_offset, fields, sizeof( fields ) );
@@ -75,7 +75,7 @@ namespace librealsense {
 
     std::vector< uint8_t > rs_dds_close_range_control::get_raw() const
     {
-        return pack( []( size_t, realdds::dds_option const & o ) { return to_field( o.get_value() ); } );
+        return pack( []( realdds::dds_option const & o ) { return to_field( o.get_value() ); } );
     }
 
     // Rejects a value its option does not accept, then adds it to the set-filter request
@@ -114,13 +114,13 @@ namespace librealsense {
             auto e = dynamic_cast< realdds::dds_enum_option const * >( &o );
             return e && ! e->get_choices().empty() ? &e->get_choices() : nullptr;
         };
-        auto min = pack( [&]( size_t, realdds::dds_option const & o )
+        auto min = pack( [&]( realdds::dds_option const & o )
                          { return to_field( choices( o ) ? json( choices( o )->front() ) : o.get_minimum_value() ); } );
-        auto max = pack( [&]( size_t, realdds::dds_option const & o )
+        auto max = pack( [&]( realdds::dds_option const & o )
                          { return to_field( choices( o ) ? json( choices( o )->back() ) : o.get_maximum_value() ); } );
-        auto step = pack( [&]( size_t, realdds::dds_option const & o )
+        auto step = pack( [&]( realdds::dds_option const & o )
                           { return choices( o ) ? 1 : to_field( o.get_stepping() ); } );
-        auto def = pack( []( size_t, realdds::dds_option const & o ) { return to_field( o.get_default_value() ); } );
+        auto def = pack( []( realdds::dds_option const & o ) { return to_field( o.get_default_value() ); } );
         std::vector< uint8_t > range;
         for( auto * bound : { &min, &max, &step, &def } )
             range.insert( range.end(), bound->begin(), bound->end() );

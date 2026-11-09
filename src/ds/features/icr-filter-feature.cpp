@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <algorithm>
 #include <cstring>
+#include <mutex>
 
 
 namespace librealsense {
@@ -118,8 +119,7 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
             << " pixels wide, but Depth is " << w << "x" << h );
 }
 
-// Rejects out-of-range values locally, never writes the read-only min depth telemetry slots, and rejects enabling ICR
-// while a Depth profile it cannot process is open. `control` is the transport (XU or DDS).
+// Rejects out-of-range values locally, and rejects enabling ICR while a Depth profile it cannot process is open. `control` is the transport (XU or DDS).
 class icr_option : public composite_option_interface
 {
 public:
@@ -131,7 +131,9 @@ public:
 
     std::vector< uint8_t > get_raw() const override
     {
-        return read_xu();
+        auto raw = _xu->get_raw();
+        check_envelope_or_throw( raw.data(), raw.size() );
+        return raw;
     }
     void set_raw( const void * data, size_t size ) override
     {
@@ -143,36 +145,28 @@ public:
         if( auto depth = find_depth_profile( _depth_sensor.get_active_streams() ) )
             icr_allowed_or_throw( &cfg, sizeof( cfg ), *depth, _depth_sensor );
 
-        // Params 7/8 are FW-computed: carry back what the device reports instead of the caller's values
-        auto const raw = read_xu();
-        rs2_icr_control current;
-        std::memcpy( &current, raw.data(), sizeof( current ) );
-        cfg.baseline_min_depth_mm = current.baseline_min_depth_mm;
-        cfg.improved_min_depth_mm = current.improved_min_depth_mm;
-        _xu->set_raw( &cfg, sizeof( cfg ) );
+        _xu->set_raw( &cfg, sizeof( cfg ) );  // FW ignores the read-only min depth fields
     }
-    // {min, max, step, def}, each a complete payload with its own envelope
+    // {min, max, step, def}, each a complete payload with its own envelope. Read once: the range does not change
     std::vector< uint8_t > get_raw_range() const override
     {
-        auto raw = _xu->get_raw_range();
-        if( raw.size() != 4 * sizeof( rs2_icr_control ) )
-            throw invalid_value_exception( "Improved Close Range control returned an unexpected range payload size" );
-        for( size_t i = 0; i < 4; ++i )
-            check_envelope_or_throw( raw.data() + i * sizeof( rs2_icr_control ), sizeof( rs2_icr_control ) );
-        return raw;
+        std::lock_guard< std::mutex > lock( _range_mutex );
+        if( _range.empty() )
+        {
+            auto raw = _xu->get_raw_range();
+            if( raw.size() != 4 * sizeof( rs2_icr_control ) )
+                throw invalid_value_exception( "Improved Close Range control returned an unexpected range payload size" );
+            for( size_t i = 0; i < 4; ++i )
+                check_envelope_or_throw( raw.data() + i * sizeof( rs2_icr_control ), sizeof( rs2_icr_control ) );
+            _range = std::move( raw );
+        }
+        return _range;
     }
     bool is_read_only() const override { return _xu->is_read_only(); }
     bool is_enabled() const override { return _xu->is_enabled(); }
     const char * get_description() const override { return _xu->get_description(); }
 
 private:
-    std::vector< uint8_t > read_xu() const
-    {
-        auto raw = _xu->get_raw();
-        check_envelope_or_throw( raw.data(), raw.size() );
-        return raw;
-    }
-
     // The payload size, header version, control ID, param count and param type must be the ICR schema
     static void check_envelope_or_throw( const uint8_t * data, size_t size )
     {
@@ -207,6 +201,8 @@ private:
 
     std::shared_ptr< composite_option_interface > _xu;
     const sensor_interface & _depth_sensor;
+    mutable std::mutex _range_mutex;
+    mutable std::vector< uint8_t > _range;
 };
 
 
