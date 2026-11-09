@@ -208,5 +208,6 @@ endif()
 
 target_sources(${LRS_TARGET} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/intent/intent-json.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/intent/intent-options.cpp
     ${CMAKE_CURRENT_LIST_DIR}/intent/contract/IntentProtocol.cpp)
 target_include_directories(${LRS_TARGET} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/intent/contract)

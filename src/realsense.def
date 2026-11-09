@@ -533,3 +533,6 @@ EXPORTS
     rs2_get_embedded_filter_type
     rs2_is_embedded_filter_extendable_to
     rs2_embedded_filter_type_to_string
+
+    rs2_get_intent
+    rs2_set_intent

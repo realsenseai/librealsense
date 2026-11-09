@@ -1,21 +1,21 @@
 // License: Apache 2.0. Copyright (C) 2026 RealSense, Inc.
 #include "src/intent/intent-json.h"
 #include "src/intent/contract/IntentProtocol.h"
+#include "src/intent/contract/IntentCapabilities.h"
 #include <algorithm>
 #include <cassert>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <rsutils/json.h>
+extern "C" int fw_accept(const unsigned char *, unsigned);
+extern "C" int fw_accept_on(const unsigned char *, unsigned, unsigned);
 extern "C" void fw_template(unsigned, unsigned char *);
+extern "C" int fw_has_rules();
 extern "C" int fw_decode(const unsigned char *, unsigned, unsigned *, unsigned *);
 using librealsense::decode_intent_json;
 using librealsense::encode_intent_json;
 using rsutils::json;
-static int fwResult(const std::vector<uint8_t> &wire) {
-    unsigned detail = 0, offset = 0;
-    return fw_decode(wire.data(), static_cast<unsigned>(wire.size()), &detail, &offset);
-}
 static void rejected(const json &value) {
     bool caught = false;
     try {
@@ -101,6 +101,9 @@ static void goldenVectors(const char *path, std::vector<uint8_t> &status) {
             ++sdk_encoded;
             if (document.at("op") == "SET")
                 sameDocument(name, json::parse(decode_intent_json(bytes, status)), document);
+        } else if (kind == "controller") {
+            const auto bytes = unhex(v.at("hex"), rsintent::wire_size);
+            if (fw_has_rules()) assert(fw_accept(bytes.data(), v.at("sku")) == expect.at("code"));
         } else {
             const unsigned sku = v.at("sku");
             const auto golden = unhex(v.at("hex"), rsintent::wire_size);
@@ -117,7 +120,7 @@ static void goldenVectors(const char *path, std::vector<uint8_t> &status) {
             const json decoded = json::parse(decode_intent_json(golden, status));
             sameDocument(name, decoded, v.at("sdk_document"));
             assert(encode_intent_json(v.at("sdk_document").dump()) == golden);
-            assert(fwResult(golden) == 0);
+            assert(fw_accept(golden.data(), sku) == 0);
         }
     }
     assert(sdk_encoded >= 8U && fw_rejected >= 40U && templates == 3U && stored == 3U);
@@ -126,18 +129,53 @@ static void goldenVectors(const char *path, std::vector<uint8_t> &status) {
               << stored << " stored GET decoded by SDK\n";
 }
 void compatibility();
+static void nativeProfiles(const std::vector<uint8_t> &status) {
+    if (!fw_has_rules()) return;
+    unsigned tested = 0;
+    for (const auto &p : rsintent::profiles) {
+        std::vector<uint8_t> wire(rsintent::wire_size);
+        fw_template(p.sku, wire.data());
+        auto document = json::parse(decode_intent_json(wire, status));
+        const char *name = nullptr;
+        for (const auto &b : rsintent::branches)
+            if (b.id == p.branch && b.sku == p.sku) name = b.name;
+        assert(name);
+        uint8_t bytes[4];
+        rsintent::write32(bytes, p.format);
+        std::string format(reinterpret_cast<char *>(bytes), 4U);
+        while (!format.empty() && format.back() == ' ') format.pop_back();
+        bool updated = false;
+        for (auto &sensor : document["sensors"])
+            for (auto &stream : sensor["streams"])
+                if (stream["branch"] == name) {
+                    stream = {{"branch", name}, {"format", format}, {"width", p.width},
+                              {"height", p.height}, {"fps", p.fps}};
+                    updated = true;
+                }
+        assert(updated);
+        // No local rule-engine shortcut: SDK encodes, the actual FW T4 gate checks.
+        wire = encode_intent_json(document.dump());
+        assert(fw_accept_on(wire.data(), p.sku, p.transport) == rsintent::OK);
+        assert(encode_intent_json(decode_intent_json(wire, status)) == wire);
+        ++tested;
+    }
+    std::cout << "profiles: " << tested << " SDK-encoded native tuples accepted by FW\n";
+}
 int main(int argc, char **argv) {
     compatibility();
     assert(argc == 2);
     std::vector<uint8_t> status(rsintent::status_size);
     status[0] = 1;
     goldenVectors(argv[1], status);
+    nativeProfiles(status);
     json depth = {
         {"branch", "DEPTH"}, {"format", "Z16"}, {"width", 1280}, {"height", 720}, {"fps", 30}};
     json document = {
         {"version", "1.0.0"},
         {"op", "SET"},
         {"sensors", json::array({{{"sensor", "STEREO"}, {"streams", json::array({depth})}}})}};
+    auto partial = encode_intent_json(document.dump());
+    if (fw_has_rules()) assert(fw_accept(partial.data(), 0xc08) == rsintent::INCOMPLETE);
     document["sensors"][0]["streams"].push_back({{"branch", "IR_LR"}, {"state", "DISABLED"}});
     document["sensors"].push_back({{"sensor", "COLOR"}, {"streams", json::array({{{"branch", "RGB"}, {"state", "DISABLED"}}})}});
     document["sensors"].push_back({{"sensor", "MOTION"}, {"streams", json::array({
@@ -147,7 +185,7 @@ int main(int argc, char **argv) {
     document["sensors"].push_back({{"sensor", "DEPTH_MAPPING"}, {"streams", json::array({
         {{"branch", "DMAP"}, {"state", "DISABLED"}}})}});
     auto bytes = encode_intent_json(document.dump());
-    assert(fwResult(bytes) == 0);
+    assert(fw_accept(bytes.data(), 0xc08) == 0);
     for (unsigned code = 0; code <= 255U; ++code) {
         auto resultStatus = status;
         resultStatus[3] = static_cast<uint8_t>(code);
@@ -162,7 +200,7 @@ int main(int argc, char **argv) {
     auto patched = document;
     patched["version"] = "1.255.255";
     auto patchedBytes = encode_intent_json(patched.dump());
-    assert(patchedBytes[6] == 255 && patchedBytes[7] == 255 && fwResult(patchedBytes) == 0);
+    assert(patchedBytes[6] == 255 && patchedBytes[7] == 255 && fw_accept(patchedBytes.data(), 0xc08) == 0);
     assert(json::parse(decode_intent_json(patchedBytes, status)).at("version") == "1.255.255");
     auto bad = document;
     for (const json &value : {json(""), json("1"), json("1.0"), json("1.0.0.0"),
@@ -210,17 +248,18 @@ int main(int argc, char **argv) {
     bad = document;
     bad["sensors"][0]["streams"][0]["fps"] = 99;
     bytes = encode_intent_json(bad.dump());
-    assert(fwResult(bytes) == rsintent::OK);
+    if (fw_has_rules())
+        assert(fw_accept(bytes.data(), 0xc08) == 4); // FW rules authoritative.
     auto motion = document;
     motion["sensors"][2]["streams"][0] = {
         {"branch", "GYRO"}, {"format", "MXYZ"}, {"width", 0}, {"height", 0}, {"fps", 200}};
     bytes = encode_intent_json(motion.dump());
     assert(encode_intent_json(decode_intent_json(bytes, status)) == bytes);
-    assert(fwResult(bytes) == rsintent::OK);
+    if (fw_has_rules()) assert(fw_accept(bytes.data(), 0xc08) == rsintent::OK);
     bad = motion;
     bad["sensors"][2]["streams"][0]["fps"] = 100;
     bytes = encode_intent_json(bad.dump());
-    assert(fwResult(bytes) == rsintent::OK);
+    if (fw_has_rules()) assert(fw_accept(bytes.data(), 0xc08) == rsintent::CONSTRAINT);
     for (const char *field : {"width", "height"}) {
         bad = motion;
         bad["sensors"][2]["streams"][0][field] = 1;
@@ -242,5 +281,5 @@ int main(int argc, char **argv) {
     fw_template(0xc07, bytes.data());
     bytes[6] = 1;
     assert(encode_intent_json(decode_intent_json(bytes, status)) == bytes);
-    std::cout << "PASS: I1 golden vectors both directions, JSON rejection and FW codec compatibility\n";
+    std::cout << "PASS: golden vectors both directions, JSON rejection and FW native profile validation\n";
 }

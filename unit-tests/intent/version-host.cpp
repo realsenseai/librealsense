@@ -43,5 +43,5 @@ int main() {
     try { (void)encode_intent_json(twoC, status); }
     catch (const std::invalid_argument &) { caught = true; }
     assert(caught);
-    std::cout << "PASS: I1 SDK N/FW N-1 omissions, named warnings, local major rejection\n";
+    std::cout << "PASS: SDK N/FW N-1 omissions, named warnings, local major rejection\n";
 }
