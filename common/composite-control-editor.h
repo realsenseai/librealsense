@@ -108,7 +108,7 @@ namespace rs2
                                  std::string & error_message,
                                  const std::function< void( const T & ) > & on_read = nullptr )
         {
-            if( _stale.exchange( false ) && ! is_dirty() )
+            if( ! is_dirty() && _stale.exchange( false ) )
                 initialized = false;
             if( initialized )
                 return true;
