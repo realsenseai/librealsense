@@ -344,7 +344,7 @@ namespace
         // 1) High-Res mode + Manual offset - exercises mode together with the
         // (high_res_mode, high_res_offset) pair it selects.
         cfg.mode = RS2_ICR_MODE_HIGH_RES;
-        cfg.high_res_mode = 2;    // Manual
+        cfg.high_res_mode = RS2_ICR_HIGH_RES_MODE_MANUAL;
         cfg.high_res_offset = 100;
         opts.set_composite_option_from( id, cfg );
         auto after_high_res = opts.get_composite_option_as< rs2_icr_control >( id );
@@ -354,7 +354,7 @@ namespace
 
         // 2) Downscale HDR + x4 ratio + Close Range Smoothing - the OTHER branch mode selects between.
         cfg.mode = RS2_ICR_MODE_DOWNSCALE_HDR;
-        cfg.downscale_ratio = 2;   // x4
+        cfg.downscale_ratio = RS2_ICR_DOWNSCALE_RATIO_X4;
         cfg.smoothing_offset_mm = 300;
         opts.set_composite_option_from( id, cfg );
         auto after_downscale = opts.get_composite_option_as< rs2_icr_control >( id );

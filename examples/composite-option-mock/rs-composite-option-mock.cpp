@@ -250,9 +250,9 @@ bool test_icr_control()
 {
     rs2_icr_control initial{};
     initial.mode = RS2_ICR_MODE_DOWNSCALE_HDR;
-    initial.downscale_ratio = 1;
+    initial.downscale_ratio = RS2_ICR_DOWNSCALE_RATIO_X2;
     rs2_icr_control modified = initial;
-    modified.downscale_ratio = 2;  // change one field to prove this second round trip is independent
+    modified.downscale_ratio = RS2_ICR_DOWNSCALE_RATIO_X4;  // change one field to prove this second round trip is independent
 
     return run_round_trip_and_atomicity_test< rs2_icr_control >(
         RS2_COMPOSITE_OPTION_ICR_CONTROL, "Improved Close Range Control (fake, for testing)", initial, modified,

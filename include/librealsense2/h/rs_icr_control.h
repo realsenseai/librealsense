@@ -26,6 +26,15 @@ extern "C" {
 #define RS2_ICR_MODE_DOWNSCALE_HDR 1
 #define RS2_ICR_MODE_HIGH_RES 2
 
+/** Downscale ratio values (rs2_icr_control::downscale_ratio) */
+#define RS2_ICR_DOWNSCALE_RATIO_X2 1
+#define RS2_ICR_DOWNSCALE_RATIO_X4 2
+
+/** High-Res mode values (rs2_icr_control::high_res_mode) */
+#define RS2_ICR_HIGH_RES_MODE_126PX 0
+#define RS2_ICR_HIGH_RES_MODE_64PX 1
+#define RS2_ICR_HIGH_RES_MODE_MANUAL 2
+
 /** The entire 38-byte HKR Improved Close Range payload, header included. */
 typedef struct rs2_icr_control
 {

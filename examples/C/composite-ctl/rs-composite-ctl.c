@@ -528,7 +528,7 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
     /* High-Res mode + Manual offset - exercises mode together with the
        (high_res_mode, high_res_offset) pair it selects. */
     cfg.mode = RS2_ICR_MODE_HIGH_RES;
-    cfg.high_res_mode = 2;
+    cfg.high_res_mode = RS2_ICR_HIGH_RES_MODE_MANUAL;
     cfg.high_res_offset = 100;
     if( ! icr_set_and_readback( opts, id, &cfg, &after ) )
         return 0;  /* helper already printed and freed its own error */
@@ -540,7 +540,7 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
 
     /* Downscale HDR + x4 ratio + Close Range Smoothing - the OTHER branch mode selects between. */
     cfg.mode = RS2_ICR_MODE_DOWNSCALE_HDR;
-    cfg.downscale_ratio = 2;
+    cfg.downscale_ratio = RS2_ICR_DOWNSCALE_RATIO_X4;
     cfg.smoothing_offset_mm = 300;
     if( ! icr_set_and_readback( opts, id, &cfg, &after ) )
         return 0;  /* helper already printed and freed its own error */
