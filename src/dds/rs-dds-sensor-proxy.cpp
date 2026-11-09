@@ -1125,7 +1125,7 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
             });
         rs_embedded_filter = filter;
     }
-    // Older FW publishes Enable/Downscale/Disparity Shift/Threshold (or Filter Type) only, exposed as scalar options
+    // Older FW publishes Enable/Downscale/Disparity Shift/Threshold only, exposed as scalar options
     else if( std::dynamic_pointer_cast< dds_close_range_filter >( embedded_filter )
              && ! find_dds_option_by_name( embedded_filter->get_options(), "Mode" ) )
     {
