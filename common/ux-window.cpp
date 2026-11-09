@@ -335,6 +335,7 @@ namespace rs2
             glfwWindowHint(GLFW_SAMPLES, _msaa_samples);
         
         glfwWindowHint(GLFW_VISIBLE, 0);
+        glfwWindowHint(GLFW_FOCUS_ON_SHOW, !is_wayland());  // Wayland cannot set focus
 
         // Create GUI Windows
         _win = glfwCreateWindow(_width, _height, _title_str.c_str(),
