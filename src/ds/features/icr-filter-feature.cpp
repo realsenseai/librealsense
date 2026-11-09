@@ -199,7 +199,7 @@ icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface &
 {
     auto option = std::make_shared< icr_option >(
         std::make_shared< dpp_composite_option< rs2_icr_filter_dpp_config > >( std::move( control ), icr_desc ), depth_sensor );
-    _filter = std::make_shared< icr_embedded_filter >( option, RS2_COMPOSITE_OPTION_ICR_CONTROL );
+    _filter = std::make_shared< icr_embedded_filter >( option, RS2_COMPOSITE_OPTION_ICR_FILTER_DPP );
 
     // ICR may have been enabled while the sensor was closed - check it against the Depth profile being opened
     owner.add_stream_combination_validator(

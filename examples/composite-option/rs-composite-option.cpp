@@ -27,7 +27,7 @@ namespace
         {
         case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  return "DECIMATION_FILTER_DPP";
         case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    return "TEMPORAL_FILTER_DPP";
-        case RS2_COMPOSITE_OPTION_ICR_CONTROL:           return "ICR_CONTROL";
+        case RS2_COMPOSITE_OPTION_ICR_FILTER_DPP:           return "ICR_FILTER_DPP";
         default:                                           return "UNKNOWN";
         }
     }
@@ -374,7 +374,7 @@ namespace
         {
         case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  exercise_decimation_filter_dpp( opts, id ); return true;
         case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    exercise_temporal_filter_dpp( opts, id ); return true;
-        case RS2_COMPOSITE_OPTION_ICR_CONTROL:           exercise_icr_control( opts, id ); return true;
+        case RS2_COMPOSITE_OPTION_ICR_FILTER_DPP:           exercise_icr_control( opts, id ); return true;
         default:
             std::cout << "      (no typed handler registered for this composite option id)\n";
             return false;

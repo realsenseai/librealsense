@@ -3,7 +3,7 @@
 
 /** \file rs_icr_filter_dpp.h
 * \brief
-* Cast-target struct for RS2_COMPOSITE_OPTION_ICR_CONTROL (see rs_composite_option.h). Holds only the
+* Cast-target struct for RS2_COMPOSITE_OPTION_ICR_FILTER_DPP (see rs_composite_option.h). Holds only the
 * user-facing settings: the firmware wire layout (header, reserved slots, packing) is private to the
 * SDK, so firmware changes do not change this struct. Only some Depth profiles are supported; others
 * are rejected when enabling or opening the stream.
@@ -38,7 +38,7 @@ typedef struct rs2_icr_filter_dpp_config
 } rs2_icr_filter_dpp_config;
 
 /** {min, max, step, def} bounds for rs2_icr_filter_dpp_config, as returned by
-* rs2_get_composite_option_range(RS2_COMPOSITE_OPTION_ICR_CONTROL). Read-only. */
+* rs2_get_composite_option_range(RS2_COMPOSITE_OPTION_ICR_FILTER_DPP). Read-only. */
 typedef struct rs2_icr_filter_dpp_range
 {
     rs2_icr_filter_dpp_config min;

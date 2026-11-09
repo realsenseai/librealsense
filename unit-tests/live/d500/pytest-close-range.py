@@ -50,7 +50,7 @@ def _skip_if_fw_below_minimum( dev ):
         pytest.skip( f"FW {fw} below minimum {min_fw} for Improved Close Range Depth on {name}" )
 
 
-ICR = rs.composite_option_id.icr_control
+ICR = rs.composite_option_id.icr_filter_dpp
 
 
 def _get_close_range_filter( test_device, composite=None ):

@@ -27,7 +27,7 @@ typedef enum rs2_composite_option_id
     /** HKR Depth Post-Processing "Temporal Filter" - see rs_temporal_filter_dpp.h. */
     RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP,
     /** HKR/D5X5 Improved Close Range control - see rs_icr_filter_dpp.h. */
-    RS2_COMPOSITE_OPTION_ICR_CONTROL,
+    RS2_COMPOSITE_OPTION_ICR_FILTER_DPP,
     RS2_COMPOSITE_OPTION_COUNT /**< Number of enumeration values. Not a valid input: intended to be used in for-loops. */
 } rs2_composite_option_id;
 

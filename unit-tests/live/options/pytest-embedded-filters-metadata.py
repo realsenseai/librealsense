@@ -109,7 +109,7 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
     720p/960p (see rs_icr_filter_dpp.h)."""
     dev, ctx = test_device
     depth_sensor = dev.first_depth_sensor()
-    option_id = rs.composite_option_id.icr_control
+    option_id = rs.composite_option_id.icr_filter_dpp
     embedded_filter = _find_filter(depth_sensor, option_id)
     if embedded_filter is None:
         pytest.skip("ICR control composite option not supported on this device")

@@ -46,7 +46,7 @@ namespace rs2
         }
 
         // Same scheme as print_decimation_filter_dpp_config() above, for
-        // RS2_COMPOSITE_OPTION_ICR_CONTROL.
+        // RS2_COMPOSITE_OPTION_ICR_FILTER_DPP.
         void print_icr_control( const rs2_icr_filter_dpp_config & v )
         {
             LOG_DEBUG( "[Improved Close Range GET] enable=" << v.enable
@@ -132,7 +132,7 @@ namespace rs2
                     draw_temporal_filter_dpp_control_editor( error_message );
                     continue;
                 }
-                if( id == RS2_COMPOSITE_OPTION_ICR_CONTROL )
+                if( id == RS2_COMPOSITE_OPTION_ICR_FILTER_DPP )
                 {
                     draw_icr_control_editor( error_message );
                     continue;
@@ -363,7 +363,7 @@ namespace rs2
 
     void embedded_filter_model::draw_icr_control_editor( std::string & error_message )
     {
-        const auto id = RS2_COMPOSITE_OPTION_ICR_CONTROL;
+        const auto id = RS2_COMPOSITE_OPTION_ICR_FILTER_DPP;
         // A rejected enable (e.g. unsupported Depth profile) leads to a re-read here - keep the toggle in sync with it
         auto on_read = [this]( const rs2_icr_filter_dpp_config & v )
         {
@@ -452,21 +452,21 @@ namespace rs2
             return;
         }
 
-        // Same scheme as Decimation above, for RS2_COMPOSITE_OPTION_ICR_CONTROL.
-        if( _embedded_filter->supports_composite_option( RS2_COMPOSITE_OPTION_ICR_CONTROL ) )
+        // Same scheme as Decimation above, for RS2_COMPOSITE_OPTION_ICR_FILTER_DPP.
+        if( _embedded_filter->supports_composite_option( RS2_COMPOSITE_OPTION_ICR_FILTER_DPP ) )
         {
             try
             {
                 if( ! _icr_editor.initialized )
                 {
                     _icr_editor.value = _embedded_filter->get_composite_option_as< rs2_icr_filter_dpp_config >(
-                        RS2_COMPOSITE_OPTION_ICR_CONTROL );
+                        RS2_COMPOSITE_OPTION_ICR_FILTER_DPP );
                     sanitize_icr_control( _icr_editor.value );
                     print_icr_control( _icr_editor.value );
                     _icr_editor.initialized = true;
                 }
                 _icr_editor.value.enable = actual ? 1 : 0;
-                _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_ICR_CONTROL, _icr_editor.value );
+                _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_ICR_FILTER_DPP, _icr_editor.value );
                 _enabled = actual;
             }
             catch( const std::exception & e )
@@ -546,7 +546,7 @@ namespace rs2
                         _enabled = _temporal_filter_dpp_editor.value.enabled != 0;
                 }
             }
-            else if( id == RS2_COMPOSITE_OPTION_ICR_CONTROL )
+            else if( id == RS2_COMPOSITE_OPTION_ICR_FILTER_DPP )
             {
                 if( _icr_editor.ensure_initialized( _embedded_filter, id, error_message, print_icr_control ) )
                 {

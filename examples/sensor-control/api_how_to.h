@@ -433,7 +433,7 @@ public:
                 std::cout << "  persistency_index : " << v.persistency_index << std::endl;
                 break;
             }
-            case RS2_COMPOSITE_OPTION_ICR_CONTROL:
+            case RS2_COMPOSITE_OPTION_ICR_FILTER_DPP:
             {
                 rs2_icr_filter_dpp_config v = filter.get_composite_option_as<rs2_icr_filter_dpp_config>(id);
                 std::cout << "  enable          : " << v.enable << std::endl;
@@ -587,7 +587,7 @@ public:
             }
             break;
         }
-        case RS2_COMPOSITE_OPTION_ICR_CONTROL:
+        case RS2_COMPOSITE_OPTION_ICR_FILTER_DPP:
         {
             rs2_icr_filter_dpp_config cfg;
             try

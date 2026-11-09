@@ -167,7 +167,7 @@ try
             continue;
         for (auto&& f : ds.query_embedded_filters())
         {
-            if (f.supports_composite_option(RS2_COMPOSITE_OPTION_ICR_CONTROL))
+            if (f.supports_composite_option(RS2_COMPOSITE_OPTION_ICR_FILTER_DPP))
             {
                 found_filter.push_back(f);
                 found_sensor.push_back(ds);
@@ -186,7 +186,7 @@ try
     {
         rs2::embedded_filter& close_range_filter = found_filter.front();
         rs2::depth_sensor& close_range_depth_sensor = found_sensor.front();
-        const auto id = RS2_COMPOSITE_OPTION_ICR_CONTROL;
+        const auto id = RS2_COMPOSITE_OPTION_ICR_FILTER_DPP;
 
         // Typed get - the SDK's own bound struct (get_composite_option_as<T>()), not raw bytes;
         // the same struct set_composite_option_from() below takes to write it back atomically.

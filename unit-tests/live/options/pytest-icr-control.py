@@ -17,7 +17,7 @@ def _find_icr_filter(sensor):
     composite option lives on one of the sensor's embedded filters, its own independent options
     registry, not on the sensor itself (see rs2::embedded_filter)."""
     for embedded_filter in sensor.query_embedded_filters():
-        if rs.composite_option_id.icr_control in embedded_filter.get_supported_composite_options():
+        if rs.composite_option_id.icr_filter_dpp in embedded_filter.get_supported_composite_options():
             return embedded_filter
     return None
 
@@ -98,7 +98,7 @@ def test_icr_control_basic_parameter_changes(test_device):
     if embedded_filter is None:
         pytest.skip("Improved Close Range Control composite option not supported on this device")
 
-    option_id = rs.composite_option_id.icr_control
+    option_id = rs.composite_option_id.icr_filter_dpp
     try:
         original_raw = embedded_filter.get_composite_option(option_id)
     except RuntimeError as e:

@@ -17,7 +17,7 @@ pytestmark = [
     pytest.mark.device_exclude("D585S"),
 ]
 
-ICR = rs.composite_option_id.icr_control
+ICR = rs.composite_option_id.icr_filter_dpp
 DECIMATION = rs.composite_option_id.decimation_filter_dpp
 MAX_FPS = 30
 

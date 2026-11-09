@@ -16,7 +16,7 @@
 
 namespace
 {
-    const rs2_composite_option_id ICR = RS2_COMPOSITE_OPTION_ICR_CONTROL;
+    const rs2_composite_option_id ICR = RS2_COMPOSITE_OPTION_ICR_FILTER_DPP;
 
     void print( const char * title, const rs2_icr_filter_dpp_config & v )
     {

@@ -21,7 +21,7 @@ static const char * composite_option_name( rs2_composite_option_id id )
     {
     case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  return "DECIMATION_FILTER_DPP";
     case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    return "TEMPORAL_FILTER_DPP";
-    case RS2_COMPOSITE_OPTION_ICR_CONTROL:           return "ICR_CONTROL";
+    case RS2_COMPOSITE_OPTION_ICR_FILTER_DPP:           return "ICR_FILTER_DPP";
     default:                                           return "UNKNOWN";
     }
 }
@@ -600,7 +600,7 @@ static int exercise_composite_option( const rs2_options * opts, rs2_composite_op
         return exercise_decimation_filter_dpp( opts, id );
     case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:
         return exercise_temporal_filter_dpp( opts, id );
-    case RS2_COMPOSITE_OPTION_ICR_CONTROL:
+    case RS2_COMPOSITE_OPTION_ICR_FILTER_DPP:
         return exercise_icr_control( opts, id );
     default:
         printf( "      (no typed handler registered for this composite option id)\n" );
