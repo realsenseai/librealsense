@@ -478,7 +478,8 @@ namespace rs2
         if (_use_glsl_proc) rs2::gl::init_processing(_win, _use_glsl_proc);
 
         glfwShowWindow(_win);
-        glfwFocusWindow(_win);
+        if (!is_wayland())
+            glfwFocusWindow(_win);
 
         _show_fps = config_file::instance().get(configurations::performance::show_fps);
         _vsync = config_file::instance().get(configurations::performance::vsync);

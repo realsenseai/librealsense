@@ -4195,7 +4195,7 @@ namespace rs2
                 manipulating = false;
                 overflow = float2{ 0.f, 0.f };
             }
-            else
+            else if( ! is_wayland() )  // Wayland does not allow setting the cursor position
             {
                 // Wrap-around the mouse in X direction
                 auto startx = (mouse.cursor.x - rect.x);
