@@ -25,7 +25,7 @@ namespace librealsense {
 
 
 // D500_CAMERA_CID_MINZ range descriptor; step is 1 per R/W slot (all-integer params), 0 for the FW-computed
-// MinZ telemetry. Defaults track LibRS's rs2_icr_control field docs.
+// min depth telemetry. Defaults track LibRS's rs2_icr_control field docs.
 // FW is the range authority, and USB reads it from FW and ignores these tables. They are only a temporary fallback
 // for GMSL, where the MIPI driver does not expose the FW MIN/MAX/RES/DEF windows yet - to be dropped once it does.
 static constexpr int32_t icr_min[]  = { 0, 1, 0,   0,     0,     0,   0,   0 };
@@ -118,7 +118,7 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
             << " pixels wide, but Depth is " << w << "x" << h );
 }
 
-// Rejects out-of-range values locally, never writes the read-only MinZ telemetry slots, and rejects enabling ICR
+// Rejects out-of-range values locally, never writes the read-only min depth telemetry slots, and rejects enabling ICR
 // while a Depth profile it cannot process is open. `control` is the transport (XU or DDS).
 class icr_option : public composite_option_interface
 {
@@ -147,8 +147,8 @@ public:
         auto const raw = read_xu();
         rs2_icr_control current;
         std::memcpy( &current, raw.data(), sizeof( current ) );
-        cfg.min_z_mm = current.min_z_mm;
-        cfg.improved_min_z_mm = current.improved_min_z_mm;
+        cfg.baseline_min_depth_mm = current.baseline_min_depth_mm;
+        cfg.improved_min_depth_mm = current.improved_min_depth_mm;
         _xu->set_raw( &cfg, sizeof( cfg ) );
     }
     // {min, max, step, def}, each a complete payload with its own envelope
@@ -192,7 +192,7 @@ private:
     void range_check_or_throw( const rs2_icr_control & cfg ) const
     {
         static const char * const names[icr_param_count] = { "Mode", "Downscale Ratio", "High-Res Mode", "High-Res Offset",
-                                                             "Smoothing Offset", "Completion Offset", "MinZ", "Improved MinZ" };
+                                                             "Smoothing Offset", "Completion Offset", "Baseline Min Depth", "Improved Min Depth" };
         auto const range = get_raw_range();
         int32_t params[icr_param_count], min[icr_param_count], max[icr_param_count];
         std::memcpy( params, &cfg.mode, sizeof( params ) );

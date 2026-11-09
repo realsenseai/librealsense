@@ -18,7 +18,7 @@ pytestmark = [
 OFF, DOWNSCALE_HDR, HIGH_RES = 0, 1, 2
 WRITABLE_FIELDS = ('mode', 'downscale_ratio', 'high_res_mode', 'high_res_offset', 'smoothing_offset_mm',
                    'completion_offset_mm')
-READ_ONLY_FIELDS = ('min_z_mm', 'improved_min_z_mm')
+READ_ONLY_FIELDS = ('baseline_min_depth_mm', 'improved_min_depth_mm')
 ALL_FIELDS = WRITABLE_FIELDS + READ_ONLY_FIELDS  # wire order, right after the 6-byte dpp_header
 
 
@@ -67,7 +67,7 @@ def icr(test_device):
 
     yield embedded_filter, option_id, embedded_filter.get_icr_control_range(option_id), depth_sensor
 
-    # MinZ / Improved MinZ are FW-computed telemetry - only the writable fields are restored and compared
+    # baseline / improved min depth are FW-computed telemetry - only the writable fields are restored and compared
     embedded_filter.set_composite_option(option_id, original_raw)
     restored = embedded_filter.get_icr_control(option_id)
     for field in WRITABLE_FIELDS:
@@ -103,7 +103,7 @@ def test_icr_writable_field_round_trip(icr, field, values):
 
 @pytest.mark.parametrize("field", ALL_FIELDS)
 def test_icr_out_of_range_rejected_locally(icr, field):
-    """Every param, read-only MinZ telemetry included, is range-checked before anything is sent."""
+    """Every param, read-only min depth telemetry included, is range-checked before anything is sent."""
     embedded_filter, option_id, range, _ = icr
     before = embedded_filter.get_composite_option(option_id)
     for bad_value in (getattr(range.min, field) - 1, getattr(range.max, field) + 1):
@@ -116,7 +116,7 @@ def test_icr_out_of_range_rejected_locally(icr, field):
 
 @pytest.mark.parametrize("field", READ_ONLY_FIELDS)
 def test_icr_read_only_telemetry_is_never_written(icr, field):
-    """An in-range SET of MinZ / Improved MinZ is accepted but the device keeps its own computed value."""
+    """An in-range SET of the baseline / improved min depth is accepted but the device keeps its own computed value."""
     embedded_filter, option_id, _, _ = icr
     before = getattr(embedded_filter.get_icr_control(option_id), field)
     attempted = 100 if before != 100 else 200
@@ -203,16 +203,16 @@ def test_icr_topology_change_rejected_while_streaming(icr, streaming_1280x720_30
 
 
 def test_icr_manual_offset_126_matches_126px_preset(icr, streaming_1280x720_30):
-    """The 126 px preset and Manual at 126 are the same shift, so Improved MinZ must not change"""
+    """The 126 px preset and Manual at 126 are the same shift, so the improved min depth must not change"""
     embedded_filter, option_id, _, _ = icr
     depth_sensor, profile = streaming_1280x720_30
     _set_fields(embedded_filter, option_id, mode=HIGH_RES, high_res_mode=0)
     _stream(depth_sensor, profile)
     try:
         time.sleep(1)  # FW recalculates the telemetry on the change
-        preset = embedded_filter.get_icr_control(option_id).improved_min_z_mm
+        preset = embedded_filter.get_icr_control(option_id).improved_min_depth_mm
         _set_fields(embedded_filter, option_id, high_res_mode=2, high_res_offset=126)
         time.sleep(1)
-        assert embedded_filter.get_icr_control(option_id).improved_min_z_mm == preset
+        assert embedded_filter.get_icr_control(option_id).improved_min_depth_mm == preset
     finally:
         _stop(depth_sensor)

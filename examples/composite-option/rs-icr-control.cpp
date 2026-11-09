@@ -63,8 +63,8 @@ namespace
                    << " high_res_offset=" << v.high_res_offset
                    << " smoothing_offset_mm=" << v.smoothing_offset_mm
                    << " completion_offset_mm=" << v.completion_offset_mm
-                   << " min_z_mm=" << v.min_z_mm
-                   << " improved_min_z_mm=" << v.improved_min_z_mm << '\n';
+                   << " baseline_min_depth_mm=" << v.baseline_min_depth_mm
+                   << " improved_min_depth_mm=" << v.improved_min_depth_mm << '\n';
     }
 
     // Prints every field of `id`'s current value, dispatching to the right typed cast - no

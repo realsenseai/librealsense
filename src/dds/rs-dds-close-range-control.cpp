@@ -98,7 +98,7 @@ namespace librealsense {
         int32_t fields[field_count];
         std::memcpy( fields, static_cast< const uint8_t * >( data ) + fields_offset, sizeof( fields ) );
 
-        // The MinZ fields are FW-computed and never sent
+        // The min depth fields are FW-computed and never sent
         json options = json::object();
         for( size_t i = 0; i < writable_field_count; ++i )
             if( _fields[i] )

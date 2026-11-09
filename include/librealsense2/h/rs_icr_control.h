@@ -47,14 +47,14 @@ typedef struct rs2_icr_control
                                      * (see high_res_offset). Range [0,2]. Default 0 */
     int32_t  high_res_offset;       /**< Disparity shift in pixels, used when high_res_mode == Manual.
                                      * Range [0,256]. Default 126 */
-    int32_t  smoothing_offset_mm;   /**< Close Range Smoothing: depth range above MinZ, in mm, where secondary-frame
+    int32_t  smoothing_offset_mm;   /**< Close Range Smoothing: depth range above the min depth, in mm, where secondary-frame
                                      * data overrides the primary. 0 disables it. Meaningful when mode == Downscale
                                      * HDR. Range [0,10000]. Default 0 */
-    int32_t  completion_offset_mm;  /**< Close Range Completion: depth range above MinZ, in mm, where holes are filled
+    int32_t  completion_offset_mm;  /**< Close Range Completion: depth range above the min depth, in mm, where holes are filled
                                      * from the secondary frame. 0 disables it. Meaningful when mode != Off.
                                      * Range [0,10000]. Default 0 */
-    int32_t  min_z_mm;              /**< Read-only. FW-computed baseline MinZ for the active resolution. Range [0,500] */
-    int32_t  improved_min_z_mm;     /**< Read-only. FW-computed MinZ achieved under the applied configuration.
+    int32_t  baseline_min_depth_mm; /**< Read-only. FW-computed baseline min depth for the active resolution. Range [0,500] */
+    int32_t  improved_min_depth_mm; /**< Read-only. FW-computed min depth achieved under the applied configuration.
                                      * Range [0,500] */
 } rs2_icr_control;
 

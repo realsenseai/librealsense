@@ -134,8 +134,8 @@ static void print_icr_struct( const rs2_icr_control * v )
     printf( "        %-20s = %d\n", "high_res_offset", v->high_res_offset );
     printf( "        %-20s = %d\n", "smoothing_offset_mm", v->smoothing_offset_mm );
     printf( "        %-20s = %d\n", "completion_offset_mm", v->completion_offset_mm );
-    printf( "        %-20s = %d\n", "min_z_mm", v->min_z_mm );
-    printf( "        %-20s = %d\n", "improved_min_z_mm", v->improved_min_z_mm );
+    printf( "        %-20s = %d\n", "baseline_min_depth_mm", v->baseline_min_depth_mm );
+    printf( "        %-20s = %d\n", "improved_min_depth_mm", v->improved_min_depth_mm );
 }
 
 /* C99 equivalent of the C++ sample's generic print_range(icr_fields(), ...): one header
@@ -157,8 +157,8 @@ static void print_icr_range( const rs2_icr_control_range * r )
     ICR_ROW( "high_res_offset", high_res_offset );
     ICR_ROW( "smoothing_offset_mm", smoothing_offset_mm );
     ICR_ROW( "completion_offset_mm", completion_offset_mm );
-    ICR_ROW( "min_z_mm", min_z_mm );
-    ICR_ROW( "improved_min_z_mm", improved_min_z_mm );
+    ICR_ROW( "baseline_min_depth_mm", baseline_min_depth_mm );
+    ICR_ROW( "improved_min_depth_mm", improved_min_depth_mm );
 #undef ICR_ROW
 }
 

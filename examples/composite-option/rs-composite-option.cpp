@@ -219,8 +219,8 @@ namespace
             make_field_printer( "high_res_offset", &rs2_icr_control::high_res_offset ),
             make_field_printer( "smoothing_offset_mm", &rs2_icr_control::smoothing_offset_mm ),
             make_field_printer( "completion_offset_mm", &rs2_icr_control::completion_offset_mm ),
-            make_field_printer( "min_z_mm", &rs2_icr_control::min_z_mm ),
-            make_field_printer( "improved_min_z_mm", &rs2_icr_control::improved_min_z_mm ),
+            make_field_printer( "baseline_min_depth_mm", &rs2_icr_control::baseline_min_depth_mm ),
+            make_field_printer( "improved_min_depth_mm", &rs2_icr_control::improved_min_depth_mm ),
         };
         return fields;
     }
@@ -328,7 +328,7 @@ namespace
 
     // Full read-modify-write + range + metadata sequence. Exercises the struct's mode-gated fields
     // (mode -> downscale_ratio/smoothing, or high_res_mode/high_res_offset; completion in both) instead of a
-    // single-field toggle, then restores the original value. MinZ/Improved MinZ are FW-computed - read, never set.
+    // single-field toggle, then restores the original value. baseline/improved min depth are FW-computed - read, never set.
     void exercise_icr_control( rs2::options & opts, rs2_composite_option_id id )
     {
         // Raw bytes and the typed cast, shown side by side to illustrate both APIs.

@@ -1,7 +1,7 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-"""Improved Close Range Depth (MinZ) supports only some Depth profiles. Checks that the SDK rejects every
+"""Improved Close Range Depth supports only some Depth profiles. Checks that the SDK rejects every
 unsupported Depth profile; the nightly tests, which stream, also check that every supported one is accepted
 and that enabling the filter while streaming follows the same rules."""
 

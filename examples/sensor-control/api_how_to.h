@@ -442,8 +442,8 @@ public:
                 std::cout << "  high_res_offset      : " << v.high_res_offset << std::endl;
                 std::cout << "  smoothing_offset_mm  : " << v.smoothing_offset_mm << std::endl;
                 std::cout << "  completion_offset_mm : " << v.completion_offset_mm << std::endl;
-                std::cout << "  min_z_mm (read-only)          : " << v.min_z_mm << std::endl;
-                std::cout << "  improved_min_z_mm (read-only) : " << v.improved_min_z_mm << std::endl;
+                std::cout << "  baseline_min_depth_mm (read-only) : " << v.baseline_min_depth_mm << std::endl;
+                std::cout << "  improved_min_depth_mm (read-only) : " << v.improved_min_depth_mm << std::endl;
                 break;
             }
             default:
@@ -619,7 +619,7 @@ public:
             std::cout << "  smoothing_offset_mm  : [" << range.min.smoothing_offset_mm << ", " << range.max.smoothing_offset_mm << "]" << std::endl;
             std::cout << "  completion_offset_mm : [" << range.min.completion_offset_mm << ", " << range.max.completion_offset_mm << "]" << std::endl;
 
-            std::cout << "\nWhich field would you like to change? (MinZ/Improved MinZ are read-only)\n" << std::endl;
+            std::cout << "\nWhich field would you like to change? (baseline/improved min depth are read-only)\n" << std::endl;
             std::cout << "  0 : mode\n  1 : downscale_ratio\n  2 : high_res_mode\n  3 : high_res_offset\n"
                           "  4 : smoothing_offset_mm\n  5 : completion_offset_mm" << std::endl;
             uint32_t field_index = get_user_selection("Select a field by index: ");

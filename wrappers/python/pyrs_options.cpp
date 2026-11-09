@@ -82,8 +82,8 @@ void init_options(py::module &m) {
         .def_readwrite( "high_res_offset", &rs2_icr_control::high_res_offset )
         .def_readwrite( "smoothing_offset_mm", &rs2_icr_control::smoothing_offset_mm )
         .def_readwrite( "completion_offset_mm", &rs2_icr_control::completion_offset_mm )
-        .def_readwrite( "min_z_mm", &rs2_icr_control::min_z_mm )
-        .def_readwrite( "improved_min_z_mm", &rs2_icr_control::improved_min_z_mm )
+        .def_readwrite( "baseline_min_depth_mm", &rs2_icr_control::baseline_min_depth_mm )
+        .def_readwrite( "improved_min_depth_mm", &rs2_icr_control::improved_min_depth_mm )
         .def( "__repr__",
               []( rs2_icr_control const & v )
               {
@@ -91,8 +91,8 @@ void init_options(py::module &m) {
                   ss << "<icr_control mode=" << v.mode << " downscale_ratio=" << v.downscale_ratio
                      << " high_res_mode=" << v.high_res_mode << " high_res_offset=" << v.high_res_offset
                      << " smoothing_offset_mm=" << v.smoothing_offset_mm
-                     << " completion_offset_mm=" << v.completion_offset_mm << " min_z_mm=" << v.min_z_mm
-                     << " improved_min_z_mm=" << v.improved_min_z_mm << ">";
+                     << " completion_offset_mm=" << v.completion_offset_mm << " baseline_min_depth_mm=" << v.baseline_min_depth_mm
+                     << " improved_min_depth_mm=" << v.improved_min_depth_mm << ">";
                   return ss.str();
               } );
 

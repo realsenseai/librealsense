@@ -77,8 +77,8 @@ namespace rs2
                        << " high_res_offset=" << v.high_res_offset
                        << " smoothing_offset_mm=" << v.smoothing_offset_mm
                        << " completion_offset_mm=" << v.completion_offset_mm
-                       << " min_z_mm=" << v.min_z_mm
-                       << " improved_min_z_mm=" << v.improved_min_z_mm );
+                       << " baseline_min_depth_mm=" << v.baseline_min_depth_mm
+                       << " improved_min_depth_mm=" << v.improved_min_depth_mm );
         }
 
     }
@@ -86,7 +86,7 @@ namespace rs2
     // A device may hand back a value outside its field's legal range (e.g. firmware still speaking another
     // wire layout). Called after every raw device read, before any branching/display code uses it, so the
     // stored value and what's shown stay consistent. The bounds are the FW-reported range (fetched once);
-    // MinZ/Improved MinZ are read-only and never edited.
+    // baseline/improved min depth are read-only and never edited.
     void embedded_filter_model::sanitize_icr( rs2_icr_control & v )
     {
         if( ! _icr_range_initialized )
@@ -375,7 +375,7 @@ namespace rs2
         any_field_active |= _icr_editor.draw_enum_field( "Downscale Ratio", "Resolution reduction applied by Downscale HDR mode.",
             "icr_downscale_ratio", downscale_ratio_labels, v.downscale_ratio, 1 );
         any_field_active |= _icr_editor.draw_scalar_field( "Close Range Smoothing (mm)",
-            "Depth range above MinZ where near-range data overrides the nominal depth. 0 disables it.",
+            "Depth range above the min depth where near-range data overrides the nominal depth. 0 disables it.",
             "icr_smoothing", v.smoothing_offset_mm, bound( &rs2_icr_control::smoothing_offset_mm, false ),
             bound( &rs2_icr_control::smoothing_offset_mm, true ), 1, 1.f, _icr_smoothing_edit, error_message );
         any_field_active |= _icr_editor.draw_enum_field( "High-Res Mode", "Fixed shift preset, or Manual to use the High-Res Offset value below.",
@@ -384,11 +384,11 @@ namespace rs2
             "icr_high_res_offset", v.high_res_offset, bound( &rs2_icr_control::high_res_offset, false ),
             bound( &rs2_icr_control::high_res_offset, true ), 1, 1.f, _icr_high_res_offset_edit, error_message );
         any_field_active |= _icr_editor.draw_scalar_field( "Close Range Completion (mm)",
-            "Depth range above MinZ where holes are filled from the near-range pass. 0 disables it.",
+            "Depth range above the min depth where holes are filled from the near-range pass. 0 disables it.",
             "icr_completion", v.completion_offset_mm, bound( &rs2_icr_control::completion_offset_mm, false ),
             bound( &rs2_icr_control::completion_offset_mm, true ), 1, 1.f, _icr_completion_edit, error_message );
 
-        // Read-only FW telemetry in any mode (Improved MinZ equals MinZ while Off). The FW recalculates it when a
+        // Read-only FW telemetry in any mode (Improved min depth equals the baseline while Off). The FW recalculates it when a
         // stream starts and keeps it after the stream stops, so it is polled at a low rate while streaming, apart
         // from the editor's own commit path so a refresh never marks an edit as pending, and kept once read
         if( _owner && _owner->streaming )
@@ -400,8 +400,8 @@ namespace rs2
                 try
                 {
                     auto const current = _embedded_filter->get_composite_option_as< rs2_icr_control >( RS2_COMPOSITE_OPTION_ICR_CONTROL );
-                    v.min_z_mm = current.min_z_mm;
-                    v.improved_min_z_mm = current.improved_min_z_mm;
+                    v.baseline_min_depth_mm = current.baseline_min_depth_mm;
+                    v.improved_min_depth_mm = current.improved_min_depth_mm;
                     _icr_telemetry_valid = true;
                 }
                 catch( const std::exception & )
@@ -411,13 +411,13 @@ namespace rs2
         }
         if( _icr_telemetry_valid )
         {
-            ImGui::Text( "MinZ: %d mm", v.min_z_mm );
-            ImGui::Text( "Improved MinZ: %d mm", v.improved_min_z_mm );
+            ImGui::Text( "Baseline min depth: %d mm", v.baseline_min_depth_mm );
+            ImGui::Text( "Improved min depth: %d mm", v.improved_min_depth_mm );
         }
         else
         {
-            ImGui::TextDisabled( "MinZ: available after the first stream" );
-            ImGui::TextDisabled( "Improved MinZ: available after the first stream" );
+            ImGui::TextDisabled( "Baseline min depth: available after the first stream" );
+            ImGui::TextDisabled( "Improved min depth: available after the first stream" );
         }
         return any_field_active;
     }
