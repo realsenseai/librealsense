@@ -6,7 +6,7 @@
 #include <librealsense2/rs.hpp>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_icr_control.h>
+#include <librealsense2/h/rs_icr_filter_dpp.h>
 #include "composite-control-editor.h"
 #include <functional>
 #include <string>
@@ -136,7 +136,7 @@ namespace rs2
         field_edit_state _temporal_filter_dpp_smooth_alpha_edit;
         field_edit_state _temporal_filter_dpp_smooth_delta_edit;
 
-        composite_control_editor< rs2_icr_control > _icr_editor;
+        composite_control_editor< rs2_icr_filter_dpp_config > _icr_editor;
         field_edit_state _icr_shift_edit;
         field_edit_state _icr_threshold_edit;
     };

@@ -71,10 +71,10 @@ def _is_composite( embedded_filter ):
 
 
 def _set_fields( embedded_filter, **fields ):
-    cfg = embedded_filter.get_icr_control( ICR )
+    cfg = embedded_filter.get_icr_filter_dpp_config( ICR )
     for name, value in fields.items():
         setattr( cfg, name, value )
-    embedded_filter.set_icr_control( ICR, cfg )
+    embedded_filter.set_icr_filter_dpp_config( ICR, cfg )
 
 
 def _set_enable( embedded_filter, value ):
@@ -159,27 +159,27 @@ def test_close_range_disparity_shift( test_device ):
 
 def test_icr_control_present( test_device ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
-    cfg = embedded_filter.get_icr_control( ICR )
+    cfg = embedded_filter.get_icr_filter_dpp_config( ICR )
     assert cfg.enable in ( 0, 1 )
     assert cfg.filter_type in ( 0, 1 )
 
 
 def test_icr_control_enable_round_trip( test_device ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
-    original = embedded_filter.get_icr_control( ICR ).enable
+    original = embedded_filter.get_icr_filter_dpp_config( ICR ).enable
     for value in ( 1, 0 ):
         _set_fields( embedded_filter, enable=value )
-        check.equal( embedded_filter.get_icr_control( ICR ).enable, value )
+        check.equal( embedded_filter.get_icr_filter_dpp_config( ICR ).enable, value )
     _set_fields( embedded_filter, enable=original )
 
 
 @pytest.mark.parametrize( "field, value", [( "enable", 2 ), ( "enable", -1 ), ( "downscale_ratio", 3 ), ( "shift_pixels", 257 )] )
 def test_icr_control_invalid_value_rejected( test_device, field, value ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
-    before = embedded_filter.get_icr_control( ICR )
+    before = embedded_filter.get_icr_filter_dpp_config( ICR )
     with pytest.raises( RuntimeError ):
         _set_fields( embedded_filter, **{ field: value } )
-    check.equal( getattr( embedded_filter.get_icr_control( ICR ), field ), getattr( before, field ) )
+    check.equal( getattr( embedded_filter.get_icr_filter_dpp_config( ICR ), field ), getattr( before, field ) )
 
 
 def _find_depth_profile( depth_sensor ):

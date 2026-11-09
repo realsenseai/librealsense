@@ -47,7 +47,7 @@ namespace rs2
 
         // Same scheme as print_decimation_filter_dpp_config() above, for
         // RS2_COMPOSITE_OPTION_ICR_CONTROL.
-        void print_icr_control( const rs2_icr_control & v )
+        void print_icr_control( const rs2_icr_filter_dpp_config & v )
         {
             LOG_DEBUG( "[Improved Close Range GET] enable=" << v.enable
                        << " filter_type=" << v.filter_type
@@ -61,7 +61,7 @@ namespace rs2
         // A real device's firmware may still speak the pre-design-review wire layout, so a field
         // can land outside its enum's legal range. Called after every raw device read, before any
         // branching/display code uses it, so the stored value and what's shown stay consistent.
-        void sanitize_icr_control( rs2_icr_control & v )
+        void sanitize_icr_control( rs2_icr_filter_dpp_config & v )
         {
             v.filter_type = std::min( std::max( v.filter_type, 0 ), 1 );
             v.downscale_ratio = std::min( std::max( v.downscale_ratio, 1 ), 2 );
@@ -365,7 +365,7 @@ namespace rs2
     {
         const auto id = RS2_COMPOSITE_OPTION_ICR_CONTROL;
         // A rejected enable (e.g. unsupported Depth profile) leads to a re-read here - keep the toggle in sync with it
-        auto on_read = [this]( const rs2_icr_control & v )
+        auto on_read = [this]( const rs2_icr_filter_dpp_config & v )
         {
             print_icr_control( v );
             _enabled = v.enable != 0;
@@ -374,11 +374,11 @@ namespace rs2
             return;
         sanitize_icr_control( _icr_editor.value );
 
-        draw_composite_editor< rs2_icr_control, rs2_icr_control_range >(
+        draw_composite_editor< rs2_icr_filter_dpp_config, rs2_icr_filter_dpp_range >(
             _icr_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
             [&]() { return draw_icr_fields( error_message ); },
             sanitize_icr_control,
-            [this]( rs2_icr_control & v )
+            [this]( rs2_icr_filter_dpp_config & v )
             {
                 v.enable = 1;
                 _enabled = true;
@@ -459,7 +459,7 @@ namespace rs2
             {
                 if( ! _icr_editor.initialized )
                 {
-                    _icr_editor.value = _embedded_filter->get_composite_option_as< rs2_icr_control >(
+                    _icr_editor.value = _embedded_filter->get_composite_option_as< rs2_icr_filter_dpp_config >(
                         RS2_COMPOSITE_OPTION_ICR_CONTROL );
                     sanitize_icr_control( _icr_editor.value );
                     print_icr_control( _icr_editor.value );

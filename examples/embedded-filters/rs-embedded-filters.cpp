@@ -2,7 +2,7 @@
 // Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 #include <librealsense2/rs.hpp>
-#include <librealsense2/h/rs_icr_control.h>
+#include <librealsense2/h/rs_icr_filter_dpp.h>
 
 #include <iostream>
 #include <string>
@@ -190,11 +190,11 @@ try
 
         // Typed get - the SDK's own bound struct (get_composite_option_as<T>()), not raw bytes;
         // the same struct set_composite_option_from() below takes to write it back atomically.
-        rs2_icr_control original{};
+        rs2_icr_filter_dpp_config original{};
         bool have_original = false;
         try
         {
-            original = close_range_filter.get_composite_option_as<rs2_icr_control>(id);
+            original = close_range_filter.get_composite_option_as<rs2_icr_filter_dpp_config>(id);
             have_original = true;
         }
         catch (const rs2::error& e)

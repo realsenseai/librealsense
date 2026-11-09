@@ -8,7 +8,7 @@
 #include <librealsense2/rs.h>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_icr_control.h>
+#include <librealsense2/h/rs_icr_filter_dpp.h>
 #include "example.h"   /* shared check_error()/print_device_info() used by every Examples/C sample */
 
 #include <stdio.h>
@@ -100,8 +100,8 @@ static void print_temporal_filter_dpp_range( const rs2_temporal_filter_dpp_range
 
 /* C99 equivalent of the C++ sample's generic print_struct(icr_fields(), ...) - no
    pointer-to-member table to drive it in C, so every field is spelled out here once, in
-   declaration order, matching rs_icr_control.h. */
-static void print_icr_struct( const rs2_icr_control * v )
+   declaration order, matching rs_icr_filter_dpp.h. */
+static void print_icr_struct( const rs2_icr_filter_dpp_config * v )
 {
     printf( "        %-16s = %d\n", "enable", v->enable );
     printf( "        %-16s = %d\n", "filter_type", v->filter_type );
@@ -114,7 +114,7 @@ static void print_icr_struct( const rs2_icr_control * v )
 
 /* C99 equivalent of the C++ sample's generic print_range(icr_fields(), ...): one header
    line naming the columns, then one row per field, name = [ min, max, default, step ]. */
-static void print_icr_range( const rs2_icr_control_range * r )
+static void print_icr_range( const rs2_icr_filter_dpp_range * r )
 {
     printf( "        %-16s   [ min, max, default, step ]\n", "" );
 #define ICR_ROW( label, field ) \
@@ -417,8 +417,8 @@ skipped:
 /* Sets *cfg and reads it back into *after. Returns 1 on success, 0 (SKIPPED message printed) on
    failure. */
 static int icr_set_and_readback( const rs2_options * opts, rs2_composite_option_id id,
-                                                    const rs2_icr_control * cfg,
-                                                    rs2_icr_control * after )
+                                                    const rs2_icr_filter_dpp_config * cfg,
+                                                    rs2_icr_filter_dpp_config * after )
 {
     rs2_error * e = NULL;
     const rs2_raw_data_buffer * raw;
@@ -456,8 +456,8 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
     const rs2_raw_data_buffer * raw;
     const unsigned char * bytes;
     int size;
-    rs2_icr_control current, cfg, after;
-    rs2_icr_control_range range;
+    rs2_icr_filter_dpp_config current, cfg, after;
+    rs2_icr_filter_dpp_range range;
     int mode;
 
     /* 1) Get (before) - both forms of the read, same as the C++ sample: the raw untyped
@@ -541,7 +541,7 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
               && after.threshold_mode == current.threshold_mode && after.threshold_mm == current.threshold_mm )
                 ? "ok" : "FAILED to restore - device may be left in the sample's last test state" );
 
-    /* 3) Get range - raw bytes, then the manual cast to rs2_icr_control_range
+    /* 3) Get range - raw bytes, then the manual cast to rs2_icr_filter_dpp_range
        (4 full copies of the struct - min/max/step/def). */
     raw = rs2_get_composite_option_range( opts, id, &e );
     if( e )

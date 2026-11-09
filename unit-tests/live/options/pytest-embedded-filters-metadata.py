@@ -23,7 +23,7 @@ pytestmark = [
 ]
 
 STREAM_WIDTH, STREAM_HEIGHT = 640, 360
-ICR_WIDTH, ICR_HEIGHT = 1280, 720  # ICR only activates at 720p/960p (see rs_icr_control.h)
+ICR_WIDTH, ICR_HEIGHT = 1280, 720  # ICR only activates at 720p/960p (see rs_icr_filter_dpp.h)
 TEMPORAL_APPLIED_BIT = 1 << 2  # documented
 ICR_APPLIED_BIT = 1 << 5      # empirically observed only, undocumented
 
@@ -106,7 +106,7 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
     """Enabling Improved Close Range Control before streaming is expected to set RS2_FRAME_
     METADATA_EMBEDDED_FILTERS's empirically-observed bit (1u<<5) on the resulting depth frames,
     and disabling it again is expected to clear it. Streams at 1280x720 - ICR only activates at
-    720p/960p (see rs_icr_control.h)."""
+    720p/960p (see rs_icr_filter_dpp.h)."""
     dev, ctx = test_device
     depth_sensor = dev.first_depth_sensor()
     option_id = rs.composite_option_id.icr_control
@@ -119,9 +119,9 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
         pytest.skip(f"ICR control registered but not functional on this device/FW: {e}")
 
     try:
-        cfg = embedded_filter.get_icr_control(option_id)
+        cfg = embedded_filter.get_icr_filter_dpp_config(option_id)
         cfg.enable = 1
-        embedded_filter.set_icr_control(option_id, cfg)
+        embedded_filter.set_icr_filter_dpp_config(option_id, cfg)
         frame = _stream_one_depth_frame(dev, ctx, ICR_WIDTH, ICR_HEIGHT)
         assert frame is not None, "No depth frame received with ICR control enabled"
         value = _embedded_filters_value(frame)
@@ -129,9 +129,9 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
             f"RS2_FRAME_METADATA_EMBEDDED_FILTERS = {value:#x}, ICR bit (1<<5) not set "
             f"with ICR control enabled")
 
-        cfg = embedded_filter.get_icr_control(option_id)
+        cfg = embedded_filter.get_icr_filter_dpp_config(option_id)
         cfg.enable = 0
-        embedded_filter.set_icr_control(option_id, cfg)
+        embedded_filter.set_icr_filter_dpp_config(option_id, cfg)
         frame = _stream_one_depth_frame(dev, ctx, ICR_WIDTH, ICR_HEIGHT)
         assert frame is not None, "No depth frame received with ICR control disabled"
         value = _embedded_filters_value(frame)
@@ -139,6 +139,6 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
             f"RS2_FRAME_METADATA_EMBEDDED_FILTERS = {value:#x}, ICR bit (1<<5) still set "
             f"with ICR control disabled")
     finally:
-        cfg = embedded_filter.get_icr_control(option_id)
+        cfg = embedded_filter.get_icr_filter_dpp_config(option_id)
         cfg.enable = 0
-        embedded_filter.set_icr_control(option_id, cfg)
+        embedded_filter.set_icr_filter_dpp_config(option_id, cfg)

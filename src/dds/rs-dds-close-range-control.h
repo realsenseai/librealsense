@@ -43,7 +43,7 @@ namespace librealsense {
 
         std::shared_ptr< realdds::dds_embedded_filter > _dds_ef;
         set_embedded_filter_callback _set_ef_cb;
-        // DDS option backing each rs2_icr_control field, in wire order; null if the FW does not advertise it
+        // DDS option backing each rs2_icr_filter_dpp_config field, in wire order; null if the FW does not advertise it
         std::vector< std::shared_ptr< realdds::dds_option > > _fields;
     };
 

@@ -1,7 +1,7 @@
 /* License: Apache 2.0. See LICENSE file in root directory.
    Copyright(c) 2026 RealSense, Inc. All Rights Reserved. */
 
-/** \file rs_icr_control.h
+/** \file rs_icr_filter_dpp.h
 * \brief
 * Cast-target struct for RS2_COMPOSITE_OPTION_ICR_CONTROL (see rs_composite_option.h). Holds only the
 * user-facing settings: the firmware wire layout (header, reserved slots, packing) is private to the
@@ -9,8 +9,8 @@
 * are rejected when enabling or opening the stream.
 */
 
-#ifndef LIBREALSENSE_RS2_ICR_CONTROL_H
-#define LIBREALSENSE_RS2_ICR_CONTROL_H
+#ifndef LIBREALSENSE_RS2_ICR_FILTER_DPP_H
+#define LIBREALSENSE_RS2_ICR_FILTER_DPP_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,10 +18,10 @@ extern "C" {
 
 #include <stdint.h>
 
-/** Improved Close Range (ICR) settings. Read with get_composite_option_as< rs2_icr_control >(),
+/** Improved Close Range (ICR) settings. Read with get_composite_option_as< rs2_icr_filter_dpp_config >(),
 * modify the fields of interest and write back with set_composite_option_from(), so untouched
 * fields keep their value. */
-typedef struct rs2_icr_control
+typedef struct rs2_icr_filter_dpp_config
 {
     int32_t  enable;                /**< 0 = Off, 1 = On. Default 0 */
     int32_t  filter_type;           /**< 0 = Downscale, 1 = Lookup shift - selects which of the
@@ -35,19 +35,19 @@ typedef struct rs2_icr_control
                                      * to the host), 2 = Manual (see threshold_mm). Default 1 */
     int32_t  threshold_mm;          /**< Used when threshold_mode == Manual. Range [0,65535].
                                      * Default 0 */
-} rs2_icr_control;
+} rs2_icr_filter_dpp_config;
 
-/** {min, max, step, def} bounds for rs2_icr_control, as returned by
+/** {min, max, step, def} bounds for rs2_icr_filter_dpp_config, as returned by
 * rs2_get_composite_option_range(RS2_COMPOSITE_OPTION_ICR_CONTROL). Read-only. */
-typedef struct rs2_icr_control_range
+typedef struct rs2_icr_filter_dpp_range
 {
-    rs2_icr_control min;
-    rs2_icr_control max;
-    rs2_icr_control step;
-    rs2_icr_control def;
-} rs2_icr_control_range;
+    rs2_icr_filter_dpp_config min;
+    rs2_icr_filter_dpp_config max;
+    rs2_icr_filter_dpp_config step;
+    rs2_icr_filter_dpp_config def;
+} rs2_icr_filter_dpp_range;
 
 #ifdef __cplusplus
 }
 #endif
-#endif  // LIBREALSENSE_RS2_ICR_CONTROL_H
+#endif  // LIBREALSENSE_RS2_ICR_FILTER_DPP_H

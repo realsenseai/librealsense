@@ -8,7 +8,7 @@
 #include <librealsense2/rs.hpp>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_icr_control.h>
+#include <librealsense2/h/rs_icr_filter_dpp.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -181,13 +181,13 @@ namespace
     const std::vector< std::shared_ptr< field_printer_base > > & icr_fields()
     {
         static const std::vector< std::shared_ptr< field_printer_base > > fields = {
-            make_field_printer( "enable", &rs2_icr_control::enable ),
-            make_field_printer( "filter_type", &rs2_icr_control::filter_type ),
-            make_field_printer( "downscale_ratio", &rs2_icr_control::downscale_ratio ),
-            make_field_printer( "shift_mode", &rs2_icr_control::shift_mode ),
-            make_field_printer( "shift_pixels", &rs2_icr_control::shift_pixels ),
-            make_field_printer( "threshold_mode", &rs2_icr_control::threshold_mode ),
-            make_field_printer( "threshold_mm", &rs2_icr_control::threshold_mm ),
+            make_field_printer( "enable", &rs2_icr_filter_dpp_config::enable ),
+            make_field_printer( "filter_type", &rs2_icr_filter_dpp_config::filter_type ),
+            make_field_printer( "downscale_ratio", &rs2_icr_filter_dpp_config::downscale_ratio ),
+            make_field_printer( "shift_mode", &rs2_icr_filter_dpp_config::shift_mode ),
+            make_field_printer( "shift_pixels", &rs2_icr_filter_dpp_config::shift_pixels ),
+            make_field_printer( "threshold_mode", &rs2_icr_filter_dpp_config::threshold_mode ),
+            make_field_printer( "threshold_mm", &rs2_icr_filter_dpp_config::threshold_mm ),
         };
         return fields;
     }
@@ -286,7 +286,7 @@ namespace
     }
 
     // Prints one verdict line for a just-completed Set - shared by every step below.
-    void verify_icr_fields_written( const char * step_label, const rs2_icr_control & written, bool matches )
+    void verify_icr_fields_written( const char * step_label, const rs2_icr_filter_dpp_config & written, bool matches )
     {
         std::cout << "Set (" << step_label << "): "
                   << ( matches ? "matches what was sent" : "differs - FW may quantize/clamp on write" ) << '\n';
@@ -300,13 +300,13 @@ namespace
     {
         // Raw bytes and the typed cast, shown side by side to illustrate both APIs.
         print_bytes( "Get Raw Data:", opts.get_composite_option( id ) );
-        auto original = opts.get_composite_option_as< rs2_icr_control >( id );
+        auto original = opts.get_composite_option_as< rs2_icr_filter_dpp_config >( id );
         std::cout << "Get Structured Data:\n";
         print_struct( std::cout, icr_fields(), original );
 
         // Read-modify-write: every field not changed below goes back as the device just reported
         // it, not zero-initialized, on every Set below.
-        rs2_icr_control cfg = original;
+        rs2_icr_filter_dpp_config cfg = original;
         cfg.enable = 1;
 
         // 1) Lookup Shift + Manual shift pixels - exercises filter_type together with the
@@ -315,7 +315,7 @@ namespace
         cfg.shift_mode = 2;    // Manual
         cfg.shift_pixels = 100;
         opts.set_composite_option_from( id, cfg );
-        auto after_shift = opts.get_composite_option_as< rs2_icr_control >( id );
+        auto after_shift = opts.get_composite_option_as< rs2_icr_filter_dpp_config >( id );
         verify_icr_fields_written( "filter_type=Lookup Shift, shift_mode=Manual, shift_pixels=100", after_shift,
             after_shift.filter_type == cfg.filter_type && after_shift.shift_mode == cfg.shift_mode
                 && after_shift.shift_pixels == cfg.shift_pixels );
@@ -324,7 +324,7 @@ namespace
         cfg.filter_type = 0;   // Downscale
         cfg.downscale_ratio = 2;   // x4
         opts.set_composite_option_from( id, cfg );
-        auto after_downscale = opts.get_composite_option_as< rs2_icr_control >( id );
+        auto after_downscale = opts.get_composite_option_as< rs2_icr_filter_dpp_config >( id );
         verify_icr_fields_written( "filter_type=Downscale, downscale_ratio=x4", after_downscale,
             after_downscale.filter_type == cfg.filter_type && after_downscale.downscale_ratio == cfg.downscale_ratio );
 
@@ -335,7 +335,7 @@ namespace
             cfg.threshold_mode = mode;
             cfg.threshold_mm = ( mode == 2 ) ? 300 : 0;
             opts.set_composite_option_from( id, cfg );
-            auto after_threshold = opts.get_composite_option_as< rs2_icr_control >( id );
+            auto after_threshold = opts.get_composite_option_as< rs2_icr_filter_dpp_config >( id );
             std::string step_label = "threshold_mode=" + std::to_string( mode );
             verify_icr_fields_written( step_label.c_str(), after_threshold,
                 after_threshold.threshold_mode == cfg.threshold_mode );
@@ -345,7 +345,7 @@ namespace
         // consequential state changes (unlike a single-field toggle), so leaving no lasting effect
         // on the device matters more here.
         opts.set_composite_option_from( id, original );
-        auto restored = opts.get_composite_option_as< rs2_icr_control >( id );
+        auto restored = opts.get_composite_option_as< rs2_icr_filter_dpp_config >( id );
         std::cout << "Restore original value: "
                   << ( restored.filter_type == original.filter_type && restored.downscale_ratio == original.downscale_ratio
                            && restored.shift_mode == original.shift_mode && restored.shift_pixels == original.shift_pixels
@@ -353,11 +353,11 @@ namespace
                        ? "ok" : "FAILED to restore - device may be left in the sample's last test state" )
                   << '\n';
 
-        // range.min/max/step/def are each a FULL rs2_icr_control - the same struct
+        // range.min/max/step/def are each a FULL rs2_icr_filter_dpp_config - the same struct
         // as `original`/`cfg` above - and those bytes ARE exactly what the
         // device's real get_xu_range() call returned.
         print_bytes( "Get Range", opts.get_composite_option_range( id ) );
-        auto range = opts.get_composite_option_range_as< rs2_icr_control_range >( id );
+        auto range = opts.get_composite_option_range_as< rs2_icr_filter_dpp_range >( id );
         std::cout << "      Range:\n";
         print_range( std::cout, icr_fields(), range.min, range.max, range.def, range.step );
 

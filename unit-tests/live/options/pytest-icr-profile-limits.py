@@ -77,11 +77,11 @@ def _stream_until_frame(sensor, profile, timeout=5):
 
 def _set_icr(icr, mode, enable):
     filter_type, ratio, _, _, _ = MODES[mode]
-    cfg = icr.get_icr_control(ICR)
+    cfg = icr.get_icr_filter_dpp_config(ICR)
     cfg.enable = enable
     cfg.filter_type = filter_type
     cfg.downscale_ratio = ratio
-    icr.set_icr_control(ICR, cfg)
+    icr.set_icr_filter_dpp_config(ICR, cfg)
 
 
 def _set_decimation(decimation, enabled):
@@ -109,14 +109,14 @@ def filters(test_device):
     decimation = next((f for f in sensor.query_embedded_filters() if f.get_type() == rs.embedded_filter_type.decimation), None)
     if icr is None or decimation is None:
         pytest.skip("Improved Close Range Depth / Decimation filters not supported on this device")
-    original_icr = icr.get_icr_control(ICR)
+    original_icr = icr.get_icr_filter_dpp_config(ICR)
     original_decimation = _decimation_enabled(decimation)
     _set_decimation(decimation, 0)
     _set_icr(icr, "downscale_x2", 0)
     yield sensor, icr, decimation
     if sensor.get_active_streams():  # an unsupported profile that opened by mistake; never started
         sensor.close()
-    icr.set_icr_control(ICR, original_icr)
+    icr.set_icr_filter_dpp_config(ICR, original_icr)
     _set_decimation(decimation, original_decimation)
 
 
@@ -201,11 +201,11 @@ def test_enable_while_streaming(filters, mode):
     with _streaming(sensor, unsupported[0]):
         with pytest.raises(RuntimeError, match="Improved Close Range Depth .* requires Depth"):
             _set_icr(icr, mode, 1)
-    assert icr.get_icr_control(ICR).enable == 0, f"{mode} {_describe(unsupported[0])}: filter got enabled"
+    assert icr.get_icr_filter_dpp_config(ICR).enable == 0, f"{mode} {_describe(unsupported[0])}: filter got enabled"
 
     with _streaming(sensor, supported[0]):
         _set_icr(icr, mode, 1)
-    assert icr.get_icr_control(ICR).enable == 1, f"{mode} {_describe(supported[0])}: filter not enabled"
+    assert icr.get_icr_filter_dpp_config(ICR).enable == 1, f"{mode} {_describe(supported[0])}: filter not enabled"
 
 
 @pytest.mark.context("nightly")
@@ -220,7 +220,7 @@ def test_geometry_change_while_streaming_rejected(filters):
         with pytest.raises(RuntimeError, match="cannot be changed while Depth or Infrared is streaming"):
             _set_icr(icr, "lookup_shift", 1)
         _set_icr(icr, "downscale_x2", 0)  # same Filter Type and Downscale Ratio - allowed
-    assert icr.get_icr_control(ICR).filter_type == 0, "Filter Type changed while streaming"
+    assert icr.get_icr_filter_dpp_config(ICR).filter_type == 0, "Filter Type changed while streaming"
 
 
 def test_downscale_x4_with_decimation_rejected(filters):

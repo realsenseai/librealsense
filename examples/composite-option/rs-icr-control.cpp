@@ -1,15 +1,15 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-// Improved Close Range (ICR) control: how to read and write the composite option with rs2_icr_control.
+// Improved Close Range (ICR) control: how to read and write the composite option with rs2_icr_filter_dpp_config.
 // Finds the first connected depth sensor exposing an ICR embedded filter, then:
 //   1. reads the current settings and the supported ranges,
 //   2. writes new settings (read-modify-write, so fields left alone keep their value),
 //   3. reads them back and restores the original settings.
-// rs2_icr_control only holds user-facing settings; the firmware payload layout is private to the SDK.
+// rs2_icr_filter_dpp_config only holds user-facing settings; the firmware payload layout is private to the SDK.
 
 #include <librealsense2/rs.hpp>
-#include <librealsense2/h/rs_icr_control.h>
+#include <librealsense2/h/rs_icr_filter_dpp.h>
 
 #include <iostream>
 #include <memory>
@@ -18,7 +18,7 @@ namespace
 {
     const rs2_composite_option_id ICR = RS2_COMPOSITE_OPTION_ICR_CONTROL;
 
-    void print( const char * title, const rs2_icr_control & v )
+    void print( const char * title, const rs2_icr_filter_dpp_config & v )
     {
         std::cout << title << '\n'
                   << "  enable          = " << v.enable << '\n'
@@ -57,10 +57,10 @@ try
     rs2::embedded_filter & icr = *found;
 
     // 1. Get - the current settings, and the {min, max, step, default} bounds
-    const auto original = icr.get_composite_option_as< rs2_icr_control >( ICR );
+    const auto original = icr.get_composite_option_as< rs2_icr_filter_dpp_config >( ICR );
     print( "Current settings:", original );
 
-    const auto range = icr.get_composite_option_range_as< rs2_icr_control_range >( ICR );
+    const auto range = icr.get_composite_option_range_as< rs2_icr_filter_dpp_range >( ICR );
     std::cout << "Supported shift_pixels: [" << range.min.shift_pixels << ", " << range.max.shift_pixels
               << "], default " << range.def.shift_pixels << '\n';
 
@@ -74,7 +74,7 @@ try
     icr.set_composite_option_from( ICR, cfg );
 
     // 3. Get again to see what the device applied (it may adjust values), then restore
-    print( "Settings after set:", icr.get_composite_option_as< rs2_icr_control >( ICR ) );
+    print( "Settings after set:", icr.get_composite_option_as< rs2_icr_filter_dpp_config >( ICR ) );
 
     icr.set_composite_option_from( ICR, original );
     std::cout << "Original settings restored\n";

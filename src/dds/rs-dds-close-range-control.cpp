@@ -20,16 +20,16 @@ using rsutils::json;
 
 namespace librealsense {
 
-    // FW-advertised DDS option names of the rs2_icr_control fields, in wire order
+    // FW-advertised DDS option names of the rs2_icr_filter_dpp_config fields, in wire order
     static const char * const field_names[] = { "Enable", "Filter Type", "Secondary frame downscale ratio", "Shift Mode",
                                                 "Shift Pixels", "MinZ Threshold Mode", "Threshold" };
     static constexpr size_t field_count = std::extent< decltype( field_names ) >::value;
     static constexpr size_t downscale_ratio_field = 2;
     static constexpr uint16_t icr_ctl_id = 0x0008;
-    static_assert( field_count * sizeof( int32_t ) == sizeof( rs2_icr_control ),
-                   "field_names must match the contiguous int32_t fields of rs2_icr_control" );
+    static_assert( field_count * sizeof( int32_t ) == sizeof( rs2_icr_filter_dpp_config ),
+                   "field_names must match the contiguous int32_t fields of rs2_icr_filter_dpp_config" );
 
-    // The downscale ratio is a DDS enum of "2"/"4"; the public rs2_icr_control holds 1 = x2, 2 = x4
+    // The downscale ratio is a DDS enum of "2"/"4"; the public rs2_icr_filter_dpp_config holds 1 = x2, 2 = x4
     static int32_t to_field( size_t field_index, json const & dds_value )
     {
         if( dds_value.is_null() )
@@ -128,7 +128,7 @@ namespace librealsense {
 
     const char * rs_dds_close_range_control::get_description() const
     {
-        return "Improved Close Range Control - use rs2_set/get_composite_option, see rs_icr_control.h";
+        return "Improved Close Range Control - use rs2_set/get_composite_option, see rs_icr_filter_dpp.h";
     }
 
 }  // namespace librealsense

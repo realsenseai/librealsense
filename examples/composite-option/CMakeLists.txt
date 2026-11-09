@@ -15,7 +15,7 @@ target_link_libraries(rs-composite-option PRIVATE ${LRS_TARGET})
 set_target_properties (rs-composite-option PROPERTIES FOLDER Examples)
 install(TARGETS rs-composite-option RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-# Shows how to get / set the Improved Close Range composite option (rs2_icr_control): reads the current value
+# Shows how to get / set the Improved Close Range composite option (rs2_icr_filter_dpp_config): reads the current value
 # and ranges from the first connected depth sensor exposing it, does a read-modify-write set, reads it back and
 # restores the original. See rs-icr-control.cpp.
 add_executable(rs-icr-control

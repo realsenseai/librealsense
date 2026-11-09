@@ -28,7 +28,7 @@ def list_embedded_filter_options(embedded_filter):
 # option" cast exists, so a new id needs an entry here. The registered method returns a real
 # typed object (see pyrs_options.cpp), and _typed_fields() below reads it by introspection.
 _COMPOSITE_OPTION_ACCESSORS = {
-    rs.composite_option_id.icr_control: 'get_icr_control',
+    rs.composite_option_id.icr_control: 'get_icr_filter_dpp_config',
     rs.composite_option_id.temporal_filter_dpp: 'get_temporal_filter_dpp_config',
     rs.composite_option_id.decimation_filter_dpp: 'get_decimation_filter_dpp_config',
 }

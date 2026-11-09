@@ -26,7 +26,7 @@ public:
 
     // USB/MIPI: the control is the HKR XU, and the filter is added to depth_sensor
     icr_filter_feature( d500_device & owner, d500_depth_sensor & depth_sensor, bool is_mipi );
-    // Any transport (e.g. DDS) providing the rs2_icr_control payload; the caller adds get_filter() to its depth sensor
+    // Any transport (e.g. DDS) providing the rs2_icr_filter_dpp_config payload; the caller adds get_filter() to its depth sensor
     icr_filter_feature( device & owner, const sensor_interface & depth_sensor,
                          std::shared_ptr< composite_option_interface > control );
 
