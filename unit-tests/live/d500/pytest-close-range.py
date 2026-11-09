@@ -30,36 +30,20 @@ CLOSE_RANGE_METADATA_BIT = 1 << 5
 RATIO_INDEX_DEFAULT = 1.0    # choices ["1","2","4"], default "2" -> index 1
 SHIFT_DEFAULT      = 0.0
 
-# Minimum FW that registers the close-range feature, mirroring src/ds/d500/d500-factory.cpp.
-# Below the gate the feature is not registered and get_embedded_filter() throws rather than
-# returning a falsy value, so we skip up front.
-MIN_FW_BY_DEVICE = {
-    "D555": "7.58.39807.10573",
-}
+# Minimum FW with the 8-parameter Improved Close Range control, for every device. Below it the filter may not be
+# exposed and get_embedded_filter() throws rather than returning a falsy value, so we skip up front; from it on, a
+# missing filter is an error.
+MIN_FW = rsutils.version( 7, 62, 0, 0 )
 
 # Pick a depth profile that the close-range merge actually exercises on D555.
 DEPTH_W, DEPTH_H, DEPTH_FPS = 640, 360, 30
 
 
 def _skip_if_fw_below_minimum( dev ):
-    name = dev.get_info( rs.camera_info.name ) if dev.supports( rs.camera_info.name ) else ""
-    min_fw = next( ( v for k, v in MIN_FW_BY_DEVICE.items() if k in name ), None )
-    if min_fw is None:
-        return
-    fw = dev.get_info( rs.camera_info.firmware_version )
-    if rsutils.version( fw ) < rsutils.version( min_fw ):
-        pytest.skip( f"FW {fw} below minimum {min_fw} for Improved Close Range Depth on {name}" )
+    require_min_fw_version( dev, MIN_FW, "Improved Close Range 8-parameter control" )
 
 
 ICR = rs.composite_option_id.icr_control
-
-
-def _skip_if_not_exposed( getter ):
-    """The getters throw when the FW does not expose the filter (e.g. the unsupported 7-parameter layout)"""
-    try:
-        return getter()
-    except RuntimeError:
-        pytest.skip( "Improved Close Range Depth filter not exposed (FW likely below the supported version)" )
 
 
 def _get_close_range_filter( test_device, composite=None ):
@@ -67,9 +51,7 @@ def _get_close_range_filter( test_device, composite=None ):
     dev, _ = test_device
     _skip_if_fw_below_minimum( dev )
     depth_sensor = dev.first_depth_sensor()
-    f = _skip_if_not_exposed( lambda: depth_sensor.get_embedded_filter( rs.embedded_filter_type.improved_close_range_depth ) )
-    if _is_composite( f ):
-        require_min_fw_version( dev, rsutils.version( 7, 62, 0, 0 ), "Improved Close Range 8-parameter control" )
+    f = depth_sensor.get_embedded_filter( rs.embedded_filter_type.improved_close_range_depth )
     if composite is not None and _is_composite( f ) != composite:
         pytest.skip( f"FW exposes the {'composite' if _is_composite( f ) else 'scalar'} form" )
     return depth_sensor, f
@@ -115,7 +97,7 @@ def test_close_range_filter_present( test_device ):
 def test_close_range_dedicated_getter( test_device ):
     dev, _ = test_device
     _skip_if_fw_below_minimum( dev )
-    embedded_filter = _skip_if_not_exposed( dev.first_depth_sensor().get_embedded_close_range_filter )
+    embedded_filter = dev.first_depth_sensor().get_embedded_close_range_filter()
     assert embedded_filter, "get_embedded_close_range_filter() returned an invalid filter"
     assert isinstance( embedded_filter, rs.embedded_close_range_filter )
     assert embedded_filter.get_type() == rs.embedded_filter_type.improved_close_range_depth

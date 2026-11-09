@@ -115,7 +115,7 @@ def filters(test_device):
     icr = _find_filter(sensor, ICR)
     decimation = next((f for f in sensor.query_embedded_filters() if f.get_type() == rs.embedded_filter_type.decimation), None)
     if icr is None or decimation is None:
-        pytest.skip("Improved Close Range Depth / Decimation filters not supported on this device")
+        pytest.fail("FW 7.62 or newer must expose the Improved Close Range Depth and Decimation filters")
     original_icr = icr.get_composite_option(ICR)
     original_decimation = _decimation_enabled(decimation)
     _set_decimation(decimation, 0)

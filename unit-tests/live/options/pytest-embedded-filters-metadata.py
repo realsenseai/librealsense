@@ -115,11 +115,11 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
     option_id = rs.composite_option_id.icr_control
     embedded_filter = _find_filter(depth_sensor, option_id)
     if embedded_filter is None:
-        pytest.skip("ICR control composite option not supported on this device")
+        pytest.fail("FW 7.62 or newer must expose the ICR control composite option")
     try:
         embedded_filter.get_composite_option(option_id)
     except RuntimeError as e:
-        pytest.skip(f"ICR control registered but not functional on this device/FW: {e}")
+        pytest.fail(f"ICR control registered but not functional: {e}")
 
     try:
         cfg = embedded_filter.get_icr_control(option_id)

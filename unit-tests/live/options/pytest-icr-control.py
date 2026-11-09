@@ -54,7 +54,7 @@ def icr(test_device):
     depth_sensor = dev.first_depth_sensor()
     embedded_filter = _find_icr_filter(depth_sensor)
     if embedded_filter is None:
-        pytest.skip("Improved Close Range Control composite option not supported on this device")
+        pytest.fail("FW 7.62 or newer must expose the Improved Close Range Control composite option")
 
     option_id = rs.composite_option_id.icr_control
     try:
@@ -63,7 +63,7 @@ def icr(test_device):
         # Registered but not actually functional on this device/FW is a real, expected outcome -
         # get_supported_composite_options() only reflects static registration, never a live
         # capability check.
-        pytest.skip(f"Improved Close Range Control registered but not functional on this device/FW: {e}")
+        pytest.fail(f"Improved Close Range Control registered but not functional: {e}")
 
     yield embedded_filter, option_id, embedded_filter.get_icr_control_range(option_id), depth_sensor
 
