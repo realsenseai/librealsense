@@ -1,11 +1,21 @@
-// Generated from dictionary.json; do not edit.
+// Generated from schema/dictionary.json by tools/generate.py; do not edit.
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "dfda8f15b1280f67d77baff070a0150a5fd8d820faaaf2224d212849c7fa05ab";
+static const char dictionary_sha256[] = "e44ce3e34645de7b444b6defb405d9f8035dfe64499cb85974d6696c48b2cf77";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned wire_size = 1024U;
+static const unsigned status_size = 32U;
+static const unsigned max_branch_id = 15U;
+static const unsigned max_sensor_id = 5U;
+static const unsigned max_streams = 8U;
+static const unsigned envelope_size = 8U;
+static const unsigned record_header_size = 4U;
+static const unsigned max_tlv_size = 1016U;
+static const unsigned sensor_record_bytes = 12U;
+static const unsigned enabled_stream_bytes = 44U;
+static const unsigned disabled_stream_bytes = 20U;
 static const unsigned rule_revision = 3U;
 enum Selectors {
     GLOBAL_INTENT = 28,
@@ -23,6 +33,18 @@ enum Records {
     STATE = 38,
     CONTROL = 48,
 };
+struct SensorDefinition { uint8_t id; const char* name; };
+static const SensorDefinition sensors[] = {
+    {1U, "STEREO"},
+    {2U, "COLOR"},
+};
+struct SkuDefinition { uint16_t pid; const char* name; };
+static const SkuDefinition skus[] = {
+    {0x0c06U, "D585F_3C"},
+    {0x0c07U, "D585_2C_PROTO"},
+    {0x0c08U, "D585_3C_PROTO"},
+};
+// One row per (branch, SKU); format is the branch default FourCC.
 struct BranchDefinition { uint8_t id, sensor; uint16_t sku; uint32_t format; const char* name; };
 static const BranchDefinition branches[] = {
     {1U, 1U, 3078U, 0x2036315aU, "DEPTH"},
@@ -45,6 +67,7 @@ static const FormatDefinition formats[] = {
     {7U, 0x32595559U},
     {7U, 0x3231564eU},
 };
+// C1-owned rule content; consumed by IntentRules.cpp, not by the codec.
 struct ProfileDefinition { uint16_t width, height, fps; };
 static const ProfileDefinition profiles[] = {
     {1280U, 720U, 30U},

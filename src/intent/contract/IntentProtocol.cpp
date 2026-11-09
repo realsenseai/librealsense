@@ -51,12 +51,38 @@ bool next(const uint8_t *data, size_t &cursor, size_t end, Record &r) {
     cursor = r.next;
     return true;
 }
-Error bad(const Record &r, uint8_t sensor = 0, uint8_t branch = 0) {
-    return Error(INVALID, sensor, branch, static_cast<uint16_t>(r.start));
+// A known record outside its grammar position, or CONTROL (Phase 2), is malformed
+// even when not CRITICAL. Only unknown, non-critical records may be skipped.
+bool known(uint8_t type) {
+    switch (type) {
+    case SENSOR:
+    case SENSOR_ID:
+    case STREAM:
+    case BRANCH_ID:
+    case FORMAT:
+    case WIDTH:
+    case HEIGHT:
+    case FPS:
+    case STATE:
+    case CONTROL:
+        return true;
+    default:
+        return false;
+    }
+}
+Error bad(const Record &r, ParseDetail why, uint8_t sensor = 0, uint8_t branch = 0) {
+    return Error(INVALID, sensor, branch, static_cast<uint16_t>(r.start), 0U, why);
+}
+Error skip(const Record &r, uint8_t sensor) {
+    if (known(r.type))
+        return bad(r, r.type == CONTROL ? PARSE_UNSUPPORTED : PARSE_MISPLACED, sensor);
+    if ((r.flags & 1U) != 0U)
+        return bad(r, PARSE_UNKNOWN_CRITICAL, sensor);
+    return Error();
 }
 Error stream(const uint8_t *data, const Record &parent, uint8_t sensor, Stream &s) {
     if ((parent.flags & 2U) == 0U)
-        return bad(parent, sensor);
+        return bad(parent, PARSE_SHAPE, sensor);
     s = Stream{};
     s.sensor = sensor;
     s.enabled = true;
@@ -67,17 +93,20 @@ Error stream(const uint8_t *data, const Record &parent, uint8_t sensor, Stream &
         Record r = {};
         r.start = pos;
         if (!next(data, pos, end, r))
-            return bad(r, sensor);
+            return bad(r, PARSE_BOUNDS, sensor);
         if (r.type < BRANCH_ID || r.type > STATE) {
-            if ((r.flags & 1U) != 0U || r.type == CONTROL)
-                return bad(r, sensor);
+            const Error e = skip(r, sensor);
+            if (e.code != OK)
+                return e;
             continue;
         }
         const unsigned field = 1U << (r.type - BRANCH_ID);
         const size_t width =
             (r.type == FORMAT) ? 4U : ((r.type == BRANCH_ID || r.type == STATE) ? 1U : 2U);
-        if ((seen & field) != 0U || (r.flags & 2U) != 0U || r.length != width)
-            return bad(r, sensor, s.branch);
+        if ((seen & field) != 0U)
+            return bad(r, PARSE_DUPLICATE, sensor, s.branch);
+        if ((r.flags & 2U) != 0U || r.length != width)
+            return bad(r, PARSE_SHAPE, sensor, s.branch);
         seen |= field;
         switch (r.type) {
         case BRANCH_ID:
@@ -97,7 +126,7 @@ Error stream(const uint8_t *data, const Record &parent, uint8_t sensor, Stream &
             break;
         case STATE:
             if (data[r.value] != 0U)
-                return bad(r, sensor, s.branch);
+                return bad(r, PARSE_VALUE, sensor, s.branch);
             s.enabled = false;
             break;
         default:
@@ -105,9 +134,10 @@ Error stream(const uint8_t *data, const Record &parent, uint8_t sensor, Stream &
         }
     }
     if (seen != (s.enabled ? 31U : 33U))
-        return Error(INCOMPLETE, sensor, s.branch, static_cast<uint16_t>(parent.start));
-    if (s.branch == 0U || s.branch >= 16U)
-        return bad(parent, sensor, s.branch);
+        return Error(INCOMPLETE, sensor, s.branch, static_cast<uint16_t>(parent.start), 0U,
+                     PARSE_MISSING);
+    if (s.branch == 0U || s.branch > max_branch_id)
+        return bad(parent, PARSE_VALUE, sensor, s.branch);
     return Error();
 }
 void header(uint8_t *p, uint8_t type, uint8_t flags, uint16_t length) {
@@ -121,62 +151,75 @@ void attr(uint8_t *p, uint8_t type, uint16_t length, uint32_t value) {
 }
 } // namespace
 Error decode(const uint8_t *data, size_t size, Request &output) {
+    // Exactly one XU transfer: shorter is truncated, longer is oversized.
     if (!data || size != wire_size)
-        return Error(INVALID);
-    if (data[0] != major || data[1] > CLEAR || read16(data + 4) != 0U || data[7] != 0U)
-        return Error(INVALID);
+        return Error(INVALID, 0, 0, 0, 0, PARSE_TRANSFER_SIZE);
+    // Envelope fields are checked in a fixed order; offset names the failing field.
+    if (data[0] != major)
+        return Error(INVALID, 0, 0, 0, 0, PARSE_MAJOR);
+    if (data[1] > CLEAR)
+        return Error(INVALID, 0, 0, 1, 0, PARSE_OPERATION);
+    if (read16(data + 4) != 0U)
+        return Error(INVALID, 0, 0, 4, 0, PARSE_RESERVED);
+    if (data[7] != 0U)
+        return Error(INVALID, 0, 0, 7, 0, PARSE_RESERVED);
     const size_t length = read16(data + 2);
-    if (length > size - 8U || (length & 3U) != 0U || (data[1] == CLEAR && length != 0U))
-        return Error(INVALID);
+    if (length > max_tlv_size || (length & 3U) != 0U || (data[1] == CLEAR && length != 0U))
+        return Error(INVALID, 0, 0, 2, 0, PARSE_TLV_SIZE);
     Request candidate = {};
     candidate.op = static_cast<Operation>(data[1]);
     candidate.minorVersion = data[6];
-    size_t pos = 8U;
+    size_t pos = envelope_size;
     const size_t end = pos + length;
-    unsigned sensors = 0U;
+    unsigned sensorsSeen = 0U;
     uint16_t branchesSeen = 0U;
     while (pos < end) {
         Record r = {};
         r.start = pos;
         if (!next(data, pos, end, r))
-            return bad(r);
+            return bad(r, PARSE_BOUNDS);
         if (r.type != SENSOR) {
-            if ((r.flags & 1U) != 0U || r.type == CONTROL)
-                return bad(r);
+            const Error e = skip(r, 0U);
+            if (e.code != OK)
+                return e;
             continue;
         }
         if ((r.flags & 2U) == 0U)
-            return bad(r);
+            return bad(r, PARSE_SHAPE);
         size_t child = r.value;
         const size_t childEnd = child + r.length;
         Record id = {};
         id.start = child;
-        if (!next(data, child, childEnd, id) || id.type != SENSOR_ID || id.length != 4U ||
-            (id.flags & 2U) != 0U)
-            return bad(id);
+        if (!next(data, child, childEnd, id))
+            return bad(id, PARSE_BOUNDS);
+        if (id.type != SENSOR_ID || id.length != 4U || (id.flags & 2U) != 0U)
+            return bad(id, PARSE_SHAPE);
         const uint8_t sensor = data[id.value];
-        if (sensor == 0U || sensor > 5U || (sensors & (1U << sensor)) != 0U ||
-            data[id.value + 1U] || data[id.value + 2U] || data[id.value + 3U])
-            return bad(id, sensor);
-        sensors |= 1U << sensor;
+        if (sensor == 0U || sensor > max_sensor_id || data[id.value + 1U] ||
+            data[id.value + 2U] || data[id.value + 3U])
+            return bad(id, PARSE_VALUE, sensor);
+        if ((sensorsSeen & (1U << sensor)) != 0U)
+            return bad(id, PARSE_DUPLICATE, sensor);
+        sensorsSeen |= 1U << sensor;
         while (child < childEnd) {
             Record c = {};
             c.start = child;
             if (!next(data, child, childEnd, c))
-                return bad(c, sensor);
+                return bad(c, PARSE_BOUNDS, sensor);
             if (c.type != STREAM) {
-                if ((c.flags & 1U) != 0U || c.type == CONTROL || c.type == SENSOR_ID)
-                    return bad(c, sensor);
+                const Error e = skip(c, sensor);
+                if (e.code != OK)
+                    return e;
                 continue;
             }
             if (candidate.model.count >= max_streams)
-                return bad(c, sensor);
+                return bad(c, PARSE_CAPACITY, sensor);
             Stream value = {};
             Error e = stream(data, c, sensor, value);
             if (e.code != OK)
                 return e;
             if ((branchesSeen & bit(value.branch)) != 0U)
-                return bad(c, sensor, value.branch);
+                return bad(c, PARSE_DUPLICATE, sensor, value.branch);
             branchesSeen = static_cast<uint16_t>(branchesSeen | bit(value.branch));
             candidate.model.streams[candidate.model.count++] = value;
         }
@@ -188,18 +231,18 @@ Error decode(const uint8_t *data, size_t size, Request &output) {
 Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
     if (!data || size != wire_size || m.count > max_streams || op > CLEAR)
         return Error(INVALID);
-    size_t needed = 8U;
-    for (unsigned sensor = 1U; sensor <= 5U; ++sensor) {
+    size_t needed = envelope_size;
+    for (unsigned sensor = 1U; sensor <= max_sensor_id; ++sensor) {
         size_t children = 0U;
         for (size_t i = 0; i < m.count; ++i)
             if (m.streams[i].sensor == sensor)
-                children += m.streams[i].enabled ? 44U : 20U;
+                children += m.streams[i].enabled ? enabled_stream_bytes : disabled_stream_bytes;
         if (children)
-            needed += 12U + children;
+            needed += sensor_record_bytes + children;
     }
     for (size_t i = 0; i < m.count; ++i) {
         const Stream &s = m.streams[i];
-        if (s.sensor == 0U || s.sensor > 5U || s.branch == 0U || s.branch >= 16U)
+        if (s.sensor == 0U || s.sensor > max_sensor_id || s.branch == 0U || s.branch > max_branch_id)
             return Error(INVALID);
         for (size_t j = 0; j < i; ++j)
             if (m.streams[j].branch == s.branch)
@@ -213,19 +256,19 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
     data[6] = static_cast<uint8_t>(minor);
     if (op == CLEAR)
         return Error();
-    size_t pos = 8U;
-    for (unsigned sensor = 1U; sensor <= 5U; ++sensor) {
+    size_t pos = envelope_size;
+    for (unsigned sensor = 1U; sensor <= max_sensor_id; ++sensor) {
         size_t children = 0U;
         for (size_t i = 0; i < m.count; ++i)
             if (m.streams[i].sensor == sensor)
-                children += m.streams[i].enabled ? 44U : 20U;
+                children += m.streams[i].enabled ? enabled_stream_bytes : disabled_stream_bytes;
         if (!children)
             continue;
         header(data + pos, SENSOR, 3U, static_cast<uint16_t>(8U + children));
         pos += 4U;
         attr(data + pos, SENSOR_ID, 4U, sensor);
         pos += 8U;
-        for (unsigned branch = 1U; branch < 16U; ++branch) {
+        for (unsigned branch = 1U; branch <= max_branch_id; ++branch) {
             const Stream *s = find(m, static_cast<uint8_t>(branch));
             if (!s || s->sensor != sensor)
                 continue;
@@ -248,7 +291,7 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
             pos += 8U;
         }
     }
-    write16(data + 2, static_cast<uint16_t>(pos - 8U));
+    write16(data + 2, static_cast<uint16_t>(pos - envelope_size));
     return Error();
 }
 Model defaultModel(uint16_t sku) {
@@ -261,39 +304,5 @@ Model defaultModel(uint16_t sku) {
             m.streams[m.count++] = s;
         }
     return m;
-}
-Error validate(const Model &m, uint16_t sku) {
-    if (defaultModel(sku).count == 0U || m.count > max_streams)
-        return Error(CONSTRAINT, 0, 0, 0, 1);
-    // Stable branch-ID order, independent of JSON/TLV record order. Absent streams are OFF.
-    for (unsigned id = 1U; id < 16U; ++id) {
-        const Stream *s = find(m, static_cast<uint8_t>(id));
-        if (!s)
-            continue;
-        const BranchDefinition *def = nullptr;
-        for (size_t j = 0; j < sizeof(branches) / sizeof(branches[0]); ++j)
-            if (branches[j].id == id && branches[j].sku == sku)
-                def = &branches[j];
-        if (!def || s->sensor != def->sensor)
-            return Error(CONSTRAINT, s->sensor, s->branch, 0, 2);
-        if (!s->enabled)
-            continue;
-        bool formatSupported = false;
-        for (const auto &f : formats)
-            formatSupported |= f.branch == s->branch && f.format == s->format;
-        if (!formatSupported)
-            return Error(CONSTRAINT, s->sensor, s->branch, 0, 3);
-        bool supported = false;
-        for (size_t j = 0; j < sizeof(profiles) / sizeof(profiles[0]); ++j)
-            supported |= s->width == profiles[j].width && s->height == profiles[j].height &&
-                         s->fps == profiles[j].fps;
-        if (!supported)
-            return Error(CONSTRAINT, s->sensor, s->branch, 0, 4);
-    }
-    const Stream *left = find(m, 2U);
-    const Stream *pair = find(m, 4U);
-    if (left && pair && left->enabled && pair->enabled)
-        return Error(CONSTRAINT, 1U, 4U, 0, 5);
-    return Error();
 }
 } // namespace rsintent

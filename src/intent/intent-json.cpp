@@ -31,7 +31,12 @@ const rsintent::BranchDefinition &definition(const json &stream) {
             return b;
     throw std::invalid_argument("Intent: unknown branch " + name);
 }
-const char *sensorName(uint8_t sensor) { return sensor == 1U ? "STEREO" : "COLOR"; }
+unsigned sensorId(const std::string &name) {
+    for (const auto &s : rsintent::sensors)
+        if (name == s.name)
+            return s.id;
+    return 0U;
+}
 } // namespace
 std::vector<uint8_t> encode_intent_json(const std::string &text) {
     const json j = json::parse(text);
@@ -62,7 +67,7 @@ std::vector<uint8_t> encode_intent_json(const std::string &text) {
         for (const auto &sensor : list) {
             keys(sensor, {"sensor", "streams"});
             const auto name = sensor.at("sensor").get<std::string>();
-            const unsigned id = name == "STEREO" ? 1U : (name == "COLOR" ? 2U : 0U);
+            const unsigned id = sensorId(name);
             if (!id || !sensors.insert(id).second)
                 throw std::invalid_argument("Intent: invalid or duplicate sensor");
             const auto &streams = sensor.at("streams");
@@ -109,7 +114,7 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
                                const std::vector<uint8_t> &status) {
     rsintent::Request request = {};
     if (rsintent::decode(wire.data(), wire.size(), request).code != rsintent::OK ||
-        status.size() != 32U || status[0] != rsintent::major)
+        status.size() != rsintent::status_size || status[0] != rsintent::major)
         throw std::invalid_argument("Intent: invalid firmware response");
     if (wire[6] > rsintent::minor)
         throw std::invalid_argument(
@@ -117,9 +122,10 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
     json j = {{"version", {{"major", wire[0]}, {"minor", wire[6]}}},
               {"op", "SET"},
               {"sensors", json::array()}};
-    for (unsigned id = 1; id <= 2; ++id) {
-        json sensor = {{"sensor", sensorName(static_cast<uint8_t>(id))},
-                       {"streams", json::array()}};
+    size_t emitted = 0;
+    for (const auto &definition : rsintent::sensors) {
+        const unsigned id = definition.id;
+        json sensor = {{"sensor", definition.name}, {"streams", json::array()}};
         for (size_t i = 0; i < request.model.count; ++i) {
             const auto &s = request.model.streams[i];
             if (s.sensor != id)
@@ -145,10 +151,13 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
                 stream["fps"] = s.fps;
             }
             sensor["streams"].push_back(stream);
+            ++emitted;
         }
         if (!sensor["streams"].empty())
             j["sensors"].push_back(sensor);
     }
+    if (emitted != request.model.count)
+        throw std::invalid_argument("Intent: firmware sensor requires a newer SDK");
     j["status"] = {{"state", status[2]},
                    {"last_result", status[3]},
                    {"error_sensor", status[10]},
