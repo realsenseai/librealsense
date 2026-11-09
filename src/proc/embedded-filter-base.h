@@ -22,6 +22,9 @@ public:
 
     rsutils::subscription register_options_changed_callback( options_watcher::callback && cb ) override
     {
+        // Composite options are registered by the filter's constructor, so they are known by the time anyone subscribes
+        for( auto & id_and_option : _composite_options_by_id )
+            _options_watcher.register_composite_option( id_and_option.first, id_and_option.second );
         return _options_watcher.subscribe( std::move( cb ) );
     }
 

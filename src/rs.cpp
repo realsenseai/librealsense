@@ -193,6 +193,7 @@ struct rs2_option_value_wrapper : rs2_option_value
 struct rs2_options_list
 {
     std::vector< rs2_option_value_wrapper const * > list;
+    std::vector< rs2_composite_option_id > changed_composites;
 };
 
 // Composite-option twin of rs2_options_list - a fully separate, id-only list type (composite
@@ -1656,8 +1657,10 @@ const char* rs2_get_option_value_description(const rs2_options* options, rs2_opt
 HANDLE_EXCEPTIONS_AND_RETURN(nullptr, options, option, value)
 
 static void populate_options_list( rs2_options_list * updated_options_list,
-                                   options_watcher::options_and_values const & updated_options )
+                                   options_watcher::options_and_values const & updated_options,
+                                   options_watcher::composite_ids const & updated_composites )
 {
+    updated_options_list->changed_composites = updated_composites;
     for( auto & id_value : updated_options )
     {
         options_watcher::option_and_value const & option_and_value = id_value.second;
@@ -1675,10 +1678,11 @@ void rs2_set_options_changed_callback( rs2_options * options,
     VALIDATE_NOT_NULL( options );
     VALIDATE_NOT_NULL( callback );
     options->subscription = options->options->register_options_changed_callback(
-        [callback]( options_watcher::options_and_values const & updated_options )
+        [callback]( options_watcher::options_and_values const & updated_options,
+                    options_watcher::composite_ids const & updated_composites )
         {
             rs2_options_list * updated_options_list = new rs2_options_list(); // Should be on heap if user will choose to save for later use.
-            populate_options_list( updated_options_list, updated_options );
+            populate_options_list( updated_options_list, updated_options, updated_composites );
             try
             {
                 callback( updated_options_list );
@@ -1704,10 +1708,11 @@ void rs2_set_options_changed_callback_cpp( rs2_options * options,
                                           } };
     VALIDATE_NOT_NULL( options );
     options->subscription = options->options->register_options_changed_callback(
-        [cb]( options_watcher::options_and_values const & updated_options )
+        [cb]( options_watcher::options_and_values const & updated_options,
+              options_watcher::composite_ids const & updated_composites )
         {
             rs2_options_list * updated_options_list = new rs2_options_list(); // Should be on heap if user will choose to save for later use.
-            populate_options_list( updated_options_list, updated_options );
+            populate_options_list( updated_options_list, updated_options, updated_composites );
             try
             {
                 cb->on_value_changed( updated_options_list );
@@ -5091,6 +5096,20 @@ void rs2_delete_composite_options_list(rs2_composite_options_list* list) BEGIN_A
     delete list;
 }
 NOEXCEPT_RETURN(, list)
+
+int rs2_get_changed_composite_options_count(const rs2_options_list* list, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(list);
+    return int(list->changed_composites.size());
+}
+HANDLE_EXCEPTIONS_AND_RETURN(0, list)
+
+rs2_composite_option_id rs2_get_changed_composite_option_from_list(const rs2_options_list* list, int i, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(list);
+    return list->changed_composites.at( i );
+}
+HANDLE_EXCEPTIONS_AND_RETURN(RS2_COMPOSITE_OPTION_COUNT, list, i)
 
 // Metadata trio for composite options, mirroring rs2_supports_option/rs2_is_option_read_only/
 // rs2_get_option_description for scalar options.

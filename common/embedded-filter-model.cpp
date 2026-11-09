@@ -126,11 +126,6 @@ namespace rs2
     {
         _name = rs2_embedded_filter_type_to_string(type);
 
-        // Only DDS has other clients that can change a filter behind the Viewer's back (and a cheap cached read)
-        bool const is_dds = owner && owner->dev.supports( RS2_CAMERA_INFO_CONNECTION_TYPE )
-                         && std::string( owner->dev.get_info( RS2_CAMERA_INFO_CONNECTION_TYPE ) ) == "DDS";
-        _decimation_filter_dpp_editor.auto_refresh = _temporal_filter_dpp_editor.auto_refresh = _icr_editor.auto_refresh = is_dds;
-
         std::stringstream ss;
         ss << "##" << ((owner) ? owner->dev.get_info(RS2_CAMERA_INFO_NAME) : _name)
             << "/" << ((owner) ? (*owner->s).get_info(RS2_CAMERA_INFO_NAME) : "_")
@@ -637,6 +632,16 @@ namespace rs2
         {
             _embedded_filter->on_options_changed([this](const options_list& list)
                 {
+                    if (!_destructing)
+                        for (auto id : list.get_changed_composite_options())
+                        {
+                            if (id == RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP)
+                                _decimation_filter_dpp_editor.mark_stale();
+                            else if (id == RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP)
+                                _temporal_filter_dpp_editor.mark_stale();
+                            else if (id == RS2_COMPOSITE_OPTION_ICR_CONTROL)
+                                _icr_editor.mark_stale();
+                        }
                     for (auto changed_option : list)
                     {
                         auto it = _options_id_to_model.find(changed_option->id);

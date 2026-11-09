@@ -180,6 +180,23 @@ namespace rs2
 
         std::shared_ptr< rs2_options_list > get() const { return _list; };
 
+        // Composite options whose value changed (options-changed callback only); read them with get_composite_option()
+        std::vector< rs2_composite_option_id > get_changed_composite_options() const
+        {
+            std::vector< rs2_composite_option_id > res;
+            if( ! _list )
+                return res;
+            rs2_error * e = nullptr;
+            auto count = rs2_get_changed_composite_options_count( _list.get(), &e );
+            error::handle( e );
+            for( int i = 0; i < count; ++i )
+            {
+                res.push_back( rs2_get_changed_composite_option_from_list( _list.get(), i, &e ) );
+                error::handle( e );
+            }
+            return res;
+        }
+
     private:
         std::shared_ptr< rs2_options_list > _list;
         size_t _size;

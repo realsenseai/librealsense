@@ -6,7 +6,7 @@
 #include <librealsense2/rs.hpp>
 #include <imgui.h>
 
-#include <cstring>
+#include <atomic>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -97,35 +97,31 @@ namespace rs2
     public:
         T value{};
         bool initialized = false;
-        bool auto_refresh = false;   // re-read while idle to follow other clients; off where nobody else can change the value
-        static constexpr double refresh_period = 1.0;   // seconds between idle re-reads
 
-        // Seeds `value` from a GET the first time this is called; a no-op afterward. Returns whether
-        // `value` is safe to use. `on_read`, if set, runs on the freshly-read value.
+        // The device value changed behind our back (options-changed callback thread): re-read on the next draw
+        void mark_stale() { _stale = true; }
+
+        // Seeds `value` from a GET the first time this is called, and again after mark_stale() unless an edit is
+        // pending. Returns whether `value` is safe to use. `on_read`, if set, runs on the freshly-read value.
         bool ensure_initialized( const std::shared_ptr< rs2::embedded_filter > & filter,
                                  rs2_composite_option_id id,
                                  std::string & error_message,
                                  const std::function< void( const T & ) > & on_read = nullptr )
         {
-            // While idle, re-read periodically to pick up changes made by other clients (e.g. ROS2 over DDS)
-            bool const refresh = auto_refresh && initialized && ! is_dirty() && ImGui::GetTime() - _last_read >= refresh_period;
-            if( initialized && ! refresh )
+            if( _stale.exchange( false ) && ! is_dirty() )
+                initialized = false;
+            if( initialized )
                 return true;
             try
             {
-                T const read = filter->get_composite_option_as< T >( id );
-                bool const changed = ! initialized || std::memcmp( &read, &value, sizeof( T ) ) != 0;
-                value = read;
+                value = filter->get_composite_option_as< T >( id );
                 initialized = true;
-                _last_read = ImGui::GetTime();
-                if( changed && on_read )
+                if( on_read )
                     on_read( value );
             }
             catch( const std::exception & e )
             {
-                _last_read = ImGui::GetTime();
-                if( ! refresh )
-                    error_message = e.what();
+                error_message = e.what();
             }
             return initialized;
         }
@@ -191,6 +187,6 @@ namespace rs2
         }
 
     private:
-        double _last_read = 0.;
+        std::atomic_bool _stale{ false };
     };
 }

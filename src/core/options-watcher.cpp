@@ -35,6 +35,17 @@ void options_watcher::register_option( rs2_option id, std::shared_ptr< option > 
         start();
 }
 
+void options_watcher::register_composite_option( rs2_composite_option_id id, std::shared_ptr< composite_option_interface > option )
+{
+    {
+        std::lock_guard< std::mutex > lock( _mutex );
+        _composite_options.emplace( id, composite_and_value{ std::move( option ), nullptr } );
+    }
+
+    if( should_start() )
+        start();
+}
+
 void options_watcher::unregister_option( rs2_option id )
 {
     {
@@ -63,7 +74,7 @@ bool options_watcher::should_start() const
 
 bool options_watcher::should_stop() const
 {
-    return _on_values_changed.size() == 0 || _options.size() == 0 || _destructing;
+    return _on_values_changed.size() == 0 || ( _options.empty() && _composite_options.empty() ) || _destructing;
 }
 
 void options_watcher::start()
@@ -72,6 +83,7 @@ void options_watcher::start()
     {
         _updater = std::thread( [this]() {
             update_options();
+            update_composite_options();
             thread_loop();
         } );
     }
@@ -126,12 +138,13 @@ void options_watcher::thread_loop()
         }
 
         auto updated_options = update_options();
+        auto updated_composites = update_composite_options();
 
         // Checking stop conditions after update, if stop requested no need to notify.
         if( should_stop() )
             break;
 
-        notify( updated_options );
+        notify( updated_options, updated_composites );
     }
 }
 
@@ -178,10 +191,46 @@ options_watcher::options_and_values options_watcher::update_options()
     return updated_options;
 }
 
-void options_watcher::notify( options_and_values const & updated_options )
+options_watcher::composite_ids options_watcher::update_composite_options()
 {
-    if( ! updated_options.empty() )
-        _on_values_changed.raise( updated_options );
+    composite_ids updated;
+
+    std::lock_guard< std::mutex > lock( _mutex );
+
+    for( auto & opt : _composite_options )
+    {
+        if( should_stop() )
+            break;
+        try
+        {
+            std::vector< uint8_t > curr_val;
+            if( opt.second.sptr->is_enabled() )
+                curr_val = opt.second.sptr->get_raw();
+
+            if( ! opt.second.p_last_known_value || *opt.second.p_last_known_value != curr_val )
+            {
+                opt.second.p_last_known_value = std::make_shared< const std::vector< uint8_t > >( std::move( curr_val ) );
+                updated.push_back( opt.first );
+            }
+        }
+        catch( ... )
+        {
+            // Like scalar options: one that cannot be read right now is reported once, until it can be read again
+            if( opt.second.p_last_known_value && ! opt.second.p_last_known_value->empty() )
+            {
+                opt.second.p_last_known_value = std::make_shared< const std::vector< uint8_t > >();
+                updated.push_back( opt.first );
+            }
+        }
+    }
+
+    return updated;
+}
+
+void options_watcher::notify( options_and_values const & updated_options, composite_ids const & updated_composites )
+{
+    if( ! updated_options.empty() || ! updated_composites.empty() )
+        _on_values_changed.raise( updated_options, updated_composites );
 }
 
 }  // namespace librealsense
