@@ -10,6 +10,7 @@ import time
 import pytest
 import pyrealsense2 as rs
 import pyrsutils as rsutils
+from rspy.pytest.device_helpers import require_min_fw_version
 from pytest_check import check
 import logging
 log = logging.getLogger(__name__)
@@ -57,6 +58,8 @@ def _get_close_range_filter( test_device, composite=None ):
     """composite: True/False skips unless the FW exposes the icr_control / scalar form; None accepts both"""
     dev, _ = test_device
     _skip_if_fw_below_minimum( dev )
+    if composite:
+        require_min_fw_version( dev, rsutils.version( 7, 62, 0, 0 ), "Improved Close Range 8-parameter control" )
     depth_sensor = dev.first_depth_sensor()
     f = depth_sensor.get_embedded_filter( rs.embedded_filter_type.improved_close_range_depth )
     if not f:

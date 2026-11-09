@@ -9,6 +9,8 @@ import time
 from contextlib import contextmanager
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
+from rspy.pytest.device_helpers import require_min_fw_version
 from rspy.timer import Timer
 import logging
 log = logging.getLogger(__name__)
@@ -108,6 +110,7 @@ def filters(test_device):
     """Yields (depth sensor, icr filter, decimation filter) with both filters off, and restores their original
     values afterwards."""
     dev, ctx = test_device
+    require_min_fw_version(dev, rsutils.version(7, 62, 0, 0), "Improved Close Range 8-parameter control")
     sensor = dev.first_depth_sensor()
     icr = _find_filter(sensor, ICR)
     decimation = next((f for f in sensor.query_embedded_filters() if f.get_type() == rs.embedded_filter_type.decimation), None)

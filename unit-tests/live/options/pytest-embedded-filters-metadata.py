@@ -12,6 +12,8 @@ added to the spec. Both together produce 0x24 (0x04 | 0x20), confirming additive
 
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
+from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
 
@@ -108,6 +110,7 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
     and disabling it again is expected to clear it. Streams at 1280x720 - ICR only activates at
     720p/960p (see rs_icr_control.h)."""
     dev, ctx = test_device
+    require_min_fw_version(dev, rsutils.version(7, 62, 0, 0), "Improved Close Range 8-parameter control")
     depth_sensor = dev.first_depth_sensor()
     option_id = rs.composite_option_id.icr_control
     embedded_filter = _find_filter(depth_sensor, option_id)
