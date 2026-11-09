@@ -231,8 +231,8 @@ namespace librealsense
         _is_safety_layout = ( pid == D585S_PID || pid == D585_LEGACY_PID );
         _is_d585s = ( pid == D585S_PID );
 
-        // Over GMSL the Mapping streams are multiplexed on the depth sensor's IR node, one device each; over USB the
-        // Mapping function has its own interface
+        // Over GMSL these Perception streams are multiplexed on the depth sensor's IR node, one device each; over USB
+        // the Mapping function has its own interface
         auto const depth_uvc = get_raw_depth_sensor()->get_uvc_device();
         platform::muxed_stream_enable const enable
             = [this, alive = _is_alive]( uint32_t stream_id, bool on, const platform::stream_profile & p )
@@ -240,17 +240,17 @@ namespace librealsense
             if( *alive )  // sensors outlive the device's HW monitor
                 enable_muxed_stream( stream_id, on, p.width, p.height, p.fps );
         };
-        std::vector< std::shared_ptr< platform::uvc_device > > muxed_devs;
+        std::vector< std::shared_ptr< platform::uvc_device > > perception_devs;
         for( auto const & desc : { occupancy_muxed_stream, labeled_point_cloud_muxed_stream } )
             if( auto dev = depth_uvc->create_muxed_stream_device( desc, enable ) )
-                muxed_devs.push_back( dev );
+                perception_devs.push_back( dev );
         std::shared_ptr< platform::uvc_device > mapping_dev;
         std::string physical_port;
-        if( ! muxed_devs.empty() )
+        if( ! perception_devs.empty() )
         {
-            mapping_dev = std::make_shared< platform::multi_pins_uvc_device >( muxed_devs );
+            mapping_dev = std::make_shared< platform::multi_pins_uvc_device >( perception_devs );
             physical_port = mapping_dev->get_device_location();
-            LOG_DEBUG( "Mapping streams are multiplexed on " << physical_port );
+            LOG_DEBUG( "Perception streams are multiplexed on " << physical_port );
         }
         else
         {
