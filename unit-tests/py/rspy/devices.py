@@ -258,6 +258,19 @@ def map_unknown_ports():
         log.debug_unindent()
 
 
+def _create_devices( device_list ):
+    """
+    Indexing the device list is what creates each device object; a failure on one device must not hide the others.
+    """
+    devices = []
+    for i in range( len( device_list ) ):
+        try:
+            devices.append( device_list[i] )
+        except RuntimeError as e:
+            log.e( f'Failed to create device #{i}: {e}' )
+    return devices
+
+
 def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dds=True, rslog=False ):
     """
     Start a new LRS context, and collect all devices
@@ -302,7 +315,7 @@ def query( monitor_changes=True, hub_reset=False, recycle_ports=True, disable_dd
 
     d555_found = False
     try:
-        devices = list( _context.query_devices() )
+        devices = _create_devices( _context.query_devices() )
     except RuntimeError as e:
         log.e( f'FAILED to query devices: {e}' )
         devices = []
