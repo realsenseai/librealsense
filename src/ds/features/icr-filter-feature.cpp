@@ -34,38 +34,6 @@ static constexpr int32_t icr_step[] = { 1, 1, 1,   1,     1,     1,   0,   0 };
 static constexpr int32_t icr_def[]  = { 0, 1, 0, 126,     0,     0,   0,   0 };
 static constexpr size_t icr_param_count = sizeof( icr_def ) / sizeof( icr_def[0] );
 
-// The baseline FW has 7 parameters: enable, filter type, downscale ratio, shift mode, shift pixels, threshold mode and
-// threshold. They are mapped onto rs2_icr_control - Smoothing, Completion and MinZ read 0 - and the threshold is kept.
-static constexpr uint8_t legacy_param_count = 7;
-static constexpr size_t icr_params_offset = offsetof( rs2_icr_control, mode );
-
-static std::vector< uint8_t > legacy_to_icr( const uint8_t * data, bool is_step )
-{
-    int32_t l[icr_param_count + 1], p[icr_param_count] = {};
-    std::memcpy( l, data + icr_params_offset, sizeof( int32_t ) * legacy_param_count );
-    p[0] = is_step ? 1 : l[0] ? ( l[1] ? RS2_ICR_MODE_HIGH_RES : RS2_ICR_MODE_DOWNSCALE_HDR ) : RS2_ICR_MODE_OFF;
-    std::memcpy( p + 1, l + 2, sizeof( int32_t ) * 3 );  // downscale ratio, shift mode, shift pixels
-    std::vector< uint8_t > out( data, data + sizeof( rs2_icr_control ) );
-    reinterpret_cast< dpp_header * >( out.data() )->param_count = icr_param_count;
-    std::memcpy( out.data() + icr_params_offset, p, sizeof( p ) );
-    return out;
-}
-
-// `legacy` is the current 7-parameter payload: the slots ICR does not map are carried back as they are
-static std::vector< uint8_t > icr_to_legacy( const rs2_icr_control & cfg, std::vector< uint8_t > legacy )
-{
-    int32_t l[legacy_param_count];
-    std::memcpy( l, legacy.data() + icr_params_offset, sizeof( l ) );
-    l[0] = cfg.mode != RS2_ICR_MODE_OFF;
-    if( cfg.mode != RS2_ICR_MODE_OFF )  // Off leaves the filter type as is
-        l[1] = cfg.mode == RS2_ICR_MODE_HIGH_RES;
-    l[2] = cfg.downscale_ratio;
-    l[3] = cfg.high_res_mode;
-    l[4] = cfg.high_res_offset;
-    std::memcpy( legacy.data() + icr_params_offset, l, sizeof( l ) );
-    return legacy;
-}
-
 static constexpr dpp_control_desc icr_desc = {
     0x0008,  // ctl_id (D500_DPP_XU_MINZ_CONTROL_ID = BIT(3))
     icr_param_count,
@@ -163,8 +131,7 @@ public:
 
     std::vector< uint8_t > get_raw() const override
     {
-        auto raw = read_xu();
-        return is_legacy( raw ) ? legacy_to_icr( raw.data(), false ) : raw;
+        return read_xu();
     }
     void set_raw( const void * data, size_t size ) override
     {
@@ -176,15 +143,8 @@ public:
         if( auto depth = find_depth_profile( _depth_sensor.get_active_streams() ) )
             icr_allowed_or_throw( &cfg, sizeof( cfg ), *depth, _depth_sensor );
 
-        auto xu_raw = read_xu();
-        if( is_legacy( xu_raw ) )
-        {
-            auto legacy = icr_to_legacy( cfg, std::move( xu_raw ) );
-            _xu->set_raw( legacy.data(), legacy.size() );
-            return;
-        }
         // Params 7/8 are FW-computed: carry back what the device reports instead of the caller's values
-        auto const & raw = xu_raw;
+        auto const raw = read_xu();
         rs2_icr_control current;
         std::memcpy( &current, raw.data(), sizeof( current ) );
         cfg.min_z_mm = current.min_z_mm;
@@ -198,15 +158,7 @@ public:
         if( raw.size() != 4 * sizeof( rs2_icr_control ) )
             throw invalid_value_exception( "Improved Close Range control returned an unexpected range payload size" );
         for( size_t i = 0; i < 4; ++i )
-        {
-            auto * bound = raw.data() + i * sizeof( rs2_icr_control );
-            check_envelope_or_throw( bound, sizeof( rs2_icr_control ) );
-            if( bound[offsetof( dpp_header, param_count )] == legacy_param_count )
-            {
-                auto icr = legacy_to_icr( bound, i == 2 );
-                std::copy( icr.begin(), icr.end(), raw.begin() + i * sizeof( rs2_icr_control ) );
-            }
-        }
+            check_envelope_or_throw( raw.data() + i * sizeof( rs2_icr_control ), sizeof( rs2_icr_control ) );
         return raw;
     }
     bool is_read_only() const override { return _xu->is_read_only(); }
@@ -220,7 +172,6 @@ private:
         check_envelope_or_throw( raw.data(), raw.size() );
         return raw;
     }
-    static bool is_legacy( std::vector< uint8_t > const & raw ) { return raw[offsetof( dpp_header, param_count )] == legacy_param_count; }
 
     // The payload size, header version, control ID, param count and param type must be the ICR schema
     static void check_envelope_or_throw( const uint8_t * data, size_t size )
@@ -230,7 +181,7 @@ private:
         dpp_header hdr = {};
         std::memcpy( &hdr, data, sizeof( hdr ) );
         if( hdr.version != DPP_HEADER_CURRENT_VERSION || hdr.ctl_id != icr_desc.ctl_id
-            || ( hdr.param_count != icr_desc.param_count && hdr.param_count != legacy_param_count ) || hdr.param_type != icr_desc.param_type )
+            || hdr.param_count != icr_desc.param_count || hdr.param_type != icr_desc.param_type )
             throw invalid_value_exception( rsutils::string::from()
                 << "Improved Close Range control returned an unsupported schema (version=" << (int)hdr.version
                 << " ctl_id=" << (int)hdr.ctl_id << " param_count=" << (int)hdr.param_count

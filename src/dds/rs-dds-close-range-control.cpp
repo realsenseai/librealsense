@@ -18,12 +18,9 @@ using rsutils::json;
 
 namespace librealsense {
 
-    // DDS options of the FW, by rs2_icr_control field in wire order. The 8-parameter FW publishes one option per
-    // field (the last two are read-only). The 7-parameter FW publishes Enable and Filter Type, which make up the mode,
-    // and no option for the smoothing, completion and MinZ fields, which then read as 0 and reject any other value.
+    // DDS options of the FW, by rs2_icr_control field in wire order: one option per field (the last two are read-only)
     static constexpr size_t field_count = 8;
     static constexpr size_t writable_field_count = field_count - 2;
-    static constexpr size_t downscale_ratio_field = 1;
     static const char * const field_names[field_count] = { "Mode",
                                                            "Downscale Ratio",
                                                            "High-Res Mode",
@@ -32,8 +29,6 @@ namespace librealsense {
                                                            "Completion Offset",
                                                            "Nominal MinZ",
                                                            "Improved MinZ" };
-    static const char * const legacy_field_names[field_count] = { nullptr, "Secondary frame downscale ratio", "Shift Mode",
-                                                                  "Shift Pixels", nullptr, nullptr, nullptr, nullptr };
     static constexpr size_t fields_offset = offsetof( rs2_icr_control, mode );
     static_assert( sizeof( rs2_icr_control ) - fields_offset == field_count * sizeof( int32_t ),
                    "field_names must match the contiguous int32_t fields of rs2_icr_control" );
@@ -52,35 +47,18 @@ namespace librealsense {
         , _fields( field_count )
     {
         auto const & options = _dds_ef->get_options();
-        _legacy = ! find_option( options, field_names[0] );
         for( size_t i = 0; i < field_count; ++i )
-            if( auto name = _legacy ? legacy_field_names[i] : field_names[i] )
-                _fields[i] = find_option( options, name );
-        if( _legacy )
-        {
-            _enable = find_option( options, "Enable" );
-            _filter_type = find_option( options, "Filter Type" );
-        }
+            _fields[i] = find_option( options, field_names[i] );
     }
 
-    // The 7-parameter downscale ratio is a DDS enum of "2"/"4"; rs2_icr_control holds 1 = x2, 2 = x4
-    int32_t rs_dds_close_range_control::to_field( size_t field, json const & dds_value ) const
+    static int32_t to_field( json const & dds_value )
     {
-        if( dds_value.is_null() )
-            return 0;
-        return _legacy && field == downscale_ratio_field ? std::stoi( dds_value.get< std::string >() ) / 2
-                                                         : dds_value.get< int32_t >();
+        return dds_value.is_null() ? 0 : dds_value.get< int32_t >();
     }
 
-    json rs_dds_close_range_control::to_dds( size_t field, int32_t value ) const
-    {
-        return _legacy && field == downscale_ratio_field ? json( std::to_string( value * 2 ) ) : json( value );
-    }
-
-    // Packs rs2_icr_control; get( field, its DDS option ) returns the field's value. The 7-parameter FW has no
-    // mode option, so `legacy_mode` is used for it.
+    // Packs rs2_icr_control; get( field, its DDS option ) returns the field's value
     template< class Get >
-    std::vector< uint8_t > rs_dds_close_range_control::pack( int32_t legacy_mode, Get && get ) const
+    std::vector< uint8_t > rs_dds_close_range_control::pack( Get && get ) const
     {
         rs2_icr_control cfg{};
         cfg.header.version = DPP_HEADER_CURRENT_VERSION;
@@ -89,8 +67,6 @@ namespace librealsense {
         int32_t fields[field_count];
         for( size_t i = 0; i < field_count; ++i )
             fields[i] = _fields[i] ? get( i, *_fields[i] ) : 0;
-        if( _legacy )
-            fields[0] = legacy_mode;
         std::vector< uint8_t > raw( sizeof( cfg ) );
         std::memcpy( raw.data(), &cfg, sizeof( cfg ) );
         std::memcpy( raw.data() + fields_offset, fields, sizeof( fields ) );
@@ -99,10 +75,7 @@ namespace librealsense {
 
     std::vector< uint8_t > rs_dds_close_range_control::get_raw() const
     {
-        int32_t mode = RS2_ICR_MODE_OFF;
-        if( _legacy && _enable && to_field( 0, _enable->get_value() ) )
-            mode = _filter_type && to_field( 0, _filter_type->get_value() ) ? RS2_ICR_MODE_HIGH_RES : RS2_ICR_MODE_DOWNSCALE_HDR;
-        return pack( mode, [this]( size_t i, realdds::dds_option const & o ) { return to_field( i, o.get_value() ); } );
+        return pack( []( size_t, realdds::dds_option const & o ) { return to_field( o.get_value() ); } );
     }
 
     // Rejects a value its option does not accept, then adds it to the set-filter request
@@ -129,14 +102,7 @@ namespace librealsense {
         json options = json::object();
         for( size_t i = 0; i < writable_field_count; ++i )
             if( _fields[i] )
-                add_checked( options, _fields[i], to_dds( i, fields[i] ) );
-        if( _legacy )
-        {
-            if( _enable )
-                add_checked( options, _enable, int( fields[0] != RS2_ICR_MODE_OFF ) );
-            if( _filter_type && fields[0] != RS2_ICR_MODE_OFF )  // Off leaves the Filter Type as is
-                add_checked( options, _filter_type, int( fields[0] == RS2_ICR_MODE_HIGH_RES ) );
-        }
+                add_checked( options, _fields[i], fields[i] );
         _set_ef_cb( options );  // the reply updates the cached values, possibly adjusted by FW
     }
 
@@ -148,14 +114,13 @@ namespace librealsense {
             auto e = dynamic_cast< realdds::dds_enum_option const * >( &o );
             return e && ! e->get_choices().empty() ? &e->get_choices() : nullptr;
         };
-        auto min = pack( RS2_ICR_MODE_OFF, [&]( size_t i, realdds::dds_option const & o )
-                         { return to_field( i, choices( o ) ? json( choices( o )->front() ) : o.get_minimum_value() ); } );
-        auto max = pack( RS2_ICR_MODE_HIGH_RES, [&]( size_t i, realdds::dds_option const & o )
-                         { return to_field( i, choices( o ) ? json( choices( o )->back() ) : o.get_maximum_value() ); } );
-        auto step = pack( 1, [&]( size_t i, realdds::dds_option const & o )
-                          { return choices( o ) ? 1 : to_field( i, o.get_stepping() ); } );
-        auto def = pack( RS2_ICR_MODE_OFF,
-                         [&]( size_t i, realdds::dds_option const & o ) { return to_field( i, o.get_default_value() ); } );
+        auto min = pack( [&]( size_t, realdds::dds_option const & o )
+                         { return to_field( choices( o ) ? json( choices( o )->front() ) : o.get_minimum_value() ); } );
+        auto max = pack( [&]( size_t, realdds::dds_option const & o )
+                         { return to_field( choices( o ) ? json( choices( o )->back() ) : o.get_maximum_value() ); } );
+        auto step = pack( [&]( size_t, realdds::dds_option const & o )
+                          { return choices( o ) ? 1 : to_field( o.get_stepping() ); } );
+        auto def = pack( []( size_t, realdds::dds_option const & o ) { return to_field( o.get_default_value() ); } );
         std::vector< uint8_t > range;
         for( auto * bound : { &min, &max, &step, &def } )
             range.insert( range.end(), bound->begin(), bound->end() );
