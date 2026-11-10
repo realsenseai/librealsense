@@ -75,10 +75,6 @@ class intent_option : public composite_option_interface {
             size_t retained = 0;
             for (size_t i = 0; i < model.count; ++i) {
                 bool supported = reported.count(model.streams[i].branch) != 0U;
-                for (const auto &b : rsintent::branches)
-                    if (b.id == model.streams[i].branch && b.since > version[1]) supported = false;
-                for (const auto &s : rsintent::sensors)
-                    if (s.id == model.streams[i].sensor && s.since > version[1]) supported = false;
                 if (supported) model.streams[retained++] = model.streams[i];
             }
             model.count = retained;
@@ -90,11 +86,6 @@ class intent_option : public composite_option_interface {
             if (rsintent::encode(model, rsintent::SET, next.data(), next.size()).code !=
                 rsintent::OK)
                 throw std::invalid_argument("Intent: cannot normalize declaration");
-            if (intent_tlv::pack(records) != intent_tlv::pack(intent_tlv::filter(records)))
-                next = payload;
-            next[0] = version[0];
-            next[6] = version[1];
-            next[7] = version[18];
         }
         std::lock_guard<std::mutex> lock(_mutex);
         sensor->invoke_powered([&](platform::uvc_device &dev) {
@@ -119,7 +110,8 @@ class intent_option : public composite_option_interface {
                             static_cast<int>(status.size())))
                 throw std::runtime_error("Intent: status read failed before start");
         });
-        if (status[2] == 0U || get_raw() != _expected)
+        // An older SDK can compare known fields, not interpret newer opaque entries.
+        if (status[2] == 0U || intent_tlv::canonical_known(get_raw()) != _expected)
             throw std::runtime_error(
                 "Intent cleared or replaced; declare it again before starting");
     }

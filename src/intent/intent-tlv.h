@@ -105,15 +105,25 @@ inline std::vector<uint8_t> transfer(const std::vector<uint8_t> &original, const
     std::fill(wire.begin() + 8, wire.end(), 0);
     require(body.size() <= wire.size() - 8);
     std::copy(body.begin(), body.end(), wire.begin() + 8);
-    rsintent::write16(wire.data() + 2, static_cast<uint16_t>(body.size()));
+    rsintent::write16(wire.data() + rsintent::envelope_tlv_size_offset, static_cast<uint16_t>(body.size()));
     return wire;
 }
 inline std::vector<Record> body(const std::vector<uint8_t> &wire) {
     require(wire.size() == rsintent::wire_size);
-    const unsigned length = rsintent::read16(wire.data() + 2);
+    const unsigned length = rsintent::read16(wire.data() + rsintent::envelope_tlv_size_offset);
     require(length <= rsintent::max_tlv_size && length % 4 == 0 &&
-            (wire[1] != rsintent::CLEAR || length == 0));
+            (wire[rsintent::envelope_operation_offset] != rsintent::CLEAR || length == 0));
     return parse(std::vector<uint8_t>(wire.begin() + 8, wire.begin() + 8 + length));
+}
+inline std::vector<uint8_t> canonical_known(const std::vector<uint8_t> &wire) {
+    const auto records = body(wire);
+    structure(records);
+    const auto clean = transfer(wire, filter(records));
+    rsintent::Request request = {};
+    require(rsintent::decode(clean.data(), clean.size(), request).code == rsintent::OK);
+    std::vector<uint8_t> canonical(rsintent::wire_size);
+    require(rsintent::encode(request.model, rsintent::SET, canonical.data(), canonical.size()).code == rsintent::OK);
+    return canonical;
 }
 inline std::string hex(const std::vector<uint8_t> &bytes) {
     const char *digits = "0123456789abcdef";

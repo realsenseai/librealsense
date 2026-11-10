@@ -4,9 +4,7 @@
 #include <string>
 #include <vector>
 namespace librealsense {
-// status: FW GLOBAL_INTENT_STATUS; items newer than its minor are omitted with a warning.
-// firmware: FW GLOBAL_INTENT GET_CUR. Sensors and branches it does not list are omitted
-// with a warning (Light D, design v0.4 section 7.10, HR-4).
+// STATUS and GET_CUR drive compatibility warnings, never trimming or version downgrade.
 std::vector<uint8_t> encode_intent_json(const std::string &text,
                                        const std::vector<uint8_t> &status = {},
                                        const std::vector<uint8_t> &firmware = {});
