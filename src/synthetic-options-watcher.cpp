@@ -25,6 +25,7 @@ synthetic_options_watcher::options_and_values synthetic_options_watcher::update_
     {
         strong->prepare_for_bulk_operation();
         updated_options = options_watcher::update_options();
+        poll_adopted();  // the embedded filters' composite options share this power cycle
         strong->finished_bulk_operation();
     }
     catch( const std::exception & ex )

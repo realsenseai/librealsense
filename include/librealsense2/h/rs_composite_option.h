@@ -118,7 +118,7 @@ void rs2_delete_composite_options_list(rs2_composite_options_list* list);
 * \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
 * \return the number of changed composite options
 */
-int rs2_get_changed_composite_options_count(const rs2_options_list* list, rs2_error** error);
+int rs2_get_changed_composite_options_list_size(const rs2_options_list* list, rs2_error** error);
 
 /**
 * Retrieve the i-th changed composite option id from a list delivered to the options-changed callback.

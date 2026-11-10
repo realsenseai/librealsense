@@ -267,6 +267,7 @@ namespace librealsense
         virtual void unregister_option_from_update( rs2_option id );
         inline void pause_options_watcher() { _options_watcher.pause(); }
         inline void unpause_options_watcher() { _options_watcher.unpause(); }
+        void adopt_options_watcher( std::shared_ptr< options_watcher > const & child ) { _options_watcher.adopt( child ); }
 
         void prepare_for_bulk_operation() override { _raw_sensor->prepare_for_bulk_operation(); }
         void finished_bulk_operation() override { _raw_sensor->finished_bulk_operation(); }

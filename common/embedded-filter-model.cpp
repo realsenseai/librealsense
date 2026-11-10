@@ -632,31 +632,39 @@ namespace rs2
         {
             _embedded_filter->on_options_changed([this](const options_list& list)
                 {
-                    if (!_destructing)
-                        for (auto id : list.get_changed_composite_options())
+                    for (auto id : list.get_changed_composite_options())
+                    {
+                        if (_destructing)
+                            break;
+                        // The header toggle follows too while the editor is collapsed (not drawn, so not re-reading).
+                        // A failed read must not skip the remaining updates; the editor shows its own error when drawn.
+                        try
                         {
-                            // The header toggle follows too while the editor is collapsed (not drawn, so not re-reading).
-                            // A failed read must not skip the remaining updates; the editor shows its own error when drawn.
-                            try
+                            bool enabled;
+                            if (id == RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP)
                             {
-                                if (id == RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP)
-                                {
-                                    _decimation_filter_dpp_editor.mark_stale();
-                                    _enabled = _embedded_filter->get_composite_option_as< rs2_decimation_filter_dpp_config >( id ).enabled != 0;
-                                }
-                                else if (id == RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP)
-                                {
-                                    _temporal_filter_dpp_editor.mark_stale();
-                                    _enabled = _embedded_filter->get_composite_option_as< rs2_temporal_filter_dpp_config >( id ).enabled != 0;
-                                }
-                                else if (id == RS2_COMPOSITE_OPTION_ICR_CONTROL)
-                                {
-                                    _icr_editor.mark_stale();
-                                    _enabled = _embedded_filter->get_composite_option_as< rs2_icr_control >( id ).enable != 0;
-                                }
+                                _decimation_filter_dpp_editor.mark_stale();
+                                enabled = _embedded_filter->get_composite_option_as< rs2_decimation_filter_dpp_config >( id ).enabled != 0;
                             }
-                            catch (const std::exception&) {}
+                            else if (id == RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP)
+                            {
+                                _temporal_filter_dpp_editor.mark_stale();
+                                enabled = _embedded_filter->get_composite_option_as< rs2_temporal_filter_dpp_config >( id ).enabled != 0;
+                            }
+                            else if (id == RS2_COMPOSITE_OPTION_ICR_CONTROL)
+                            {
+                                _icr_editor.mark_stale();
+                                enabled = _embedded_filter->get_composite_option_as< rs2_icr_control >( id ).enable != 0;
+                            }
+                            else
+                                continue;
+                            // The read blocks, so re-check that the model still exists. Same fallback rule as the draw path:
+                            // a filter with the scalar enable option keeps that as the source of _enabled.
+                            if (!_destructing && !_embedded_filter->supports(RS2_OPTION_EMBEDDED_FILTER_ENABLED))
+                                _enabled = enabled;
                         }
+                        catch (const std::exception&) {}
+                    }
                     for (auto changed_option : list)
                     {
                         auto it = _options_id_to_model.find(changed_option->id);

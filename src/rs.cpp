@@ -5097,7 +5097,7 @@ void rs2_delete_composite_options_list(rs2_composite_options_list* list) BEGIN_A
 }
 NOEXCEPT_RETURN(, list)
 
-int rs2_get_changed_composite_options_count(const rs2_options_list* list, rs2_error** error) BEGIN_API_CALL
+int rs2_get_changed_composite_options_list_size(const rs2_options_list* list, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(list);
     return int(list->changed_composites.size());

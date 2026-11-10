@@ -52,6 +52,10 @@ public:
 
     rsutils::subscription subscribe( callback && cb );
 
+    // Let this watcher's thread also poll the composite options of 'child', so one thread (and one bulk-operation
+    // scope, see synthetic_options_watcher) serves both. The child runs no thread of its own.
+    void adopt( std::shared_ptr< options_watcher > const & child );
+
     void set_update_interval( std::chrono::milliseconds update_interval ) { _update_interval = update_interval; }
 
     inline void pause() { _paused.store(true); }
@@ -67,6 +71,9 @@ protected:
     virtual options_and_values update_options();
     composite_ids update_composite_options();
     void notify( options_and_values const & updated_options, composite_ids const & updated_composites );
+    void poll_adopted();    // run by the driving thread, inside its bulk-operation scope
+    void poll_as_adopted(); // composite options only: adopted watchers have no scalar options
+    bool adopted_have_subscribers() const;
 
     options_and_values _options;
     struct composite_and_value
@@ -82,6 +89,12 @@ protected:
     std::condition_variable _stopping;
     std::atomic_bool _destructing;
     std::atomic_bool _paused;
+    std::atomic_bool _running{ false };
+
+    std::atomic< options_watcher * > _driver{ nullptr };  // the watcher whose thread polls this one, if adopted
+    bool _primed = false;                                  // adopted only: baseline recorded, so changes are reported
+    mutable std::mutex _adopted_mutex;
+    std::vector< std::weak_ptr< options_watcher > > _adopted;
 };
 
 

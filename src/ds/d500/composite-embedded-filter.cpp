@@ -14,6 +14,7 @@ composite_embedded_filter< Base, Type >::composite_embedded_filter(
     std::shared_ptr< composite_option_interface > option,
     rs2_composite_option_id option_id )
 {
+    this->_options_watcher.register_composite_option( option_id, option );
     this->register_composite_option( option_id, std::move( option ) );
 }
 

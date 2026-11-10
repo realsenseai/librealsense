@@ -22,6 +22,55 @@ options_watcher::~options_watcher()
 {
     _destructing = true;
     stop();
+
+    // An adopted watcher (a filter) can outlive its driver (the sensor)
+    std::lock_guard< std::mutex > lock( _adopted_mutex );
+    for( auto & weak : _adopted )
+        if( auto child = weak.lock() )
+            child->_driver = nullptr;
+}
+
+void options_watcher::adopt( std::shared_ptr< options_watcher > const & child )
+{
+    std::lock_guard< std::mutex > lock( _adopted_mutex );
+    _adopted.push_back( child );
+    child->_driver = this;
+}
+
+bool options_watcher::adopted_have_subscribers() const
+{
+    std::lock_guard< std::mutex > lock( _adopted_mutex );
+    for( auto & weak : _adopted )
+        if( auto child = weak.lock() )
+            if( child->_on_values_changed.size() > 0 )
+                return true;
+    return false;
+}
+
+void options_watcher::poll_adopted()
+{
+    std::vector< std::shared_ptr< options_watcher > > children;
+    {
+        std::lock_guard< std::mutex > lock( _adopted_mutex );
+        for( auto & weak : _adopted )
+            if( auto child = weak.lock() )
+                children.push_back( std::move( child ) );
+    }
+    for( auto & child : children )
+        child->poll_as_adopted();
+}
+
+void options_watcher::poll_as_adopted()
+{
+    if( _on_values_changed.size() == 0 )
+    {
+        _primed = false;
+        return;
+    }
+    auto changed = update_composite_options();
+    if( _primed )
+        notify( {}, changed );
+    _primed = true;  // the first poll only records the baseline
 }
 
 void options_watcher::register_option( rs2_option id, std::shared_ptr< option > option )
@@ -74,19 +123,32 @@ bool options_watcher::should_start() const
 
 bool options_watcher::should_stop() const
 {
-    return _on_values_changed.size() == 0 || ( _options.empty() && _composite_options.empty() ) || _destructing;
+    return ( _on_values_changed.size() == 0 && ! adopted_have_subscribers() )
+        || ( _options.empty() && _composite_options.empty() ) || _destructing;
 }
 
 void options_watcher::start()
 {
-    if( ! _updater.joinable() ) // If not already started
+    if( auto driver = _driver.load() ) // Polled by the driver's thread, which has to be running
     {
-        _updater = std::thread( [this]() {
-            update_options();
-            update_composite_options();
-            thread_loop();
-        } );
+        if( driver->should_start() )
+            driver->start();
+        return;
     }
+
+    if( _running ) // Already started
+        return;
+
+    if( _updater.joinable() ) // A previous thread exited after the last unsubscribe
+        _updater.join();
+
+    _running = true;
+    _updater = std::thread( [this]() {
+        update_options();
+        update_composite_options();
+        thread_loop();
+        _running = false;
+    } );
 }
 
 void options_watcher::stop()

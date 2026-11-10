@@ -187,7 +187,7 @@ namespace rs2
             if( ! _list )
                 return res;
             rs2_error * e = nullptr;
-            auto count = rs2_get_changed_composite_options_count( _list.get(), &e );
+            auto count = rs2_get_changed_composite_options_list_size( _list.get(), &e );
             error::handle( e );
             for( int i = 0; i < count; ++i )
             {

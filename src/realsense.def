@@ -490,7 +490,7 @@ EXPORTS
     rs2_get_composite_options_list_size
     rs2_get_composite_option_from_list
     rs2_delete_composite_options_list
-    rs2_get_changed_composite_options_count
+    rs2_get_changed_composite_options_list_size
     rs2_get_changed_composite_option_from_list
     rs2_supports_composite_option
     rs2_is_composite_option_read_only
