@@ -53,8 +53,6 @@ public:
     void stop() override;
     void set_imu_sensitivity( rs2_stream stream, float value );
     double get_imu_sensitivity_values( rs2_stream stream );
-    // True if the user explicitly set the sensitivity of this stream (only then it is written to FW on open)
-    bool is_imu_sensitivity_set( rs2_stream stream ) const { return _imu_sensitivity_per_rs2_stream.count( stream ) > 0; }
     // Value to report for the sensitivity option: the user value if set, else the value held by FW (read once, while the
     // sensor is closed), else the given fallback.
     float query_imu_sensitivity( rs2_stream stream, float fallback );
@@ -88,6 +86,9 @@ private:
 
     // Read the sensitivity currently in FW, converted to the option scale. Returns false if unavailable.
     bool read_fw_imu_sensitivity( rs2_stream stream, float & option_value );
+    // True if the user explicitly set the sensitivity of this stream (only then it is written to FW on open).
+    // Caller holds _configure_lock.
+    bool is_imu_sensitivity_set( rs2_stream stream ) const { return _imu_sensitivity_per_rs2_stream.count( stream ) > 0; }
     bool _gyro_sensitivity_uses_range_index = false;
 
     stream_profiles get_sensor_profiles( std::string sensor_name ) const;

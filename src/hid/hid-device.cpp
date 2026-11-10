@@ -237,14 +237,18 @@ namespace librealsense
         {
             const auto hid_interface = get_hid_interface()->get_number();
             uint32_t transferred;
-            return dev->control_transfer( USB_REQUEST_CODE_GET,
-                                          HID_REQUEST_GET_REPORT,
-                                          ( HID_REPORT_TYPE_FEATURE << 8 ) + report_id,
-                                          hid_interface,
-                                          (uint8_t *)&report,
-                                          sizeof( report ),
-                                          transferred,
-                                          1000 );
+            report = {};
+            auto res = dev->control_transfer( USB_REQUEST_CODE_GET,
+                                              HID_REQUEST_GET_REPORT,
+                                              ( HID_REPORT_TYPE_FEATURE << 8 ) + report_id,
+                                              hid_interface,
+                                              (uint8_t *)&report,
+                                              sizeof( report ),
+                                              transferred,
+                                              1000 );
+            if( res == RS2_USB_STATUS_SUCCESS && transferred < sizeof( report ) )
+                return RS2_USB_STATUS_OTHER;  // short read: the sensitivity field may be missing
+            return res;
         }
 
         usb_status rs_hid_device::set_feature_report( unsigned char power, int report_id, int fps, bool apply_sensitivity, double sensitivity )

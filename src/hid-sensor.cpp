@@ -144,6 +144,7 @@ void hid_sensor::close()
     {
         std::lock_guard< std::mutex > lock( _configure_lock );
         _configured_profiles.clear();
+        _fw_imu_sensitivity.clear();  // FW may have changed (this open wrote the user value), read again on next query
         _is_configured_stream.clear();
         _is_configured_stream.assign(RS2_STREAM_COUNT, false);
     }
