@@ -1,12 +1,11 @@
 {
-  "upstream_repository": "https://github.com/RealSenseAI-Internal/Software_D5x5_Constrains_Library",
-  "upstream_commit": "21f64a934b0b770da3c52d30e565bd510abe8065",
+  "upstream_repository": "https://github.com/RealSenseAI-Internal/soc-rs-hkr-common",
+  "upstream_commit": "eec08ef99f7b3571a136aa1e8cb039e39b53054e",
   "upstream_directory": "intent",
   "dictionary_sha256": "727baba76bf003aaaf6784fc85bf013f9d7936c8d57f4866430fedfcf1e607b2",
   "major": 1,
   "minor": 0,
   "patch": 0,
-  "consumer": "sdk",
   "files": {
     "IntentDictionary.h": "bacae36de3c54db44131126d45e025d64ac80a007f110042e3fe0d1031ba7abb",
     "IntentProtocol.cpp": "9586cd9ea1d908e5a837ec508c61674bdc6d2dd978fe7e58206f910966d8b9ba",
