@@ -29,15 +29,15 @@ namespace librealsense
     {
     }
 
+    // A FW version alone can't tell the products sharing the FW apart, so the product ID and connection decide first
     bool d500_nn_loader::supports_nn_upload() const
     {
-        return unsupported_reason().empty();
+        return ds::nn_upload_pids.count( get_pid() ) && ! _is_mipi_device;
     }
 
-    // A FW version alone can't tell the products sharing the FW apart, so the product ID and connection decide first
     std::string d500_nn_loader::unsupported_reason() const
     {
-        if( ! ds::nn_upload_pids.count( get_pid() ) || _is_mipi_device )
+        if( ! supports_nn_upload() )
             return "NN model upload is not supported on this camera";
         if( _fw_version < NN_UPLOAD_MIN_FW )
             return firmware_reason();
@@ -110,22 +110,28 @@ namespace librealsense
         }
     }
 
-    // NN_STATUS shows an install by any process. A status that FW without the NN tables refuses, or that can't be read,
-    // doesn't block the update: the FW itself refuses an update during the flash write
     void d500_nn_loader::enter_update_state() const
+    {
+        check_flash_write_allowed();
+        d500_device::enter_update_state();
+    }
+
+    // NN_STATUS shows an install by any process, including from the upload's own progress callback. A status that FW
+    // without the NN tables refuses, or that can't be read, doesn't block the write: the FW queues it behind the install
+    void d500_nn_loader::check_flash_write_allowed() const
     {
         nn::status status = {};
         try
         {
-            if( supports_nn_upload() )
+            if( unsupported_reason().empty() )
                 nn_transport_hwm( _hw_monitor ).read_status( status );
         }
-        catch( std::exception const & )
+        catch( std::exception const & e )
         {
+            LOG_DEBUG( "NN_STATUS read failed, not blocking the write: " << e.what() );
         }
         if( nn::is_busy( status.state ) )
             throw wrong_api_call_sequence_exception( nn::INSTALLING_MESSAGE );
-        d500_device::enter_update_state();
     }
 
     // Static reasons only: an upload in progress or a streaming sensor is refused by nn_upload itself

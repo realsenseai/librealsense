@@ -23,8 +23,9 @@ namespace librealsense
                         rs2_update_progress_callback_sptr callback ) override;
         bool is_upload_supported( std::string & reason ) override;
 
-        // The device refuses a FW update during an install
+        // The device refuses a FW update during an install, and queues calibration writes behind it
         void enter_update_state() const override;
+        void check_flash_write_allowed() const override;
 
     private:
         // Empty if this camera's product, connection and FW support the upload; otherwise why not

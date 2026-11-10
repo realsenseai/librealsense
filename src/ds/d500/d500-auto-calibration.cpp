@@ -198,6 +198,10 @@ namespace librealsense
                                                                         float * const health,
                                                                         rs2_update_progress_callback_sptr progress_callback )
     {
+        // A commit writes the new depth calibration to flash
+        if( json.find( "calib commit" ) != std::string::npos )
+            check_flash_write_allowed();
+
         bool is_d555 = false;
         auto dev = As< device >( _debug_dev );
         std::string dev_name = dev ? dev->get_info( RS2_CAMERA_INFO_NAME ) : "";
@@ -782,6 +786,7 @@ namespace librealsense
 
     void d500_auto_calibrated::write_calibration() const
     {
+        check_flash_write_allowed();
         _calib_engine->write_calibration(_curr_calibration);
 
         for( auto & cb : _depth_write_callbacks )
@@ -819,6 +824,7 @@ namespace librealsense
 
     void d500_auto_calibrated::reset_to_factory_calibration() const
     {
+        check_flash_write_allowed();
         auto cmd = _debug_dev->build_command(ds::CAL_RESTORE_DFLT);
         auto res = _debug_dev->send_receive_raw_data(cmd);
 
@@ -927,6 +933,7 @@ namespace librealsense
 
     void d500_auto_calibrated::set_calibration_config(const std::string& calibration_config_json_str) const
     {
+        check_flash_write_allowed();
         _calib_engine->set_calibration_config(calibration_config_json_str);
     }
 
