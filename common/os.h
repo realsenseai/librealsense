@@ -25,6 +25,9 @@ namespace rs2
 
     std::vector<std::string> split_string(std::string& input, char delim);
 
+    // Wayland forbids reading or setting the window position and icon
+    bool is_wayland();
+
     // Helper function to get window rect from GLFW
     rect get_window_rect(GLFWwindow* window);
 

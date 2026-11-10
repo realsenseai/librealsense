@@ -108,13 +108,23 @@ Some auxillary functionalities might be affected. Please report this message if 
         return result;
     }
 
+    bool is_wayland()
+    {
+#if GLFW_VERSION_MAJOR > 3 || ( GLFW_VERSION_MAJOR == 3 && GLFW_VERSION_MINOR >= 4 )
+        return glfwGetPlatform() == GLFW_PLATFORM_WAYLAND;
+#else
+        return false;
+#endif
+    }
+
     // Helper function to get window rect from GLFW
     rect get_window_rect(GLFWwindow* window)
     {
         int width, height;
         glfwGetWindowSize(window, &width, &height);
-        int xpos, ypos;
-        glfwGetWindowPos(window, &xpos, &ypos);
+        int xpos = 0, ypos = 0;
+        if (!is_wayland())
+            glfwGetWindowPos(window, &xpos, &ypos);
 
         return{ (float)xpos, (float)ypos,
             (float)width, (float)height };

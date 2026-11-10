@@ -335,6 +335,7 @@ namespace rs2
             glfwWindowHint(GLFW_SAMPLES, _msaa_samples);
         
         glfwWindowHint(GLFW_VISIBLE, 0);
+        glfwWindowHint(GLFW_FOCUS_ON_SHOW, !is_wayland());  // Wayland cannot set focus
 
         // Create GUI Windows
         _win = glfwCreateWindow(_width, _height, _title_str.c_str(),
@@ -342,7 +343,7 @@ namespace rs2
         if (!_win)
             throw std::runtime_error("Could not open OpenGL window, please check your graphic drivers or use the textual SDK tools");
 
-        if (config_file::instance().get(configurations::window::saved_pos))
+        if (config_file::instance().get(configurations::window::saved_pos) && !is_wayland())
         {
             int x = config_file::instance().get(configurations::window::position_x);
             int y = config_file::instance().get(configurations::window::position_y);
@@ -415,7 +416,8 @@ namespace rs2
             self->_window_state_timer.start();
         });
 
-        setup_icon();
+        if (!is_wayland())
+            setup_icon();
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -477,7 +479,8 @@ namespace rs2
         if (_use_glsl_proc) rs2::gl::init_processing(_win, _use_glsl_proc);
 
         glfwShowWindow(_win);
-        glfwFocusWindow(_win);
+        if (!is_wayland())
+            glfwFocusWindow(_win);
 
         _show_fps = config_file::instance().get(configurations::performance::show_fps);
         _vsync = config_file::instance().get(configurations::performance::vsync);
