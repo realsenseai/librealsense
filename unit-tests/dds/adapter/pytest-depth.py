@@ -67,8 +67,6 @@ def test_depth():
     assert adapter_process is not None
 
     from rspy import librs as rs
-    if log.isEnabledFor( logging.DEBUG ):
-        rs.log_to_console( rs.log_severity.debug )
 
     try:
 

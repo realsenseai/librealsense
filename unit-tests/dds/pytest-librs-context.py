@@ -13,8 +13,6 @@ pytestmark = [
     pytest.mark.dds,
 ]
 
-if log.isEnabledFor(logging.DEBUG):
-    rs.log_to_console( rs.log_severity.debug )
 
 #############################################################################################
 #

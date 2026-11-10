@@ -188,8 +188,6 @@ else:
         #############################################################################################
         # Initialize librs device
         from rspy import librs as rs
-        if log.isEnabledFor( logging.DEBUG ):
-            rs.log_to_console( rs.log_severity.debug )
         context = rs.context( { 'dds': { 'enabled': True, 'domain': config_file.get_domain_from_config_file_or_default() }} )
         device = rs.wait_for_devices( context, rs.only_sw_devices, n=1. )
         sensors = device.sensors

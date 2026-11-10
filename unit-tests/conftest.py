@@ -58,7 +58,7 @@ from rspy.signals import register_signal_handlers
 from rspy.pytest.logging_setup import (
     setup_test_logging, bridge_rspy_log, ensure_newline, configure_logging,
     open_log, close_log, _compose_log_name, print_terminal_summary,
-    configure_junit_logging, install_rs_log_bridge,
+    configure_junit_logging, install_rs_log_bridge, uninstall_rs_log_bridge,
 )
 from rspy.pytest.log_live_format import install as install_live_log_format
 from rspy.pytest.cli import consume_legacy_flags, apply_pending_flags
@@ -914,6 +914,19 @@ def module_device_setup(request, _test_device_serial, __pytest_repeat_step_numbe
 
     yield serial_number
     _teardown([serial_number])
+
+
+@pytest.fixture(scope="module")
+def rs_debug_log(module_log):
+    """Under --debug, LibRS debug logs of this module go to its log file and are turned off at
+    module teardown. A no-op when --rslog already bridges them for the whole session."""
+    if not (rs and log.isEnabledFor(logging.DEBUG) and install_rs_log_bridge(rs)):
+        yield
+        return
+    try:
+        yield
+    finally:
+        uninstall_rs_log_bridge(rs)
 
 
 @pytest.fixture(scope="module")

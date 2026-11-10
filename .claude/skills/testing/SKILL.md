@@ -55,6 +55,11 @@ Flags are registered in `conftest.py`: `--live`, `--not-live`, `--device`, `--ex
 `--context`, `--tag`, `--repeat`, `--reruns`, `--debug`, `--rslog`, `--test-dir`, `--device-map`. Note that `-s`
 disables the per-test log files. See the `pytest-infra` skill (`.claude/skills/pytest-infra/SKILL.md`) for fixtures and markers.
 
+LibRS (SDK) debug logs: `--rslog` sends them to every test's log file for the whole session. For one test file only,
+add `pytest.mark.usefixtures('rs_debug_log')` (on under `--debug`, turned off when the file ends; every `dds/` file
+already has it). Never call `rs.log_to_console()` from a test — the LibRS logger is process-global, so it leaks into
+the console of every later test.
+
 ## Running the C++ Tests (legacy runner)
 
 Navigate to the `unit-tests/` directory and run:

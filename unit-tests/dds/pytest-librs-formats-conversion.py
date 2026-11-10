@@ -15,8 +15,6 @@ pytestmark = [
     pytest.mark.flaky( reruns=2 ),
 ]
 
-if log.isEnabledFor(logging.DEBUG):
-    rs.log_to_console( rs.log_severity.debug )
 
 @pytest.fixture(scope='module')
 def remote_and_sensors():

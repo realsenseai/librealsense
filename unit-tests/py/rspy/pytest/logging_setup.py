@@ -61,10 +61,12 @@ def install_rs_log_bridge(rs):
     --rslog surfaces LibRS debug lines regardless of --debug -- matching the legacy
     run-unit-tests.py behavior, where --rslog and --debug were independent -- WITHOUT lowering
     the shared logger and leaking every other test's DEBUG output. Its records still propagate
-    up to the root FileHandler (propagation is gated only by the originating logger's level)."""
+    up to the root FileHandler (propagation is gated only by the originating logger's level).
+
+    Returns True only if this call installed the bridge (False if one is already installed)."""
     global _rs_log_callback
     if _rs_log_callback is not None:
-        return
+        return False
     level_map = {
         rs.log_severity.debug: logging.DEBUG,
         rs.log_severity.info: logging.INFO,
@@ -75,6 +77,8 @@ def install_rs_log_bridge(rs):
     rs_log = logging.getLogger('librealsense.rs')
 
     def _callback(severity, message):
+        if _rs_log_callback is not _callback:
+            return  # delivered after uninstall: drop it rather than leak into the next module's log
         try:
             # Older pyrealsense2 builds may hand the callback a plain str instead of a
             # log-message object; fall back to str() so the message still gets through.
@@ -84,13 +88,21 @@ def install_rs_log_bridge(rs):
             pass  # never let a logging callback break a test
 
     rs_log.setLevel(logging.DEBUG)
-    _rs_log_callback = _callback
     try:
         # Async: the emitting LibRS thread never takes the GIL, so a LOG under an internal
         # mutex cannot deadlock against the main thread; messages arrive as plain str
         rs.log_to_callback(rs.log_severity.debug, _callback, asynchronous=True)
     except TypeError:  # older pyrealsense2 build without the flag
         rs.log_to_callback(rs.log_severity.debug, _callback)
+    _rs_log_callback = _callback
+    return True
+
+
+def uninstall_rs_log_bridge(rs):
+    """Reset the process-global LibRS logger so later tests don't inherit the bridge."""
+    global _rs_log_callback
+    rs.reset_logger()
+    _rs_log_callback = None
 
 
 def bridge_rspy_log():
