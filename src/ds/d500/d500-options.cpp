@@ -68,12 +68,15 @@ namespace librealsense
     float d500_hid_accel_sensitivity_option::query() const
     {
         // Until the user sets a value, follow the FW (like DDS and GMSL do)
-        if( ! _user_set )
+        if( ! _user_set && ! _fw_value_read )
         {
             auto sensor = _sensor.lock();
             float fw_value;
-            if( sensor && ! sensor->is_streaming() && sensor->read_fw_imu_sensitivity( RS2_STREAM_ACCEL, fw_value ) )
+            if( sensor && ! sensor->is_opened() && sensor->read_fw_imu_sensitivity( RS2_STREAM_ACCEL, fw_value ) )
+            {
                 _value = fw_value;
+                _fw_value_read = true;
+            }
         }
         return _value;
     }

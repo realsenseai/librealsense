@@ -7,13 +7,22 @@ import pyrealsense2 as rs
 import logging
 log = logging.getLogger(__name__)
 
-# On USB (HID) the SDK must follow the FW sensitivity default and write it only when the user sets the option
+# On USB (HID) the SDK must follow the FW sensitivity and write it only when the user sets the option.
+# Note: the value set by one application stays in FW and is seen by the next one.
 pytestmark = [
-    pytest.mark.device_each("D455"),
-    pytest.mark.device_each("D500*"),
+    pytest.mark.device_each("D455", "D500*"),
     pytest.mark.device_type_exclude("DDS", "GMSL"),
     pytest.mark.skipif(platform.machine() == "aarch64", reason="D455 not available on CI Jetson"),
 ]
+
+OPTIONS = [rs.option.gyro_sensitivity, rs.option.accel_sensitivity]
+
+
+def _motion_sensor_of_same_device(ctx, serial):
+    for d in ctx.query_devices():
+        if d.get_info(rs.camera_info.serial_number) == serial:
+            return d, d.first_motion_sensor()
+    pytest.fail(f"device {serial} not found in a new context")
 
 
 def _stream_imu_once(dev, ctx):
@@ -26,37 +35,40 @@ def _stream_imu_once(dev, ctx):
     pipe.stop()
 
 
-def test_open_does_not_override_fw_default(test_device):
+@pytest.fixture
+def restore_fw_sensitivity(test_device):
+    """Remember the FW values before the test and write them back after it (FW keeps what the SDK writes)."""
     dev, ctx = test_device
-    motion_sensor = dev.first_motion_sensor()
-    if not motion_sensor.supports(rs.option.gyro_sensitivity):
-        pytest.skip("Gyro Sensitivity option not supported on this device/FW")
-
-    fw_default = motion_sensor.get_option(rs.option.gyro_sensitivity)
-    log.info(f"gyro sensitivity reported before open: {fw_default}")
-
+    ms = dev.first_motion_sensor()
+    original = {opt: ms.get_option(opt) for opt in OPTIONS if ms.supports(opt)}
+    yield original
+    for opt, value in original.items():
+        ms.set_option(opt, value)
     _stream_imu_once(dev, ctx)
 
-    assert motion_sensor.get_option(rs.option.gyro_sensitivity) == fw_default
 
-
-def test_user_value_stays_in_fw(test_device):
+@pytest.mark.parametrize("option", OPTIONS, ids=lambda o: str(o))
+def test_value_set_by_one_context_is_seen_by_the_next(test_device, restore_fw_sensitivity, option):
     dev, ctx = test_device
-    motion_sensor = dev.first_motion_sensor()
-    if not motion_sensor.supports(rs.option.gyro_sensitivity):
-        pytest.skip("Gyro Sensitivity option not supported on this device/FW")
+    ms = dev.first_motion_sensor()
+    if not ms.supports(option):
+        pytest.skip(f"{option} not supported on this device/FW")
+    serial = dev.get_info(rs.camera_info.serial_number)
 
-    original = motion_sensor.get_option(rs.option.gyro_sensitivity)
-    new_value = 3.0 if original != 3.0 else 2.0
-    try:
-        motion_sensor.set_option(rs.option.gyro_sensitivity, new_value)
-        _stream_imu_once(dev, ctx)
+    original = restore_fw_sensitivity[option]
+    new_value = 2.0 if original != 2.0 else 1.0
 
-        # A new context has no cached user value: the option must report what FW holds
-        ctx2 = rs.context()
-        dev2 = ctx2.query_devices()[0]
-        readback = dev2.first_motion_sensor().get_option(rs.option.gyro_sensitivity)
-        assert readback == new_value
-    finally:
-        motion_sensor.set_option(rs.option.gyro_sensitivity, original)
-        _stream_imu_once(dev, ctx)
+    # Context A: explicitly set, FW must receive it on open
+    ms.set_option(option, new_value)
+    _stream_imu_once(dev, ctx)
+
+    # Context B: nothing set by the user, query() must report what FW holds, and opening must not change it
+    ctx_b = rs.context()
+    dev_b, ms_b = _motion_sensor_of_same_device(ctx_b, serial)
+    assert ms_b.get_option(option) == new_value
+    _stream_imu_once(dev_b, ctx_b)
+
+    # Context C: still the same value after B opened the sensor without setting anything
+    ctx_c = rs.context()
+    _, ms_c = _motion_sensor_of_same_device(ctx_c, serial)
+    assert ms_c.get_option(option) == new_value

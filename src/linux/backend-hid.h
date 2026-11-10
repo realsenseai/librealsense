@@ -175,7 +175,6 @@ namespace librealsense
 
             std::string get_sampling_frequency_name() const;
 
-            std::string get_sensitivity_name() const;
 
             // read the IIO device inputs.
             void read_device_inputs();

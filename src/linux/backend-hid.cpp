@@ -842,7 +842,7 @@ namespace librealsense
             _sampling_frequency_name = get_sampling_frequency_name();
 
             // get the specific name of sensitivity
-            _sensitivity_name = get_sensitivity_name();
+            _sensitivity_name = find_sensitivity_name( _iio_device_path );
             
             for (auto& input : _inputs)
                 input->enable(true);
@@ -925,11 +925,6 @@ namespace librealsense
 
         /*The sensitivity value we need to transfer to FW is stored in a file named with "hysteresis" in its title.
         Therefore, we are searching for a file that includes "hysteresis" in its name.*/
-        std::string iio_hid_sensor::get_sensitivity_name() const
-        {
-            return find_sensitivity_name( _iio_device_path );
-        }
-
         std::string iio_hid_sensor::find_sensitivity_name( const std::string & iio_device_path )
         {
             std::string sensitivity_name = "";

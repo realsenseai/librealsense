@@ -403,18 +403,21 @@ bool hid_sensor::read_fw_imu_sensitivity( rs2_stream stream, float & option_valu
 
         if( stream == RS2_STREAM_GYRO && ! _gyro_sensitivity_uses_range_index )
         {
-            // D400 token (0, 0.1 .. 0.4) -> option index, nearest match
+            // D400 token (0.1 .. 0.4) -> option index, nearest match. Raw 0 is ambiguous (libusb stores the token as an
+            // integer, so every token reads back as 0) and is reported as unavailable.
             for( auto && entry : gyro_sensitivity_convert )
-                if( std::fabs( entry.second - raw ) < 0.05 )
+                if( entry.second > 0. && std::fabs( entry.second - raw ) < 0.05 )
                 {
                     option_value = entry.first;
                     return true;
                 }
             return false;
         }
-        // Range index (D500 gyro and accel)
+        // Range index (D500 gyro and accel). Anything that is not a valid index (e.g. a legacy fractional value
+        // written by an older SDK) is reported as unavailable.
         const auto index = std::round( raw );
-        if( index < 0. || index > 4. )
+        const double max_index = stream == RS2_STREAM_ACCEL ? RS2_ACCEL_SENSITIVITY_COUNT - 1 : 4.;
+        if( std::fabs( raw - index ) > 0.05 || index < 0. || index > max_index )
             return false;
         option_value = static_cast< float >( index );
         return true;
