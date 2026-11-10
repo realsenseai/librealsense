@@ -1,4 +1,4 @@
-// Generated from schema/dictionary.json by tools/generate.py; do not edit.
+// Generated from schema/dictionary.json by tools/generate_intent_contract_headers.py; do not edit.
 #pragma once
 #include <stdint.h>
 namespace rsintent {
