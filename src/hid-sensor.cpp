@@ -144,7 +144,8 @@ void hid_sensor::close()
     {
         std::lock_guard< std::mutex > lock( _configure_lock );
         _configured_profiles.clear();
-        _fw_imu_sensitivity.clear();  // FW may have changed (this open wrote the user value), read again on next query
+        if( ! _imu_sensitivity_per_rs2_stream.empty() )
+            _fw_imu_sensitivity.clear();  // open() wrote the user value to FW, read it again on the next query
         _is_configured_stream.clear();
         _is_configured_stream.assign(RS2_STREAM_COUNT, false);
     }
@@ -422,10 +423,11 @@ bool hid_sensor::read_fw_imu_sensitivity( rs2_stream stream, float & option_valu
 
         if( stream == RS2_STREAM_GYRO && ! _gyro_sensitivity_uses_range_index )
         {
-            // D400 token (0.1 .. 0.4) -> option index, nearest match. Raw 0 is ambiguous (libusb stores the token as an
-            // integer, so every token reads back as 0) and is reported as unavailable.
+            // D400 token (0, 0.1 .. 0.4) -> option index, nearest match
+            if( _hid_device->is_token_sensitivity_read_lossy() )
+                return false;
             for( auto && entry : gyro_sensitivity_convert )
-                if( entry.second > 0. && std::fabs( entry.second - raw ) < 0.05 )
+                if( std::fabs( entry.second - raw ) < 0.05 )
                 {
                     option_value = entry.first;
                     return true;

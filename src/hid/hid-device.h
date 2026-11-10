@@ -43,6 +43,7 @@ namespace librealsense
             // accel raw counts pass through unscaled on this backend
             void set_accel_scale_factor( double scale_factor ) override {}
             bool read_sensitivity( const std::string & sensor_name, double & value ) override;
+            bool is_token_sensitivity_read_lossy() const override { return true; }
 
         private:
             void handle_interrupt();

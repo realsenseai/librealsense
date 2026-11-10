@@ -91,6 +91,9 @@ public:
     // Read the sensitivity currently held by FW for a sensor, as the raw backend value (not yet converted to option scale).
     // Returns false if the backend cannot provide it.
     virtual bool read_sensitivity( const std::string & sensor_name, double & value ) { return false; }
+    // True if the backend cannot carry the D400 fractional gyro token (0, 0.1 .. 0.4) through read_sensitivity (libusb stores
+    // it as an integer, so every token reads back as 0)
+    virtual bool is_token_sensitivity_read_lossy() const { return false; }
 };
 
 

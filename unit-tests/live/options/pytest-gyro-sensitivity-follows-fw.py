@@ -48,16 +48,16 @@ def restore_fw_sensitivity(test_device):
     _stream_imu_once(dev, ctx)
 
 
+@pytest.mark.parametrize("level", [0.0, 1.0, 2.0, 3.0], ids=lambda v: f"level{int(v)}")  # valid for both gyro and accel
 @pytest.mark.parametrize("option", OPTIONS, ids=lambda o: str(o))
-def test_value_set_by_one_context_is_seen_by_the_next(test_device, restore_fw_sensitivity, option):
+def test_value_set_by_one_context_is_seen_by_the_next(test_device, restore_fw_sensitivity, option, level):
     dev, ctx = test_device
     ms = dev.first_motion_sensor()
     if not ms.supports(option):
         pytest.skip(f"{option} not supported on this device/FW")
     serial = dev.get_info(rs.camera_info.serial_number)
 
-    original = restore_fw_sensitivity[option]
-    new_value = 2.0 if original != 2.0 else 1.0
+    new_value = level
 
     # Context A: explicitly set, FW must receive it on open
     ms.set_option(option, new_value)
