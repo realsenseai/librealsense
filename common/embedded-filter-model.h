@@ -8,6 +8,7 @@
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
 #include <librealsense2/h/rs_icr_control.h>
 #include "composite-control-editor.h"
+#include <chrono>
 #include <functional>
 #include <string>
 #include <vector>
@@ -95,8 +96,9 @@ namespace rs2
         bool draw_decimation_filter_dpp_fields( std::string & error_message );
         bool draw_temporal_filter_dpp_fields( std::string & error_message );
         // Each ICR field is wrapped in BeginDisabled()/EndDisabled() when the current
-        // filter_type/shift_mode selection makes it irrelevant.
+        // mode/high_res_mode selection makes it irrelevant.
         bool draw_icr_fields( std::string & error_message );
+        void sanitize_icr( rs2_icr_control & v );
 
         // The three concerns populate_options() used to inline directly, split out so each is
         // readable on its own: scalar rs2_option models, composite-option editor priming, and
@@ -137,7 +139,15 @@ namespace rs2
         field_edit_state _temporal_filter_dpp_smooth_delta_edit;
 
         composite_control_editor< rs2_icr_control > _icr_editor;
-        field_edit_state _icr_shift_edit;
-        field_edit_state _icr_threshold_edit;
+        field_edit_state _icr_high_res_offset_edit;
+        field_edit_state _icr_smoothing_edit;
+        field_edit_state _icr_completion_edit;
+        std::chrono::steady_clock::time_point _icr_telemetry_time;
+        bool _icr_telemetry_valid = false;
+        // FW-reported bounds, fetched once like the Decimation range above
+        rs2_icr_control_range _icr_range{};
+        bool _icr_range_initialized = false;
+        // Mode restored when the filter is switched back on, as FW only allows Off <-> the prebuilt active mode
+        int32_t _icr_last_active_mode = RS2_ICR_MODE_DOWNSCALE_HDR;
     };
 }

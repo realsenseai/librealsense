@@ -76,21 +76,23 @@ void init_options(py::module &m) {
         m, "icr_control", "Improved Close Range Control composite option payload - see rs_icr_control.h." )
         .def( py::init<>() )
         .def_readwrite( "header", &rs2_icr_control::header )
-        .def_readwrite( "enable", &rs2_icr_control::enable )
-        .def_readwrite( "filter_type", &rs2_icr_control::filter_type )
+        .def_readwrite( "mode", &rs2_icr_control::mode )
         .def_readwrite( "downscale_ratio", &rs2_icr_control::downscale_ratio )
-        .def_readwrite( "shift_mode", &rs2_icr_control::shift_mode )
-        .def_readwrite( "shift_pixels", &rs2_icr_control::shift_pixels )
-        .def_readwrite( "threshold_mode", &rs2_icr_control::threshold_mode )
-        .def_readwrite( "threshold_mm", &rs2_icr_control::threshold_mm )
+        .def_readwrite( "high_res_mode", &rs2_icr_control::high_res_mode )
+        .def_readwrite( "high_res_offset", &rs2_icr_control::high_res_offset )
+        .def_readwrite( "smoothing_offset_mm", &rs2_icr_control::smoothing_offset_mm )
+        .def_readwrite( "completion_offset_mm", &rs2_icr_control::completion_offset_mm )
+        .def_readwrite( "baseline_min_depth_mm", &rs2_icr_control::baseline_min_depth_mm )
+        .def_readwrite( "improved_min_depth_mm", &rs2_icr_control::improved_min_depth_mm )
         .def( "__repr__",
               []( rs2_icr_control const & v )
               {
                   std::ostringstream ss;
-                  ss << "<icr_control enable=" << v.enable << " filter_type=" << v.filter_type
-                     << " downscale_ratio=" << v.downscale_ratio << " shift_mode=" << v.shift_mode
-                     << " shift_pixels=" << v.shift_pixels << " threshold_mode=" << v.threshold_mode
-                     << " threshold_mm=" << v.threshold_mm << ">";
+                  ss << "<icr_control mode=" << v.mode << " downscale_ratio=" << v.downscale_ratio
+                     << " high_res_mode=" << v.high_res_mode << " high_res_offset=" << v.high_res_offset
+                     << " smoothing_offset_mm=" << v.smoothing_offset_mm
+                     << " completion_offset_mm=" << v.completion_offset_mm << " baseline_min_depth_mm=" << v.baseline_min_depth_mm
+                     << " improved_min_depth_mm=" << v.improved_min_depth_mm << ">";
                   return ss.str();
               } );
 

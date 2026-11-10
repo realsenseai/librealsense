@@ -344,7 +344,15 @@ dds_device_proxy::dds_device_proxy( std::shared_ptr< const device_info > const &
             auto& embedded_filters = stream->embedded_filters();
             for (auto& embedded_filter : embedded_filters)
             {
-                sensor_info.proxy->add_embedded_filter(embedded_filter);
+                // A filter layout we do not support must not take the whole device down
+                try
+                {
+                    sensor_info.proxy->add_embedded_filter(embedded_filter);
+                }
+                catch( std::exception const & e )
+                {
+                    LOG_ERROR( "Embedded filter '" << embedded_filter->get_name() << "' not added: " << e.what() );
+                }
             }
         } );  // End foreach_stream lambda
 

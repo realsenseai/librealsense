@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Improved Close Range Depth over DDS. Older FW publishes Enable, Downscale Ratio, Disparity Shift and
-# Threshold, exposed as scalar options; newer FW publishes the 7 icr_control fields, exposed as the
+# Threshold, exposed as scalar options; newer FW publishes the 8 icr_control fields, exposed as the
 # icr_control composite option same as over USB (field round trips in live/options/pytest-icr-control.py).
 
 import time
@@ -10,6 +10,7 @@ import time
 import pytest
 import pyrealsense2 as rs
 import pyrsutils as rsutils
+from rspy.pytest.device_helpers import require_min_fw_version
 from pytest_check import check
 import logging
 log = logging.getLogger(__name__)
@@ -29,25 +30,17 @@ CLOSE_RANGE_METADATA_BIT = 1 << 5
 RATIO_INDEX_DEFAULT = 1.0    # choices ["1","2","4"], default "2" -> index 1
 SHIFT_DEFAULT      = 0.0
 
-# Minimum FW that registers the close-range feature, mirroring src/ds/d500/d500-factory.cpp.
-# Below the gate the feature is not registered and get_embedded_filter() throws rather than
-# returning a falsy value, so we skip up front.
-MIN_FW_BY_DEVICE = {
-    "D555": "7.58.39807.10573",
-}
+# Minimum FW with the 8-parameter Improved Close Range control, for every device. Below it the filter may not be
+# exposed and get_embedded_filter() throws rather than returning a falsy value, so we skip up front; from it on, a
+# missing filter is an error.
+MIN_FW = rsutils.version( 7, 62, 0, 0 )
 
 # Pick a depth profile that the close-range merge actually exercises on D555.
 DEPTH_W, DEPTH_H, DEPTH_FPS = 640, 360, 30
 
 
 def _skip_if_fw_below_minimum( dev ):
-    name = dev.get_info( rs.camera_info.name ) if dev.supports( rs.camera_info.name ) else ""
-    min_fw = next( ( v for k, v in MIN_FW_BY_DEVICE.items() if k in name ), None )
-    if min_fw is None:
-        return
-    fw = dev.get_info( rs.camera_info.firmware_version )
-    if rsutils.version( fw ) < rsutils.version( min_fw ):
-        pytest.skip( f"FW {fw} below minimum {min_fw} for Improved Close Range Depth on {name}" )
+    require_min_fw_version( dev, MIN_FW, "Improved Close Range 8-parameter control" )
 
 
 ICR = rs.composite_option_id.icr_control
@@ -59,8 +52,6 @@ def _get_close_range_filter( test_device, composite=None ):
     _skip_if_fw_below_minimum( dev )
     depth_sensor = dev.first_depth_sensor()
     f = depth_sensor.get_embedded_filter( rs.embedded_filter_type.improved_close_range_depth )
-    if not f:
-        pytest.skip( "Improved Close Range Depth filter not exposed (FW likely below the supported version)" )
     if composite is not None and _is_composite( f ) != composite:
         pytest.skip( f"FW exposes the {'composite' if _is_composite( f ) else 'scalar'} form" )
     return depth_sensor, f
@@ -79,7 +70,7 @@ def _set_fields( embedded_filter, **fields ):
 
 def _set_enable( embedded_filter, value ):
     if _is_composite( embedded_filter ):
-        _set_fields( embedded_filter, enable=value )
+        _set_fields( embedded_filter, mode=value )
     else:
         embedded_filter.set_option( rs.option.embedded_filter_enabled, value )
 
@@ -161,19 +152,19 @@ def test_icr_control_present( test_device ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
     cfg = embedded_filter.get_icr_control( ICR )
     assert cfg.header.version == 1
-    assert cfg.header.param_count == 7
+    assert cfg.header.param_count == 8
 
 
 def test_icr_control_enable_round_trip( test_device ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
-    original = embedded_filter.get_icr_control( ICR ).enable
+    original = embedded_filter.get_icr_control( ICR ).mode
     for value in ( 1, 0 ):
-        _set_fields( embedded_filter, enable=value )
-        check.equal( embedded_filter.get_icr_control( ICR ).enable, value )
-    _set_fields( embedded_filter, enable=original )
+        _set_fields( embedded_filter, mode=value )
+        check.equal( embedded_filter.get_icr_control( ICR ).mode, value )
+    _set_fields( embedded_filter, mode=original )
 
 
-@pytest.mark.parametrize( "field, value", [( "enable", 2 ), ( "enable", -1 ), ( "downscale_ratio", 3 ), ( "shift_pixels", 257 )] )
+@pytest.mark.parametrize( "field, value", [( "mode", 3 ), ( "mode", -1 ), ( "downscale_ratio", 3 ), ( "high_res_offset", 257 )] )
 def test_icr_control_invalid_value_rejected( test_device, field, value ):
     _, embedded_filter = _get_close_range_filter( test_device, composite=True )
     before = embedded_filter.get_icr_control( ICR )
