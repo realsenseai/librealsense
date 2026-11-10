@@ -65,9 +65,8 @@ def test_temperatures_xu_vs_hwmc(test_device):
                 decimal_part = relevant_data[i]
             else:
                 whole_number_part = relevant_data[i]
-                if decimal_part == 0xff or whole_number_part == 0xff:
-                    assert decimal_part == 0xff and whole_number_part == 0xff, \
-                        f"Partial unavailability sentinel: decimal=0x{decimal_part:02x} whole=0x{whole_number_part:02x}"
+                # only 0xff 0xff is the sentinel; a single 0xff byte is a valid reading (0xff 0x1d = 29.996 deg)
+                if decimal_part == 0xff and whole_number_part == 0xff:
                     current_temp = 0.0
                 else:
                     signed_whole_number_part = whole_number_part - 256 if whole_number_part > 127 else whole_number_part
