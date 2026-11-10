@@ -1,3 +1,5 @@
+// License: Apache 2.0. See LICENSE file in root directory.
+// Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 // Generated from schema/dictionary.json by tools/generate_intent_contract_headers.py; do not edit.
 #pragma once
 #include <stdint.h>
@@ -17,6 +19,12 @@ static const unsigned max_tlv_size = 1016U;
 static const unsigned sensor_record_bytes = 12U;
 static const unsigned enabled_stream_bytes = 44U;
 static const unsigned disabled_stream_bytes = 20U;
+static const unsigned envelope_major_offset = 0U;
+static const unsigned envelope_minor_offset = 1U;
+static const unsigned envelope_patch_offset = 2U;
+static const unsigned envelope_operation_offset = 3U;
+static const unsigned envelope_tlv_size_offset = 4U;
+static const unsigned envelope_reserved_offset = 6U;
 static const unsigned rule_revision = 4U;
 enum Selectors {
     GLOBAL_INTENT = 28,

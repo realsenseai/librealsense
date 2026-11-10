@@ -128,15 +128,14 @@ std::vector<intent_tlv::Record> applyLayouts(const json &j, std::vector<intent_t
     if (level == 1) require(!result.empty() && result.front().type == rsintent::SENSOR_ID);
     return result;
 }
-std::vector<intent_tlv::Record> supported(const std::vector<intent_tlv::Record> &records,
-                                        unsigned firmwareMinor, unsigned sourceMinor) {
+void warn_unsupported(const std::vector<intent_tlv::Record> &records,
+                      unsigned firmwareMinor, unsigned sourceMinor) {
     using namespace intent_tlv;
-    std::vector<Record> result;
-    for (auto r : records) {
+    for (const auto &r : records) {
         unsigned since = rsintent::recordSince(r.type);
         std::string name = "record type " + std::to_string(r.type);
         if (!recognized(r)) {
-            // No local since metadata: retain on the source FW or newer, omit on older FW.
+            // Opaque entries retain their source version; FW decides whether to accept them.
             since = sourceMinor;
             name = "opaque " + name;
             if (r.type == rsintent::SENSOR || r.type == rsintent::STREAM)
@@ -154,7 +153,7 @@ std::vector<intent_tlv::Record> supported(const std::vector<intent_tlv::Record> 
                     name = std::string("branch ") + b.name;
                 }
             }
-            r.value = pack(supported(parse(r.value), firmwareMinor, sourceMinor));
+            warn_unsupported(parse(r.value), firmwareMinor, sourceMinor);
         } else {
             switch (r.type) {
             case rsintent::SENSOR_ID: name = "SENSOR_ID"; break;
@@ -168,11 +167,18 @@ std::vector<intent_tlv::Record> supported(const std::vector<intent_tlv::Record> 
             }
         }
         if (since > firmwareMinor) {
-            LOG_WARNING("Intent: omitting " << name << " (since minor " << since
-                        << "; firmware minor " << firmwareMinor << ")");
-        } else result.push_back(r);
+            LOG_WARNING("Intent: forwarding " << name << " (since minor " << since
+                        << "; firmware minor " << firmwareMinor << "); firmware decides acceptance");
+        }
     }
-    return result;
+}
+void warn_version(const std::vector<uint8_t> &status) {
+    if (!status.empty() && status[1] != rsintent::minor) {
+        LOG_WARNING("Intent dictionary mismatch: SDK " << rsintent::major << "." << rsintent::minor
+                    << "." << rsintent::patch << ", firmware " << unsigned(status[0]) << "."
+                    << unsigned(status[1]) << "." << unsigned(status[18])
+                    << "; continuing with known fields and opaque pass-through");
+    }
 }
 void attachLayouts(json &j, const std::vector<intent_tlv::Record> &records, unsigned level) {
     j["layout"] = intent_tlv::layout(records);
@@ -195,6 +201,7 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
     if (!status.empty() && (status.size() != rsintent::status_size || status[0] != rsintent::major ||
                            status[3] > rsintent::READ_ONLY))
         throw std::invalid_argument("Intent: firmware major mismatch or invalid status");
+    warn_version(status);
     keys(j, {"version", "op", "sensors", "status", "layout"});
     const std::string operation = j.value("op", std::string("SET"));
     rsintent::Operation op = rsintent::SET;
@@ -260,8 +267,8 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
     std::vector<uint8_t> wire(rsintent::wire_size);
     if (rsintent::encode(model, op, wire.data(), wire.size()).code != rsintent::OK)
         throw std::invalid_argument("Intent: encoding failed");
-    wire[6] = minor;
-    wire[7] = patch;
+    wire[rsintent::envelope_minor_offset] = minor;
+    wire[rsintent::envelope_patch_offset] = patch;
     if (op == rsintent::CLEAR && j.contains("layout"))
         throw std::invalid_argument("Intent: CLEAR must not carry a layout");
     if (op != rsintent::CLEAR) {
@@ -282,7 +289,7 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
         });
         records = applyLayouts(j, records, 0);
         intent_tlv::structure(records);
-        if (!status.empty()) records = supported(records, status[1], minor);
+        if (!status.empty()) warn_unsupported(records, status[1], minor);
         wire = intent_tlv::transfer(wire, records);
     }
     return wire;
@@ -297,7 +304,10 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
         status.size() != rsintent::status_size || status[0] != rsintent::major ||
         status[3] > rsintent::READ_ONLY)
         throw std::invalid_argument("Intent: invalid firmware response");
-    json j = {{"version", std::to_string(wire[0]) + "." + std::to_string(wire[6]) + "." + std::to_string(wire[7])},
+    warn_version(status);
+    json j = {{"version", std::to_string(wire[rsintent::envelope_major_offset]) + "." +
+                         std::to_string(wire[rsintent::envelope_minor_offset]) + "." +
+                         std::to_string(wire[rsintent::envelope_patch_offset])},
               {"op", request.op == rsintent::CLEAR ? "CLEAR" :
                      (request.op == rsintent::VALIDATE_ONLY ? "VALIDATE_ONLY" : "SET")},
               {"sensors", json::array()}};

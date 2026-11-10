@@ -156,19 +156,20 @@ Error decode(const uint8_t *data, size_t size, Request &output) {
     if (!data || size != wire_size)
         return Error(INVALID, 0, 0, 0, 0, PARSE_TRANSFER_SIZE);
     // Envelope fields are checked in a fixed order; offset names the failing field.
-    if (data[0] != major)
-        return Error(INVALID, 0, 0, 0, 0, PARSE_MAJOR);
-    if (data[1] > CLEAR)
-        return Error(INVALID, 0, 0, 1, 0, PARSE_OPERATION);
-    if (read16(data + 4) != 0U)
-        return Error(INVALID, 0, 0, 4, 0, PARSE_RESERVED);
-    const size_t length = read16(data + 2);
-    if (length > max_tlv_size || (length & 3U) != 0U || (data[1] == CLEAR && length != 0U))
-        return Error(INVALID, 0, 0, 2, 0, PARSE_TLV_SIZE);
+    if (data[envelope_major_offset] != major)
+        return Error(INVALID, 0, 0, envelope_major_offset, 0, PARSE_MAJOR);
+    if (data[envelope_operation_offset] > CLEAR)
+        return Error(INVALID, 0, 0, envelope_operation_offset, 0, PARSE_OPERATION);
+    if (read16(data + envelope_reserved_offset) != 0U)
+        return Error(INVALID, 0, 0, envelope_reserved_offset, 0, PARSE_RESERVED);
+    const size_t length = read16(data + envelope_tlv_size_offset);
+    if (length > max_tlv_size || (length & 3U) != 0U ||
+        (data[envelope_operation_offset] == CLEAR && length != 0U))
+        return Error(INVALID, 0, 0, envelope_tlv_size_offset, 0, PARSE_TLV_SIZE);
     Request candidate = {};
-    candidate.op = static_cast<Operation>(data[1]);
-    candidate.minorVersion = data[6];
-    candidate.patchVersion = data[7];
+    candidate.op = static_cast<Operation>(data[envelope_operation_offset]);
+    candidate.minorVersion = data[envelope_minor_offset];
+    candidate.patchVersion = data[envelope_patch_offset];
     size_t pos = envelope_size;
     const size_t end = pos + length;
     unsigned sensorsSeen = 0U;
@@ -251,10 +252,10 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
     if (needed > size)
         return Error(INVALID);
     memset(data, 0, size);
-    data[0] = static_cast<uint8_t>(major);
-    data[1] = op;
-    data[6] = static_cast<uint8_t>(minor);
-    data[7] = static_cast<uint8_t>(patch);
+    data[envelope_major_offset] = static_cast<uint8_t>(major);
+    data[envelope_operation_offset] = op;
+    data[envelope_minor_offset] = static_cast<uint8_t>(minor);
+    data[envelope_patch_offset] = static_cast<uint8_t>(patch);
     if (op == CLEAR)
         return Error();
     size_t pos = envelope_size;
@@ -292,7 +293,7 @@ Error encode(const Model &m, Operation op, uint8_t *data, size_t size) {
             pos += 8U;
         }
     }
-    write16(data + 2, static_cast<uint16_t>(pos - envelope_size));
+    write16(data + envelope_tlv_size_offset, static_cast<uint16_t>(pos - envelope_size));
     return Error();
 }
 Model defaultModel(uint16_t sku) {
