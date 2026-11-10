@@ -1,3 +1,6 @@
+# License: Apache 2.0. See LICENSE file in root directory.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
 # Run after 80-iio-sensor-proxy.rules: the D555 IMU is managed by the camera SDK.
 # Desktop sensor services must not change its sampling interval, buffer, or trigger.
 SUBSYSTEM=="iio", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b56", ENV{IIO_SENSOR_PROXY_TYPE}=""
