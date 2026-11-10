@@ -27,12 +27,13 @@ with tempfile.TemporaryDirectory(prefix='intent-json-') as temp:
         # Cross-repo: the vendored bundle must be exactly what FW exports, and the
         # FW side of the test is compiled from the FW tree with its generated header.
         fw = args.fw_root.resolve()
-        subprocess.run([sys.executable, str(fw / 'tools/export_sdk.py'), '--check', str(contract)], check=True)
+        shared = fw / 'contract'
+        subprocess.run([sys.executable, str(shared / 'tools/export_sdk.py'), '--check', str(contract)], check=True)
         fw_include = out / 'fw-generated'
-        subprocess.run([sys.executable, str(fw / 'tools/generate.py'), '--output',
+        subprocess.run([sys.executable, str(shared / 'tools/generate.py'), '--output',
                         str(fw_include / 'IntentDictionary.h')], check=True)
-        fw_sources = [fw / 'IntentProtocol.cpp', fw / 'IntentRules.cpp', fw / 'IntentController.cpp']
-        fw_includes = ['-I' + str(fw_include), '-I' + str(fw), '-DINTENT_FW_RULES']
+        fw_sources = [shared / 'IntentProtocol.cpp', fw / 'IntentRules.cpp', fw / 'IntentController.cpp']
+        fw_includes = ['-I' + str(fw_include), '-I' + str(fw), '-I' + str(shared), '-DINTENT_FW_RULES']
     else:
         print('note: --fw-root not given; FW side uses the vendored codec and a rule stub')
         fw_sources = [contract / 'IntentProtocol.cpp', root / 'unit-tests/intent/rules-stub.cpp']
@@ -69,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix='intent-json-') as temp:
             shutil.copyfile(root / 'src/intent' / name, future / name)
         for name in ('IntentProtocol.cpp', 'IntentProtocol.h', 'IntentStatus.h'):
             shutil.copyfile(contract / name, future / 'contract' / name)
-        schema = json.loads((fw / 'schema/dictionary.json').read_text())
+        schema = json.loads((shared / 'schema/dictionary.json').read_text())
         schema['minor'] = 1
         for sensor in schema['sensors']:
             if sensor['name'] == 'COLOR': sensor['since'] = 1
@@ -77,7 +78,7 @@ with tempfile.TemporaryDirectory(prefix='intent-json-') as temp:
             if branch['name'] in ('RGB', 'RGB_R'): branch['since'] = 1
         schema_path = future / 'dictionary.json'
         schema_path.write_text(json.dumps(schema))
-        subprocess.run([sys.executable, str(fw / 'tools/generate.py'), '--schema', str(schema_path),
+        subprocess.run([sys.executable, str(shared / 'tools/generate.py'), '--schema', str(schema_path),
                         '--output', str(future / 'contract/IntentDictionary.h')], check=True)
         executable = out / 'test-versions'
         subprocess.run(host_flags + ['-I' + str(future), '-I' + str(future / 'contract'),
