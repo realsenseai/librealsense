@@ -289,6 +289,15 @@ namespace librealsense
 
         _depth_scale = ((librealsense::depth_frame*)depth.get())->get_units();
 
+        // Backends cache per-depth-profile state; drop it when depth switches profile (e.g. decimation toggled).
+        // Held by shared_ptr so a freed profile's address can't be mistaken for the current one.
+        auto depth_profile = ((librealsense::frame_interface*)depth.get())->get_stream();
+        if (depth_profile != _depth_profile)
+        {
+            _depth_profile = depth_profile;
+            reset_cache(RS2_STREAM_DEPTH, _to_stream_type);
+        }
+
         if (_to_stream_type == RS2_STREAM_DEPTH)
             frames.foreach_rs([&other_frames](const rs2::frame& f) {if ((f.get_profile().stream_type() != RS2_STREAM_DEPTH) && f.is<rs2::video_frame>()) other_frames.push_back(f); });
         else

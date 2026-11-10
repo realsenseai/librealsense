@@ -47,6 +47,7 @@ namespace librealsense
         rs2_stream _to_stream_type;
         std::map<std::pair<stream_profile_interface*, stream_profile_interface*>, std::shared_ptr<rs2::video_stream_profile>> _align_stream_unique_ids;
         rs2::stream_profile _source_stream_profile;
+        std::shared_ptr<stream_profile_interface> _depth_profile;
         float _depth_scale;
 
     private:
