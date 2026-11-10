@@ -56,6 +56,7 @@ All Python tests run under pytest. `run-unit-tests.py` is kept only for C++ test
    | Only a context | `test_context` |
    | Hub setup only, own context (e.g. DDS settings) | `module_device_setup` |
    | Active `--context` tags | `test_context_var` |
+   | LibRS debug log in this file's log (under `--debug`) | `rs_debug_log` — never `rs.log_to_console()` |
    | No device | none |
 
    The first test in a file recycles the device via the hub; later tests in the file reuse it.
