@@ -28,9 +28,9 @@ with tempfile.TemporaryDirectory(prefix='intent-json-') as temp:
         # FW side of the test is compiled from the FW tree with its generated header.
         fw = args.fw_root.resolve()
         shared = fw / 'contract'
-        subprocess.run([sys.executable, str(shared / 'tools/export_sdk.py'), '--check', str(contract)], check=True)
+        subprocess.run([sys.executable, str(shared / 'tools/export_intent_contract_bundle.py'), '--check', str(contract)], check=True)
         fw_include = out / 'fw-generated'
-        subprocess.run([sys.executable, str(shared / 'tools/generate.py'), '--output',
+        subprocess.run([sys.executable, str(shared / 'tools/generate_intent_contract_headers.py'), '--output',
                         str(fw_include / 'IntentDictionary.h')], check=True)
         fw_sources = [shared / 'IntentProtocol.cpp', fw / 'IntentRules.cpp', fw / 'IntentController.cpp']
         fw_includes = ['-I' + str(fw_include), '-I' + str(fw), '-I' + str(shared), '-DINTENT_FW_RULES']
@@ -78,7 +78,7 @@ with tempfile.TemporaryDirectory(prefix='intent-json-') as temp:
             if branch['name'] in ('RGB', 'RGB_R'): branch['since'] = 1
         schema_path = future / 'dictionary.json'
         schema_path.write_text(json.dumps(schema))
-        subprocess.run([sys.executable, str(shared / 'tools/generate.py'), '--schema', str(schema_path),
+        subprocess.run([sys.executable, str(shared / 'tools/generate_intent_contract_headers.py'), '--schema', str(schema_path),
                         '--output', str(future / 'contract/IntentDictionary.h')], check=True)
         executable = out / 'test-versions'
         subprocess.run(host_flags + ['-I' + str(future), '-I' + str(future / 'contract'),
