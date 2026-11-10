@@ -12,6 +12,8 @@ added to the spec. Both together produce 0x24 (0x04 | 0x20), confirming additive
 
 import pytest
 import pyrealsense2 as rs
+import pyrsutils as rsutils
+from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
 
@@ -108,19 +110,20 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
     and disabling it again is expected to clear it. Streams at 1280x720 - ICR only activates at
     720p/960p (see rs_icr_control.h)."""
     dev, ctx = test_device
+    require_min_fw_version(dev, rsutils.version(7, 62, 0, 0), "Improved Close Range 8-parameter control")
     depth_sensor = dev.first_depth_sensor()
     option_id = rs.composite_option_id.icr_control
     embedded_filter = _find_filter(depth_sensor, option_id)
     if embedded_filter is None:
-        pytest.skip("ICR control composite option not supported on this device")
+        pytest.fail("FW 7.62 or newer must expose the ICR control composite option")
     try:
         embedded_filter.get_composite_option(option_id)
     except RuntimeError as e:
-        pytest.skip(f"ICR control registered but not functional on this device/FW: {e}")
+        pytest.fail(f"ICR control registered but not functional: {e}")
 
     try:
         cfg = embedded_filter.get_icr_control(option_id)
-        cfg.enable = 1
+        cfg.mode = 1  # Downscale HDR
         embedded_filter.set_icr_control(option_id, cfg)
         frame = _stream_one_depth_frame(dev, ctx, ICR_WIDTH, ICR_HEIGHT)
         assert frame is not None, "No depth frame received with ICR control enabled"
@@ -130,7 +133,7 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
             f"with ICR control enabled")
 
         cfg = embedded_filter.get_icr_control(option_id)
-        cfg.enable = 0
+        cfg.mode = 0  # Off
         embedded_filter.set_icr_control(option_id, cfg)
         frame = _stream_one_depth_frame(dev, ctx, ICR_WIDTH, ICR_HEIGHT)
         assert frame is not None, "No depth frame received with ICR control disabled"
@@ -140,5 +143,5 @@ def test_icr_control_sets_embedded_filters_metadata_bit(test_device):
             f"with ICR control disabled")
     finally:
         cfg = embedded_filter.get_icr_control(option_id)
-        cfg.enable = 0
+        cfg.mode = 0  # Off
         embedded_filter.set_icr_control(option_id, cfg)

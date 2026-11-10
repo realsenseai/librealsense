@@ -12,34 +12,31 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
-#include <iterator>
 #include <string>
-#include <type_traits>
 
 using rsutils::json;
 
 namespace librealsense {
 
-    // FW-advertised DDS option names of the rs2_icr_control fields, in wire order
-    static const char * const field_names[] = { "Enable", "Filter Type", "Secondary frame downscale ratio", "Shift Mode",
-                                                "Shift Pixels", "MinZ Threshold Mode", "Threshold" };
-    static constexpr size_t field_count = std::extent< decltype( field_names ) >::value;
-    static constexpr size_t downscale_ratio_field = 2;
-    static constexpr size_t fields_offset = offsetof( rs2_icr_control, enable );
-    static_assert( offsetof( rs2_icr_control, reserved ) - fields_offset == field_count * sizeof( int32_t ),
+    // DDS options of the FW, by rs2_icr_control field in wire order: one option per field (the last two are read-only)
+    static constexpr size_t field_count = 8;
+    static constexpr size_t writable_field_count = field_count - 2;
+    static const char * const field_names[field_count] = { "Mode",
+                                                           "Downscale Ratio",
+                                                           "High-Res Mode",
+                                                           "High-Res Offset",
+                                                           "Smoothing Offset",
+                                                           "Completion Offset",
+                                                           "Nominal MinZ",
+                                                           "Improved MinZ" };
+    static constexpr size_t fields_offset = offsetof( rs2_icr_control, mode );
+    static_assert( sizeof( rs2_icr_control ) - fields_offset == field_count * sizeof( int32_t ),
                    "field_names must match the contiguous int32_t fields of rs2_icr_control" );
 
-    // The downscale ratio is a DDS enum of "2"/"4"; rs2_icr_control holds 1 = x2, 2 = x4
-    static int32_t to_field( size_t field_index, json const & dds_value )
+    static std::shared_ptr< realdds::dds_option > find_option( realdds::dds_options const & options, std::string const & name )
     {
-        if( dds_value.is_null() )
-            return 0;
-        return field_index == downscale_ratio_field ? std::stoi( dds_value.get< std::string >() ) / 2 : dds_value.get< int32_t >();
-    }
-
-    static json to_dds( size_t field_index, int32_t field )
-    {
-        return field_index == downscale_ratio_field ? json( std::to_string( field * 2 ) ) : json( field );
+        auto it = std::find_if( options.begin(), options.end(), [&]( auto const & o ) { return o->get_name() == name; } );
+        return it == options.end() ? nullptr : *it;
     }
 
     rs_dds_close_range_control::rs_dds_close_range_control(
@@ -49,17 +46,17 @@ namespace librealsense {
         , _set_ef_cb( std::move( set_embedded_filter_cb ) )
         , _fields( field_count )
     {
-        for( auto & option : _dds_ef->get_options() )
-        {
-            auto it = std::find( std::begin( field_names ), std::end( field_names ), option->get_name() );
-            if( it == std::end( field_names ) )
-                LOG_WARNING( "Ignoring unknown Improved Close Range Depth option '" << option->get_name() << "'" );
-            else
-                _fields[it - std::begin( field_names )] = option;
-        }
+        auto const & options = _dds_ef->get_options();
+        for( size_t i = 0; i < field_count; ++i )
+            _fields[i] = find_option( options, field_names[i] );
     }
 
-    // Packs rs2_icr_control; get( field index, its DDS option ) returns the field's value
+    static int32_t to_field( json const & dds_value )
+    {
+        return dds_value.is_null() ? 0 : dds_value.get< int32_t >();
+    }
+
+    // Packs rs2_icr_control; get( DDS option ) returns the field's value
     template< class Get >
     std::vector< uint8_t > rs_dds_close_range_control::pack( Get && get ) const
     {
@@ -69,7 +66,7 @@ namespace librealsense {
         cfg.header.param_count = static_cast< uint8_t >( field_count );
         int32_t fields[field_count];
         for( size_t i = 0; i < field_count; ++i )
-            fields[i] = _fields[i] ? get( i, *_fields[i] ) : 0;
+            fields[i] = _fields[i] ? get( *_fields[i] ) : 0;
         std::vector< uint8_t > raw( sizeof( cfg ) );
         std::memcpy( raw.data(), &cfg, sizeof( cfg ) );
         std::memcpy( raw.data() + fields_offset, fields, sizeof( fields ) );
@@ -78,7 +75,19 @@ namespace librealsense {
 
     std::vector< uint8_t > rs_dds_close_range_control::get_raw() const
     {
-        return pack( []( size_t i, realdds::dds_option const & o ) { return to_field( i, o.get_value() ); } );
+        return pack( []( realdds::dds_option const & o ) { return to_field( o.get_value() ); } );
+    }
+
+    // Rejects a value its option does not accept, then adds it to the set-filter request
+    static void add_checked( json & options, std::shared_ptr< realdds::dds_option > const & option, json value )
+    {
+        option->check_value( value );
+        if( ( ! option->get_minimum_value().is_null() && value < option->get_minimum_value() )
+            || ( ! option->get_maximum_value().is_null() && value > option->get_maximum_value() ) )
+            throw invalid_value_exception( rsutils::string::from()
+                                           << option->get_name() << " value " << value << " is out of range ["
+                                           << option->get_minimum_value() << ", " << option->get_maximum_value() << "]" );
+        options[option->get_name()] = std::move( value );
     }
 
     void rs_dds_close_range_control::set_raw( const void * data, size_t size )
@@ -89,21 +98,11 @@ namespace librealsense {
         int32_t fields[field_count];
         std::memcpy( fields, static_cast< const uint8_t * >( data ) + fields_offset, sizeof( fields ) );
 
+        // The min depth fields are FW-computed and never sent
         json options = json::object();
-        for( size_t i = 0; i < field_count; ++i )
-        {
-            auto & option = _fields[i];
-            if( ! option )
-                continue;
-            json value = to_dds( i, fields[i] );
-            option->check_value( value );
-            if( ( ! option->get_minimum_value().is_null() && value < option->get_minimum_value() )
-                || ( ! option->get_maximum_value().is_null() && value > option->get_maximum_value() ) )
-                throw invalid_value_exception( rsutils::string::from()
-                                               << option->get_name() << " value " << value << " is out of range ["
-                                               << option->get_minimum_value() << ", " << option->get_maximum_value() << "]" );
-            options[option->get_name()] = std::move( value );
-        }
+        for( size_t i = 0; i < writable_field_count; ++i )
+            if( _fields[i] )
+                add_checked( options, _fields[i], fields[i] );
         _set_ef_cb( options );  // the reply updates the cached values, possibly adjusted by FW
     }
 
@@ -115,13 +114,13 @@ namespace librealsense {
             auto e = dynamic_cast< realdds::dds_enum_option const * >( &o );
             return e && ! e->get_choices().empty() ? &e->get_choices() : nullptr;
         };
-        auto min = pack( [&]( size_t i, realdds::dds_option const & o )
-                         { return to_field( i, choices( o ) ? json( choices( o )->front() ) : o.get_minimum_value() ); } );
-        auto max = pack( [&]( size_t i, realdds::dds_option const & o )
-                         { return to_field( i, choices( o ) ? json( choices( o )->back() ) : o.get_maximum_value() ); } );
-        auto step = pack( [&]( size_t i, realdds::dds_option const & o )
-                          { return choices( o ) ? 1 : to_field( i, o.get_stepping() ); } );
-        auto def = pack( []( size_t i, realdds::dds_option const & o ) { return to_field( i, o.get_default_value() ); } );
+        auto min = pack( [&]( realdds::dds_option const & o )
+                         { return to_field( choices( o ) ? json( choices( o )->front() ) : o.get_minimum_value() ); } );
+        auto max = pack( [&]( realdds::dds_option const & o )
+                         { return to_field( choices( o ) ? json( choices( o )->back() ) : o.get_maximum_value() ); } );
+        auto step = pack( [&]( realdds::dds_option const & o )
+                          { return choices( o ) ? 1 : to_field( o.get_stepping() ); } );
+        auto def = pack( []( realdds::dds_option const & o ) { return to_field( o.get_default_value() ); } );
         std::vector< uint8_t > range;
         for( auto * bound : { &min, &max, &step, &def } )
             range.insert( range.end(), bound->begin(), bound->end() );

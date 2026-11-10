@@ -57,13 +57,14 @@ namespace
                    << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
                    << " param_count=" << (int)v.header.param_count
                    << " param_type=" << (int)v.header.param_type
-                   << " enable=" << v.enable
-                   << " filter_type=" << v.filter_type
+                   << " mode=" << v.mode
                    << " downscale_ratio=" << v.downscale_ratio
-                   << " shift_mode=" << v.shift_mode
-                   << " shift_pixels=" << v.shift_pixels
-                   << " threshold_mode=" << v.threshold_mode
-                   << " threshold_mm=" << v.threshold_mm << '\n';
+                   << " high_res_mode=" << v.high_res_mode
+                   << " high_res_offset=" << v.high_res_offset
+                   << " smoothing_offset_mm=" << v.smoothing_offset_mm
+                   << " completion_offset_mm=" << v.completion_offset_mm
+                   << " baseline_min_depth_mm=" << v.baseline_min_depth_mm
+                   << " improved_min_depth_mm=" << v.improved_min_depth_mm << '\n';
     }
 
     // Prints every field of `id`'s current value, dispatching to the right typed cast - no

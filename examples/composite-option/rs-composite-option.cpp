@@ -213,13 +213,14 @@ namespace
             make_field_printer( "ctl_id", &rs2_icr_control::header, &dpp_header::ctl_id ),
             make_field_printer( "param_count", &rs2_icr_control::header, &dpp_header::param_count ),
             make_field_printer( "param_type", &rs2_icr_control::header, &dpp_header::param_type ),
-            make_field_printer( "enable", &rs2_icr_control::enable ),
-            make_field_printer( "filter_type", &rs2_icr_control::filter_type ),
+            make_field_printer( "mode", &rs2_icr_control::mode ),
             make_field_printer( "downscale_ratio", &rs2_icr_control::downscale_ratio ),
-            make_field_printer( "shift_mode", &rs2_icr_control::shift_mode ),
-            make_field_printer( "shift_pixels", &rs2_icr_control::shift_pixels ),
-            make_field_printer( "threshold_mode", &rs2_icr_control::threshold_mode ),
-            make_field_printer( "threshold_mm", &rs2_icr_control::threshold_mm ),
+            make_field_printer( "high_res_mode", &rs2_icr_control::high_res_mode ),
+            make_field_printer( "high_res_offset", &rs2_icr_control::high_res_offset ),
+            make_field_printer( "smoothing_offset_mm", &rs2_icr_control::smoothing_offset_mm ),
+            make_field_printer( "completion_offset_mm", &rs2_icr_control::completion_offset_mm ),
+            make_field_printer( "baseline_min_depth_mm", &rs2_icr_control::baseline_min_depth_mm ),
+            make_field_printer( "improved_min_depth_mm", &rs2_icr_control::improved_min_depth_mm ),
         };
         return fields;
     }
@@ -325,9 +326,9 @@ namespace
         print_struct( std::cout, icr_fields(), written );
     }
 
-    // Full read-modify-write + range + metadata sequence. Exercises both of the struct's
-    // conditional axes (filter_type -> downscale_ratio/shift_mode+shift_pixels, threshold_mode ->
-    // threshold_mm) instead of a single-field toggle, then restores the original value.
+    // Full read-modify-write + range + metadata sequence. Exercises the struct's mode-gated fields
+    // (mode -> downscale_ratio/smoothing, or high_res_mode/high_res_offset; completion in both) instead of a
+    // single-field toggle, then restores the original value. baseline/improved min depth are FW-computed - read, never set.
     void exercise_icr_control( rs2::options & opts, rs2_composite_option_id id )
     {
         // Raw bytes and the typed cast, shown side by side to illustrate both APIs.
@@ -339,39 +340,34 @@ namespace
         // Read-modify-write: wire header carried over untouched from what the device just
         // reported, not zero-initialized, on every Set below.
         rs2_icr_control cfg = original;
-        cfg.enable = 1;
 
-        // 1) Lookup Shift + Manual shift pixels - exercises filter_type together with the
-        // (shift_mode, shift_pixels) pair it selects.
-        cfg.filter_type = 1;   // Lookup Shift
-        cfg.shift_mode = 2;    // Manual
-        cfg.shift_pixels = 100;
+        // 1) High-Res mode + Manual offset - exercises mode together with the
+        // (high_res_mode, high_res_offset) pair it selects.
+        cfg.mode = RS2_ICR_MODE_HIGH_RES;
+        cfg.high_res_mode = RS2_ICR_HIGH_RES_MODE_MANUAL;
+        cfg.high_res_offset = 100;
         opts.set_composite_option_from( id, cfg );
-        auto after_shift = opts.get_composite_option_as< rs2_icr_control >( id );
-        verify_icr_fields_written( "filter_type=Lookup Shift, shift_mode=Manual, shift_pixels=100", after_shift,
-            after_shift.filter_type == cfg.filter_type && after_shift.shift_mode == cfg.shift_mode
-                && after_shift.shift_pixels == cfg.shift_pixels );
+        auto after_high_res = opts.get_composite_option_as< rs2_icr_control >( id );
+        verify_icr_fields_written( "mode=High-Res, high_res_mode=Manual, high_res_offset=100", after_high_res,
+            after_high_res.mode == cfg.mode && after_high_res.high_res_mode == cfg.high_res_mode
+                && after_high_res.high_res_offset == cfg.high_res_offset );
 
-        // 2) Downscale + x4 ratio - exercises the OTHER branch filter_type selects between.
-        cfg.filter_type = 0;   // Downscale
-        cfg.downscale_ratio = 2;   // x4
+        // 2) Downscale HDR + x4 ratio + Close Range Smoothing - the OTHER branch mode selects between.
+        cfg.mode = RS2_ICR_MODE_DOWNSCALE_HDR;
+        cfg.downscale_ratio = RS2_ICR_DOWNSCALE_RATIO_X4;
+        cfg.smoothing_offset_mm = 300;
         opts.set_composite_option_from( id, cfg );
         auto after_downscale = opts.get_composite_option_as< rs2_icr_control >( id );
-        verify_icr_fields_written( "filter_type=Downscale, downscale_ratio=x4", after_downscale,
-            after_downscale.filter_type == cfg.filter_type && after_downscale.downscale_ratio == cfg.downscale_ratio );
+        verify_icr_fields_written( "mode=Downscale HDR, downscale_ratio=x4, smoothing_offset_mm=300", after_downscale,
+            after_downscale.mode == cfg.mode && after_downscale.downscale_ratio == cfg.downscale_ratio
+                && after_downscale.smoothing_offset_mm == cfg.smoothing_offset_mm );
 
-        // 3) Cycle threshold_mode through all three rungs - threshold_mm only matters for Manual,
-        // exercising that same selects-a-field-pair pattern on the other axis of this struct.
-        for( int mode : { 0, 1, 2 } )
-        {
-            cfg.threshold_mode = mode;
-            cfg.threshold_mm = ( mode == 2 ) ? 300 : 0;
-            opts.set_composite_option_from( id, cfg );
-            auto after_threshold = opts.get_composite_option_as< rs2_icr_control >( id );
-            std::string step_label = "threshold_mode=" + std::to_string( mode );
-            verify_icr_fields_written( step_label.c_str(), after_threshold,
-                after_threshold.threshold_mode == cfg.threshold_mode );
-        }
+        // 3) Close Range Completion applies in every mode but Off.
+        cfg.completion_offset_mm = 200;
+        opts.set_composite_option_from( id, cfg );
+        auto after_completion = opts.get_composite_option_as< rs2_icr_control >( id );
+        verify_icr_fields_written( "completion_offset_mm=200", after_completion,
+            after_completion.completion_offset_mm == cfg.completion_offset_mm );
 
         // Restore the original value read at the very start - this sample exercises real,
         // consequential state changes (unlike a single-field toggle), so leaving no lasting effect
@@ -379,9 +375,11 @@ namespace
         opts.set_composite_option_from( id, original );
         auto restored = opts.get_composite_option_as< rs2_icr_control >( id );
         std::cout << "Restore original value: "
-                  << ( restored.filter_type == original.filter_type && restored.downscale_ratio == original.downscale_ratio
-                           && restored.shift_mode == original.shift_mode && restored.shift_pixels == original.shift_pixels
-                           && restored.threshold_mode == original.threshold_mode && restored.threshold_mm == original.threshold_mm
+                  << ( restored.mode == original.mode && restored.downscale_ratio == original.downscale_ratio
+                           && restored.high_res_mode == original.high_res_mode
+                           && restored.high_res_offset == original.high_res_offset
+                           && restored.smoothing_offset_mm == original.smoothing_offset_mm
+                           && restored.completion_offset_mm == original.completion_offset_mm
                        ? "ok" : "FAILED to restore - device may be left in the sample's last test state" )
                   << '\n';
 
