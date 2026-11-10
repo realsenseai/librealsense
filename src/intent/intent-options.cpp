@@ -4,6 +4,7 @@
 #include "intent-tlv.h"
 #include <librealsense2/h/rs_composite_option.h>
 #include <mutex>
+#include <set>
 #include <src/composite-option-interface.h>
 #include <src/core/device-interface.h>
 #include <src/ds/d500/d500-device.h>
@@ -44,14 +45,23 @@ class intent_option : public composite_option_interface {
         if (!sensor)
             throw std::runtime_error("Intent: sensor disconnected");
         std::vector<uint8_t> payload(static_cast<const uint8_t *>(data), static_cast<const uint8_t *>(data) + size);
-        std::vector<uint8_t> version(rsintent::status_size);
+        std::vector<uint8_t> version(rsintent::status_size), firmware(rsintent::wire_size);
         sensor->invoke_powered([&](platform::uvc_device &dev) {
             if (!dev.get_xu(ds::depth_xu, rsintent::GLOBAL_INTENT_STATUS, version.data(), static_cast<int>(version.size())))
                 throw std::runtime_error("Intent: status read failed before SET");
+            // Light D (design v0.4 section 7.10, HR-4): GET_CUR lists every sensor and
+            // branch the FW supports, in every state.
+            if (!dev.get_xu(ds::depth_xu, rsintent::GLOBAL_INTENT, firmware.data(), static_cast<int>(firmware.size())))
+                throw std::runtime_error("Intent: GET_CUR failed before SET");
         });
         // Raw composite-option callers follow the same version policy as the JSON API.
         const auto document = decode_intent_json(payload, version);
-        payload = encode_intent_json(document, version);
+        payload = encode_intent_json(document, version, firmware);
+        std::set<unsigned> reported;
+        for (const auto &s : intent_tlv::body(firmware))
+            if (s.type == rsintent::SENSOR)
+                for (const auto &c : intent_tlv::parse(s.value))
+                    if (c.type == rsintent::STREAM) reported.insert(intent_tlv::id(c));
         const auto records = intent_tlv::body(payload);
         const auto clean = intent_tlv::transfer(payload, intent_tlv::filter(records));
         rsintent::Request request = {};
@@ -64,7 +74,7 @@ class intent_option : public composite_option_interface {
             auto model = rsintent::defaultModel(_sku);
             size_t retained = 0;
             for (size_t i = 0; i < model.count; ++i) {
-                bool supported = true;
+                bool supported = reported.count(model.streams[i].branch) != 0U;
                 for (const auto &b : rsintent::branches)
                     if (b.id == model.streams[i].branch && b.since > version[1]) supported = false;
                 for (const auto &s : rsintent::sensors)

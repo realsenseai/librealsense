@@ -1,6 +1,6 @@
 {
   "upstream_repository": "https://github.com/RealSenseAI-Internal/soc-rs-hkr-common",
-  "upstream_commit": "9527a56f9797f06c588687ad8efefdfdf2c24ebe",
+  "upstream_commit": "e621483eae2ef26633fc347dd4b5322687e5bb22",
   "upstream_directory": "intent",
   "dictionary_sha256": "727baba76bf003aaaf6784fc85bf013f9d7936c8d57f4866430fedfcf1e607b2",
   "major": 1,

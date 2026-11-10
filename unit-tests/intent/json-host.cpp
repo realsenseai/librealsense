@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <set>
 #include <rsutils/json.h>
 extern "C" int fw_accept(const unsigned char *, unsigned);
 extern "C" int fw_accept_on(const unsigned char *, unsigned, unsigned);
@@ -241,6 +242,50 @@ static void statusReasons() {
     assert(contains(describe_intent_status(status), "last_result=CONSTRAINT: CONSTRAINT"));
     std::cout << "status: FW REJECT_REASON list decoded and named by SDK\n";
 }
+static std::set<std::string> branchNames(const std::vector<uint8_t> &wire, const std::vector<uint8_t> &status) {
+    std::set<std::string> names;
+    const auto document = json::parse(decode_intent_json(wire, status));
+    for (const auto &sensor : document["sensors"])
+        for (const auto &stream : sensor["streams"]) names.insert(stream["branch"].get<std::string>());
+    return names;
+}
+// Light D (design v0.4 section 7.10, HR-4): FW GET_CUR lists the sensors/branches it supports;
+// the SDK omits anything else before SET.
+static void lightD(const std::vector<uint8_t> &status) {
+    std::vector<uint8_t> c3(rsintent::wire_size), c2(rsintent::wire_size);
+    fw_template(0xc06, c3.data());
+    fw_template(0xc07, c2.data());
+    const auto document = decode_intent_json(c3, status);
+    assert(encode_intent_json(document, status, {}) == encode_intent_json(document, status));
+    // 3C declares sensor COLOR / branch RGB; a 2C FW does not report them.
+    auto wire = encode_intent_json(document, status, c2);
+    auto names = branchNames(wire, status);
+    assert(!names.count("RGB") && names.count("DEPTH") && names.count("ACCEL"));
+    unsigned detail = 0, offset = 0;
+    assert(fw_decode(wire.data(), static_cast<unsigned>(wire.size()), &detail, &offset) == rsintent::OK);
+    // A FW that reports STEREO without RGB_R: only that branch is omitted.
+    auto model = rsintent::defaultModel(0xc07);
+    size_t kept = 0;
+    for (size_t i = 0; i < model.count; ++i)
+        if (model.streams[i].branch != 6U) model.streams[kept++] = model.streams[i];
+    model.count = kept;
+    std::vector<uint8_t> partial(rsintent::wire_size);
+    assert(rsintent::encode(model, rsintent::SET, partial.data(), partial.size()).code == rsintent::OK);
+    wire = encode_intent_json(decode_intent_json(c2, status), status, partial);
+    names = branchNames(wire, status);
+    assert(!names.count("RGB_R") && names.count("RGB_L") && names.count("IR_LR"));
+    assert(fw_decode(wire.data(), static_cast<unsigned>(wire.size()), &detail, &offset) == rsintent::OK);
+    auto mismatch = c2;
+    mismatch[0] = rsintent::major + 1U;
+    bool caught = false;
+    try {
+        (void)encode_intent_json(document, status, mismatch);
+    } catch (const std::invalid_argument &) {
+        caught = true;
+    }
+    assert(caught);
+    std::cout << "light D: items not reported by FW GET_CUR omitted before SET\n";
+}
 int main(int argc, char **argv) {
     compatibility();
     assert(argc == 2);
@@ -249,6 +294,7 @@ int main(int argc, char **argv) {
     goldenVectors(argv[1], status);
     nativeProfiles(status);
     statusReasons();
+    lightD(status);
     json depth = {
         {"branch", "DEPTH"}, {"format", "Z16"}, {"width", 1280}, {"height", 720}, {"fps", 30}};
     json document = {
