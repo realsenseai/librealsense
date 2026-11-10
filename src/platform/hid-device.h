@@ -21,7 +21,8 @@ struct hid_profile
     std::string sensor_name;
     uint32_t frequency;
     double sensitivity;
-    bool apply_sensitivity_to_accel = false;  // accel keeps its FW default unless a level was explicitly set
+    // Sensitivity is written to FW only when explicitly set by the user; otherwise the FW value is left untouched.
+    bool apply_sensitivity = false;
 };
 
 
@@ -86,6 +87,10 @@ public:
         = 0;
     virtual void set_gyro_scale_factor( double scale_factor ) = 0;
     virtual void set_accel_scale_factor( double scale_factor ) = 0;
+
+    // Read the sensitivity currently held by FW for a sensor, as the raw backend value (not yet converted to option scale).
+    // Returns false if the backend cannot provide it.
+    virtual bool read_sensitivity( const std::string & sensor_name, double & value ) { return false; }
 };
 
 
@@ -125,6 +130,14 @@ public:
 
     void set_gyro_scale_factor( double scale_factor ) override {};
     void set_accel_scale_factor( double scale_factor ) override {};
+
+    bool read_sensitivity( const std::string & sensor_name, double & value ) override
+    {
+        for( auto && dev : _dev )
+            if( dev->read_sensitivity( sensor_name, value ) )
+                return true;
+        return false;
+    }
 
 private:
     std::vector< std::shared_ptr< hid_device > > _dev;

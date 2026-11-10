@@ -460,11 +460,20 @@ namespace librealsense
                                            + std::to_string( value ) );
 
         _value = value;
+        _user_set = true;
         strong->set_imu_sensitivity( RS2_STREAM_GYRO, value );
     }
 
     float librealsense::gyro_sensitivity_option::query() const
     {
+        // Until the user sets a value, follow the FW (like DDS and GMSL do)
+        if( ! _user_set )
+        {
+            auto strong = _sensor.lock();
+            float fw_value;
+            if( strong && ! strong->is_streaming() && strong->read_fw_imu_sensitivity( RS2_STREAM_GYRO, fw_value ) )
+                _value = fw_value;
+        }
         return _value;
     }
 

@@ -285,7 +285,7 @@ namespace librealsense
         explicit d500_hid_accel_sensitivity_option( const std::weak_ptr< hid_sensor > & sensor );
 
         void set( float value ) override;
-        float query() const override { return _value; }
+        float query() const override;
         bool is_enabled() const override { return true; }
         bool is_read_only() const override;
         const char * get_description() const override;
@@ -293,7 +293,8 @@ namespace librealsense
         void enable_recording( std::function< void( const option & ) > record_action ) override { _record_action = record_action; }
 
     private:
-        float _value;
+        mutable float _value;  // user value, else last value read from FW, else the default
+        bool _user_set = false;
         std::weak_ptr< hid_sensor > _sensor;
         std::function< void( const option & ) > _record_action = []( const option & ) {};
     };

@@ -301,11 +301,10 @@ namespace librealsense
 
                             pPropsToSet->Release();
 
-                            //implemented for Gyro sensitivity, and for Accel when a level was explicitly set
+                            // Written only when the user explicitly set the sensitivity; otherwise the FW value is kept
                             const bool is_gyro = profile_to_open.sensor_name == "HID Sensor Class Device: Gyroscope";
-                            const bool is_accel = profile_to_open.apply_sensitivity_to_accel
-                                               && profile_to_open.sensor_name == "HID Sensor Class Device: Accelerometer";
-                            if( is_gyro || is_accel )
+                            const bool is_accel = profile_to_open.sensor_name == "HID Sensor Class Device: Accelerometer";
+                            if( profile_to_open.apply_sensitivity && ( is_gyro || is_accel ) )
                             {
                                 // creating IPortableDeviceValues container for <Data Field, Sensitivity> tuples
                                 IPortableDeviceValues * pInSensitivityValues;

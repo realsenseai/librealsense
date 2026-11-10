@@ -3,6 +3,7 @@
 // Copyright(c) 2023-4 RealSense, Inc. All Rights Reserved.
 
 #include "hid-sensor.h"
+#include <cmath>
 #include "device.h"
 #include "stream.h"
 #include "image.h"
@@ -121,7 +122,7 @@ void hid_sensor::open( const stream_profiles & requests )
             std::move( sensor_name ),
             fps_to_sampling_frequency(request->get_stream_type(), request->get_framerate()),
             get_imu_sensitivity_values( request->get_stream_type() ),
-            _imu_sensitivity_per_rs2_stream.count( RS2_STREAM_ACCEL ) > 0 } );
+            is_imu_sensitivity_set( request->get_stream_type() ) } );
     }
     _hid_device->open( configured_hid_profiles );
     if( Is< librealsense::global_time_interface >( _owner ) )
@@ -390,6 +391,39 @@ double hid_sensor::get_imu_sensitivity_values( rs2_stream stream )
 
     // FW receives 0.001 and adjusts the accelerometer sensitivity to its default setting of 4g.
     return 0.001;
+}
+
+bool hid_sensor::read_fw_imu_sensitivity( rs2_stream stream, float & option_value )
+{
+    try
+    {
+        double raw = 0.;
+        if( ! _hid_device->read_sensitivity( rs2_stream_to_sensor_name( stream ), raw ) )
+            return false;
+
+        if( stream == RS2_STREAM_GYRO && ! _gyro_sensitivity_uses_range_index )
+        {
+            // D400 token (0, 0.1 .. 0.4) -> option index, nearest match
+            for( auto && entry : gyro_sensitivity_convert )
+                if( std::fabs( entry.second - raw ) < 0.05 )
+                {
+                    option_value = entry.first;
+                    return true;
+                }
+            return false;
+        }
+        // Range index (D500 gyro and accel)
+        const auto index = std::round( raw );
+        if( index < 0. || index > 4. )
+            return false;
+        option_value = static_cast< float >( index );
+        return true;
+    }
+    catch( const std::exception & e )
+    {
+        LOG_DEBUG( "Failed to read IMU sensitivity from FW: " << e.what() );
+        return false;
+    }
 }
 
 iio_hid_timestamp_reader::iio_hid_timestamp_reader()

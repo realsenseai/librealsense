@@ -454,7 +454,7 @@ namespace librealsense
             }
         }
 
-        iio_hid_sensor::iio_hid_sensor(const std::string& device_path, uint32_t frequency, float sensitivity)
+        iio_hid_sensor::iio_hid_sensor( const std::string & device_path, uint32_t frequency, bool apply_sensitivity, float sensitivity )
             : _stop_pipe_fd{},
               _fd(0),
               _iio_device_number(0),
@@ -465,7 +465,7 @@ namespace librealsense
               _is_capturing(false),
               _pm_dispatcher(16, "hid-power-mgmt")    // queue for async power management commands
         {
-            init(frequency, sensitivity);
+            init( frequency, apply_sensitivity, sensitivity );
         }
 
         iio_hid_sensor::~iio_hid_sensor()
@@ -782,7 +782,7 @@ namespace librealsense
         }
 
         // initialize the device sensor. reading its name and all of its inputs.
-        void iio_hid_sensor::init(uint32_t frequency, float sensitivity)
+        void iio_hid_sensor::init( uint32_t frequency, bool apply_sensitivity, float sensitivity )
         {
             std::ifstream iio_device_file(_iio_device_path + "/name");
 
@@ -848,7 +848,9 @@ namespace librealsense
                 input->enable(true);
 
             set_frequency(frequency);
-            set_sensitivity( sensitivity );
+            // Leave the FW sensitivity untouched unless the user explicitly set it
+            if( apply_sensitivity )
+                set_sensitivity( sensitivity );
             write_fs_attribute(_iio_device_path + "/buffer/length", hid_buf_len);
         }
 
@@ -925,16 +927,21 @@ namespace librealsense
         Therefore, we are searching for a file that includes "hysteresis" in its name.*/
         std::string iio_hid_sensor::get_sensitivity_name() const
         {
+            return find_sensitivity_name( _iio_device_path );
+        }
+
+        std::string iio_hid_sensor::find_sensitivity_name( const std::string & iio_device_path )
+        {
             std::string sensitivity_name = "";
             DIR * dir = nullptr;
             struct dirent * dir_ent = nullptr;
 
             // start enumerate the scan elemnts dir.
-            dir = opendir( _iio_device_path.c_str() );
+            dir = opendir( iio_device_path.c_str() );
             if( dir == nullptr )
             {
                 throw linux_backend_exception( rsutils::string::from()
-                                               << "Failed to open scan_element " << _iio_device_path );
+                                               << "Failed to open scan_element " << iio_device_path );
             }
 
             // verify file format. should include in_ (input) and _en (enable).
@@ -1057,12 +1064,14 @@ namespace librealsense
                     {
                         uint32_t frequency = 0;
                         float sensitivity = 0;
+                        bool apply_sensitivity = false;
                         for (auto& profile : hid_profiles)
                         {
                             if (profile.sensor_name == device_info.id)
                             {
                                 frequency = profile.frequency;
-                                sensitivity = profile.sensitivity;
+                                sensitivity = static_cast< float >( profile.sensitivity );
+                                apply_sensitivity = profile.apply_sensitivity;
                                 break;
                             }
                         }
@@ -1070,7 +1079,7 @@ namespace librealsense
                         if (frequency == 0)
                             continue;
 
-                        auto device = std::unique_ptr<iio_hid_sensor>(new iio_hid_sensor(device_info.device_path, frequency, sensitivity));
+                        auto device = std::unique_ptr<iio_hid_sensor>(new iio_hid_sensor( device_info.device_path, frequency, apply_sensitivity, sensitivity ));
                         _iio_hid_sensors.push_back(std::move(device));
                     }
                 }
@@ -1085,6 +1094,33 @@ namespace librealsense
                     throw;
                 }
             }
+        }
+
+        bool v4l_hid_device::read_sensitivity( const std::string & sensor_name, double & value )
+        {
+            for( auto & device_info : _hid_device_infos )
+            {
+                if( device_info.id != sensor_name )
+                    continue;
+                try
+                {
+                    auto name = iio_hid_sensor::find_sensitivity_name( device_info.device_path );
+                    if( name.empty() )
+                        return false;
+                    std::ifstream file( device_info.device_path + "/" + name );
+                    double raw = 0.;
+                    if( ! ( file >> raw ) )
+                        return false;
+                    value = raw;
+                    return true;
+                }
+                catch( const std::exception & e )
+                {
+                    LOG_DEBUG( "Failed to read sensitivity of " << sensor_name << ": " << e.what() );
+                    return false;
+                }
+            }
+            return false;
         }
 
         void v4l_hid_device::close()

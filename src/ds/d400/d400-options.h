@@ -185,7 +185,7 @@ namespace librealsense
             , _value( opt_range.def )
             , _sensor( sensor )
         {
-            set( _value );
+            // The default is only a fallback for reporting; nothing is written to FW until the user calls set()
         }
         virtual ~gyro_sensitivity_option() = default;
         virtual void set( float value ) override;
@@ -200,7 +200,8 @@ namespace librealsense
         virtual bool is_read_only() const override;
 
     private:
-        float _value;
+        mutable float _value;  // user value, else last value read from FW, else the default
+        bool _user_set = false;
         std::weak_ptr< hid_sensor > _sensor;
         std::function< void( const option & ) > _record_action = []( const option & ) {};
 

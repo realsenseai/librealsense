@@ -53,6 +53,10 @@ public:
     void stop() override;
     void set_imu_sensitivity( rs2_stream stream, float value );
     double get_imu_sensitivity_values( rs2_stream stream );
+    // True if the user explicitly set the sensitivity of this stream (only then it is written to FW on open)
+    bool is_imu_sensitivity_set( rs2_stream stream ) const { return _imu_sensitivity_per_rs2_stream.count( stream ) > 0; }
+    // Read the sensitivity currently in FW, converted to the option scale. Returns false if unavailable.
+    bool read_fw_imu_sensitivity( rs2_stream stream, float & option_value );
     // HKR FW accepts the option value directly as a range index:
     // 0/1/2/3/4 select 2000/1000/500/250/125 dps respectively.
     // Other devices retain the D400 conversion to FW tokens 0/0.1/0.2/0.3/0.4.

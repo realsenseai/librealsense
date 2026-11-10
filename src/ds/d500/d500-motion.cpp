@@ -290,10 +290,11 @@ namespace librealsense
         {
             auto raw_motion_sensor = get_raw_motion_sensor();
             raw_motion_sensor->enable_gyro_sensitivity_range_index();
-            // The SDK writes this default on every open, so it must match the FW default: 1000 dps on D5x5, 125 dps on others
-            float default_index = ds::d5x5_family_pids.count( get_pid() ) ? 1.f : 4.f;
+            // Nothing is written to FW unless the user sets the option, and query() follows the FW value.
+            // The default index is only a fallback for reporting if the FW value cannot be read.
+            const float fallback_index = 4.f;
             register_feature(
-                std::make_shared< gyro_sensitivity_feature >( raw_motion_sensor, get_motion_sensor(), default_index ) );
+                std::make_shared< gyro_sensitivity_feature >( raw_motion_sensor, get_motion_sensor(), fallback_index ) );
             if( supports_accel_range() )
                 get_motion_sensor().register_option( RS2_OPTION_ACCEL_SENSITIVITY,
                                                      std::make_shared< d500_hid_accel_sensitivity_option >( raw_motion_sensor ) );
