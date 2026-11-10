@@ -13,6 +13,7 @@ pytestmark = [
     pytest.mark.device_each("D455", "D500*"),
     pytest.mark.device_type_exclude("DDS", "GMSL"),
     pytest.mark.skipif(platform.machine() == "aarch64", reason="D455 not available on CI Jetson"),
+    pytest.mark.skipif(platform.system() != "Linux", reason="FW sensitivity read-back is implemented on Linux backends only"),
 ]
 
 OPTIONS = [rs.option.gyro_sensitivity, rs.option.accel_sensitivity]

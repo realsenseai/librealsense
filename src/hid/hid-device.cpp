@@ -233,6 +233,20 @@ namespace librealsense
             }
         }
 
+        usb_status rs_hid_device::get_feature_report( const rs_usb_messenger & dev, int report_id, FEATURE_REPORT & report )
+        {
+            const auto hid_interface = get_hid_interface()->get_number();
+            uint32_t transferred;
+            return dev->control_transfer( USB_REQUEST_CODE_GET,
+                                          HID_REQUEST_GET_REPORT,
+                                          ( HID_REPORT_TYPE_FEATURE << 8 ) + report_id,
+                                          hid_interface,
+                                          (uint8_t *)&report,
+                                          sizeof( report ),
+                                          transferred,
+                                          1000 );
+        }
+
         usb_status rs_hid_device::set_feature_report( unsigned char power, int report_id, int fps, bool apply_sensitivity, double sensitivity )
         {
             uint32_t transferred;
@@ -248,14 +262,7 @@ namespace librealsense
             if (!dev)
                 return RS2_USB_STATUS_NO_DEVICE;
 
-            auto res = dev->control_transfer(USB_REQUEST_CODE_GET,
-                HID_REQUEST_GET_REPORT,
-                value,
-                hid_interface,
-                (uint8_t*) &featureReport,
-                sizeof(featureReport),
-                transferred,
-                1000);
+            auto res = get_feature_report( dev, report_id, featureReport );
 
             if(res != RS2_USB_STATUS_SUCCESS)
             {
@@ -291,14 +298,7 @@ namespace librealsense
                 return res;
             }
 
-            res = dev->control_transfer(USB_REQUEST_CODE_GET,
-                HID_REQUEST_GET_REPORT,
-                value,
-                hid_interface,
-                (uint8_t*) &featureReport,
-                sizeof(featureReport),
-                transferred,
-                1000);
+            res = get_feature_report( dev, report_id, featureReport );
 
             if(res != RS2_USB_STATUS_SUCCESS)
             {
@@ -331,16 +331,7 @@ namespace librealsense
                     return false;
 
                 FEATURE_REPORT featureReport;
-                uint32_t transferred;
-                auto res = dev->control_transfer( USB_REQUEST_CODE_GET,
-                                                  HID_REQUEST_GET_REPORT,
-                                                  ( HID_REPORT_TYPE_FEATURE << 8 ) + id->second,
-                                                  hid_interface,
-                                                  (uint8_t *)&featureReport,
-                                                  sizeof( featureReport ),
-                                                  transferred,
-                                                  1000 );
-                if( res != RS2_USB_STATUS_SUCCESS )
+                if( get_feature_report( dev, id->second, featureReport ) != RS2_USB_STATUS_SUCCESS )
                     return false;
                 value = featureReport.sensitivity;
                 return true;

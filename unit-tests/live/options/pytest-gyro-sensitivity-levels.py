@@ -15,6 +15,25 @@ pytestmark = [
 ]
 
 
+
+@pytest.fixture(autouse=True)
+def restore_fw_sensitivity(test_device):
+    """The SDK leaves the last written level in FW (seen by the next application): put the original one back."""
+    dev, ctx = test_device
+    ms = dev.first_motion_sensor()
+    original = ms.get_option(rs.option.gyro_sensitivity) if ms.supports(rs.option.gyro_sensitivity) else None
+    yield
+    if original is not None:
+        ms.set_option(rs.option.gyro_sensitivity, original)
+        pipe = rs.pipeline(ctx)
+        pipe.set_device(dev)
+        cfg = rs.config()
+        cfg.enable_stream(rs.stream.accel)
+        cfg.enable_stream(rs.stream.gyro)
+        pipe.start(cfg)
+        pipe.stop()
+
+
 def test_gyro_sensitivity_all_levels(test_device):
     dev, ctx = test_device
     motion_sensor = dev.first_motion_sensor()

@@ -357,7 +357,25 @@ uint32_t hid_sensor::fps_to_sampling_frequency( rs2_stream stream, uint32_t fps 
 }
 void hid_sensor::set_imu_sensitivity( rs2_stream stream, float value ) 
 {
+    std::lock_guard< std::mutex > lock( _configure_lock );
     _imu_sensitivity_per_rs2_stream[stream] = value;
+}
+
+float hid_sensor::query_imu_sensitivity( rs2_stream stream, float fallback )
+{
+    std::lock_guard< std::mutex > lock( _configure_lock );  // serializes with open(), which also touches the device
+    auto user_value = _imu_sensitivity_per_rs2_stream.find( stream );
+    if( user_value != _imu_sensitivity_per_rs2_stream.end() )
+        return user_value->second;
+
+    auto fw_value = _fw_imu_sensitivity.find( stream );
+    if( fw_value == _fw_imu_sensitivity.end() && ! _is_opened )
+    {
+        float value = 0.f;
+        const bool ok = read_fw_imu_sensitivity( stream, value );
+        fw_value = _fw_imu_sensitivity.emplace( stream, std::make_pair( ok, value ) ).first;
+    }
+    return ( fw_value != _fw_imu_sensitivity.end() && fw_value->second.first ) ? fw_value->second.second : fallback;
 }
 
 void hid_sensor::set_gyro_scale_factor(double scale_factor) 
@@ -417,7 +435,7 @@ bool hid_sensor::read_fw_imu_sensitivity( rs2_stream stream, float & option_valu
         // written by an older SDK) is reported as unavailable.
         const auto index = std::round( raw );
         const double max_index = stream == RS2_STREAM_ACCEL ? RS2_ACCEL_SENSITIVITY_COUNT - 1 : 4.;
-        if( std::fabs( raw - index ) > 0.05 || index < 0. || index > max_index )
+        if( std::fabs( raw - index ) > 1e-4 || index < 0. || index > max_index )
             return false;
         option_value = static_cast< float >( index );
         return true;

@@ -4,7 +4,6 @@
 #pragma once
 
 #include "d400-private.h"
-#include <atomic>
 #include "ds/ds-options.h"
 
 #include "algo.h"
@@ -201,9 +200,7 @@ namespace librealsense
         virtual bool is_read_only() const override;
 
     private:
-        mutable std::atomic< float > _value;  // user value, else value read from FW, else the default
-        std::atomic< bool > _user_set{ false };
-        mutable std::atomic< bool > _fw_value_read{ false };  // FW is read once, polling query() must not hit the bus
+        float _value;  // last value set by the user, or the default reported when FW cannot be read
         std::weak_ptr< hid_sensor > _sensor;
         std::function< void( const option & ) > _record_action = []( const option & ) {};
 

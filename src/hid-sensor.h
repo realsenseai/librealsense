@@ -55,8 +55,9 @@ public:
     double get_imu_sensitivity_values( rs2_stream stream );
     // True if the user explicitly set the sensitivity of this stream (only then it is written to FW on open)
     bool is_imu_sensitivity_set( rs2_stream stream ) const { return _imu_sensitivity_per_rs2_stream.count( stream ) > 0; }
-    // Read the sensitivity currently in FW, converted to the option scale. Returns false if unavailable.
-    bool read_fw_imu_sensitivity( rs2_stream stream, float & option_value );
+    // Value to report for the sensitivity option: the user value if set, else the value held by FW (read once, while the
+    // sensor is closed), else the given fallback.
+    float query_imu_sensitivity( rs2_stream stream, float fallback );
     // HKR FW accepts the option value directly as a range index:
     // 0/1/2/3/4 select 2000/1000/500/250/125 dps respectively.
     // Other devices retain the D400 conversion to FW tokens 0/0.1/0.2/0.3/0.4.
@@ -82,6 +83,11 @@ private:
     std::unique_ptr< frame_timestamp_reader > _custom_hid_timestamp_reader;
     //Keeps set sensitivity values for gyro and accel
     std::map< rs2_stream, float > _imu_sensitivity_per_rs2_stream;
+    // Sensitivity read from FW, per stream. A stream is looked up once, a failed read is not retried on every query.
+    std::map< rs2_stream, std::pair< bool, float > > _fw_imu_sensitivity;  // < read succeeded, option value >
+
+    // Read the sensitivity currently in FW, converted to the option scale. Returns false if unavailable.
+    bool read_fw_imu_sensitivity( rs2_stream stream, float & option_value );
     bool _gyro_sensitivity_uses_range_index = false;
 
     stream_profiles get_sensor_profiles( std::string sensor_name ) const;
