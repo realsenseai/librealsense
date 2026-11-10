@@ -52,15 +52,10 @@ def _bounce_magnitude(embedded_filter, option_id, original, range):
 
 def _restore_original_raw(embedded_filter, option_id, original_raw):
     """Always restore the very first raw payload read from the device, regardless of what
-    happened above. `reserved` MUST be zero on SET, but a real device can hand back non-zero on
-    GET - zero it in both the sent buffer and the readback comparison before restoring."""
-    expected_raw = bytearray(original_raw)
-    expected_raw[-24:] = b"\x00" * 24
-    expected_raw = bytes(expected_raw)
-    embedded_filter.set_composite_option(option_id, expected_raw)
-    readback_raw = bytearray(embedded_filter.get_composite_option(option_id))
-    readback_raw[-24:] = b"\x00" * 24
-    assert bytes(readback_raw) == expected_raw, "failed to restore original Decimation Filter DPP value"
+    happened above."""
+    embedded_filter.set_composite_option(option_id, bytes(original_raw))
+    readback_raw = embedded_filter.get_composite_option(option_id)
+    assert bytes(readback_raw) == bytes(original_raw), "failed to restore original Decimation Filter DPP value"
 
 
 def test_decimation_filter_dpp_basic_parameter_changes(test_device):

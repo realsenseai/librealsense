@@ -3,6 +3,7 @@
 
 
 #include <src/ds/features/icr-filter-feature.h>
+#include <src/ds/dpp-composite-option.h>
 #include <src/ds/d500/d500-device.h>
 #include <src/ds/d500/icr-embedded-filter.h>
 #include <src/ds/ds-private.h>
@@ -13,7 +14,7 @@
 #include <rsutils/string/from.h>
 
 #include <librealsense2/h/rs_composite_option.h>
-#include <librealsense2/h/rs_icr_control.h>
+#include <librealsense2/h/rs_icr_filter_dpp.h>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 
 #include <algorithm>
@@ -24,7 +25,7 @@ namespace librealsense {
 
 
 // D500_CAMERA_CID_MINZ range descriptor; step is 1 per slot (all-integer params). Defaults
-// track LibRS's rs2_icr_control field docs.
+// track LibRS's rs2_icr_filter_dpp_config field docs.
 // GMSL cannot query ranges (V4L2 array controls report one scalar bound and the FW
 // registers hold only the current value), so these tables are the only source of the MIPI
 // range. USB reads it from FW and ignores this desc.
@@ -82,9 +83,9 @@ static bool embedded_decimation_enabled( const sensor_interface & depth_sensor )
 static void icr_allowed_or_throw( const void * icr_control, size_t size, const video_stream_profile_interface & depth,
                                    const sensor_interface & depth_sensor )
 {
-    if( ! icr_control || size != sizeof( rs2_icr_control ) )
+    if( ! icr_control || size != sizeof( rs2_icr_filter_dpp_config ) )
         return;
-    rs2_icr_control cfg;
+    rs2_icr_filter_dpp_config cfg;
     std::memcpy( &cfg, icr_control, sizeof( cfg ) );
     if( ! cfg.enable )
         return;
@@ -126,7 +127,8 @@ static void icr_allowed_or_throw( const void * icr_control, size_t size, const v
             << " at up to " << max_fps << " FPS, but Depth is " << w << "x" << h << " @ " << fps << " FPS" );
 }
 
-// Rejects enabling ICR while a Depth profile it cannot process is open. `control` is the transport (XU or DDS).
+// Rejects enabling ICR while a Depth profile it cannot process is open. `control` is the transport (XU or DDS) wrapped
+// in dpp_composite_option, so it exchanges rs2_icr_filter_dpp_config.
 class icr_option : public composite_option_interface
 {
 public:
@@ -136,12 +138,7 @@ public:
     {
     }
 
-    std::vector< uint8_t > get_raw() const override
-    {
-        auto raw = _control->get_raw();
-        check_envelope_or_throw( raw.data(), raw.size() );
-        return raw;
-    }
+    std::vector< uint8_t > get_raw() const override { return _control->get_raw(); }
     void set_raw( const void * data, size_t size ) override
     {
         auto active = _depth_sensor.get_active_streams();
@@ -150,45 +147,21 @@ public:
             icr_allowed_or_throw( data, size, *depth, _depth_sensor );
         _control->set_raw( data, size );
     }
-    // {min, max, step, def}, each a complete payload with its own envelope
-    std::vector< uint8_t > get_raw_range() const override
-    {
-        auto raw = _control->get_raw_range();
-        if( raw.size() != 4 * sizeof( rs2_icr_control ) )
-            throw invalid_value_exception( "Improved Close Range control returned an unexpected range payload size" );
-        for( size_t i = 0; i < 4; ++i )
-            check_envelope_or_throw( raw.data() + i * sizeof( rs2_icr_control ), sizeof( rs2_icr_control ) );
-        return raw;
-    }
+    std::vector< uint8_t > get_raw_range() const override { return _control->get_raw_range(); }
     bool is_read_only() const override { return _control->is_read_only(); }
     bool is_enabled() const override { return _control->is_enabled(); }
     const char * get_description() const override { return _control->get_description(); }
 
 private:
-    // The payload size, header version, control ID, param count and param type must be the ICR schema
-    static void check_envelope_or_throw( const uint8_t * data, size_t size )
-    {
-        if( size != sizeof( rs2_icr_control ) )
-            throw invalid_value_exception( "Improved Close Range control returned an unexpected payload size" );
-        dpp_header hdr = {};
-        std::memcpy( &hdr, data, sizeof( hdr ) );
-        if( hdr.version != DPP_HEADER_CURRENT_VERSION || hdr.ctl_id != icr_desc.ctl_id
-            || hdr.param_count != icr_desc.param_count || hdr.param_type != icr_desc.param_type )
-            throw invalid_value_exception( rsutils::string::from()
-                << "Improved Close Range control returned an unsupported schema (version=" << (int)hdr.version
-                << " ctl_id=" << (int)hdr.ctl_id << " param_count=" << (int)hdr.param_count
-                << " param_type=" << (int)hdr.param_type << ")" );
-    }
-
     // FW rejects changing Filter Type or Downscale Ratio while Depth or IR stream, with an obscure error
     void geometry_unchanged_or_throw( const void * data, size_t size, const stream_profiles & active ) const
     {
         bool const streaming = std::any_of( active.begin(), active.end(), []( const std::shared_ptr< stream_profile_interface > & p )
                                             { return p->get_stream_type() == RS2_STREAM_DEPTH || p->get_stream_type() == RS2_STREAM_INFRARED; } );
-        if( ! streaming || ! data || size != sizeof( rs2_icr_control ) )
+        if( ! streaming || ! data || size != sizeof( rs2_icr_filter_dpp_config ) )
             return;
-        rs2_icr_control next;
-        rs2_icr_control current;
+        rs2_icr_filter_dpp_config next;
+        rs2_icr_filter_dpp_config current;
         std::memcpy( &next, data, sizeof( next ) );
         auto raw = _control->get_raw();
         if( raw.size() != sizeof( current ) )
@@ -214,8 +187,8 @@ icr_filter_feature::icr_filter_feature( d500_device & owner, d500_depth_sensor &
                                std::dynamic_pointer_cast< uvc_sensor >( depth_sensor.get_raw_sensor() ),
                                ds::depth_xu,
                                ds::DS5_HKR_ICR_CONTROL,
-                               static_cast< uint32_t >( sizeof( rs2_icr_control ) ),
-                               "Improved Close Range Control (prototype) - use rs2_set/get_composite_option, see rs_icr_control.h",
+                               static_cast< uint32_t >( sizeof( dpp_control_payload ) ),
+                               "Improved Close Range Control (prototype) - use rs2_set/get_composite_option, see rs_icr_filter_dpp.h",
                                icr_desc ) )
 {
     depth_sensor.add_embedded_filter( _filter );
@@ -224,8 +197,9 @@ icr_filter_feature::icr_filter_feature( d500_device & owner, d500_depth_sensor &
 icr_filter_feature::icr_filter_feature( device & owner, const sensor_interface & depth_sensor,
                                           std::shared_ptr< composite_option_interface > control )
 {
-    auto option = std::make_shared< icr_option >( std::move( control ), depth_sensor );
-    _filter = std::make_shared< icr_embedded_filter >( option, RS2_COMPOSITE_OPTION_ICR_CONTROL );
+    auto option = std::make_shared< icr_option >(
+        std::make_shared< dpp_composite_option< rs2_icr_filter_dpp_config > >( std::move( control ), icr_desc ), depth_sensor );
+    _filter = std::make_shared< icr_embedded_filter >( option, RS2_COMPOSITE_OPTION_ICR_FILTER_DPP );
 
     // ICR may have been enabled while the sensor was closed - check it against the Depth profile being opened
     owner.add_stream_combination_validator(

@@ -2,7 +2,7 @@
 // Copyright(c) 2025 RealSense, Inc. All Rights Reserved.
 
 #include <librealsense2/rs.hpp>
-#include <librealsense2/h/rs_icr_control.h>
+#include <librealsense2/h/rs_icr_filter_dpp.h>
 
 #include <iostream>
 #include <string>
@@ -167,7 +167,7 @@ try
             continue;
         for (auto&& f : ds.query_embedded_filters())
         {
-            if (f.supports_composite_option(RS2_COMPOSITE_OPTION_ICR_CONTROL))
+            if (f.supports_composite_option(RS2_COMPOSITE_OPTION_ICR_FILTER_DPP))
             {
                 found_filter.push_back(f);
                 found_sensor.push_back(ds);
@@ -186,14 +186,16 @@ try
     {
         rs2::embedded_filter& close_range_filter = found_filter.front();
         rs2::depth_sensor& close_range_depth_sensor = found_sensor.front();
-        const auto id = RS2_COMPOSITE_OPTION_ICR_CONTROL;
+        const auto id = RS2_COMPOSITE_OPTION_ICR_FILTER_DPP;
 
         // Typed get - the SDK's own bound struct (get_composite_option_as<T>()), not raw bytes;
         // the same struct set_composite_option_from() below takes to write it back atomically.
-        rs2_icr_control original{};
+        rs2_icr_filter_dpp_config original{};
+        bool have_original = false;
         try
         {
-            original = close_range_filter.get_composite_option_as<rs2_icr_control>(id);
+            original = close_range_filter.get_composite_option_as<rs2_icr_filter_dpp_config>(id);
+            have_original = true;
         }
         catch (const rs2::error& e)
         {
@@ -201,10 +203,9 @@ try
             // outcome - supports_composite_option() only reflects static registration, never a
             // live capability check.
             std::cout << "Registered but not functional on this device/FW: " << e.what() << std::endl;
-            original.header.version = 0;
         }
 
-        if (original.header.version == 0)
+        if (!have_original)
         {
             // get_composite_option_as() failed above - nothing more to demo.
         }

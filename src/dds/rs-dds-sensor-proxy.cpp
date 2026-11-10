@@ -1146,7 +1146,7 @@ void dds_sensor_proxy::add_embedded_filter( std::shared_ptr< realdds::dds_embedd
     }
     else if (auto close_range_filter = std::dynamic_pointer_cast< dds_close_range_filter >(embedded_filter))
     {
-        // All parameters as rs2_icr_control. Same feature as USB, only the transport of the payload differs
+        // All parameters as the ICR wire payload. Same feature as USB, only the transport of the payload differs
         auto feature = std::make_shared< icr_filter_feature >(
             *_owner,
             *this,

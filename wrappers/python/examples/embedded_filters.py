@@ -28,7 +28,7 @@ def list_embedded_filter_options(embedded_filter):
 # option" cast exists, so a new id needs an entry here. The registered method returns a real
 # typed object (see pyrs_options.cpp), and _typed_fields() below reads it by introspection.
 _COMPOSITE_OPTION_ACCESSORS = {
-    rs.composite_option_id.icr_control: 'get_icr_control',
+    rs.composite_option_id.icr_filter_dpp: 'get_icr_filter_dpp_config',
     rs.composite_option_id.temporal_filter_dpp: 'get_temporal_filter_dpp_config',
     rs.composite_option_id.decimation_filter_dpp: 'get_decimation_filter_dpp_config',
 }
@@ -36,10 +36,9 @@ _COMPOSITE_OPTION_ACCESSORS = {
 
 def _typed_fields(value):
     '''The real, public fields on a typed composite-option object, discovered from the object
-    itself rather than a hand-maintained name list. `header` is skipped - it's wire-transport
-    framing (version/ctl_id/param_count/...), not one of the control's own logical fields.'''
+    itself rather than a hand-maintained name list.'''
     return [name for name in dir(value)
-            if not name.startswith('_') and name != 'header' and not callable(getattr(value, name))]
+            if not name.startswith('_') and not callable(getattr(value, name))]
 
 
 def list_embedded_filter_composite_options(embedded_filter):

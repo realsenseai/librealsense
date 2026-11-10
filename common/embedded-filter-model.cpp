@@ -20,80 +20,53 @@ namespace rs2
         // emits at DEBUG+ verbosity, not the default INFO level.
         void print_decimation_filter_dpp_config( const rs2_decimation_filter_dpp_config & v )
         {
-            LOG_DEBUG( "[Decimation Filter DPP GET] version=" << (int)v.header.version
-                       << " flags=" << (int)v.header.flags
-                       << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
-                       << " param_count=" << (int)v.header.param_count
-                       << " param_type=" << (int)v.header.param_type
-                       << " enabled=" << v.enabled
+            LOG_DEBUG( "[Decimation Filter DPP GET] enabled=" << v.enabled
                        << " magnitude=" << v.magnitude );
         }
 
-        // No enum-valued fields to clamp here - every field is just range-bounded. Still zeroes
-        // the reserved slots - "MUST be zero on SET" rule.
-        void sanitize_decimation_filter_dpp_config( rs2_decimation_filter_dpp_config & v )
+        // No enum-valued fields to clamp here - every field is just range-bounded.
+        void sanitize_decimation_filter_dpp_config( rs2_decimation_filter_dpp_config & )
         {
-            for( auto & r : v.reserved )
-                r = 0;
         }
 
         // Same scheme as print_decimation_filter_dpp_config() above, for
         // RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP.
         void print_temporal_filter_dpp_config( const rs2_temporal_filter_dpp_config & v )
         {
-            LOG_DEBUG( "[Temporal Filter DPP GET] version=" << (int)v.header.version
-                       << " flags=" << (int)v.header.flags
-                       << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
-                       << " param_count=" << (int)v.header.param_count
-                       << " param_type=" << (int)v.header.param_type
-                       << " enabled=" << v.enabled
+            LOG_DEBUG( "[Temporal Filter DPP GET] enabled=" << v.enabled
                        << " smooth_alpha=" << v.smooth_alpha
                        << " smooth_delta=" << v.smooth_delta
-                       << " persistency_index=" << v.persistency_index
-                       << " reserved=[" << v.reserved[0] << "," << v.reserved[1] << ","
-                       << v.reserved[2] << "," << v.reserved[3] << "]" );
+                       << " persistency_index=" << v.persistency_index );
         }
 
         // No enum-valued fields to clamp here (unlike sanitize_icr_control() below) - every field
-        // is just range-bounded. Still zeroes the reserved slots - same "MUST be zero on SET" rule.
-        void sanitize_temporal_filter_dpp_config( rs2_temporal_filter_dpp_config & v )
+        // is just range-bounded.
+        void sanitize_temporal_filter_dpp_config( rs2_temporal_filter_dpp_config & )
         {
-            for( auto & r : v.reserved )
-                r = 0;
         }
 
         // Same scheme as print_decimation_filter_dpp_config() above, for
-        // RS2_COMPOSITE_OPTION_ICR_CONTROL.
-        void print_icr_control( const rs2_icr_control & v )
+        // RS2_COMPOSITE_OPTION_ICR_FILTER_DPP.
+        void print_icr_control( const rs2_icr_filter_dpp_config & v )
         {
-            LOG_DEBUG( "[Improved Close Range GET] version=" << (int)v.header.version
-                       << " flags=" << (int)v.header.flags
-                       << " ctl_id=0x" << std::hex << v.header.ctl_id << std::dec
-                       << " param_count=" << (int)v.header.param_count
-                       << " param_type=" << (int)v.header.param_type
-                       << " enable=" << v.enable
+            LOG_DEBUG( "[Improved Close Range GET] enable=" << v.enable
                        << " filter_type=" << v.filter_type
                        << " downscale_ratio=" << v.downscale_ratio
                        << " shift_mode=" << v.shift_mode
                        << " shift_pixels=" << v.shift_pixels
                        << " threshold_mode=" << v.threshold_mode
-                       << " threshold_mm=" << v.threshold_mm
-                       << " reserved=[" << v.reserved[0] << "]" );
+                       << " threshold_mm=" << v.threshold_mm );
         }
 
         // A real device's firmware may still speak the pre-design-review wire layout, so a field
         // can land outside its enum's legal range. Called after every raw device read, before any
         // branching/display code uses it, so the stored value and what's shown stay consistent.
-        void sanitize_icr_control( rs2_icr_control & v )
+        void sanitize_icr_control( rs2_icr_filter_dpp_config & v )
         {
             v.filter_type = std::min( std::max( v.filter_type, 0 ), 1 );
             v.downscale_ratio = std::min( std::max( v.downscale_ratio, 1 ), 2 );
             v.shift_mode = std::min( std::max( v.shift_mode, 0 ), 2 );
             v.threshold_mode = std::min( std::max( v.threshold_mode, 0 ), 2 );
-            // Header doc: "MUST be zero on SET". A real device may hand back a non-zero byte here
-            // on GET (pre-design-review firmware, or simply unused memory) - without this, every
-            // later auto-commit/enable-toggle would echo that non-zero value straight back on SET.
-            v.reserved[0] = 0;
         }
     }
 
@@ -159,7 +132,7 @@ namespace rs2
                     draw_temporal_filter_dpp_control_editor( error_message );
                     continue;
                 }
-                if( id == RS2_COMPOSITE_OPTION_ICR_CONTROL )
+                if( id == RS2_COMPOSITE_OPTION_ICR_FILTER_DPP )
                 {
                     draw_icr_control_editor( error_message );
                     continue;
@@ -390,9 +363,9 @@ namespace rs2
 
     void embedded_filter_model::draw_icr_control_editor( std::string & error_message )
     {
-        const auto id = RS2_COMPOSITE_OPTION_ICR_CONTROL;
+        const auto id = RS2_COMPOSITE_OPTION_ICR_FILTER_DPP;
         // A rejected enable (e.g. unsupported Depth profile) leads to a re-read here - keep the toggle in sync with it
-        auto on_read = [this]( const rs2_icr_control & v )
+        auto on_read = [this]( const rs2_icr_filter_dpp_config & v )
         {
             print_icr_control( v );
             _enabled = v.enable != 0;
@@ -401,11 +374,11 @@ namespace rs2
             return;
         sanitize_icr_control( _icr_editor.value );
 
-        draw_composite_editor< rs2_icr_control, rs2_icr_control_range >(
+        draw_composite_editor< rs2_icr_filter_dpp_config, rs2_icr_filter_dpp_range >(
             _icr_editor, _viewer.panel_extra_width(), _embedded_filter, id, _enabled, sensor_stopping(), error_message,
             [&]() { return draw_icr_fields( error_message ); },
             sanitize_icr_control,
-            [this]( rs2_icr_control & v )
+            [this]( rs2_icr_filter_dpp_config & v )
             {
                 v.enable = 1;
                 _enabled = true;
@@ -479,21 +452,21 @@ namespace rs2
             return;
         }
 
-        // Same scheme as Decimation above, for RS2_COMPOSITE_OPTION_ICR_CONTROL.
-        if( _embedded_filter->supports_composite_option( RS2_COMPOSITE_OPTION_ICR_CONTROL ) )
+        // Same scheme as Decimation above, for RS2_COMPOSITE_OPTION_ICR_FILTER_DPP.
+        if( _embedded_filter->supports_composite_option( RS2_COMPOSITE_OPTION_ICR_FILTER_DPP ) )
         {
             try
             {
                 if( ! _icr_editor.initialized )
                 {
-                    _icr_editor.value = _embedded_filter->get_composite_option_as< rs2_icr_control >(
-                        RS2_COMPOSITE_OPTION_ICR_CONTROL );
+                    _icr_editor.value = _embedded_filter->get_composite_option_as< rs2_icr_filter_dpp_config >(
+                        RS2_COMPOSITE_OPTION_ICR_FILTER_DPP );
                     sanitize_icr_control( _icr_editor.value );
                     print_icr_control( _icr_editor.value );
                     _icr_editor.initialized = true;
                 }
                 _icr_editor.value.enable = actual ? 1 : 0;
-                _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_ICR_CONTROL, _icr_editor.value );
+                _embedded_filter->set_composite_option_from( RS2_COMPOSITE_OPTION_ICR_FILTER_DPP, _icr_editor.value );
                 _enabled = actual;
             }
             catch( const std::exception & e )
@@ -573,7 +546,7 @@ namespace rs2
                         _enabled = _temporal_filter_dpp_editor.value.enabled != 0;
                 }
             }
-            else if( id == RS2_COMPOSITE_OPTION_ICR_CONTROL )
+            else if( id == RS2_COMPOSITE_OPTION_ICR_FILTER_DPP )
             {
                 if( _icr_editor.ensure_initialized( _embedded_filter, id, error_message, print_icr_control ) )
                 {

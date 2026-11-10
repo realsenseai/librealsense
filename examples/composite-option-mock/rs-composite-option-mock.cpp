@@ -14,7 +14,7 @@
 #include <librealsense2/rs.hpp>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_icr_control.h>
+#include <librealsense2/h/rs_icr_filter_dpp.h>
 
 #include <src/composite-option-interface.h>
 #include <src/core/options-interface.h>
@@ -248,23 +248,23 @@ bool test_temporal_filter_dpp()
 
 bool test_icr_control()
 {
-    rs2_icr_control initial{};
+    rs2_icr_filter_dpp_config initial{};
     initial.enable = 1;
     initial.filter_type = 0;
     initial.downscale_ratio = 1;
-    rs2_icr_control modified = initial;
+    rs2_icr_filter_dpp_config modified = initial;
     modified.downscale_ratio = 2;  // change one field to prove this second round trip is independent
 
-    return run_round_trip_and_atomicity_test< rs2_icr_control >(
-        RS2_COMPOSITE_OPTION_ICR_CONTROL, "Improved Close Range Control (fake, for testing)", initial, modified,
-        []( const rs2_icr_control & a, const rs2_icr_control & b )
+    return run_round_trip_and_atomicity_test< rs2_icr_filter_dpp_config >(
+        RS2_COMPOSITE_OPTION_ICR_FILTER_DPP, "Improved Close Range Control (fake, for testing)", initial, modified,
+        []( const rs2_icr_filter_dpp_config & a, const rs2_icr_filter_dpp_config & b )
         {
             return a.enable == b.enable && a.filter_type == b.filter_type
                 && a.downscale_ratio == b.downscale_ratio && a.shift_mode == b.shift_mode
                 && a.shift_pixels == b.shift_pixels && a.threshold_mode == b.threshold_mode
                 && a.threshold_mm == b.threshold_mm;
         },
-        []( std::ostream & os, const rs2_icr_control & v )
+        []( std::ostream & os, const rs2_icr_filter_dpp_config & v )
         { os << "enable=" << v.enable << " filter_type=" << v.filter_type << " downscale_ratio=" << v.downscale_ratio; } );
 }
 

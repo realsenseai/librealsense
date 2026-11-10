@@ -7,6 +7,7 @@
 #include <src/ds/d500/composite-embedded-filter.h>
 #include <src/ds/ds-private.h>
 #include <src/ds/composite-xu-option.h>
+#include <src/ds/dpp-composite-option.h>
 #include <src/proc/decimation-embedded-filter.h>
 #include <src/uvc-sensor.h>
 
@@ -50,12 +51,12 @@ decimation_filter_feature::decimation_filter_feature( d500_depth_sensor & depth_
         raw_depth_ep,
         ds::depth_xu,
         ds::DS5_HKR_DECIMATION_FILTER_DPP,
-        static_cast< uint32_t >( sizeof( rs2_decimation_filter_dpp_config ) ),
+        static_cast< uint32_t >( sizeof( dpp_control_payload ) ),
         "Decimation Filter DPP (prototype) - use rs2_set/get_composite_option, see rs_decimation_filter_dpp.h",
         decimation_desc );
     depth_sensor.add_embedded_filter( std::make_shared<
         composite_embedded_filter< decimation_embedded_filter, RS2_EMBEDDED_FILTER_TYPE_DECIMATION > >(
-        std::move( option ), RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ) );
+        std::make_shared< dpp_composite_option< rs2_decimation_filter_dpp_config > >( std::move( option ), decimation_desc ), RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP ) );
 }
 
 feature_id decimation_filter_feature::get_id() const

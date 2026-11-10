@@ -17,7 +17,7 @@ def _find_icr_filter(sensor):
     composite option lives on one of the sensor's embedded filters, its own independent options
     registry, not on the sensor itself (see rs2::embedded_filter)."""
     for embedded_filter in sensor.query_embedded_filters():
-        if rs.composite_option_id.icr_control in embedded_filter.get_supported_composite_options():
+        if rs.composite_option_id.icr_filter_dpp in embedded_filter.get_supported_composite_options():
             return embedded_filter
     return None
 
@@ -34,25 +34,25 @@ def _bounce_field_pair(embedded_filter, option_id, original, range, filter_type,
     current = getattr(original, field)
     new_value = lo if current != lo else hi
 
-    # Each set starts from a freshly-read struct - the header/other fields must be carried over
+    # Each set starts from a freshly-read struct - the other fields must be carried over
     # exactly as the device just reported them, not zero-initialized.
-    cfg = embedded_filter.get_icr_control(option_id)
+    cfg = embedded_filter.get_icr_filter_dpp_config(option_id)
     cfg.filter_type = filter_type
     if field == 'shift_pixels':
         cfg.shift_mode = 2  # Manual - the only mode that makes shift_pixels meaningful
     setattr(cfg, field, new_value)
-    embedded_filter.set_icr_control(option_id, cfg)
+    embedded_filter.set_icr_filter_dpp_config(option_id, cfg)
 
-    readback = embedded_filter.get_icr_control(option_id)
+    readback = embedded_filter.get_icr_filter_dpp_config(option_id)
     assert readback.filter_type == filter_type, f"filter_type: expected {filter_type}, got {readback.filter_type}"
     assert getattr(readback, field) == new_value, f"{field}: expected {new_value}, got {getattr(readback, field)}"
 
-    cfg = embedded_filter.get_icr_control(option_id)
+    cfg = embedded_filter.get_icr_filter_dpp_config(option_id)
     cfg.filter_type = original.filter_type
     if field == 'shift_pixels':
         cfg.shift_mode = original.shift_mode
     setattr(cfg, field, current)
-    embedded_filter.set_icr_control(option_id, cfg)
+    embedded_filter.set_icr_filter_dpp_config(option_id, cfg)
     return True
 
 
@@ -65,33 +65,28 @@ def _bounce_threshold(embedded_filter, option_id, original, range):
         log.info(f"threshold_mm: no room to change, range is [{lo}, {hi}]")
         return False
 
-    cfg = embedded_filter.get_icr_control(option_id)
+    cfg = embedded_filter.get_icr_filter_dpp_config(option_id)
     cfg.threshold_mode = 2
     cfg.threshold_mm = lo if original.threshold_mm != lo else hi
-    embedded_filter.set_icr_control(option_id, cfg)
+    embedded_filter.set_icr_filter_dpp_config(option_id, cfg)
 
-    readback = embedded_filter.get_icr_control(option_id)
+    readback = embedded_filter.get_icr_filter_dpp_config(option_id)
     assert readback.threshold_mode == 2, f"threshold_mode: expected 2, got {readback.threshold_mode}"
     assert readback.threshold_mm == cfg.threshold_mm, f"threshold_mm: expected {cfg.threshold_mm}, got {readback.threshold_mm}"
 
-    cfg = embedded_filter.get_icr_control(option_id)
+    cfg = embedded_filter.get_icr_filter_dpp_config(option_id)
     cfg.threshold_mode = original.threshold_mode
     cfg.threshold_mm = original.threshold_mm
-    embedded_filter.set_icr_control(option_id, cfg)
+    embedded_filter.set_icr_filter_dpp_config(option_id, cfg)
     return True
 
 
 def _restore_original_raw(embedded_filter, option_id, original_raw):
     """Always restore the very first raw payload read from the device, regardless of what
-    happened above. `reserved` MUST be zero on SET, but a real device can hand back non-zero on
-    GET - zero it in both the sent buffer and the readback comparison before restoring."""
-    expected_raw = bytearray(original_raw)
-    expected_raw[-4:] = b"\x00\x00\x00\x00"
-    expected_raw = bytes(expected_raw)
-    embedded_filter.set_composite_option(option_id, expected_raw)
-    readback_raw = bytearray(embedded_filter.get_composite_option(option_id))
-    readback_raw[-4:] = b"\x00\x00\x00\x00"
-    assert bytes(readback_raw) == expected_raw, "failed to restore original Improved Close Range Control value"
+    happened above."""
+    embedded_filter.set_composite_option(option_id, bytes(original_raw))
+    readback_raw = embedded_filter.get_composite_option(option_id)
+    assert bytes(readback_raw) == bytes(original_raw), "failed to restore original Improved Close Range Control value"
 
 
 def test_icr_control_basic_parameter_changes(test_device):
@@ -103,7 +98,7 @@ def test_icr_control_basic_parameter_changes(test_device):
     if embedded_filter is None:
         pytest.skip("Improved Close Range Control composite option not supported on this device")
 
-    option_id = rs.composite_option_id.icr_control
+    option_id = rs.composite_option_id.icr_filter_dpp
     try:
         original_raw = embedded_filter.get_composite_option(option_id)
     except RuntimeError as e:
@@ -115,8 +110,8 @@ def test_icr_control_basic_parameter_changes(test_device):
     # Typed get/set (see pyrs_options.cpp) - the SDK's own bound struct, no hand-rolled
     # struct.pack/unpack format string to keep in sync. Only the final restore-and-verify below
     # uses the raw bytes, for the strongest possible guarantee.
-    original = embedded_filter.get_icr_control(option_id)
-    range = embedded_filter.get_icr_control_range(option_id)
+    original = embedded_filter.get_icr_filter_dpp_config(option_id)
+    range = embedded_filter.get_icr_filter_dpp_range(option_id)
 
     try:
         changed_any = False

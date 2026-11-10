@@ -4,7 +4,7 @@
 #include "composite-xu-option.h"
 #include <src/librealsense-exception.h>
 #include <rsutils/string/from.h>
-#include <librealsense2/h/rs_dpp_header.h>
+#include <src/ds/dpp-header.h>
 
 #include <cstring>
 

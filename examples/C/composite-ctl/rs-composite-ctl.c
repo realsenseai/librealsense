@@ -8,7 +8,7 @@
 #include <librealsense2/rs.h>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_icr_control.h>
+#include <librealsense2/h/rs_icr_filter_dpp.h>
 #include "example.h"   /* shared check_error()/print_device_info() used by every Examples/C sample */
 
 #include <stdio.h>
@@ -21,7 +21,7 @@ static const char * composite_option_name( rs2_composite_option_id id )
     {
     case RS2_COMPOSITE_OPTION_DECIMATION_FILTER_DPP:  return "DECIMATION_FILTER_DPP";
     case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:    return "TEMPORAL_FILTER_DPP";
-    case RS2_COMPOSITE_OPTION_ICR_CONTROL:           return "ICR_CONTROL";
+    case RS2_COMPOSITE_OPTION_ICR_FILTER_DPP:           return "ICR_FILTER_DPP";
     default:                                           return "UNKNOWN";
     }
 }
@@ -56,11 +56,6 @@ static void print_bytes( const char * label, const unsigned char * data, int siz
    table to drive it in C, so every field is spelled out here once, in wire order. */
 static void print_decimation_filter_dpp_struct( const rs2_decimation_filter_dpp_config * v )
 {
-    printf( "        %-16s = %d\n", "version", (int)v->header.version );
-    printf( "        %-16s = %d\n", "flags", (int)v->header.flags );
-    printf( "        %-16s = 0x%x\n", "ctl_id", (unsigned int)v->header.ctl_id );
-    printf( "        %-16s = %d\n", "param_count", (int)v->header.param_count );
-    printf( "        %-16s = %d\n", "param_type", (int)v->header.param_type );
     printf( "        %-16s = %d\n", "enabled", v->enabled );
     printf( "        %-16s = %d\n", "magnitude", v->magnitude );
 }
@@ -72,11 +67,6 @@ static void print_decimation_filter_dpp_range( const rs2_decimation_filter_dpp_r
 #define DECIMATION_FILTER_DPP_ROW( label, field ) \
     printf( "        %-16s = [ %d, %d, %d, %d ]\n", label, \
             (int)r->min.field, (int)r->max.field, (int)r->def.field, (int)r->step.field )
-    DECIMATION_FILTER_DPP_ROW( "version", header.version );
-    DECIMATION_FILTER_DPP_ROW( "flags", header.flags );
-    DECIMATION_FILTER_DPP_ROW( "ctl_id", header.ctl_id );
-    DECIMATION_FILTER_DPP_ROW( "param_count", header.param_count );
-    DECIMATION_FILTER_DPP_ROW( "param_type", header.param_type );
     DECIMATION_FILTER_DPP_ROW( "enabled", enabled );
     DECIMATION_FILTER_DPP_ROW( "magnitude", magnitude );
 #undef DECIMATION_FILTER_DPP_ROW
@@ -87,11 +77,6 @@ static void print_decimation_filter_dpp_range( const rs2_decimation_filter_dpp_r
    DPP param slot is an int32), so it prints as a plain %d like every other field, not a float. */
 static void print_temporal_filter_dpp_struct( const rs2_temporal_filter_dpp_config * v )
 {
-    printf( "        %-16s = %d\n", "version", (int)v->header.version );
-    printf( "        %-16s = %d\n", "flags", (int)v->header.flags );
-    printf( "        %-16s = 0x%x\n", "ctl_id", (unsigned int)v->header.ctl_id );
-    printf( "        %-16s = %d\n", "param_count", (int)v->header.param_count );
-    printf( "        %-16s = %d\n", "param_type", (int)v->header.param_type );
     printf( "        %-16s = %d\n", "enabled", v->enabled );
     printf( "        %-16s = %d\n", "smooth_alpha", v->smooth_alpha );
     printf( "        %-16s = %d\n", "smooth_delta", v->smooth_delta );
@@ -106,11 +91,6 @@ static void print_temporal_filter_dpp_range( const rs2_temporal_filter_dpp_range
 #define TEMPORAL_FILTER_DPP_ROW( label, field ) \
     printf( "        %-16s = [ %d, %d, %d, %d ]\n", label, \
             (int)r->min.field, (int)r->max.field, (int)r->def.field, (int)r->step.field )
-    TEMPORAL_FILTER_DPP_ROW( "version", header.version );
-    TEMPORAL_FILTER_DPP_ROW( "flags", header.flags );
-    TEMPORAL_FILTER_DPP_ROW( "ctl_id", header.ctl_id );
-    TEMPORAL_FILTER_DPP_ROW( "param_count", header.param_count );
-    TEMPORAL_FILTER_DPP_ROW( "param_type", header.param_type );
     TEMPORAL_FILTER_DPP_ROW( "enabled", enabled );
     TEMPORAL_FILTER_DPP_ROW( "smooth_alpha", smooth_alpha );
     TEMPORAL_FILTER_DPP_ROW( "smooth_delta", smooth_delta );
@@ -119,15 +99,10 @@ static void print_temporal_filter_dpp_range( const rs2_temporal_filter_dpp_range
 }
 
 /* C99 equivalent of the C++ sample's generic print_struct(icr_fields(), ...) - no
-   pointer-to-member table to drive it in C, so every field is spelled out here once, in wire
-   order, matching rs_icr_control.h. */
-static void print_icr_struct( const rs2_icr_control * v )
+   pointer-to-member table to drive it in C, so every field is spelled out here once, in
+   declaration order, matching rs_icr_filter_dpp.h. */
+static void print_icr_struct( const rs2_icr_filter_dpp_config * v )
 {
-    printf( "        %-16s = %d\n", "version", (int)v->header.version );
-    printf( "        %-16s = %d\n", "flags", (int)v->header.flags );
-    printf( "        %-16s = 0x%x\n", "ctl_id", (unsigned int)v->header.ctl_id );
-    printf( "        %-16s = %d\n", "param_count", (int)v->header.param_count );
-    printf( "        %-16s = %d\n", "param_type", (int)v->header.param_type );
     printf( "        %-16s = %d\n", "enable", v->enable );
     printf( "        %-16s = %d\n", "filter_type", v->filter_type );
     printf( "        %-16s = %d\n", "downscale_ratio", v->downscale_ratio );
@@ -139,17 +114,12 @@ static void print_icr_struct( const rs2_icr_control * v )
 
 /* C99 equivalent of the C++ sample's generic print_range(icr_fields(), ...): one header
    line naming the columns, then one row per field, name = [ min, max, default, step ]. */
-static void print_icr_range( const rs2_icr_control_range * r )
+static void print_icr_range( const rs2_icr_filter_dpp_range * r )
 {
     printf( "        %-16s   [ min, max, default, step ]\n", "" );
 #define ICR_ROW( label, field ) \
     printf( "        %-16s = [ %d, %d, %d, %d ]\n", label, \
             (int)r->min.field, (int)r->max.field, (int)r->def.field, (int)r->step.field )
-    ICR_ROW( "version", header.version );
-    ICR_ROW( "flags", header.flags );
-    ICR_ROW( "ctl_id", header.ctl_id );
-    ICR_ROW( "param_count", header.param_count );
-    ICR_ROW( "param_type", header.param_type );
     ICR_ROW( "enable", enable );
     ICR_ROW( "filter_type", filter_type );
     ICR_ROW( "downscale_ratio", downscale_ratio );
@@ -447,8 +417,8 @@ skipped:
 /* Sets *cfg and reads it back into *after. Returns 1 on success, 0 (SKIPPED message printed) on
    failure. */
 static int icr_set_and_readback( const rs2_options * opts, rs2_composite_option_id id,
-                                                    const rs2_icr_control * cfg,
-                                                    rs2_icr_control * after )
+                                                    const rs2_icr_filter_dpp_config * cfg,
+                                                    rs2_icr_filter_dpp_config * after )
 {
     rs2_error * e = NULL;
     const rs2_raw_data_buffer * raw;
@@ -486,8 +456,8 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
     const rs2_raw_data_buffer * raw;
     const unsigned char * bytes;
     int size;
-    rs2_icr_control current, cfg, after;
-    rs2_icr_control_range range;
+    rs2_icr_filter_dpp_config current, cfg, after;
+    rs2_icr_filter_dpp_range range;
     int mode;
 
     /* 1) Get (before) - both forms of the read, same as the C++ sample: the raw untyped
@@ -519,7 +489,7 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
     printf( "      Get Structured Data:\n" );
     print_icr_struct( &current );
 
-    /* 2) Set + Get, wire header and every other field carried over untouched from `current`, not
+    /* 2) Set + Get, every other field carried over untouched from `current`, not
        zero-initialized, on every step below. */
     cfg = current;
     cfg.enable = 1;
@@ -571,8 +541,8 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
               && after.threshold_mode == current.threshold_mode && after.threshold_mm == current.threshold_mm )
                 ? "ok" : "FAILED to restore - device may be left in the sample's last test state" );
 
-    /* 3) Get range - raw bytes, then the manual cast to rs2_icr_control_range
-       (4 full copies of the struct - min/max/step/def, header fields included). */
+    /* 3) Get range - raw bytes, then the manual cast to rs2_icr_filter_dpp_range
+       (4 full copies of the struct - min/max/step/def). */
     raw = rs2_get_composite_option_range( opts, id, &e );
     if( e )
         goto skipped;
@@ -630,7 +600,7 @@ static int exercise_composite_option( const rs2_options * opts, rs2_composite_op
         return exercise_decimation_filter_dpp( opts, id );
     case RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP:
         return exercise_temporal_filter_dpp( opts, id );
-    case RS2_COMPOSITE_OPTION_ICR_CONTROL:
+    case RS2_COMPOSITE_OPTION_ICR_FILTER_DPP:
         return exercise_icr_control( opts, id );
     default:
         printf( "      (no typed handler registered for this composite option id)\n" );

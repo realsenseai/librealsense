@@ -5,7 +5,7 @@
 #include <librealsense2/hpp/rs_options.hpp>
 #include <librealsense2/h/rs_decimation_filter_dpp.h>
 #include <librealsense2/h/rs_temporal_filter_dpp.h>
-#include <librealsense2/h/rs_icr_control.h>
+#include <librealsense2/h/rs_icr_filter_dpp.h>
 
 using rsutils::json;
 
@@ -13,22 +13,12 @@ using rsutils::json;
 void init_options(py::module &m) {
     /** rs_options.hpp **/
 
-    // Typed struct bindings for the two known composite-option wire layouts, bound directly
+    // Typed struct bindings for the known composite-option structs, bound directly
     // against the real C structs via pointer-to-member (same mechanism as rs2_intrinsics above)
     // so a shape change fails to compile instead of silently misinterpreting bytes.
-    py::class_< dpp_header >(
-        m, "dpp_header", "Wire header shared by the HKR DPP composite-option control family - see rs_dpp_header.h." )
-        .def( py::init<>() )
-        .def_readwrite( "version", &dpp_header::version )
-        .def_readwrite( "flags", &dpp_header::flags )
-        .def_readwrite( "ctl_id", &dpp_header::ctl_id )
-        .def_readwrite( "param_count", &dpp_header::param_count )
-        .def_readwrite( "param_type", &dpp_header::param_type );
-
     py::class_< rs2_decimation_filter_dpp_config >(
         m, "decimation_filter_dpp_config", "Decimation Filter DPP composite option payload - see rs_decimation_filter_dpp.h." )
         .def( py::init<>() )
-        .def_readwrite( "header", &rs2_decimation_filter_dpp_config::header )
         .def_readwrite( "enabled", &rs2_decimation_filter_dpp_config::enabled )
         .def_readwrite( "magnitude", &rs2_decimation_filter_dpp_config::magnitude )
         .def( "__repr__",
@@ -50,7 +40,6 @@ void init_options(py::module &m) {
     py::class_< rs2_temporal_filter_dpp_config >(
         m, "temporal_filter_dpp_config", "Temporal Filter DPP composite option payload - see rs_temporal_filter_dpp.h." )
         .def( py::init<>() )
-        .def_readwrite( "header", &rs2_temporal_filter_dpp_config::header )
         .def_readwrite( "enabled", &rs2_temporal_filter_dpp_config::enabled )
         .def_readwrite( "smooth_alpha", &rs2_temporal_filter_dpp_config::smooth_alpha )
         .def_readwrite( "smooth_delta", &rs2_temporal_filter_dpp_config::smooth_delta )
@@ -72,38 +61,37 @@ void init_options(py::module &m) {
         .def_readwrite( "step", &rs2_temporal_filter_dpp_range::step )
         .def_readwrite( "default", &rs2_temporal_filter_dpp_range::def );
 
-    py::class_< rs2_icr_control >(
-        m, "icr_control", "Improved Close Range Control composite option payload - see rs_icr_control.h." )
+    py::class_< rs2_icr_filter_dpp_config >(
+        m, "icr_filter_dpp_config", "Improved Close Range Control composite option payload - see rs_icr_filter_dpp.h." )
         .def( py::init<>() )
-        .def_readwrite( "header", &rs2_icr_control::header )
-        .def_readwrite( "enable", &rs2_icr_control::enable )
-        .def_readwrite( "filter_type", &rs2_icr_control::filter_type )
-        .def_readwrite( "downscale_ratio", &rs2_icr_control::downscale_ratio )
-        .def_readwrite( "shift_mode", &rs2_icr_control::shift_mode )
-        .def_readwrite( "shift_pixels", &rs2_icr_control::shift_pixels )
-        .def_readwrite( "threshold_mode", &rs2_icr_control::threshold_mode )
-        .def_readwrite( "threshold_mm", &rs2_icr_control::threshold_mm )
+        .def_readwrite( "enable", &rs2_icr_filter_dpp_config::enable )
+        .def_readwrite( "filter_type", &rs2_icr_filter_dpp_config::filter_type )
+        .def_readwrite( "downscale_ratio", &rs2_icr_filter_dpp_config::downscale_ratio )
+        .def_readwrite( "shift_mode", &rs2_icr_filter_dpp_config::shift_mode )
+        .def_readwrite( "shift_pixels", &rs2_icr_filter_dpp_config::shift_pixels )
+        .def_readwrite( "threshold_mode", &rs2_icr_filter_dpp_config::threshold_mode )
+        .def_readwrite( "threshold_mm", &rs2_icr_filter_dpp_config::threshold_mm )
         .def( "__repr__",
-              []( rs2_icr_control const & v )
+              []( rs2_icr_filter_dpp_config const & v )
               {
                   std::ostringstream ss;
-                  ss << "<icr_control enable=" << v.enable << " filter_type=" << v.filter_type
+                  ss << "<icr_filter_dpp_config enable=" << v.enable << " filter_type=" << v.filter_type
                      << " downscale_ratio=" << v.downscale_ratio << " shift_mode=" << v.shift_mode
                      << " shift_pixels=" << v.shift_pixels << " threshold_mode=" << v.threshold_mode
                      << " threshold_mm=" << v.threshold_mm << ">";
                   return ss.str();
               } );
 
-    py::class_< rs2_icr_control_range >(
-        m, "icr_control_range", "Supported {min,max,step,default} bounds for icr_control - see rs_icr_control.h." )
+    py::class_< rs2_icr_filter_dpp_range >(
+        m, "icr_filter_dpp_range", "Supported {min,max,step,default} bounds for icr_filter_dpp_config - see rs_icr_filter_dpp.h." )
         .def( py::init<>() )
-        .def_readwrite( "min", &rs2_icr_control_range::min )
-        .def_readwrite( "max", &rs2_icr_control_range::max )
-        .def_readwrite( "step", &rs2_icr_control_range::step )
+        .def_readwrite( "min", &rs2_icr_filter_dpp_range::min )
+        .def_readwrite( "max", &rs2_icr_filter_dpp_range::max )
+        .def_readwrite( "step", &rs2_icr_filter_dpp_range::step )
         // 'def' is a Python keyword and cannot be used as an attribute name (obj.def is a syntax
         // error) - exposed as "default" instead, the one place this binding's naming has to
         // diverge from the C++ field it mirrors.
-        .def_readwrite( "default", &rs2_icr_control_range::def );
+        .def_readwrite( "default", &rs2_icr_filter_dpp_range::def );
 
     // Expose option values as a custom struct rather than 'rs2_option_value*'
     struct option_value
@@ -340,18 +328,18 @@ void init_options(py::module &m) {
             "Typed counterpart to get_composite_option_range() for Temporal Filter DPP.",
             "option"_a )
         .def(
-            "get_icr_control",
-            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_icr_control
+            "get_icr_filter_dpp_config",
+            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_icr_filter_dpp_config
             {
                 py::gil_scoped_release release;
-                return self.get_composite_option_as< rs2_icr_control >( id );
+                return self.get_composite_option_as< rs2_icr_filter_dpp_config >( id );
             },
             "Typed counterpart to get_composite_option() for Improved Close Range Control - returns a "
-            "icr_control object (bound directly against the real C struct) instead of raw bytes.",
+            "icr_filter_dpp_config object (bound directly against the public C struct) instead of raw bytes.",
             "option"_a )
         .def(
-            "set_icr_control",
-            []( rs2::options const & self, rs2_composite_option_id id, rs2_icr_control const & value )
+            "set_icr_filter_dpp_config",
+            []( rs2::options const & self, rs2_composite_option_id id, rs2_icr_filter_dpp_config const & value )
             {
                 py::gil_scoped_release release;
                 self.set_composite_option_from( id, value );
@@ -360,11 +348,11 @@ void init_options(py::module &m) {
             "option"_a,
             "value"_a )
         .def(
-            "get_icr_control_range",
-            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_icr_control_range
+            "get_icr_filter_dpp_range",
+            []( rs2::options const & self, rs2_composite_option_id id ) -> rs2_icr_filter_dpp_range
             {
                 py::gil_scoped_release release;
-                return self.get_composite_option_range_as< rs2_icr_control_range >( id );
+                return self.get_composite_option_range_as< rs2_icr_filter_dpp_range >( id );
             },
             "Typed counterpart to get_composite_option_range() for Improved Close Range Control.",
             "option"_a );

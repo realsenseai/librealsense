@@ -7,6 +7,7 @@
 #include <src/ds/d500/composite-embedded-filter.h>
 #include <src/ds/ds-private.h>
 #include <src/ds/composite-xu-option.h>
+#include <src/ds/dpp-composite-option.h>
 #include <src/proc/temporal-embedded-filter.h>
 #include <src/uvc-sensor.h>
 
@@ -48,12 +49,12 @@ temporal_filter_feature::temporal_filter_feature( d500_depth_sensor & depth_sens
         raw_depth_ep,
         ds::depth_xu,
         ds::DS5_HKR_TEMPORAL_FILTER_DPP,
-        static_cast< uint32_t >( sizeof( rs2_temporal_filter_dpp_config ) ),
+        static_cast< uint32_t >( sizeof( dpp_control_payload ) ),
         "Temporal Filter DPP (prototype) - use rs2_set/get_composite_option, see rs_temporal_filter_dpp.h",
         temporal_desc );
     depth_sensor.add_embedded_filter( std::make_shared<
         composite_embedded_filter< temporal_embedded_filter, RS2_EMBEDDED_FILTER_TYPE_TEMPORAL > >(
-        std::move( option ), RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP ) );
+        std::make_shared< dpp_composite_option< rs2_temporal_filter_dpp_config > >( std::move( option ), temporal_desc ), RS2_COMPOSITE_OPTION_TEMPORAL_FILTER_DPP ) );
 }
 
 feature_id temporal_filter_feature::get_id() const

@@ -709,7 +709,7 @@ std::string const & get_string( rs2_composite_option_id value )
 #define CASE( X ) STRARR( arr, COMPOSITE_OPTION, X );
         CASE( DECIMATION_FILTER_DPP )
         CASE( TEMPORAL_FILTER_DPP )
-        CASE( ICR_CONTROL )
+        CASE( ICR_FILTER_DPP )
 #undef CASE
         return arr;
     }();
