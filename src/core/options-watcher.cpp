@@ -124,7 +124,7 @@ bool options_watcher::should_start() const
 bool options_watcher::should_stop() const
 {
     return ( _on_values_changed.size() == 0 && ! adopted_have_subscribers() )
-        || ( _options.empty() && _composite_options.empty() ) || _destructing;
+        || ( _options.empty() && _composite_options.empty() && ! adopted_have_subscribers() ) || _destructing;
 }
 
 void options_watcher::start()
