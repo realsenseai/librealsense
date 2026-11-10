@@ -142,6 +142,14 @@ public:
         return false;
     }
 
+    bool is_token_sensitivity_read_lossy() const override
+    {
+        for( auto && dev : _dev )
+            if( dev->is_token_sensitivity_read_lossy() )
+                return true;
+        return false;
+    }
+
 private:
     std::vector< std::shared_ptr< hid_device > > _dev;
     std::vector< hid_profile > _hid_profiles;
