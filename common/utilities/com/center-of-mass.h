@@ -55,6 +55,7 @@ struct person_center_of_mass {
     float mean_body_depth;  // Euclidean distance to person (mm); 0 = unreliable
     vec3f world_pos;        // 3D camera coords (mm); zero if intrinsics not provided
     vec2f image_pos;        // Center of Mass (COM) pixel in color/depth image; zero if intrinsics not provided
+    bool  is_primary = false;  // mean_body_depth came from the histogram, not the column-sample fallback
 };
 
 // ---------------------------------------------------------------------------
@@ -136,10 +137,14 @@ public:
     // object instead of the subject). Not FW-mirrored — kept here as a reference for FW.
     //   roi                — same ROI passed to calculate() as color_bbox
     //   estimated_depth_mm — calculate()'s result.mean_body_depth
+    //   check_center_hole  — pass result.is_primary; the column-sample fallback already
+    //                        requires a coherent reading and deliberately searches off-center,
+    //                        so the center-hole signal only applies to a histogram result
     static bool is_minz_violation(const depth_image_16&   raw_depth,
                                   const rect&              roi,
                                   const camera_intrinsics& intrinsics,
-                                  float                    estimated_depth_mm);
+                                  float                    estimated_depth_mm,
+                                  bool                     check_center_hole);
 
 private:
     static int  get_depth_at_color_pixel(const depth_image_16& depth, vec2f color_pt);

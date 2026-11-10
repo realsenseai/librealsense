@@ -4695,7 +4695,8 @@ namespace rs2
                     // Below minZ, calculate() can lock onto a background object instead of the
                     // subject; is_minz_violation() is not FW-mirrored — kept as a reference for FW.
                     if( com::center_of_mass_calculator::is_minz_violation(
-                            com_raw, com_bbox, com_intrin, com_result.mean_body_depth ) )
+                            com_raw, com_bbox, com_intrin, com_result.mean_body_depth,
+                            com_result.is_primary ) )
                     {
                         viewer_depth_m = 0.f;
                         minz_violation = true;
