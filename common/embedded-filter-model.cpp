@@ -654,7 +654,7 @@ namespace rs2
                             else if (id == RS2_COMPOSITE_OPTION_ICR_CONTROL)
                             {
                                 _icr_editor.mark_stale();
-                                enabled = _embedded_filter->get_composite_option_as< rs2_icr_control >( id ).enable != 0;
+                                enabled = _embedded_filter->get_composite_option_as< rs2_icr_control >( id ).mode != RS2_ICR_MODE_OFF;
                             }
                             else
                                 continue;

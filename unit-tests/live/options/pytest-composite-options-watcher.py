@@ -18,7 +18,7 @@ pytestmark = [
 # Temporal Filter DPP is a USB/GMSL composite; on DDS only the Improved Close Range control is one.
 COMPOSITES = [
     (rs.composite_option_id.temporal_filter_dpp, "get_temporal_filter_dpp_config", "set_temporal_filter_dpp_config", "enabled"),
-    (rs.composite_option_id.icr_control, "get_icr_control", "set_icr_control", "enable"),
+    (rs.composite_option_id.icr_control, "get_icr_control", "set_icr_control", "mode"),
 ]
 
 
