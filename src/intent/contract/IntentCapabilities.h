@@ -2,7 +2,7 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char capabilities_sha256[] = "34714b7c11d39de7e6b88b50d1aa32d977c54ff1d8679857c00c16531e9ebfd7";
+static const char capabilities_sha256[] = "408df6148f7dc258ca68e9e6eda5283747882f752b2f335076864aa1309138d7";
 // Transport IDs: USB3=0, GMSL=1 (local context, not wire fields).
 struct ProfileDefinition {
     uint16_t sku; uint8_t transport, sensor, branch; uint32_t format;
