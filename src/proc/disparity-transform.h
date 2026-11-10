@@ -11,6 +11,7 @@
 #include <src/core/sensor-interface.h>
 #include <src/depth-sensor.h>
 #include "synthetic-stream.h"
+#include "calibration-change-tracker.h"
 
 namespace librealsense
 {
@@ -57,6 +58,7 @@ namespace librealsense
 
         bool                    _transform_to_disparity;
         rs2::stream_profile     _source_stream_profile;
+        calibration_change_tracker _calibration;
         rs2::stream_profile     _target_stream_profile;
         bool                    _update_target;
         bool                    _stereoscopic_depth;

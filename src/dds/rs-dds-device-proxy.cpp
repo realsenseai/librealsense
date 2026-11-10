@@ -510,8 +510,7 @@ dds_device_proxy::dds_device_proxy( std::shared_ptr< const device_info > const &
                 for( auto & profile : it->second )
                     set_video_profile_intrinsics( profile, video_stream );
 
-                for( const auto & cb : _calib_changed_callbacks )
-                    cb->on_calibration_change( rs2_calibration_status::RS2_CALIBRATION_SUCCESSFUL );
+                notify_calibration_change();
             }
             else
             {

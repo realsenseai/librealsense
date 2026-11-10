@@ -5,7 +5,6 @@
 #include "option.h"
 #include "device-calibration.h"
 
-#include <set>
 
 
 namespace librealsense
@@ -50,20 +49,10 @@ namespace librealsense
             _monitor(monitor)
         {
             if (auto mon = _monitor.lock())
-                mon->add_observer([&](float)
-                {
-                    for (auto && cb : _user_callbacks)
-                        cb->on_calibration_change(rs2_calibration_status::RS2_CALIBRATION_SUCCESSFUL);
-                });
-        }
-
-        void register_calibration_change_callback( rs2_calibration_change_callback_sptr callback ) override
-        {
-            _user_callbacks.insert(callback);
+                mon->add_observer([&](float) { notify_calibration_change(); });
         }
 
     private:
         std::weak_ptr<ds_thermal_monitor>  _monitor;
-        std::set< rs2_calibration_change_callback_sptr > _user_callbacks;
     };
 }

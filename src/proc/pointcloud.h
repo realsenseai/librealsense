@@ -3,6 +3,7 @@
 #pragma once
 
 #include "synthetic-stream.h"
+#include "calibration-change-tracker.h"
 #include <src/float3.h>
 
 
@@ -58,7 +59,6 @@ namespace librealsense
         rs2::frame process_depth_frame(const rs2::frame_source& source, const rs2::depth_frame& depth);
         void set_extrinsics();
 
-        stream_filter _prev_stream_filter;
-        std::shared_ptr< pointcloud > _registered_auto_calib_cb;
+        calibration_change_tracker _calibration;
     };
 }

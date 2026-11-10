@@ -284,6 +284,11 @@ namespace librealsense
 
     void  decimation_filter::update_output_profile(const rs2::frame& f)
     {
+        if( _calibration.changed( f ) )
+        {
+            _registered_profiles.clear();  // Their intrinsics were computed from the old calibration
+            _options_changed = true;
+        }
         if (_options_changed || f.get_profile().get() != _source_stream_profile.get())
         {
             _options_changed = false;
