@@ -148,6 +148,14 @@ void gated_by_value_option::set( float requested_option_value )
 }
 
 
+void locked_option::set( float value )
+{
+    if( _is_locked() )
+        throw invalid_value_exception( _reason );
+    proxy_option::set( value );
+}
+
+
 void min_distance_option::set( float value )
 {
     auto strong = _max_option.lock();

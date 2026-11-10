@@ -100,6 +100,12 @@ namespace librealsense
         register_passive_depth_option();
         register_ae_policy_option();
         register_color_options( dev_info );
+
+        // The firmware refuses it ("SW Not Ready") while color shares the imagers
+        if( auto emitter = depth_sensor.get_option_handler( RS2_OPTION_EMITTER_ON_OFF ) )
+            depth_sensor.register_option( RS2_OPTION_EMITTER_ON_OFF,
+                std::make_shared< locked_option >( emitter, [this] { return color_shares_imagers(); },
+                    "Emitter On/Off cannot be changed while color streams together with depth or infrared" ) );
     }
 
     // The rule below only bites once a color stream shares the depth sensor's imagers.
@@ -113,6 +119,13 @@ namespace librealsense
     {
         return std::any_of( requests.begin(), requests.end(), [type]( auto & p )
                             { return p && p->get_stream_type() == type; } );
+    }
+
+    bool d500_dual_color::color_shares_imagers()
+    {
+        auto const active = get_depth_sensor().get_active_streams();
+        return color_requested( active )
+            && ( stream_requested( active, RS2_STREAM_DEPTH ) || stream_requested( active, RS2_STREAM_INFRARED ) );
     }
 
     // Produce a friendly stream name to the user, e.g. "Depth" / "Color 1"
