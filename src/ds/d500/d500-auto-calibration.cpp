@@ -198,6 +198,10 @@ namespace librealsense
                                                                         float * const health,
                                                                         rs2_update_progress_callback_sptr progress_callback )
     {
+        // A commit writes the new depth calibration to flash
+        if( json.find( "calib commit" ) != std::string::npos )
+            check_flash_write_allowed();
+
         bool is_d555 = false;
         auto dev = As< device >( _debug_dev );
         std::string dev_name = dev ? dev->get_info( RS2_CAMERA_INFO_NAME ) : "";
