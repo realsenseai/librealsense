@@ -11,7 +11,6 @@ log.nested = 'C  '
 
 pytestmark = [
     pytest.mark.dds,
-    pytest.mark.usefixtures( 'rs_debug_log' ),
 ]
 
 

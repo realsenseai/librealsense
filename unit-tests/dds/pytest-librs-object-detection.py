@@ -15,7 +15,6 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.dds,
-    pytest.mark.usefixtures( 'rs_debug_log' ),
     pytest.mark.flaky( reruns=2 ),
 ]
 

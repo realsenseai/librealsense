@@ -13,7 +13,6 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.dds,
-    pytest.mark.usefixtures( 'rs_debug_log' ),
 ]
 
 # A device that publishes aligned depth on its own topic, alongside the raw depth one. Both carry the

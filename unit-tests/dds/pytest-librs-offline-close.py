@@ -13,7 +13,6 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.dds,
-    pytest.mark.usefixtures( 'rs_debug_log' ),
 ]
 
 # A device that drops off the network while a stream is open and then comes back. The client keeps

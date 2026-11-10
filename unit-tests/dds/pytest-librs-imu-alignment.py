@@ -20,7 +20,6 @@ log = logging.getLogger(__name__)
 
 pytestmark = [
     pytest.mark.dds,
-    pytest.mark.usefixtures( 'rs_debug_log' ),
 ]
 
 # D555 firmware streams the IMU in its sensor frame, while USB aligns it to the depth frame with diag(-1,1,-1).

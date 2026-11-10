@@ -1,11 +1,6 @@
 # License: Apache 2.0. See LICENSE file in root directory.
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
-"""
-rs_log_bridge_scope (rspy/pytest/logging_setup.py) bridges LibRS logs into Python logging for
-one scope and resets the process-global LibRS logger on exit, so later tests don't inherit it.
-"""
-
 import logging
 import types
 
@@ -34,22 +29,24 @@ def no_session_bridge(monkeypatch):
     monkeypatch.setattr(logging_setup, '_rs_log_callback', None)
 
 
-def test_bridges_inside_and_resets_on_exit(caplog):
+def test_install_bridges_and_uninstall_resets(caplog):
     rs = FakeRs()
     with caplog.at_level(logging.DEBUG, logger='librealsense.rs'):
-        with logging_setup.rs_log_bridge_scope(rs):
-            rs.callback(rs.log_severity.debug, 'udev remove')
+        assert logging_setup.install_rs_log_bridge(rs)
+        rs.callback(rs.log_severity.debug, 'udev remove')
     assert 'udev remove' in caplog.text
-    assert rs.callback is None and rs.resets == 1
-    assert logging_setup._rs_log_callback is None
+    logging_setup.uninstall_rs_log_bridge(rs)
+    assert rs.callback is None and rs.resets == 1 and logging_setup._rs_log_callback is None
 
 
-def test_resets_when_block_raises():
+def test_line_delivered_after_uninstall_is_dropped(caplog):
     rs = FakeRs()
-    with pytest.raises(RuntimeError):
-        with logging_setup.rs_log_bridge_scope(rs):
-            raise RuntimeError('test failed')
-    assert rs.resets == 1
+    logging_setup.install_rs_log_bridge(rs)
+    stale = rs.callback
+    logging_setup.uninstall_rs_log_bridge(rs)
+    with caplog.at_level(logging.DEBUG, logger='librealsense.rs'):
+        stale(rs.log_severity.debug, 'queued before reset')
+    assert 'queued before reset' not in caplog.text
 
 
 def test_failed_install_leaves_no_bridge_behind():
@@ -58,15 +55,11 @@ def test_failed_install_leaves_no_bridge_behind():
         raise RuntimeError('log_to_callback failed')
     rs.log_to_callback = fail
     with pytest.raises(RuntimeError):
-        with logging_setup.rs_log_bridge_scope(rs):
-            pass
-    assert rs.resets == 1 and logging_setup._rs_log_callback is None
+        logging_setup.install_rs_log_bridge(rs)
+    assert logging_setup._rs_log_callback is None
 
 
-def test_keeps_session_bridge(monkeypatch):
-    """Under --rslog the session bridge is already installed: leave it, and never reset it."""
+def test_no_install_when_session_bridge_exists(monkeypatch):
+    """Under --rslog the session bridge is already installed: report it, so the caller won't reset it."""
     monkeypatch.setattr(logging_setup, '_rs_log_callback', object())
-    rs = FakeRs()
-    with logging_setup.rs_log_bridge_scope(rs):
-        pass
-    assert rs.resets == 0
+    assert not logging_setup.install_rs_log_bridge(FakeRs())
