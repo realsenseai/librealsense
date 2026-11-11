@@ -233,10 +233,13 @@ namespace librealsense
             }
         }
 
-        usb_status rs_hid_device::get_feature_report( const rs_usb_messenger & dev, int report_id, FEATURE_REPORT & report )
+        usb_status rs_hid_device::get_feature_report( const rs_usb_messenger & dev,
+                                                      int report_id,
+                                                      FEATURE_REPORT & report,
+                                                      uint32_t & transferred )
         {
             const auto hid_interface = get_hid_interface()->get_number();
-            uint32_t transferred;
+            transferred = 0;
             report = {};
             auto res = dev->control_transfer( USB_REQUEST_CODE_GET,
                                               HID_REQUEST_GET_REPORT,
@@ -246,9 +249,7 @@ namespace librealsense
                                               sizeof( report ),
                                               transferred,
                                               1000 );
-            if( res == RS2_USB_STATUS_SUCCESS && transferred < sizeof( report ) )
-                return RS2_USB_STATUS_OTHER;  // short read: the sensitivity field may be missing
-            return res;
+            return res;  // a short read is not an error here: callers that need the full report check `transferred`
         }
 
         usb_status rs_hid_device::set_feature_report( unsigned char power, int report_id, int fps, bool apply_sensitivity, double sensitivity )
@@ -266,7 +267,8 @@ namespace librealsense
             if (!dev)
                 return RS2_USB_STATUS_NO_DEVICE;
 
-            auto res = get_feature_report( dev, report_id, featureReport );
+            uint32_t report_size = 0;
+            auto res = get_feature_report( dev, report_id, featureReport, report_size );
 
             if(res != RS2_USB_STATUS_SUCCESS)
             {
@@ -302,7 +304,7 @@ namespace librealsense
                 return res;
             }
 
-            res = get_feature_report( dev, report_id, featureReport );
+            res = get_feature_report( dev, report_id, featureReport, report_size );
 
             if(res != RS2_USB_STATUS_SUCCESS)
             {
@@ -335,7 +337,9 @@ namespace librealsense
                     return false;
 
                 FEATURE_REPORT featureReport;
-                if( get_feature_report( dev, id->second, featureReport ) != RS2_USB_STATUS_SUCCESS )
+                uint32_t report_size = 0;
+                if( get_feature_report( dev, id->second, featureReport, report_size ) != RS2_USB_STATUS_SUCCESS
+                    || report_size < sizeof( featureReport ) )  // short read: the sensitivity field is missing
                     return false;
                 value = featureReport.sensitivity;
                 return true;

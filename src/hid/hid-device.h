@@ -53,7 +53,7 @@ namespace librealsense
             // overwritten only when apply_sensitivity is set (explicit user request), so the FW value is otherwise preserved.
             usb_status set_feature_report( unsigned char power, int report_id, int fps = 0, bool apply_sensitivity = false, double sensitivity = 0. );
             // GET_REPORT of the HID feature report of report_id
-            usb_status get_feature_report( const rs_usb_messenger & dev, int report_id, FEATURE_REPORT & report );
+            usb_status get_feature_report( const rs_usb_messenger & dev, int report_id, FEATURE_REPORT & report, uint32_t & transferred );
             bool _running = false;
             dispatcher _action_dispatcher;
 

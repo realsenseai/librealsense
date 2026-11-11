@@ -437,7 +437,7 @@ bool hid_sensor::read_fw_imu_sensitivity( rs2_stream stream, float & option_valu
         // Range index (D500 gyro and accel). Anything that is not a valid index (e.g. a legacy fractional value
         // written by an older SDK) is reported as unavailable.
         const auto index = std::round( raw );
-        const double max_index = stream == RS2_STREAM_ACCEL ? RS2_ACCEL_SENSITIVITY_COUNT - 1 : 4.;
+        const double max_index = stream == RS2_STREAM_ACCEL ? RS2_ACCEL_SENSITIVITY_COUNT - 1 : RS2_GYRO_SENSITIVITY_COUNT - 1;
         if( std::fabs( raw - index ) > 1e-4 || index < 0. || index > max_index )
             return false;
         option_value = static_cast< float >( index );
