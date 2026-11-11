@@ -33,6 +33,14 @@ def setup_exception_handlers(app: FastAPI):
             content={"detail": exc.errors()},
         )
 
+    # pyrealsense2 raises SDK errors as RuntimeError: they are refused requests, with the SDK's own message
+    @app.exception_handler(RuntimeError)
+    async def sdk_exception_handler(request: Request, exc: RuntimeError):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc)},
+        )
+
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception):
         return JSONResponse(

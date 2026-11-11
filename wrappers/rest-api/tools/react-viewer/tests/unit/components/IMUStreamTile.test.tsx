@@ -1,10 +1,28 @@
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { screen, fireEvent, within } from '@testing-library/react'
 import { StreamViewer } from '@/components/StreamViewer'
-import { render, createMockDevice, createMockDeviceState } from '../../utils/test-utils'
-import type { IMUData, StreamConfig } from '@/api/types'
+import { render, createMockDevice, createMockDeviceState, startedProfiles } from '../../utils/test-utils'
+import type { StreamConfig } from '@/api/types'
 
 const NOW = 1_700_000_000_000
+
+type Sample = { x: number; y: number; z: number }
+
+// Each tile's frame socket delivers one motion frame, as the backend sends it: float32 x, y, z.
+const samples = vi.hoisted(() => new Map<string, Sample>())
+vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => (callback(0), 1))
+vi.mock('@/api/frames', () => ({
+  openFrameStream: (deviceId: string, profile: { stream_type: string }, onFrame: (frame: unknown) => void) => {
+    const sample = samples.get(`${deviceId}/${profile.stream_type}`)
+    if (sample) {
+      onFrame({
+        header: { frame_number: 1, timestamp: NOW, timestamp_domain: 'global_time', format: 'motion_xyz32f', metadata: {} },
+        pixels: new Float32Array([sample.x, sample.y, sample.z]).buffer,
+      })
+    }
+    return () => {}
+  },
+}))
 
 function motionConfig(streamType: 'accel' | 'gyro'): StreamConfig {
   return {
@@ -17,22 +35,19 @@ function motionConfig(streamType: 'accel' | 'gyro'): StreamConfig {
   }
 }
 
-// `render` resets the store, so state has to arrive via initialStoreState. The tile
-// takes its samples from each stream's metadata, as it does live.
-function streamingDevice(deviceId: string, serial: string, accel?: IMUData, gyro?: IMUData) {
+// `render` resets the store, so state has to arrive via initialStoreState.
+function streamingDevice(deviceId: string, serial: string, accel?: Sample, gyro?: Sample) {
+  if (accel) samples.set(`${deviceId}/accel`, accel)
+  if (gyro) samples.set(`${deviceId}/gyro`, gyro)
   const device = createMockDevice({ device_id: deviceId, serial_number: serial })
   return createMockDeviceState(device, {
     isActive: true,
     isStreaming: true,
     // A stream is shown only when its sensor reports it running; pipeline mode is gone.
     sensorStreamingStatus: {
-      'motion-sensor': { is_streaming: true, stream_types: ['accel', 'gyro'] },
+      'motion-sensor': { is_streaming: true, profiles: startedProfiles('accel', 'gyro') },
     },
     streamConfigs: [motionConfig('accel'), motionConfig('gyro')],
-    streamMetadata: {
-      accel: { frame_number: 1, timestamp: NOW, width: 0, height: 0, motion_data: accel },
-      gyro: { frame_number: 1, timestamp: NOW, width: 0, height: 0, motion_data: gyro },
-    },
   })
 }
 
@@ -49,6 +64,8 @@ const accelTiles = () =>
 const accelTile = () => accelTiles()[0]
 
 describe('IMUStreamTile', () => {
+  beforeEach(() => samples.clear())
+
   it('renders the orientation view by default', () => {
     render(<StreamViewer />, { initialStoreState: oneDevice() })
 

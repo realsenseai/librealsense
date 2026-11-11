@@ -1,37 +1,91 @@
-import { useRef, useEffect, useLayoutEffect, memo } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { useRef, useEffect, useState, useMemo, useCallback, memo } from 'react'
+import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
 import { useAppStore } from '../store'
+import type { DeviceState, Extrinsics, SupportedStreamProfile } from '../api/types'
+import { buildCloud, deprojectionRays, gridIndex, MESH, POINT } from '../utils/pointCloud'
+import type { Frame } from '../api/frames'
+import { useFrameStream } from '../api/useFrameStream'
 
-// Round point sprite (built once). Default square points read as a coarse pixel grid;
-// a circular alpha mask + alphaTest makes points blend into a smoother surface.
-const circleSprite = (() => {
-  const s = 64
-  const cv = document.createElement('canvas')
-  cv.width = cv.height = s
-  const ctx = cv.getContext('2d')!
-  ctx.beginPath()
-  ctx.arc(s / 2, s / 2, s / 2 - 2, 0, Math.PI * 2)
-  ctx.fillStyle = '#fff'
-  ctx.fill()
-  return new THREE.CanvasTexture(cv)
-})()
+// Legacy pc-shader style: a vertex is drawn only as what `valid` allows; in the mesh, a triangle
+// is drawn only where all its corners are mesh corners (the interpolated value stays at MESH)
+const VERTEX = `
+in vec3 position;
+in vec3 color;
+in float valid;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform float pointSize;
+out vec3 vColor;
+out float vValid;
+void main() {
+  vColor = color;
+  vValid = valid;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = pointSize;
+}`
+const FRAGMENT = `
+precision highp float;
+in vec3 vColor;
+in float vValid;
+uniform float minValid;
+out vec4 outColor;
+void main() {
+  if (vValid < minValid) discard;
+  outColor = vec4(vColor, 1.0);
+}`
+
+type Shading = 'mesh' | 'points'
+
+/** What the cloud is built from: the first device streaming depth, and its color stream if it runs. */
+interface CloudSource {
+  deviceId: string
+  depth: SupportedStreamProfile
+  color?: SupportedStreamProfile
+  depthToColor?: Extrinsics
+}
+
+function cloudSource(deviceStates: Record<string, DeviceState>): CloudSource | null {
+  for (const ds of Object.values(deviceStates)) {
+    const started = Object.values(ds.sensorStreamingStatus).filter(s => s.is_streaming)
+    const profiles = started.flatMap(s => s.profiles ?? [])
+    const depth = profiles.find(p => p.stream_type === 'depth')
+    if (!depth) continue
+    const color = profiles.find(p => p.stream_type === 'color')
+    const fromDepth = ds.extrinsics?.find(e => e.stream_type === 'depth' && e.stream_index === depth.stream_index)
+    const depthToColor = color && fromDepth?.to.find(t => t.stream_type === 'color' && t.stream_index === color.stream_index)
+    return { deviceId: ds.device.device_id, depth, color, depthToColor }
+  }
+  return null
+}
+
+/** The cloud's current points, for Export PLY: the pixels whose `valid` is at least POINT */
+interface Points { positions: Float32Array; valid: Float32Array }
 
 export function PointCloudViewer() {
-  const { pointCloudVertices, pointCloudColors, viewMode } = useAppStore()
+  const viewMode = useAppStore(s => s.viewMode)
+  const deviceStates = useAppStore(s => s.deviceStates)
+  const source = useMemo(() => cloudSource(deviceStates), [deviceStates])
+  const [points, setPoints] = useState<Points | null>(null)
+  const [shading, setShading] = useState<Shading>('mesh') // the legacy viewer's 3D default is a mesh too
 
   return (
     <div className="h-full flex flex-col">
       {/* Controls */}
       <div className="flex items-center justify-end gap-4 p-2 bg-gray-800 rounded-t-lg">
+        <select
+          value={shading}
+          onChange={e => setShading(e.target.value as Shading)}
+          className="bg-gray-700 text-white text-sm rounded px-2 py-1"
+          aria-label="Shading"
+        >
+          <option value="mesh">Mesh</option>
+          <option value="points">Points</option>
+        </select>
         <button
-          onClick={() => {
-            if (pointCloudVertices) {
-              exportToPLY(pointCloudVertices)
-            }
-          }}
-          disabled={!pointCloudVertices}
+          onClick={() => points && exportToPLY(points)}
+          disabled={!points}
           className="control-button-secondary text-sm py-1"
         >
           Export PLY
@@ -40,15 +94,15 @@ export function PointCloudViewer() {
 
       {/* 3D Canvas */}
       <div className="flex-1 bg-black rounded-b-lg overflow-hidden">
-        {pointCloudVertices ? (
-          <Canvas frameloop={viewMode === '3d' ? 'always' : 'never'}>
+        {source ? (
+          // flat + linear: no tone mapping or sRGB re-encoding of the axes and grid, as the cloud's shader has none
+          <Canvas flat linear frameloop={viewMode === '3d' ? 'always' : 'never'}>
             {/* Head-on, on the depth optical axis (sensor POV) — matches the C++ viewer's
                 default 3D camera and the 2D framing, so raw-cloud edge artifacts stay
                 behind surfaces instead of reading as floating noise from an oblique angle. */}
             <PerspectiveCamera makeDefault position={[0, 0, 1]} fov={45} />
             <OrbitControls enablePan enableZoom enableRotate target={[0, 0, -1]} />
-            <ambientLight intensity={0.5} />
-            <PointCloud vertices={pointCloudVertices} sampledColors={pointCloudColors} />
+            <PointCloud {...source} shading={shading} active={viewMode === '3d'} onPoints={setPoints} />
             <SceneDecor />
           </Canvas>
         ) : (
@@ -77,190 +131,80 @@ export function PointCloudViewer() {
   )
 }
 
-interface PointCloudProps {
-  vertices: Float32Array
-  // Optional 1:1 per-vertex RGB sampled from the live color frame on the server
-  // (3 bytes per vertex). When present the cloud is texture-mapped (cpp viewer
-  // parity); when null the per-vertex color falls back to the depth colormap.
-  sampledColors: Uint8Array | null
+interface PointCloudProps extends CloudSource {
+  shading: Shading
+  active: boolean // the frame sockets are open only while the 3D view shows
+  onPoints: (points: Points | null) => void // the same object while the resolution stays
 }
 
-function PointCloud({ vertices, sampledColors }: PointCloudProps) {
-  // One persistent geometry with grow-only fixed-capacity attributes. Inspired by the
-  // C++ viewer's upload_points: the GPU buffers are allocated once (regrown only when a
-  // frame needs more room) and rewritten in place every frame — no per-frame BufferGeometry
-  // or BufferAttribute allocation, so no GPU-buffer leak. setDrawRange limits rendering to
-  // the live vertex count, since the point count varies frame to frame.
-  const geometryRef = useRef<THREE.BufferGeometry>()
-  const capacityRef = useRef(0)
-  // EMA-smoothed depth range, derived from robust percentiles of the cloud so the
-  // gradient uses the full blue→red span (farthest points reach red) while staying
-  // temporally stable — and ignoring sparse far outliers that would wash everything blue.
-  const rangeRef = useRef<{ near: number; far: number }>({ near: NaN, far: NaN })
-  const histRef = useRef<Uint32Array>(new Uint32Array(128))
-  if (!geometryRef.current) geometryRef.current = new THREE.BufferGeometry()
-  const geometry = geometryRef.current
+function PointCloud({ deviceId, depth, color, depthToColor, shading, active, onPoints }: PointCloudProps) {
+  // Per-pixel attributes rewritten in place every frame, like the C++ viewer's upload_points, shared by
+  // the mesh (with the pixel grid's triangles, built once per resolution) and the points
+  const geometries = useMemo(() => ({ mesh: new THREE.BufferGeometry(), points: new THREE.BufferGeometry() }), [])
+  useEffect(() => () => { geometries.mesh.dispose(); geometries.points.dispose() }, [geometries])
+  // Drawn as the frame's bytes, unlit, as the legacy viewer's flat-shaded mesh
+  const material = useMemo(() => new THREE.RawShaderMaterial({
+    glslVersion: THREE.GLSL3, vertexShader: VERTEX, fragmentShader: FRAGMENT, side: THREE.DoubleSide,
+    uniforms: { pointSize: { value: 1 }, minValid: { value: MESH - 0.001 } },
+  }), [])
+  useEffect(() => () => material.dispose(), [material])
+  // The legacy viewer's point size: grows as the view is wider than the depth frame
+  const { size, viewport } = useThree()
+  material.uniforms.pointSize.value = Math.max(1, Math.sqrt(size.width / depth.width)) * viewport.dpr
+  material.uniforms.minValid.value = shading === 'mesh' ? MESH - 0.001 : POINT - 0.5
 
-  useEffect(() => {
-    const geo = geometry
-    return () => geo.dispose()
-  }, [geometry])
+  const points = useRef<Points | null>(null)
+  useEffect(() => () => onPoints(null), [onPoints])
+  const rays = useRef<{ key: string; rays: Float32Array } | null>(null)
+  const latestColor = useRef<Frame | null>(null)
+  useEffect(() => { latestColor.current = null }, [color, active])
 
-  // useLayoutEffect rather than useMemo: this writes side effects (typed-array
-  // mutations, EMA range advance) which useMemo's contract doesn't guarantee
-  // will fire — the runtime is allowed to drop a memoized value and re-run.
-  useLayoutEffect(() => {
-    const geo = geometry
-    const n = vertices.length
-    const count = (n / 3) | 0
-
-    // Empty frame: nothing to upload. Skip before the attribute access — the
-    // first frame may carry zero valid points (all depth pixels < 0.03m), and
-    // posAttr would be undefined here.
-    if (count === 0) {
-      geo.setDrawRange(0, 0)
-      return
+  const draw = useCallback((frame: Frame) => {
+    const intrinsics = frame.header.intrinsics
+    if (!intrinsics) return
+    const key = JSON.stringify(intrinsics) // a filter such as decimation changes them
+    if (rays.current?.key !== key) rays.current = { key, rays: deprojectionRays(intrinsics) }
+    const { width, height } = intrinsics
+    let pos = geometries.points.getAttribute('position') as THREE.BufferAttribute | undefined
+    if (!pos || pos.count !== width * height) {
+      pos = new THREE.BufferAttribute(new Float32Array(width * height * 3), 3)
+      const attributes = {
+        position: pos,
+        color: new THREE.BufferAttribute(new Float32Array(width * height * 3), 3),
+        valid: new THREE.BufferAttribute(new Float32Array(width * height), 1),
+      }
+      for (const g of [geometries.mesh, geometries.points]) {
+        for (const [name, attribute] of Object.entries(attributes)) g.setAttribute(name, attribute)
+      }
+      geometries.mesh.setIndex(new THREE.BufferAttribute(gridIndex(width, height), 1))
+      points.current = { positions: pos.array as Float32Array, valid: attributes.valid.array as Float32Array }
     }
-
-    // Grow-only: reallocate buffers only when a frame exceeds current capacity (in vertices).
-    // After the first few frames this stops firing entirely (steady state = no allocation).
-    // Capacity is tracked in vertices so the float arrays stay a multiple of 3 (a fractional
-    // BufferAttribute.count would read past the array on writes).
-    if (capacityRef.current < count) {
-      const vcap = count + (count >> 2) + 1 // +25% headroom to avoid frequent regrows
-      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vcap * 3), 3))
-      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(vcap * 3), 3))
-      capacityRef.current = vcap
-    }
-    const posAttr = geo.getAttribute('position') as THREE.BufferAttribute
-    const colAttr = geo.getAttribute('color') as THREE.BufferAttribute
-    const positions = posAttr.array as Float32Array
-    const colors = colAttr.array as Float32Array
-
-    // Use server-sampled RGB (textured PC) when the array length matches the
-    // current vertex count. The server sends 3 uint8 bytes per vertex, aligned
-    // 1:1 with `vertices`. Length mismatch can happen for one tick when a
-    // stale frame arrives during decimation-step change → fall back to the
-    // depth colormap that frame.
-    const useSampled = !!sampledColors && sampledColors.length === count * 3
-    if (useSampled) {
-      const src = sampledColors as Uint8Array
-      const INV_255 = 1 / 255
-      for (let i = 0; i < n; i += 3) {
-        // RealSense: x-right, y-down, z-forward (m).  Three.js: x-right, y-up, z-toward-camera.
-        positions[i] = vertices[i]
-        positions[i + 1] = -vertices[i + 1]
-        positions[i + 2] = -vertices[i + 2]
-        colors[i] = src[i] * INV_255
-        colors[i + 1] = src[i + 1] * INV_255
-        colors[i + 2] = src[i + 2] * INV_255
-      }
-    } else {
-      // Robust depth range via a coarse histogram → 2nd/98th percentile, then EMA-smoothed.
-      // Percentiles (not raw min/max) reject sparse far/near outliers that would otherwise
-      // stretch the range and wash the whole scene to one color; EMA keeps it stable.
-      const HMAX = 10 // meters; histogram window
-      const NB = histRef.current.length
-      const hist = histRef.current
-      hist.fill(0)
-      const sc = NB / HMAX
-      let total = 0
-      for (let i = 2; i < n; i += 3) {
-        const z = vertices[i]
-        if (z <= 0) continue
-        let b = (z * sc) | 0
-        if (b >= NB) b = NB - 1
-        hist[b]++
-        total++
-      }
-      let zlo = NaN
-      let zhi = NaN
-      if (total > 0) {
-        const loT = total * 0.02
-        const hiT = total * 0.98
-        let acc = 0
-        let loB = -1
-        let hiB = NB - 1
-        for (let b = 0; b < NB; b++) {
-          acc += hist[b]
-          if (loB < 0 && acc >= loT) loB = b
-          if (acc >= hiT) { hiB = b; break }
-        }
-        if (loB < 0) loB = 0
-        zlo = loB / sc
-        zhi = (hiB + 1) / sc
-      }
-      const r = rangeRef.current
-      if (!isFinite(r.near) || !isFinite(r.far)) {
-        r.near = isFinite(zlo) ? zlo : 0
-        r.far = isFinite(zhi) ? zhi : HMAX
-      } else if (isFinite(zlo) && isFinite(zhi) && zhi > zlo) {
-        const A = 0.1 // ~10-frame time constant
-        r.near += (zlo - r.near) * A
-        r.far += (zhi - r.far) * A
-      }
-      const near = r.near
-      const far = r.far
-      const span = far > near ? far - near : 1
-      const invSpan = 1 / span
-
-      for (let i = 0; i < n; i += 3) {
-        const z = vertices[i + 2]
-        positions[i] = vertices[i]
-        positions[i + 1] = -vertices[i + 1]
-        positions[i + 2] = -z
-
-        let t = (z - near) * invSpan
-        if (t < 0) t = 0
-        else if (t > 1) t = 1
-        const c = jetColor(t)
-        colors[i] = c[0]
-        colors[i + 1] = c[1]
-        colors[i + 2] = c[2]
-      }
-    }
-
-    // Only the first `count` vertices are valid this frame; render exactly those.
-    // No computeBoundingSphere: it reads posAttr.count (= full grown capacity),
-    // which includes stale/zero trailing positions and inflates the sphere.
-    // frustumCulled={false} on the <points> below makes the missing sphere safe.
-    posAttr.needsUpdate = true
-    colAttr.needsUpdate = true
-    geo.setDrawRange(0, count)
-  }, [vertices, sampledColors])
+    const col = geometries.points.getAttribute('color') as THREE.BufferAttribute
+    const val = geometries.points.getAttribute('valid') as THREE.BufferAttribute
+    const c = latestColor.current
+    const texture = c?.header.intrinsics && depthToColor
+      ? { frame: c, intrinsics: c.header.intrinsics, depthToColor } : undefined
+    const { positions, valid } = points.current!
+    const count = buildCloud(frame, rays.current.rays, positions, col.array as Float32Array, valid, texture)
+    pos.needsUpdate = col.needsUpdate = val.needsUpdate = true
+    onPoints(count ? points.current : null)
+  }, [geometries, depthToColor, onPoints])
 
   return (
-    <points geometry={geometry} frustumCulled={false}>
-      <pointsMaterial
-        size={3}
-        sizeAttenuation={false}
-        vertexColors
-        map={circleSprite}
-        alphaTest={0.5}
-        transparent={false}
-      />
-    </points>
+    <>
+      {active && <FrameSource deviceId={deviceId} profile={depth} onFrame={draw} />}
+      {active && color && <FrameSource deviceId={deviceId} profile={color} onFrame={(f) => { latestColor.current = f }} />}
+      {/* No bounding sphere: pixels without depth keep stale positions, hidden by `valid` */}
+      {shading === 'mesh'
+        ? <mesh geometry={geometries.mesh} material={material} frustumCulled={false} />
+        : <points geometry={geometries.points} material={material} frustumCulled={false} />}
+    </>
   )
 }
 
-// Depth colormap matching the 2D view's DepthLegend 'jet' (see DepthLegend.tsx):
-// near = blue → cyan → yellow → red → dark red = far. Linear interpolation between
-// the same 5 stops the legend uses, so 2D and 3D agree.
-const JET_STOPS: [number, number, number][] = [
-  [0, 0, 1],        // near  - blue
-  [0, 1, 1],        //         cyan
-  [1, 1, 0],        //         yellow
-  [1, 0, 0],        //         red
-  [50 / 255, 0, 0], // far   - dark red
-]
-function jetColor(t: number): [number, number, number] {
-  const v = Math.min(Math.max(t, 0), 1)
-  const seg = v * (JET_STOPS.length - 1)
-  const i = Math.min(Math.floor(seg), JET_STOPS.length - 2)
-  const f = seg - i
-  const a = JET_STOPS[i]
-  const b = JET_STOPS[i + 1]
-  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]
+function FrameSource({ deviceId, profile, onFrame }: { deviceId: string; profile: SupportedStreamProfile; onFrame: (frame: Frame) => void }) {
+  useFrameStream(deviceId, profile, false, onFrame)
+  return null
 }
 
 // Module-level constants: stable array identity so r3f never rebuilds these
@@ -301,21 +245,23 @@ const SceneDecor = memo(function SceneDecor() {
   )
 })
 
-function exportToPLY(vertices: Float32Array) {
-  const numPoints = vertices.length / 3
-  
-  let plyContent = `ply
+function exportToPLY({ positions, valid }: Points) {
+  let count = 0
+  let vertices = ''
+  // Back from three.js axes to the SDK's: y down, z forward
+  for (let i = 0; i < valid.length; i++) {
+    if (valid[i] < POINT) continue
+    vertices += `${positions[i * 3]} ${-positions[i * 3 + 1]} ${-positions[i * 3 + 2]}\n`
+    count++
+  }
+  const plyContent = `ply
 format ascii 1.0
-element vertex ${numPoints}
+element vertex ${count}
 property float x
 property float y
 property float z
 end_header
-`
-
-  for (let i = 0; i < vertices.length; i += 3) {
-    plyContent += `${vertices[i]} ${vertices[i + 1]} ${vertices[i + 2]}\n`
-  }
+${vertices}`
 
   // Create and download file
   const blob = new Blob([plyContent], { type: 'text/plain' })

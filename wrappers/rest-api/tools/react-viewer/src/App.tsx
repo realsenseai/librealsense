@@ -9,7 +9,7 @@ import { AssistantButton, AssistantPanel } from './components/AiAssistant'
 import { ApiDiagnostics } from './components/ApiDiagnostics'
 import { ServerWarnings } from './components/ServerWarnings'
 import { useAppStore } from './store'
-import { socketService } from './api/socket'
+import { connectEvents } from './api/events'
 import { isDesktopApp } from './api/backend'
 
 function App() {
@@ -23,15 +23,7 @@ function App() {
   const loadingDeviceName = activeDevices.find(ds => ds.isLoading)?.device.name
 
   useEffect(() => {
-    // Connect to Socket.IO on mount
-    socketService.connect()
-    
-    // Don't disconnect on cleanup in dev mode (React strict mode double-mounts)
-    // The socket service handles reconnection gracefully
-    return () => {
-      // Only disconnect if we're actually unmounting the app
-      // In development with strict mode, this fires twice
-    }
+    connectEvents() // once: strict mode's second mount finds it open
   }, [])
 
   return (
@@ -60,8 +52,8 @@ function App() {
         <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
           {hasActiveDevices ? (
             <>
-              {/* Stream/PointCloud View — keep both mounted so WebRTC stays alive
-                  when switching 3D → 2D (otherwise StreamViewer remount renegotiates). */}
+              {/* Stream/PointCloud View — keep both mounted so switching 3D → 2D keeps each
+                  tile's frame socket and IMU history (a StreamViewer remount reopens them). */}
               <div className="flex-1 p-4 min-h-0 overflow-hidden relative">
                 <div className={`absolute inset-4 ${viewMode === '2d' ? '' : 'invisible pointer-events-none'}`}>
                   <StreamViewer />

@@ -6,6 +6,7 @@ from typing import List
 
 
 from app.models.device import DeviceInfo
+from app.models.stream import StreamExtrinsics
 from app.services.rs_manager import RealSenseManager
 from app.api.dependencies import get_realsense_manager
 
@@ -48,6 +49,16 @@ async def refresh_devices(
     Delegates to get_devices(force_refresh=True) so the underlying logic lives in one place.
     """
     return await get_devices(force_refresh=True, rs_manager=rs_manager)
+
+@router.get("/{device_id}/extrinsics", response_model=List[StreamExtrinsics])
+async def get_extrinsics(
+    device_id: str,
+    rs_manager: RealSenseManager = Depends(get_realsense_manager),
+):
+    """
+    The device's calibration between its streams: from each stream to every other, whether streaming or not.
+    """
+    return rs_manager.get_extrinsics(device_id)
 
 @router.post("/{device_id}/hw_reset/", response_model=bool)
 async def hw_reset_device(

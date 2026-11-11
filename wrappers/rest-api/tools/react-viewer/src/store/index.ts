@@ -4,7 +4,6 @@ import type {
   SensorInfo,
   OptionInfo,
   StreamConfig,
-  MetadataUpdate,
   ViewMode,
   DeviceState,
   AdvancedControls,
@@ -12,6 +11,7 @@ import type {
   SensorFilters,
   FirmwareState,
   SensorConfig,
+  SensorStreamStatus,
   SupportedStreamProfile,
 } from '../api/types'
 
@@ -27,6 +27,13 @@ let _fetchSeq = 0
 
 type States = { deviceStates: Record<string, DeviceState> }
 
+// The filters the legacy viewer starts with on (common/subdevice-model.cpp): all but these, and
+// decimation stays off on a color sensor
+const LEGACY_OFF_FILTERS = new Set(['Hole Filling Filter', 'Filter By Sequence id', 'Rotation Filter', 'Threshold Filter'])
+function legacyFilterDefault(name: string, colorSensor: boolean): boolean {
+  return !LEGACY_OFF_FILTERS.has(name) && !(colorSensor && name === 'Decimation Filter')
+}
+
 /** Update one device's state, leaving the others alone; a device that is gone is a no-op. */
 function patchDevice(state: States, deviceId: string, patch: (ds: DeviceState) => Partial<DeviceState>) {
   const ds = state.deviceStates[deviceId]
@@ -37,20 +44,6 @@ function patchDevice(state: States, deviceId: string, patch: (ds: DeviceState) =
 function patchGroup(state: States, deviceId: string, key: string, patch: (g: ControlGroup) => ControlGroup) {
   return patchDevice(state, deviceId, (ds) =>
     ds.controls[key] ? { controls: { ...ds.controls, [key]: patch(ds.controls[key]) } } : {})
-}
-
-// Server sends point-cloud buffers as base64 strings over Socket.IO; the
-// ArrayBuffer branch is here for a future binary-attachment transport.
-function decodeUint8Payload(raw: ArrayBuffer | string): Uint8Array {
-  if (typeof raw === 'string') {
-    return Uint8Array.from(atob(raw), (c) => c.charCodeAt(0))
-  }
-  return new Uint8Array(raw)
-}
-
-function decodeFloat32Payload(raw: ArrayBuffer | string): Float32Array {
-  const u8 = decodeUint8Payload(raw)
-  return new Float32Array(u8.buffer, u8.byteOffset, u8.byteLength >> 2)
 }
 
 const resolutionOf = (p: SupportedStreamProfile) => ({ width: p.width, height: p.height })
@@ -85,6 +78,44 @@ function buildStreamConfigs(sensors: SensorInfo[]): StreamConfig[] {
       enable: enableByDefault,
     }
   }))
+}
+
+// The viewer hides infrared index 0
+function visibleProfiles(profiles: SupportedStreamProfile[]) {
+  return profiles.filter(p => streamKey(p) !== 'infrared-0')
+}
+
+/**
+ * The device with each sensor's streaming as the server reports it, by sensor_id, whichever client started
+ * it: a streaming sensor shows its streams selected as they run. Kept from before: a stop this page has in
+ * flight, a start error, whether this page started it, and the profiles while they stay the same (a tile
+ * reopens its socket when its profile object changes).
+ */
+function withStreaming(ds: DeviceState, active: Record<string, SupportedStreamProfile[]>): Partial<DeviceState> {
+  const sensorStreamingStatus = { ...ds.sensorStreamingStatus }
+  let { streamConfigs, sensorConfigs } = ds
+  for (const [sensorId, listed] of Object.entries(active)) {
+    const was = sensorStreamingStatus[sensorId]
+    const visible = visibleProfiles(listed)
+    const profiles = JSON.stringify(visible) === JSON.stringify(was?.profiles) ? was!.profiles! : visible
+    const streaming = profiles.length > 0
+    sensorStreamingStatus[sensorId] = {
+      ...was, sensor_id: sensorId, profiles,
+      is_streaming: streaming && was?.pendingOp !== 'stopping', // shown stopped from the click on
+      startedHere: streaming && !!was?.startedHere, pendingOp: streaming ? was?.pendingOp : null,
+    }
+    if (!streaming) continue
+    streamConfigs = streamConfigs.map(c => {
+      if (c.sensor_id !== sensorId) return c
+      const p = profiles.find(p => streamKey(p) === c.stream_type)
+      return p ? { ...c, format: p.format, resolution: resolutionOf(p), framerate: p.fps, enable: true } : { ...c, enable: false }
+    })
+    sensorConfigs = { ...sensorConfigs, [sensorId]: { resolution: resolutionOf(profiles[0]), framerate: profiles[0].fps } }
+  }
+  return {
+    sensorStreamingStatus, streamConfigs, sensorConfigs,
+    isStreaming: Object.values(sensorStreamingStatus).some(s => s.is_streaming),
+  }
 }
 
 function buildSensorConfigs(sensors: SensorInfo[]): Record<string, SensorConfig> {
@@ -140,6 +171,8 @@ interface AppState {
 
   // Per-device sensors fetch
   fetchSensors: (deviceId: string) => Promise<void>
+  /** What each sensor of the device streams now, by sensor_id, as the server pushes it on any client's start or stop */
+  applyStreaming: (deviceId: string, active: Record<string, SupportedStreamProfile[]>) => void
 
   // Per-device stream configuration
   updateStreamConfig: (deviceId: string, config: StreamConfig) => void
@@ -149,12 +182,9 @@ interface AppState {
   startSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
   stopSensorStreaming: (deviceId: string, sensorId: string) => Promise<void>
 
-  // Metadata from Socket.IO
-  updateMetadata: (metadata: MetadataUpdate) => void
-
   // UI state
   viewMode: ViewMode
-  setViewMode: (mode: ViewMode) => Promise<void>
+  setViewMode: (mode: ViewMode) => void
 
   // Chat/AI Assistant state
   isChatOpen: boolean
@@ -193,17 +223,10 @@ interface AppState {
   error: string | null
   setError: (error: string | null) => void
   clearError: () => void
-
-  pointCloudVertices: Float32Array | null
-  // Per-vertex RGB sampled from the live color frame on the server (1 Uint8 per
-  // channel, 3 channels per vertex; aligned 1:1 with pointCloudVertices). Null
-  // when the server didn't texture the cloud (no color stream / unsupported
-  // format) — the 3D viewer falls back to a depth colormap in that case.
-  pointCloudColors: Uint8Array | null
 }
 
 // Shared driver for both firmware-update paths (user file + recommended download):
-// flips is_updating, runs the API call (progress arrives via Socket.IO), refreshes
+// flips is_updating, runs the API call (progress arrives as events), refreshes
 // device info, and records any failure on the device's firmware state.
 async function performFirmwareUpdate(
   set: StoreApi<AppState>['setState'],
@@ -231,7 +254,7 @@ async function performFirmwareUpdate(
     const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
     const message = detail || (error instanceof Error ? error.message : 'Firmware update failed')
     setFirmwareState({ is_updating: false, last_error: message })
-    // A request rejected outright emits no Socket.IO event, so only the caller can react.
+    // A request rejected outright emits no firmware event, so only the caller can react.
     throw new Error(message)
   }
 }
@@ -342,9 +365,13 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     sensors.forEach((s, i) => {
       groups[`sensors/${s.sensor_id}/options`] =
         { section: 'Controls', sensorId: s.sensor_id, name: '', options: s.options }
+      const color = s.supported_stream_profiles.some((p) => p.stream_type.toLowerCase() === 'color')
+      const sequenceIds = s.options.some((o) => o.option_id === 'sequence_id')
       for (const [name, filter] of Object.entries(perSensor[i])) {
+        // The legacy viewer leaves HDR Merge out where the sensor has no sequence ids
+        if (name === 'HDR Merge' && !sequenceIds) continue
         groups[`sensors/${s.sensor_id}/filters/${name}`] =
-          { section: 'Post-Processing', sensorId: s.sensor_id, name, ...filter }
+          { section: 'Post-Processing', sensorId: s.sensor_id, name, ...filter, default_enabled: legacyFilterDefault(name, color) }
       }
     })
     set((state) => patchDevice(state, deviceId, () => ({ controls: groups, advancedMode })))
@@ -414,9 +441,9 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     const existing = state.deviceStates[device.device_id]
     
     if (existing?.isActive) {
-      // Deactivate: stop streaming if active, then remove
+      // Deactivate: stop what this page started, then remove; other clients' streams go on
       for (const [sensorId, status] of Object.entries(existing.sensorStreamingStatus)) {
-        if (status.is_streaming) await get().stopSensorStreaming(device.device_id, sensorId)
+        if (status.is_streaming && status.startedHere) await get().stopSensorStreaming(device.device_id, sensorId)
       }
       set((s) => {
         const newStates = { ...s.deviceStates }
@@ -435,7 +462,6 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
         isStreaming: false,
         isActive: true,
         isLoading: true,
-        streamMetadata: {},
         sensorStreamingStatus: {},
       }
       set((s) => ({
@@ -446,7 +472,22 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
       await get().fetchSensors(device.device_id)
       // Best-effort: a versions-DB outage shouldn't make opening a camera look like it failed.
       get().checkFirmwareUpdates(device.device_id).catch(() => {})
-      get().fetchDeviceControls(device.device_id)
+      // Calibration, so read once: the 3D view textures with it, whoever started the streams
+      apiClient.getExtrinsics(device.device_id)
+        .then((extrinsics) => set((state) => patchDevice(state, device.device_id, () => ({ extrinsics }))))
+        .catch(() => {})
+      get().fetchDeviceControls(device.device_id).then(async () => {
+        // The server starts every filter off; the viewer starts from the legacy viewer's. A filter
+        // already on was chosen by a client (this one earlier, or another), so the server's are kept.
+        const filters = Object.entries(get().deviceStates[device.device_id]?.controls ?? {})
+          .filter(([, g]) => g.section === 'Post-Processing')
+        if (filters.some(([, g]) => g.enabled)) return
+        // Last first: Disparity to Depth is on before Depth to Disparity, so a running stream never
+        // sends disparity frames in between
+        for (const [key, g] of filters.reverse()) {
+          if (g.default_enabled) await get().setControlEnabled(device.device_id, key, true)
+        }
+      }).catch((error) => set({ error: `Failed to enable the default filters: ${error instanceof Error ? error.message : 'unknown error'}` }))
     }
   },
 
@@ -483,17 +524,14 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     }))
 
     try {
-      // The viewer hides infrared index 0
       const sensors = (await apiClient.getSensors(deviceId)).map(s => ({
         ...s,
-        supported_stream_profiles: s.supported_stream_profiles.filter(p => streamKey(p) !== 'infrared-0'),
+        supported_stream_profiles: visibleProfiles(s.supported_stream_profiles),
       }))
+      const fresh = { sensors, streamConfigs: buildStreamConfigs(sensors), sensorConfigs: buildSensorConfigs(sensors), isLoading: false }
+      const active = Object.fromEntries(sensors.map(s => [s.sensor_id, s.active_profiles]))
 
-      const configs = buildStreamConfigs(sensors)
-      const sensorConfigs = buildSensorConfigs(sensors)
-
-      set((state) => patchDevice(state, deviceId, () =>
-        ({ sensors, streamConfigs: configs, sensorConfigs, isLoading: false })))
+      set((state) => patchDevice(state, deviceId, (ds) => ({ ...fresh, ...withStreaming({ ...ds, ...fresh }, active) })))
     } catch (error) {
       set((state) => ({
         deviceStates: {
@@ -507,6 +545,8 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
       }))
     }
   },
+
+  applyStreaming: (deviceId, active) => set((state) => patchDevice(state, deviceId, (ds) => withStreaming(ds, active))),
 
   updateStreamConfig: (deviceId: string, config: StreamConfig) => {
     set((state) => {
@@ -597,22 +637,12 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
 
     try {
       await apiClient.startSensor(deviceId, sensorId, profiles)
-      const status = { sensor_id: sensorId, is_streaming: true, stream_types: profiles.map(streamKey) }
-
-      set((s) => ({
-        deviceStates: {
-          ...s.deviceStates,
-          [deviceId]: {
-            ...s.deviceStates[deviceId],
-            isStreaming: true,
-            sensorStreamingStatus: {
-              ...s.deviceStates[deviceId].sensorStreamingStatus,
-              [sensorId]: status,
-            },
-          },
-        },
-        error: null,
-      }))
+      // As the server's push, which may have come first: the same merge keeps the tiles' profile objects
+      set((s) => ({ ...patchDevice(s, deviceId, (ds) => {
+        const started = withStreaming(ds, { [sensorId]: profiles })
+        started.sensorStreamingStatus![sensorId].startedHere = true
+        return started
+      }), error: null }))
     } catch (error) {
       // Extract error message - axios errors have response.data.detail
       let errorMessage = 'Failed to start sensor'
@@ -673,10 +703,6 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
       )
 
       return {
-        // Drop last point cloud so the 3D canvas doesn't freeze on the last
-        // frame; a still-streaming sensor will repopulate within one frame.
-        pointCloudVertices: null,
-        pointCloudColors: null,
         deviceStates: {
           ...s.deviceStates,
           [deviceId]: {
@@ -692,32 +718,7 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     const stopPromise = (async () => {
       try {
         await apiClient.stopSensor(deviceId, sensorId)
-
-        set((s) => {
-          const deviceState = s.deviceStates[deviceId]
-          if (!deviceState) return s
-
-          const newSensorStatus = { ...deviceState.sensorStreamingStatus }
-          newSensorStatus[sensorId] = {
-            sensor_id: sensorId,
-            is_streaming: false,
-            pendingOp: null,  // Clear pending state
-          }
-
-          // Recheck streaming state now that the stop is confirmed
-          const anyStreaming = Object.values(newSensorStatus).some(ss => ss.is_streaming)
-
-          return {
-            deviceStates: {
-              ...s.deviceStates,
-              [deviceId]: {
-                ...deviceState,
-                isStreaming: anyStreaming,
-                sensorStreamingStatus: newSensorStatus,
-              },
-            },
-          }
-        })
+        get().applyStreaming(deviceId, { [sensorId]: [] })
       } catch (error) {
         // Rollback: restore streaming state on error
         set((s) => {
@@ -755,82 +756,9 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
     await stopPromise
   },
 
-  // Metadata
-  updateMetadata: (metadata) => {
-    const deviceId = metadata.device_id
-    set((state) => {
-      const deviceState = state.deviceStates[deviceId]
-      if (!deviceState) return state
-      
-      return {
-        deviceStates: {
-          ...state.deviceStates,
-          [deviceId]: {
-            ...deviceState,
-            streamMetadata: metadata.metadata_streams,
-          },
-        },
-      }
-    })
-
-    for (const streamData of Object.values(metadata.metadata_streams)) {
-      // Extract point cloud data if present.
-      // Server sends raw float32 bytes as a Socket.IO binary attachment (ArrayBuffer);
-      // fall back to base64 string for older servers.
-      if (streamData.point_cloud?.vertices) {
-        // Drop frames that arrive after the device was stopped — the server's
-        // stop_broadcast can race with frames already in flight, and accepting
-        // them would repopulate the cleared cloud and freeze the 3D canvas.
-        if (!get().deviceStates[deviceId]?.isStreaming) continue
-        try {
-          const vertices = decodeFloat32Payload(streamData.point_cloud.vertices)
-          // Colors are sampled server-side from the color frame (cpp-viewer
-          // parity). Present only when depth+color are both active and the
-          // color format is RGB8/BGR8.
-          const colors = streamData.point_cloud.colors
-            ? decodeUint8Payload(streamData.point_cloud.colors)
-            : null
-          set({ pointCloudVertices: vertices, pointCloudColors: colors })
-        } catch (error) {
-          console.error('Failed to decode point cloud data:', error)
-        }
-      }
-    }
-  },
-
   // UI state
   viewMode: '2d',
-  setViewMode: async (mode) => {
-    const prev = get().viewMode
-    if (prev === mode) return
-    set({ viewMode: mode })
-
-    const activeDevices = Object.values(get().deviceStates).filter(ds => ds.isActive)
-    try {
-      if (mode === '3d') {
-        await Promise.all(
-          activeDevices.map(ds => apiClient.enablePointCloud(ds.device.device_id))
-        )
-      } else {
-        await Promise.all(
-          activeDevices.map(ds => apiClient.disablePointCloud(ds.device.device_id))
-        )
-        set({ pointCloudVertices: null, pointCloudColors: null })
-      }
-    } catch (err) {
-      // Roll back so the user can retry — otherwise viewMode is wedged at the
-      // new mode and the `prev === mode` short-circuit at the top blocks the
-      // retry click. Server may be partly-applied; the user is informed via
-      // the error message and a re-click will reissue enable/disable on all
-      // active devices.
-      set({
-        viewMode: prev,
-        error: `Failed to ${mode === '3d' ? 'enable' : 'disable'} point cloud: ${
-          err instanceof Error ? err.message : 'Unknown error'
-        }`,
-      })
-    }
-  },
+  setViewMode: (mode) => set({ viewMode: mode }),
 
   // Chat/AI Assistant state
   isChatOpen: false,
@@ -1051,6 +979,4 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
   setError: (error) => set({ error }),
   clearError: () => set({ error: null }),
 
-  pointCloudVertices: null,
-  pointCloudColors: null,
 }))

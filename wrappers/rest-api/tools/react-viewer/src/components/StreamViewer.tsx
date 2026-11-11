@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react'
 import { useAppStore } from '../store'
-import { WebRTCHandler } from '../api/webrtc'
-import { apiClient } from '../api/client'
+import type { Frame, FrameHeader } from '../api/frames'
+import { useFrameStream } from '../api/useFrameStream'
 import { DepthLegend } from './DepthLegend'
+import { rulerGradient, sampleDistances, updateRuler } from '../utils/depthRuler'
 import { appendIMUPoint, type IMUChartPoint } from '../utils/imuChart'
-import type { DeviceState, StreamConfig, StreamMetadata } from '../api/types'
+import { FrameRenderer } from '../utils/frameRenderer'
+import { streamKey, type DeviceState, type StreamConfig, type SupportedStreamProfile } from '../api/types'
 
 import IMUOrientation from './IMUOrientation'
 import IMUChart from './IMUChart'
@@ -15,7 +17,7 @@ interface DeviceStream {
   deviceName: string
   serialNumber: string
   config: StreamConfig
-  metadata?: StreamMetadata
+  profile: SupportedStreamProfile // the SDK profile the stream runs with
 }
 
 export function StreamViewer() {
@@ -29,20 +31,17 @@ export function StreamViewer() {
       if (!ds.isActive) return
       
       ds.streamConfigs.filter(c => c.enable).forEach(config => {
-        // Is this specific stream running on its sensor?
+        // The profile this stream runs with on its sensor, if it runs
         const sensorStatus = ds.sensorStreamingStatus?.[config.sensor_id]
-        const activeTypes = sensorStatus?.stream_types ?? []
-        const streamIsActive = sensorStatus?.is_streaming === true &&
-                        activeTypes.some(st => st.toLowerCase() === config.stream_type.toLowerCase())
-
-        if (!streamIsActive) return
+        const profile = sensorStatus?.is_streaming ? sensorStatus.profiles?.find(p => streamKey(p) === config.stream_type) : undefined
+        if (!profile) return
 
         streams.push({
           deviceId: ds.device.device_id,
           deviceName: ds.device.name,
           serialNumber: ds.device.serial_number,
           config,
-          metadata: ds.streamMetadata[config.stream_type],
+          profile,
         })
       })
     })
@@ -89,11 +88,12 @@ export function StreamViewer() {
               return (
                 <IMUStreamTile
                   key={`${stream.deviceId}-${stream.config.sensor_id}-${stream.config.stream_type}`}
+                  deviceId={stream.deviceId}
                   streamType={stream.config.stream_type}
+                  profile={stream.profile}
                   showDeviceName={activeDeviceCount > 1}
                   deviceName={stream.deviceName}
                   serialNumber={stream.serialNumber}
-                  metadata={stream.metadata}
                 />
               )
             }
@@ -105,7 +105,7 @@ export function StreamViewer() {
                 deviceName={stream.deviceName}
                 serialNumber={stream.serialNumber}
                 streamType={stream.config.stream_type}
-                metadata={stream.metadata}
+                profile={stream.profile}
                 showDeviceName={activeDeviceCount > 1}
               />
             )
@@ -121,20 +121,18 @@ interface StreamTileProps {
   deviceName: string
   serialNumber: string
   streamType: string
+  profile: SupportedStreamProfile
   showDeviceName?: boolean
-  metadata?: StreamMetadata
 }
 
-function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDeviceName, metadata }: StreamTileProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+function StreamTile({ deviceId, deviceName, serialNumber, streamType, profile, showDeviceName }: StreamTileProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const webrtcHandlerRef = useRef<WebRTCHandler | null>(null)
-  const hoverRequestId = useRef(0)
-  const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | null>(null)
-  const [fps, setFps] = useState(0)
+  const renderer = useRef<FrameRenderer | null>(null)
+  const latestFrame = useRef<Frame | null>(null) // the frame on screen, for hover depth
+  const [unsupportedFormat, setUnsupportedFormat] = useState<string | null>(null)
   const [showMetadata, setShowMetadata] = useState(false)
-  const lastFrameTime = useRef(0)
-  const frameCount = useRef(0)
+  useEffect(() => () => renderer.current?.dispose(), [])
   const [hoverDepth, setHoverDepth] = useState<{
     x: number
     y: number
@@ -142,175 +140,60 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
     mouseX: number
     mouseY: number
   } | null>(null)
-  const [depthRange, setDepthRange] = useState<{ min: number; max: number }>({ min: 0, max: 6 })
+  // The depth ruler, from the frames: a Z16 frame comes with the color of every depth value
+  const rulerTaken = useRef(0)
+  const [legend, setLegend] = useState<{ min: number; max: number; gradient: string } | null>(null)
 
   const isDepthStream = streamType.toLowerCase() === 'depth'
 
-  // Fetch dynamic depth range periodically for depth streams
-  useEffect(() => {
-    if (!isDepthStream) return
-    let cancelled = false
-    const fetchRange = async () => {
-      try {
-        const result = await apiClient.getDepthRange(deviceId)
-        if (!cancelled) {
-          setDepthRange({ min: result.min_depth, max: result.max_depth })
-        }
-      } catch (error) {
-        // Ignore errors, keep previous range
-      }
+  const { state: connectionState, fps, header } = useFrameStream(deviceId, profile, showMetadata, (frame) => {
+    renderer.current ??= new FrameRenderer(canvasRef.current!)
+    setUnsupportedFormat(renderer.current.draw(frame) ? null : frame.header.format)
+    latestFrame.current = frame
+    const { width = 0, height = 0, stride = 0, bpp = 1, units } = frame.header
+    const now = performance.now()
+    if (frame.colorTable && units && now - rulerTaken.current >= 100) { // like legacy: a scale needs no more
+      rulerTaken.current = now
+      const { colorTable } = frame
+      const samples = sampleDistances(new Uint16Array(frame.pixels), width, height, stride / bpp, units)
+      setLegend(last => { // the bounds may hold, the colors follow each frame
+        const r = updateRuler(last, samples)
+        return r && { ...r, gradient: rulerGradient(colorTable, units, r.min, r.max) }
+      })
     }
-    fetchRange()
-    const interval = setInterval(fetchRange, 2000) // Update every 2 seconds
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [isDepthStream, deviceId])
+  })
 
-  // Calculate FPS from metadata updates
-  useEffect(() => {
-    if (metadata?.frame_number) {
-      frameCount.current++
-      const now = Date.now()
-      if (now - lastFrameTime.current >= 1000) {
-        setFps(+(frameCount.current * 1000 / (now - lastFrameTime.current)).toFixed(2))
-        frameCount.current = 0
-        lastFrameTime.current = now
-      }
-    }
-  }, [metadata?.frame_number])
-
-  const handleTrack = useCallback((event: RTCTrackEvent) => {
-    if (videoRef.current && event.streams[0]) {
-      videoRef.current.srcObject = event.streams[0]
-    }
-  }, [])
-
-  const handleConnectionStateChange = useCallback((state: RTCPeerConnectionState) => {
-    setConnectionState(state)
-  }, [])
-
-  // Throttle depth queries to avoid overloading the backend
-  const lastQueryTime = useRef(0)
-  const pendingQuery = useRef<{ x: number; y: number; mouseX: number; mouseY: number } | null>(null)
-  const queryThrottleMs = 50 // Query at most every 50ms
-
+  // Read the hovered pixel's depth from the frame on screen
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!isDepthStream || showMetadata || !containerRef.current || !metadata) return
+      const frame = latestFrame.current
+      if (!isDepthStream || showMetadata || !containerRef.current || !frame) return
+      const { width = 0, height = 0, stride = 0, bpp = 1, units } = frame.header
 
       const rect = containerRef.current.getBoundingClientRect()
       const mouseX = e.clientX - rect.left
       const mouseY = e.clientY - rect.top
 
-      // The <video> uses object-contain so it is letterboxed within the tile.
-      // Compute the actual displayed video rect and ignore the bars.
-      const scale = Math.min(rect.width / metadata.width, rect.height / metadata.height)
-      const displayW = metadata.width * scale
-      const displayH = metadata.height * scale
+      // The canvas uses object-contain so it is letterboxed within the tile.
+      // Compute the actual displayed frame rect and ignore the bars.
+      const scale = Math.min(rect.width / width, rect.height / height)
+      const displayW = width * scale
+      const displayH = height * scale
       const offsetX = (rect.width - displayW) / 2
       const offsetY = (rect.height - displayH) / 2
-
-      if (mouseX < offsetX || mouseX >= offsetX + displayW ||
-          mouseY < offsetY || mouseY >= offsetY + displayH) {
+      const x = Math.floor((mouseX - offsetX) / displayW * width)
+      const y = Math.floor((mouseY - offsetY) / displayH * height)
+      if (x < 0 || x >= width || y < 0 || y >= height) {
         setHoverDepth(null)
         return
       }
-
-      const x = Math.floor((mouseX - offsetX) / displayW * metadata.width)
-      const y = Math.floor((mouseY - offsetY) / displayH * metadata.height)
-
-      if (x < 0 || x >= metadata.width || y < 0 || y >= metadata.height) {
-        setHoverDepth(null)
-        return
-      }
-
-      // Store pending query coords
-      pendingQuery.current = { x, y, mouseX, mouseY }
-
-      const now = Date.now()
-      if (now - lastQueryTime.current < queryThrottleMs) {
-        // Skip this event, a recent query is still fresh
-        return
-      }
-      lastQueryTime.current = now
-
-      const requestId = ++hoverRequestId.current
-      apiClient.getDepthAtPixel(deviceId, x, y).then((result) => {
-        if (requestId === hoverRequestId.current && pendingQuery.current) {
-          setHoverDepth({
-            x: pendingQuery.current.x,
-            y: pendingQuery.current.y,
-            depth: result.depth,
-            mouseX: pendingQuery.current.mouseX,
-            mouseY: pendingQuery.current.mouseY,
-          })
-        }
-      }).catch((error) => {
-        console.error('Error getting depth at pixel:', error)
-      })
+      const value = new Uint16Array(frame.pixels)[y * (stride / bpp) + x]
+      setHoverDepth({ x, y, depth: value ? value * units! : null, mouseX, mouseY })
     },
-    [isDepthStream, showMetadata, deviceId, metadata]
+    [isDepthStream, showMetadata]
   )
 
-  const handleMouseLeave = useCallback(() => {
-    hoverRequestId.current++
-    setHoverDepth(null)
-  }, [])
-
-  useEffect(() => {
-    let mounted = true
-    
-    const startWebRTC = async () => {
-      if (!deviceId) return
-      
-      // Clean up existing handler
-      if (webrtcHandlerRef.current) {
-        webrtcHandlerRef.current.disconnect()
-        webrtcHandlerRef.current = null
-      }
-      
-      const handler = new WebRTCHandler(
-        deviceId,
-        [streamType],
-        handleTrack,
-        handleConnectionStateChange
-      )
-      
-      webrtcHandlerRef.current = handler
-      
-      try {
-        await handler.connect()
-      } catch (error) {
-        if (mounted) {
-          console.error('WebRTC connection failed:', error)
-        }
-      }
-    }
-    
-    const stopWebRTC = () => {
-      if (webrtcHandlerRef.current) {
-        webrtcHandlerRef.current.disconnect()
-        webrtcHandlerRef.current = null
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null
-      }
-      setConnectionState(null)
-    }
-
-    if (deviceId) {
-      startWebRTC()
-    } else {
-      stopWebRTC()
-    }
-
-    return () => {
-      mounted = false
-      stopWebRTC()
-    }
-  }, [deviceId, streamType, handleTrack, handleConnectionStateChange])
+  const handleMouseLeave = useCallback(() => setHoverDepth(null), [])
 
   return (
     <div 
@@ -319,16 +202,13 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
       onMouseMove={isDepthStream ? handleMouseMove : undefined}
       onMouseLeave={isDepthStream ? handleMouseLeave : undefined}
     >
-      {/* Video Element */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        disablePictureInPicture
-        controlsList="nodownload nofullscreen noremoteplayback"
-        className="w-full h-full object-contain stream-video"
-      />
+      <canvas ref={canvasRef} className="w-full h-full object-contain stream-video" />
+
+      {unsupportedFormat && (
+        <div className="absolute inset-0 flex items-center justify-center text-rs-dim text-sm">
+          {unsupportedFormat.toUpperCase()} frames can't be drawn yet
+        </div>
+      )}
 
       {/* Device Name Header (shown for multi-camera) */}
       {showDeviceName && (
@@ -348,14 +228,15 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
       </div>
 
       {/* Connection Status */}
-      {connectionState && connectionState !== 'connected' && (
+      {connectionState && connectionState !== 'open' && (
         <div className={`absolute ${showDeviceName ? 'top-7' : 'top-2'} right-2 px-2 py-0.5 rounded-md border border-rs-warn/40 bg-rs-warn/15 backdrop-blur-sm text-[11px] text-rs-warn`}>
           {connectionState}
         </div>
       )}
 
       <MetadataPanel
-        metadata={metadata}
+        header={header}
+        profile={profile}
         streamType={streamType}
         fps={fps}
         show={showMetadata}
@@ -364,9 +245,9 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
       />
 
       {/* Depth Legend (for depth streams) */}
-      {isDepthStream && (
+      {legend && (
         <div className="absolute top-12 right-2 bottom-12 w-16">
-          <DepthLegend minDepth={depthRange.min} maxDepth={depthRange.max} colorScheme="jet" show={true} />
+          <DepthLegend minDepth={legend.min} maxDepth={legend.max} gradient={legend.gradient} />
         </div>
       )}
 
@@ -388,37 +269,23 @@ function StreamTile({ deviceId, deviceName, serialNumber, streamType, showDevice
 
 // IMU Stream Tile - specialized visualization for gyro/accel streams
 interface IMUStreamTileProps {
+  deviceId: string
   streamType: string
+  profile: SupportedStreamProfile
   showDeviceName?: boolean
   deviceName: string
   serialNumber: string
-  metadata?: StreamMetadata
 }
 
-function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, metadata }: IMUStreamTileProps) {
+function IMUStreamTile({ deviceId, streamType, profile, showDeviceName, deviceName, serialNumber }: IMUStreamTileProps) {
   // The tile unmounts when its stream stops, so a restart starts a fresh window.
   const [points, setPoints] = useState<IMUChartPoint[]>([])
-  const motion = metadata?.motion_data
-  useEffect(() => {
-    if (motion) setPoints((prev) => appendIMUPoint(prev, motion, Date.now()))
-  }, [motion])
   const [showGraph, setShowGraph] = useState(false)
-  const [fps, setFps] = useState(0)
   const [showMetadata, setShowMetadata] = useState(false)
-  const lastFrameTime = useRef(0)
-  const frameCount = useRef(0)
-
-  useEffect(() => {
-    if (metadata?.frame_number !== undefined) {
-      frameCount.current++
-      const now = Date.now()
-      if (now - lastFrameTime.current >= 1000) {
-        setFps(+(frameCount.current * 1000 / (now - lastFrameTime.current)).toFixed(2))
-        frameCount.current = 0
-        lastFrameTime.current = now
-      }
-    }
-  }, [metadata?.frame_number])
+  const { fps, header } = useFrameStream(deviceId, profile, showMetadata, (frame) => {
+    const [x, y, z] = new Float32Array(frame.pixels) // a motion frame's data starts with float32 x, y, z
+    setPoints((prev) => appendIMUPoint(prev, { x, y, z }, Date.now()))
+  })
   
   const isGyro = streamType.toLowerCase() === 'gyro'
   const latest = points[points.length - 1]
@@ -451,7 +318,8 @@ function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, m
             </svg>
           </button>
           <MetadataPanel
-            metadata={metadata}
+            header={header}
+            profile={profile}
             streamType={streamType}
             fps={fps}
             show={showMetadata}
@@ -481,16 +349,16 @@ function IMUStreamTile({ streamType, showDeviceName, deviceName, serialNumber, m
 
 interface MetadataOverlayProps {
   streamType: string
-  metadata: StreamMetadata
+  header: FrameHeader
+  profile: SupportedStreamProfile
   fps: number
 }
 
-export function MetadataOverlay({ streamType, metadata, fps }: MetadataOverlayProps) {
-  const frameMd = metadata.frame_metadata ?? {}
-  const isMotion = ['gyro', 'accel', 'motion'].includes(streamType.toLowerCase())
+export function MetadataOverlay({ streamType, header, profile, fps }: MetadataOverlayProps) {
+  const isVideo = header.width !== undefined
   // Mirrors C++ viewer (common/stream-model.cpp): when SDK falls back to system_time,
   // per-frame metadata is unavailable from the kernel UVC driver.
-  const metadataUnavailable = metadata.clock_domain === 'system_time'
+  const metadataUnavailable = header.timestamp_domain === 'system_time'
   return (
     <div className="absolute inset-0 overflow-y-auto bg-black/60 text-white text-xs z-10">
       <div className="sticky top-0 px-3 py-2 bg-rs-inset font-semibold border-b border-rs-border">
@@ -499,13 +367,13 @@ export function MetadataOverlay({ streamType, metadata, fps }: MetadataOverlayPr
       <div className="px-3 py-2 border-b border-rs-border bg-rs-darker/60">
         <div className="text-rs-muted uppercase tracking-wide text-[10px] mb-1">Viewer Info</div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono">
-          <MetadataItem label="Frame Timestamp" value={metadata.timestamp} />
-          <MetadataItem label="Clock Domain" value={metadata.clock_domain} />
-          <MetadataItem label="Frame Number" value={metadata.frame_number} />
-          <MetadataItem label="Pixel Format" value={metadata.pixel_format} />
-          <MetadataItem label="Hardware Size" value={!isMotion ? resolutionFrom(metadata.hardware_width, metadata.hardware_height) : undefined} />
-          <MetadataItem label="Display Size" value={!isMotion ? resolutionFrom(metadata.width, metadata.height) : undefined} />
-          <MetadataItem label="Hardware FPS" value={metadata.hardware_fps} />
+          <MetadataItem label="Frame Timestamp" value={header.timestamp} />
+          <MetadataItem label="Clock Domain" value={header.timestamp_domain} />
+          <MetadataItem label="Frame Number" value={header.frame_number} />
+          <MetadataItem label="Pixel Format" value={header.format.toUpperCase()} />
+          <MetadataItem label="Hardware Size" value={isVideo ? `${profile.width}×${profile.height}` : undefined} />
+          <MetadataItem label="Display Size" value={isVideo ? `${header.width}×${header.height}` : undefined} />
+          <MetadataItem label="Hardware FPS" value={profile.fps} />
           <MetadataItem label="Viewer FPS" value={fps} />
         </div>
       </div>
@@ -519,7 +387,7 @@ export function MetadataOverlay({ streamType, metadata, fps }: MetadataOverlayPr
         </div>
       )}
       <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 p-3 font-mono">
-        {Object.entries(frameMd).map(([k, v]) => (
+        {Object.entries(header.metadata).map(([k, v]) => (
           <MetadataItem key={k} label={lessScreamy(k)} value={v} />
         ))}
       </div>
@@ -527,12 +395,9 @@ export function MetadataOverlay({ streamType, metadata, fps }: MetadataOverlayPr
   )
 }
 
-function resolutionFrom(w: number | undefined, h: number | undefined): string | undefined {
-  return w !== undefined && h !== undefined ? `${w}×${h}` : undefined
-}
-
 interface MetadataPanelProps {
-  metadata?: StreamMetadata
+  header: FrameHeader | null // the newest frame's; null until one arrives
+  profile: SupportedStreamProfile
   streamType: string
   fps: number
   show: boolean
@@ -540,13 +405,8 @@ interface MetadataPanelProps {
   buttonClassName?: string
 }
 
-export function MetadataPanel({ metadata, streamType, fps, show, onToggle, buttonClassName = '' }: MetadataPanelProps) {
-  const hasMetadata = !!metadata && (
-    metadata.frame_number !== undefined ||
-    metadata.timestamp !== undefined ||
-    Object.keys(metadata.frame_metadata ?? {}).length > 0
-  )
-  if (!hasMetadata) return null
+export function MetadataPanel({ header, profile, streamType, fps, show, onToggle, buttonClassName = '' }: MetadataPanelProps) {
+  if (!header) return null
   return (
     <>
       <button
@@ -558,7 +418,7 @@ export function MetadataPanel({ metadata, streamType, fps, show, onToggle, butto
       >
         {show ? '✕' : 'Metadata'}
       </button>
-      {show && <MetadataOverlay streamType={streamType} metadata={metadata!} fps={fps} />}
+      {show && <MetadataOverlay streamType={streamType} header={header} profile={profile} fps={fps} />}
     </>
   )
 }

@@ -6,19 +6,8 @@ This Python library provides a convenient wrapper to interact with the [RealSens
 It simplifies remote control and data streaming from RealSense devices by handling communication protocols for:
 
 1.  **RESTful Operations:** For device discovery, configuration, and control.
-2.  **WebRTC:** For efficient, browser-compatible live video streaming (RGB, Depth).
-3.  **Socket.IO:** For real-time streaming of frame metadata and point cloud data.
-    * In order to decode point cloud data in the client, follow those steps:
-        * Decode Base64 string to Uint8Array
-        * 'bytes' now holds the raw byte data that originated from the NumPy array
-        * Interpret bytes as Float32Array.
-        IMPORTANT ASSUMPTION: We assume the original NumPy array used float32.
-        If it used float64 (Python's default float), use Float64Array here.
-        The ArrayBuffer gives access to the raw binary data buffer of the Uint8Array.
-        The Float32Array constructor creates a *view* over that buffer, interpreting
-        groups of 4 bytes as 32-bit floats without copying data.
-        * Now you can use the 'vertices' Float32Array
-    * Motion raw data is also propogated using this socket.io channel
+2.  **WebSocket frames:** Each stream's frames as the SDK gives them, one WebSocket per stream.
+3.  **WebSocket events:** `/api/v1/events` tells every client what changed (devices, streaming, firmware updates).
 
 ## Support Features
 
@@ -33,15 +22,13 @@ It simplifies remote control and data streaming from RealSense devices by handli
     *   Update writable sensor options.
 *   **REST-based Stream Control:**
     *   Start/Stop streams with specific configurations (resolution, format, FPS).
-    *   Check the streaming status of a device.
-*   **WebRTC Video Streaming:**
-    *   Initiate WebRTC sessions with the API to receive live video feeds.
-    *   Handles the offer/answer and ICE candidate exchange mechanisms required for WebRTC setup (via REST endpoints).
-*   **Socket.IO Data Streaming:**
-    *   Establish a Socket.IO connection to the API.
-    *   Receive real-time events containing:
-        *   Frame metadata (timestamps, frame numbers, etc.).
-        *   Point cloud data streams.
+*   **Frame Streaming:**
+    *   Open a WebSocket to `/api/v1/devices/{device_id}/frames/{stream_type}/{stream_index}` for a running stream.
+    *   Each binary message is one frame: a JSON header (number, timestamp, metadata, profile, size, intrinsics) and the frame's bytes, unchanged; see `app/services/frame_sender.py`.
+*   **Events:**
+    *   Open a plain WebSocket to `/api/v1/events`; each message is JSON, `{"event": name, ...fields}`.
+    *   `devices_changed`, `streaming_changed`, `firmware_progress`, `firmware_update_success`, `firmware_update_failed`; see `app/services/events.py`.
+    *   Events are not replayed: read the current state through the REST API once connected.
 
 ## Missing Features
 * Not all SDK capabilities are yet supported(e.g. Texture Mapping, Post processing filters,...)
