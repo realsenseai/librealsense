@@ -21,7 +21,8 @@ OPT = rs.option.emitter_on_off
 def profile(sensor, stream_type, index, fmt):
     for p in sensor.get_stream_profiles():
         vp = p.as_video_stream_profile()
-        if vp and p.stream_type() == stream_type and p.stream_index() == index and p.format() == fmt                 and vp.width() == W and vp.height() == H and p.fps() == FPS:
+        if vp and p.stream_type() == stream_type and p.stream_index() == index and p.format() == fmt \
+                and vp.width() == W and vp.height() == H and p.fps() == FPS:
             return p
     pytest.skip( f"Device publishes no {stream_type} {index} {W}x{H}@{FPS} {fmt}" )
 
