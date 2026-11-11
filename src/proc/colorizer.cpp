@@ -267,12 +267,12 @@ namespace librealsense
                               depth.get_width(), depth.get_height() );
         auto pixels = (float)_hist_data[MAX_DEPTH - 1];
         for( int d = 0; d < MAX_DEPTH; ++d )
-            colorize_pixel( table, d, cm, d, [&]( float data ) {
+            colorize_pixel( table, d, cm, d, [&]( int data ) {
                 if( equalize )
-                    return _hist_data[(int)data] / pixels;
+                    return _hist_data[data] / pixels;
                 if( min >= max )
                     return 0.f;
-                return ( data * units - min ) / ( max - min );
+                return ( float( data ) * units - min ) / ( max - min );
             } );
     }
 
