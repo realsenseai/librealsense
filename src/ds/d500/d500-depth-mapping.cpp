@@ -336,7 +336,6 @@ namespace librealsense
                 throw wrong_api_call_sequence_exception( rsutils::string::from()
                     << "While Labeled Point Cloud streams, Depth must run at " << lpcl->get_framerate() << " fps, not "
                     << depth->get_framerate() << " fps" );
-            return;
         }
         auto const occupancy = find_stream( get_sensor( _depth_mapping_idx ).get_active_streams(), RS2_STREAM_OCCUPANCY );
         if( ! occupancy )
