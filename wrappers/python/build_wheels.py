@@ -76,6 +76,9 @@ def capture(cmd):
 
 
 def probe_python(executable):
+    # Keep the path as given: facade/bin/python in a virtualenv is a symlink to
+    # the base interpreter, and resolving it would silently drop the venv.
+    executable = os.path.abspath(os.path.expanduser(str(executable)))
     try:
         raw = capture([executable, "-c", PROBE])
     except (OSError, subprocess.CalledProcessError) as exc:
@@ -99,7 +102,7 @@ def probe_python(executable):
         print("  skipping {}: development headers not found (Python.h)".format(executable))
         return None
 
-    return PythonInfo(str(Path(executable).resolve()), version, include, data.get("platform", ""))
+    return PythonInfo(executable, version, include, data.get("platform", ""))
 
 
 def uv_candidates():
@@ -123,11 +126,12 @@ def discover_pythons():
     def add(path):
         if not path:
             return
-        resolved = str(Path(path).resolve())
-        if resolved in seen:
+        absolute = os.path.abspath(os.path.expanduser(str(path)))
+        identity = os.path.realpath(absolute)
+        if identity in seen:
             return
-        seen.add(resolved)
-        candidates.append(resolved)
+        seen.add(identity)
+        candidates.append(absolute)
 
     add(sys.executable)
     for minor in range(20, 8, -1):
