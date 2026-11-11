@@ -36,4 +36,3 @@ Checks: >
   -clang-analyzer-security.FloatLoopCounter,
   misc-redundant-expression
 HeaderFilterRegex: '/(src|common|tools|examples|include/librealsense2|third-party/realdds|third-party/rsutils)/'
-ExcludeHeaderFilterRegex: '/(build|third-party/(arcball|easyloggingpp|filesystem|glad|glfw|imgui|implot|rapidxml|realsense-file|stb_|tclap|tinyfiledialogs))'
