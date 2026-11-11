@@ -3,9 +3,10 @@
 
 # Labeled point cloud (LPCL) together with Depth, in both start orders.
 # The camera feeds the LPCL from Depth and refuses the stream that starts second when the frame rates differ,
-# so the SDK must raise a clear error instead of passing the request on (RSDEV-16285).
-# Depth sizes other than 640x360 / 1280x720 depend on the FW (relaxed from FW with RSDEV-16286),
+# so the SDK must raise a clear error instead of passing the request on.
+# Depth sizes other than 640x360 / 1280x720 depend on the FW (newer FW accepts them),
 # so for them the test only checks that the SDK does not raise its own rate error.
+# USB only: over GMSL the LPCL shares the depth IR node and the camera path is different.
 
 import pytest
 import time
@@ -16,11 +17,12 @@ log = logging.getLogger(__name__)
 pytestmark = [
     pytest.mark.device_each( "D585" ),
     pytest.mark.device_exclude( "D585S" ),   # D585S has its own mapping stream rules
+    pytest.mark.device_type_exclude( "GMSL" ),
 ]
 
 SETTLE_TIME = 2    # [sec] the camera refuses a mapping start that follows a stop too closely
 FRAMES_TIMEOUT = 10   # [sec] to get a frame from each stream
-RATE_ERROR = "fps"
+RATE_ERROR = "Labeled Point Cloud"   # start of the SDK messages
 
 
 def get_sensors( dev ):
@@ -57,8 +59,10 @@ def run_pair( first, second ):
         return counts
     finally:
         for sensor in reversed( started ):
-            sensor.stop()
-            sensor.close()
+            try:
+                sensor.stop()
+            finally:
+                sensor.close()   # still close, and let the other sensor be closed too, when stop() raises
         time.sleep( SETTLE_TIME )
 
 
@@ -85,8 +89,11 @@ def test_depth_at_other_rate_raises( test_device, order ):
     dev, _ = test_device
     mapping, depth = get_sensors( dev )
     lpcl = lpcl_profile( mapping )
-    other_fps = next( p.fps() for p in depth.profiles
-                      if p.stream_type() == rs.stream.depth and p.fps() != lpcl.fps() )
+    other_fps = next( ( p.fps() for p in depth.profiles
+                        if p.stream_type() == rs.stream.depth and p.fps() != lpcl.fps()
+                        and ( p.as_video_stream_profile().width(), p.as_video_stream_profile().height() ) == ( 640, 360 ) ),
+                      None )
+    assert other_fps, "no Depth 640x360 profile at a rate different from the LPCL rate"
     dprofile = depth_profile( depth, 640, 360, other_fps )
     with pytest.raises( RuntimeError, match=RATE_ERROR ):
         run_pair( *ordered( order, ( mapping, lpcl ), ( depth, dprofile ) ) )
@@ -99,9 +106,13 @@ def test_other_depth_size_is_left_to_the_camera( test_device, order, size ):
     mapping, depth = get_sensors( dev )
     lpcl = lpcl_profile( mapping )
     dprofile = depth_profile( depth, *size, lpcl.fps() )
+    log.info( "FW %s, Depth %s, %s", dev.get_info( rs.camera_info.firmware_version ), size, order )
     try:
-        run_pair( *ordered( order, ( mapping, lpcl ), ( depth, dprofile ) ) )
+        counts = run_pair( *ordered( order, ( mapping, lpcl ), ( depth, dprofile ) ) )
     except RuntimeError as e:
-        # FW before RSDEV-16286 refuses these sizes in the backend; the SDK must not claim a rate problem
-        assert RATE_ERROR not in str( e ), str( e )
-        log.info( "camera refused %s %s: %s", size, order, e )
+        # Older FW refuses these sizes in the backend; the SDK must not claim a rate problem
+        if RATE_ERROR in str( e ):
+            raise
+        log.info( "camera refused: %s", e )
+        return
+    assert all( c > 0 for c in counts ), f"missing frames, {counts}"
