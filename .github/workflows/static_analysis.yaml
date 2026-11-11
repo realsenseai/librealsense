@@ -34,8 +34,7 @@ jobs:
 
       - name: Configure
         run: |
-          CC=clang-19 CXX=clang++-19 cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_EXAMPLES=ON -DBUILD_WITH_DDS=ON -DCHECK_FOR_UPDATES=ON
-          cmake --build build --target foonathan_memory -j4
+          CC=clang-19 CXX=clang++-19 cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_WITH_DDS=ON -DCHECK_FOR_UPDATES=ON -DENABLE_STATS=ON
 
       - name: Analyze changed lines
         if: github.event_name == 'pull_request'
