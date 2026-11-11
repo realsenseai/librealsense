@@ -3111,6 +3111,20 @@ rs2_processing_block* rs2_create_colorizer(rs2_error** error) BEGIN_API_CALL
 }
 NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
 
+void rs2_get_colorizer_color_table(rs2_processing_block* colorizer, const rs2_frame* depth, unsigned char* table, int table_size, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(colorizer);
+    VALIDATE_NOT_NULL(depth);
+    VALIDATE_NOT_NULL(table);
+    VALIDATE_FIXED_SIZE(table_size, librealsense::colorizer::MAX_DEPTH * 3);
+    auto block = dynamic_cast<librealsense::colorizer*>(colorizer->block.get());
+    if (!block)
+        throw std::runtime_error("the processing block is not a colorizer");
+    ((frame_interface*)depth)->acquire();  // the rs2::frame below releases it
+    block->get_color_table(rs2::frame((rs2_frame*)depth), table);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, colorizer, depth, table, table_size)
+
 
 rs2_processing_block* rs2_create_decimation_filter_block(rs2_error** error) BEGIN_API_CALL
 {
