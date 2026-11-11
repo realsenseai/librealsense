@@ -3,6 +3,7 @@
 
 #include "v4l-mipi-logic.h"
 #include "v4l-ioctl.h"  // xioctl()
+#include "../intent/contract/IntentProtocol.h"
 
 #include <src/librealsense-exception.h>  // linux_backend_exception
 
@@ -73,6 +74,8 @@ namespace librealsense
 
             static constexpr uint32_t RS_CAMERA_CID_ALIGNED_DEPTH           = ( RS_CAMERA_CID_BASE + 55 );
             static constexpr uint32_t RS_CAMERA_CID_PASSIVE_DEPTH           = ( RS_CAMERA_CID_BASE + 17 ); // D500 reuses D400's manual-exposure offset
+            static constexpr uint32_t RS_CAMERA_CID_GLOBAL_INTENT           = ( RS_CAMERA_CID_BASE + 65 );
+            static constexpr uint32_t RS_CAMERA_CID_GLOBAL_INTENT_STATUS    = ( RS_CAMERA_CID_BASE + 66 );
 
             static constexpr uint8_t GVD_VALID_OPCODE = 0x10;
 
@@ -350,6 +353,8 @@ namespace librealsense
                     case RS_HDRD_CONTROL:          return RS_CAMERA_CID_MINZ;
                     case RS_ALIGN_DEPTH:           return RS_CAMERA_CID_ALIGNED_DEPTH;
                     case RS_PASSIVE_DEPTH:         return RS_CAMERA_CID_PASSIVE_DEPTH;
+                    case rsintent::GLOBAL_INTENT: return RS_CAMERA_CID_GLOBAL_INTENT;
+                    case rsintent::GLOBAL_INTENT_STATUS: return RS_CAMERA_CID_GLOBAL_INTENT_STATUS;
                     default: break;  // the rest are common to both families
                     }
                 }
