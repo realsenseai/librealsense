@@ -14,6 +14,7 @@ on:
       - 'CMake/pybind11-download.cmake.in'
       - '.github/workflows/python-bindings-CI.yaml'
   pull_request:
+    branches: [development]
     paths:
       - 'wrappers/python/**'
       - 'third-party/rsutils/py/**'
