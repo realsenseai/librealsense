@@ -153,6 +153,7 @@ void locked_option::set( float value )
     if( _is_locked() )
         throw invalid_value_exception( _reason );
     proxy_option::set( value );
+    _recording_function( *this );
 }
 
 

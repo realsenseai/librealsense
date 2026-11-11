@@ -105,7 +105,7 @@ namespace librealsense
         if( auto emitter = depth_sensor.get_option_handler( RS2_OPTION_EMITTER_ON_OFF ) )
             depth_sensor.register_option( RS2_OPTION_EMITTER_ON_OFF,
                 std::make_shared< locked_option >( emitter, [this] { return color_shares_imagers(); },
-                    "Emitter On/Off cannot be changed while color streams together with depth or infrared" ) );
+                    "Emitter On/Off cannot be changed while color is open together with depth or infrared" ) );
     }
 
     // The rule below only bites once a color stream shares the depth sensor's imagers.
