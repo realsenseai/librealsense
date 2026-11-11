@@ -7,14 +7,39 @@ include(ExternalProject)
 # (i.e turn off BUILD_SHARED_LIBS which is used on LRS build as well)
 function(get_pybind11)
 
+    # pybind11 3.x is the first release that supports Python 3.14/3.15, and it
+    # requires CMake 3.15+. Keep the requirement scoped to the bindings so that
+    # C++-only builds continue to work with older CMake versions.
+    if(CMAKE_VERSION VERSION_LESS 3.15)
+        message( FATAL_ERROR "BUILD_PYTHON_BINDINGS requires CMake 3.15 or newer (pybind11 3.x)" )
+    endif()
+
+    # Resolve the interpreter before pybind11 is configured. pybind11 3.x uses
+    # CMake's FindPython by default. Translate the historical PYTHON_EXECUTABLE
+    # spelling (still used by older docs and CI) into FindPython's variable, and
+    # keep both names in sync so every consumer picks the same interpreter.
+    if( PYTHON_EXECUTABLE AND NOT Python_EXECUTABLE )
+        set( Python_EXECUTABLE "${PYTHON_EXECUTABLE}" CACHE FILEPATH "Python interpreter used for the Python bindings" FORCE )
+    endif()
+    # FindPython gained the Development.Module component in CMake 3.18. Older
+    # supported CMake versions fall back to Development (which includes Embed).
+    if(CMAKE_VERSION VERSION_LESS 3.18)
+        find_package( Python REQUIRED COMPONENTS Interpreter Development )
+    else()
+        find_package( Python REQUIRED COMPONENTS Interpreter Development.Module )
+    endif()
+    set( PYTHON_EXECUTABLE "${Python_EXECUTABLE}" CACHE FILEPATH "Python interpreter used for the Python bindings" FORCE )
+    set( PYBIND11_FINDPYTHON ON CACHE BOOL "Use CMake's FindPython mode with pybind11" FORCE )
+
     message( STATUS #CHECK_START
         "Fetching pybind11..." )
     #list( APPEND CMAKE_MESSAGE_INDENT "  " )  # Indent outputs
 
     # We want to clone the pybind repo and build it here, during configuration, so we can use it.
     # But ExternalProject_add is limited in that it only does its magic during build.
-    # This is possible in CMake 3.12+ with FetchContent and FetchContent_MakeAvailable in 3.14+ (meaning Ubuntu 20)
-    # but we need to adhere to CMake 3.10 (Ubuntu 18).
+    # This is possible in CMake 3.14+ with FetchContent_MakeAvailable, but the
+    # ExternalProject-based workflow below also works with the CMake versions we
+    # still support for non-Python builds.
     # So instead, we invoke a new CMake project just to download pybind:
     configure_file( CMake/pybind11-download.cmake.in
                     ${CMAKE_BINARY_DIR}/external-projects/pybind11-download/CMakeLists.txt )
@@ -39,7 +64,9 @@ function(get_pybind11)
         BINARY_DIR  ${CMAKE_BINARY_DIR}/third-party/pybind11/build
         CMAKE_ARGS
                     -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-                    -DPYTHON_EXECUTABLE=${PYTHON_EXECUTABLE}
+                    -DPython_EXECUTABLE=${Python_EXECUTABLE}
+                    -DPYTHON_EXECUTABLE=${Python_EXECUTABLE}
+                    -DPYBIND11_FINDPYTHON=ON
                     -DBUILD_SHARED_LIBS=OFF
                     # Suppress warnings that are meant for the author of the CMakeLists.txt files
                     -Wno-dev   
@@ -66,14 +93,7 @@ function(get_pybind11)
     #         ARCHIVE DESTINATION ${PYTHON_INSTALL_DIR}
     #         )
     # But, to do this, we need to define PYTHON_INSTALL_DIR!
-    if( CMAKE_VERSION VERSION_LESS 3.12 )
-      find_package(PythonInterp REQUIRED)
-      find_package(PythonLibs REQUIRED)
-      set( PYTHON_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/pyrealsense2" CACHE PATH "Installation directory for Python bindings")
-    else()
-      find_package(Python REQUIRED COMPONENTS Interpreter Development)
-      set( PYTHON_INSTALL_DIR "${Python_SITEARCH}/pyrealsense2" CACHE PATH "Installation directory for Python bindings")
-    endif()
+    set( PYTHON_INSTALL_DIR "${Python_SITEARCH}/pyrealsense2" CACHE PATH "Installation directory for Python bindings")
 
     message( STATUS #CHECK_PASS
         "Fetching pybind11 - Done" )

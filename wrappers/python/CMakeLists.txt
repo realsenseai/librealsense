@@ -24,7 +24,7 @@ set(PYRS_CPP
     ../../common/metadata-helper.cpp
 )
 
-pybind11_add_module(pyrealsense2 SHARED pyrealsense2.h ${PYRS_CPP})
+pybind11_add_module(pyrealsense2 MODULE pyrealsense2.h ${PYRS_CPP})
 
 set(CMAKECONFIG_PY_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/pyrealsense2")
 
@@ -121,7 +121,7 @@ if(${BACKEND} STREQUAL RS2_USE_LIBUVC_BACKEND)
 endif()
 
 if( BUILD_LEGACY_PYBACKEND )
-    pybind11_add_module(pybackend2 SHARED ${RAW_RS})
+    pybind11_add_module(pybackend2 MODULE ${RAW_RS})
 
     if(USE_EXTERNAL_USB)
         add_dependencies(pybackend2 libusb)
