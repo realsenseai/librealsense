@@ -10,50 +10,46 @@
 #include <src/ds/d500/d500-device.h>
 #include <src/ds/ds-private.h>
 #include <src/librealsense-exception.h>
+#include <src/hw-monitor.h>
 #include <src/uvc-sensor.h>
 namespace librealsense {
 namespace {
 class intent_option : public composite_option_interface {
     std::weak_ptr<uvc_sensor> _sensor;
+    std::shared_ptr<hw_monitor> _monitor;
     bool _status;
     uint16_t _sku;
     std::mutex _mutex;
     std::vector<uint8_t> _expected;
 
   public:
-    intent_option(std::shared_ptr<uvc_sensor> sensor, bool status, uint16_t sku = 0)
-        : _sensor(sensor), _status(status), _sku(sku) {}
+    intent_option(std::shared_ptr<uvc_sensor> sensor, std::shared_ptr<hw_monitor> monitor,
+                  bool status, uint16_t sku = 0)
+        : _sensor(sensor), _monitor(monitor), _status(status), _sku(sku) {}
+    std::vector<uint8_t> read(uint8_t opcode, size_t expected) const {
+        auto wire = _monitor->send(command(opcode));
+        if (wire.size() != expected)
+            throw std::runtime_error("Intent HWMC response has an invalid length");
+        return wire;
+    }
     std::vector<uint8_t> get_raw() const override {
         auto sensor = _sensor.lock();
         if (!sensor)
             throw std::runtime_error("Intent: sensor disconnected");
-        return sensor->invoke_powered([&](platform::uvc_device &dev) {
-            std::vector<uint8_t> wire(_status ? rsintent::status_size : rsintent::wire_size);
-            if (!dev.get_xu(ds::depth_xu,
-                            _status ? rsintent::GLOBAL_INTENT_STATUS : rsintent::GLOBAL_INTENT,
-                            wire.data(), static_cast<int>(wire.size())))
-                throw std::runtime_error("Intent GET failed");
-            return wire;
-        });
+        return read(_status ? rsintent::HWMC_GET_INTENT_STATUS : rsintent::HWMC_GET_INTENT,
+                    _status ? rsintent::status_size : rsintent::wire_size);
     }
     void set_raw(const void *data, size_t size) override {
         if (_status)
             throw std::invalid_argument("Intent status is read-only");
         if (!data || size != rsintent::wire_size)
-            throw std::invalid_argument("Intent transfer must contain 1024 bytes");
+            throw std::invalid_argument("Intent HWMC data must contain 1000 bytes");
         auto sensor = _sensor.lock();
         if (!sensor)
             throw std::runtime_error("Intent: sensor disconnected");
         std::vector<uint8_t> payload(static_cast<const uint8_t *>(data), static_cast<const uint8_t *>(data) + size);
-        std::vector<uint8_t> version(rsintent::status_size), firmware(rsintent::wire_size);
-        sensor->invoke_powered([&](platform::uvc_device &dev) {
-            if (!dev.get_xu(ds::depth_xu, rsintent::GLOBAL_INTENT_STATUS, version.data(), static_cast<int>(version.size())))
-                throw std::runtime_error("Intent: status read failed before SET");
-            // Light D (design v0.4 section 7.10, HR-4): GET_CUR lists every sensor and
-            // branch the FW supports, in every state.
-            if (!dev.get_xu(ds::depth_xu, rsintent::GLOBAL_INTENT, firmware.data(), static_cast<int>(firmware.size())))
-                throw std::runtime_error("Intent: GET_CUR failed before SET");
-        });
+        auto version = read(rsintent::HWMC_GET_INTENT_STATUS, rsintent::status_size);
+        auto firmware = read(rsintent::HWMC_GET_INTENT, rsintent::wire_size);
         // Raw composite-option callers follow the same version policy as the JSON API.
         const auto document = decode_intent_json(payload, version);
         payload = encode_intent_json(document, version, firmware);
@@ -88,11 +84,9 @@ class intent_option : public composite_option_interface {
                 throw std::invalid_argument("Intent: cannot normalize declaration");
         }
         std::lock_guard<std::mutex> lock(_mutex);
-        sensor->invoke_powered([&](platform::uvc_device &dev) {
-            if (!dev.set_xu(ds::depth_xu, rsintent::GLOBAL_INTENT,
-                            payload.data(), static_cast<int>(payload.size())))
-                throw std::runtime_error("Intent SET rejected");
-        });
+        command hwmc_request(rsintent::HWMC_SET_INTENT);
+        hwmc_request.data = std::move(payload);
+        _monitor->send(hwmc_request);
         if (request.op != rsintent::VALIDATE_ONLY)
             _expected.swap(next);
     }
@@ -104,12 +98,7 @@ class intent_option : public composite_option_interface {
         auto sensor = _sensor.lock();
         if (!sensor)
             throw std::runtime_error("Intent: sensor disconnected");
-        std::vector<uint8_t> status(rsintent::status_size);
-        sensor->invoke_powered([&](platform::uvc_device &dev) {
-            if (!dev.get_xu(ds::depth_xu, rsintent::GLOBAL_INTENT_STATUS, status.data(),
-                            static_cast<int>(status.size())))
-                throw std::runtime_error("Intent: status read failed before start");
-        });
+        auto status = read(rsintent::HWMC_GET_INTENT_STATUS, rsintent::status_size);
         // An older SDK can compare known fields, not interpret newer opaque entries.
         if (status[2] == 0U || intent_tlv::canonical_known(get_raw()) != _expected)
             throw std::runtime_error(
@@ -125,11 +114,11 @@ class intent_option : public composite_option_interface {
     }
 };
 } // namespace
-void register_intent_options(d500_depth_sensor &sensor) {
+void register_intent_options(d500_depth_sensor &sensor, std::shared_ptr<hw_monitor> monitor) {
     auto raw = std::dynamic_pointer_cast<uvc_sensor>(sensor.get_raw_sensor());
     if (!raw)
         return;
-    auto status = std::make_shared<intent_option>(raw, true);
+    auto status = std::make_shared<intent_option>(raw, monitor, true);
     uint16_t sku = 0;
     try {
         const auto wire = status->get_raw();
@@ -142,7 +131,7 @@ void register_intent_options(d500_depth_sensor &sensor) {
         return;
     } // Unsupported firmware keeps legacy behavior.
     sensor.register_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT,
-                                     std::make_shared<intent_option>(raw, false, sku));
+                                     std::make_shared<intent_option>(raw, monitor, false, sku));
     sensor.register_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT_STATUS, status);
 }
 } // namespace librealsense

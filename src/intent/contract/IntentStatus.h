@@ -2,8 +2,9 @@
 #pragma once
 #include "IntentProtocol.h"
 namespace rsintent {
-// GLOBAL_INTENT_STATUS: read-only control, design v0.4 section 9.8 Option B (OI-12).
-// Fixed status_size (1024 B) transfer, little-endian, zero after the last reason:
+enum State : uint8_t { UNSET, VALIDATING, CONFIGURED, ACTIVATING, LOCKED, UNLOCKING };
+// I1 STATUS encoding; the I2 controller produces the state and diagnostic values.
+// Fixed status_size (1000 B) HWMC data, little-endian, zero after the last reason:
 //    0 major          1 minor        2 state         3 last_result    4 last_op
 //    5 source         6 active_mask  8 PID          10 sensor        11 branch
 //   12 offset        14 rule        16 detail       18 patch         19 n_reasons
