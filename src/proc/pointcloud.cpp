@@ -305,10 +305,12 @@ namespace librealsense
     {
         if( _calibration.changed( f ) )
         {
-            // Have the inspect_* functions re-read intrinsics and extrinsics
+            // Re-read intrinsics and extrinsics. Keep the texture stream and re-read it now: its next frame may come only
+            // after this depth frame is processed, which would then be left without texture mapping.
             _output_stream = rs2::stream_profile();
-            _other_stream = rs2::frame();
             _extrinsics = optional_value< rs2_extrinsics >();
+            if( auto texture = _other_stream )
+                inspect_other_frame( texture );
         }
 
         rs2::frame rv;
@@ -328,7 +330,8 @@ namespace librealsense
                 inspect_depth_frame(f);
                 rv = process_depth_frame(source, f);
             }
-            if (f.get_profile().stream_type() == _stream_filter.stream && f.get_profile().format() == _stream_filter.format)
+            // Index too: a set may carry raw depth next to device-aligned depth, and only the mapped one is the texture
+            if (_stream_filter.stream != RS2_STREAM_ANY && _stream_filter.match(f))
             {
                 inspect_other_frame(f);
             }
