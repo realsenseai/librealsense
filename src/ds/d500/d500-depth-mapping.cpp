@@ -313,8 +313,31 @@ namespace librealsense
             throw wrong_api_call_sequence_exception( "Occupancy cannot start while the depth sensor streams color" );
     }
 
+    // The camera feeds the labeled point cloud from Depth and rejects the later stream if the rates differ
+    void d500_depth_mapping::lpcl_allowed_or_throw( const stream_profiles & requests ) const
+    {
+        auto const lpcl = find_stream( requests, RS2_STREAM_LABELED_POINT_CLOUD );
+        if( _is_safety_layout || ! lpcl )
+            return;
+        auto const depth = find_stream( get_sensor( _depth_device_idx ).get_active_streams(), RS2_STREAM_DEPTH );
+        if( depth && depth->get_framerate() != lpcl->get_framerate() )
+            throw wrong_api_call_sequence_exception( rsutils::string::from()
+                << "Labeled Point Cloud needs Depth at " << lpcl->get_framerate() << " fps, while Depth streams at "
+                << depth->get_framerate() << " fps" );
+    }
+
     void d500_depth_mapping::depth_sensor_allowed_or_throw( const stream_profiles & requests ) const
     {
+        auto const lpcl = find_stream( get_sensor( _depth_mapping_idx ).get_active_streams(), RS2_STREAM_LABELED_POINT_CLOUD );
+        if( lpcl )
+        {
+            auto const depth = find_stream( requests, RS2_STREAM_DEPTH );
+            if( depth && depth->get_framerate() != lpcl->get_framerate() )
+                throw wrong_api_call_sequence_exception( rsutils::string::from()
+                    << "While Labeled Point Cloud streams, Depth must run at " << lpcl->get_framerate() << " fps, not "
+                    << depth->get_framerate() << " fps" );
+            return;
+        }
         auto const occupancy = find_stream( get_sensor( _depth_mapping_idx ).get_active_streams(), RS2_STREAM_OCCUPANCY );
         if( ! occupancy )
             return;
@@ -999,6 +1022,7 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             throw wrong_api_call_sequence_exception( "Point Cloud cannot start while Depth is streaming; stop Depth first" );
 
         _owner->occupancy_allowed_or_throw(requests);
+        _owner->lpcl_allowed_or_throw(requests);
         synthetic_sensor::open(requests);
     }
 

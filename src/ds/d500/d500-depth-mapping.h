@@ -37,6 +37,9 @@ namespace librealsense
         // Throws if the camera would refuse occupancy with the running depth sensor streams, or starve them
         void occupancy_allowed_or_throw( const stream_profiles & requests ) const;
 
+        // Throws if the camera would refuse the labeled point cloud because the running depth stream has a different rate
+        void lpcl_allowed_or_throw( const stream_profiles & requests ) const;
+
     private:
 
         friend class d500_depth_mapping_sensor;
