@@ -26,6 +26,19 @@ set(PYRS_CPP
 
 pybind11_add_module(pyrealsense2 MODULE pyrealsense2.h ${PYRS_CPP})
 
+# Look for librealsense2 next to the extension. The build tree gets an absolute
+# rpath, which breaks as soon as the module is packaged into a wheel or copied
+# out of the build directory; $ORIGIN / @loader_path keeps it relocatable.
+if(APPLE)
+    set(PYREALSENSE2_ORIGIN "@loader_path")
+else()
+    set(PYREALSENSE2_ORIGIN "$ORIGIN")
+endif()
+set_target_properties(pyrealsense2 PROPERTIES
+    BUILD_RPATH "${PYREALSENSE2_ORIGIN}"
+    INSTALL_RPATH "${PYREALSENSE2_ORIGIN}"
+)
+
 set(CMAKECONFIG_PY_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/pyrealsense2")
 
 target_link_libraries(pyrealsense2 PRIVATE ${DEPENDENCIES})
