@@ -4,18 +4,18 @@
 #pragma once
 #include <stdint.h>
 namespace rsintent {
-static const char dictionary_sha256[] = "727baba76bf003aaaf6784fc85bf013f9d7936c8d57f4866430fedfcf1e607b2";
+static const char dictionary_sha256[] = "670af461c92f6f62e418292a0629c709dc7f97807ec6b03b38c5e237b5092c50";
 static const unsigned major = 1U;
 static const unsigned minor = 0U;
 static const unsigned patch = 0U;
-static const unsigned wire_size = 1024U;
-static const unsigned status_size = 1024U;
+static const unsigned wire_size = 1000U;
+static const unsigned status_size = 1000U;
 static const unsigned max_branch_id = 15U;
 static const unsigned max_sensor_id = 5U;
 static const unsigned max_streams = 8U;
 static const unsigned envelope_size = 8U;
 static const unsigned record_header_size = 4U;
-static const unsigned max_tlv_size = 1016U;
+static const unsigned max_tlv_size = 992U;
 static const unsigned sensor_record_bytes = 12U;
 static const unsigned enabled_stream_bytes = 44U;
 static const unsigned disabled_stream_bytes = 20U;
@@ -26,9 +26,10 @@ static const unsigned envelope_operation_offset = 3U;
 static const unsigned envelope_tlv_size_offset = 4U;
 static const unsigned envelope_reserved_offset = 6U;
 static const unsigned rule_revision = 4U;
-enum Selectors {
-    GLOBAL_INTENT = 28,
-    GLOBAL_INTENT_STATUS = 29,
+enum Opcodes {
+    HWMC_SET_INTENT = 193,
+    HWMC_GET_INTENT = 194,
+    HWMC_GET_INTENT_STATUS = 195,
 };
 enum Records {
     SENSOR = 16,

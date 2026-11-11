@@ -14,7 +14,7 @@ enum Result : uint8_t {
     STREAM_MISMATCH,
     CONTROL_STATE,
     READ_ONLY,
-    INTERNAL = 0xff // Local backend/transport failure only; never a PDF last_result.
+    INTERNAL = 0xff // Local backend/transport failure only; never a public Intent last_result.
 };
 // Error::detail for INVALID/INCOMPLETE decode results (Error::rule is 0).
 enum ParseDetail : uint16_t {
