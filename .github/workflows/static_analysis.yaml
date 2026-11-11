@@ -30,25 +30,25 @@ jobs:
       - name: Install
         run: |
           sudo apt-get update
-          sudo apt-get install -qq clang-18 clang-tidy-18 libusb-1.0-0-dev libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
+          sudo apt-get install -qq clang-19 clang-tidy-19 libcurl4-openssl-dev libusb-1.0-0-dev libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
 
       - name: Configure
         run: |
-          CC=clang-18 CXX=clang++-18 cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_EXAMPLES=ON -DBUILD_WITH_DDS=ON -DCHECK_FOR_UPDATES=ON
+          CC=clang-19 CXX=clang++-19 cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_EXAMPLES=ON -DBUILD_WITH_DDS=ON -DCHECK_FOR_UPDATES=ON
           cmake --build build --target foonathan_memory -j4
 
       - name: Analyze changed lines
         if: github.event_name == 'pull_request'
         run: |
           git diff -U0 origin/${{ github.base_ref }}...HEAD -- $SCOPE \
-            | clang-tidy-diff-18.py -p1 -path build -j4 -quiet -iregex '.*\.(cpp|cc|h|hpp)' 2>&1 | tee clang-tidy.log
+            | clang-tidy-diff-19.py -p1 -path build -j4 -quiet -iregex '.*\.(cpp|cc|h|hpp)' 2>&1 | tee clang-tidy.log
           ! grep -E ': (warning|error):' clang-tidy.log
 
       - name: Analyze full tree
         if: github.event_name != 'pull_request'
         run: |
           files=$(jq -r '.[].file' build/compile_commands.json | grep -E "^$GITHUB_WORKSPACE/(${SCOPE// /|})/.*\.(cpp|cc)$" | sort -u | awk 'NR % 4 == ${{ matrix.shard }}')
-          run-clang-tidy-18 -p build -j4 -quiet $files > clang-tidy.log 2>&1 || true
+          run-clang-tidy-19 -p build -j4 -quiet $files > clang-tidy.log 2>&1 || true
           grep -E ': (warning|error):' clang-tidy.log | sort -u > clang-tidy.findings.log || true
           echo "### clang-tidy: $(wc -l < clang-tidy.findings.log) findings" >> $GITHUB_STEP_SUMMARY
           grep -oE '\[[a-z][^]]*\]$' clang-tidy.findings.log | sort | uniq -c | sort -rn | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY
