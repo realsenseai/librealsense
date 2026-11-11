@@ -97,6 +97,7 @@ jobs:
           -DCHECK_FOR_UPDATES=false
           -DBUILD_WITH_DDS=false
           -DBUILD_PYTHON_BINDINGS=true
+          -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
 
     - name: LibCI
       # Note: requires BUILD_UNIT_TESTS or the executable C++ unit-tests won't run (and it won't complain)
@@ -143,6 +144,7 @@ jobs:
           -DCHECK_FOR_UPDATES=false
           -DBUILD_WITH_DDS=true
           -DBUILD_PYTHON_BINDINGS=true
+          -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
           -DENABLE_SECURITY_FLAGS=true
 
     - name: LibCI
