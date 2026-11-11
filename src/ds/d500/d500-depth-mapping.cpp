@@ -313,11 +313,11 @@ namespace librealsense
             throw wrong_api_call_sequence_exception( "Occupancy cannot start while the depth sensor streams color" );
     }
 
-    // The camera feeds the labeled point cloud from Depth and rejects the later stream if the rates differ
+    // Over USB the camera feeds the labeled point cloud from Depth and rejects the later stream if the rates differ (GMSL not verified)
     void d500_depth_mapping::lpcl_allowed_or_throw( const stream_profiles & requests ) const
     {
         auto const lpcl = find_stream( requests, RS2_STREAM_LABELED_POINT_CLOUD );
-        if( _is_safety_layout || ! lpcl )
+        if( _is_safety_layout || _is_mipi_device || ! lpcl )
             return;
         auto const depth = find_stream( get_sensor( _depth_device_idx ).get_active_streams(), RS2_STREAM_DEPTH );
         if( depth && depth->get_framerate() != lpcl->get_framerate() )
@@ -329,7 +329,7 @@ namespace librealsense
     void d500_depth_mapping::depth_sensor_allowed_or_throw( const stream_profiles & requests ) const
     {
         auto const lpcl = find_stream( get_sensor( _depth_mapping_idx ).get_active_streams(), RS2_STREAM_LABELED_POINT_CLOUD );
-        if( lpcl )
+        if( lpcl && ! _is_mipi_device )
         {
             auto const depth = find_stream( requests, RS2_STREAM_DEPTH );
             if( depth && depth->get_framerate() != lpcl->get_framerate() )

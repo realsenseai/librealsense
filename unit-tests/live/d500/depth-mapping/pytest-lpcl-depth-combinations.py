@@ -47,22 +47,26 @@ def depth_profile( depth, width, height, fps ):
 def run_pair( first, second ):
     """Open and start both (sensor, profile) pairs, in order. Returns the frame counts. Always closes everything."""
     counts = [0, 0]
+    opened = []
     started = []
     try:
         for i, ( sensor, profile ) in enumerate( ( first, second ) ):
             sensor.open( profile )
-            started.append( sensor )
+            opened.append( sensor )
             sensor.start( lambda f, i=i: counts.__setitem__( i, counts[i] + 1 ) )
+            started.append( sensor )
         deadline = time.time() + FRAMES_TIMEOUT
         while min( counts ) == 0 and time.time() < deadline:
             time.sleep( 0.1 )
         return counts
     finally:
-        for sensor in reversed( started ):
-            try:
-                sensor.stop()
-            finally:
-                sensor.close()   # still close, and let the other sensor be closed too, when stop() raises
+        # Close everything even if one call fails, and keep the original error visible
+        for sensor in reversed( opened ):
+            for action in ( sensor.stop, sensor.close ) if sensor in started else ( sensor.close, ):
+                try:
+                    action()
+                except RuntimeError as e:
+                    log.warning( "cleanup failed: %s", e )
         time.sleep( SETTLE_TIME )
 
 
