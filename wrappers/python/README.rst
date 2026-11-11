@@ -40,6 +40,6 @@ Install with the matching Python (e.g. ``python3.10 -m pip install pyrealsense2`
 JetPack 6). Installing with a different Python pulls a wheel built against another
 JetPack's CUDA; ``pip`` cannot detect this and GPU-accelerated paths (e.g. RGB8/BGR8
 color conversion, align, pointcloud) will fail. Python 3.8 (the JetPack 5 system Python) is
-end-of-life and not supported; the minimum is Python 3.9. For other Python versions, or to
-run without CUDA, build from source:
+end-of-life and not supported; the minimum is Python 3.9. For other Python versions
+(including 3.14 and 3.15), or to run without CUDA, build from source:
 https://github.com/realsenseai/librealsense/blob/master/wrappers/python/readme.md#building-from-source
