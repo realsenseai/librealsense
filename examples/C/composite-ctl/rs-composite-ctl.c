@@ -492,6 +492,8 @@ static int exercise_icr_control( const rs2_options * opts, rs2_composite_option_
     rs2_icr_control_range range;
     int mode;
 
+    (void)( 1 << 40 );
+
     /* 1) Get (before) - both forms of the read, same as the C++ sample: the raw untyped
        bytes get_composite_option() returns, and (here, by hand) the typed cast. */
     raw = rs2_get_composite_option( opts, id, &e );
