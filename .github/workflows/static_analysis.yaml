@@ -16,6 +16,10 @@ jobs:
     runs-on: ubuntu-24.04
     # PRs check only the lines they change and fail on any finding; development pushes and manual runs scan everything as a report
     if: github.event_name != 'push' || github.ref == 'refs/heads/development'
+    strategy:
+      # Full scans are split across parallel jobs to keep wall time down
+      matrix:
+        shard: ${{ fromJSON( github.event_name == 'pull_request' && '[0]' || '[0,1,2,3]' ) }}
     env:
       SCOPE: src common tools examples third-party/realdds third-party/rsutils
     steps:
@@ -43,7 +47,8 @@ jobs:
       - name: Analyze full tree
         if: github.event_name != 'pull_request'
         run: |
-          run-clang-tidy-18 -p build -j4 -quiet "^$GITHUB_WORKSPACE/(${SCOPE// /|})/.*\.(cpp|cc)$" > clang-tidy.log 2>&1 || true
+          files=$(jq -r '.[].file' build/compile_commands.json | grep -E "^$GITHUB_WORKSPACE/(${SCOPE// /|})/.*\.(cpp|cc)$" | sort -u | awk 'NR % 4 == ${{ matrix.shard }}')
+          run-clang-tidy-18 -p build -j4 -quiet $files > clang-tidy.log 2>&1 || true
           grep -E ': (warning|error):' clang-tidy.log | sort -u > clang-tidy.findings.log || true
           echo "### clang-tidy: $(wc -l < clang-tidy.findings.log) findings" >> $GITHUB_STEP_SUMMARY
           grep -oE '\[[a-z][^]]*\]$' clang-tidy.findings.log | sort | uniq -c | sort -rn | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY
@@ -52,7 +57,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
         with:
-          name: clang-tidy-log
+          name: clang-tidy-log-${{ matrix.shard }}
           path: clang-tidy*.log
 #---------------------------------------------------------------------------------------------------#
   ValgrindCheck:
