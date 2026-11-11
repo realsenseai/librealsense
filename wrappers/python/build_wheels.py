@@ -105,9 +105,23 @@ def probe_python(executable):
     return PythonInfo(executable, version, include, data.get("platform", ""))
 
 
+def uv_python_root():
+    """Where uv stores interpreters it manages."""
+    override = os.environ.get("UV_PYTHON_INSTALL_DIR")
+    if override:
+        return Path(override).expanduser()
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
+        return base / "uv" / "python"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "uv" / "python"
+    return Path.home() / ".local" / "share" / "uv" / "python"
+
+
 def uv_candidates():
     """Interpreters installed by uv are not necessarily on PATH."""
-    root = Path.home() / ".local" / "share" / "uv" / "python"
+    root = uv_python_root()
     if not root.is_dir():
         return []
     found = []
