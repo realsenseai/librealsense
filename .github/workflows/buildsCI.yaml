@@ -207,9 +207,11 @@ jobs:
         include:
           - os: ubuntu-22.04
             name: U22
+            warnings-as-errors: -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
           - os: ubuntu-24.04
             name: U24
-          - os: ubuntu-latest  # follows GitHub's default image, so new images are caught before older ones are deprecated
+            warnings-as-errors: -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+          - os: ubuntu-latest  # follows GitHub's default image, so new images are caught before older ones are deprecated; a newer GCC must not fail PRs on warnings
             name: U-Latest
     name: ${{ matrix.name }}_ST_Py_EX_CfU
     timeout-minutes: 60
@@ -234,6 +236,7 @@ jobs:
           -DBUILD_TOOLS=true
           -DCHECK_FOR_UPDATES=true
           -DENABLE_SECURITY_FLAGS=true
+          ${{ matrix.warnings-as-errors }}
 
   #--------------------------------------------------------------------------------
   U22_U26_SH_Py_CI:  # Ubuntu, Shared, Python, LibCI with executables
