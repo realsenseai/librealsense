@@ -218,6 +218,15 @@ namespace librealsense
             { 0x80000043, uint32_t( md_type::META_DATA_INTEL_POINT_CLOUD_ID ), sizeof( md_point_cloud ), true },
             { 640, 360, rs_fourcc( 'P', 'A', 'L', '8' ), 640 * 360 * ( 3 * sizeof( float ) + 1 ), false } };
 
+    // Point cloud XYZ: one stream with a record per resolution, so one registration per PCL tuple. GREY as on USB
+    platform::muxed_stream pcl_xyz_muxed_stream( uint32_t width, uint32_t height )
+    {
+        return { "Point Cloud",
+                 ds::MUX_POINT_CLOUD_STREAM,
+                 { uint32_t( md_type::META_DATA_INTEL_POINT_CLOUD_ID ), uint32_t( md_type::META_DATA_INTEL_POINT_CLOUD_ID ), sizeof( md_point_cloud ), true },
+                 { width, height, rs_fourcc( 'G', 'R', 'E', 'Y' ), size_t( width ) * height * 3 * sizeof( float ), false } };
+    }
+
     d500_depth_mapping::d500_depth_mapping( std::shared_ptr< const d500_info > const & dev_info)
         : device( dev_info ), d500_device( dev_info ),
         _occupancy_stream(new stream(RS2_STREAM_OCCUPANCY)),
@@ -241,7 +250,11 @@ namespace librealsense
                 enable_muxed_stream( stream_id, on, p.width, p.height, p.fps );
         };
         std::vector< std::shared_ptr< platform::uvc_device > > perception_devs;
-        for( auto const & desc : { occupancy_muxed_stream, labeled_point_cloud_muxed_stream } )
+        std::vector< platform::muxed_stream > descs = { occupancy_muxed_stream, labeled_point_cloud_muxed_stream };
+        if( ! _is_safety_layout )
+            for( auto const & t : pcl_xyz_tuples )
+                descs.push_back( pcl_xyz_muxed_stream( t.width, t.height ) );
+        for( auto const & desc : descs )
             if( auto dev = depth_uvc->create_muxed_stream_device( desc, enable ) )
                 perception_devs.push_back( dev );
         std::shared_ptr< platform::uvc_device > mapping_dev;
@@ -991,12 +1004,6 @@ void d500_depth_mapping::register_processing_blocks( std::shared_ptr< d500_depth
             throw invalid_value_exception(rsutils::string::from()
                 << "The Depth Mapping Camera streams one of Point Cloud, Labeled Point Cloud, or Occupancy at a time; "
                 << requests.size() << " profiles were requested");
-
-        // FW Phase 1 rejects PCL STREAM_OPEN while Depth streams (no prebuilt XYZ branch); fail here with a clear error.
-        // Depth starting while PCL streams is supported.
-        if( ! requests.empty() && requests.front()->get_stream_type() == RS2_STREAM_POINT_CLOUD
-            && _owner->get_depth_sensor().is_streaming() )
-            throw wrong_api_call_sequence_exception( "Point Cloud cannot start while Depth is streaming; stop Depth first" );
 
         _owner->occupancy_allowed_or_throw(requests);
         synthetic_sensor::open(requests);

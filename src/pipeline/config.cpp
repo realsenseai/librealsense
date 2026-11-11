@@ -191,17 +191,6 @@ namespace librealsense
             std::lock_guard<std::mutex> lock(_mtx);
             _resolved_profile.reset();
 
-            // D5xx device point cloud, Phase 1: the pipeline opens Depth first and FW rejects PCL while Depth runs
-            auto requested = [this]( rs2_stream s )
-            {
-                for( auto && r : _stream_requests )
-                    if( r.first.first == s )
-                        return true;
-                return false;
-            };
-            if( requested( RS2_STREAM_POINT_CLOUD ) && requested( RS2_STREAM_DEPTH ) )
-                throw invalid_value_exception( "Point Cloud and Depth cannot be streamed together; enable one of them" );
-
             std::shared_ptr< librealsense::device_interface > requested_device = pipe->get_device();
             if(! requested_device )
                 requested_device = resolve_device_requests( pipe, timeout );
