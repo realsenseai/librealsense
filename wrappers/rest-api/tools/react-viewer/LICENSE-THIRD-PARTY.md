@@ -29,10 +29,6 @@ This application is built using only open source dependencies with permissive li
 | FastAPI            | 0.120.x   | MIT            | REST API framework                             |
 | Pydantic           | 2.x       | MIT            | Request / response validation                  |
 | Uvicorn            | 0.34.x    | BSD-3-Clause   | ASGI server                                    |
-| python-socketio    | 5.x       | MIT            | Socket.IO server                               |
-| aiortc             | 1.15.x    | BSD-3-Clause   | WebRTC stack (PeerConnection, video tracks)    |
-| PyAV (`av`)        | 17.x      | BSD-3-Clause   | Pulled transitively by aiortc (FFmpeg wheel binding) |
-| numpy              | 2.x       | BSD-3-Clause   | Numeric arrays                                 |
 | pyrealsense2       | 2.x       | Apache-2.0     | RealSense SDK Python bindings (in-house)       |
 
 ## Frontend (React runtime — bundled into `dist/` by Vite)
@@ -46,7 +42,6 @@ This application is built using only open source dependencies with permissive li
 | Three.js             | 0.158.x | MIT     | 3D engine (point cloud rendering)  |
 | Recharts             | 2.x     | MIT     | Charts (IMU graphs)                |
 | axios                | 1.x     | MIT     | HTTP client                        |
-| socket.io-client     | 4.x     | MIT     | Socket.IO client                   |
 | Zustand              | 4.x     | MIT     | State management                   |
 | lucide-react         | 0.290.x | ISC     | Icon set                           |
 
@@ -82,8 +77,7 @@ This application is built using only open source dependencies with permissive li
 - All shipped runtime dependencies are MIT, Apache-2.0, BSD or ISC — all OSI-approved permissive licenses.
 - Rust ecosystem packages are commonly dual-licensed (`Apache-2.0 OR MIT`); recipients may choose either.
 - **PyInstaller** is GPL-2.0+ but its [bootloader exception](https://pyinstaller.org/en/stable/license.html) means generated executables are **not subject to GPL**.
-- The **PyAV** wheel bundles prebuilt **FFmpeg** shared libraries, licensed **LGPL-2.1+** (built without GPL components). They are redistributed unmodified as dynamically-linked libraries, which satisfies the LGPL for the packaged application; the FFmpeg license text ships inside the wheel.
-- Apart from the LGPL FFmpeg binaries noted above, no copyleft or non-commercial dependencies are bundled into the produced artifacts.
+- No copyleft or non-commercial dependencies are bundled into the produced artifacts.
 - The list above covers **direct** dependencies declared in `requirements.txt`, `package.json`, and `Cargo.toml`. Transitive dependencies inherit the same permissive license classes; the full transitive set is enumerated in the respective lockfiles (`package-lock.json`, `Cargo.lock`).
 
 ---

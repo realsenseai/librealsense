@@ -29,7 +29,7 @@ React Frontend
 FastAPI Backend
 ├── Runs as subprocess (production) or separate process (dev)
 ├── Responds to requests from React frontend
-└── Manages WebRTC, RealSense SDK, Socket.IO
+└── Manages the RealSense SDK, WebSockets
 ```
 
 ## Development Setup

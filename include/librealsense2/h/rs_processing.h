@@ -28,6 +28,17 @@ extern "C" {
 rs2_processing_block* rs2_create_colorizer(rs2_error** error);
 
 /**
+* Fills the RGB color of every Z16 depth value, as the colorizer would paint the given depth frame:
+* with its color scheme, min/max range and, when equalizing, the frame's own histogram
+* \param[in] colorizer    a block created by rs2_create_colorizer
+* \param[in] depth        a Z16 depth frame
+* \param[out] table       receives 3 bytes (R, G, B) for each depth value 0..0xFFFF; value 0 is black
+* \param[in] table_size   size of table in bytes; must be 0x10000 * 3
+* \param[out] error       if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+*/
+void rs2_get_colorizer_color_table(rs2_processing_block* colorizer, const rs2_frame* depth, unsigned char* table, int table_size, rs2_error** error);
+
+/**
 * Creates Sync processing block. This block accepts arbitrary frames and output composite frames of best matches
 * Some frames may be released within the syncer if they are waiting for match for too long
 * Syncronization is done (mostly) based on timestamps so good hardware timestamps are a pre-condition

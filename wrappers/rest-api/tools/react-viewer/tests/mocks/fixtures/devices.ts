@@ -10,7 +10,6 @@ export const mockDevice: DeviceInfo = {
   usb_type: '3.2',
   product_id: '0B07',
   sensors: ['Stereo Module', 'RGB Camera', 'Motion Module'],
-  is_streaming: false,
 }
 
 export const mockDevice2: DeviceInfo = {
@@ -22,7 +21,6 @@ export const mockDevice2: DeviceInfo = {
   usb_type: '3.2',
   product_id: '0B5C',
   sensors: ['Stereo Module', 'RGB Camera', 'Motion Module'],
-  is_streaming: false,
 }
 
 export const mockStreamConfigs: StreamConfig[] = [
@@ -98,7 +96,6 @@ export const mockDeviceState: DeviceState = {
   isStreaming: false,
   isActive: true,
   isLoading: false,
-  streamMetadata: {},
   sensorStreamingStatus: {},
 }
 
@@ -110,15 +107,6 @@ export const mockDeviceStateInactive: DeviceState = {
 export const mockDeviceStateStreaming: DeviceState = {
   ...mockDeviceState,
   isStreaming: true,
-  streamMetadata: {
-    depth: {
-      stream_type: 'depth',
-      timestamp: Date.now(),
-      frame_number: 100,
-      width: 640,
-      height: 480,
-    },
-  },
 }
 
 export const mockDeviceStates: Record<string, DeviceState> = {

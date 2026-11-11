@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../mocks/server'
 import { useAppStore } from '@/store'
-import { firmwareStatus } from '@/api/types'
+import { firmwareStatus, type SupportedStreamProfile } from '@/api/types'
 import { resetStore, createMockDevice, createMockDeviceState, createMockSensor, createMockOption } from '../../utils/test-utils'
 import { mockDevice } from '../../mocks/fixtures/devices'
 import { mockDepthSensorProfiles, mockSensors } from '../../mocks/fixtures/sensors'
@@ -87,15 +87,15 @@ describe('AppStore', () => {
   })
 
   describe('View Mode', () => {
-    it('switches to 3d', async () => {
-      await useAppStore.getState().setViewMode('3d')
+    it('switches to 3d', () => {
+      useAppStore.getState().setViewMode('3d')
 
       expect(useAppStore.getState().viewMode).toBe('3d')
     })
 
-    it('switches back to 2d', async () => {
-      await useAppStore.getState().setViewMode('3d')
-      await useAppStore.getState().setViewMode('2d')
+    it('switches back to 2d', () => {
+      useAppStore.getState().setViewMode('3d')
+      useAppStore.getState().setViewMode('2d')
 
       expect(useAppStore.getState().viewMode).toBe('2d')
     })
@@ -138,6 +138,38 @@ describe('AppStore', () => {
       useAppStore.getState().clearChat()
       
       expect(useAppStore.getState().chatMessages).toEqual([])
+    })
+  })
+
+  describe('Post-processing defaults', () => {
+    // Activates the mock device; the filters the viewer turns on, in the order it does, go to the returned list
+    async function activate(filters: Record<string, { enabled: boolean; options: [] }>) {
+      const enabled: string[] = []
+      server.use(
+        http.get('/api/v1/devices/:deviceId/sensors/:sensorId/filters/', ({ params }) =>
+          HttpResponse.json((params.sensorId as string).endsWith('sensor-0') ? filters : {})),
+        http.put('/api/v1/devices/:deviceId/sensors/:sensorId/filters/:name/enabled/', async ({ params, request }) => {
+          if (((await request.json()) as { value: boolean }).value) enabled.push(params.name as string)
+          return HttpResponse.json({})
+        }),
+      )
+      await useAppStore.getState().toggleDeviceActive(mockDevice)
+      await vi.waitFor(() => expect(useAppStore.getState().deviceStates[mockDevice.device_id]?.controls).not.toEqual({}))
+      return enabled
+    }
+    const off = { enabled: false, options: [] as [] }
+
+    it('starts a fresh device with the legacy viewer filters', async () => {
+      const enabled = await activate({ 'Decimation Filter': off, 'Spatial Filter': off, 'Temporal Filter': off,
+        'Hole Filling Filter': off, 'Threshold Filter': off })
+      // One at a time, last first: wait for all, or a late one lands in the next test
+      await vi.waitFor(() => expect(enabled).toEqual(['Temporal Filter', 'Spatial Filter', 'Decimation Filter']))
+    })
+
+    it('keeps the filters a client already chose on the server', async () => {
+      const enabled = await activate({ 'Spatial Filter': { ...off, enabled: true }, 'Temporal Filter': off })
+      await new Promise((r) => setTimeout(r, 50)) // a default would be sent at once
+      expect(enabled).toEqual([])
     })
   })
 
@@ -328,7 +360,7 @@ describe('AppStore', () => {
 
       expect(bodies).toEqual([{ profiles: [rowOf('depth', 'z16', 848, 30), rowOf('infrared', 'y8', 848, 30)] }])
       expect(useAppStore.getState().deviceStates[mockDevice.device_id].sensorStreamingStatus[depthId])
-        .toMatchObject({ is_streaming: true, stream_types: ['depth', 'infrared-1'] })
+        .toMatchObject({ is_streaming: true, profiles: [rowOf('depth', 'z16', 848, 30), rowOf('infrared', 'y8', 848, 30)] })
     })
 
     it('does not start a format the selected resolution lacks', async () => {
@@ -341,6 +373,74 @@ describe('AppStore', () => {
 
       expect(bodies).toEqual([])
       expect(useAppStore.getState().error).toBe('infrared-1 has no y16 profile at 848x480 30fps')
+    })
+
+    // A sensor some client already streams, as the server lists it
+    function serveActive(active: SupportedStreamProfile[]) {
+      server.use(http.get('/api/v1/devices/:deviceId/sensors/', () =>
+        HttpResponse.json([{ ...mockSensors[0], active_profiles: active }, ...mockSensors.slice(1)])))
+    }
+
+    it('picks up the streams another client started', async () => {
+      const running = [rowOf('depth', 'z16', 1280, 15), rowOf('infrared', 'y8', 1280, 15)]
+      serveActive(running)
+
+      const state = await loadSensors()
+
+      expect(state.sensorStreamingStatus[depthId]).toMatchObject({ is_streaming: true, profiles: running })
+      expect(state.sensorConfigs[depthId]).toEqual({ resolution: { width: 1280, height: 720 }, framerate: 15 })
+      expect(state.streamConfigs.filter(c => c.sensor_id === depthId).map(c => [c.stream_type, c.enable]))
+        .toEqual([['depth', true], ['infrared-1', true]])
+      expect(state.isStreaming).toBe(true)
+    })
+
+    it('follows a stop another client made, as the server pushes it', async () => {
+      serveActive([rowOf('depth', 'z16', 848, 30)])
+      await loadSensors()
+
+      useAppStore.getState().applyStreaming(mockDevice.device_id, { [depthId]: [] })
+
+      const state = useAppStore.getState().deviceStates[mockDevice.device_id]
+      expect(state.sensorStreamingStatus[depthId]).toMatchObject({ is_streaming: false, profiles: [] })
+      expect(state.isStreaming).toBe(false)
+    })
+
+    it('keeps the profile objects while they stay the same, so tiles keep their sockets', async () => {
+      const running = [rowOf('depth', 'z16', 848, 30)]
+      serveActive(running)
+      const before = (await loadSensors()).sensorStreamingStatus[depthId].profiles
+
+      useAppStore.getState().applyStreaming(mockDevice.device_id, { [depthId]: running.map(p => ({ ...p })) })
+
+      expect(useAppStore.getState().deviceStates[mockDevice.device_id].sensorStreamingStatus[depthId].profiles).toBe(before)
+    })
+
+    it('a pushed status keeps a stop in flight and which streams this page started', async () => {
+      serveActive([rowOf('depth', 'z16', 848, 30)])
+      await loadSensors()
+      useAppStore.setState((s) => {
+        const ds = s.deviceStates[mockDevice.device_id]
+        return { deviceStates: { [mockDevice.device_id]: { ...ds, sensorStreamingStatus: {
+          [depthId]: { ...ds.sensorStreamingStatus[depthId], pendingOp: 'stopping', startedHere: true } } } } }
+      })
+
+      useAppStore.getState().applyStreaming(mockDevice.device_id, { [depthId]: [rowOf('depth', 'z16', 848, 30)] })
+
+      expect(useAppStore.getState().deviceStates[mockDevice.device_id].sensorStreamingStatus[depthId])
+        .toMatchObject({ pendingOp: 'stopping', startedHere: true, is_streaming: false })
+    })
+
+    it('a start whose push came first keeps the pushed profile objects', async () => {
+      await loadSensors()
+      captureStart()
+      const pushed = { ...rowOf('depth', 'z16', 848, 30) }
+      useAppStore.getState().applyStreaming(mockDevice.device_id, { [depthId]: [pushed] })
+
+      await useAppStore.getState().startSensorStreaming(mockDevice.device_id, depthId)
+
+      expect(useAppStore.getState().deviceStates[mockDevice.device_id].sensorStreamingStatus[depthId])
+        .toMatchObject({ is_streaming: true, startedHere: true })
+      expect(useAppStore.getState().deviceStates[mockDevice.device_id].sensorStreamingStatus[depthId].profiles![0]).toBe(pushed)
     })
   })
 

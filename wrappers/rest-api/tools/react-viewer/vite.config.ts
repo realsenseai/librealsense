@@ -22,23 +22,16 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
-      // Socket.IO needs a ws-capable proxy in dev (React runs on :3000, backend on :8000)
-      '/socket': {
-        target: 'http://localhost:8000',
-        ws: true,
-        changeOrigin: true,
-      },
     },
   },
   // `npm run preview` serves the production bundle against the same backend as dev.
-  // Without the proxy here it cannot reach /api or /socket, which leaves dev mode as
+  // Without the proxy here it cannot reach /api, which leaves dev mode as
   // the only way to run the viewer locally — and dev-mode React is far slower, which
   // reads as the viewer being laggy when it is not.
   preview: {
     port: 4173,
     proxy: {
-      '/api': { target: 'http://localhost:8000', changeOrigin: true },
-      '/socket': { target: 'http://localhost:8000', ws: true, changeOrigin: true },
+      '/api': { target: 'http://localhost:8000', ws: true, changeOrigin: true }, // ws: the frame and event sockets
     },
   },
   build: {

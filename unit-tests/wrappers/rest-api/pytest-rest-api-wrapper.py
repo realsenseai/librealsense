@@ -32,7 +32,6 @@ _REQUIRED_MODULES = {
     "pydantic": "pydantic",
     "multipart": "python-multipart",  # FastAPI File/UploadFile route registration
     "aiortc": "aiortc",
-    "socketio": "python-socketio",
     "numpy": "numpy",
     "httpx": "httpx",  # FastAPI TestClient
 }

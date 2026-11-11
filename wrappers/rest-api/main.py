@@ -55,7 +55,6 @@ def _prefer_local_pyrealsense2() -> None:
 
 _prefer_local_pyrealsense2()
 
-import asyncio
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -64,9 +63,6 @@ from fastapi.staticfiles import StaticFiles
 from app.api.router import api_router
 from app.core.errors import setup_exception_handlers
 from config import settings
-import socketio
-from app.services.socketio import sio
-from app.services.rs_manager import RealSenseManager
 
 
 # --- Create FastAPI App ---
@@ -97,18 +93,6 @@ if (_static_dir / "index.html").exists():
     app.router.default = StaticFiles(directory=_static_dir, html=True)
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Store the main event loop for use in synchronous callbacks."""
-    loop = asyncio.get_running_loop()
-    RealSenseManager.set_event_loop(loop)
-
-
-# --- Combine FastAPI and Socket.IO into a single ASGI App ---
-# Mount the Socket.IO app (`sio`) onto the FastAPI app (`app`)
-# The result `combined_app` is what Uvicorn will run.
-combined_app = socketio.ASGIApp(socketio_server=sio, other_asgi_app=app, socketio_path='socket')
-
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description=settings.PROJECT_NAME)
@@ -125,17 +109,19 @@ if __name__ == "__main__":
     if is_bundled:
         # When bundled, pass the app object directly (string import doesn't work)
         uvicorn.run(
-            combined_app,
+            app,
             host=args.host,
             port=args.port,
-            log_level="info"
+            log_level="info",
+            ws_per_message_deflate=False,  # compressing every raw frame costs a core and caps the fps
         )
     else:
         # In development, use string reference to enable reload
         uvicorn.run(
-            "main:combined_app",
+            "main:app",
             host=args.host,
             port=args.port,
             reload=reload_enabled,
-            log_level="debug"
+            log_level="debug",
+            ws_per_message_deflate=False,  # compressing every raw frame costs a core and caps the fps
         )

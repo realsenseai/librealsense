@@ -46,7 +46,7 @@ async function startDepthStream(page: Page, device: DeviceInfo): Promise<void> {
   const startButton = depthSensorModule(page).locator('[data-testid="start-streaming"]')
   await expect(startButton).toBeEnabled()
   await startButton.click()
-  await expect(page.locator('video.stream-video').first()).toBeVisible({ timeout: 20000 })
+  await expect(page.locator('canvas.stream-video').first()).toBeVisible({ timeout: 20000 })
 }
 
 async function stopDepthStream(page: Page): Promise<void> {
@@ -91,7 +91,7 @@ test.describe('@real-device Real Device Tests', () => {
     await startDepthStream(page, device)
 
     // The frame number lives only in the metadata overlay, behind its toggle
-    const tile = page.locator('video.stream-video').first().locator('..')
+    const tile = page.locator('canvas.stream-video').first().locator('..')
     await tile.locator('[data-testid="toggle-metadata"]').click({ timeout: 20000 })
 
     // Frame number must keep climbing, and the browser must really decode the frames
@@ -101,12 +101,6 @@ test.describe('@real-device Real Device Tests', () => {
       .poll(async () => Number(await frameNumber.textContent()), { timeout: 15000 })
       .toBeGreaterThan(first)
 
-    // The tile renders before WebRTC has negotiated, so this has to be polled
-    await expect
-      .poll(() => page.locator('video.stream-video').first()
-        .evaluate((v: HTMLVideoElement) => v.getVideoPlaybackQuality().totalVideoFrames))
-      .toBeGreaterThan(0)
-
     await stopDepthStream(page)
   })
 
@@ -114,17 +108,15 @@ test.describe('@real-device Real Device Tests', () => {
     await page.goto('/')
     await startDepthStream(page, device)
 
-    const video = page.locator('video.stream-video').first()
-    const activated = page.waitForResponse(r => r.url().includes('/point_cloud/activate'))
+    const video = page.locator('canvas.stream-video').first()
     await page.getByRole('button', { name: '3D View' }).click()
-    expect((await activated).ok()).toBe(true)
     await expect(video).toBeHidden()
 
-    // Export PLY enables only once vertices reach the store, so it stands for the whole
-    // path: SDK point cloud -> socket -> viewer. The canvas itself cannot be read back,
-    // as three.js renders without preserveDrawingBuffer.
+    // Export PLY enables only once the page built points from a depth frame, so it stands for
+    // the whole path: depth frame socket -> deprojection -> geometry. The canvas itself cannot
+    // be read back, as three.js renders without preserveDrawingBuffer.
     await expect(page.getByRole('button', { name: 'Export PLY' })).toBeEnabled({ timeout: 20000 })
-    await expect(page.locator('canvas')).toBeVisible()
+    await expect(page.locator('canvas:not(.stream-video)')).toBeVisible()
 
     await page.getByRole('button', { name: '2D View' }).click()
     await expect(video).toBeVisible()
@@ -139,7 +131,7 @@ test.describe('@real-device Real Device Tests', () => {
     for (let attempt = 1; attempt <= 2; attempt++) {
       await startDepthStream(page, device)
       await stopDepthStream(page)
-      await expect(page.locator('video.stream-video')).toHaveCount(0)
+      await expect(page.locator('canvas.stream-video')).toHaveCount(0)
     }
   })
 

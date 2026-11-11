@@ -23,4 +23,5 @@ class SensorInfo(BaseModel):
     name: str
     type: str
     supported_stream_profiles: List[StreamProfile] = []
+    active_profiles: List[StreamProfile] = []  # what it streams now, by any API; empty when stopped
     options: List[OptionInfo] = []

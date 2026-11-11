@@ -5,7 +5,7 @@ A modern React-based web UI for RealSense Cameras, leveraging the REST API backe
 ## Features
 
 - **Device Management**: Discover, select, and reset RealSense devices
-- **Stream Viewing**: Real-time video streams via WebRTC (Depth, Color, Infrared)
+- **Stream Viewing**: Real-time streams, the SDK's frames drawn in the browser (Depth, Color, Infrared)
 - **Camera Controls**: Adjust exposure, gain, laser power, and other camera options
 - **3D Point Cloud**: Interactive point cloud visualization with Three.js
 - **IMU Visualization**: Real-time accelerometer and gyroscope graphs
@@ -117,7 +117,7 @@ backend automatically.
 ```
 react-viewer/
 ├── src/                # React app (TypeScript)
-│   ├── api/            # Backend clients (REST, Socket.IO, WebRTC, chat)
+│   ├── api/            # Backend clients (REST, events and frame WebSockets, chat)
 │   ├── components/     # React components
 │   │   └── ChatBot/    # AI chat UI (Ask + Agent modes)
 │   ├── store/          # Zustand state management
@@ -271,8 +271,6 @@ manual build steps, dev mode and troubleshooting, see
 - **Zustand** - State management
 - **React Three Fiber** - 3D point cloud rendering
 - **Recharts** - IMU data charts
-- **Socket.IO Client** - Real-time metadata
-- **WebRTC** - Low-latency video streaming
 
 ## API Integration
 
@@ -282,9 +280,9 @@ The viewer connects to the REST API at `/api/v1/`:
 - `GET /devices/{id}/sensors` - Get device sensors
 - `PUT /devices/{id}/sensors/{sid}/options/{oid}` - Update camera option
 - `POST /devices/{id}/streams/start` - Start streaming
-- `POST /webrtc/offer` - WebRTC signaling
+- `WS /devices/{id}/frames/{stream}/{index}` - A stream's frames
 
-Real-time data is received via Socket.IO on the `/socket` path.
+Server events (devices, streaming, firmware updates) arrive as JSON on the `/api/v1/events` WebSocket.
 
 ## License
 

@@ -145,6 +145,7 @@ namespace librealsense
     {
         _histogram = std::vector<int>(MAX_DEPTH, 0);
         _hist_data = _histogram.data();
+        _z16_table = std::vector< uint8_t >( MAX_DEPTH * 3 );
         _stream_filter.stream = RS2_STREAM_DEPTH;
         _stream_filter.format = RS2_FORMAT_Z16;
 
@@ -252,6 +253,29 @@ namespace librealsense
         return false;
     }
 
+    void colorizer::get_color_table( const rs2::frame & f, uint8_t * table )
+    {
+        auto depth = f.as< rs2::depth_frame >();
+        if( ! depth || depth.get_profile().format() != RS2_FORMAT_Z16 )
+            throw invalid_value_exception( "a color table is only defined for Z16 depth frames" );
+        auto units = depth.get_units();
+        auto equalize = _equalize;
+        auto min = _min, max = _max;
+        auto cm = _maps[_map_index];
+        if( equalize )
+            update_histogram( _hist_data, reinterpret_cast< const uint16_t * >( depth.get_data() ),
+                              depth.get_width(), depth.get_height() );
+        auto pixels = (float)_hist_data[MAX_DEPTH - 1];
+        for( int d = 0; d < MAX_DEPTH; ++d )
+            colorize_pixel( table, d, cm, d, [&]( int data ) {
+                if( equalize )
+                    return _hist_data[data] / pixels;
+                if( min >= max )
+                    return 0.f;
+                return ( float( data ) * units - min ) / ( max - min );
+            } );
+    }
+
     rs2::frame colorizer::process_frame(const rs2::frame_source& source, const rs2::frame& f)
     {
         if (f.as<rs2::depth_frame>())
@@ -284,12 +308,6 @@ namespace librealsense
                 update_histogram(_hist_data, depth_data, w, h);
                 make_rgb_data<float>(depth_data, rgb_data, w, h, coloring_function);
             }
-            else if (depth_format == RS2_FORMAT_Z16)
-            {
-                auto depth_data = reinterpret_cast<const uint16_t*>(depth.get_data());
-                update_histogram(_hist_data, depth_data, w, h);
-                make_rgb_data<uint16_t>(depth_data, rgb_data, w, h, coloring_function);
-            }
         };
 
         auto make_value_cropped_frame = [this](const rs2::video_frame& depth, rs2::video_frame rgb)
@@ -312,17 +330,6 @@ namespace librealsense
                 };
                 make_rgb_data<float>(depth_data, rgb_data, w, h, coloring_function);
             }
-            else if (depth_format == RS2_FORMAT_Z16)
-            {
-                auto depth_data = reinterpret_cast<const uint16_t*>(depth.get_data());
-                auto min = _min;
-                auto max = _max;
-                auto coloring_function = [&, this](float data) {
-                    if (min >= max) return 0.f;
-                    return (data * _depth_units - min) / (max - min);
-                };
-                make_rgb_data<uint16_t>(depth_data, rgb_data, w, h, coloring_function);
-            }
         };
 
         rs2::frame ret;
@@ -330,7 +337,15 @@ namespace librealsense
         auto vf = f.as<rs2::video_frame>();
         ret = source.allocate_video_frame(_target_stream_profile, f, 3, vf.get_width(), vf.get_height(), vf.get_width() * 3, RS2_EXTENSION_VIDEO_FRAME);
 
-        if (_equalize)
+        if( vf.get_profile().format() == RS2_FORMAT_Z16 )
+        {
+            get_color_table( f, _z16_table.data() );
+            auto depth_data = reinterpret_cast< const uint16_t * >( vf.get_data() );
+            auto rgb_data = reinterpret_cast< uint8_t * >( const_cast< void * >( ret.get_data() ) );
+            for( int i = 0, n = vf.get_width() * vf.get_height(); i < n; ++i )
+                memcpy( rgb_data + i * 3, &_z16_table[depth_data[i] * 3], 3 );
+        }
+        else if (_equalize)
             make_equalized_histogram(f, ret);
         else
             make_value_cropped_frame(f, ret);

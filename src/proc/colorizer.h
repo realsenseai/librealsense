@@ -119,6 +119,10 @@ namespace librealsense {
         static const int MAX_DEPTH = 0x10000;
         static const int MAX_DISPARITY = 0x2710;
 
+        // The RGB color of every Z16 depth value (MAX_DEPTH * 3 bytes) as this colorizer would paint
+        // the frame: its color scheme, min/max and, when equalizing, the frame's own histogram.
+        void get_color_table( const rs2::frame & depth, uint8_t * table );
+
     protected:
         colorizer(const char* name);
 
@@ -163,6 +167,7 @@ namespace librealsense {
 
         std::vector<int> _histogram;
         int* _hist_data;
+        std::vector< uint8_t > _z16_table;
 
         int _preset = 0;
         rs2::stream_profile _target_stream_profile;

@@ -5,3 +5,6 @@ export const isDesktopApp = '__TAURI__' in window
 
 // Desktop app pages are served by the app itself; the bundled backend is always local.
 export const BACKEND_ORIGIN = isDesktopApp ? 'http://localhost:8000' : window.location.origin
+
+// Vite's dev proxy relays raw frames at a fraction of their rate, so dev opens WebSockets to the backend directly
+export const WS_ORIGIN = import.meta.env.DEV ? 'ws://localhost:8000' : BACKEND_ORIGIN.replace(/^http/, 'ws')
