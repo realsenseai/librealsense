@@ -1,0 +1,26 @@
+# License: Apache 2.0. See LICENSE file in root directory.
+# Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
+
+# Bug-finding checks only (no style); noisy checks are disabled
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-branch-clone,
+  -bugprone-casting-through-void,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-empty-catch,
+  -bugprone-exception-escape,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-inc-dec-in-conditions,
+  -bugprone-macro-parentheses,
+  -bugprone-multi-level-implicit-pointer-conversion,
+  -bugprone-narrowing-conversions,
+  -bugprone-reserved-identifier,
+  -bugprone-switch-missing-default-case,
+  -bugprone-unchecked-optional-access,
+  clang-analyzer-*,
+  -clang-analyzer-optin.*,
+  -clang-analyzer-osx.*,
+  -clang-analyzer-security.insecureAPI.*,
+  misc-redundant-expression
+HeaderFilterRegex: '/(src|common|tools|examples|include/librealsense2|third-party/realdds|third-party/rsutils)/'
