@@ -15,19 +15,24 @@ Nothing is replayed: a client reads the current state through the REST API once 
 """
 
 import asyncio
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional
+
+# A client that doesn't read fast enough would make its queue grow without end. To keep our memory bounded,
+# a client 100 events behind has its socket closed with this code; it reconnects and reads the state again.
+QUEUE_SIZE = 100
+TOO_SLOW = 4003
 
 
 class Events:
     def __init__(self) -> None:
-        self._queues: Set[asyncio.Queue] = set()  # one per client, in the order the events happened
+        self._queues: Dict[asyncio.Queue, Any] = {}  # one per client, in the order the events happened: its socket
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     async def serve(self, websocket: Any) -> None:
         """Send the events to an accepted WebSocket until the client disconnects."""
         self._loop = asyncio.get_running_loop()
-        queue: asyncio.Queue = asyncio.Queue()
-        self._queues.add(queue)
+        queue: asyncio.Queue = asyncio.Queue(QUEUE_SIZE)
+        self._queues[queue] = websocket
 
         async def send() -> None:
             while True:
@@ -40,7 +45,7 @@ class Events:
                 pass  # the client has nothing to say
         finally:
             sending.cancel()
-            self._queues.discard(queue)
+            self._queues.pop(queue, None)
 
     def emit(self, event: str, fields: Dict[str, Any]) -> None:
         """From any thread."""
@@ -48,5 +53,10 @@ class Events:
             self._loop.call_soon_threadsafe(self._put, {"event": event, **fields})
 
     def _put(self, message: Dict[str, Any]) -> None:
-        for queue in self._queues:
-            queue.put_nowait(message)
+        for queue, websocket in list(self._queues.items()):
+            try:
+                queue.put_nowait(message)
+            except asyncio.QueueFull:
+                del self._queues[queue]
+                closing = asyncio.ensure_future(websocket.close(TOO_SLOW, "not reading the events fast enough"))
+                closing.add_done_callback(lambda t: t.cancelled() or t.exception())  # it may have left already
