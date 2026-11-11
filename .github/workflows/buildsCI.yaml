@@ -55,8 +55,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Win_SH_EX_CfU  # Check for Updates, no usage monitoring
-            cmake-options: -DCHECK_FOR_UPDATES=true -DENABLE_STATS=OFF
+          - name: Win_SH_EX_CfU  # Check for Updates, no usage monitoring; warnings fail the build
+            cmake-options: -DCHECK_FOR_UPDATES=true -DENABLE_STATS=OFF -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
           - name: Win_SH_EX_No_Logs  # no EasyLogging and no Check for Updates
             cmake-options: -DCHECK_FOR_UPDATES=false -DBUILD_EASYLOGGINGPP=false
     name: ${{ matrix.name }}
