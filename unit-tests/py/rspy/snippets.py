@@ -15,7 +15,8 @@ _FIRST_COLOR_FRAME_MAX_DELAY_GOLDEN_D585_PROTOTYPE = 1.5
 
 def first_color_frame_max_delay(dev):
     """Max allowed time [sec] from start to the first color frame. Longer for the D585 Prototype on its golden FW."""
-    if "D585 Prototype" in dev.get_info(rs.camera_info.name) \
+    if dev and dev.supports(rs.camera_info.name) and "D585 Prototype" in dev.get_info(rs.camera_info.name) \
+            and dev.supports(rs.camera_info.firmware_version) \
             and dev.get_info(rs.camera_info.firmware_version) == _GOLDEN_FW_D585_PROTOTYPE:
         return _FIRST_COLOR_FRAME_MAX_DELAY_GOLDEN_D585_PROTOTYPE
     return _FIRST_COLOR_FRAME_MAX_DELAY
