@@ -6,6 +6,7 @@
 #include "../include/librealsense2/hpp/rs_frame.hpp"
 #include "../include/librealsense2/hpp/rs_processing.hpp"
 #include "proc/synthetic-stream.h"
+#include "proc/calibration-change-tracker.h"
 
 namespace librealsense
 {
@@ -41,6 +42,7 @@ namespace librealsense
         uint16_t                _padded_height;
         bool                    _recalc_profile;
         bool                    _options_changed;   // Tracking changes imposed by user
+        calibration_change_tracker _calibration;
     };
     MAP_EXTENSION(RS2_EXTENSION_DECIMATION_FILTER, librealsense::decimation_filter);
 }

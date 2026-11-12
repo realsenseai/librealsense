@@ -18,6 +18,7 @@
 #include "ds/ds-device-common.h"
 #include "backend-device.h"
 #include "d500-auto-calibration.h"
+#include <src/device-calibration.h>
 #include <src/core/video.h>
 #include <src/depth-sensor.h>
 
@@ -85,6 +86,7 @@ namespace librealsense
         , public d500_auto_calibrated
         , public updatable
         , public extendable_interface
+        , public calibration_change_device
     {
     public:
         std::shared_ptr<synthetic_sensor> create_depth_device(std::shared_ptr<context> ctx,

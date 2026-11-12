@@ -367,10 +367,7 @@ namespace rs2
         init_labeled_points_uid();
 
         // Initialize and prepare depth and texture sources
-        int selected_depth_source = -1;
-        std::vector<std::string> depth_sources_str;
-        std::vector<int> depth_sources;
-        init_depth_uid(selected_depth_source, depth_sources_str, depth_sources);
+        auto const depth_sources_count = init_depth_uid();
 
         int selected_tex_source = 0;
         std::vector<std::string> tex_sources_str;
@@ -392,6 +389,11 @@ namespace rs2
                 auto stream_origin_iter = streams_origin.find(profile_unique_id);
                 auto profile_found = stream_origin_iter != streams_origin.end();
 
+                // Depth textures only its own points: another depth stream's pixels (e.g. device-aligned depth) mean nothing there
+                if( s.second.profile.stream_type() == RS2_STREAM_DEPTH
+                    && ( ! profile_found || stream_origin_iter->second != selected_depth_source_uid ) )
+                    continue;
+
                 if( selected_tex_source_uid == -1 && selected_depth_source_uid != -1 )
                 {
                     if( profile_found && streams.find(stream_origin_iter->second ) != streams.end() )
@@ -411,9 +413,8 @@ namespace rs2
                     tex_profiles.push_back(s.second.profile);
 
                     auto dev_name = s.second.dev ? s.second.dev->dev.get_info(RS2_CAMERA_INFO_NAME) : "Unknown";
-                    std::string stream_name = viewer_stream_name( rs2_stream_to_string(s.second.profile.stream_type()) );
-                    if (s.second.profile.stream_index())
-                        stream_name += "_" + std::to_string(s.second.profile.stream_index());
+                    // Same name as the stream's tile, so raw and device-aligned depth can be told apart
+                    std::string stream_name = viewer_stream_name( s.second.profile.stream_name() );
                     if (s.second.profile.stream_type() == RS2_STREAM_POINT_CLOUD)
                         stream_name += " (depth colors)";
                     else if (s.second.profile.stream_type() == RS2_STREAM_LABELED_POINT_CLOUD)
@@ -431,8 +432,10 @@ namespace rs2
             auto it = std::find(begin(last_tex_sources), end(last_tex_sources), id);
             if (it == last_tex_sources.end())
             {
-                // Don't auto-switch to IR stream, nor to the device cloud's own depth colors
+                // Don't auto-switch to IR stream, to depth (when the source changes it would override the user's texture),
+                // nor to the device cloud's own depth colors
                 if (tex_profiles[i].format() != RS2_FORMAT_Y8
+                    && tex_profiles[i].stream_type() != RS2_STREAM_DEPTH
                     && tex_profiles[i].stream_type() != RS2_STREAM_POINT_CLOUD
                     && tex_profiles[i].stream_type() != RS2_STREAM_LABELED_POINT_CLOUD)
                     selected_tex_source_uid = id;
@@ -440,6 +443,12 @@ namespace rs2
             }
         }
         last_tex_sources = tex_sources;
+
+        // A depth texture follows the source when it changes - the previous depth stream is no longer a choice
+        auto tex_it = streams.find( selected_tex_source_uid );
+        if( tex_it != streams.end() && tex_it->second.profile.stream_type() == RS2_STREAM_DEPTH
+            && selected_depth_source_uid != -1 && selected_tex_source_uid != selected_depth_source_uid )
+            selected_tex_source_uid = selected_depth_source_uid;
 
         const auto top_bar_height = 60.f;
 
@@ -461,7 +470,7 @@ namespace rs2
         float left = 5.f;
         float button_width = win.get_font_size() * 3.8f;
 
-        const auto has_stream = tex_sources_str.size() && depth_sources_str.size();
+        const auto has_stream = tex_sources_str.size() && depth_sources_count;
         // HKR clouds (PCL, LPCL): no host Depth needed for pause or texture
         const bool has_hkr_cloud = bool( last_device_points ) || bool( last_labeled_points );
         const bool can_pause = has_stream || has_hkr_cloud;
@@ -555,15 +564,17 @@ namespace rs2
                     s.second.texture->get_last_frame() &&
                     s.second.profile.stream_type() == RS2_STREAM_DEPTH)
                 {
-                    std::string id = rsutils::string::from() << depth_sources_str[i] << "##DepthSource-" << i;
+                    // Labeled and matched to the selection here, in the same pass, so an entry names the stream it selects
+                    auto stream_origin_iter = streams_origin.find(s.second.profile.unique_id());
+                    auto dev_name = s.second.dev ? s.second.dev->dev.get_info(RS2_CAMERA_INFO_NAME) : "Unknown";
+                    std::string label = rsutils::string::from() << dev_name << " " << viewer_stream_name( s.second.profile.stream_name() );
+                    std::string id = rsutils::string::from() << label << "##DepthSource-" << i;
 
-                    bool selected = i == selected_depth_source;
+                    bool selected = stream_origin_iter != streams_origin.end() && stream_origin_iter->second == selected_depth_source_uid;
                     if (ImGui::MenuItem(id.c_str(), nullptr, &selected))
                     {
                         if (selected)
                         {
-                            auto stream_origin_iter = streams_origin.find(s.second.profile.unique_id());
-
                             if( stream_origin_iter != streams_origin.end() )
                                 selected_depth_source_uid = stream_origin_iter->second;
                         }
@@ -4838,9 +4849,9 @@ namespace rs2
         return results;
     }
 
-    void viewer_model::init_depth_uid(int& selected_depth_source, std::vector<std::string>& depth_sources_str, std::vector<int>& depth_sources)
+    size_t viewer_model::init_depth_uid()
     {
-        int i = 0;
+        size_t count = 0;
 
         for (auto&& s : streams)
         {
@@ -4856,21 +4867,10 @@ namespace rs2
                         selected_depth_source_uid = stream_origin_iter->second;
                     }
                 }
-                if (stream_origin_iter != streams_origin.end() && stream_origin_iter->second == selected_depth_source_uid)
-                {
-                    selected_depth_source = i;
-                }
-
-                depth_sources.push_back(s.second.profile.unique_id());
-
-                auto dev_name = s.second.dev ? s.second.dev->dev.get_info(RS2_CAMERA_INFO_NAME) : "Unknown";
-                auto stream_name = rs2_stream_to_string(s.second.profile.stream_type());
-
-                depth_sources_str.push_back(rsutils::string::from() << dev_name << " " << stream_name);
-
-                i++;
+                ++count;
             }
         }
+        return count;
     }
 
     void viewer_model::init_labeled_points_uid()

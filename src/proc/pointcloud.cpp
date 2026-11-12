@@ -9,8 +9,6 @@
 #include <src/device.h>
 #include <src/stream.h>
 #include <src/points.h>
-#include <src/core/sensor-interface.h>
-#include "device-calibration.h"
 
 #include <librealsense2/rs.hpp>
 
@@ -103,91 +101,8 @@ namespace librealsense
         set_extrinsics();
     }
 
-    template< class callback >
-    rs2_calibration_change_callback_sptr create_calibration_change_callback_ptr( callback&& cb )
-    {
-        return {
-            new rs2::calibration_change_callback< callback >( std::move( cb ) ),
-            []( rs2_calibration_change_callback* p ) { p->release(); }
-        };
-    }
-
     void pointcloud::inspect_other_frame(const rs2::frame& other)
     {
-        if (_stream_filter != _prev_stream_filter)
-        {
-            _prev_stream_filter = _stream_filter;
-
-            if (!_registered_auto_calib_cb)
-            {
-                auto sensor = ((frame_interface*)other.get())->get_sensor();
-                if (sensor)
-                {
-                    _registered_auto_calib_cb
-                        = std::shared_ptr< pointcloud >( this, []( pointcloud * p ) {} );
-
-                    auto dev = sensor->get_device().shared_from_this();
-                    auto * d2r = dynamic_cast<calibration_change_device*>(dev.get());
-                    if( d2r )
-                        try
-                        {
-                            std::weak_ptr< pointcloud > wr{ _registered_auto_calib_cb };
-                            auto fn = [=]( rs2_calibration_status status ) {
-                                auto r = wr.lock();
-                                if( ! r )
-                                    // nobody there any more!
-                                    return;
-                                if( status == RS2_CALIBRATION_SUCCESSFUL )
-                                {
-                                    stream_profile_interface *ds = nullptr, *os = nullptr;
-                                    for( size_t x = 0, N = dev->get_sensors_count(); x < N; ++x )
-                                    {
-                                        sensor_interface & s = dev->get_sensor( x );
-                                        for( auto const & sp : s.get_active_streams() )
-                                        {
-                                            if(( sp->get_stream_type() == RS2_STREAM_COLOR ) &&
-                                               ( _stream_filter.stream == RS2_STREAM_COLOR ))
-                                            {
-                                                auto vspi = As< video_stream_profile_interface >(
-                                                    sp.get() );
-                                                if( vspi )
-                                                {
-                                                    os = vspi;
-                                                    _other_intrinsics = vspi->get_intrinsics();
-                                                    _occlusion_filter->set_texel_intrinsics(
-                                                        _other_intrinsics.value() );
-                                                }
-                                            }
-                                            else if( sp->get_stream_type() == RS2_STREAM_DEPTH )
-                                            {
-                                                ds = sp.get();
-                                            }
-                                        }
-                                    }
-                                    if( ds && os )
-                                    {
-                                        rs2_extrinsics ex;
-                                        if( environment::get_instance()
-                                                .get_extrinsics_graph()
-                                                .try_fetch_extrinsics( *ds, *os, &ex ) )
-                                            _extrinsics = ex;
-                                        else
-                                            LOG_ERROR( "Failed to refresh extrinsics after calibration change" );
-                                    }
-                                }
-                            };
-
-                            d2r->register_calibration_change_callback(
-                                create_calibration_change_callback_ptr( std::move( fn ) ) );
-                        }
-                        catch( const std::bad_weak_ptr & )
-                        {
-                            LOG_WARNING( "Device destroyed" );
-                        }
-                }
-            }
-        }
-
         bool const same_stream = _other_stream && other.get_profile().get() == _other_stream.get_profile().get();
 
         // Nothing left to resolve for this texture stream - extrinsics are in hand, or its intrinsics are known
@@ -388,6 +303,16 @@ namespace librealsense
 
     rs2::frame pointcloud::process_frame(const rs2::frame_source& source, const rs2::frame& f)
     {
+        if( _calibration.changed( f ) )
+        {
+            // Re-read intrinsics and extrinsics. Keep the texture stream and re-read it now: its next frame may come only
+            // after this depth frame is processed, which would then be left without texture mapping.
+            _output_stream = rs2::stream_profile();
+            _extrinsics = optional_value< rs2_extrinsics >();
+            if( auto texture = _other_stream )
+                inspect_other_frame( texture );
+        }
+
         rs2::frame rv;
         if (auto composite = f.as<rs2::frameset>())
         {
@@ -405,7 +330,8 @@ namespace librealsense
                 inspect_depth_frame(f);
                 rv = process_depth_frame(source, f);
             }
-            if (f.get_profile().stream_type() == _stream_filter.stream && f.get_profile().format() == _stream_filter.format)
+            // Index too: a set may carry raw depth next to device-aligned depth, and only the mapped one is the texture
+            if (_stream_filter.stream != RS2_STREAM_ANY && _stream_filter.match(f))
             {
                 inspect_other_frame(f);
             }

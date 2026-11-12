@@ -3,6 +3,7 @@
 
 import time
 import pytest
+import numpy as np
 import pyrealsense2 as rs
 from pytest_check import check
 import logging
@@ -178,6 +179,85 @@ def test_extrinsics_to_color_are_identity(test_device, depth_sensor):
     extrinsics = profile.get_extrinsics_to(color)
     check.equal([round(t, 6) for t in extrinsics.translation], [0, 0, 0])
     check.equal([round(r, 6) for r in extrinsics.rotation], [1, 0, 0, 0, 1, 0, 0, 0, 1])
+
+
+@pytest.mark.device_type_exclude("DDS")
+def test_mode_change_is_published_as_calibration_change(test_device, depth_sensor):
+    """Users caching calibration listen on calibration changes; by the time they hear of one, re-reading must
+    already return the new calibration."""
+    dev, _ = test_device
+    profile = depth_profile(depth_sensor)
+    raw_fx = profile.get_intrinsics().fx
+    color = next(iter(color_profiles(dev)), None)
+    if color is None:
+        pytest.skip("device has no dedicated color sensor")
+
+    heard = []
+    rs.calibration_change_device(dev).register_calibration_change_callback(
+        lambda status: heard.append((status, profile.get_intrinsics().fx, profile.get_extrinsics_to(color).translation)))
+    set_align_depth(depth_sensor, 1)
+
+    assert len(heard) == 1
+    status, fx, translation = heard[0]
+    check.equal(status, rs.calibration_status.successful)
+    check.not_equal(fx, raw_fx, "depth intrinsics were not updated before notifying")
+    check.equal([round(t, 6) for t in translation], [0, 0, 0])
+
+
+def texture_maps(dev, depth_sensor, pointclouds):
+    """Streams depth and color once and maps the same depth frame with each pointcloud, returning which depth
+    pixels are valid and each pointcloud's texture coordinates."""
+    color_sensor = next(s for s in dev.sensors if s.is_color_sensor())
+    depth = depth_profile(depth_sensor)
+    color = next((p for p in color_profiles(dev) if p.fps() == depth.fps()), None)
+    if color is None:
+        pytest.skip("no color profile at the depth frame rate")
+
+    sync = rs.syncer()
+    depth_sensor.open(depth)
+    color_sensor.open(color)
+    depth_sensor.start(sync)
+    color_sensor.start(sync)
+    try:
+        deadline = time.time() + MAX_TIME_TO_WAIT_FOR_FRAMES
+        while True:
+            frames = sync.wait_for_frames(MAX_TIME_TO_WAIT_FOR_FRAMES * 1000)
+            if frames.get_depth_frame() and frames.get_color_frame():
+                break
+            assert time.time() < deadline, "no frameset with both depth and color"
+        maps = []
+        for pc in pointclouds:
+            pc.map_to(frames.get_color_frame())
+            points = pc.calculate(frames.get_depth_frame())
+            valid = np.asanyarray(points.get_vertices()).view(np.float32).reshape(-1, 3)[:, 2] > 0
+            maps.append(np.asanyarray(points.get_texture_coordinates()).view(np.float32).reshape(-1, 2))
+        return valid, maps
+    finally:
+        depth_sensor.stop()
+        color_sensor.stop()
+        depth_sensor.close()
+        color_sensor.close()
+        time.sleep(MODE_SETTLE_TIME)  # the device rejects enabling the mode right after a stream closes
+
+
+@pytest.mark.device_type_exclude("DDS")
+def test_pointcloud_follows_the_mode(test_device, depth_sensor):
+    """A pointcloud that already mapped raw depth must drop that calibration once aligned depth is on,
+    and texture the same depth frame exactly as a new pointcloud does."""
+    dev, _ = test_device
+    if not color_profiles(dev):
+        pytest.skip("device has no dedicated color sensor")
+
+    kept = rs.pointcloud()
+    texture_maps(dev, depth_sensor, [kept])
+
+    set_align_depth(depth_sensor, 1)
+    valid, (kept_map, fresh_map) = texture_maps(dev, depth_sensor, [kept, rs.pointcloud()])
+    if not valid.any():
+        pytest.skip("no valid depth in the scene")
+    difference = np.abs(kept_map[valid] - fresh_map[valid]).max()
+    log.info("%d valid depth pixels, max texture-coordinate difference %g", valid.sum(), difference)
+    check.less(difference, 1e-6)
 
 
 def test_rejected_while_streaming(depth_sensor):

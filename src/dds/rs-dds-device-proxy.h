@@ -88,15 +88,6 @@ public:
     // revert the first sensor's streams to defaults unless the first is already streaming.
     bool start_sensors_when_opened() const override { return true; }
 
-    // calibration_change_device
-public:
-    void register_calibration_change_callback( rs2_calibration_change_callback_sptr callback ) override
-    {
-        _calib_changed_callbacks.insert( callback );
-    }
-
-private:
-    std::set< rs2_calibration_change_callback_sptr > _calib_changed_callbacks;
 
     // debug_interface
 private:

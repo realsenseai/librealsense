@@ -322,7 +322,8 @@ namespace rs2
         std::shared_ptr< rs2::colorizer > _ruler_colorizer;
 
         void set_export_popup(ImFont* large_font, ImFont* font, rect stream_rect, std::string& error_message, config_file& temp_cfg);
-        void init_depth_uid(int& selected_depth_source, std::vector<std::string>& depth_sources_str, std::vector<int>& depth_sources);
+        // Picks a 3D depth source when none is selected; returns how many depth streams can be one
+        size_t init_depth_uid();
         void init_labeled_points_uid();
         void draw_3d_labeled_points(const rect& viewer_rect, rs2::labeled_points labeled_points);
         // Label color legend of the labeled point cloud; (x, y) is the corner given by right / bottom
