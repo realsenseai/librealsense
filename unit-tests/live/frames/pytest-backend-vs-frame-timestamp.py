@@ -12,6 +12,7 @@ import time
 import threading
 import logging
 from rspy.snippets import is_dds_dev
+from rspy.known_fw_issues import skip_on_golden_d585_prototype
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -64,6 +65,7 @@ def _run_timestamp_check(sensor, profile, stream_name):
 
 def test_depth_backend_vs_frame_timestamp(test_device):
     dev, ctx = test_device
+    skip_on_golden_d585_prototype(dev)
 
     ds = dev.first_depth_sensor()
     dp = next(p for p in ds.profiles
