@@ -21,7 +21,7 @@ jobs:
       matrix:
         shard: ${{ fromJSON( github.event_name == 'pull_request' && '[0]' || '[0,1,2,3]' ) }}
     env:
-      SCOPE: src common tools examples third-party/realdds third-party/rsutils
+      SCOPE: include src common tools examples third-party/realdds third-party/rsutils
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
         with:
@@ -40,11 +40,12 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           git diff -U0 origin/${{ github.base_ref }}...HEAD -- $SCOPE \
-            | clang-tidy-diff-19.py -p1 -path build -j4 -quiet -iregex '.*\.(cpp|cc|h|hpp)' 2>&1 | tee clang-tidy.log || true
-          grep -q Traceback clang-tidy.log && exit 1
-          # Annotate the PR diff with each finding, and fail if there are any
-          sed -nE "s#^$GITHUB_WORKSPACE/([^:]+):([0-9]+):([0-9]+): (warning|error): (.*)#::error file=\1,line=\2,col=\3::\5#p" clang-tidy.log | sort -u
-          grep -qE ': (warning|error):' clang-tidy.log || exit 0
+            | clang-tidy-diff-19.py -clang-tidy-binary clang-tidy-19 -p1 -path build -j4 -quiet -iregex '.*\.(cpp|cc|h|hpp)' 2>&1 | tee clang-tidy.log || true
+          grep -qE 'Traceback|^Failed:|^Terminated by' clang-tidy.log && exit 1
+          # Annotate the PR diff with each finding, and fail if there are any; compile errors are not line-filtered, so they are skipped
+          grep -v '\[clang-diagnostic-error\]' clang-tidy.log > clang-tidy.findings.log || true
+          sed -nE "s#^$GITHUB_WORKSPACE/([^:]+):([0-9]+):([0-9]+): (warning|error): (.*)#::error file=\1,line=\2,col=\3::\5#p" clang-tidy.findings.log | sort -u
+          grep -qE ': (warning|error):' clang-tidy.findings.log || exit 0
           echo "For a false positive, add // NOLINT(<check-name>) on the flagged line, with the check name shown in [brackets]"
           exit 1
 
@@ -52,7 +53,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           files=$(jq -r '.[].file' build/compile_commands.json | grep -E "^$GITHUB_WORKSPACE/(${SCOPE// /|})/.*\.(cpp|cc)$" | sort -u | awk 'NR % 4 == ${{ matrix.shard }}')
-          run-clang-tidy-19 -p build -j4 -quiet $files > clang-tidy.log 2>&1 || true
+          run-clang-tidy-19 -clang-tidy-binary clang-tidy-19 -p build -j4 -quiet $files > clang-tidy.log 2>&1 || true
           grep -E ': (warning|error):' clang-tidy.log | sort -u > clang-tidy.findings.log || true
           echo "### clang-tidy: $(wc -l < clang-tidy.findings.log) findings" >> $GITHUB_STEP_SUMMARY
           grep -oE '\[[a-z][^]]*\]$' clang-tidy.findings.log | sort | uniq -c | sort -rn | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY
