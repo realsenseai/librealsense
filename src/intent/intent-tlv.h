@@ -86,6 +86,10 @@ inline void structure(const std::vector<Record> &records, unsigned level = 0) {
             const auto children = parse(r.value);
             if (r.type == rsintent::SENSOR)
                 require(!children.empty() && children.front().type == rsintent::SENSOR_ID);
+            if (r.type == rsintent::SENSOR)
+                for (const auto &child : children)
+                    if (child.type == rsintent::STREAM && (child.flags & 1U))
+                        require((r.flags & 1U) != 0U);
             if (recognized(r)) structure(children, level + 1);
         }
     }

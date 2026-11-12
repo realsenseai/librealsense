@@ -29,6 +29,8 @@ namespace librealsense
             std::shared_ptr<profile> resolve(std::shared_ptr<pipeline> pipe, const std::chrono::milliseconds& timeout = std::chrono::milliseconds(0));
             bool can_resolve(std::shared_ptr<pipeline> pipe);
             bool get_repeat_playback();
+            void enable_intent(bool enabled) { std::lock_guard<std::mutex> lock(_mtx); _enable_intent = enabled; }
+            bool intent_enabled() const { std::lock_guard<std::mutex> lock(_mtx); return _enable_intent; }
 
             //Non top level API
             std::shared_ptr<profile> get_cached_resolved_profile();
@@ -41,6 +43,7 @@ namespace librealsense
                 _enable_all_streams = other._enable_all_streams;
                 _resolved_profile = nullptr;
                 _playback_loop = other._playback_loop;
+                _enable_intent = other._enable_intent;
             }
         private:
             struct device_request
@@ -59,6 +62,7 @@ namespace librealsense
             std::map<std::pair<rs2_stream, int>, stream_profile> _stream_requests;
             mutable std::mutex _mtx;
             bool _enable_all_streams = false;
+            bool _enable_intent = false;
             std::shared_ptr<profile> _resolved_profile;
             bool _playback_loop = false;
             std::vector<std::pair<rs2_stream, int>> _streams_to_disable;

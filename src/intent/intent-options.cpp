@@ -11,8 +11,53 @@
 #include <src/ds/ds-private.h>
 #include <src/librealsense-exception.h>
 #include <src/hw-monitor.h>
+#include <rsutils/json.h>
 #include <src/uvc-sensor.h>
 namespace librealsense {
+void declare_pipeline_intent(device_interface &device,
+    const std::vector<std::shared_ptr<stream_profile_interface>> &profiles) {
+    composite_option_interface *option = nullptr, *statusOption = nullptr;
+    for (size_t i = 0; i < device.get_sensors_count(); ++i) {
+        auto &sensor = device.get_sensor(i);
+        if (sensor.supports_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT)) {
+            option = &sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT);
+            statusOption = &sensor.get_composite_option(RS2_COMPOSITE_OPTION_GLOBAL_INTENT_STATUS);
+            break;
+        }
+    }
+    if (!option || !statusOption)
+        throw invalid_value_exception("Global Intent is not supported by this device");
+    const auto status = statusOption->get_raw();
+    auto document = rsutils::json::parse(decode_intent_json(option->get_raw(), status));
+    document.erase("layout"); document.erase("status");
+    for (auto &sensor : document["sensors"]) {
+        sensor.erase("layout");
+        for (auto &stream : sensor["streams"]) {
+            stream.erase("layout");
+            const auto name = stream["stream"], index = stream["index"];
+            stream = {{"stream", name}, {"index", index}, {"state", "DISABLED"}, {"required", false}};
+        }
+    }
+    for (const auto &profile : profiles) {
+        const std::string name = rs2_stream_to_string(profile->get_stream_type());
+        bool matched = false;
+        for (auto &sensor : document["sensors"])
+            for (auto &stream : sensor["streams"]) {
+                if (stream["stream"] != name || stream["index"] != profile->get_stream_index()) continue;
+                stream.erase("state");
+                stream["format"] = rs2_format_to_string(profile->get_format());
+                stream["fps"] = profile->get_framerate();
+                const auto video = dynamic_cast<const video_stream_profile_interface *>(profile.get());
+                stream["width"] = video ? video->get_width() : 0;
+                stream["height"] = video ? video->get_height() : 0;
+                stream["required"] = true;
+                matched = true;
+            }
+        if (!matched) throw invalid_value_exception("Resolved SDK stream/index is absent from FW Intent capabilities: " + name);
+    }
+    const auto wire = encode_intent_json(document.dump(), status);
+    option->set_raw(wire.data(), wire.size());
+}
 namespace {
 class intent_option : public composite_option_interface {
     std::weak_ptr<uvc_sensor> _sensor;
@@ -26,8 +71,8 @@ class intent_option : public composite_option_interface {
     intent_option(std::shared_ptr<uvc_sensor> sensor, std::shared_ptr<hw_monitor> monitor,
                   bool status, uint16_t sku = 0)
         : _sensor(sensor), _monitor(monitor), _status(status), _sku(sku) {}
-    std::vector<uint8_t> read(uint8_t opcode, size_t expected) const {
-        auto wire = _monitor->send(command(opcode));
+    std::vector<uint8_t> read(uint8_t opcode, size_t expected, uint32_t selector = 0) const {
+        auto wire = _monitor->send(command(opcode, selector));
         if (wire.size() != expected)
             throw std::runtime_error("Intent HWMC response has an invalid length");
         return wire;
@@ -50,9 +95,11 @@ class intent_option : public composite_option_interface {
         std::vector<uint8_t> payload(static_cast<const uint8_t *>(data), static_cast<const uint8_t *>(data) + size);
         auto version = read(rsintent::HWMC_GET_INTENT_STATUS, rsintent::status_size);
         auto firmware = read(rsintent::HWMC_GET_INTENT, rsintent::wire_size);
+        auto discovery = read(rsintent::HWMC_GET_INTENT, rsintent::wire_size, 2U);
+        decode_intent_capabilities(discovery);
         // Raw composite-option callers follow the same version policy as the JSON API.
         const auto document = decode_intent_json(payload, version);
-        payload = encode_intent_json(document, version, firmware);
+        payload = encode_intent_json(document, version, firmware, discovery);
         std::set<unsigned> reported;
         for (const auto &s : intent_tlv::body(firmware))
             if (s.type == rsintent::SENSOR)

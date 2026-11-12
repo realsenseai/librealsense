@@ -55,15 +55,34 @@ void version(const json &value, uint8_t &minor, uint8_t &patch) {
     patch = static_cast<uint8_t>(components[2]);
 }
 const rsintent::BranchDefinition &definition(const json &stream) {
+    if (stream.contains("stream")) {
+        const auto name = stream.at("stream").get<std::string>();
+        const unsigned index = integer(stream, "index", 255);
+        for (const auto &b : rsintent::branches)
+            if (name == b.sdk_name && index == b.sdk_index) return b;
+        throw std::invalid_argument("Intent: unknown SDK stream/index " + name);
+    }
     const auto name = stream.at("branch").get<std::string>();
-    for (const auto &b : rsintent::branches)
-        if (name == b.name)
-            return b;
+    for (const auto &b : rsintent::branches) if (name == b.name) return b;
     throw std::invalid_argument("Intent: unknown branch " + name);
+}
+uint32_t formatId(const std::string &name) {
+    for (const auto &f : rsintent::sdk_formats)
+        if (name == f.name) return f.format;
+    if (name.size() <= 4U && !name.empty()) {
+        auto text = name; text.resize(4U, ' ');
+        const uint32_t value = rsintent::read32(reinterpret_cast<const uint8_t *>(text.data()));
+        for (const auto &f : rsintent::sdk_formats) if (f.format == value) return value;
+    }
+    throw std::invalid_argument("Intent: unknown SDK format " + name);
+}
+std::string formatName(uint32_t value) {
+    for (const auto &f : rsintent::sdk_formats) if (f.format == value) return f.name;
+    throw std::invalid_argument("Intent: unknown semantic format");
 }
 unsigned sensorId(const std::string &name) {
     for (const auto &s : rsintent::sensors)
-        if (name == s.name)
+        if (name == s.sdk_name || name == s.name)
             return s.id;
     return 0U;
 }
@@ -121,6 +140,7 @@ std::vector<intent_tlv::Record> applyLayouts(const json &j, std::vector<intent_t
             require(match < records.size() && consumed.insert(match).second);
             Record r = records[match];
             require((flags & 2U) == (r.flags & 2U));
+            require(!(r.flags & 1U) || (flags & 1U));
             r.flags = flags;
             result.push_back(r);
         }
@@ -235,7 +255,8 @@ void attachLayouts(json &j, const std::vector<intent_tlv::Record> &records, unsi
 }
 } // namespace
 std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vector<uint8_t> &status,
-                                       const std::vector<uint8_t> &firmware) {
+                                       const std::vector<uint8_t> &firmware,
+                                       const std::vector<uint8_t> &discovery) {
     const json j = json::parse(text);
     if (!status.empty() && (status.size() != rsintent::status_size || status[0] != rsintent::major ||
                            status[3] > rsintent::READ_ONLY))
@@ -274,7 +295,9 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
             if (!streams.is_array())
                 throw std::invalid_argument("Intent: streams must be an array");
             for (const auto &entry : streams) {
-                keys(entry, {"branch", "state", "format", "width", "height", "fps", "layout"});
+                keys(entry, {"stream", "index", "branch", "state", "format", "width", "height", "fps", "layout", "required"});
+                if (entry.contains("stream") && entry.contains("branch"))
+                    throw std::invalid_argument("Intent: use one stream identity form");
                 const auto &def = definition(entry);
                 if (def.sensor != id || !seen.insert(def.id).second ||
                     model.count == rsintent::max_streams)
@@ -283,16 +306,23 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
                 s.sensor = def.sensor;
                 s.branch = def.id;
                 s.enabled = !entry.contains("state");
+                if (entry.contains("required") && !entry.at("required").is_boolean())
+                    throw std::invalid_argument("Intent: required must be boolean");
+                s.required = entry.value("required", s.enabled);
+                s.optional = s.enabled && !s.required;
+                if (s.optional && rsintent::recordCritical(rsintent::STREAM))
+                    throw std::invalid_argument("Intent: dictionary-required stream cannot be optional");
                 if (!s.enabled) {
-                    if (entry.at("state") != "DISABLED" || entry.size() != (entry.contains("layout") ? 3U : 2U))
+                    if (entry.at("state") != "DISABLED" || entry.contains("format") || entry.contains("width") ||
+                        entry.contains("height") || entry.contains("fps"))
                         throw std::invalid_argument(
                             "Intent: disabled stream has profile attributes");
                 } else {
-                    std::string format = entry.at("format").get<std::string>();
-                    if (format.empty() || format.size() > 4U)
-                        throw std::invalid_argument("Intent: format must be a FourCC");
-                    format.resize(4U, ' ');
-                    s.format = rsintent::read32(reinterpret_cast<const uint8_t *>(format.data()));
+                    s.format = formatId(entry.at("format").get<std::string>());
+                    bool supported = false;
+                    for (const auto &f : rsintent::formats)
+                        supported |= f.branch == s.branch && f.format == s.format;
+                    if (!supported) throw std::invalid_argument("Intent: format is not defined for this stream");
                     s.width = static_cast<uint16_t>(integer(entry, "width", 65535U));
                     s.height = static_cast<uint16_t>(integer(entry, "height", 65535U));
                     s.fps = static_cast<uint16_t>(integer(entry, "fps", 65535U));
@@ -332,9 +362,100 @@ std::vector<uint8_t> encode_intent_json(const std::string &text, const std::vect
         intent_tlv::structure(records);
         if (!status.empty()) warn_unsupported(records, status[1], minor);
         if (!firmware.empty()) warn_unreported(records, intent_tlv::body(firmware));
+        if (!discovery.empty()) {
+            const auto report = json::parse(decode_intent_capabilities(discovery));
+            const auto warn = [&](uint8_t type) {
+                bool found = false;
+                for (const auto &id : report["supported_record_ids"]) found |= id == type;
+                if (!found) LOG_WARNING("Intent: FW does not report record/attribute " << unsigned(type)
+                                        << "; request forwarded unchanged for FW validation");
+            };
+            for (const auto &sensor : records) {
+                warn(sensor.type);
+                if (sensor.type != rsintent::SENSOR) continue;
+                for (const auto &stream : intent_tlv::parse(sensor.value)) {
+                    warn(stream.type);
+                    if (stream.type == rsintent::STREAM) {
+                        const unsigned branch = intent_tlv::id(stream);
+                        bool branchReported = false;
+                        for (const auto &entry : report["branches"]) {
+                            if (entry["sensor"] != intent_tlv::id(sensor) || entry["id"] != branch) continue;
+                            branchReported = true;
+                            for (const auto &attribute : intent_tlv::parse(stream.value)) {
+                                if (attribute.type != rsintent::FORMAT || attribute.value.size() != 4U) continue;
+                                const uint32_t format = rsintent::read32(attribute.value.data());
+                                bool supported = false;
+                                for (const auto &value : entry["formats"]) supported |= value == format;
+                                if (!supported) LOG_WARNING("Intent: FW does not report format " << format
+                                                            << " for branch " << branch << "; request forwarded unchanged");
+                            }
+                        }
+                        if (!branchReported) LOG_WARNING("Intent: FW does not report branch " << branch
+                                                        << "; request forwarded unchanged");
+                        for (const auto &attribute : intent_tlv::parse(stream.value)) {
+                            warn(attribute.type);
+                            bool found = false;
+                            for (const auto &id : report["supported_stream_attribute_ids"]) found |= id == attribute.type;
+                            if (!found) LOG_WARNING("Intent: FW does not report stream attribute " << unsigned(attribute.type)
+                                                    << "; request forwarded unchanged");
+                        }
+                    }
+                }
+            }
+        }
         wire = intent_tlv::transfer(wire, records);
     }
     return wire;
+}
+std::string decode_intent_capabilities(const std::vector<uint8_t> &data) {
+    if (data.size() != rsintent::wire_size || data[0] != rsintent::major || data[3] != 1U ||
+        data[12] || data[13] || data[14] || data[15])
+        throw std::invalid_argument("Intent: invalid capability report header");
+    const size_t end = rsintent::read16(data.data() + 6);
+    size_t pos = 16U;
+    if (end < pos || end > data.size()) throw std::invalid_argument("Intent: truncated capability report");
+    const auto need = [&](size_t size) {
+        if (pos > end || size > end - pos) throw std::invalid_argument("Intent: truncated capability report");
+    };
+    json report = {{"sku", rsintent::read16(data.data() + 4)},
+                   {"version", std::to_string(data[0]) + "." + std::to_string(data[1]) + "." + std::to_string(data[2])},
+                   {"supported_record_ids", json::array()}, {"supported_stream_attribute_ids", json::array()},
+                   {"sensors", json::array()}, {"branches", json::array()}};
+    for (const auto &field : {std::make_pair(8U, "supported_record_ids"), std::make_pair(9U, "supported_stream_attribute_ids")}) {
+        std::set<uint8_t> seen;
+        need(data[field.first]);
+        for (unsigned i = 0; i < data[field.first]; ++i) {
+            const auto id = data[pos++];
+            if (!id || !seen.insert(id).second) throw std::invalid_argument("Intent: duplicate capability ID");
+            report[field.second].push_back(id);
+        }
+    }
+    std::set<uint8_t> sensorIds, branchIds;
+    for (unsigned i = 0; i < data[10]; ++i) {
+        need(2U);
+        const uint8_t id = data[pos++];
+        if (!id || !sensorIds.insert(id).second) throw std::invalid_argument("Intent: invalid capability sensor");
+        report["sensors"].push_back({{"id", id}, {"since", data[pos++]}});
+    }
+    for (unsigned i = 0; i < data[11]; ++i) {
+        need(4U);
+        const uint8_t sensor = data[pos++], branch = data[pos++], count = data[pos++], since = data[pos++];
+        if (!sensorIds.count(sensor) || !branch || !branchIds.insert(branch).second)
+            throw std::invalid_argument("Intent: invalid capability branch");
+        json entry = {{"sensor", sensor}, {"id", branch}, {"since", since}, {"formats", json::array()}};
+        std::set<uint32_t> formats;
+        need(size_t(count) * 4U);
+        for (unsigned n = 0; n < count; ++n) {
+            const uint32_t value = rsintent::read32(data.data() + pos); pos += 4U;
+            if (!formats.insert(value).second) throw std::invalid_argument("Intent: duplicate capability format");
+            entry["formats"].push_back(value);
+        }
+        report["branches"].push_back(entry);
+    }
+    if (pos != end) throw std::invalid_argument("Intent: invalid capability report length");
+    for (; pos < data.size(); ++pos)
+        if (data[pos]) throw std::invalid_argument("Intent: nonzero capability padding");
+    return report.dump();
 }
 std::string decode_intent_json(const std::vector<uint8_t> &wire,
                                const std::vector<uint8_t> &status) {
@@ -357,27 +478,23 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
     size_t emitted = 0;
     for (const auto &definition : rsintent::sensors) {
         const unsigned id = definition.id;
-        json sensor = {{"sensor", definition.name}, {"streams", json::array()}};
+        json sensor = {{"sensor", definition.sdk_name}, {"streams", json::array()}};
         for (size_t i = 0; i < request.model.count; ++i) {
             const auto &s = request.model.streams[i];
             if (s.sensor != id)
                 continue;
-            const char *name = nullptr;
+            const rsintent::BranchDefinition *branch = nullptr;
             for (const auto &b : rsintent::branches)
                 if (b.id == s.branch)
-                    name = b.name;
-            if (!name)
+                    branch = &b;
+            if (!branch)
                 throw std::invalid_argument("Intent: firmware branch requires a newer SDK");
-            json stream = {{"branch", name}};
+            json stream = {{"stream", branch->sdk_name}, {"index", branch->sdk_index},
+                           {"required", s.required}};
             if (!s.enabled)
                 stream["state"] = "DISABLED";
             else {
-                uint8_t bytes[4];
-                rsintent::write32(bytes, s.format);
-                std::string format(reinterpret_cast<char *>(bytes), 4U);
-                while (!format.empty() && format.back() == ' ')
-                    format.pop_back();
-                stream["format"] = format;
+                stream["format"] = formatName(s.format);
                 stream["width"] = s.width;
                 stream["height"] = s.height;
                 stream["fps"] = s.fps;
@@ -401,7 +518,7 @@ std::string decode_intent_json(const std::vector<uint8_t> &wire,
                    {"error_rule", rsintent::read16(status.data() + 14)},
                    {"error_detail", rsintent::read16(status.data() + 16)},
                    {"source", status[5] ? "DEFAULT" : "CURRENT"},
-                   {"active_mask", rsintent::read16(status.data() + 6)},
+                   {"active_mask", rsintent::read32(status.data() + rsintent::status_active_mask_offset)},
                    {"sku", rsintent::read16(status.data() + 8)},
                    {"rule_revision", rsintent::read32(status.data() + 20)},
                    {"reasons", json::array()}};

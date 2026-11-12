@@ -2700,6 +2700,15 @@ void rs2_config_enable_all_stream(rs2_config* config, rs2_error ** error) BEGIN_
 }
 HANDLE_EXCEPTIONS_AND_RETURN(, config)
 
+void rs2_config_enable_intent(rs2_config* config, int enabled, rs2_error ** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(config);
+    if (enabled != 0 && enabled != 1)
+        throw librealsense::invalid_value_exception("Intent enable must be 0 or 1");
+    config->config->enable_intent(enabled != 0);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, config, enabled)
+
 void rs2_config_enable_device(rs2_config* config, const char* serial, rs2_error ** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(config);

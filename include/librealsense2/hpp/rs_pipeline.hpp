@@ -159,6 +159,16 @@ namespace rs2
             rs2_config_enable_stream(_config.get(), stream_type, stream_index, width, height, format, framerate, &e);
             error::handle(e);
         }
+        /** Declare resolved profiles as required Intent before open/start.
+         * Disabled by default; rejection fails start rather than falling back.
+         * Stop does not implicitly clear the device-wide declaration.
+         */
+        void enable_intent(bool enabled = true)
+        {
+            rs2_error* e = nullptr;
+            rs2_config_enable_intent(_config.get(), enabled ? 1 : 0, &e);
+            error::handle(e);
+        }
 
         /**
         * Stream type and possibly also stream index. Other parameters are resolved internally.

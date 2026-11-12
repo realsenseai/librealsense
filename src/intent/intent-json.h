@@ -8,7 +8,9 @@ namespace librealsense {
 // STATUS and GET_CUR drive compatibility warnings, never trimming or version downgrade.
 std::vector<uint8_t> encode_intent_json(const std::string &text,
                                        const std::vector<uint8_t> &status = {},
-                                       const std::vector<uint8_t> &firmware = {});
+                                       const std::vector<uint8_t> &firmware = {},
+                                       const std::vector<uint8_t> &discovery = {});
+std::string decode_intent_capabilities(const std::vector<uint8_t> &discovery);
 std::string decode_intent_json(const std::vector<uint8_t> &wire,
                                const std::vector<uint8_t> &status);
 // Names last_result and every REJECT_REASON of a GLOBAL_INTENT_STATUS transfer (design 9.6).
@@ -22,4 +24,7 @@ std::string intent_rejection(device_interface &device) noexcept;
 // Call only from a catch block: rethrows, appending intent_rejection() to backend errors.
 [[noreturn]] void rethrow_with_intent_rejection(device_interface &device);
 void register_intent_options(d500_depth_sensor &sensor, std::shared_ptr<hw_monitor> monitor);
+class stream_profile_interface;
+void declare_pipeline_intent(device_interface &device,
+    const std::vector<std::shared_ptr<stream_profile_interface>> &profiles);
 } // namespace librealsense

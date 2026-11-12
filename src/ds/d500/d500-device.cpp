@@ -884,7 +884,8 @@ namespace librealsense
 
     void d500_device::register_dpp_embedded_filters()
     {
-        if (_pid == ds::D585F_PID || _pid == ds::D585_2C_PROTO_PID
+        if (_pid == ds::D585_2C_PID || _pid == ds::D585_3C_PID ||
+            _pid == ds::D585F_PID || _pid == ds::D585_2C_PROTO_PID
                                 || _pid == ds::D585_3C_PROTO_PID)
             register_intent_options(dynamic_cast<d500_depth_sensor&>(get_depth_sensor()), _hw_monitor);
         // MIPI publishes these CIDs later than USB. Older firmware on either transport ignores

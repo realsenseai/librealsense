@@ -79,6 +79,15 @@ extern "C" {
     * \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
     */
     void rs2_config_enable_all_stream(rs2_config* config, rs2_error ** error);
+    /**
+    * Opt in to declaring resolved pipeline profiles as required device-wide Intent before open/start.
+    * Disabled by default. Unsupported firmware or a rejected SET fails start without legacy fallback.
+    * This does not start streaming immediately or clear the declaration on stop.
+    * \param[in] config Config to update
+    * \param[in] enabled 0 to preserve legacy behavior, 1 to enable Intent declaration
+    * \param[out] error Receives an error for an invalid config or enabled value
+    */
+    void rs2_config_enable_intent(rs2_config* config, int enabled, rs2_error ** error);
 
     /**
     * Select a specific device explicitly by its serial number, to be used by the pipeline.

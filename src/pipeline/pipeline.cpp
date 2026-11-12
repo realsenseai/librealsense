@@ -8,6 +8,7 @@
 #include "media/record/record_device.h"
 #include <src/proc/syncer-processing-block.h>
 #include <src/core/frame-callback.h>
+#include <src/intent/intent-json.h>
 
 #include <rsutils/string/from.h>
 
@@ -100,6 +101,8 @@ namespace librealsense
             if (!profile->_multistream.get_profiles().size())
                 throw librealsense::wrong_api_call_sequence_exception("No streams are selected!");
 
+            if (conf->intent_enabled())
+                declare_pipeline_intent(*profile->get_device(), profile->get_active_streams());
             auto synced_streams_ids = on_start(profile);
 
             rs2_frame_callback_sptr callbacks = get_callback(synced_streams_ids);
