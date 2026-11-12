@@ -465,6 +465,9 @@ namespace librealsense
 
     float librealsense::gyro_sensitivity_option::query() const
     {
+        // Until the user sets a value, follow the FW (like DDS and GMSL do)
+        if( auto strong = _sensor.lock() )
+            return strong->query_imu_sensitivity( RS2_STREAM_GYRO );
         return _value;
     }
 

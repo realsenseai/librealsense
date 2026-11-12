@@ -5,6 +5,7 @@ import math
 import pytest
 import platform
 import pyrealsense2 as rs
+from imu_sensitivity_helpers import restore_sensitivity
 import logging
 log = logging.getLogger(__name__)
 
@@ -17,6 +18,16 @@ pytestmark = [
 GRAVITY = 9.80665  # m/s^2, ~1000 mg
 GRAVITY_TOLERANCE = 0.5
 FRAMES_TO_CHECK = 20
+
+
+
+@pytest.fixture(autouse=True)
+def restore_fw_sensitivity(test_device):
+    dev, ctx = test_device
+    ms = dev.first_motion_sensor()
+    original = {rs.option.accel_sensitivity: ms.get_option(rs.option.accel_sensitivity)} if ms.supports(rs.option.accel_sensitivity) else {}
+    yield
+    restore_sensitivity(dev, ctx, original)
 
 
 def test_accel_sensitivity_all_levels(test_device):

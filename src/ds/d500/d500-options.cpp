@@ -47,6 +47,8 @@ namespace librealsense
         , _value( 0.f )
         , _sensor( sensor )
     {
+        if( auto hid = _sensor.lock() )
+            hid->set_default_imu_sensitivity( RS2_STREAM_ACCEL, _value );
     }
 
     void d500_hid_accel_sensitivity_option::set( float value )
@@ -62,6 +64,14 @@ namespace librealsense
         sensor->set_imu_sensitivity( RS2_STREAM_ACCEL, value );
         _value = value;
         _record_action( *this );
+    }
+
+    float d500_hid_accel_sensitivity_option::query() const
+    {
+        // Until the user sets a value, follow the FW (like DDS and GMSL do)
+        if( auto sensor = _sensor.lock() )
+            return sensor->query_imu_sensitivity( RS2_STREAM_ACCEL );
+        return _value;
     }
 
     bool d500_hid_accel_sensitivity_option::is_read_only() const
