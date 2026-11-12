@@ -179,8 +179,8 @@ namespace librealsense
               || _pid == ds::D585_2C_PID || _pid == ds::D585_3C_PID || _pid == ds::D585F_PID
               || _pid == ds::D585_2C_PROTO_PID || _pid == ds::D585_3C_PROTO_PID )
         {
-            // D585/D585S specific - Bosch BMI085
-            _def_extr = { { 1, 0, 0, 0, 1, 0, 0, 0, 1 },{ -0.0195f, 0.0f, -0.0114f } };
+            // D585/D585S specific - Bosch BMI085/BMI088
+            _def_extr = { { 1, 0, 0, 0, 1, 0, 0, 0, 1 },{ -0.0195f, 0.0f, 0.0135f } };
             _imu_2_depth_rot = { { -1,0,0 },{ 0,-1,0 },{ 0,0,1 } };
         }
         else // unmapped configurations
