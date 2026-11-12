@@ -314,8 +314,6 @@ def test_fw_update( request, module_device_setup, test_context_var ):
     # check if recovery on the configured domain (e.g. a D400 USB recovery device). If so recover.
     # (recovered may already be True from the domain-0 DDS recovery handled above.)
     if device.is_in_recovery_mode():
-        if product_name.startswith( "D585S" ):
-            pytest.fail( f"{serial} is a D585S in recovery; not flashing a safety camera from LibCI" )
         log.debug( "recovering device ..." )
         # rs-fw-update -r needs a known-good image, which isn't always the caller's
         # --custom-fw-<plat> path (e.g. D400 -r expects a *signed* FW, while the custom

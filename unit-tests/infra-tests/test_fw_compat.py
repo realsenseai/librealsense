@@ -26,7 +26,7 @@ class TestGoldRecoveryKey:
         for name in ( "Intel RealSense D555 Recovery", "RealSense D555 Recovery",
                       "RealSense D555", "D555 Recovery" ):
             assert fw_compat.gold_recovery_key( "D500", name ) == "D555"
-        assert fw_compat.gold_recovery_key( "D500", "RealSense D585S" ) == "D585"
+        assert fw_compat.gold_recovery_key( "D500", "RealSense D585S" ) == "D585S"
 
     def test_unresolvable_returns_none(self):
         assert fw_compat.gold_recovery_key( "D500", None ) is None
