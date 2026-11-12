@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "pybind11-stubgen==2.5.5"]
 build-backend = "hatchling.build"
 
 [project]
@@ -50,7 +50,8 @@ artifacts = [
     "pyrealsense2/*.pyd",
     "pyrealsense2/*.dll",
     "pyrealsense2/*.dylib",
-    "pyrealsense2/*.dylib.*"
+    "pyrealsense2/*.dylib.*",
+    "pyrealsense2/pyrealsense2/*.pyi"
 ]
 packages = ["pyrealsense2"]
 
