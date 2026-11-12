@@ -5,98 +5,65 @@ on:
     branches: ['**']
   pull_request:
     branches: ['**']
+  workflow_dispatch:
     
 permissions: read-all
 
 jobs:
-  CppCheck:
-    name: CppCheck
-    timeout-minutes: 30
-    runs-on: ubuntu-22.04
+  ClangTidy:
+    name: clang-tidy
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    # PRs check only the lines they change and fail on any finding; development pushes and manual runs scan everything as a report
+    if: github.event_name != 'push' || github.ref == 'refs/heads/development'
+    strategy:
+      # Full scans are split across parallel jobs to keep wall time down
+      matrix:
+        shard: ${{ fromJSON( github.event_name == 'pull_request' && '[0]' || '[0,1,2,3]' ) }}
+    env:
+      SCOPE: include src common tools examples third-party/realdds third-party/rsutils
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+        with:
+          fetch-depth: 0
 
-      - name: Install 
-        shell: bash
+      - name: Install
         run: |
-          sudo apt-get update;
-          sudo apt-get install -qq cppcheck;
-        
-      - name: Run
-        shell: bash
-        #Selected run options:
-        #  ./xxx            :   Folders to scan
-        #  --quiet          :   Don't show current checked configuration in log
-        #  --std=c++11      :   Use C++11 standard (default but worth mentioning)
-        #  --xml            :   Output in XML format
-        #  -j4              :   Run parallel jobs for a faster scan. current HW is 2 core (https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners) using 4 to future proof
-        #  --enable         :   Additional check to run. options are [all, warning, style, performance, protability, information, unusedFunction, missingInclude]
-        #  -I               :   Include directories
-        #  -i               :   Ignore directories. Ignore third-party libs that we don't want to check
-        #  --suppress       :   Don't issue errors about files matching the expression (when -i for folders is not enough)
-        #  --force          :   Check all configurations, takes a very long time (~2 hours) and did not find additional errors. Removed.
-        #  --max-configs=6  :   Using less configuration permutations (default is 12) to reduce run time. Detects less errors. Removed.
-        #  -Dxxx            :   preprocessor configuration to use. Relevant flags taken from build on Ubuntu.
-        run: > 
-          cppcheck ./src ./include ./common ./tools ./examples ./third-party/realdds ./third-party/rsutils
-          --quiet --std=c++11 --xml -j4 --enable=warning
-          -I./src -I./include -I./third-party/rsutils/include -I./common
-          -i./src/mf -i./src/uvc -i./src/win -i./src/winusb --suppress=*:third-party/json.hpp
-          -DBUILD_WITH_DDS -DHWM_OVER_XU -DRS2_USE_V4L2_BACKEND -DUNICODE -DUSING_UDEV -DCHECK_FOR_UPDATES -D__linux__
-          &> cppcheck_run.log
+          sudo apt-get update
+          sudo apt-get install -qq clang-19 clang-tidy-19 libcurl4-openssl-dev libudev-dev libusb-1.0-0-dev libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev
 
-      - name: Diff
-        id: diff-step
-        continue-on-error: true 
-        shell: bash
+      - name: Configure
         run: |
-          python3 .github/workflows/cppcheck-parse.py --severity E cppcheck_run.log | sort --key 3 > cppcheck_run.parsed.log
-          python3 .github/workflows/cppcheck-parse.py --severity E .github/workflows/cppcheck_run.log | sort --key 3 > cppcheck_run.parsed.golden
-          diff cppcheck_run.parsed.golden cppcheck_run.parsed.log \
-            &&  echo "No diffs found in cppcheck_run.log"
+          CC=clang-19 CXX=clang++-19 cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_WITH_DDS=ON -DCHECK_FOR_UPDATES=ON -DENABLE_STATS=ON
 
-      - name: Ensure cppcheck_run.parsed.log was updated
-        id: diff-parsed-step
-        continue-on-error: true 
-        shell: bash
+      - name: Analyze changed lines
+        if: github.event_name == 'pull_request'
         run: |
-          diff cppcheck_run.parsed.golden .github/workflows/cppcheck_run.parsed.log \
-            &&  echo "No diffs found in cppcheck_run.parsed.log"
+          git diff -U0 origin/${{ github.base_ref }}...HEAD -- $SCOPE \
+            | clang-tidy-diff-19.py -clang-tidy-binary clang-tidy-19 -p1 -path build -j4 -quiet -iregex '.*\.(cpp|cc|h|hpp)' 2>&1 | tee clang-tidy.log || true
+          grep -qE 'Traceback|^Failed:|^Terminated by' clang-tidy.log && exit 1
+          # Annotate the PR diff with each finding, and fail if there are any; compile errors are not line-filtered, so they are skipped
+          grep -v '\[clang-diagnostic-error\]' clang-tidy.log > clang-tidy.findings.log || true
+          sed -nE "s#^$GITHUB_WORKSPACE/([^:]+):([0-9]+):([0-9]+): (warning|error): (.*)#::error file=\1,line=\2,col=\3::\5#p" clang-tidy.findings.log | sort -u
+          grep -qE ': (warning|error):' clang-tidy.findings.log || exit 0
+          echo "For a false positive, add // NOLINT(<check-name>) on the flagged line, with the check name shown in [brackets]"
+          exit 1
+
+      - name: Analyze full tree
+        if: github.event_name != 'pull_request'
+        run: |
+          files=$(jq -r '.[].file' build/compile_commands.json | grep -E "^$GITHUB_WORKSPACE/(${SCOPE// /|})/.*\.(cpp|cc)$" | sort -u | awk 'NR % 4 == ${{ matrix.shard }}')
+          run-clang-tidy-19 -clang-tidy-binary clang-tidy-19 -p build -j4 -quiet $files > clang-tidy.log 2>&1 || true
+          grep -E ': (warning|error):' clang-tidy.log | sort -u > clang-tidy.findings.log || true
+          echo "### clang-tidy: $(wc -l < clang-tidy.findings.log) findings" >> $GITHUB_STEP_SUMMARY
+          grep -oE '\[[a-z][^]]*\]$' clang-tidy.findings.log | sort | uniq -c | sort -rn | sed 's/^/    /' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload logs
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
-        with: 
-          name: cppcheck_log
-          path: |
-            cppcheck_run.log
-            cppcheck_run.parsed.log
-  
-      - name: Provide correct exit status
-        shell: bash
-        run: |
-          ERROR_COUNT=$(grep cppcheck_run.log -e "severity=\"error\"" -c)  || ERROR_COUNT=0
-          EXPECTED_ERROR_COUNT=$(grep .github/workflows/cppcheck_run.log -e "severity=\"error\"" -c)  || EXPECTED_ERROR_COUNT=0
-          if [ $ERROR_COUNT -eq $EXPECTED_ERROR_COUNT ]
-          then
-            echo "cppcheck_run succeeded, found" $ERROR_COUNT "errors, as expected"
-            if [ ${{steps.diff-step.outcome}} == "failure" ]
-            then
-               echo "however, the ---> DIFF FAILED <---"
-            elif [ ${{steps.diff-parsed-step.outcome}} == "failure" ]
-            then
-               echo "however, the ---> PARSED log was not UPDATED <---"
-            else
-               exit 0
-            fi
-          elif [ $ERROR_COUNT -lt $EXPECTED_ERROR_COUNT ]
-          then
-            echo "cppcheck_run ---> SUCCEEDED <--- but found" $ERROR_COUNT "errors when expecting" $EXPECTED_ERROR_COUNT
-          else
-            echo "cppcheck_run ---> FAILED <--- with" $ERROR_COUNT "errors; expecting" $EXPECTED_ERROR_COUNT
-          fi
-          echo "see the diff step above, or the 'cppcheck_log' artifact (under Summary) for details"
-          echo "commit all files in the artifact to .github/workflows/ if these are valid results"
-          exit 1
+        with:
+          name: clang-tidy-log-${{ matrix.shard }}
+          path: clang-tidy*.log
 #---------------------------------------------------------------------------------------------------#
   ValgrindCheck:
     name: Valgrind Memory Leak Check
