@@ -403,6 +403,25 @@ namespace librealsense
         std::vector< std::tuple< std::weak_ptr< option >, float, std::string > > _gating_options;
     };
 
+    // Read-only while is_locked() holds; set() then throws reason instead of reaching the device.
+    class locked_option : public proxy_option
+    {
+    public:
+        locked_option( std::shared_ptr< option > proxy, std::function< bool() > is_locked, std::string reason )
+            : proxy_option( std::move( proxy ) )
+            , _is_locked( std::move( is_locked ) )
+            , _reason( std::move( reason ) )
+        {
+        }
+
+        void set( float value ) override;
+        bool is_read_only() const override { return _is_locked() || proxy_option::is_read_only(); }
+
+    private:
+        std::function< bool() > _is_locked;
+        std::string _reason;
+    };
+
 
     /** \brief class provided a control
     * that changes min distance value when changing max distance value */
