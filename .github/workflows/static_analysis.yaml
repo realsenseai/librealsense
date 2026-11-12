@@ -40,6 +40,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           git diff -U0 origin/${{ github.base_ref }}...HEAD -- $SCOPE \
+          grep -q Traceback clang-tidy.log && exit 1
             | clang-tidy-diff-19.py -p1 -path build -j4 -quiet -iregex '.*\.(cpp|cc|h|hpp)' 2>&1 | tee clang-tidy.log || true
           # Annotate the PR diff with each finding, and fail if there are any
           sed -nE "s#^$GITHUB_WORKSPACE/([^:]+):([0-9]+):([0-9]+): (warning|error): (.*)#::error file=\1,line=\2,col=\3::\5#p" clang-tidy.log | sort -u
