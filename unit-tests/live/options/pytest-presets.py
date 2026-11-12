@@ -5,7 +5,7 @@ import pytest
 import pyrealsense2 as rs
 import time
 import logging
-from rspy.snippets import is_dds_dev
+from rspy.stopwatch import Stopwatch
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -17,6 +17,21 @@ pytestmark = [
 
 
 _module_state = {}
+
+# A DDS device (e.g. D555) handles a command asynchronously:
+# reading the option right after setting it can return the old value.
+OPTION_APPLY_TIMEOUT = 10  # [sec]
+
+
+def _wait_for_option(sensor, option, expected, timeout=OPTION_APPLY_TIMEOUT):
+    """Poll until `option` reads `expected`, up to `timeout` seconds. Returns the last value read."""
+    stopwatch = Stopwatch()
+    value = sensor.get_option(option)
+    while value != expected and stopwatch.get_elapsed() < timeout:
+        time.sleep(0.1)
+        value = sensor.get_option(option)
+    log.debug(f"{option} read {value} after {stopwatch.get_elapsed():.2f}s (expected {expected})")
+    return value
 
 
 def test_visual_preset_support(test_device_wrapped):
@@ -33,13 +48,11 @@ def test_set_presets(test_device_wrapped):
     dev, ctx = test_device_wrapped
     depth_sensor = dev.first_depth_sensor()
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.high_accuracy))
-    if is_dds_dev(dev):
-        time.sleep(1)  # Command is handled in the DDS device, not host. It may take some time to be fully handled.
-    assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.high_accuracy
+    assert _wait_for_option(depth_sensor, rs.option.visual_preset, rs.rs400_visual_preset.high_accuracy) \
+        == rs.rs400_visual_preset.high_accuracy
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.default))
-    if is_dds_dev(dev):
-        time.sleep(1)
-    assert depth_sensor.get_option(rs.option.visual_preset) == rs.rs400_visual_preset.default
+    assert _wait_for_option(depth_sensor, rs.option.visual_preset, rs.rs400_visual_preset.default) \
+        == rs.rs400_visual_preset.default
 
 
 def test_save_load_preset(test_device_wrapped):
@@ -89,7 +102,7 @@ def test_setting_color_options(test_device_wrapped):
         pytest.skip("Color sensor does not support hue option")
 
     color_sensor.set_option(rs.option.hue, 123)
-    assert color_sensor.get_option(rs.option.hue) == 123
+    assert _wait_for_option(color_sensor, rs.option.hue, 123) == 123
 
     depth_sensor.set_option(rs.option.visual_preset, int(rs.rs400_visual_preset.default))
     if product_line == "D400":
