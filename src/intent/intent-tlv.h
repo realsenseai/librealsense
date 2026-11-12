@@ -86,6 +86,10 @@ inline void structure(const std::vector<Record> &records, unsigned level = 0) {
             const auto children = parse(r.value);
             if (r.type == rsintent::SENSOR)
                 require(!children.empty() && children.front().type == rsintent::SENSOR_ID);
+            if (r.type == rsintent::SENSOR)
+                for (const auto &child : children)
+                    if (child.type == rsintent::STREAM && (child.flags & 1U))
+                        require((r.flags & 1U) != 0U);
             if (recognized(r)) structure(children, level + 1);
         }
     }
@@ -114,6 +118,16 @@ inline std::vector<Record> body(const std::vector<uint8_t> &wire) {
     require(length <= rsintent::max_tlv_size && length % 4 == 0 &&
             (wire[rsintent::envelope_operation_offset] != rsintent::CLEAR || length == 0));
     return parse(std::vector<uint8_t>(wire.begin() + 8, wire.begin() + 8 + length));
+}
+inline std::vector<uint8_t> canonical_known(const std::vector<uint8_t> &wire) {
+    const auto records = body(wire);
+    structure(records);
+    const auto clean = transfer(wire, filter(records));
+    rsintent::Request request = {};
+    require(rsintent::decode(clean.data(), clean.size(), request).code == rsintent::OK);
+    std::vector<uint8_t> canonical(rsintent::wire_size);
+    require(rsintent::encode(request.model, rsintent::SET, canonical.data(), canonical.size()).code == rsintent::OK);
+    return canonical;
 }
 inline std::string hex(const std::vector<uint8_t> &bytes) {
     const char *digits = "0123456789abcdef";

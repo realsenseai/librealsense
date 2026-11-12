@@ -48,6 +48,8 @@ struct Stream {
     bool enabled;
     uint32_t format;
     uint16_t width, height, fps;
+    bool required;
+    bool optional;
 };
 struct Model {
     Stream streams[max_streams];
@@ -71,5 +73,11 @@ Error encode(const Model &model, Operation op, uint8_t *data, size_t size);
 Model defaultModel(uint16_t sku);
 const Stream *find(const Model &model, uint8_t branch);
 bool same(const Stream &a, const Stream &b);
-uint16_t bit(uint8_t branch);
+uint32_t bit(uint8_t branch);
+bool knownSensor(uint8_t sensor);
+bool knownBranch(uint8_t branch);
+Stream nativeStream(const Stream &stream, bool gmsl = false);
+typedef bool (*CapabilityFilter)(uint8_t branch, uint32_t format, void *context);
+Error capabilities(uint16_t sku, uint8_t *data, size_t size,
+                   CapabilityFilter filter = nullptr, void *context = nullptr);
 } // namespace rsintent

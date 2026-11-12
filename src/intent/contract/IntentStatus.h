@@ -6,12 +6,13 @@ enum State : uint8_t { UNSET, VALIDATING, CONFIGURED, ACTIVATING, LOCKED, UNLOCK
 // I1 STATUS encoding; the I2 controller produces the state and diagnostic values.
 // Fixed status_size (1000 B) HWMC data, little-endian, zero after the last reason:
 //    0 major          1 minor        2 state         3 last_result    4 last_op
-//    5 source         6 active_mask  8 PID          10 sensor        11 branch
+//    5 source         6 reserved     8 PID          10 sensor        11 branch
 //   12 offset        14 rule        16 detail       18 patch         19 n_reasons
-//   20 rule_revision 24 reserved    32 REJECT_REASON x n_reasons
+//   20 rule_revision 24 active_mask(u32) 28 reserved 32 REJECT_REASON x n_reasons
 // Bytes 10..17 repeat the first reason plus the decoder byte offset. No host token
 // and no reason text.
 static const size_t status_header_size = 32U;
+static const size_t status_active_mask_offset = 24U;
 static const size_t status_reason_count_offset = 19U;
 static const size_t reject_reason_size = 8U;
 static const size_t max_reject_reasons = (status_size - status_header_size) / reject_reason_size;
