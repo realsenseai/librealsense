@@ -892,11 +892,12 @@ namespace librealsense
         hwmon_response_type response = d500_hwmon_response::SUCCESS;
         // A Mapping switch may still be draining on the camera worker, so a not-ready camera is given some time
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 1500 );
+        std::vector< uint8_t > reply;
         auto send = [&]( uint32_t action, uint32_t enable, std::vector< uint8_t > profile = {} )
         {
             command cmd( MUX_CONTROL, MUX_CONTROL_VERSION, action, stream_id, enable );
             cmd.data = std::move( profile );
-            auto reply = _hw_monitor->send( cmd, &response );
+            reply = _hw_monitor->send( cmd, &response );
             while( response == d500_hwmon_response::SW_NOT_READY && std::chrono::steady_clock::now() < deadline )
             {
                 std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
@@ -932,8 +933,23 @@ namespace librealsense
             std::vector< uint8_t > profile( sizeof( packed ) );
             std::memcpy( profile.data(), &packed, sizeof( packed ) );
             state = send( MUX_ENABLE_WITH_PROFILE, 1, profile );
+            // The camera echoes the profile it took; another one would stream data of another layout
+            if( response == d500_hwmon_response::SUCCESS
+                && ( reply.size() < profile.size() || ! std::equal( profile.begin(), profile.end(), reply.begin() ) ) )
+            {
+                try
+                {
+                    send( MUX_SET_ENABLE, 0 );
+                }
+                catch( const std::exception & e )
+                {
+                    LOG_ERROR( "MUX stream " << stream_id << " disable after a profile mismatch failed: " << e.what() );
+                }
+                throw invalid_value_exception( rsutils::string::from() << "MUX stream " << stream_id
+                                                                       << " enable echoed another profile" );
+            }
             // Camera firmware without the profile action does not know it, and picks the rate itself
-            if( response == d500_hwmon_response::COMMAND_NOT_SUPPORTED )
+            if( response == d500_hwmon_response::COMMAND_NOT_SUPPORTED && stream_id != MUX_POINT_CLOUD_STREAM )
             {
                 LOG_WARNING( "MUX stream " << stream_id << " profile action not supported by the camera; enabling without a rate, "
                                            << "the requested " << fps << " fps may not be served" );

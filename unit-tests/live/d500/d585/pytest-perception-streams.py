@@ -2,7 +2,7 @@
 # Copyright(c) 2026 RealSense, Inc. All Rights Reserved.
 
 # Perception streams on D585, over USB and GMSL, in 2C and 3C.
-# Object Detection (PD), Occupancy and the Labeled Point Cloud run on their own, with no Depth or Color capture. The camera builds Occupancy
+# Object Detection (PD), Occupancy and the (Labeled) Point Cloud run on their own, with no Depth or Color capture. The camera builds Occupancy
 # from Depth at 640x360 or 1280x720 at the Occupancy rate; Occupancy started first fixes that source at 640x360.
 # The SDK rejects the depth sensor combinations the camera would refuse or starve before the camera is touched.
 
@@ -10,6 +10,8 @@ import pytest
 import pyrealsense2 as rs
 import struct
 import time
+import pyrsutils as rsutils
+from rspy.pytest.device_helpers import require_min_fw_version
 import logging
 log = logging.getLogger(__name__)
 
@@ -21,7 +23,8 @@ pytestmark = [
 ]
 
 MIN_FRAMES = { rs.stream.object_detection: 8,   # GMSL runs PD at ~15 fps
-               rs.stream.occupancy: 15, rs.stream.labeled_point_cloud: 15, rs.stream.depth: 15, rs.stream.color: 15 }
+               rs.stream.occupancy: 15, rs.stream.labeled_point_cloud: 15, rs.stream.point_cloud: 10,   # PCL 1280x720 runs at 15 fps
+               rs.stream.depth: 15, rs.stream.color: 15 }
 FRAME_TIMEOUT_S = 5       # first frames of a fresh stream
 QUIET_S = 0.3             # how long a stopped stream must stay silent
 SDK_REJECT_S = 1.0        # a camera refusal takes longer
@@ -94,6 +97,8 @@ class Collector:
             elif stream_type == rs.stream.labeled_point_cloud:
                 points = f.as_labeled_points()
                 info.update( points=( points.get_width(), points.get_height() ) )
+            elif stream_type == rs.stream.point_cloud:
+                info.update( points=f.as_points().size() )
         self.frames.append( info )
     def of(self, stream_type, since=0.):
         return [i for i in self.frames if i['type'] == stream_type and i['time'] >= since]
@@ -117,6 +122,8 @@ def check_content(dev, profile, frames):
     vp = profile.as_video_stream_profile()
     if profile.stream_type() == rs.stream.labeled_point_cloud:
         assert all( i['points'] == ( vp.width(), vp.height() ) for i in frames )
+    elif profile.stream_type() == rs.stream.point_cloud:
+        assert all( i['points'] == vp.width() * vp.height() for i in frames )
     else:
         assert all( i['grid'] == ( vp.height(), vp.width() ) for i in frames ), "grids need their occupancy metadata"
     if is_gmsl( dev ):   # over USB the FW reports counter 0 on every grid until its fix lands
@@ -143,9 +150,11 @@ def rejected(sensor, profiles, frames):
     return time.monotonic() - begin < SDK_REJECT_S
 
 
-@pytest.mark.parametrize( 'stream', ['object_detection', 'occupancy', 'labeled_point_cloud'] )
+@pytest.mark.parametrize( 'stream', ['object_detection', 'occupancy', 'labeled_point_cloud', 'point_cloud'] )
 def test_standalone_lifecycle(device, stream):
     """Runs with no other capture, resumes after stop, and a second session starts after the first one closed."""
+    if stream == 'point_cloud':  # older FW publishes the profiles but delivers no frames
+        require_min_fw_version( device, rsutils.version( "7.61.47150" ), "device point cloud" )
     stream_type = getattr( rs.stream, stream )
     sensor, profile = perception( device, stream_type )
     frames = Collector()

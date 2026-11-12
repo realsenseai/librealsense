@@ -193,6 +193,7 @@ namespace librealsense
 
         // MUX_CONTROL params { version, action, stream id, enable }, ENABLE_WITH_PROFILE adding the profile as data
         const uint32_t MUX_CONTROL_VERSION = 1;
+        const uint32_t MUX_POINT_CLOUD_STREAM = 9;  // starts only with its profile; a plain enable picks the camera's default
         enum d500_mux_action : uint32_t
         {
             MUX_SET_ENABLE = 1,
