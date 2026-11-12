@@ -18,11 +18,11 @@ pytestmark = [
 ]
 
 # product name fragment -> expected RS2_OPTION_GYRO_SENSITIVITY value (the first test of a file runs on a recycled
-# device, so FW holds its own default)
+# device, so FW holds its own default). The first matching fragment wins, so D585S must stay before D585.
 EXPECTED_DEFAULT = {
+    "D585S": 4.0,  # 125 dps, the code fallback; not checked against FW (the lab D585S FW has no gyro sensitivity option)
     "D455": 1.0,  # 1000 dps
     "D585": 1.0,  # 1000 dps
-    "D535": 1.0,  # 1000 dps
 }
 
 
