@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.15)
 project(pybind11-download NONE)
 
 include(ExternalProject)
@@ -6,7 +6,7 @@ ExternalProject_Add(
     pybind11
     PREFIX .
     GIT_REPOSITORY "https://github.com/pybind/pybind11.git"
-    GIT_TAG        v2.13.6
+    GIT_TAG        v3.1.0
     GIT_CONFIG     advice.detachedHead=false  # otherwise we'll get "You are in 'detached HEAD' state..."
     SOURCE_DIR     "${CMAKE_BINARY_DIR}/third-party/pybind11"
     GIT_SHALLOW    ON        # No history needed (requires cmake 3.6)

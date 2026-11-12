@@ -24,7 +24,20 @@ set(PYRS_CPP
     ../../common/metadata-helper.cpp
 )
 
-pybind11_add_module(pyrealsense2 SHARED pyrealsense2.h ${PYRS_CPP})
+pybind11_add_module(pyrealsense2 MODULE pyrealsense2.h ${PYRS_CPP})
+
+# Look for librealsense2 next to the extension. The build tree gets an absolute
+# rpath, which breaks as soon as the module is packaged into a wheel or copied
+# out of the build directory; $ORIGIN / @loader_path keeps it relocatable.
+if(APPLE)
+    set(PYREALSENSE2_ORIGIN "@loader_path")
+else()
+    set(PYREALSENSE2_ORIGIN "$ORIGIN")
+endif()
+set_property(TARGET pyrealsense2 APPEND PROPERTY
+    BUILD_RPATH "${PYREALSENSE2_ORIGIN}")
+set_property(TARGET pyrealsense2 APPEND PROPERTY
+    INSTALL_RPATH "${PYREALSENSE2_ORIGIN}")
 
 set(CMAKECONFIG_PY_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/pyrealsense2")
 
@@ -121,7 +134,7 @@ if(${BACKEND} STREQUAL RS2_USE_LIBUVC_BACKEND)
 endif()
 
 if( BUILD_LEGACY_PYBACKEND )
-    pybind11_add_module(pybackend2 SHARED ${RAW_RS})
+    pybind11_add_module(pybackend2 MODULE ${RAW_RS})
 
     if(USE_EXTERNAL_USB)
         add_dependencies(pybackend2 libusb)

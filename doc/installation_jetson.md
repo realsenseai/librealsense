@@ -84,6 +84,14 @@ python3.<X> -m pip install pyrealsense2
 
 Installing with a different Python silently pulls a wheel built for another JetPack's CUDA and GPU-accelerated paths will fail. For any other Python version, or to run without CUDA, [build the wrapper from source](../wrappers/python/readme.md#building-from-source).
 
+Source builds cover Python 3.9 through 3.15, including 3.14 and 3.15 (pybind11 3.1, CMake 3.15 or newer). To build one wheel for every Python installed on the board:
+
+```sh
+python3 wrappers/python/build_wheels.py --rsusb
+```
+
+`--rsusb` avoids requiring the native kernel patches. Add `--python /usr/bin/python3.14` (repeatable) to select interpreters explicitly, or `--extra-cmake-arg=-DBUILD_WITH_CUDA=true` for a CUDA build. Wheels are written to `wrappers/python/dist`.
+
 ## Building from Source using **RSUSB** Backend
 
 ⮕ Use the RSUSB backend without the kernel patching
