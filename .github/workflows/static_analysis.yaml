@@ -12,7 +12,7 @@ permissions: read-all
 jobs:
   ClangTidy:
     name: clang-tidy
-    timeout-minutes: 120
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
     # PRs check only the lines they change and fail on any finding; development pushes and manual runs scan everything as a report
     if: github.event_name != 'push' || github.ref == 'refs/heads/development'
