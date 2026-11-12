@@ -43,7 +43,7 @@ if [ "$install" = true ]; then
         read -p "Remove all RealSense cameras attached. Hit any key when ready"
         echo -e "\e[0m"
     fi
-    sudo cp config/99-realsense-libusb.rules /etc/udev/rules.d/
+    sudo cp config/99-realsense-libusb.rules config/99-realsense-imu.rules /etc/udev/rules.d/
 
     if [[ -n "${is_ipu6}" ]] || [[ -n "${is_tegra}" ]]; then
         sudo cp config/99-realsense-d4xx-mipi-dfu.rules /etc/udev/rules.d/
@@ -51,7 +51,7 @@ if [ "$install" = true ]; then
         sudo cp scripts/rs_ipu6_d457_bind.sh /usr/local/bin/rs_ipu6_d457_bind.sh
     fi
 else
-    sudo rm /etc/udev/rules.d/99-realsense-libusb.rules
+    sudo rm /etc/udev/rules.d/99-realsense-libusb.rules /etc/udev/rules.d/99-realsense-imu.rules
     if [[ -n "${is_ipu6}" ]] || [[ -n "${is_tegra}" ]]; then
         sudo rm /etc/udev/rules.d/99-realsense-d4xx-mipi-dfu.rules
         sudo rm /usr/local/bin/rs-enum.sh
