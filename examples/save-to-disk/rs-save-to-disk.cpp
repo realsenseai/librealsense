@@ -2,6 +2,7 @@
 // Copyright(c) 2015-2017 RealSense, Inc. All Rights Reserved.
 
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
+#include "../example-utils.hpp"
 
 #include <fstream>              // File IO
 #include <iostream>             // Terminal IO
@@ -21,8 +22,11 @@ int main(int argc, char * argv[]) try
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
 
+    rs2::context ctx;
+    wait_for_devices( ctx );
+
     // Declare RealSense pipeline, encapsulating the actual device and sensors
-    rs2::pipeline pipe;
+    rs2::pipeline pipe( ctx );
     // Start streaming with default recommended configuration
     pipe.start();
 
