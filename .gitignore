@@ -11,7 +11,7 @@ BrainStemLog.txt
 
 
 # Docs
-doc/doxygen/html/
+doc/doxygen/html/22
 *.html.lnk
 
 # CMake
