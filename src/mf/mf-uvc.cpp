@@ -503,7 +503,8 @@ namespace librealsense
         long to_100micros(long v)
         {
             double res = pow(2.0, v);
-            return static_cast<long>(res * 10000);
+            // Round fractional UVC units to avoid biasing exposure readback downward.
+            return static_cast<long>(std::roundl(res * 10000.0));
         }
 
         long from_100micros(long val)
