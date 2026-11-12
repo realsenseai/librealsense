@@ -29,6 +29,8 @@ def _get_option_after_set(dev, sensor, option, expected):
         log.debug(f"{option} read {value}, expected {expected}: reading again after 1 s")
         time.sleep(1)
         value = sensor.get_option(option)
+        if value != expected:
+            log.warning(f"{option} still reads {value}, expected {expected}, 2 s after it was set")
     return value
 
 
