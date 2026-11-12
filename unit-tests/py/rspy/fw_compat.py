@@ -7,15 +7,13 @@ FW-update pre-flash compatibility gate.
 For a given device, picks a candidate FW version (a user-supplied custom-fw image
 or the device's RECOMMENDED_FIRMWARE_VERSION) and compares it against the device's
 minimum supported FW (rs2::device::get_firmware_min_version). When the candidate is
-below the min, the device's golden FW (the gold recovery image) is substituted instead of
-skipping or failing the test.
+below the min, the device's golden FW is substituted instead of skipping or failing the test.
 
-The golden images live in fw_fallback.json next to this file so they can be
-maintained without touching code. Both run-unit-tests.py and pytest-based test
+Golden FW URLs come from the caller (pytest-fw-update's --gold-fw-<sku> options, which LibCI fills
+from fw-versions.properties in the deploy repo). Both run-unit-tests.py and pytest-based test
 runners should import these helpers rather than re-implementing the logic.
 """
 
-import json
 import os
 import re
 import subprocess
@@ -24,89 +22,47 @@ import urllib.request
 from rspy import log, libci
 
 
-_FALLBACK_JSON = os.path.join( os.path.dirname( __file__ ), 'fw_fallback.json' )
+def download_gold_fw( url ):
+    """Return a local path to the golden FW image at `url` (or `url` itself if it is a local file).
 
-
-def _load_gold_recovery_fw_map():
-    """Read fw_fallback.json `gold_recovery_fw` -> dict[key -> URL]. Returns {} on any error."""
-    try:
-        with open( _FALLBACK_JSON, 'r' ) as f:
-            data = json.load( f )
-    except (FileNotFoundError, ValueError, OSError) as e:
-        log.w( f'[fw-gate] could not load {_FALLBACK_JSON}: {e}' )
-        return {}
-    return data.get( 'gold_recovery_fw', {} )
-
-
-def gold_recovery_key( product_line, device_name=None ):
-    """Pick the fw_fallback.json `gold_recovery_fw` key for a device.
-
-    All D400 SKUs reuse a single gold image, so D400 is keyed by the product line ('D400').
-    D500 SKUs do NOT share an image -- each (e.g. 'D555') has its own -- so D500 is keyed by
-    the SKU parsed from the device name. Returns the key, or None if it can't be determined.
+    Used to recover a device in DFU and as the below-min-FW fallback. The image is cached under
+    libci.home (persistent across reboots) and only re-downloaded if missing on disk. Returns the
+    local path, or None on failure (never raises).
     """
-    if product_line == "D400":
-        return "D400"
-    # Prefix-agnostic: matches the SKU anywhere, so it works whether the name is
-    # "RealSense D555 ...", "D555 Recovery", etc. -> "D555". A D585S keeps its 'S': it must never
-    # get the D585 image
-    m = re.search( r'D\d{3}S?', device_name or '' )
-    return m.group( 0 ) if m else None
-
-
-def download_gold_fw( product_line, device_name=None ):
-    """Return a local path to the gold recovery FW image for a device in DFU mode.
-
-    Used as a recovery image since the unsigned --custom-fw-<plat> path can't always be reused
-    for recovery (rs-fw-update's -r path expects a known-good image). The image is keyed by
-    gold_recovery_key() -- product line for D400 (shared), SKU for D500 -- and configured in
-    fw_fallback.json under `gold_recovery_fw.<key>` so it can be updated without touching code.
-
-    Note on signing: the D400 gold is a signed release; D500/D555 FW is unsigned-only (there is
-    no signed variant and `-u` is not supported for D555), and rs-fw-update's -r path accepts
-    the unsigned .img -- verified by recovering a real D555 on-device.
-
-    The image is cached under libci.home (persistent across reboots) and only re-downloaded if
-    missing on disk. Returns the local path, or None on failure.
-    """
-    key = gold_recovery_key( product_line, device_name )
-    if not key:
-        log.w( f"could not determine gold-FW key (product_line={product_line}, name={device_name})" )
-        return None
-    url = _load_gold_recovery_fw_map().get( key )
     if not url:
-        log.w( f"fw_fallback.json has no gold_recovery_fw.{key} entry" )
         return None
-    cache_dir = os.path.join( libci.home, 'data', 'FW', key )
+    if os.path.isfile( url ):
+        return url
+    cache_dir = os.path.join( libci.home, 'data', 'FW', 'golden' )
     dest = os.path.join( cache_dir, os.path.basename( url ) )
     if os.path.isfile( dest ):
-        log.d( f"gold {key} FW already cached: {dest}" )
+        log.d( f"golden FW already cached: {dest}" )
         return dest
     try:
         os.makedirs( cache_dir, exist_ok=True )
     except OSError as e:
         log.w( f"could not create cache directory {cache_dir}: {e}" )
         return None
-    log.d( f"downloading gold {key} FW from {url}" )
+    log.d( f"downloading golden FW from {url}" )
     try:
         with urllib.request.urlopen( url, timeout=120 ) as response:  # don't hang CI forever
             content = response.read()
     except Exception as e:
-        log.w( f"failed to download gold {key} FW: {e}" )
+        log.w( f"failed to download golden FW: {e}" )
         return None
-    # Sanity-check before caching: a real gold FW image is well over 512 KB, so a tiny payload
+    # Sanity-check before caching: a real FW image is well over 512 KB, so a tiny payload
     # (an HTML error page, a redirect body, or a truncated transfer) means a bad download that
     # we must not cache and hand to rs-fw-update.
     if len( content ) < 512 * 1024:
-        log.w( f"downloaded gold {key} FW is suspiciously small ({len( content )} bytes); discarding" )
+        log.w( f"downloaded golden FW is suspiciously small ({len( content )} bytes); discarding" )
         return None
     try:
         with open( dest, 'wb' ) as out_file:
             out_file.write( content )
     except OSError as e:
-        log.w( f"could not write gold {key} FW to {dest}: {e}" )
+        log.w( f"could not write golden FW to {dest}: {e}" )
         return None
-    log.d( f"saved gold {key} FW to: {dest}" )
+    log.d( f"saved golden FW to: {dest}" )
     return dest
 
 
@@ -147,7 +103,7 @@ def version_from_fw_filename( path ):
 
 
 def resolve_fw_gate( rspy_device, test_name, sn=None,
-                     custom_fw_d400_path=None, custom_fw_d555_path=None ):
+                     custom_fw_d400_path=None, custom_fw_d555_path=None, gold_fw_url=None ):
     """
     Combined fw-compat check and fallback resolution for test-fw-update.
 
@@ -172,14 +128,14 @@ def resolve_fw_gate( rspy_device, test_name, sn=None,
         log.d( f'[fw-gate] {label}: cannot decide -- {reason}; deferring to test' )
         return False, None
     # status == 'below_min'
-    fallback = download_gold_fw( rspy_device.product_line, rspy_device.name )
+    fallback = download_gold_fw( gold_fw_url )
     if fallback:
         if custom_fw_d400_path:
             log.i( f'{test_name}: {label}: {reason}; --custom-fw-d400 is below min too, overriding with fallback {fallback}' )
         else:
             log.i( f'{test_name}: {label}: {reason}; using fallback {fallback}' )
         return False, fallback
-    log.e( f'{test_name}: {label}: {reason}; no golden FW available from rspy/fw_fallback.json -- refusing to flash a below-min FW' )
+    log.e( f'{test_name}: {label}: {reason}; no golden FW available (--gold-fw-*) -- refusing to flash a below-min FW' )
     return True, None
 
 

@@ -489,8 +489,7 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
         opts.append( '--rslog' )
     # custom_fw_d400_override comes from the FW-compat gate below (rspy.fw_compat): when
     # the bundled FW (or a user-supplied --custom-fw-d400) is below the device's minimum
-    # supported FW, the gate swaps in the device's golden image from
-    # rspy/fw_fallback.json so test-fw-update can still exercise the flash path. The
+    # supported FW, the gate refuses (this runner passes no golden image to swap in). The
     # override wins over --custom-fw-d400. Only D400 has a populated min-FW map
     # today; adding D555/D585S would require a D5xx override of
     # get_firmware_min_version() and a parallel --custom-fw-d555 override pipe.
