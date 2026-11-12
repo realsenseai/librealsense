@@ -205,3 +205,8 @@ if(BUILD_WITH_DDS)
     target_sources( ${LRS_TARGET} PRIVATE ${RS_DDS_SOURCE_FILES} )
     hide_sources_symbols( ${RS_DDS_SOURCE_FILES} )
 endif()
+
+target_sources(${LRS_TARGET} PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/intent/intent-json.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/intent/contract/IntentProtocol.cpp)
+target_include_directories(${LRS_TARGET} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/intent/contract)
