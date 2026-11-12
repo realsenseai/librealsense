@@ -16,7 +16,7 @@ import logging
 log = logging.getLogger(__name__)
 import time
 import platform
-from rspy.snippets import is_dds_dev
+from rspy.snippets import is_dds_dev, first_color_frame_max_delay
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
@@ -121,7 +121,7 @@ def test_first_depth_frame_delay(sensor_device):
 def test_first_color_frame_delay(sensor_device):
     dev, ctx = sensor_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = 1
+    max_delay = first_color_frame_max_delay(dev)
     os_name = platform.system()
 
     log.info(f"Testing first color frame delay on {product_name} device - {os_name} OS")

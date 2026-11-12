@@ -16,7 +16,7 @@ import logging
 log = logging.getLogger(__name__)
 import time
 import platform
-from rspy.snippets import is_dds_dev
+from rspy.snippets import is_dds_dev, first_color_frame_max_delay
 
 pytestmark = [
     pytest.mark.device_each("D400*"),
@@ -79,7 +79,7 @@ def test_pipeline_first_depth_frame_delay(pipeline_device):
 def test_pipeline_first_color_frame_delay(pipeline_device):
     dev, ctx = pipeline_device
     product_name = dev.get_info(rs.camera_info.name)
-    max_delay = 1
+    max_delay = first_color_frame_max_delay(dev)
     os_name = platform.system()
 
     if any(model in product_name for model in ['D421', 'D405', 'D430', 'D401']):
