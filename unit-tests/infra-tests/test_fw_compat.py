@@ -46,7 +46,7 @@ class TestDownloadGoldFw:
 
     @patch( "rspy.fw_compat._load_gold_recovery_fw_map", return_value={} )
     def test_missing_entry_returns_none(self, _map):
-        # also covers a missing/malformed fw_fallback.json, which _load_*_map maps to {}
+        # also covers a missing/malformed fw_fallback.json, which _load_gold_recovery_fw_map maps to {}
         assert fw_compat.download_gold_fw( "D400" ) is None
 
     @patch( "rspy.fw_compat._load_gold_recovery_fw_map",

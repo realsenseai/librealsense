@@ -260,16 +260,16 @@ def test_fw_update( request, module_device_setup, test_context_var ):
     custom_fw_d585s = abs_fw_path( request.config.getoption( '--custom-fw-d585s' ) )
 
     # FW-compat pre-flash gate (was harness-side, in run-unit-tests.py): refuse to flash a
-    # below-min image, or substitute the per-device fallback image registered in
-    # rspy/fw_fallback.json. A refusal is a FAILURE (not a skip), matching the legacy harness.
+    # below-min image, or substitute the device's golden FW from rspy/fw_fallback.json.
+    # A refusal is a FAILURE (not a skip), matching the legacy harness.
     rspy_dev = devices.get( serial )
     gate_skip, fw_d400_override = fw_compat.resolve_fw_gate(
-        rspy_dev, libci.home, 'pytest-fw-update', sn=serial,
+        rspy_dev, 'pytest-fw-update', sn=serial,
         custom_fw_d400_path=custom_fw_d400,
         custom_fw_d555_path=custom_fw_d555 )
     if gate_skip:
         pytest.fail( f"candidate FW for {rspy_dev.name}_{serial} is below the device's minimum "
-                     f"supported FW and no fallback is registered in rspy/fw_fallback.json" )
+                     f"supported FW and no golden FW is available from rspy/fw_fallback.json" )
     if fw_d400_override:
         custom_fw_d400 = fw_d400_override
 
@@ -395,8 +395,8 @@ def test_fw_update( request, module_device_setup, test_context_var ):
     cmd = [fw_updater_exe, '-f', image_file]
     if serial:
         cmd += ['-s', serial]
-    # Add '-u' only if the path doesn't include 'signed'
-    if ('signed' not in custom_fw_path.lower()
+    # Add '-u' only for an unsigned image: not the (signed) golden override, and no 'signed' in the path
+    if (custom_fw_path != fw_d400_override and 'signed' not in custom_fw_path.lower()
             and "d555" not in product_name.lower()  # currently -u is not supported for D555
             and "d585" not in product_name.lower()): # nor for D585/D585S
         cmd.insert(1, '-u')

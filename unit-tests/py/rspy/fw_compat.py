@@ -7,10 +7,10 @@ FW-update pre-flash compatibility gate.
 For a given device, picks a candidate FW version (a user-supplied custom-fw image
 or the device's RECOMMENDED_FIRMWARE_VERSION) and compares it against the device's
 minimum supported FW (rs2::device::get_firmware_min_version). When the candidate is
-below the min, a per-device fallback FW image can be substituted instead of skipping
-or failing the test.
+below the min, the device's golden FW (the gold recovery image) is substituted instead of
+skipping or failing the test.
 
-The fallback mapping lives in fw_fallback.json next to this file so it can be
+The golden images live in fw_fallback.json next to this file so they can be
 maintained without touching code. Both run-unit-tests.py and pytest-based test
 runners should import these helpers rather than re-implementing the logic.
 """
@@ -28,8 +28,7 @@ _FALLBACK_JSON = os.path.join( os.path.dirname( __file__ ), 'fw_fallback.json' )
 
 
 def _load_gold_recovery_fw_map():
-    """Read fw_fallback.json -> dict[product_line -> URL]. Returns {} on any error.
-    Gold recovery images live in a `gold_recovery_fw` section alongside `fallbacks`."""
+    """Read fw_fallback.json `gold_recovery_fw` -> dict[key -> URL]. Returns {} on any error."""
     try:
         with open( _FALLBACK_JSON, 'r' ) as f:
             data = json.load( f )
@@ -78,7 +77,6 @@ def download_gold_fw( product_line, device_name=None ):
     if not url:
         log.w( f"fw_fallback.json has no gold_recovery_fw.{key} entry" )
         return None
-    # Co-locate with the per-key fallback images, under libci.home.
     cache_dir = os.path.join( libci.home, 'data', 'FW', key )
     dest = os.path.join( cache_dir, os.path.basename( url ) )
     if os.path.isfile( dest ):
@@ -132,34 +130,6 @@ def reload_d4xx_driver_on_jetson(context):
         log.w("Could not reload d4xx driver (passwordless sudo may not be configured):", e)
 
 
-def _load_fallback_map():
-    """Read fw_fallback.json -> dict[device_name -> relpath]. Returns {} on any error."""
-    try:
-        with open( _FALLBACK_JSON, 'r' ) as f:
-            data = json.load( f )
-    except (FileNotFoundError, ValueError, OSError) as e:
-        log.w( f'[fw-gate] could not load {_FALLBACK_JSON}: {e}' )
-        return {}
-    return data.get( 'fallbacks', {} )
-
-
-def fw_fallback_image_for( rspy_device, libci_home ):
-    """
-    Return an absolute path to the fallback FW image for `rspy_device`, or None
-    if there's no mapping or the file is missing on disk. `libci_home` is the
-    root under which the relative paths in fw_fallback.json resolve.
-    """
-    fallbacks = _load_fallback_map()
-    relpath = fallbacks.get( rspy_device.name )
-    if not relpath:
-        return None
-    path = os.path.join( libci_home, relpath )
-    if not os.path.isfile( path ):
-        log.w( f'[fw-gate] fallback FW for {rspy_device.name} not found on disk: {path}' )
-        return None
-    return path
-
-
 def version_to_tuple( s ):
     parts = re.findall( r'\d+', s or '' )
     return tuple( int( p ) for p in parts[:4] ) + (0,) * max( 0, 4 - len( parts ) )
@@ -176,7 +146,7 @@ def version_from_fw_filename( path ):
     return '.'.join( m.group( i ) for i in range( 1, 5 ) )
 
 
-def resolve_fw_gate( rspy_device, libci_home, test_name, sn=None,
+def resolve_fw_gate( rspy_device, test_name, sn=None,
                      custom_fw_d400_path=None, custom_fw_d555_path=None ):
     """
     Combined fw-compat check and fallback resolution for test-fw-update.
@@ -186,8 +156,8 @@ def resolve_fw_gate( rspy_device, libci_home, test_name, sn=None,
 
     Returns (skip: bool, fw_override: str|None):
       - (False, None)   -- compatible / can't decide; run the test as-is
-      - (False, <path>) -- below min FW with a fallback available; flash this image instead
-      - (True,  None)   -- below min FW with NO fallback registered; do not run the test.
+      - (False, <path>) -- below min FW; flash this golden image instead
+      - (True,  None)   -- below min FW with NO golden available; do not run the test.
                           rs-fw-update -u on an unlocked camera bypasses the C++ min-FW
                           check, so letting the test run here would silently flash a
                           below-min image. Refuse instead.
@@ -202,14 +172,14 @@ def resolve_fw_gate( rspy_device, libci_home, test_name, sn=None,
         log.d( f'[fw-gate] {label}: cannot decide -- {reason}; deferring to test' )
         return False, None
     # status == 'below_min'
-    fallback = fw_fallback_image_for( rspy_device, libci_home )
+    fallback = download_gold_fw( rspy_device.product_line, rspy_device.name )
     if fallback:
         if custom_fw_d400_path:
             log.i( f'{test_name}: {label}: {reason}; --custom-fw-d400 is below min too, overriding with fallback {fallback}' )
         else:
             log.i( f'{test_name}: {label}: {reason}; using fallback {fallback}' )
         return False, fallback
-    log.e( f'{test_name}: {label}: {reason}; no fallback registered in rspy/fw_fallback.json -- refusing to flash a below-min FW' )
+    log.e( f'{test_name}: {label}: {reason}; no golden FW available from rspy/fw_fallback.json -- refusing to flash a below-min FW' )
     return True, None
 
 
