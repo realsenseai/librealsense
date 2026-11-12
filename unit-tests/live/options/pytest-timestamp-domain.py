@@ -5,6 +5,7 @@ import pytest
 import pyrealsense2 as rs
 import time
 import logging
+from rspy.known_fw_issues import skip_on_golden_d585_prototype
 log = logging.getLogger(__name__)
 
 pytestmark = [
@@ -64,6 +65,7 @@ def _run_timestamp_domain_test(sensor, stream_type, global_time_enabled):
 
 def test_depth_timestamp_domain_off(test_device):
     device, ctx = test_device
+    skip_on_golden_d585_prototype(device)
     log.info('Check setting global time domain: depth sensor - timestamp domain is OFF')
     _run_timestamp_domain_test(device.first_depth_sensor(), rs.stream.depth, False)
 
