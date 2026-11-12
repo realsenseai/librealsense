@@ -6,6 +6,7 @@
 #include <librealsense2/rs.hpp>
 #include <imgui.h>
 
+#include <atomic>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -75,6 +76,7 @@ namespace rs2
         void collapse_deadline_on_focus_loss( bool any_field_active_this_frame );
 
         bool commit_due() const { return _dirty && ImGui::GetTime() >= _commit_deadline; }
+        bool is_dirty() const { return _dirty; }
         void clear_dirty();
 
     private:
@@ -96,13 +98,18 @@ namespace rs2
         T value{};
         bool initialized = false;
 
-        // Seeds `value` from a GET the first time this is called; a no-op afterward. Returns whether
-        // `value` is safe to use. `on_read`, if set, runs on the freshly-read value.
+        // The device value changed behind our back (options-changed callback thread): re-read on the next draw
+        void mark_stale() { _stale = true; }
+
+        // Seeds `value` from a GET the first time this is called, and again after mark_stale() unless an edit is
+        // pending. Returns whether `value` is safe to use. `on_read`, if set, runs on the freshly-read value.
         bool ensure_initialized( const std::shared_ptr< rs2::embedded_filter > & filter,
                                  rs2_composite_option_id id,
                                  std::string & error_message,
                                  const std::function< void( const T & ) > & on_read = nullptr )
         {
+            if( ! is_dirty() && _stale.exchange( false ) )
+                initialized = false;
             if( initialized )
                 return true;
             try
@@ -178,5 +185,8 @@ namespace rs2
             }
             clear_dirty();
         }
+
+    private:
+        std::atomic_bool _stale{ false };
     };
 }

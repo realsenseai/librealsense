@@ -25,6 +25,8 @@ public:
         return _options_watcher.subscribe( std::move( cb ) );
     }
 
+    options_watcher & get_options_watcher() { return _options_watcher; }
+
 protected:
     options_watcher _options_watcher;
 };

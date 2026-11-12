@@ -23,6 +23,7 @@
 #include <src/ds/features/temporal-filter-feature.h>
 #include <src/ds/features/icr-filter-feature.h>
 
+#include "proc/embedded-filter-base.h"
 #include "proc/depth-formats-converter.h"
 #include "proc/y8i-to-y8y8.h"
 #include "proc/y16i-10msb-to-y16y16.h"
@@ -270,6 +271,14 @@ namespace librealsense
         if (_depth_units < 0)
             _depth_units = get_option(RS2_OPTION_DEPTH_UNITS).query();
         return _depth_units;
+    }
+
+    void d500_depth_sensor::add_embedded_filter( std::shared_ptr< embedded_filter_interface > filter )
+    {
+        // The filter's composite options are polled by this sensor's options watcher, in its single bulk-operation scope
+        if( auto base = std::dynamic_pointer_cast< embedded_filter_base >( filter ) )
+            adopt_options_watcher( std::shared_ptr< options_watcher >( base, &base->get_options_watcher() ) );
+        _embedded_filters.push_back( std::move( filter ) );
     }
 
     void d500_depth_sensor::set_depth_scale( float val )

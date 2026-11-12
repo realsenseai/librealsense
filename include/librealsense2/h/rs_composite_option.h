@@ -112,6 +112,24 @@ rs2_composite_option_id rs2_get_composite_option_from_list(const rs2_composite_o
 void rs2_delete_composite_options_list(rs2_composite_options_list* list);
 
 /**
+* Number of composite options whose value changed, in a list delivered to the options-changed callback
+* (see rs2_set_options_changed_callback). Read the new value with rs2_get_composite_option.
+* \param[in]  list   the list passed to the callback
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return the number of changed composite options
+*/
+int rs2_get_changed_composite_options_list_size(const rs2_options_list* list, rs2_error** error);
+
+/**
+* Retrieve the i-th changed composite option id from a list delivered to the options-changed callback.
+* \param[in]  list   the list passed to the callback
+* \param[in]  i      the index of the composite option id to retrieve
+* \param[out] error  if non-null, receives any error that occurs during this call, otherwise, errors are ignored
+* \return the composite option id at index i
+*/
+rs2_composite_option_id rs2_get_changed_composite_option_from_list(const rs2_options_list* list, int i, rs2_error** error);
+
+/**
 * check if a particular composite option is supported (and currently enabled) by this options
 * container - the composite-option analogue of rs2_supports_option.
 * \param[in]  options  Options container (sensor or embedded_filter)
