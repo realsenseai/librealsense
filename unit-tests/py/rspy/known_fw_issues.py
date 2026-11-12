@@ -16,6 +16,7 @@ _NO_FRAMES = ("depth sometimes gives no frames on the first stream start; suspec
 
 def skip_on_golden_d585_prototype(dev, reason=_NO_FRAMES):
     """Skip the running test when `dev` is a D585 Prototype with the golden FW."""
-    if "D585 Prototype" in dev.get_info(rs.camera_info.name) \
+    if dev and dev.supports(rs.camera_info.name) and "D585 Prototype" in dev.get_info(rs.camera_info.name) \
+            and dev.supports(rs.camera_info.firmware_version) \
             and dev.get_info(rs.camera_info.firmware_version) == GOLDEN_FW_D585_PROTOTYPE:
         pytest.skip(f"{reason} (D585 Prototype, golden FW {GOLDEN_FW_D585_PROTOTYPE})")
