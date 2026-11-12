@@ -102,7 +102,7 @@ DRIVER=="hid_sensor*", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="1156", RUN+="
 KERNEL=="iio*", ATTRS{idVendor}=="38e5", MODE:="0777", GROUP:="plugdev", RUN+="/bin/sh -c 'chmod -R 0777 /sys/%p'"
 DRIVER=="hid_sensor*", ATTRS{idVendor}=="38e5", RUN+="/bin/sh -c ' chmod -R 0777 /sys/%p && chmod 0777 /dev/%k'"
 
-# D555 IMU is managed by the SDK: clear the desktop sensor classification set by 80-iio-sensor-proxy.rules (this file sorts after it).
+# D555 IMU is managed by the SDK: clear the desktop sensor classification set by 80-iio-sensor-proxy.rules (on standard installs this file sorts after it; Debian is covered below).
 # Debian packages rename this file to 60-*, which sorts before 80, so the same rule is also provided in 99-realsense-imu.rules (to be installed by the Debian recipe).
 SUBSYSTEM=="iio", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b56", ENV{IIO_SENSOR_PROXY_TYPE}=""
 
