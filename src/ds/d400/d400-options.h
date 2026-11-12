@@ -185,7 +185,7 @@ namespace librealsense
             , _value( opt_range.def )
             , _sensor( sensor )
         {
-            // The default is only a fallback for reporting; nothing is written to FW until the user calls set()
+            // The default is reported (and written on open) only when the FW value can't be read
         }
         virtual ~gyro_sensitivity_option() = default;
         virtual void set( float value ) override;

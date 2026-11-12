@@ -4,6 +4,7 @@
 import pytest
 import platform
 import pyrealsense2 as rs
+from imu_sensitivity_helpers import restore_sensitivity, stream_imu_once
 import logging
 log = logging.getLogger(__name__)
 
@@ -26,26 +27,13 @@ def _motion_sensor_of_same_device(ctx, serial):
     pytest.fail(f"device {serial} not found in a new context")
 
 
-def _stream_imu_once(dev, ctx):
-    pipe = rs.pipeline(ctx)
-    pipe.set_device(dev)
-    cfg = rs.config()
-    cfg.enable_stream(rs.stream.accel)
-    cfg.enable_stream(rs.stream.gyro)
-    pipe.start(cfg)
-    pipe.stop()
-
-
 @pytest.fixture
 def restore_fw_sensitivity(test_device):
-    """Remember the FW values before the test and write them back after it (FW keeps what the SDK writes)."""
     dev, ctx = test_device
     ms = dev.first_motion_sensor()
     original = {opt: ms.get_option(opt) for opt in OPTIONS if ms.supports(opt)}
     yield original
-    for opt, value in original.items():
-        ms.set_option(opt, value)
-    _stream_imu_once(dev, ctx)
+    restore_sensitivity(dev, ctx, original)
 
 
 @pytest.mark.parametrize("level", [0.0, 1.0, 2.0, 3.0], ids=lambda v: f"level{int(v)}")  # valid for both gyro and accel
@@ -61,13 +49,13 @@ def test_value_set_by_one_context_is_seen_by_the_next(test_device, restore_fw_se
 
     # Context A: explicitly set, FW must receive it on open
     ms.set_option(option, new_value)
-    _stream_imu_once(dev, ctx)
+    stream_imu_once(dev, ctx)
 
     # Context B: nothing set by the user, query() must report what FW holds, and opening must not change it
     ctx_b = rs.context()
     dev_b, ms_b = _motion_sensor_of_same_device(ctx_b, serial)
     assert ms_b.get_option(option) == new_value
-    _stream_imu_once(dev_b, ctx_b)
+    stream_imu_once(dev_b, ctx_b)
 
     # Context C: still the same value after B opened the sensor without setting anything
     ctx_c = rs.context()

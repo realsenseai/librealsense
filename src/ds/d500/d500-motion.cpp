@@ -290,9 +290,8 @@ namespace librealsense
         {
             auto raw_motion_sensor = get_raw_motion_sensor();
             raw_motion_sensor->enable_gyro_sensitivity_range_index();
-            // Nothing is written to FW unless the user sets the option, and query() follows the FW value.
-            // The default index is only a fallback for reporting when the FW value cannot be read (Windows MF has no
-            // read-back yet), so it still has to match the FW default: 1000 dps on D5x5, 125 dps on others.
+            // query() follows the FW value; where it can't be read (Windows MF) the default index is reported and written
+            // on open, so it must match the FW default: 1000 dps on D5x5, 125 dps on others.
             // TODO: remove fallback_index once Windows MF can read the FW sensitivity.
             const float fallback_index = ds::d5x5_family_pids.count( get_pid() ) ? 1.f : 4.f;
             register_feature(
