@@ -11,7 +11,7 @@ import pytest
 from pytest_check import check
 import pyrealsense2 as rs
 import pyrsutils as rsutils
-from rspy import devices, repo, fw_compat, config_file, libci
+from rspy import devices, repo, fw_compat, config_file, libci, tests_wrapper
 from rspy.timer import Timer
 import time
 import logging
@@ -175,7 +175,7 @@ def find_device_or_fail( serial ):
     pytest.fail( f"No device with serial number / firmware-update ID '{serial}' is visible" )
 
 
-def recover_dds_device_on_golden_domain( serial, context, fw_updater_exe ):
+def recover_dds_device_on_golden_domain( serial, context, fw_updater_exe, gold_fw_url ):
     """
     A D555 bricked in DFU reverts to its golden DDS domain (0), so it does NOT appear on the
     rig's configured domain -- our normal discovery below would miss it. The harness detects it
@@ -215,7 +215,7 @@ def recover_dds_device_on_golden_domain( serial, context, fw_updater_exe ):
         return False
 
     log.debug( f"found recovery device {serial} ({rec_name}) on golden DDS domain 0; recovering ..." )
-    gold_fw = fw_compat.download_gold_fw( "D500", "D555" )  # D555 is the only DDS DFU SKU today; revisit for D585 etc.
+    gold_fw = fw_compat.download_gold_fw( gold_fw_url )  # D555 is the only DDS DFU SKU today
     if not gold_fw:
         pytest.fail( f"Could not download gold recovery FW for {rec_name} ({serial}); cannot recover DFU device" )
     # 1) gold-flash on domain 0 (where a bricked DDS device lives)
@@ -260,22 +260,24 @@ def test_fw_update( request, module_device_setup, test_context_var ):
     custom_fw_d585s = abs_fw_path( request.config.getoption( '--custom-fw-d585s' ) )
 
     # FW-compat pre-flash gate (was harness-side, in run-unit-tests.py): refuse to flash a
-    # below-min image, or substitute the per-device fallback image registered in
-    # rspy/fw_fallback.json. A refusal is a FAILURE (not a skip), matching the legacy harness.
+    # below-min image, or substitute the D400 golden FW (--gold-fw-d400).
+    # A refusal is a FAILURE (not a skip), matching the legacy harness.
     rspy_dev = devices.get( serial )
     gate_skip, fw_d400_override = fw_compat.resolve_fw_gate(
-        rspy_dev, libci.home, 'pytest-fw-update', sn=serial,
+        rspy_dev, 'pytest-fw-update', sn=serial,
         custom_fw_d400_path=custom_fw_d400,
-        custom_fw_d555_path=custom_fw_d555 )
+        custom_fw_d555_path=custom_fw_d555,
+        gold_fw_url=request.config.getoption( '--gold-fw-d400' ) )
     if gate_skip:
         pytest.fail( f"candidate FW for {rspy_dev.name}_{serial} is below the device's minimum "
-                     f"supported FW and no fallback is registered in rspy/fw_fallback.json" )
+                     f"supported FW and no golden FW is available (--gold-fw-d400)" )
     if fw_d400_override:
         custom_fw_d400 = fw_d400_override
 
     # A bricked DDS camera reverts to golden domain 0 and won't show on the configured domain;
     # recover + restore it first so the normal discovery below succeeds.
-    recovered = recover_dds_device_on_golden_domain( serial, context, fw_updater_exe )
+    recovered = recover_dds_device_on_golden_domain( serial, context, fw_updater_exe,
+                                                     request.config.getoption( '--gold-fw-d555' ) )
 
     device, ctx = find_device_or_fail( serial )
     product_line = device.get_info( rs.camera_info.product_line )
@@ -308,19 +310,22 @@ def test_fw_update( request, module_device_setup, test_context_var ):
     elif "D585" in product_name and custom_fw_d585:
         custom_fw_path = custom_fw_d585
 
+    # The SKU's golden FW (--gold-fw-<sku>; LibCI passes it from fw-versions.properties), used to
+    # recover a device in DFU. "D585S" is checked before "D585", which is a substring of it
+    sku = "D400" if product_line == "D400" else next( ( s for s in ( "D555", "D585S", "D585" ) if s in product_name ), None )
+    gold_fw_url = request.config.getoption( f'--gold-fw-{sku.lower()}' ) if sku else None
+
     if not custom_fw_path:
         pytest.skip("No custom FW path provided (use --custom-fw-d400 / --custom-fw-d555 / --custom-fw-d585 / --custom-fw-d585s); skipping FW update test")
 
     # check if recovery on the configured domain (e.g. a D400 USB recovery device). If so recover.
     # (recovered may already be True from the domain-0 DDS recovery handled above.)
     if device.is_in_recovery_mode():
-        if product_name.startswith( "D585S" ):
-            pytest.fail( f"{serial} is a D585S in recovery; not flashing a safety camera from LibCI" )
         log.debug( "recovering device ..." )
         # rs-fw-update -r needs a known-good image, which isn't always the caller's
         # --custom-fw-<plat> path (e.g. D400 -r expects a *signed* FW, while the custom
-        # image is typically unsigned). Fetch the per-product-line gold FW to recover with.
-        gold_fw = fw_compat.download_gold_fw( product_line, product_name )
+        # image is typically unsigned). Recover with the SKU's golden FW.
+        gold_fw = fw_compat.download_gold_fw( gold_fw_url )
         if not gold_fw and product_line == "D500":
             # D500 FW is unsigned-only, so the custom image is as good as the gold one for -r
             log.debug( f"no gold FW for {product_name}; recovering with the custom image {custom_fw_path}" )
@@ -392,13 +397,17 @@ def test_fw_update( request, module_device_setup, test_context_var ):
         check.equal( downgrade_counter, 0 )
         downgrade_counter = 0
 
+    # Flash a D585S in safety service (maintenance) mode, not while its safety function runs
+    if "D585S" in product_name:
+        tests_wrapper.set_safety_mode( device.first_safety_sensor(), rs.safety_mode.service )
+
     image_file = custom_fw_path
 
     cmd = [fw_updater_exe, '-f', image_file]
     if serial:
         cmd += ['-s', serial]
-    # Add '-u' only if the path doesn't include 'signed'
-    if ('signed' not in custom_fw_path.lower()
+    # Add '-u' only for an unsigned image: not the (signed) golden override, and no 'signed' in the path
+    if (custom_fw_path != fw_d400_override and 'signed' not in custom_fw_path.lower()
             and "d555" not in product_name.lower()  # currently -u is not supported for D555
             and "d585" not in product_name.lower()): # nor for D585/D585S
         cmd.insert(1, '-u')

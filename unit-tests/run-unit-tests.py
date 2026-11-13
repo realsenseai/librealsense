@@ -489,10 +489,9 @@ def test_wrapper_( test, configuration=None, repetition=1, curr_retry=0, max_ret
         opts.append( '--rslog' )
     # custom_fw_d400_override comes from the FW-compat gate below (rspy.fw_compat): when
     # the bundled FW (or a user-supplied --custom-fw-d400) is below the device's minimum
-    # supported FW, the gate swaps in a per-device fallback image listed in
-    # rspy/fw_fallback.json so test-fw-update can still exercise the flash path. The
-    # override wins over --custom-fw-d400. Only D400 has both a populated min-FW map and
-    # a fallback entry today; adding D555/D585S would require a D5xx override of
+    # supported FW, the gate refuses (this runner passes no golden image to swap in). The
+    # override wins over --custom-fw-d400. Only D400 has a populated min-FW map
+    # today; adding D555/D585S would require a D5xx override of
     # get_firmware_min_version() and a parallel --custom-fw-d555 override pipe.
     effective_custom_fw_d400 = custom_fw_d400_override or custom_fw_path
     if test.name == "test-fw-update" and effective_custom_fw_d400:
@@ -725,7 +724,7 @@ try:
                     for sn in serial_numbers:
                         d = devices.get( sn )
                         skip_for_d, override = fw_compat.resolve_fw_gate(
-                            d, libci.home, test.name, sn=sn,
+                            d, test.name, sn=sn,
                             custom_fw_d400_path=custom_fw_path,
                             custom_fw_d555_path=custom_fw_d555_path )
                         if skip_for_d:
