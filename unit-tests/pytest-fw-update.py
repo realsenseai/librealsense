@@ -11,7 +11,7 @@ import pytest
 from pytest_check import check
 import pyrealsense2 as rs
 import pyrsutils as rsutils
-from rspy import devices, repo, fw_compat, config_file, libci
+from rspy import devices, repo, fw_compat, config_file, libci, tests_wrapper
 from rspy.timer import Timer
 import time
 import logging
@@ -396,6 +396,10 @@ def test_fw_update( request, module_device_setup, test_context_var ):
         log.debug( f'downgrade counter after reset is: {downgrade_counter}' )
         check.equal( downgrade_counter, 0 )
         downgrade_counter = 0
+
+    # Flash a D585S in safety service (maintenance) mode, not while its safety function runs
+    if "D585S" in product_name:
+        tests_wrapper.set_safety_mode( device.first_safety_sensor(), rs.safety_mode.service )
 
     image_file = custom_fw_path
 
