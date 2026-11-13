@@ -1007,6 +1007,17 @@ namespace librealsense
 
         _storage->set_filter({filter_topics});
 
+        // Compile the per-topic regexes once: re-compiling them for every message
+        // is pure overhead, and (before the #15843 fix) re-compiling them on every
+        // spin of an unmatched message is what the hang looked like in a profile.
+        const std::regex device_info_re(device_info_regex_str);
+        const std::regex sensor_info_re(sensor_info_regex_str);
+        const std::regex sensor_option_re(sensor_option_regex_str);
+        const std::regex sensor_option_description_re(sensor_option_description_regex_str);
+        const std::regex post_processing_blocks_re(post_processing_blocks_regex_str);
+        const std::regex extrinsics_re(extrinsics_regex_str);
+        const std::regex stream_info_re(stream_info_regex_str);
+
         snapshot_collection device_extensions;
         auto sensors_info = std::map<uint32_t, std::shared_ptr<info_container>>();
         auto sensors_options = std::map<uint32_t, std::shared_ptr<options_container>>();
@@ -1019,17 +1030,17 @@ namespace librealsense
             {
                 throw std::runtime_error("read_device_description: invalid message");
             }
-            if (std::regex_match(msg->topic_name, std::regex(device_info_regex_str)))
+            if (std::regex_match(msg->topic_name, device_info_re))
             {
                 auto device_info = read_info_snapshot(msg->topic_name); // Will read all device info messages
                 device_extensions[RS2_EXTENSION_INFO] = device_info;
             }
-            else if (std::regex_match(msg->topic_name, std::regex(sensor_info_regex_str)))
+            else if (std::regex_match(msg->topic_name, sensor_info_re))
             {
                 uint32_t sensor_index = ros2_topic::get_sensor_index(msg->topic_name);
                 sensors_info[sensor_index] = read_info_snapshot(msg->topic_name);
             }
-            else if (std::regex_match(msg->topic_name, std::regex(sensor_option_regex_str)))
+            else if (std::regex_match(msg->topic_name, sensor_option_re))
             {
                 uint32_t sensor_index = ros2_topic::get_sensor_index(msg->topic_name);
                 // An option re-written mid-recording starts a second, partial scan; keep the first, full
@@ -1039,13 +1050,41 @@ namespace librealsense
                 if( ! recorded_options )
                     recorded_options = options;
             }
-            else if (std::regex_match(msg->topic_name, std::regex(post_processing_blocks_regex_str)))
+            else if (std::regex_match(msg->topic_name, sensor_option_description_re))
+            {
+                // Option descriptions are normally consumed by read_option_description()
+                // right after their value message, but the storage orders messages by
+                // timestamp, so a description can surface here on its own (e.g. its
+                // timestamp is 0 while its value message is timestamped later, as in
+                // a recording whose camera dropped right after the recorder started).
+                // It must still be consumed: with no branch for it the loop re-peeks
+                // the same message forever (see #15843). Cache it so that a later
+                // create_option() call can still find the description.
+                uint32_t sensor_index = ros2_topic::get_sensor_index(msg->topic_name);
+                std::string option_name = ros2_topic::get_option_name(msg->topic_name);
+                msg = read_next_cached(); // consume
+                try
+                {
+                    std::replace(option_name.begin(), option_name.end(), '_', ' ');
+                    rs2_option id;
+                    if (convert(option_name, id))
+                        m_read_options_descriptions[sensor_index][id] = deserialize_message<cdr_string>(msg).value;
+                    else
+                        LOG_WARNING("read_device_description: unknown option in description topic: " << msg->topic_name);
+                }
+                catch (const std::exception& e)
+                {
+                    LOG_WARNING("read_device_description: ignoring unreadable option description on topic '"
+                        << msg->topic_name << "': " << e.what());
+                }
+            }
+            else if (std::regex_match(msg->topic_name, post_processing_blocks_re))
             {
                 uint32_t sensor_index = ros2_topic::get_sensor_index(msg->topic_name);
                 auto sensor_options = sensors_options[sensor_index]; // Assuming options were already read
                 sensors_processing_blocks[sensor_index] = update_proccesing_blocks(sensor_index, sensor_options);
             }
-            else if (std::regex_match(msg->topic_name, std::regex(extrinsics_regex_str)))
+            else if (std::regex_match(msg->topic_name, extrinsics_re))
             {
                 stream_identifier stream_id = ros2_topic::get_stream_identifier(msg->topic_name);
                 uint32_t reference_id;
@@ -1055,7 +1094,7 @@ namespace librealsense
                     m_extrinsics_map[stream_id] = std::make_pair(reference_id, stream_extrinsic);
                 }
             }
-            else if (std::regex_match(msg->topic_name, std::regex(stream_info_regex_str)))
+            else if (std::regex_match(msg->topic_name, stream_info_re))
             {
                 stream_identifier stream_id = ros2_topic::get_stream_identifier(msg->topic_name);
                 auto stream_profile = read_next_stream_profile();
@@ -1064,18 +1103,40 @@ namespace librealsense
 
                 sensor_to_streams[stream_id.sensor_index].push_back(stream_profile);
             }
+            else
+            {
+                // Defensive: any topic admitted by the storage filter but matched by
+                // no branch above must still be consumed, otherwise the loop spins
+                // on the same message forever (see #15843).
+                LOG_WARNING("read_device_description: skipping unexpected topic: " << msg->topic_name);
+                read_next_cached();
+            }
         }
 
         // Build sensor descriptions from info and streams
         for (auto sensor_index : sensor_indices)
         {
             snapshot_collection sensor_extensions;
+            // A sensor whose info topic exists but carries no messages (e.g. a
+            // truncated recording) has no info snapshot; use an empty container
+            // instead of storing a null extension (see #15843).
+            if (!sensors_info[sensor_index])
+                sensors_info[sensor_index] = std::make_shared<info_container>();
             sensor_extensions[RS2_EXTENSION_INFO] = sensors_info[sensor_index];
             auto proccesing_blocks = sensors_processing_blocks.find(sensor_index) != sensors_processing_blocks.end() ?
                 sensors_processing_blocks[sensor_index] : std::make_shared<recommended_proccesing_blocks_snapshot>(processing_blocks{});
             sensor_extensions[RS2_EXTENSION_RECOMMENDED_FILTERS] = proccesing_blocks;
 
             auto& sensor_options = sensors_options[sensor_index];
+            if (!sensor_options)
+            {
+                // A sensor with no recorded option messages (e.g. a recording
+                // truncated before any option was written) has no options
+                // snapshot; dereferencing the null pointer below segfaults
+                // (see #15843). An empty container keeps the depth-sensor
+                // extension absent without crashing.
+                sensor_options = std::make_shared<options_container>();
+            }
             sensor_extensions[RS2_EXTENSION_OPTIONS] = sensor_options;
             if (sensor_options->supports_option(RS2_OPTION_DEPTH_UNITS))
             {
