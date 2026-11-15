@@ -21,6 +21,14 @@ namespace platform {
 class hid_startup
 {
 public:
+    // Check the D585 2C/3C USB products (including prototypes) whose
+    // shared-consumer refusal path is handled here. Other Windows HID devices
+    // keep asynchronous start; new PIDs are not automatically opted in.
+    static bool is_required( const std::string & vid, const std::string & pid )
+    {
+        return vid == "38e5" && ( pid == "c04" || pid == "c05" || pid == "c07" || pid == "c08" );
+    }
+
     hid_startup( const std::vector<std::string> & names, uint64_t started_at )
         : _pending( names.begin(), names.end() ), _started_at( started_at ) {}
 

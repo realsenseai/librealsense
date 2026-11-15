@@ -359,9 +359,14 @@ namespace librealsense
                 throw std::runtime_error( "Previous Windows HID capture is still active" );
             std::vector<std::string> names;
             for( auto const & sensor : _opened_sensors )
-                names.push_back( sensor->get_sensor_name() );
-            FILETIME now;
-            GetSystemTimePreciseAsFileTime( &now );
+            {
+                auto const & info = sensor->get_device_info();
+                if( hid_startup::is_required( info.vid, info.pid ) )
+                    names.push_back( sensor->get_sensor_name() );
+            }
+            FILETIME now{};
+            if( ! names.empty() )
+                GetSystemTimePreciseAsFileTime( &now );
             const uint64_t started_at = ( uint64_t(now.dwHighDateTime) << 32 ) | now.dwLowDateTime;
             CComPtr<sensor_events> events = new sensor_events( names, started_at, callback,
                                                              _gyro_scale_factor, _accel_scale_factor );

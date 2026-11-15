@@ -8,12 +8,35 @@
 using librealsense::platform::hid_startup;
 using namespace std::chrono;
 
+TEST_CASE( "HID startup verification is limited to D585 USB products", "[hid][startup]" )
+{
+    for( auto const & pid : {"c04", "c05", "c07", "c08"} )
+    {
+        CHECK( hid_startup::is_required( "38e5", pid ) );
+        CHECK_FALSE( hid_startup::is_required( "8086", pid ) );
+    }
+    CHECK_FALSE( hid_startup::is_required( "8086", "b5c" ) );  // D455
+    CHECK_FALSE( hid_startup::is_required( "8086", "b6b" ) );  // D585S
+    CHECK_FALSE( hid_startup::is_required( "38e5", "c09" ) );  // no automatic opt-in for new products
+}
+
+TEST_CASE( "Unverified HID startup completes without any sensor reports", "[hid][startup]" )
+{
+    hid_startup startup( {}, 100 );
+    // Keep callbacks out of a partially registered capture. With no sensors
+    // to verify, finishing registration needs no data or timeout allowance.
+    CHECK_FALSE( startup.on_report( "Gyro", 99 ) );
+    REQUIRE_NOTHROW( startup.wait_for( milliseconds(0) ) );
+    CHECK( startup.on_report( "Gyro", 99 ) );
+    CHECK( startup.on_report( "Accel", 101 ) );
+}
+
 TEST_CASE( "HID startup requires every requested sensor", "[hid][startup]" )
 {
     hid_startup startup( {"Accel", "Gyro"}, 100 );
     CHECK_FALSE( startup.on_report( "Accel", 101 ) );
-    CHECK_THROWS_WITH( startup.wait_for( milliseconds(1) ),
-                      "Windows HID start timed out waiting for fresh data from: Gyro" );
+    CHECK_THROWS_MATCHES( startup.wait_for( milliseconds(1) ), std::runtime_error,
+                         Catch::Matchers::Message( "Windows HID start timed out waiting for fresh data from: Gyro" ) );
     CHECK_FALSE( startup.on_report( "Gyro", 102 ) );
     REQUIRE_NOTHROW( startup.wait_for( milliseconds(1) ) );
     CHECK( startup.on_report( "Accel", 103 ) );
@@ -25,8 +48,8 @@ TEST_CASE( "Cached HID reports cannot admit a new capture", "[hid][startup]" )
     hid_startup startup( {"Accel", "Gyro"}, 100 );
     CHECK_FALSE( startup.on_report( "Accel", 99 ) );
     CHECK_FALSE( startup.on_report( "Gyro", 101 ) );
-    CHECK_THROWS_WITH( startup.wait_for( milliseconds(1) ),
-                      "Windows HID start timed out waiting for fresh data from: Accel" );
+    CHECK_THROWS_MATCHES( startup.wait_for( milliseconds(1) ), std::runtime_error,
+                         Catch::Matchers::Message( "Windows HID start timed out waiting for fresh data from: Accel" ) );
     CHECK_FALSE( startup.on_report( "Accel", 100 ) );
     REQUIRE_NOTHROW( startup.wait_for( milliseconds(1) ) );
 }
